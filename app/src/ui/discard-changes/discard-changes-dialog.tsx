@@ -170,7 +170,8 @@ export class DiscardChanges extends React.Component<
     await this.props.dispatcher.discardChanges(
       this.props.repository,
       this.props.files,
-      moveToTrash
+      moveToTrash,
+      this.props.permanentlyDelete
     )
 
     this.props.onConfirmDiscardChangesChanged(this.state.confirmDiscardChanges)

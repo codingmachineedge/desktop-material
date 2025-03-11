@@ -1138,9 +1138,15 @@ export class Dispatcher {
   public discardChanges(
     repository: Repository,
     files: ReadonlyArray<WorkingDirectoryFileChange>,
-    moveToTrash: boolean = true
+    moveToTrash: boolean = true,
+    cleanUntracked: boolean = false
   ): Promise<void> {
-    return this.appStore._discardChanges(repository, files, moveToTrash)
+    return this.appStore._discardChanges(
+      repository,
+      files,
+      moveToTrash,
+      cleanUntracked
+    )
   }
 
   /** Discard the changes from the given diff selection. */

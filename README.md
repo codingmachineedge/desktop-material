@@ -43,6 +43,9 @@ These features are implemented and live on `main`.
 - Every search bar gains fuzzy / substring / regex filter modes, a case toggle, and per-list filter chips
 - A full regex builder — anchors, character classes, quantifiers, groups, alternation, lookaround, all six flags, and a live tester — reachable from the search bars
 
+**Repository safety and cleanup**
+- A context-menu option can permanently discard changes without sending files to the trash, including untracked files, for large cleanup operations where the regular discard flow would be slow
+
 **Dynamic UI scaling**
 - A UI-scale slider (50–200%) in Preferences → Appearance plus auto-fit-to-window that shrinks the interface to fit smaller windows (on by default), composing with `Ctrl` `+` / `-` / `0`
 
