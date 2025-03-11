@@ -255,13 +255,15 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
 
   private onDiscardChangesFromFiles = (
     files: ReadonlyArray<WorkingDirectoryFileChange>,
-    isDiscardingAllChanges: boolean
+    isDiscardingAllChanges: boolean,
+    permanentlyDelete: boolean
   ) => {
     this.props.dispatcher.showPopup({
       type: PopupType.ConfirmDiscardChanges,
       repository: this.props.repository,
       showDiscardChangesSetting: false,
       discardingAllChanges: isDiscardingAllChanges,
+      permanentlyDelete,
       files,
     })
   }

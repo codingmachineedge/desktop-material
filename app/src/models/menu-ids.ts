@@ -3,6 +3,7 @@ export type MenuIDs =
   | 'rename-branch'
   | 'delete-branch'
   | 'discard-all-changes'
+  | 'permanently-discard-all-changes'
   | 'stash-all-changes'
   | 'preferences'
   | 'update-branch-with-contribution-target-branch'

@@ -457,6 +457,13 @@ export function buildDefaultMenuTemplate({
       click: emit('discard-all-changes'),
     },
     {
+      label: __DARWIN__
+        ? 'Permanently Discard All Changes…'
+        : 'Permanently discard all changes…',
+      id: 'permanently-discard-all-changes',
+      click: emit('permanently-discard-all-changes'),
+    },
+    {
       label: askForConfirmationWhenStashingAllChanges
         ? confirmStashAllChangesLabel
         : stashAllChangesLabel,

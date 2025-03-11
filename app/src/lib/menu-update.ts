@@ -107,6 +107,7 @@ const allMenuIds: ReadonlyArray<MenuIDs> = [
   'rename-branch',
   'delete-branch',
   'discard-all-changes',
+  'permanently-discard-all-changes',
   'stash-all-changes',
   'preferences',
   'update-branch-with-contribution-target-branch',
@@ -336,6 +337,11 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
     )
 
     menuStateBuilder.setEnabled(
+      'permanently-discard-all-changes',
+      repositoryActive && hasChangedFiles && !rebaseInProgress
+    )
+
+    menuStateBuilder.setEnabled(
       'stash-all-changes',
       hasChangedFiles && onBranch && !rebaseInProgress && !hasConflicts
     )
@@ -372,6 +378,7 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
     menuStateBuilder.disable('rename-branch')
     menuStateBuilder.disable('delete-branch')
     menuStateBuilder.disable('discard-all-changes')
+    menuStateBuilder.disable('permanently-discard-all-changes')
     menuStateBuilder.disable('stash-all-changes')
     menuStateBuilder.disable('update-branch-with-contribution-target-branch')
     menuStateBuilder.disable('merge-branch')

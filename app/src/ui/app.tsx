@@ -517,7 +517,9 @@ export class App extends React.Component<IAppProps, IAppState> {
       case 'delete-branch':
         return this.deleteBranch()
       case 'discard-all-changes':
-        return this.discardAllChanges()
+        return this.discardAllChanges(false)
+      case 'permanently-discard-all-changes':
+        return this.discardAllChanges(true)
       case 'stash-all-changes':
         return this.stashAllChanges()
       case 'show-preferences':
@@ -855,7 +857,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
   }
 
-  private discardAllChanges() {
+  private discardAllChanges(permanentlyDiscard: boolean) {
     const state = this.state.selectedState
 
     if (state == null || state.type !== SelectionType.Repository) {
@@ -870,6 +872,7 @@ export class App extends React.Component<IAppProps, IAppState> {
       files: workingDirectory.files,
       showDiscardChangesSetting: false,
       discardingAllChanges: true,
+      permanentlyDelete: permanentlyDiscard,
     })
   }
 
@@ -1685,15 +1688,9 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       case PopupType.ConfirmDiscardChanges:
-        const showSetting =
-          popup.showDiscardChangesSetting === undefined
-            ? true
-            : popup.showDiscardChangesSetting
-        const discardingAllChanges =
-          popup.discardingAllChanges === undefined
-            ? false
-            : popup.discardingAllChanges
-
+        const showSetting = popup.showDiscardChangesSetting ?? true
+        const discardingAllChanges = popup.discardingAllChanges ?? false
+        const permanentlyDelete = popup.permanentlyDelete ?? false
         return (
           <DiscardChanges
             key="discard-changes"
@@ -1705,6 +1702,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             }
             showDiscardChangesSetting={showSetting}
             discardingAllChanges={discardingAllChanges}
+            permanentlyDelete={permanentlyDelete}
             onDismissed={onPopupDismissedFn}
             onConfirmDiscardChangesChanged={this.onConfirmDiscardChangesChanged}
           />
