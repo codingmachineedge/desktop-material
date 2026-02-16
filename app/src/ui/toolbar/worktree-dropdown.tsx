@@ -198,7 +198,13 @@ export class WorktreeDropdown extends React.Component<
         showDisclosureArrow={true}
         enableFocusTrap={enableFocusTrap}
         foldoutStyleOverrides={
-          enableResizingToolbarButtons() ? { minWidth: 365 } : undefined
+          enableResizingToolbarButtons()
+            ? {
+                width: this.props.worktreeDropdownWidth.value,
+                maxWidth: this.props.worktreeDropdownWidth.max,
+                minWidth: 365,
+              }
+            : undefined
         }
       />
     )
