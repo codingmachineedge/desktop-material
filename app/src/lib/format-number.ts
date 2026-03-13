@@ -16,7 +16,7 @@ import { enableFormattingPreferences } from './feature-flag'
  *                separators, defaults to the user's preferred format.
  */
 export function formatNumber(value: number, fmt?: INumberFormat): string {
-  if (!enableFormattingPreferences()) {
+  if (!fmt && !enableFormattingPreferences()) {
     return value.toString()
   }
 
@@ -44,8 +44,11 @@ export function formatNumber(value: number, fmt?: INumberFormat): string {
   return isNegative ? `-${result}` : result
 }
 
-export function formatCompactNumber(value: number) {
-  if (!enableFormattingPreferences()) {
+export function formatCompactNumber(
+  value: number,
+  fmt?: INumberFormat
+): string {
+  if (!fmt && !enableFormattingPreferences()) {
     return `${value}`
   }
 
@@ -54,7 +57,7 @@ export function formatCompactNumber(value: number) {
   }
 
   if (value < 1000) {
-    return formatNumber(value)
+    return formatNumber(value, fmt)
   }
 
   const units = ['', 'k', 'm', 'b', 't']
@@ -64,12 +67,12 @@ export function formatCompactNumber(value: number) {
   )
 
   if (unitIx === 0) {
-    return formatNumber(value) + ' ' + units[unitIx]
+    return formatNumber(value, fmt) + ' ' + units[unitIx]
   }
 
   const scaled = value / Math.pow(1000, unitIx)
   const decimals = scaled < 10 ? 1 : 0
 
   const result = round(scaled, decimals)
-  return formatNumber(result) + ' ' + units[unitIx]
+  return formatNumber(result, fmt) + ' ' + units[unitIx]
 }
