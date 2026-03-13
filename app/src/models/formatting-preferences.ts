@@ -220,51 +220,19 @@ export const timeFormats: ReadonlyArray<{
 }))
 
 /**
- * Format a number using the given separator configuration.
- *
- * This is a simple formatter that handles integer and decimal parts with
- * configurable separators. It is not intended to be a full locale-aware
- * number formatter.
- */
-export function formatNumber(value: number, fmt: INumberFormat): string {
-  const isNegative = value < 0
-  const abs = Math.abs(value)
-  const [intPart, decPart] = abs.toString().split('.')
-
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\x00')
-  const formattedInt = grouped.replace(/\x00/g, fmt.thousandsSeparator)
-
-  const result =
-    decPart !== undefined
-      ? `${formattedInt}${fmt.decimalSeparator}${decPart}`
-      : formattedInt
-
-  return isNegative ? `-${result}` : result
-}
-
-/** Preview number used to demonstrate number formatting (1,234,567.89). */
-const previewNumber = 1234567.89
-
-/**
  * All valid number format configurations with their preview strings.
  *
  * Excludes configurations where the thousands and decimal separator are the
  * same character.
  */
-export const numberFormats: ReadonlyArray<{
-  readonly format: INumberFormat
-  readonly example: string
-}> = [
+export const numberFormats: ReadonlyArray<INumberFormat> = [
   { thousandsSeparator: '', decimalSeparator: '.' },
   { thousandsSeparator: '', decimalSeparator: ',' },
   { thousandsSeparator: ',', decimalSeparator: '.' },
   { thousandsSeparator: '.', decimalSeparator: ',' },
   { thousandsSeparator: ' ', decimalSeparator: '.' },
   { thousandsSeparator: ' ', decimalSeparator: ',' },
-].map(fmt => ({
-  format: fmt as INumberFormat,
-  example: formatNumber(previewNumber, fmt as INumberFormat),
-}))
+]
 
 export const defaultDateFormat: DateFormat = 'MMM d, yyyy'
 export const defaultTimeFormat: TimeFormat = prefersTwelveHourTime()
@@ -326,8 +294,8 @@ export function numberFormatToKey(fmt: INumberFormat): string {
  * default if the key is invalid.
  */
 export function numberFormatFromKey(key: string): INumberFormat {
-  const match = numberFormats.find(n => numberFormatToKey(n.format) === key)
-  return match?.format ?? defaultNumberFormat
+  const match = numberFormats.find(n => numberFormatToKey(n) === key)
+  return match ?? defaultNumberFormat
 }
 
 const relativeTimeInCommitListKey = 'relativeTimeInCommitList'

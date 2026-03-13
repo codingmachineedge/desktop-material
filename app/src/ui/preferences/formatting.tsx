@@ -11,6 +11,7 @@ import {
   numberFormats,
   numberFormatToKey,
 } from '../../models/formatting-preferences'
+import { formatNumber } from '../../lib/format-number'
 
 interface IFormattingProps {
   readonly selectedDateFormat: DateFormat
@@ -42,10 +43,10 @@ export class Formatting extends React.Component<IFormattingProps> {
     event: React.FormEvent<HTMLSelectElement>
   ) => {
     const match = numberFormats.find(
-      n => numberFormatToKey(n.format) === event.currentTarget.value
+      n => numberFormatToKey(n) === event.currentTarget.value
     )
     if (match) {
-      this.props.onSelectedNumberFormatChanged(match.format)
+      this.props.onSelectedNumberFormatChanged(match)
     }
   }
 
@@ -95,12 +96,12 @@ export class Formatting extends React.Component<IFormattingProps> {
           value={numberFormatToKey(this.props.selectedNumberFormat)}
           onChange={this.onNumberFormatChanged}
         >
-          {numberFormats.map(({ format, example }) => (
+          {numberFormats.map(format => (
             <option
               key={numberFormatToKey(format)}
               value={numberFormatToKey(format)}
             >
-              {example}
+              {formatNumber(1234567.89, format)}
             </option>
           ))}
         </Select>
