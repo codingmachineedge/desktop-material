@@ -108,6 +108,11 @@ const decimalPointCountries = [
   'US', // United States
 ]
 
+// Source: https://docs.oracle.com/cd/E19455-01/806-0169/overview-9/index.html
+const commaDigitGroupingCountries = ['US', 'GB', 'TH']
+const spaceDigitGroupingCountries = ['CA', 'DK', 'FI', 'SE', 'FR', 'DE']
+const dotDigitGroupingCountries = ['IT', 'NO', 'ES']
+
 function prefersTwelveHourTime(): boolean {
   return (
     localeCountryCode !== null && twelveHourCountries.has(localeCountryCode)
@@ -119,6 +124,29 @@ function prefersDecimalPoint(): boolean {
     localeCountryCode !== null &&
     decimalPointCountries.includes(localeCountryCode)
   )
+}
+
+function preferredThousandsSeparator(): INumberFormat['thousandsSeparator'] {
+  if (localeCountryCode === null) {
+    return ''
+  }
+
+  if (commaDigitGroupingCountries.includes(localeCountryCode)) {
+    return ','
+  }
+
+  if (spaceDigitGroupingCountries.includes(localeCountryCode)) {
+    return ' '
+  }
+
+  if (dotDigitGroupingCountries.includes(localeCountryCode)) {
+    return '.'
+  }
+
+  // Default to no digit grouping because some locales (e.g. India) use digit
+  // grouping sizes that we can't handle right now and I suppose it's better to
+  // show ungrouped numbers than incorrectly grouped ones.
+  return ''
 }
 
 /**
@@ -168,11 +196,10 @@ export interface INumberFormat {
  * Any random date used for previewing date and time formats. This happens to be
  * the date of the 1.0 release of GitHub Desktop but it could be any date
  * (preferrably one where YYMMDD doesn't look the same as MMDDYY or DDMMYY to
- * avoid confusion in the previews). Similarly, the time portion should be greater
- * than 12:00 to make it clear when the 12-hour formats are used.
+ * avoid confusion in the previews). Similarly, the time portion should be
+ * greater than 12:00 to make it clear when the 12-hour formats are used.
  */
-const previewDate = new Date(2017, 9, 19, 14, 30, 45)
-
+const previewDate = new Date(2025, 11, 25, 14, 30, 45)
 /**
  * All available date format patterns with their preview strings.
  */
@@ -244,9 +271,11 @@ export const defaultDateFormat: DateFormat = 'MMM d, yyyy'
 export const defaultTimeFormat: TimeFormat = prefersTwelveHourTime()
   ? 'h:mm aaa'
   : 'HH:mm'
-export const defaultNumberFormat: INumberFormat = prefersDecimalPoint()
-  ? { thousandsSeparator: '', decimalSeparator: '.' }
-  : { thousandsSeparator: '', decimalSeparator: ',' }
+
+export const defaultNumberFormat: INumberFormat = {
+  thousandsSeparator: preferredThousandsSeparator(),
+  decimalSeparator: prefersDecimalPoint() ? '.' : ',',
+}
 
 const dateFormatKey = 'dateFormat'
 const timeFormatKey = 'timeFormat'
