@@ -91,8 +91,7 @@ export function getLowestReasoningEffort(
 /**
  * Selects the model to use for commit message generation. Prefers
  * `DefaultCopilotModel` if it is in the list; otherwise falls back to the
- * cheapest available model by billing multiplier (with ties broken by lowest
- * supported reasoning effort).
+ * cheapest available model by billing multiplier.
  *
  * Returns null if the model list is empty.
  */
