@@ -49,7 +49,7 @@
     ],
     "3.5.5": [
       "[New] Support running hooks in user's shell environment and allow bypassing commit hooks - #21319",
-      "[New] Enable one-time opening of a repository in an alternate editor` - #21436. Thanks @jackfreem!",
+      "[New] Enable one-time opening of a repository in an alternate editor - #21436. Thanks @jackfreem!",
       "[Added] Add Warp terminal support for Windows - #21471. Thanks @Cocodrulo!",
       "[Added] \"View Branch on GitHub\" option on branch list context menu - #21071. Thanks @DylanDevelops!",
       "[Fixed] Fix bad repository state when switching between branches with submodules - #21188",
