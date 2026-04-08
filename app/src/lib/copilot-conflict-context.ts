@@ -2,6 +2,10 @@ import { readFile } from 'fs/promises'
 import { join, extname } from 'path'
 
 import { MergeConflictState } from './app-state'
+import { Repository } from '../models/repository'
+import { PullRequest } from '../models/pull-request'
+import { getMergeBase } from './git/merge'
+import { getCommits } from './git/log'
 
 /** A single conflict hunk extracted from a file with conflict markers */
 export interface IConflictHunk {
@@ -25,6 +29,30 @@ export interface IFileConflictContext {
   readonly hunks: ReadonlyArray<IConflictHunk>
   /** File extension (e.g., 'ts', 'tsx', 'js') for language hinting */
   readonly extension: string
+}
+
+/** Commit context relevant to the merge conflict */
+export interface IConflictCommitContext {
+  /** Recent commits on our branch since the merge base */
+  readonly ourCommits: ReadonlyArray<{
+    readonly sha: string
+    readonly summary: string
+  }>
+  /** Recent commits on their branch since the merge base */
+  readonly theirCommits: ReadonlyArray<{
+    readonly sha: string
+    readonly summary: string
+  }>
+}
+
+/** PR context when the merge involves a pull request */
+export interface IConflictPullRequestContext {
+  /** PR number */
+  readonly number: number
+  /** PR title */
+  readonly title: string
+  /** PR body/description (markdown) */
+  readonly body: string
 }
 
 /** Full conflict context for a merge operation */
@@ -140,6 +168,69 @@ export function extractConflictHunks(
 }
 
 /**
+ * Gather commit messages from both sides of the merge to provide intent
+ * context for conflict resolution.
+ *
+ * Uses getMergeBase() to find the common ancestor, then getCommits() to
+ * retrieve recent commits on each side since the divergence point.
+ *
+ * Best-effort: returns null if the merge base cannot be determined.
+ */
+export async function gatherCommitContext(
+  repository: Repository,
+  ourBranch: string,
+  theirBranch: string,
+  limit: number = 10
+): Promise<IConflictCommitContext | null> {
+  try {
+    const mergeBase = await getMergeBase(repository, ourBranch, theirBranch)
+    if (mergeBase === null) {
+      return null
+    }
+
+    const [ourRawCommits, theirRawCommits] = await Promise.all([
+      getCommits(repository, `${mergeBase}..${ourBranch}`, limit),
+      getCommits(repository, `${mergeBase}..${theirBranch}`, limit),
+    ])
+
+    return {
+      ourCommits: ourRawCommits.map(c => ({
+        sha: c.shortSha,
+        summary: c.summary,
+      })),
+      theirCommits: theirRawCommits.map(c => ({
+        sha: c.shortSha,
+        summary: c.summary,
+      })),
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Extract PR context when the merge involves a pull request.
+ *
+ * Takes the current pull request from Desktop's branch state (already
+ * cached locally in Dexie DB — no API call needed).
+ *
+ * @returns PR context or null if no associated PR
+ */
+export function gatherPullRequestContext(
+  currentPullRequest: PullRequest | null
+): IConflictPullRequestContext | null {
+  if (currentPullRequest === null) {
+    return null
+  }
+
+  return {
+    number: currentPullRequest.pullRequestNumber,
+    title: currentPullRequest.title,
+    body: currentPullRequest.body,
+  }
+}
+
+/**
  * Extract the incoming branch name from the `.git/MERGE_MSG` file.
  *
  * The MERGE_MSG file is created by git during a merge and typically
@@ -238,7 +329,9 @@ export async function buildConflictContext(
  * @returns A formatted string describing the merge conflicts
  */
 export function formatConflictContextForPrompt(
-  context: ICopilotConflictContext
+  context: ICopilotConflictContext,
+  commitContext?: IConflictCommitContext | null,
+  pullRequestContext?: IConflictPullRequestContext | null
 ): string {
   const parts: Array<string> = []
 
@@ -246,6 +339,38 @@ export function formatConflictContextForPrompt(
     `Merge conflict between branch "${context.ourBranch}" (ours) and "${context.theirBranch}" (theirs).`
   )
   parts.push('')
+
+  if (pullRequestContext) {
+    parts.push('## Pull Request Context')
+    parts.push(`PR #${pullRequestContext.number}: ${pullRequestContext.title}`)
+    parts.push('')
+    if (pullRequestContext.body) {
+      parts.push('Description:')
+      parts.push(pullRequestContext.body)
+      parts.push('')
+    }
+  }
+
+  if (commitContext) {
+    parts.push('## Recent Commits')
+    parts.push('')
+
+    if (commitContext.ourCommits.length > 0) {
+      parts.push(`### Our branch (${context.ourBranch}) commits:`)
+      for (const commit of commitContext.ourCommits) {
+        parts.push(`- ${commit.sha}: ${commit.summary}`)
+      }
+      parts.push('')
+    }
+
+    if (commitContext.theirCommits.length > 0) {
+      parts.push(`### Their branch (${context.theirBranch}) commits:`)
+      for (const commit of commitContext.theirCommits) {
+        parts.push(`- ${commit.sha}: ${commit.summary}`)
+      }
+      parts.push('')
+    }
+  }
 
   for (const file of context.files) {
     parts.push(`## File: ${file.path}`)

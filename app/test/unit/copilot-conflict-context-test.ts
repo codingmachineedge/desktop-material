@@ -4,8 +4,13 @@ import assert from 'node:assert'
 import {
   extractConflictHunks,
   formatConflictContextForPrompt,
+  gatherPullRequestContext,
   ICopilotConflictContext,
+  IConflictCommitContext,
+  IConflictPullRequestContext,
 } from '../../src/lib/copilot-conflict-context'
+import { PullRequest, PullRequestRef } from '../../src/models/pull-request'
+import { gitHubRepoFixture } from '../helpers/github-repo-builder'
 
 describe('copilot-conflict-context', () => {
   describe('extractConflictHunks', () => {
@@ -469,6 +474,191 @@ describe('copilot-conflict-context', () => {
 
       assert.ok(!result.includes('Context before'))
       assert.ok(!result.includes('Context after'))
+    })
+  })
+
+  describe('gatherPullRequestContext', () => {
+    it('returns structured context from a PullRequest', () => {
+      const ghRepo = gitHubRepoFixture({ owner: 'owner', name: 'repo' })
+      const pr = new PullRequest(
+        new Date(),
+        'Add UUID support',
+        42,
+        new PullRequestRef('refs/heads/feature', 'aaa', ghRepo),
+        new PullRequestRef('refs/heads/main', 'bbb', ghRepo),
+        'author',
+        false,
+        'This PR adds UUID support for user identifiers.'
+      )
+
+      const result = gatherPullRequestContext(pr)
+
+      assert.notEqual(result, null)
+      assert.equal(result!.number, 42)
+      assert.equal(result!.title, 'Add UUID support')
+      assert.equal(
+        result!.body,
+        'This PR adds UUID support for user identifiers.'
+      )
+    })
+
+    it('returns null when no pull request is provided', () => {
+      const result = gatherPullRequestContext(null)
+      assert.equal(result, null)
+    })
+  })
+
+  describe('formatConflictContextForPrompt with enrichment', () => {
+    const baseContext: ICopilotConflictContext = {
+      ourBranch: 'main',
+      theirBranch: 'feature/uuids',
+      files: [
+        {
+          path: 'src/user.ts',
+          extension: 'ts',
+          hunks: [
+            {
+              oursContent: 'id: number',
+              theirsContent: 'id: string',
+              baseContent: null,
+              contextBefore: '',
+              contextAfter: '',
+            },
+          ],
+        },
+      ],
+    }
+
+    it('includes commit context in output', () => {
+      const commitCtx: IConflictCommitContext = {
+        ourCommits: [
+          { sha: 'abc1234', summary: 'Add numeric IDs' },
+          { sha: 'def5678', summary: 'Update schema' },
+        ],
+        theirCommits: [{ sha: '111aaaa', summary: 'Add UUID support' }],
+      }
+
+      const result = formatConflictContextForPrompt(
+        baseContext,
+        commitCtx,
+        null
+      )
+
+      assert.ok(result.includes('## Recent Commits'))
+      assert.ok(result.includes('### Our branch (main) commits:'))
+      assert.ok(result.includes('- abc1234: Add numeric IDs'))
+      assert.ok(result.includes('- def5678: Update schema'))
+      assert.ok(result.includes('### Their branch (feature/uuids) commits:'))
+      assert.ok(result.includes('- 111aaaa: Add UUID support'))
+      // File content should still be present
+      assert.ok(result.includes('## File: src/user.ts'))
+    })
+
+    it('includes PR context in output', () => {
+      const prCtx: IConflictPullRequestContext = {
+        number: 99,
+        title: 'Migrate to UUIDs',
+        body: 'This migrates all user IDs from integers to UUIDs.',
+      }
+
+      const result = formatConflictContextForPrompt(baseContext, null, prCtx)
+
+      assert.ok(result.includes('## Pull Request Context'))
+      assert.ok(result.includes('PR #99: Migrate to UUIDs'))
+      assert.ok(result.includes('Description:'))
+      assert.ok(
+        result.includes('This migrates all user IDs from integers to UUIDs.')
+      )
+      // Should not include commit section
+      assert.ok(!result.includes('## Recent Commits'))
+      // File content should still be present
+      assert.ok(result.includes('## File: src/user.ts'))
+    })
+
+    it('includes both commit and PR context in output', () => {
+      const commitCtx: IConflictCommitContext = {
+        ourCommits: [{ sha: 'aaa1111', summary: 'Fix type error' }],
+        theirCommits: [{ sha: 'bbb2222', summary: 'Add UUIDs' }],
+      }
+      const prCtx: IConflictPullRequestContext = {
+        number: 50,
+        title: 'UUID migration',
+        body: 'Migrate IDs to UUIDs.',
+      }
+
+      const result = formatConflictContextForPrompt(
+        baseContext,
+        commitCtx,
+        prCtx
+      )
+
+      // PR section comes before commits
+      const prIdx = result.indexOf('## Pull Request Context')
+      const commitIdx = result.indexOf('## Recent Commits')
+      const fileIdx = result.indexOf('## File: src/user.ts')
+
+      assert.ok(prIdx !== -1, 'PR context should be present')
+      assert.ok(commitIdx !== -1, 'Commit context should be present')
+      assert.ok(fileIdx !== -1, 'File context should be present')
+      assert.ok(
+        prIdx < commitIdx,
+        'PR context should come before commit context'
+      )
+      assert.ok(
+        commitIdx < fileIdx,
+        'Commit context should come before file context'
+      )
+    })
+
+    it('is backward compatible when no enrichment is provided', () => {
+      const withoutEnrichment = formatConflictContextForPrompt(baseContext)
+      const withNulls = formatConflictContextForPrompt(baseContext, null, null)
+      const withUndefined = formatConflictContextForPrompt(
+        baseContext,
+        undefined,
+        undefined
+      )
+
+      // All three should produce the same output
+      assert.equal(withoutEnrichment, withNulls)
+      assert.equal(withoutEnrichment, withUndefined)
+
+      // Should not include enrichment sections
+      assert.ok(!withoutEnrichment.includes('## Pull Request Context'))
+      assert.ok(!withoutEnrichment.includes('## Recent Commits'))
+
+      // Should still include file context
+      assert.ok(withoutEnrichment.includes('## File: src/user.ts'))
+    })
+
+    it('omits PR description section when body is empty', () => {
+      const prCtx: IConflictPullRequestContext = {
+        number: 10,
+        title: 'Quick fix',
+        body: '',
+      }
+
+      const result = formatConflictContextForPrompt(baseContext, null, prCtx)
+
+      assert.ok(result.includes('PR #10: Quick fix'))
+      assert.ok(!result.includes('Description:'))
+    })
+
+    it('omits commit sections when both sides have no commits', () => {
+      const commitCtx: IConflictCommitContext = {
+        ourCommits: [],
+        theirCommits: [],
+      }
+
+      const result = formatConflictContextForPrompt(
+        baseContext,
+        commitCtx,
+        null
+      )
+
+      assert.ok(result.includes('## Recent Commits'))
+      assert.ok(!result.includes('### Our branch'))
+      assert.ok(!result.includes('### Their branch'))
     })
   })
 })
