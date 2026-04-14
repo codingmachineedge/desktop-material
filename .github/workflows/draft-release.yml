@@ -125,6 +125,14 @@ jobs:
 
           echo "📝 Parsed $COUNT changelog entries"
 
+      - name: Generate app token
+        id: generate-token
+        if: ${{ inputs.dry-run == false }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DESKTOP_RELEASES_APP_ID }}
+          private-key: ${{ secrets.DESKTOP_RELEASES_APP_PRIVATE_KEY }}
+
       - name: Create release branch and commit
         if: ${{ inputs.dry-run == false }}
         env:
@@ -134,6 +142,11 @@ jobs:
           REF_OVERRIDE: ${{ inputs.ref }}
           ENTRIES: ${{ steps.changelog.outputs.entries }}
         run: |
+          # Use the app token for all git operations so the push triggers
+          # the create event for release-pr.yml (GITHUB_TOKEN cannot
+          # trigger other workflows)
+          git remote set-url origin "https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/${{ github.repository }}.git"
+
           BRANCH="releases/$NEXT_VERSION"
 
           # Check if the release branch already exists
@@ -167,22 +180,5 @@ jobs:
 
           git add app/package.json changelog.json
           git commit -m "Draft release $NEXT_VERSION"
-
-      - name: Generate token for push
-        id: generate-token
-        if: ${{ inputs.dry-run == false }}
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.DESKTOP_RELEASES_APP_ID }}
-          private-key: ${{ secrets.DESKTOP_RELEASES_APP_PRIVATE_KEY }}
-
-      - name: Push release branch
-        if: ${{ inputs.dry-run == false }}
-        env:
-          NEXT_VERSION: ${{ steps.version.outputs.next }}
-        run: |
-          # Use the app token so the push triggers the create event
-          # for release-pr.yml (GITHUB_TOKEN cannot trigger other workflows)
-          git remote set-url origin "https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/${{ github.repository }}.git"
-          git push origin "releases/$NEXT_VERSION"
-          echo "✅ Pushed releases/$NEXT_VERSION — release-pr.yml will create the draft PR"
+          git push origin "$BRANCH"
+          echo "✅ Pushed $BRANCH — release-pr.yml will create the draft PR"
