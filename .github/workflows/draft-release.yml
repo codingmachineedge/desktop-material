@@ -59,7 +59,7 @@ jobs:
         if: ${{ inputs.channel == 'beta' }}
         uses: github/copilot-release-notes@v1
         with:
-          base-ref: release-${{ steps.version.outputs.previous }}
+          base-ref: release-${{ steps.version.outputs.compare-base }}
           head-ref: ${{ inputs.ref || 'development' }}
           instructions: .github/release-notes-instructions.md
         env:
@@ -71,6 +71,7 @@ jobs:
         env:
           CHANNEL: ${{ inputs.channel }}
           RELEASE_NOTES: ${{ steps.notes.outputs.release-notes }}
+          RELEASE_NOTES_JSON: ${{ steps.notes.outputs.release-notes-json }}
           UNCERTAIN: ${{ steps.notes.outputs.uncertain-entries }}
           SKIPPED: ${{ steps.notes.outputs.skipped-prs }}
           PREVIOUS: ${{ steps.version.outputs.previous }}
@@ -81,9 +82,13 @@ jobs:
             ENTRIES=$(yarn --silent ts-node -P script/tsconfig.json \
               script/draft-release/ci.ts changelog-entries "$PREVIOUS")
           else
-            # Beta: parse AI-generated notes, extracting [Tag] lines
-            ENTRIES=$(echo "$RELEASE_NOTES" | grep -E '^\[' || true)
-            ENTRIES=$(echo "$ENTRIES" | jq -c -R -s 'split("\n") | map(select(length > 0))')
+            # Beta: extract descriptions from structured JSON output
+            if [ -z "$RELEASE_NOTES_JSON" ] || [ "$RELEASE_NOTES_JSON" = "[]" ]; then
+              echo "::warning::No structured release notes JSON returned"
+              ENTRIES="[]"
+            else
+              ENTRIES=$(echo "$RELEASE_NOTES_JSON" | jq -ce 'map(.description)')
+            fi
           fi
 
           # Write entries as single-line JSON to output
