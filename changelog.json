@@ -1,6 +1,7 @@
 {
   "releases": {
     "3.5.9-beta1": [
+      "[Added] Add date, time, and number formatting preferences to the Appearance settings - #21836",
       "[Fixed] Fix a crash (Maximum update depth exceeded) that could occur while the conflicts dialog was open during a multi-commit operation - #21879",
       "[Fixed] Remove discontinued GitHub AE references from the Enterprise sign-in screen - #21926. Thanks @toddmanion!",
       "[Improved] Update Git for Windows to v2.53.0.windows.3 - #21957",
