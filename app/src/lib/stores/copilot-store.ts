@@ -276,6 +276,7 @@ export class CopilotStore extends BaseStore {
           mode: 'append',
           content: CommitMessageSystemPrompt,
         },
+        availableTools: [],
         onPermissionRequest: async () => ({
           kind: 'denied-interactively-by-user',
         }),
