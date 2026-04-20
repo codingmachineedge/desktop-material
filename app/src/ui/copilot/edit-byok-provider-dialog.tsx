@@ -58,6 +58,7 @@ const DefaultModel: IBYOKModel = {
 interface IModelRowProps {
   readonly index: number
   readonly model: IBYOKModel
+  readonly canRemove: boolean
   readonly onIdChanged: (index: number, id: string) => void
   readonly onNameChanged: (index: number, name: string) => void
   readonly onReasoningChanged: (index: number, value: boolean) => void
@@ -66,7 +67,7 @@ interface IModelRowProps {
 
 class ModelRow extends React.Component<IModelRowProps> {
   public render() {
-    const { model } = this.props
+    const { model, canRemove } = this.props
     return (
       <div className="copilot-byok-model-row">
         <TextBox
@@ -82,7 +83,7 @@ class ModelRow extends React.Component<IModelRowProps> {
           placeholder="GPT-4o"
         />
         <Checkbox
-          label="Reasoning effort"
+          label="Reasoning"
           value={
             model.supportsReasoningEffort === true
               ? CheckboxValue.On
@@ -90,7 +91,11 @@ class ModelRow extends React.Component<IModelRowProps> {
           }
           onChange={this.onReasoningChanged}
         />
-        <Button onClick={this.onRemove} ariaLabel="Remove model">
+        <Button
+          onClick={this.onRemove}
+          ariaLabel="Remove model"
+          disabled={!canRemove}
+        >
           <Octicon symbol={octicons.trash} />
         </Button>
       </div>
@@ -107,6 +112,21 @@ class ModelRow extends React.Component<IModelRowProps> {
     this.props.onReasoningChanged(this.props.index, event.currentTarget.checked)
 
   private onRemove = () => this.props.onRemove(this.props.index)
+}
+
+/**
+ * Returns a hint URL appropriate for the given provider type, used as the
+ * placeholder in the Base URL field.
+ */
+function getBaseUrlPlaceholder(type: BYOKProviderType): string {
+  switch (type) {
+    case 'openai':
+      return 'https://api.openai.com/v1'
+    case 'azure':
+      return 'https://<resource>.openai.azure.com/'
+    case 'anthropic':
+      return 'https://api.anthropic.com'
+  }
 }
 export class EditCopilotBYOKProviderDialog extends React.Component<
   IEditCopilotBYOKProviderDialogProps,
@@ -158,108 +178,149 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
           <DialogError>{this.state.errorMessage}</DialogError>
         )}
         <DialogContent>
-          <TextBox
-            label="Name"
-            value={this.state.name}
-            onValueChanged={this.onNameChanged}
-            placeholder="My provider"
-            required={true}
-            autoFocus={true}
-          />
-
-          <Select
-            label="Type"
-            value={this.state.type}
-            onChange={this.onTypeChanged}
-          >
-            <option value="openai">OpenAI / OpenAI-compatible</option>
-            <option value="azure">Azure</option>
-            <option value="anthropic">Anthropic</option>
-          </Select>
-
-          <TextBox
-            label="Base URL"
-            value={this.state.baseUrl}
-            onValueChanged={this.onBaseUrlChanged}
-            placeholder="https://api.openai.com/v1"
-            required={true}
-          />
-
-          {this.state.type === 'openai' && (
-            <Select
-              label={__DARWIN__ ? 'Wire API' : 'Wire API'}
-              value={this.state.wireApi}
-              onChange={this.onWireApiChanged}
-            >
-              <option value="completions">Chat completions (default)</option>
-              <option value="responses">Responses (GPT-5 series)</option>
-            </Select>
-          )}
-
-          {this.state.type === 'azure' && (
-            <TextBox
-              label={__DARWIN__ ? 'Azure API Version' : 'Azure API version'}
-              value={this.state.azureApiVersion}
-              onValueChanged={this.onAzureApiVersionChanged}
-              placeholder="2024-10-21"
-            />
-          )}
-
-          <Select
-            label={__DARWIN__ ? 'Authentication' : 'Authentication'}
-            value={this.state.authKind}
-            onChange={this.onAuthKindChanged}
-          >
-            <option value="apiKey">API key</option>
-            <option value="bearer">Bearer token</option>
-            <option value="none">None (local provider)</option>
-          </Select>
-
-          {this.state.authKind !== 'none' && (
-            <TextBox
-              label={
-                this.state.authKind === 'bearer' ? 'Bearer token' : 'API key'
-              }
-              type="password"
-              value={this.state.secret}
-              onValueChanged={this.onSecretChanged}
-              placeholder={isEditing ? '(unchanged)' : ''}
-            />
-          )}
-
-          <TextBox
-            label={
-              __DARWIN__
-                ? 'Request Timeout (seconds)'
-                : 'Request timeout (seconds)'
-            }
-            value={this.state.requestTimeoutSeconds}
-            onValueChanged={this.onRequestTimeoutChanged}
-            placeholder="60"
-          />
-
-          <div className="copilot-byok-models">
-            <h2>Models</h2>
-            {this.state.models.map((m, i) => (
-              <ModelRow
-                key={i}
-                index={i}
-                model={m}
-                onIdChanged={this.onModelIdChanged}
-                onNameChanged={this.onModelNameChanged}
-                onReasoningChanged={this.onModelReasoningChanged}
-                onRemove={this.onRemoveModel}
-              />
-            ))}
-            <Button onClick={this.onAddModel}>
-              {__DARWIN__ ? 'Add Model' : 'Add model'}
-            </Button>
-          </div>
+          {this.renderProviderSection()}
+          {this.renderAuthenticationSection(isEditing)}
+          {this.renderModelsSection()}
+          {this.renderAdvancedSection()}
         </DialogContent>
         <DialogFooter>
           <OkCancelButtonGroup okButtonText={isEditing ? 'Save' : 'Add'} />
         </DialogFooter>
       </Dialog>
+    )
+  }
+
+  private renderProviderSection() {
+    return (
+      <fieldset className="copilot-byok-fieldset">
+        <legend>Provider</legend>
+        <TextBox
+          label="Name"
+          value={this.state.name}
+          onValueChanged={this.onNameChanged}
+          placeholder="My provider"
+          required={true}
+          autoFocus={true}
+        />
+        <Select
+          label="Type"
+          value={this.state.type}
+          onChange={this.onTypeChanged}
+        >
+          <option value="openai">OpenAI / OpenAI-compatible</option>
+          <option value="azure">Azure</option>
+          <option value="anthropic">Anthropic</option>
+        </Select>
+        <TextBox
+          label={__DARWIN__ ? 'Base URL' : 'Base URL'}
+          value={this.state.baseUrl}
+          onValueChanged={this.onBaseUrlChanged}
+          placeholder={getBaseUrlPlaceholder(this.state.type)}
+          required={true}
+        />
+        {this.state.type === 'openai' && (
+          <Select
+            label={__DARWIN__ ? 'Wire API' : 'Wire API'}
+            value={this.state.wireApi}
+            onChange={this.onWireApiChanged}
+          >
+            <option value="completions">Chat completions (default)</option>
+            <option value="responses">Responses (GPT-5 series)</option>
+          </Select>
+        )}
+        {this.state.type === 'azure' && (
+          <TextBox
+            label={__DARWIN__ ? 'Azure API Version' : 'Azure API version'}
+            value={this.state.azureApiVersion}
+            onValueChanged={this.onAzureApiVersionChanged}
+            placeholder="2024-10-21"
+          />
+        )}
+      </fieldset>
+    )
+  }
+
+  private renderAuthenticationSection(isEditing: boolean) {
+    return (
+      <fieldset className="copilot-byok-fieldset">
+        <legend>Authentication</legend>
+        <Select
+          label={__DARWIN__ ? 'Authentication' : 'Authentication'}
+          value={this.state.authKind}
+          onChange={this.onAuthKindChanged}
+        >
+          <option value="apiKey">API key</option>
+          <option value="bearer">Bearer token</option>
+          <option value="none">None (local provider)</option>
+        </Select>
+        {this.state.authKind !== 'none' && (
+          <TextBox
+            label={
+              this.state.authKind === 'bearer' ? 'Bearer token' : 'API key'
+            }
+            type="password"
+            value={this.state.secret}
+            onValueChanged={this.onSecretChanged}
+            placeholder={isEditing ? '(unchanged)' : ''}
+          />
+        )}
+        {this.state.authKind === 'none' && (
+          <p className="copilot-byok-section-hint">
+            No credentials will be sent. Suitable for local providers like
+            Ollama or Foundry Local.
+          </p>
+        )}
+      </fieldset>
+    )
+  }
+
+  private renderModelsSection() {
+    return (
+      <fieldset className="copilot-byok-fieldset copilot-byok-models">
+        <legend>Models</legend>
+        <p className="copilot-byok-section-hint">
+          Add the models you want to make available. The model ID must match
+          what the provider expects.
+        </p>
+        {this.state.models.map((m, i) => (
+          <ModelRow
+            key={i}
+            index={i}
+            model={m}
+            canRemove={this.state.models.length > 1}
+            onIdChanged={this.onModelIdChanged}
+            onNameChanged={this.onModelNameChanged}
+            onReasoningChanged={this.onModelReasoningChanged}
+            onRemove={this.onRemoveModel}
+          />
+        ))}
+        <Button onClick={this.onAddModel}>
+          <Octicon symbol={octicons.plus} />
+          {__DARWIN__ ? 'Add Model' : 'Add model'}
+        </Button>
+      </fieldset>
+    )
+  }
+
+  private renderAdvancedSection() {
+    return (
+      <fieldset className="copilot-byok-fieldset">
+        <legend>Advanced</legend>
+        <TextBox
+          label={
+            __DARWIN__
+              ? 'Request Timeout (seconds)'
+              : 'Request timeout (seconds)'
+          }
+          value={this.state.requestTimeoutSeconds}
+          onValueChanged={this.onRequestTimeoutChanged}
+          placeholder="60"
+        />
+        <p className="copilot-byok-section-hint">
+          How long to wait for a response before giving up. Leave blank to use
+          the default.
+        </p>
+      </fieldset>
     )
   }
 
