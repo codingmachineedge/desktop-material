@@ -235,18 +235,21 @@ describe('CopilotPreferences', () => {
     assert.strictEqual(select.value, '__default__')
   })
 
-  it('hides the Custom Providers section when showBYOKSettings is false', () => {
-    render(<CopilotPreferences {...defaults()} />)
-    assert.strictEqual(screen.queryByText('Custom providers'), null)
-    assert.strictEqual(screen.queryByText('Custom Providers'), null)
+  it('hides the Providers tab when showBYOKSettings is false', () => {
+    const view = render(<CopilotPreferences {...defaults()} />)
+    const tabs = view.container.querySelectorAll('[role="tab"]')
+    assert.strictEqual(tabs.length, 0)
   })
 
-  it('shows the Custom Providers section when enabled', () => {
-    render(<CopilotPreferences {...defaults()} showBYOKSettings={true} />)
-    assert.ok(
-      screen.queryByText('Custom providers') ??
-        screen.queryByText('Custom Providers')
+  it('shows the Providers tab when enabled', () => {
+    const view = render(
+      <CopilotPreferences {...defaults()} showBYOKSettings={true} />
     )
+    const tabs = view.container.querySelectorAll('[role="tab"]')
+    const providersTab = Array.from(tabs).find(t =>
+      (t.textContent ?? '').toLowerCase().includes('providers')
+    )
+    assert.ok(providersTab)
   })
 
   it('invokes onAddBYOKProvider when the Add button is clicked', () => {
@@ -262,7 +265,7 @@ describe('CopilotPreferences', () => {
     )
     const tabs = view.container.querySelectorAll('[role="tab"]')
     const providersTab = Array.from(tabs).find(t =>
-      (t.textContent ?? '').toLowerCase().includes('custom providers')
+      (t.textContent ?? '').toLowerCase().includes('providers')
     )
     assert.ok(providersTab)
     fireEvent.click(providersTab!)
