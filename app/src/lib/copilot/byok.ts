@@ -171,11 +171,6 @@ export function parseModelKey(value: string): CopilotModelKey {
 }
 
 /**
- * Returns true if the given base URL points at the local machine. Used to
- * surface a "Local" badge in the provider list. Recognises both IPv4 (127/8
- * and 0.0.0.0) and IPv6 loopback in bracketed and bare forms.
- */
-/**
  * Returns true if saving a BYOK provider with the given new auth kind
  * requires the user to enter a fresh secret. We can rely on the previously
  * stored secret only when editing an existing provider that already used
@@ -196,6 +191,11 @@ export function requiresNewBYOKSecret(
   return existingProvider.authKind !== newAuthKind
 }
 
+/**
+ * Returns true if the given base URL points at the local machine. Used to
+ * surface a "Local" badge in the provider list. Recognises both IPv4 (127/8
+ * and 0.0.0.0) and IPv6 loopback in bracketed and bare forms.
+ */
 export function isLocalBaseUrl(baseUrl: string): boolean {
   let hostname: string
   try {
