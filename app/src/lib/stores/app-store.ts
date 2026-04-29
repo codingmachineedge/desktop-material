@@ -5714,7 +5714,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
               repository.path,
               await this.resolveCopilotModelRequest(
                 this.selectedCopilotModels['commit-message-generation'] ?? null
-              )
+              ),
+              this.repositoryStateCache
+                .get(repository)
+                ?.changesState.currentRepoRulesInfo?.commitMessagePatterns.getRules() ??
+                []
             )
           : await API.fromAccount(account).getDiffChangesCommitMessage(diff)
 
