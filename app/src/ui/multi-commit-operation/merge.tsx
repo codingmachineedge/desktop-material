@@ -23,7 +23,8 @@ export abstract class Merge extends BaseMultiCommitOperation {
 
     if (
       (state.step.kind !== MultiCommitOperationStepKind.ShowConflicts &&
-        state.step.kind !== MultiCommitOperationStepKind.ShowCopilotConflicts) ||
+        state.step.kind !==
+          MultiCommitOperationStepKind.ShowCopilotConflicts) ||
       conflictState === null ||
       !isMergeConflictState(conflictState) ||
       operationDetail.kind !== MultiCommitOperationKind.Merge
@@ -33,9 +34,7 @@ export abstract class Merge extends BaseMultiCommitOperation {
     }
 
     // If continuing from Copilot resolution, write files to disk and stage now
-    if (
-      state.step.kind === MultiCommitOperationStepKind.ShowCopilotConflicts
-    ) {
+    if (state.step.kind === MultiCommitOperationStepKind.ShowCopilotConflicts) {
       await dispatcher.applyCopilotConflictResolutions(repository)
     }
 

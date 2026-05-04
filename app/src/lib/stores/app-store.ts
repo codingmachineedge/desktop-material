@@ -5901,7 +5901,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     const { step } = multiCommitOperationState
-    if (step.kind !== MultiCommitOperationStepKind.ShowCopilotConflictsLoading) {
+    if (
+      step.kind !== MultiCommitOperationStepKind.ShowCopilotConflictsLoading
+    ) {
       return
     }
 
@@ -5982,10 +5984,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     for (const resolution of copilotResolutions) {
-      const absolutePath = await resolveWithin(
-        repository.path,
-        resolution.path
-      )
+      const absolutePath = await resolveWithin(repository.path, resolution.path)
       if (absolutePath === null) {
         log.warn(
           `Copilot resolution skipped: path outside repository: ${resolution.path}`
