@@ -83,6 +83,9 @@ export abstract class BaseMultiCommitOperation extends React.Component<IMultiCom
       },
       true
     )
+
+    // Fire-and-forget: the orchestrator handles transitions on success/failure
+    dispatcher.startCopilotConflictResolution(repository)
   }
 
   protected onFlowEnded = () => {

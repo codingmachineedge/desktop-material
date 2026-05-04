@@ -1,4 +1,5 @@
 import * as Path from 'path'
+import { writeFile } from 'fs/promises'
 import {
   AccountsStore,
   CloningRepositoriesStore,
@@ -217,6 +218,7 @@ import {
   getFilesDiffText,
   TerminalOutput,
   HookProgress,
+  git,
 } from '../git'
 import {
   installGlobalLFSFilters,
@@ -389,6 +391,7 @@ import {
   buildConflictContext,
   gatherCommitContext,
 } from '../copilot-conflict-context'
+import { resolveWithin } from '../path'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -5882,6 +5885,90 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /**
+   * Orchestrate end-to-end Copilot conflict resolution: call the API, write
+   * resolved content to disk, stage the files, and transition the multi-commit
+   * operation to the result dialog.
+   *
+   * This shouldn't be called directly. See `Dispatcher`.
+   */
+  public async _startCopilotConflictResolution(
+    repository: Repository
+  ): Promise<void> {
+    const state = this.repositoryStateCache.get(repository)
+    const { multiCommitOperationState } = state
+    if (multiCommitOperationState === null) {
+      return
+    }
+
+    const { step } = multiCommitOperationState
+    if (step.kind !== MultiCommitOperationStepKind.ShowCopilotConflictsLoading) {
+      return
+    }
+
+    const { conflictState } = step
+
+    try {
+      const result = await this._resolveConflictsWithCopilot(repository)
+
+      if (result === null) {
+        throw new Error('Copilot conflict resolution returned no results')
+      }
+
+      // Write resolved content to disk and stage each file
+      for (const resolution of result.resolutions) {
+        const absolutePath = await resolveWithin(
+          repository.path,
+          resolution.path
+        )
+        if (absolutePath === null) {
+          log.warn(
+            `Copilot resolution skipped: path outside repository: ${resolution.path}`
+          )
+          continue
+        }
+
+        await writeFile(absolutePath, resolution.resolvedContent, 'utf8')
+        await git(
+          ['add', '--', resolution.path],
+          repository.path,
+          'copilotConflictResolution'
+        )
+      }
+
+      // Store resolutions and transition to the result dialog
+      this.repositoryStateCache.updateMultiCommitOperationState(
+        repository,
+        () => ({
+          step: {
+            kind: MultiCommitOperationStepKind.ShowCopilotConflicts,
+            conflictState,
+          },
+          copilotResolutions: result.resolutions,
+        })
+      )
+
+      this.emitUpdate()
+    } catch (e) {
+      log.warn('AppStore: Copilot conflict resolution flow failed', e)
+
+      // Transition back to manual conflict resolution
+      this.repositoryStateCache.updateMultiCommitOperationState(
+        repository,
+        () => ({
+          step: {
+            kind: MultiCommitOperationStepKind.ShowConflicts,
+            conflictState,
+          },
+          useCopilotConflictResolution: false,
+          copilotResolutions: null,
+        })
+      )
+
+      this.emitUpdate()
+    }
+  }
+
+  /**
    * Set the global application menu.
    *
    * This is called in response to the main process emitting an event signalling
@@ -8294,6 +8381,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       },
       userHasResolvedConflicts: false,
       useCopilotConflictResolution: false,
+      copilotResolutions: null,
       originalBranchTip,
       targetBranch,
     })

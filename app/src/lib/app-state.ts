@@ -1,6 +1,7 @@
 import type { ModelInfo } from '@github/copilot-sdk'
 import type { CopilotModelSelections } from './stores/copilot-store'
 import type { IBYOKProvider } from './copilot/byok'
+import type { IFileResolution } from './copilot-conflict-resolution'
 import { Account } from '../models/account'
 import { CommitIdentity } from '../models/commit-identity'
 import { IDiff, ImageDiffType } from '../models/diff'
@@ -1055,6 +1056,13 @@ export interface IMultiCommitOperationState {
    * route through ShowCopilotConflictsLoading instead of ShowConflicts.
    */
   readonly useCopilotConflictResolution: boolean
+
+  /**
+   * Resolutions returned by Copilot for the current conflict round. Null when
+   * Copilot hasn't been invoked or has not yet completed. Set after a
+   * successful resolution so the result dialog can display per-file reasoning.
+   */
+  readonly copilotResolutions: ReadonlyArray<IFileResolution> | null
 
   /**
    * The commit id of the tip of the branch user is modifying in the operation.
