@@ -5908,7 +5908,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const { conflictState } = step
 
     try {
-      const result = await this._resolveConflictsWithCopilot(repository)
+      const result = await this._resolveConflictsWithCopilot(
+        repository,
+        progress => {
+          this.repositoryStateCache.updateMultiCommitOperationState(
+            repository,
+            () => ({ copilotResolutionProgress: progress })
+          )
+          this.emitUpdate()
+        }
+      )
 
       if (result === null) {
         throw new Error('Copilot conflict resolution returned no results')
@@ -5925,6 +5934,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
             conflictState,
           },
           copilotResolutions: result.resolutions,
+          copilotResolutionProgress: null,
         })
       )
 
@@ -5942,6 +5952,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
           },
           useCopilotConflictResolution: false,
           copilotResolutions: null,
+          copilotResolutionProgress: null,
         })
       )
 
@@ -8405,6 +8416,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       userHasResolvedConflicts: false,
       useCopilotConflictResolution: false,
       copilotResolutions: null,
+      copilotResolutionProgress: null,
       originalBranchTip,
       targetBranch,
     })

@@ -273,6 +273,7 @@ export abstract class BaseMultiCommitOperation extends React.Component<IMultiCom
             repository={this.props.repository}
             dispatcher={this.props.dispatcher}
             conflictState={step.conflictState}
+            progress={this.props.state.copilotResolutionProgress}
           />
         )
       case MultiCommitOperationStepKind.ShowCopilotConflicts:

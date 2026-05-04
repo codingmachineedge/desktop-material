@@ -4,6 +4,7 @@ import { Dispatcher } from '../../dispatcher'
 import { Repository } from '../../../models/repository'
 import { MultiCommitOperationStepKind } from '../../../models/multi-commit-operation'
 import { MultiCommitOperationConflictState } from '../../../lib/app-state'
+import { IConflictResolutionProgress } from '../../../lib/copilot-conflict-resolution'
 import { OkCancelButtonGroup } from '../../dialog/ok-cancel-button-group'
 import { Octicon } from '../../octicons'
 import * as octicons from '../../octicons/octicons.generated'
@@ -12,6 +13,7 @@ interface ICopilotConflictsLoadingDialogProps {
   readonly repository: Repository
   readonly dispatcher: Dispatcher
   readonly conflictState: MultiCommitOperationConflictState
+  readonly progress: IConflictResolutionProgress | null
 }
 
 /**
@@ -32,6 +34,20 @@ export class CopilotConflictsLoadingDialog extends React.Component<ICopilotConfl
     )
   }
 
+  private renderProgress(): JSX.Element | null {
+    const { progress } = this.props
+    if (progress === null) {
+      return null
+    }
+
+    const { filesResolved, filesTotal } = progress
+    return (
+      <p className="copilot-conflicts-loading-progress">
+        {filesResolved} of {filesTotal} files resolved
+      </p>
+    )
+  }
+
   public render() {
     return (
       <Dialog
@@ -43,6 +59,7 @@ export class CopilotConflictsLoadingDialog extends React.Component<ICopilotConfl
           <div className="copilot-conflicts-loading-content">
             <Octicon symbol={octicons.copilot} />
             <p>Resolving conflicts with Copilot…</p>
+            {this.renderProgress()}
           </div>
         </DialogContent>
         <DialogFooter>
