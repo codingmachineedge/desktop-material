@@ -2890,7 +2890,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     const { step, operationDetail } = multiCommitOperationState
-    if (step.kind !== MultiCommitOperationStepKind.ShowConflicts) {
+    if (
+      step.kind !== MultiCommitOperationStepKind.ShowConflicts &&
+      step.kind !== MultiCommitOperationStepKind.ShowCopilotConflicts
+    ) {
       return
     }
 
@@ -2975,20 +2978,38 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.statsStore.increment('mergeConflictFromExplicitMergeCount')
 
-    this._setMultiCommitOperationStep(repository, {
-      kind: MultiCommitOperationStepKind.ShowConflicts,
-      conflictState: {
-        kind: 'multiCommitOperation',
-        manualResolutions,
-        ourBranch,
-        theirBranch,
-      },
-    })
+    const mcoConflictState = {
+      kind: 'multiCommitOperation' as const,
+      manualResolutions,
+      ourBranch,
+      theirBranch,
+    }
 
-    this._showPopup({
-      type: PopupType.MultiCommitOperation,
-      repository,
-    })
+    if (multiCommitOperationState.useCopilotConflictResolution) {
+      // Auto-route to Copilot: the user previously opted into Copilot
+      // resolution during this operation, so skip the manual dialog.
+      this._setMultiCommitOperationStep(repository, {
+        kind: MultiCommitOperationStepKind.ShowCopilotConflictsLoading,
+        conflictState: mcoConflictState,
+      })
+
+      this._showPopup({
+        type: PopupType.MultiCommitOperation,
+        repository,
+      })
+
+      await this._startCopilotConflictResolution(repository)
+    } else {
+      this._setMultiCommitOperationStep(repository, {
+        kind: MultiCommitOperationStepKind.ShowConflicts,
+        conflictState: mcoConflictState,
+      })
+
+      this._showPopup({
+        type: PopupType.MultiCommitOperation,
+        repository,
+      })
+    }
   }
 
   private async getMergeConflictsTheirBranch(
