@@ -433,7 +433,7 @@ export class CopilotStore extends BaseStore {
       },
       cwd: repositoryPath,
       autoStart: true,
-      githubToken: this.currentAccount.token,
+      gitHubToken: this.currentAccount.token,
     })
   }
 
@@ -525,7 +525,7 @@ export class CopilotStore extends BaseStore {
         },
         availableTools: [],
         onPermissionRequest: async () => ({
-          kind: 'denied-interactively-by-user',
+          kind: 'reject',
         }),
       })
 
@@ -696,7 +696,7 @@ export class CopilotStore extends BaseStore {
             content: ConflictResolutionSystemPrompt,
           },
           onPermissionRequest: async () => ({
-            kind: 'denied-interactively-by-user',
+            kind: 'reject',
           }),
         })
 
