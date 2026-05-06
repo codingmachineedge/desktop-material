@@ -8,7 +8,6 @@ import {
 } from './workflow-preferences'
 import { assertNever, fatalError } from '../lib/fatal-error'
 import { createEqualityHash } from './equality-hash'
-import { isLinkedWorktreeSync } from '../lib/git/worktree'
 
 function getBaseName(path: string): string {
   const baseName = Path.basename(path)
@@ -22,19 +21,9 @@ function getBaseName(path: string): string {
   return baseName
 }
 
-/** Base type for a directory you can run git commands successfully */
-export type WorkingTree = {
-  readonly path: string
-}
-
 /** A local repository. */
 export class Repository {
   public readonly name: string
-  /**
-   * The main working tree (what we commonly
-   * think of as the repository's working directory)
-   */
-  private readonly mainWorkTree: WorkingTree
 
   /**
    * A hash of the properties of the object.
@@ -43,14 +32,12 @@ export class Repository {
    */
   public hash: string
 
-  private _isLinkedWorktree: boolean | undefined = undefined
-
   /**
    * @param path The working directory of this repository
    * @param missing Was the repository missing on disk last we checked?
    */
   public constructor(
-    path: string,
+    public readonly path: string,
     public readonly id: number,
     public readonly gitHubRepository: GitHubRepository | null,
     public readonly missing: boolean,
@@ -63,7 +50,6 @@ export class Repository {
      */
     public readonly isTutorialRepository: boolean = false
   ) {
-    this.mainWorkTree = { path }
     this.name = (gitHubRepository && gitHubRepository.name) || getBaseName(path)
 
     this.hash = createEqualityHash(
@@ -76,23 +62,6 @@ export class Repository {
       this.isTutorialRepository
     )
   }
-
-  public get path(): string {
-    return this.mainWorkTree.path
-  }
-
-  public get isLinkedWorktree(): boolean {
-    if (this._isLinkedWorktree === undefined) {
-      this._isLinkedWorktree = isLinkedWorktreeSync(this.path)
-    }
-    return this._isLinkedWorktree
-  }
-}
-
-/** A worktree linked to a main working tree (aka `Repository`) */
-export type LinkedWorkTree = WorkingTree & {
-  /** The sha of the head commit in this work tree */
-  readonly head: string
 }
 
 /** Identical to `Repository`, except it **must** have a `gitHubRepository` */

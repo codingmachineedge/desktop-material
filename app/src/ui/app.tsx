@@ -3029,9 +3029,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     const { useCustomShell, selectedShell } = this.state
     const filterText = this.state.repositoryFilterText
-    const repositories = this.state.repositories.filter(
-      r => !(r instanceof Repository && r.isLinkedWorktree)
-    )
+    const repositories = this.state.repositories
     return (
       <RepositoriesList
         filterText={filterText}
