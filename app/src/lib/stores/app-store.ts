@@ -381,6 +381,7 @@ import {
   migratedCustomIntegration,
 } from '../custom-integration'
 import { updateStore } from '../../ui/lib/update-store'
+import { startTimer } from '../../ui/lib/timing'
 import { BypassReasonType } from '../../ui/secret-scanning/bypass-push-protection-dialog'
 import { getRepoHooks } from '../hooks/get-repo-hooks'
 import {
@@ -5839,6 +5840,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return null
     }
 
+    const totalTimer = startTimer('resolve conflicts with Copilot', repository)
+
     try {
       const state = this.repositoryStateCache.get(repository)
       const { conflictState } = state.changesState
@@ -5850,11 +5853,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
         return null
       }
 
+      const labelsTimer = startTimer('gather conflict labels', repository)
       const labels = await this.getConflictLabelsAndRefs(
         repository,
         conflictState,
         state.multiCommitOperationState
       )
+      labelsTimer.done()
 
       const conflictedFiles = getConflictedFiles(
         state.changesState.workingDirectory,
@@ -5868,14 +5873,21 @@ export class AppStore extends TypedBaseStore<IAppState> {
         return null
       }
 
+      log.info(
+        `[Timing] resolving ${conflictedFiles.length} conflicted file(s)`
+      )
+
+      const contextTimer = startTimer('build conflict context', repository)
       const context = await buildConflictContext(
         labels.ourLabel,
         labels.theirLabel,
         repository.path,
         conflictedFiles
       )
+      contextTimer.done()
 
       // Best-effort enrichment — never block resolution on these
+      const commitContextTimer = startTimer('gather commit context', repository)
       const commitContext =
         labels.ourRef && labels.theirRef
           ? await gatherCommitContext(
@@ -5884,9 +5896,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
               labels.theirRef
             ).catch(() => null)
           : null
+      commitContextTimer.done()
 
       const currentPullRequest = state.branchesState.currentPullRequest ?? null
 
+      const resolveTimer = startTimer(
+        'copilotStore.resolveConflicts',
+        repository
+      )
       const result = await this.copilotStore.resolveConflicts(
         context,
         commitContext,
@@ -5894,9 +5911,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
         repository.path,
         onProgress
       )
+      resolveTimer.done()
+
+      totalTimer.done()
 
       return result
     } catch (e) {
+      totalTimer.done()
       log.warn('AppStore: Copilot conflict resolution failed', e)
       return null
     }
@@ -5941,6 +5962,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
           ) {
             return
           }
+          if (__DEV__ && progress.reasoningSnippet !== undefined) {
+            log.info(
+              `[Copilot SDK] app-store progress snippet: ${progress.reasoningSnippet}`
+            )
+          }
           this.repositoryStateCache.updateMultiCommitOperationState(
             repository,
             () => ({ copilotResolutionProgress: progress })
@@ -5952,16 +5978,52 @@ export class AppStore extends TypedBaseStore<IAppState> {
       // Re-check state: user may have cancelled during the await
       const currentState = this.repositoryStateCache.get(repository)
       const currentMco = currentState.multiCommitOperationState
-      if (
-        currentMco === null ||
-        currentMco.step.kind !==
+      if (currentMco === null) {
+        return
+      }
+
+      // The user can navigate to ConfirmAbort while we're awaiting the
+      // resolution. If they came from the loading step, we still want
+      // the resolution to be available when they click "Return to
+      // conflicts" — store the result and rewrite the return target
+      // so they land on the result dialog rather than an empty
+      // ShowCopilotConflicts step.
+      const currentStep = currentMco.step
+      const isStillLoading =
+        currentStep.kind ===
+        MultiCommitOperationStepKind.ShowCopilotConflictsLoading
+      const isConfirmAbortFromLoading =
+        currentStep.kind === MultiCommitOperationStepKind.ConfirmAbort &&
+        currentStep.returnToStepKind ===
           MultiCommitOperationStepKind.ShowCopilotConflictsLoading
-      ) {
+
+      if (!isStillLoading && !isConfirmAbortFromLoading) {
         return
       }
 
       if (result === null) {
         throw new Error('Copilot conflict resolution returned no results')
+      }
+
+      if (isConfirmAbortFromLoading) {
+        // Stash the result and update the return target so the user
+        // lands on the result dialog if they cancel the abort.
+        this.repositoryStateCache.updateMultiCommitOperationState(
+          repository,
+          () => ({
+            step: {
+              kind: MultiCommitOperationStepKind.ConfirmAbort,
+              conflictState,
+              returnToStepKind:
+                MultiCommitOperationStepKind.ShowCopilotConflicts,
+            },
+            copilotResolutions: result.resolutions,
+            copilotResolutionProgress: null,
+          })
+        )
+
+        this.emitUpdate()
+        return
       }
 
       // Store resolutions and transition to the result dialog.
