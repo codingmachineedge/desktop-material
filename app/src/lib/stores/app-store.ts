@@ -4217,6 +4217,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return repository
     }
 
+    // If the branch is checked out in another worktree, switch to that worktree
+    // instead of checking out the branch in the current worktree. Note that
+    // this is racey - if the user has just created a worktree for the branch
+    // and we haven't refreshed the repository state yet, we might not find the
+    // worktree. In that we'll encounter an error during checkout which we'll
+    // handle below.
+    const wt = repositoryState.worktrees.find(wt => wt.branch === branch.ref)
+
+    if (wt) {
+      return this._switchWorktree(repository, wt.path)
+    }
+
     let strategy = explicitStrategy ?? this.uncommittedChangesStrategy
 
     // The user hasn't been presented with an explicit choice
@@ -4258,6 +4270,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
             return this._switchWorktree(repository, worktreePath)
           }
           this.emitError(new CheckoutError(e, repository, branch))
+          return repository
         })
         .then(() => this.refreshAfterCheckout(repository, branch.name))
         .finally(() => this.updateCheckoutProgress(repository, null))
@@ -5677,7 +5690,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   public async _switchWorktree(
     repository: Repository,
     worktreePath: string
-  ): Promise<void> {
+  ): Promise<Repository> {
     const { kind } = await getRepositoryType(worktreePath).catch(e => {
       log.error('Could not determine repository type', e)
       return { kind: 'missing' } as RepositoryType
@@ -5701,6 +5714,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
 
     await this._selectRepository(result.repository)
+
+    return result.repository
   }
 
   /** This shouldn't be called directly. See 'Dispatcher'. */

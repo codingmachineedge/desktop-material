@@ -1015,11 +1015,11 @@ export class Dispatcher {
    * If the target path is already registered as a separate repository, that
    * repository is selected instead.
    */
-  public switchWorktree(
+  public async switchWorktree(
     repository: Repository,
     worktreePath: string
   ): Promise<void> {
-    return this.appStore
+    await this.appStore
       ._switchWorktree(repository, worktreePath)
       .catch(e => this.postError(e))
   }
@@ -1028,11 +1028,11 @@ export class Dispatcher {
    * Delete a worktree. If the worktree being deleted is the currently selected
    * one, the repository is switched to the main worktree first.
    */
-  public deleteWorktree(
+  public async deleteWorktree(
     repository: Repository,
     worktreePath: string
   ): Promise<void> {
-    return this.appStore
+    await this.appStore
       ._deleteWorktree(repository, worktreePath)
       .catch(e => this.postError(e))
   }
