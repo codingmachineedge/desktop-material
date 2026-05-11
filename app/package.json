@@ -19,7 +19,7 @@
   "dependencies": {
     "@floating-ui/react-dom": "^2.1.2",
     "@github/alive-client": "^1.2.0",
-    "@github/copilot-sdk": "^0.2.1",
+    "@github/copilot-sdk": "^1.0.0-beta.1",
     "@xterm/xterm": "^5.5.0",
     "app-path": "^3.3.0",
     "byline": "^5.0.0",
@@ -59,7 +59,7 @@
     "react-css-transition-replace": "^3.0.3",
     "react-dom": "^16.8.4",
     "react-transition-group": "^4.4.1",
-    "react-virtualized": "^9.20.0",
+    "react-virtualized": "^9.22.6",
     "registry-js": "^1.16.0",
     "source-map-support": "^0.4.15",
     "split2": "^4.2.0",
