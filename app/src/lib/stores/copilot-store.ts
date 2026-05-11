@@ -494,6 +494,7 @@ export class CopilotStore extends BaseStore {
     } finally {
       unsubscribe()
     }
+  }
 
   /**
    * Generates a commit message for the given diff using Copilot.
