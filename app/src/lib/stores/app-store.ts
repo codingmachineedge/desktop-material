@@ -395,7 +395,6 @@ import {
   gatherCommitContext,
 } from '../copilot-conflict-context'
 import { resolveWithin } from '../path'
-import { coerceToString } from '../git/coerce-to-string'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -4214,11 +4213,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     // If the branch is checked out in another worktree, switch to that worktree
-    // instead of checking out the branch in the current worktree. Note that
-    // this is racey - if the user has just created a worktree for the branch
-    // and we haven't refreshed the repository state yet, we might not find the
-    // worktree. In that we'll encounter an error during checkout which we'll
-    // handle below.
+    // instead of checking out the branch in the current worktree.
     const wt = repositoryState.worktrees.find(wt => wt.branch === branch.ref)
 
     if (wt) {
@@ -4261,12 +4256,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return this.checkoutImplementation(repository, branch, strategy)
         .then(() => this.onSuccessfulCheckout(repository, branch))
         .catch(async e => {
-          const worktreePath = this.parseWorktreeConflictError(e)
-          if (worktreePath !== undefined) {
-            return this._switchWorktree(repository, worktreePath)
-          }
           this.emitError(new CheckoutError(e, repository, branch))
-          return repository
         })
         .then(() => this.refreshAfterCheckout(repository, branch.name))
         .finally(() => this.updateCheckoutProgress(repository, null))
