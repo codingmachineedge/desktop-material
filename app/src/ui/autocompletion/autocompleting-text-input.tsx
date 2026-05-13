@@ -699,6 +699,7 @@ export abstract class AutocompletingTextInput<
         this.insertCompletion(item, 'keyboard')
       }
     } else if (event.key === 'Escape') {
+      event.preventDefault()
       this.close()
     }
   }

@@ -55,7 +55,11 @@ export class BranchAutocompletionProvider
       return <HighlightText text={item.name} highlight={item.highlight} />
     }
 
-    return <>{item.name}</>
+    return (
+      <div className="branch">
+        <div className="title">{item.name}</div>
+      </div>
+    )
   }
 
   public getItemAriaLabel(item: IBranchHit): string {

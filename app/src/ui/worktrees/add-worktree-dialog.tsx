@@ -119,7 +119,11 @@ export class AddWorktreeDialog extends React.Component<
       ? `Will check out existing branch "${branchName}"`
       : `Will create new branch "${branchName}"`
 
-    return <p className="branch-status-hint">{message}</p>
+    return (
+      <Row>
+        <p className="branch-status-hint">{message}</p>
+      </Row>
+    )
   }
 
   public render() {
@@ -151,8 +155,8 @@ export class AddWorktreeDialog extends React.Component<
               onValueChange={this.onBranchNameChanged}
               autocompletionProvider={this.branchAutocompletionProvider}
             />
-            {this.renderBranchStatus()}
           </Row>
+          {this.renderBranchStatus()}
         </DialogContent>
 
         <DialogFooter>

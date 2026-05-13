@@ -71,9 +71,18 @@
 }
 
 #add-worktree {
+  width: 450px;
+
+  .autocompletion-popup {
+    width: 350px;
+  }
+
   .branch-status-hint {
     margin: var(--spacing-third) 0 0;
     font-size: var(--font-size-sm);
     color: var(--text-secondary-color);
+  }
+  .ref-name-text-box {
+    margin-bottom: 0;
   }
 }
