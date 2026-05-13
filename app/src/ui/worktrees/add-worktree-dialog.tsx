@@ -12,6 +12,7 @@ import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { showOpenDialog } from '../main-process-proxy'
 import { addWorktree, listWorktrees } from '../../lib/git/worktree'
 import { BranchAutocompletionProvider } from '../autocompletion/branch-autocompletion-provider'
+import memoizeOne from 'memoize-one'
 
 interface IAddWorktreeDialogProps {
   readonly repository: Repository
@@ -31,14 +32,13 @@ export class AddWorktreeDialog extends React.Component<
   IAddWorktreeDialogProps,
   IAddWorktreeDialogState
 > {
-  private readonly branchAutocompletionProvider: BranchAutocompletionProvider
+  private getAutocompletionProvider = memoizeOne(
+    (branches: ReadonlyArray<Branch>) =>
+      new BranchAutocompletionProvider(branches)
+  )
 
   public constructor(props: IAddWorktreeDialogProps) {
     super(props)
-
-    this.branchAutocompletionProvider = new BranchAutocompletionProvider(
-      props.allBranches
-    )
 
     this.state = {
       path: '',
@@ -153,7 +153,9 @@ export class AddWorktreeDialog extends React.Component<
               label={__DARWIN__ ? 'Branch Name' : 'Branch name'}
               initialValue={this.state.branchName}
               onValueChange={this.onBranchNameChanged}
-              autocompletionProvider={this.branchAutocompletionProvider}
+              autocompletionProvider={this.getAutocompletionProvider(
+                this.props.allBranches
+              )}
             />
           </Row>
           {this.renderBranchStatus()}
