@@ -58,6 +58,11 @@ interface IRefNameProps {
    * TextBox.
    */
   readonly autocompletionProvider?: IAutocompletionProvider<object>
+
+  /**
+   * Optional placeholder text shown when the input is empty.
+   */
+  readonly placeholder?: string
 }
 
 interface IRefNameState {
@@ -124,6 +129,7 @@ export class RefNameTextBox extends React.Component<
         <AutocompletingInput
           ref={this.autocompletingInputRef}
           label={this.props.label}
+          placeholder={this.props.placeholder}
           value={this.state.proposedValue}
           ariaLabelledBy={this.props.ariaLabelledBy}
           ariaDescribedBy={ariaDescribedBy}
@@ -140,6 +146,7 @@ export class RefNameTextBox extends React.Component<
     return (
       <TextBox
         label={this.props.label}
+        placeholder={this.props.placeholder}
         value={this.state.proposedValue}
         ref={this.textBoxRef}
         ariaLabelledBy={this.props.ariaLabelledBy}

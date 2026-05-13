@@ -12,6 +12,7 @@ import { BranchAutocompletionProvider } from '../autocompletion/branch-autocompl
 import memoizeOne from 'memoize-one'
 import { RepositoryPath } from '../lib/repository-path'
 import { Ref } from '../lib/ref'
+import { sanitizedRefName } from '../../lib/sanitize-ref-name'
 
 interface IAddWorktreeDialogProps {
   readonly repository: Repository
@@ -23,6 +24,7 @@ interface IAddWorktreeDialogProps {
 
 interface IAddWorktreeDialogState {
   readonly fullPath: string | null
+  readonly worktreeName: string
   readonly branchName: string
   readonly creating: boolean
 }
@@ -41,6 +43,7 @@ export class AddWorktreeDialog extends React.Component<
 
     this.state = {
       fullPath: null,
+      worktreeName: '',
       branchName: props.initialBranchName ?? '',
       creating: false,
     }
@@ -50,8 +53,25 @@ export class AddWorktreeDialog extends React.Component<
     this.setState({ fullPath })
   }
 
+  private onWorktreeNameChanged = (worktreeName: string) => {
+    this.setState({ worktreeName })
+  }
+
   private onBranchNameChanged = (branchName: string) => {
     this.setState({ branchName })
+  }
+
+  /**
+   * Returns the effective branch name to use. If the user has explicitly
+   * entered a branch name, that is used. Otherwise, fall back to the
+   * sanitized worktree name.
+   */
+  private getEffectiveBranchName(): string {
+    const { branchName, worktreeName } = this.state
+    if (branchName.length > 0) {
+      return branchName
+    }
+    return sanitizedRefName(worktreeName)
   }
 
   private branchExists(name: string): boolean {
@@ -59,21 +79,25 @@ export class AddWorktreeDialog extends React.Component<
   }
 
   private onSubmit = async () => {
-    const { fullPath, branchName } = this.state
+    const { fullPath } = this.state
 
     if (fullPath === null) {
       return
     }
 
+    const effectiveBranchName = this.getEffectiveBranchName()
+
     this.setState({ creating: true })
 
-    const branchExists = this.branchExists(branchName)
+    const branchExists = this.branchExists(effectiveBranchName)
 
     try {
       await addWorktree(this.props.repository, fullPath, {
-        branch: branchExists ? branchName : undefined,
+        branch: branchExists ? effectiveBranchName : undefined,
         createBranch:
-          !branchExists && branchName.length > 0 ? branchName : undefined,
+          !branchExists && effectiveBranchName.length > 0
+            ? effectiveBranchName
+            : undefined,
       })
     } catch (e) {
       this.props.dispatcher.postError(e)
@@ -100,15 +124,15 @@ export class AddWorktreeDialog extends React.Component<
   }
 
   private renderBranchStatus() {
-    const { branchName } = this.state
-    if (branchName.length === 0) {
+    const effectiveName = this.getEffectiveBranchName()
+    if (effectiveName.length === 0) {
       return null
     }
 
-    const exists = this.branchExists(branchName)
+    const exists = this.branchExists(effectiveName)
     const message = exists
-      ? `Will check out existing branch "${branchName}"`
-      : `Will create new branch "${branchName}"`
+      ? `Will check out existing branch "${effectiveName}"`
+      : `Will create new branch "${effectiveName}"`
 
     return (
       <Row>
@@ -132,6 +156,7 @@ export class AddWorktreeDialog extends React.Component<
 
   public render() {
     const disabled = this.state.fullPath === null || this.state.creating
+    const branchPlaceholder = sanitizedRefName(this.state.worktreeName)
 
     return (
       <Dialog
@@ -144,6 +169,7 @@ export class AddWorktreeDialog extends React.Component<
         <DialogContent>
           <RepositoryPath
             onFullPathChanged={this.onFullPathChanged}
+            onNameChanged={this.onWorktreeNameChanged}
             nameLabel={__DARWIN__ ? 'Worktree Name' : 'Worktree name'}
             namePlaceholder="worktree name"
             pathPlaceholder="worktree path"
@@ -152,6 +178,7 @@ export class AddWorktreeDialog extends React.Component<
           <Row>
             <RefNameTextBox
               label={__DARWIN__ ? 'Branch Name' : 'Branch name'}
+              placeholder={branchPlaceholder}
               initialValue={this.state.branchName}
               onValueChange={this.onBranchNameChanged}
               autocompletionProvider={this.getAutocompletionProvider(
