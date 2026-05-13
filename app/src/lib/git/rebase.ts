@@ -1,4 +1,3 @@
-import * as Path from 'path'
 import { ChildProcess } from 'child_process'
 import { GitError } from 'dugite'
 import byline from 'byline'
@@ -73,7 +72,7 @@ export enum RebaseResult {
  * a rebase operation is underway.
  */
 function isRebaseHeadSet(repository: Repository) {
-  const path = Path.join(repository.path, '.git', 'REBASE_HEAD')
+  const path = repository.gitPath('REBASE_HEAD')
   return pathExists(path)
 }
 
@@ -100,14 +99,14 @@ export async function getRebaseInternalState(
 
   try {
     originalBranchTip = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'orig-head'),
+      repository.gitPath('rebase-merge', 'orig-head'),
       'utf8'
     )
 
     originalBranchTip = originalBranchTip.trim()
 
     targetBranch = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'head-name'),
+      repository.gitPath('rebase-merge', 'head-name'),
       'utf8'
     )
 
@@ -116,7 +115,7 @@ export async function getRebaseInternalState(
     }
 
     baseBranchTip = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'onto'),
+      repository.gitPath('rebase-merge', 'onto'),
       'utf8'
     )
 
@@ -168,7 +167,7 @@ export async function getRebaseSnapshot(repository: Repository): Promise<{
   try {
     // this contains the patch number that was recently applied to the repository
     const nextText = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'msgnum'),
+      repository.gitPath('rebase-merge', 'msgnum'),
       'utf8'
     )
 
@@ -183,7 +182,7 @@ export async function getRebaseSnapshot(repository: Repository): Promise<{
 
     // this contains the total number of patches to be applied to the repository
     const lastText = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'end'),
+      repository.gitPath('rebase-merge', 'end'),
       'utf8'
     )
 
@@ -197,14 +196,14 @@ export async function getRebaseSnapshot(repository: Repository): Promise<{
     }
 
     originalBranchTip = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'orig-head'),
+      repository.gitPath('rebase-merge', 'orig-head'),
       'utf8'
     )
 
     originalBranchTip = originalBranchTip.trim()
 
     baseBranchTip = await readFile(
-      Path.join(repository.path, '.git', 'rebase-merge', 'onto'),
+      repository.gitPath('rebase-merge', 'onto'),
       'utf8'
     )
 
@@ -263,7 +262,7 @@ export async function getRebaseSnapshot(repository: Repository): Promise<{
  */
 async function readRebaseHead(repository: Repository): Promise<string | null> {
   try {
-    const rebaseHead = Path.join(repository.path, '.git', 'REBASE_HEAD')
+    const rebaseHead = repository.gitPath('REBASE_HEAD')
     const rebaseCurrentCommitOutput = await readFile(rebaseHead, 'utf8')
     return rebaseCurrentCommitOutput.trim()
   } catch (err) {

@@ -1,4 +1,3 @@
-import * as Path from 'path'
 import { GitError } from 'dugite'
 import { Repository } from '../../models/repository'
 import {
@@ -240,10 +239,7 @@ export async function getCherryPickSnapshot(
   // or aborted at the same time.
   try {
     abortSafetySha = (
-      await readFile(
-        Path.join(repository.path, '.git', 'sequencer', 'abort-safety'),
-        'utf8'
-      )
+      await readFile(repository.gitPath('sequencer', 'abort-safety'), 'utf8')
     ).trim()
 
     if (abortSafetySha === '') {
@@ -253,10 +249,7 @@ export async function getCherryPickSnapshot(
     }
 
     headSha = (
-      await readFile(
-        Path.join(repository.path, '.git', 'sequencer', 'head'),
-        'utf8'
-      )
+      await readFile(repository.gitPath('sequencer', 'head'), 'utf8')
     ).trim()
 
     if (headSha === '') {
@@ -266,10 +259,7 @@ export async function getCherryPickSnapshot(
     }
 
     const remainingPicks = (
-      await readFile(
-        Path.join(repository.path, '.git', 'sequencer', 'todo'),
-        'utf8'
-      )
+      await readFile(repository.gitPath('sequencer', 'todo'), 'utf8')
     ).trim()
 
     if (remainingPicks === '') {
@@ -307,10 +297,7 @@ export async function getCherryPickSnapshot(
     // If cherry-pick is in progress, then there was only one commit cherry-picked
     // thus sequencer files were not used.
     const cherryPickHeadSha = (
-      await readFile(
-        Path.join(repository.path, '.git', 'CHERRY_PICK_HEAD'),
-        'utf8'
-      )
+      await readFile(repository.gitPath('CHERRY_PICK_HEAD'), 'utf8')
     ).trim()
     const commit = await getCommit(repository, cherryPickHeadSha)
     if (commit === null) {
@@ -487,12 +474,7 @@ export async function isCherryPickHeadFound(
   repository: Repository
 ): Promise<boolean> {
   try {
-    const cherryPickHeadPath = Path.join(
-      repository.path,
-      '.git',
-      'CHERRY_PICK_HEAD'
-    )
-    return pathExists(cherryPickHeadPath)
+    return pathExists(repository.gitPath('CHERRY_PICK_HEAD'))
   } catch (err) {
     log.warn(
       `[cherryPick] a problem was encountered reading .git/CHERRY_PICK_HEAD,

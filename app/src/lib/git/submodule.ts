@@ -129,7 +129,7 @@ export async function listSubmodules(
 ): Promise<ReadonlyArray<SubmoduleEntry>> {
   const [submodulesFile, submodulesDir] = await Promise.all([
     pathExists(Path.join(repository.path, '.gitmodules')),
-    pathExists(Path.join(repository.path, '.git', 'modules')),
+    pathExists(repository.gitPath('modules')),
   ])
 
   if (!submodulesFile && !submodulesDir) {

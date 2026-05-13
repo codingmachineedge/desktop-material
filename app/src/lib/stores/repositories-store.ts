@@ -152,7 +152,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.missing,
       repo.alias,
       repo.workflowPreferences,
-      repo.isTutorialRepository
+      repo.isTutorialRepository,
+      repo.gitDir
     )
   }
 
@@ -199,7 +200,8 @@ export class RepositoriesStore extends TypedBaseStore<
   public async addTutorialRepository(
     path: string,
     endpoint: string,
-    apiRepo: IAPIFullRepository
+    apiRepo: IAPIFullRepository,
+    gitDir?: string
   ) {
     await this.db.transaction(
       'rw',
@@ -218,6 +220,7 @@ export class RepositoriesStore extends TypedBaseStore<
           missing: false,
           lastStashCheckDate: null,
           isTutorialRepository: true,
+          gitDir,
         })
       }
     )
@@ -232,6 +235,7 @@ export class RepositoriesStore extends TypedBaseStore<
    */
   public async addRepository(
     path: string,
+    gitDir: string | undefined,
     opts?: AddRepositoryOptions
   ): Promise<Repository> {
     const repository = await this.db.transaction(
@@ -252,6 +256,7 @@ export class RepositoriesStore extends TypedBaseStore<
           missing: opts?.missing ?? false,
           lastStashCheckDate: null,
           alias: null,
+          gitDir,
         }
         const id = await this.db.repositories.add(dbRepo)
         return this.toRepository({ id, ...dbRepo })
@@ -287,7 +292,29 @@ export class RepositoriesStore extends TypedBaseStore<
       missing,
       repository.alias,
       repository.workflowPreferences,
-      repository.isTutorialRepository
+      repository.isTutorialRepository,
+      repository.gitDir
+    )
+  }
+
+  /** Update the repository's `gitDir` path. */
+  public async updateRepositoryGitDir(
+    repository: Repository,
+    gitDir: string
+  ): Promise<Repository> {
+    await this.db.repositories.update(repository.id, { gitDir })
+
+    this.emitUpdatedRepositories()
+
+    return new Repository(
+      repository.path,
+      repository.id,
+      repository.gitHubRepository,
+      repository.missing,
+      repository.alias,
+      repository.workflowPreferences,
+      repository.isTutorialRepository,
+      gitDir
     )
   }
 
@@ -337,7 +364,8 @@ export class RepositoriesStore extends TypedBaseStore<
       false,
       repository.alias,
       repository.workflowPreferences,
-      repository.isTutorialRepository
+      repository.isTutorialRepository,
+      repository.gitDir
     )
   }
 
@@ -528,7 +556,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.missing,
       repo.alias,
       repo.workflowPreferences,
-      repo.isTutorialRepository
+      repo.isTutorialRepository,
+      repo.gitDir
     )
 
     assertIsRepositoryWithGitHubRepository(updatedRepo)

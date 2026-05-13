@@ -48,7 +48,13 @@ export class Repository {
      * onboarding flow. Tutorial repositories trigger a tutorial user experience
      * which introduces new users to some core concepts of Git and GitHub.
      */
-    public readonly isTutorialRepository: boolean = false
+    public readonly isTutorialRepository: boolean = false,
+    /**
+     * The path to the .git directory for this repository, or undefined if it
+     * hasn't been resolved yet (e.g. for repositories added before this
+     * property was introduced).
+     */
+    public readonly gitDir: string | undefined = undefined
   ) {
     this.name = (gitHubRepository && gitHubRepository.name) || getBaseName(path)
 
@@ -61,6 +67,27 @@ export class Repository {
       this.workflowPreferences.forkContributionTarget,
       this.isTutorialRepository
     )
+  }
+
+  /**
+   * The resolved path to the .git directory for this repository.
+   *
+   * Uses the stored gitDir if available, otherwise falls back to
+   * joining the repository path with '.git'.
+   */
+  public get resolvedGitDir(): string {
+    return this.gitDir ?? Path.join(this.path, '.git')
+  }
+
+  /**
+   * Resolve a path relative to the .git directory, similar to
+   * `git rev-parse --git-path`.
+   *
+   * Example: `repository.gitPath('FETCH_HEAD')` returns the absolute
+   * path to the FETCH_HEAD file for this repository.
+   */
+  public gitPath(...segments: string[]): string {
+    return Path.join(this.resolvedGitDir, ...segments)
   }
 }
 
