@@ -108,6 +108,13 @@ interface IAutocompletingTextInputProps<ElementType, AutocompleteItemType> {
    * defaults to ' '
    */
   readonly completionSuffix?: string
+
+  /** Whether the autocompletion popup should be anchored to the caret position
+   * instead of the input/textarea element. Optional (defaults to true) */
+  readonly anchorToCaret?: boolean
+
+  /** Offset to apply to the distance from the anchor */
+  readonly anchorOffset?: number
 }
 
 interface IAutocompletionState<T> {
@@ -124,12 +131,6 @@ interface IAutocompletionState<T> {
  * The height of the autocompletion result rows.
  */
 const RowHeight = 29
-
-/**
- * The amount to offset on the Y axis so that the popup is displayed below the
- * current line.
- */
-const YOffset = 20
 
 /**
  * The default height for the popup. Note that the actual height may be
@@ -290,8 +291,13 @@ export abstract class AutocompletingTextInput<
 
     return (
       <Popover
-        anchor={this.invisibleCaretRef.current}
+        anchor={
+          this.props.anchorToCaret === false
+            ? this.element
+            : this.invisibleCaretRef.current
+        }
         anchorPosition={PopoverAnchorPosition.BottomLeft}
+        anchorOffset={this.props.anchorOffset}
         decoration={PopoverDecoration.None}
         maxHeight={Math.min(DefaultPopupHeight, noOverflowItemHeight)}
         minHeight={minHeight}
@@ -496,12 +502,15 @@ export abstract class AutocompletingTextInput<
       return null
     }
 
+    if (this.props.anchorToCaret === false) {
+      return null
+    }
+
     return (
       <div
         style={{
           backgroundColor: 'transparent',
           width: 2,
-          height: YOffset,
           position: 'absolute',
           left: caretCoordinates.left,
           top: caretCoordinates.top,
