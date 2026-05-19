@@ -3272,6 +3272,10 @@ export class App extends React.Component<IAppProps, IAppState> {
       })
     }
 
+    const onShowWorktrees = () => {
+      this.showWorktrees()
+    }
+
     const items = generateRepositoryListContextMenu({
       onRemoveRepository: this.removeRepository,
       onShowRepository: this.showRepository,
@@ -3284,6 +3288,7 @@ export class App extends React.Component<IAppProps, IAppState> {
       onRemoveRepositoryAlias: onRemoveRepositoryAlias,
       onViewOnGitHub: this.viewOnGitHub,
       onCreateWorktree: onCreateWorktree,
+      onShowWorktrees: onShowWorktrees,
       repository: repository,
       shellLabel: this.state.useCustomShell
         ? undefined
