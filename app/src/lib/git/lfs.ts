@@ -1,6 +1,12 @@
 import { git } from './core'
 import { Repository } from '../../models/repository'
 
+interface ILFSTrackOutput {
+  readonly patterns: ReadonlyArray<{
+    readonly tracked: boolean
+  }>
+}
+
 /** Install the global LFS filters. */
 export async function installGlobalLFSFilters(force: boolean): Promise<void> {
   const args = ['lfs', 'install', '--skip-repo']
@@ -29,10 +35,16 @@ export async function isUsingLFS(repository: Repository): Promise<boolean> {
   const env = {
     GIT_LFS_TRACK_NO_INSTALL_HOOKS: '1',
   }
-  const result = await git(['lfs', 'track'], repository.path, 'isUsingLFS', {
-    env,
-  })
-  return result.stdout.length > 0
+  const result = await git(
+    ['lfs', 'track', '--json'],
+    repository.path,
+    'isUsingLFS',
+    {
+      env,
+    }
+  )
+  const output: ILFSTrackOutput = JSON.parse(result.stdout)
+  return output.patterns.some(pattern => pattern.tracked)
 }
 
 /**
