@@ -164,11 +164,11 @@ export class RepositoryPath extends React.Component<
       <InputWarning
         id="repo-sanitized-name-warning"
         trackedUserInput={this.state.name}
-        ariaLiveMessage={`Will be created as ${sanitizedName}. Spaces and invalid characters have been replaced by hyphens.`}
+        ariaLiveMessage={`Will be created as ${sanitizedName}. Invalid characters have been replaced by hyphens.`}
       >
         <p>Will be created as {sanitizedName}</p>
         <span className="sr-only">
-          Spaces and invalid characters have been replaced by hyphens.
+          Invalid characters have been replaced by hyphens.
         </span>
       </InputWarning>
     )
