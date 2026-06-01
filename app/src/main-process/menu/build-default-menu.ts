@@ -35,7 +35,11 @@ export const separator: Electron.MenuItemConstructorOptions = {
   type: 'separator',
 }
 
-export function buildDefaultMenu({
+export function buildDefaultMenu(params: MenuLabelsEvent): Electron.Menu {
+  return Menu.buildFromTemplate(buildDefaultMenuTemplate(params))
+}
+
+export function buildDefaultMenuTemplate({
   selectedExternalEditor,
   selectedShell,
   askForConfirmationOnForcePush,
@@ -46,7 +50,7 @@ export function buildDefaultMenu({
   isStashedChangesVisible = false,
   askForConfirmationWhenStashingAllChanges = true,
   isChangesFilterVisible = true,
-}: MenuLabelsEvent): Electron.Menu {
+}: MenuLabelsEvent): Electron.MenuItemConstructorOptions[] {
   contributionTargetDefaultBranch = truncateWithEllipsis(
     contributionTargetDefaultBranch,
     25
@@ -199,7 +203,7 @@ export function buildDefaultMenu({
         click: emit('show-branches'),
       },
       {
-        label: __DARWIN__ ? 'Show Worktrees List' : '&Worktrees list',
+        label: __DARWIN__ ? 'Show Worktrees List' : 'Wor&ktrees list',
         id: 'show-worktrees-list',
         accelerator: 'CmdOrCtrl+Alt+W',
         click: emit('show-worktrees'),
@@ -604,7 +608,7 @@ export function buildDefaultMenu({
 
   ensureItemIds(template)
 
-  return Menu.buildFromTemplate(template)
+  return template
 }
 
 function getPushLabel(
