@@ -1,7 +1,7 @@
 import assert from 'node:assert'
-import { describe, it } from 'node:test'
+import { before, describe, it } from 'node:test'
 import * as React from 'react'
-import { render, screen, fireEvent } from '../../helpers/ui/render'
+import { render, screen, fireEvent, waitFor } from '../../helpers/ui/render'
 import { CopilotPreferences } from '../../../src/ui/preferences/copilot'
 import {
   DefaultCopilotModel,
@@ -51,6 +51,54 @@ const ollamaProvider: IBYOKProvider = {
   ],
 }
 
+class TestListResizeObserver implements ResizeObserver {
+  public constructor(private readonly callback: ResizeObserverCallback) {}
+
+  public observe(target: Element) {
+    Object.defineProperty(target, 'offsetWidth', {
+      configurable: true,
+      value: 365,
+    })
+    Object.defineProperty(target, 'offsetHeight', {
+      configurable: true,
+      value: 360,
+    })
+
+    const contentRect = {
+      x: 0,
+      y: 0,
+      width: 365,
+      height: 360,
+      top: 0,
+      right: 365,
+      bottom: 360,
+      left: 0,
+      toJSON: () => ({}),
+    }
+
+    this.callback(
+      [
+        {
+          target,
+          contentRect,
+          borderBoxSize: [],
+          contentBoxSize: [],
+          devicePixelContentBoxSize: [],
+        },
+      ],
+      this
+    )
+  }
+
+  public unobserve() {}
+
+  public disconnect() {}
+}
+
+before(() => {
+  Object.assign(window, { ResizeObserver: TestListResizeObserver })
+})
+
 function defaults() {
   return {
     selectedCopilotModels: {},
@@ -63,6 +111,20 @@ function defaults() {
     onEditBYOKProvider: () => {},
     onDeleteBYOKProvider: () => {},
   }
+}
+
+function getModelPickerButton(container: HTMLElement): HTMLButtonElement {
+  const button = container.querySelector(
+    '.copilot-model-picker > .button-component'
+  )
+
+  assert.ok(button instanceof HTMLButtonElement)
+
+  return button
+}
+
+function getModelPickerButtonText(container: HTMLElement): string {
+  return getModelPickerButton(container).textContent ?? ''
 }
 
 describe('CopilotPreferences', () => {
@@ -95,34 +157,35 @@ describe('CopilotPreferences', () => {
     )
   })
 
-  it('renders a Copilot optgroup with the available models', () => {
+  it('renders a Copilot group with the available models', async () => {
     const view = render(<CopilotPreferences {...defaults()} />)
 
-    const optgroups = view.container.querySelectorAll('optgroup')
-    assert.strictEqual(optgroups.length, 1)
-    assert.strictEqual(optgroups[0].label, 'GitHub Copilot')
+    fireEvent.click(getModelPickerButton(view.container))
 
-    const options = view.container.querySelectorAll('option')
-    assert.strictEqual(options[0].textContent, 'GPT-5 mini (default)')
-    assert.strictEqual(options[1].textContent, 'Claude Sonnet')
+    await waitFor(() => assert.ok(screen.getByText('Claude Sonnet')))
+    assert.ok(screen.getByText('GitHub Copilot'))
+    assert.ok(screen.getAllByText('GPT-5 mini (default)').length >= 2)
   })
 
-  it('renders a BYOK optgroup per provider', () => {
+  it('renders a BYOK group per provider', async () => {
     const view = render(
       <CopilotPreferences {...defaults()} byokProviders={[ollamaProvider]} />
     )
-    const labels = Array.from(view.container.querySelectorAll('optgroup')).map(
-      g => g.label
-    )
-    assert.deepStrictEqual(labels, ['GitHub Copilot', 'Ollama'])
+
+    fireEvent.click(getModelPickerButton(view.container))
+
+    await waitFor(() => assert.ok(screen.getByText('Ollama')))
+    assert.ok(screen.getByText('GitHub Copilot'))
   })
 
   it('selects the default Copilot model when no model is selected', () => {
     const view = render(<CopilotPreferences {...defaults()} />)
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({ kind: 'copilot', modelId: DefaultCopilotModel })
+
+    assert.ok(
+      getModelPickerButtonText(view.container).includes('GPT-5 mini (default)')
+    )
+    assert.ok(
+      !getModelPickerButtonText(view.container).includes('GitHub Copilot')
     )
   })
 
@@ -133,10 +196,9 @@ describe('CopilotPreferences', () => {
         selectedCopilotModels={{ 'commit-message-generation': 'claude-sonnet' }}
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({ kind: 'copilot', modelId: 'claude-sonnet' })
+
+    assert.ok(
+      getModelPickerButtonText(view.container).includes('Claude Sonnet')
     )
   })
 
@@ -154,18 +216,13 @@ describe('CopilotPreferences', () => {
         }}
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({
-        kind: 'byok',
-        providerId: ollamaProvider.id,
-        modelId: 'llama3',
-      })
-    )
+
+    const buttonText = getModelPickerButtonText(view.container)
+    assert.ok(buttonText.includes('Llama 3'))
+    assert.ok(!buttonText.includes('Ollama'))
   })
 
-  it('emits the encoded composite key on change', () => {
+  it('emits the encoded composite key on change', async () => {
     const changed: Array<{ feature: CopilotFeature; model: string | null }> = []
     const view = render(
       <CopilotPreferences
@@ -175,12 +232,11 @@ describe('CopilotPreferences', () => {
         }
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    fireEvent.change(select, {
-      target: {
-        value: encodeModelKey({ kind: 'copilot', modelId: 'claude-sonnet' }),
-      },
-    })
+
+    fireEvent.click(getModelPickerButton(view.container))
+    await waitFor(() => assert.ok(screen.getByText('Claude Sonnet')))
+    fireEvent.click(screen.getByText('Claude Sonnet'))
+
     assert.deepStrictEqual(changed, [
       {
         feature: 'commit-message-generation',
@@ -189,7 +245,7 @@ describe('CopilotPreferences', () => {
     ])
   })
 
-  it('emits the selected value directly on change', () => {
+  it('emits the selected value directly on change', async () => {
     const changed: Array<{ feature: CopilotFeature; model: string | null }> = []
     const view = render(
       <CopilotPreferences
@@ -200,15 +256,11 @@ describe('CopilotPreferences', () => {
         }
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    fireEvent.change(select, {
-      target: {
-        value: encodeModelKey({
-          kind: 'copilot',
-          modelId: DefaultCopilotModel,
-        }),
-      },
-    })
+
+    fireEvent.click(getModelPickerButton(view.container))
+    await waitFor(() => assert.ok(screen.getByText('GPT-5 mini (default)')))
+    fireEvent.click(screen.getByText('GPT-5 mini (default)'))
+
     assert.deepStrictEqual(changed, [
       {
         feature: 'commit-message-generation',
@@ -229,10 +281,9 @@ describe('CopilotPreferences', () => {
         }}
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({ kind: 'copilot', modelId: DefaultCopilotModel })
+
+    assert.ok(
+      getModelPickerButtonText(view.container).includes('GPT-5 mini (default)')
     )
   })
 
@@ -249,10 +300,9 @@ describe('CopilotPreferences', () => {
         }}
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({ kind: 'copilot', modelId: DefaultCopilotModel })
+
+    assert.ok(
+      getModelPickerButtonText(view.container).includes('GPT-5 mini (default)')
     )
   })
 
@@ -267,10 +317,9 @@ describe('CopilotPreferences', () => {
         }}
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({ kind: 'copilot', modelId: otherModel.id })
+
+    assert.ok(
+      getModelPickerButtonText(view.container).includes('Claude Sonnet')
     )
   })
 
@@ -285,15 +334,10 @@ describe('CopilotPreferences', () => {
         }}
       />
     )
-    const select = view.container.querySelector('select') as HTMLSelectElement
-    assert.strictEqual(
-      select.value,
-      encodeModelKey({
-        kind: 'byok',
-        providerId: ollamaProvider.id,
-        modelId: ollamaProvider.models[0].id,
-      })
-    )
+
+    const buttonText = getModelPickerButtonText(view.container)
+    assert.ok(buttonText.includes('Llama 3'))
+    assert.ok(!buttonText.includes('Ollama'))
   })
 
   it('hides the Providers tab when showBYOKSettings is false', () => {

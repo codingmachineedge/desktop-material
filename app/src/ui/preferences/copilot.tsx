@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { DialogContent } from '../dialog'
 import { Row } from '../lib/row'
-import { Select } from '../lib/select'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
 import { Octicon } from '../octicons'
@@ -9,12 +8,16 @@ import * as octicons from '../octicons/octicons.generated'
 import { TabBar } from '../tab-bar'
 import type { ModelInfo } from '@github/copilot-sdk'
 import {
+  CopilotModelPicker,
+  hasCopilotModelPickerItems,
+} from '../lib/copilot-model-picker'
+import {
   DefaultCopilotModel,
   type CopilotFeature,
   type CopilotModelSelections,
 } from '../../lib/stores/copilot-store'
 import {
-  IBYOKProvider,
+  type IBYOKProvider,
   encodeModelKey,
   isLocalBaseUrl,
   parseModelKey,
@@ -52,13 +55,8 @@ export class CopilotPreferences extends React.Component<
     this.setState({ selectedTabIndex: index })
   }
 
-  private onCommitMessageModelChanged = (
-    event: React.FormEvent<HTMLSelectElement>
-  ) => {
-    this.props.onSelectedCopilotModelChanged(
-      'commit-message-generation',
-      event.currentTarget.value
-    )
+  private onCommitMessageModelChanged = (model: string) => {
+    this.props.onSelectedCopilotModelChanged('commit-message-generation', model)
   }
 
   private onAddBYOKProviderClick = () => this.props.onAddBYOKProvider()
@@ -121,7 +119,7 @@ export class CopilotPreferences extends React.Component<
       return <p>Loading available models…</p>
     }
 
-    if (copilotModels.length === 0 && byokProviders.length === 0) {
+    if (!hasCopilotModelPickerItems(copilotModels, byokProviders)) {
       return <p>No models available. Check your Copilot subscription.</p>
     }
 
@@ -132,12 +130,6 @@ export class CopilotPreferences extends React.Component<
       byokProviders,
       rawSelection
     )
-
-    if (value === null) {
-      // This should not happen at this point because if there are no models then
-      // we return early.
-      return <p>No models available. Check your Copilot subscription.</p>
-    }
 
     return (
       <>
@@ -150,46 +142,17 @@ export class CopilotPreferences extends React.Component<
             .
           </p>
         </Row>
-        <Select
+        <CopilotModelPicker
           label={
             __DARWIN__
               ? 'Commit Message Generation'
               : 'Commit message generation'
           }
+          copilotModels={copilotModels}
+          byokProviders={byokProviders}
           value={value}
           onChange={this.onCommitMessageModelChanged}
-        >
-          {copilotModels.length > 0 && (
-            <optgroup label="GitHub Copilot">
-              {copilotModels.map(m => (
-                <option
-                  key={m.id}
-                  value={encodeModelKey({ kind: 'copilot', modelId: m.id })}
-                >
-                  {m.id === DefaultCopilotModel
-                    ? `${m.name} (default)`
-                    : m.name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {byokProviders.map(p => (
-            <optgroup key={p.id} label={p.name}>
-              {p.models.map(m => (
-                <option
-                  key={m.id}
-                  value={encodeModelKey({
-                    kind: 'byok',
-                    providerId: p.id,
-                    modelId: m.id,
-                  })}
-                >
-                  {m.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
+        />
         <p className="settings-description">
           <LinkButton uri="https://docs.github.com/en/desktop/making-changes-in-a-branch/committing-and-reviewing-changes-to-your-project-in-github-desktop#write-a-commit-message-and-push-your-changes">
             Learn more about generating commit messages.
@@ -248,7 +211,13 @@ export class CopilotPreferences extends React.Component<
       return encodeModelKey({ kind: 'copilot', modelId: firstCopilotModel.id })
     }
 
-    const firstProvider = byokProviders[0]
+    const firstProvider = byokProviders.find(provider => provider.models[0])
+
+    if (firstProvider === undefined) {
+      // This should not happen because we check for selectable models earlier.
+      throw new Error('No models available')
+    }
+
     const firstByokModel = firstProvider.models[0]
     return encodeModelKey({
       kind: 'byok',
