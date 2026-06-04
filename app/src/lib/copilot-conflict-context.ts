@@ -459,10 +459,6 @@ export function formatConflictContextForPrompt(
     }
   }
 
-  parts.push(
-    'Before you answer: if this repository or the user has provided Copilot custom instructions, apply them to the wording and level of detail of your summary and per-file reasoning, while still returning the exact JSON structure requested.'
-  )
-
   return parts.join('\n')
 }
 
