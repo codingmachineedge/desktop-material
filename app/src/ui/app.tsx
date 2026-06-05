@@ -215,6 +215,7 @@ import { AddWorktreeDialog } from './worktrees/add-worktree-dialog'
 import { RenameWorktreeDialog } from './worktrees/rename-worktree-dialog'
 import { DeleteWorktreeDialog } from './worktrees/delete-worktree-dialog'
 import { DeleteWorktreeFailedDialog } from './worktrees/delete-worktree-failed-dialog'
+import { WorktreeEntry } from '../models/worktree'
 
 const MinuteInMilliseconds = 1000 * 60
 const HourInMilliseconds = MinuteInMilliseconds * 60
@@ -1668,6 +1669,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             confirmCommitMessageOverride={
               this.state.askForConfirmationOnCommitMessageOverride
             }
+            confirmWorktreeRemoval={
+              this.state.askForConfirmationOnWorktreeRemoval
+            }
             uncommittedChangesStrategy={this.state.uncommittedChangesStrategy}
             selectedExternalEditor={this.state.selectedExternalEditor}
             useWindowsOpenSSH={this.state.useWindowsOpenSSH}
@@ -2801,7 +2805,13 @@ export class App extends React.Component<IAppProps, IAppState> {
             key="delete-worktree"
             repository={popup.repository}
             worktreePath={popup.worktreePath}
+            askForConfirmationOnWorktreeRemoval={
+              this.state.askForConfirmationOnWorktreeRemoval
+            }
             onDeleteWorktree={this.onDeleteWorkTree}
+            onConfirmWorktreeRemovalChanged={
+              this.onConfirmWorktreeRemovalChanged
+            }
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -2813,7 +2823,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             repository={popup.repository}
             worktreePath={popup.worktreePath}
             error={popup.error}
+            originalWorktree={popup.originalWorktree}
             onDeleteWorktree={this.onDeleteWorkTree}
+            onSwitchToWorktree={this.onSwitchToWorktree}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -2823,12 +2835,23 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
   }
 
+  private onSwitchToWorktree = (
+    repository: Repository,
+    worktree: WorktreeEntry
+  ) => {
+    return this.props.dispatcher.switchWorktree(repository, worktree)
+  }
+
   private onDeleteWorkTree = (
     repository: Repository,
     worktreePath: string,
     force?: boolean
   ) => {
     return this.props.dispatcher.deleteWorktree(repository, worktreePath, force)
+  }
+
+  private onConfirmWorktreeRemovalChanged = (value: boolean) => {
+    this.props.dispatcher.setConfirmWorktreeRemovalSetting(value)
   }
 
   private onUpdateCommitOptions = (

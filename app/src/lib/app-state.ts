@@ -255,6 +255,9 @@ export interface IAppState {
   /** Should the app prompt the user to confirm commit message override? */
   readonly askForConfirmationOnCommitMessageOverride: boolean
 
+  /** Should the app prompt the user to confirm worktree removal? */
+  readonly askForConfirmationOnWorktreeRemoval: boolean
+
   /** How the app should handle uncommitted changes when switching branches */
   readonly uncommittedChangesStrategy: UncommittedChangesStrategy
 
