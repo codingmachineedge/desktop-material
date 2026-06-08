@@ -209,6 +209,8 @@ describe('CopilotPreferences', () => {
 
     await waitFor(() => assert.ok(screen.getByText('Claude Sonnet (2x)')))
     assert.strictEqual(screen.queryByText('GitHub Copilot'), null)
+    assert.ok(document.querySelector('.popover-component'))
+    assert.strictEqual(document.querySelector('.popover-tip'), null)
     assert.ok(screen.getByText('Lightweight'))
     assert.ok(screen.getAllByText('GPT-5 mini (1x) (default)').length >= 2)
     assert.ok(screen.getByText('Usage Billed Model'))
@@ -220,11 +222,11 @@ describe('CopilotPreferences', () => {
     assert.strictEqual(screen.queryByText('AI credits per 1M tokens'), null)
     assert.strictEqual(
       getListItemHeight(screen.getByText('Claude Sonnet (2x)')),
-      '36px'
+      '30px'
     )
     assert.strictEqual(
       getListItemHeight(screen.getByText('Usage Billed Model')),
-      '54px'
+      '46px'
     )
   })
 

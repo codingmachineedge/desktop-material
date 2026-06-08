@@ -12,6 +12,7 @@ interface IPopoverDropdownProps {
   readonly className?: string
   readonly contentTitle: string
   readonly buttonContent: JSX.Element | string
+  readonly decoration?: PopoverDecoration
   readonly label?: string
   /**
    * The class name to apply to the open button. This is useful for
@@ -69,7 +70,7 @@ export class PopoverDropdown extends React.Component<
       return
     }
 
-    const { contentTitle } = this.props
+    const { contentTitle, decoration = PopoverDecoration.Balloon } = this.props
     this.dropdownHeaderId ??= createUniqueId('popover-dropdown-header')
 
     return (
@@ -78,7 +79,7 @@ export class PopoverDropdown extends React.Component<
         anchor={this.invokeButtonRef}
         anchorPosition={PopoverAnchorPosition.BottomLeft}
         maxHeight={maxPopoverContentHeight}
-        decoration={PopoverDecoration.Balloon}
+        decoration={decoration}
         onClickOutside={this.closePopover}
         ariaLabelledby={this.dropdownHeaderId}
       >

@@ -4,6 +4,7 @@ import memoizeOne from 'memoize-one'
 import { DefaultCopilotModel } from '../../lib/stores/copilot-store'
 import { type IBYOKProvider, encodeModelKey } from '../../lib/copilot/byok'
 import { IFilterListGroup, IFilterListItem } from './filter-list'
+import { PopoverDecoration } from './popover'
 import { PopoverDropdown } from './popover-dropdown'
 import { SectionFilterList } from './section-filter-list'
 import { Model, ModelBilling } from '@github/copilot-sdk/dist/generated/rpc'
@@ -357,6 +358,7 @@ export class CopilotModelPicker extends React.Component<
         className="copilot-model-picker"
         contentTitle="Choose a model"
         buttonContent={this.renderButtonContent(buttonItem)}
+        decoration={PopoverDecoration.Bordered}
         label={this.props.label}
         ref={this.popoverRef}
       >

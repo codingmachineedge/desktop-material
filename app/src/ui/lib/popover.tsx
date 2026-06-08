@@ -50,12 +50,22 @@ export enum PopoverAppearEffect {
 
 export enum PopoverDecoration {
   None = 'none',
+  Bordered = 'bordered',
   Balloon = 'balloon',
 }
 
 const TipSize = 8
 const TipCornerPadding = TipSize
 export const PopoverScreenBorderPadding = 10
+
+const hasPopoverComponentDecoration = (
+  decoration: PopoverDecoration | undefined
+) =>
+  decoration === PopoverDecoration.Balloon ||
+  decoration === PopoverDecoration.Bordered
+
+const hasPopoverTip = (decoration: PopoverDecoration | undefined) =>
+  decoration === PopoverDecoration.Balloon
 
 interface IPopoverProps {
   readonly onClickOutside?: (event?: MouseEvent) => void
@@ -146,7 +156,7 @@ export class Popover extends React.Component<IPopoverProps, IPopoverState> {
 
     const tipDiv = this.tipDivRef.current
     const extraOffset = anchorOffset ?? 0
-    const popoverOffset = decoration === PopoverDecoration.Balloon ? TipSize : 0
+    const popoverOffset = hasPopoverTip(decoration) ? TipSize : 0
 
     const middleware = [
       offset(popoverOffset + extraOffset),
@@ -173,7 +183,7 @@ export class Popover extends React.Component<IPopoverProps, IPopoverState> {
       }),
     ]
 
-    if (decoration === PopoverDecoration.Balloon && tipDiv) {
+    if (hasPopoverTip(decoration) && tipDiv) {
       middleware.push(arrow({ element: tipDiv, padding: TipCornerPadding }))
     }
 
@@ -287,7 +297,7 @@ export class Popover extends React.Component<IPopoverProps, IPopoverState> {
       isDialog,
     } = this.props
     const cn = classNames(
-      decoration === PopoverDecoration.Balloon && 'popover-component',
+      hasPopoverComponentDecoration(decoration) && 'popover-component',
       className,
       appearEffect && `appear-${appearEffect}`
     )
@@ -360,7 +370,7 @@ export class Popover extends React.Component<IPopoverProps, IPopoverState> {
         >
           {children}
         </div>
-        {decoration === PopoverDecoration.Balloon && (
+        {hasPopoverTip(decoration) && (
           <div
             className="popover-tip"
             style={{
