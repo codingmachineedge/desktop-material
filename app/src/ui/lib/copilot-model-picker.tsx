@@ -55,10 +55,6 @@ export interface ICopilotModelPickerSelectionInfo {
 
 const ModelPickerCompactRowHeight = 30
 const ModelPickerSubtitleRowHeight = 46
-const AIModelCreditNumberFormat = {
-  thousandsSeparator: ',' as const,
-  decimalSeparator: '.' as const,
-}
 
 const getPremiumRequestsBillingLabel = (billing: ModelBilling | undefined) => {
   const multiplier = billing?.multiplier
@@ -111,7 +107,7 @@ const formatReasoningEffortLevels = (
 }
 
 const formatAIModelCreditAmount = (value: number | undefined) =>
-  value === undefined ? null : formatNumber(value, AIModelCreditNumberFormat)
+  value === undefined ? null : formatNumber(value)
 
 const getTokenPriceDetails = (
   tokenPrices: ModelBilling['tokenPrices']
@@ -469,6 +465,7 @@ export class CopilotModelPicker extends React.Component<
       this.state.selectedItemId,
       this.props.value
     )
+    const buttonItem = this.getItemByValue(groups, this.props.value)
     const buttonAriaLabel = `${this.props.label}: ${
       buttonItem === undefined ? 'None' : getCopilotModelTitle(buttonItem)
     }`

@@ -23,6 +23,7 @@ import {
   type IBYOKProvider,
 } from '../../../src/lib/copilot/byok'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
+import { setNumberFormatPreference } from '../../../src/models/formatting-preferences'
 
 function makeModel(
   overrides: Partial<Model> & Pick<Model, 'id' | 'name'>
@@ -277,7 +278,7 @@ describe('CopilotPreferences', () => {
 
     assert.strictEqual(
       modelPickerButton.getAttribute('aria-label'),
-      `${pickerLabel}: GPT-5 mini`
+      `${pickerLabel}: GPT-5 mini (1x) (default)`
     )
     assert.strictEqual(modelPickerButton.getAttribute('aria-expanded'), 'false')
     assert.strictEqual(
@@ -347,6 +348,18 @@ describe('CopilotPreferences', () => {
   it('shows usage billing below the selected model picker', async t => {
     enableTestTimers(['setTimeout'])
     t.after(resetTestTimers)
+    const previousNumberFormat = localStorage.getItem('numberFormat')
+    t.after(() => {
+      if (previousNumberFormat === null) {
+        localStorage.removeItem('numberFormat')
+      } else {
+        localStorage.setItem('numberFormat', previousNumberFormat)
+      }
+    })
+    setNumberFormatPreference({
+      thousandsSeparator: '.',
+      decimalSeparator: ',',
+    })
 
     const view = render(
       <CopilotPreferences
@@ -416,7 +429,7 @@ describe('CopilotPreferences', () => {
     assert.ok(screen.getByText('Cached input'))
     assert.ok(screen.getByText('20'))
     assert.ok(screen.getByText('Output'))
-    assert.ok(screen.getByText('1,200'))
+    assert.ok(screen.getByText('1.200'))
 
     fireEvent.keyDown(costsButton, { key: 'Escape' })
 
