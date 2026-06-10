@@ -194,13 +194,13 @@ export class CopilotPreferences extends React.Component<
         return <p>Checking Copilot access…</p>
       case 'no-license':
         return this.renderAccessCallToAction(
-          'Copilot features in GitHub Desktop require access to GitHub Copilot.',
+          'Copilot features in GitHub Desktop require a GitHub Copilot license.',
           'View Copilot plans',
           this.props.onOpenCopilotPlans
         )
       case 'desktop-disabled':
         return this.renderAccessCallToAction(
-          'Copilot is enabled for your account, but Copilot in GitHub Desktop is disabled in your Copilot feature settings.',
+          'A Copilot license is available for your account, but "Copilot in GitHub Desktop" is disabled in your Copilot feature settings.',
           'Open Copilot feature settings',
           this.props.onOpenCopilotFeatureSettings
         )
