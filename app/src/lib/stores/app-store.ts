@@ -1043,7 +1043,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.accounts.find(
       account =>
         !isGHES(account.endpoint) &&
-        enableCopilotSdkCommitMessageGeneration(account)
+        enableCopilotSdkCommitMessageGeneration(account) &&
+        account.isCopilotDesktopEnabled
     )
   }
 
