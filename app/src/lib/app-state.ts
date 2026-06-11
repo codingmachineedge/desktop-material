@@ -423,7 +423,7 @@ export interface IAppState {
    */
   readonly copilotModels: ReadonlyArray<Model> | null
 
-  /** Whether Copilot is available (i.e. a GitHub.com account is signed in). */
+  /** Whether an account is available for Copilot model configuration. */
   readonly copilotAvailable: boolean
 
   /**

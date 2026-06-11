@@ -1,16 +1,114 @@
 import type { CopilotSession } from '@github/copilot-sdk'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
 import assert from 'node:assert'
-import { describe, it } from 'node:test'
+import { after, before, describe, it } from 'node:test'
+import { getDotComAPIEndpoint } from '../../../src/lib/api'
+import { AccountsStore } from '../../../src/lib/stores/accounts-store'
 import {
   CopilotConflictResolutionAbortError,
+  CopilotStore,
   DefaultCopilotModel,
+  getCopilotGHHost,
+  getCopilotModelCacheKey,
   getLowestReasoningEffort,
   getPreferredDefaultModel,
   getSupportedReasoningEffort,
   isCopilotConflictResolutionAbortError,
   runConflictResolutionTurn,
 } from '../../../src/lib/stores/copilot-store'
+import { Account } from '../../../src/models/account'
+import { AsyncInMemoryStore, InMemoryStore } from '../../helpers/stores'
+
+const PreviewFeaturesEnv = 'GITHUB_DESKTOP_PREVIEW_FEATURES'
+
+interface IAccountOverrides {
+  readonly login?: string
+  readonly endpoint?: string
+  readonly token?: string
+  readonly id?: number
+  readonly name?: string
+}
+
+interface ITestCopilotClient {
+  start(): Promise<void>
+  listModels(): Promise<ReadonlyArray<Model>>
+  stop(): Promise<void>
+}
+
+interface ITestableCopilotStore {
+  createClient(account: Account): Promise<ITestCopilotClient>
+}
+
+function makeAccount(overrides: IAccountOverrides = {}): Account {
+  const login = overrides.login ?? 'monalisa'
+
+  return new Account(
+    login,
+    overrides.endpoint ?? getDotComAPIEndpoint(),
+    overrides.token ?? 'token',
+    [],
+    '',
+    overrides.id ?? 1,
+    overrides.name ?? login,
+    'free'
+  )
+}
+
+function createAccountsStore(): AccountsStore {
+  return new AccountsStore(new InMemoryStore(), new AsyncInMemoryStore())
+}
+
+function createDeferred<T>(): {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T) => void
+} {
+  let resolveValue: ((value: T) => void) | null = null
+  const promise = new Promise<T>(resolve => {
+    resolveValue = resolve
+  })
+
+  if (resolveValue === null) {
+    throw new Error('Deferred promise resolver was not initialized')
+  }
+
+  return { promise, resolve: resolveValue }
+}
+
+function createCopilotStoreWithModels(
+  getModels: (
+    account: Account
+  ) => ReadonlyArray<Model> | Promise<ReadonlyArray<Model>>
+): {
+  readonly accountsStore: AccountsStore
+  readonly store: CopilotStore
+  readonly createClientAccounts: ReadonlyArray<Account>
+  readonly stopCount: () => number
+} {
+  const accountsStore = createAccountsStore()
+  const store = new CopilotStore(accountsStore)
+  const createClientAccounts: Array<Account> = []
+  let stopCount = 0
+  const testableStore = store as unknown as ITestableCopilotStore
+
+  testableStore.createClient = async account => {
+    createClientAccounts.push(account)
+
+    return {
+      start: async () => {},
+      listModels: async () => getModels(account),
+      stop: async () => {
+        stopCount++
+      },
+    }
+  }
+
+  return {
+    accountsStore,
+    store,
+    createClientAccounts,
+    stopCount: () => stopCount,
+  }
+}
 
 function makeModel(
   overrides: Partial<Model> & Pick<Model, 'id' | 'name'>
@@ -23,6 +121,197 @@ function makeModel(
     ...overrides,
   }
 }
+
+describe('getCopilotModelCacheKey', () => {
+  it('uses account id and endpoint', () => {
+    const account = makeAccount({
+      id: 42,
+      endpoint: 'https://api.github.example.com',
+    })
+
+    assert.strictEqual(
+      getCopilotModelCacheKey(account),
+      '42:https://api.github.example.com'
+    )
+  })
+
+  it('differs when account id or endpoint differs', () => {
+    const account = makeAccount({ id: 1 })
+    const sameEndpointDifferentId = makeAccount({ id: 2 })
+    const sameIdDifferentEndpoint = makeAccount({
+      id: 1,
+      endpoint: 'https://api.github.example.com',
+    })
+
+    assert.notStrictEqual(
+      getCopilotModelCacheKey(account),
+      getCopilotModelCacheKey(sameEndpointDifferentId)
+    )
+    assert.notStrictEqual(
+      getCopilotModelCacheKey(account),
+      getCopilotModelCacheKey(sameIdDifferentEndpoint)
+    )
+  })
+})
+
+describe('getCopilotGHHost', () => {
+  it('returns undefined for GitHub.com accounts', () => {
+    assert.strictEqual(getCopilotGHHost(makeAccount()), undefined)
+  })
+
+  it('returns the endpoint host for Enterprise accounts', () => {
+    const account = makeAccount({
+      endpoint: 'https://github.example.com:8443/api/v3',
+    })
+
+    assert.strictEqual(getCopilotGHHost(account), 'github.example.com:8443')
+  })
+})
+
+describe('CopilotStore model cache', () => {
+  let previousPreviewFeatures: string | undefined
+
+  before(() => {
+    previousPreviewFeatures = process.env[PreviewFeaturesEnv]
+    process.env[PreviewFeaturesEnv] = '1'
+  })
+
+  after(() => {
+    if (previousPreviewFeatures === undefined) {
+      delete process.env[PreviewFeaturesEnv]
+    } else {
+      process.env[PreviewFeaturesEnv] = previousPreviewFeatures
+    }
+  })
+
+  it('reuses cached models for the same account', async () => {
+    const account = makeAccount()
+    const models = [makeModel({ id: 'model-a', name: 'Model A' })]
+    const { accountsStore, store, createClientAccounts, stopCount } =
+      createCopilotStoreWithModels(() => models)
+
+    await accountsStore.addAccount(account)
+
+    assert.strictEqual(await store.listModels(account), models)
+    assert.strictEqual(store.getCachedModelList(account), models)
+    assert.strictEqual(await store.listModels(account), models)
+    assert.strictEqual(createClientAccounts.length, 1)
+    assert.strictEqual(stopCount(), 1)
+  })
+
+  it('keeps separate model caches for different accounts', async () => {
+    const dotComAccount = makeAccount({ id: 1, login: 'dotcom' })
+    const enterpriseAccount = makeAccount({
+      id: 1,
+      login: 'enterprise',
+      endpoint: 'https://github.example.com/api/v3',
+    })
+    const dotComModels = [makeModel({ id: 'dotcom', name: 'Dotcom' })]
+    const enterpriseModels = [
+      makeModel({ id: 'enterprise', name: 'Enterprise' }),
+    ]
+    const { accountsStore, store, createClientAccounts } =
+      createCopilotStoreWithModels(account =>
+        account.endpoint === dotComAccount.endpoint
+          ? dotComModels
+          : enterpriseModels
+      )
+
+    await accountsStore.addAccount(dotComAccount)
+    await accountsStore.addAccount(enterpriseAccount)
+
+    assert.strictEqual(await store.listModels(dotComAccount), dotComModels)
+    assert.strictEqual(
+      await store.listModels(enterpriseAccount),
+      enterpriseModels
+    )
+    assert.strictEqual(store.getCachedModelList(dotComAccount), dotComModels)
+    assert.strictEqual(
+      store.getCachedModelList(enterpriseAccount),
+      enterpriseModels
+    )
+    assert.strictEqual(createClientAccounts.length, 2)
+  })
+
+  it('deduplicates concurrent fetches for the same account', async () => {
+    const account = makeAccount()
+    const models = [makeModel({ id: 'model-a', name: 'Model A' })]
+    const deferred = createDeferred<ReadonlyArray<Model>>()
+    const { accountsStore, store, createClientAccounts } =
+      createCopilotStoreWithModels(() => deferred.promise)
+
+    await accountsStore.addAccount(account)
+
+    const first = store.listModels(account)
+    const second = store.listModels(account)
+
+    assert.strictEqual(createClientAccounts.length, 1)
+
+    deferred.resolve(models)
+
+    assert.strictEqual(await first, models)
+    assert.strictEqual(await second, models)
+    assert.strictEqual(store.getCachedModelList(account), models)
+  })
+
+  it('clears cached models when the account is logged out', async () => {
+    const account = makeAccount()
+    const models = [makeModel({ id: 'model-a', name: 'Model A' })]
+    const { accountsStore, store } = createCopilotStoreWithModels(() => models)
+
+    await accountsStore.addAccount(account)
+    assert.strictEqual(await store.listModels(account), models)
+    assert.strictEqual(store.getCachedModelList(account), models)
+
+    await accountsStore.removeAccount(account)
+
+    assert.strictEqual(store.getCachedModelList(account), null)
+    assert.strictEqual(await store.listModels(account), null)
+  })
+
+  it('does not restore cached models when an in-flight fetch resolves after logout', async () => {
+    const account = makeAccount()
+    const models = [makeModel({ id: 'model-a', name: 'Model A' })]
+    const deferred = createDeferred<ReadonlyArray<Model>>()
+    const { accountsStore, store } = createCopilotStoreWithModels(
+      () => deferred.promise
+    )
+
+    await accountsStore.addAccount(account)
+    const fetch = store.listModels(account)
+
+    await accountsStore.removeAccount(account)
+    deferred.resolve(models)
+
+    assert.strictEqual(await fetch, models)
+    assert.strictEqual(store.getCachedModelList(account), null)
+    assert.strictEqual(await store.listModels(account), null)
+  })
+
+  it('does not restore stale models when the account signs back in before an old fetch resolves', async () => {
+    const account = makeAccount()
+    const staleModels = [makeModel({ id: 'stale', name: 'Stale' })]
+    const freshModels = [makeModel({ id: 'fresh', name: 'Fresh' })]
+    const deferred = createDeferred<ReadonlyArray<Model>>()
+    let fetchCount = 0
+    const { accountsStore, store } = createCopilotStoreWithModels(() => {
+      fetchCount++
+      return fetchCount === 1 ? deferred.promise : freshModels
+    })
+
+    await accountsStore.addAccount(account)
+    const staleFetch = store.listModels(account)
+
+    await accountsStore.removeAccount(account)
+    await accountsStore.addAccount(account)
+    deferred.resolve(staleModels)
+
+    assert.strictEqual(await staleFetch, staleModels)
+    assert.strictEqual(store.getCachedModelList(account), null)
+    assert.strictEqual(await store.listModels(account), freshModels)
+    assert.strictEqual(store.getCachedModelList(account), freshModels)
+  })
+})
 
 describe('getLowestReasoningEffort', () => {
   it('returns undefined when model has no supported reasoning efforts', () => {

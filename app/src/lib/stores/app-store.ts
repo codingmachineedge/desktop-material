@@ -285,6 +285,7 @@ import {
   enableCopilotSdkCommitMessageGeneration,
   enableCustomIntegration,
 } from '../feature-flag'
+import { isGHES } from '../endpoint-capabilities'
 import { Banner, BannerType } from '../../models/banner'
 import { ComputedAction } from '../../models/computed-action'
 import {
@@ -994,6 +995,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.accountsStore.onDidUpdate(accounts => {
       this.accounts = accounts
+      this.syncCopilotModelsFromCache()
       const endpointTokens = accounts.map<EndpointToken>(
         ({ endpoint, token }) => ({ endpoint, token })
       )
@@ -1032,11 +1034,29 @@ export class AppStore extends TypedBaseStore<IAppState> {
     updateStore.onDidChange(() => this.emitUpdate())
 
     this.copilotStore.onDidUpdate(() => {
-      this.copilotModels = this.copilotStore.isAvailable
-        ? this.copilotStore.cachedModelList ?? this.copilotModels
-        : null
+      this.syncCopilotModelsFromCache()
       this.emitUpdate()
     })
+  }
+
+  private getCopilotModelsAccount(): Account | undefined {
+    return this.accounts.find(
+      account =>
+        !isGHES(account.endpoint) &&
+        enableCopilotSdkCommitMessageGeneration(account)
+    )
+  }
+
+  private syncCopilotModelsFromCache(): void {
+    const account = this.getCopilotModelsAccount()
+
+    if (account === undefined) {
+      this.copilotModels = null
+      return
+    }
+
+    this.copilotModels =
+      this.copilotStore.getCachedModelList(account) ?? this.copilotModels
   }
 
   /** Load the emoji from disk. */
@@ -1228,7 +1248,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       showChangesFilter: this.showChangesFilter,
       selectedCopilotModels: this.selectedCopilotModels,
       copilotModels: this.copilotModels,
-      copilotAvailable: this.copilotStore.isAvailable,
+      copilotAvailable: this.getCopilotModelsAccount() !== undefined,
       byokProviders: this.byokProviders,
     }
   }
@@ -5988,6 +6008,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       try {
         const response = enableCopilotSdkCommitMessageGeneration(account)
           ? await this.copilotStore.generateCommitMessage(
+              account,
               diff,
               repository.path,
               await this.resolveCopilotModelRequest(
@@ -6090,6 +6111,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return null
     }
 
+    const account = getAccountForCopilotConflictResolution(
+      this.accounts,
+      repository
+    )
+
+    if (!account) {
+      return null
+    }
+
     const totalTimer = startTimer('resolve conflicts with Copilot', repository)
 
     try {
@@ -6143,6 +6173,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       )
       try {
         const result = await this.copilotStore.resolveConflicts(
+          account,
           context,
           repository.path,
           modelRequest,
@@ -9932,11 +9963,19 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   /** This shouldn't be called directly. See 'Dispatcher'. */
   public async _fetchCopilotModels(): Promise<void> {
-    const models = await this.copilotStore.listModels()
+    const account = this.getCopilotModelsAccount()
+    if (account === undefined) {
+      this.copilotModels = null
+      this.emitUpdate()
+      return
+    }
+
+    const models = await this.copilotStore.listModels(account)
     // Only overwrite the cached model list when we actually got a list back.
-    // listModels() returns null when the result is unknown (no signed-in
-    // account or an SDK failure with no prior cache); treating that as an
-    // empty list would scrub the user's Copilot model selections.
+    // listModels() returns null when the result is unknown (the selected
+    // account cannot use the SDK or an SDK failure has no prior cache);
+    // treating that as an empty list would scrub the user's Copilot model
+    // selections.
     if (models !== null) {
       this.copilotModels = [...models]
       this.scrubMissingCopilotModelSelections()
