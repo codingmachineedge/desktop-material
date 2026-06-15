@@ -375,7 +375,6 @@ async function findWarp(): Promise<string | null> {
     return warpInstallationPath.data
   }
 
-
   return await findOldWarp(warpRegistry)
 }
 
