@@ -406,20 +406,21 @@ export async function getWorkingDirectoryDiff(
  * index stage.
  *
  * During an active merge, git stores the common ancestor at index stage 1
- * (`:1:path`). We diff that against the target content so the user sees
- * what changed relative to the last clean version — no conflict markers.
+ * (`git show :1:<path>`). We diff that against the target content so the
+ * user sees what changed relative to the last clean version — no conflict
+ * markers.
  *
- * When `content` is `'ours'` or `'theirs'`, the content is read from
- * the corresponding merge index stage (`git show :2:<path>` or
- * `git show :3:<path>`). These always refer to git's definition:
- * `ours` = stage 2 (HEAD at merge time), `theirs` = stage 3 (the commit
- * being merged in). Note that during a rebase, git considers the upstream
- * branch as "ours" and the rebased commit as "theirs" — the opposite of
- * what the user might expect. The caller is responsible for mapping
- * user-facing labels (e.g. "Current branch") to the correct git side.
+ * Two calling conventions:
  *
- * When `content` is any other string, it's used directly as the right
- * side of the diff (e.g. Copilot's resolved text).
+ * 1. **Content mode** — pass a `content` string (e.g. Copilot's resolved
+ *    text) to diff directly against the merge base.
+ * 2. **Stage mode** — pass `stage: 'ours' | 'theirs'` to read from the
+ *    merge index (`git show :2:<path>` or `git show :3:<path>`).
+ *    These always refer to git's definition: `ours` = stage 2 (HEAD at
+ *    merge time), `theirs` = stage 3 (the commit being merged in). Note
+ *    that during a rebase, git swaps these — the upstream branch is "ours"
+ *    and the rebased commit is "theirs". The caller is responsible for
+ *    mapping user-facing labels to the correct git side.
  *
  * For stage-based diffs, follows `getWorkingDirectoryDiff` patterns:
  * - If the stage doesn't exist but the base does (file deleted in that
@@ -429,35 +430,30 @@ export async function getWorkingDirectoryDiff(
  *   branch), diffs empty → stage to show all lines as additions.
  *
  * Uses `git diff --no-index` with temp files.
- *
- * @param repository The repository with an active merge conflict
- * @param filePath   Repo-relative path of the conflicted file
- * @param content    `'ours'` (stage 2), `'theirs'` (stage 3), or a resolved
- *                   content string to diff directly
- * @param hideWhitespaceInDiff When true, passes `-w` to ignore whitespace
  */
 export async function getResolutionDiff(
   repository: Repository,
   filePath: string,
-  content: string | 'ours' | 'theirs',
+  options: { content: string } | { stage: 'ours' | 'theirs' },
   hideWhitespaceInDiff: boolean = false
 ): Promise<IDiff> {
-  const stage =
-    content === 'ours' ? ':2' : content === 'theirs' ? ':3' : undefined
+  const gitStage =
+    'stage' in options ? (options.stage === 'ours' ? ':2' : ':3') : undefined
 
   let baseContent: string
   let targetContent: string
 
-  if (stage === undefined) {
+  if (gitStage === undefined) {
     // Direct content mode (e.g. Copilot's resolved text).
     // Read merge base from stage 1; fall back to on-disk if not in a merge.
+    const resolvedContent = (options as { content: string }).content
     try {
       const buffer = await getBlobContents(repository, ':1', filePath)
       baseContent = buffer.toString('utf-8')
     } catch {
       baseContent = await readFile(Path.join(repository.path, filePath), 'utf8')
     }
-    targetContent = content
+    targetContent = resolvedContent
   } else {
     // Stage mode — read both base and target from the merge index.
     let baseExists = true
@@ -471,7 +467,7 @@ export async function getResolutionDiff(
 
     let stageExists = true
     try {
-      const buffer = await getBlobContents(repository, stage, filePath)
+      const buffer = await getBlobContents(repository, gitStage, filePath)
       targetContent = buffer.toString('utf-8')
     } catch {
       targetContent = ''

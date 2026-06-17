@@ -39,7 +39,7 @@ describe('git/diff/getResolutionDiff (stage mode)', () => {
     await exec(['merge', 'feature', '--no-commit'], repo.path)
 
     // Compute ours diff: merge base → :2: (master's version)
-    const diff = await getResolutionDiff(repo, 'file.txt', 'ours')
+    const diff = await getResolutionDiff(repo, 'file.txt', { stage: 'ours' })
 
     assert.equal(diff.kind, DiffType.Text)
     const textDiff = diff as ITextDiff
@@ -78,7 +78,7 @@ describe('git/diff/getResolutionDiff (stage mode)', () => {
     await exec(['merge', 'feature', '--no-commit'], repo.path)
 
     // Compute theirs diff: merge base → :3: (feature's version)
-    const diff = await getResolutionDiff(repo, 'file.txt', 'theirs')
+    const diff = await getResolutionDiff(repo, 'file.txt', { stage: 'theirs' })
 
     assert.equal(diff.kind, DiffType.Text)
     const textDiff = diff as ITextDiff
@@ -117,7 +117,7 @@ describe('git/diff/getResolutionDiff (stage mode)', () => {
     // file.txt was deleted in feature (:3 doesn't exist), but base (:1) does.
     // Should produce an all-deletion diff (base → empty), same as how deleted
     // files appear in the regular changes view.
-    const diff = await getResolutionDiff(repo, 'file.txt', 'theirs')
+    const diff = await getResolutionDiff(repo, 'file.txt', { stage: 'theirs' })
 
     assert.equal(diff.kind, DiffType.Text)
     const textDiff = diff as ITextDiff
@@ -156,7 +156,9 @@ describe('git/diff/getResolutionDiff (stage mode)', () => {
     await exec(['merge', 'feature', '--no-commit'], repo.path)
 
     // new-file.txt has no base (:1) and no ours (:2) — only exists in :3
-    const diff = await getResolutionDiff(repo, 'new-file.txt', 'ours')
+    const diff = await getResolutionDiff(repo, 'new-file.txt', {
+      stage: 'ours',
+    })
     assert.equal(diff.kind, DiffType.Unrenderable)
   })
 
@@ -183,7 +185,12 @@ describe('git/diff/getResolutionDiff (stage mode)', () => {
     await exec(['merge', 'feature', '--no-commit'], repo.path)
 
     // With whitespace hidden, the spacing change should not appear as a diff
-    const diff = await getResolutionDiff(repo, 'file.txt', 'theirs', true)
+    const diff = await getResolutionDiff(
+      repo,
+      'file.txt',
+      { stage: 'theirs' },
+      true
+    )
 
     assert.equal(diff.kind, DiffType.Text)
     const textDiff = diff as ITextDiff

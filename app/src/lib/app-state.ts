@@ -595,6 +595,9 @@ export interface IRepositoryState {
   /** Is generating a commit message? */
   readonly isGeneratingCommitMessage: boolean
 
+  /** Controller used to cancel an in-flight commit message generation. */
+  readonly commitMessageGenerationAbortController: AbortController | null
+
   /** Commit being amended, or null if none. */
   readonly commitToAmend: Commit | null
 

@@ -40,7 +40,9 @@ describe('git/diff/getResolutionDiff', () => {
 
     // Compute diff: merge base → resolved content
     const resolved = 'line 1\nmerged result\nline 3\n'
-    const diff = await getResolutionDiff(repo, 'file.txt', resolved)
+    const diff = await getResolutionDiff(repo, 'file.txt', {
+      content: resolved,
+    })
 
     assert.equal(diff.kind, DiffType.Text)
     const textDiff = diff as ITextDiff
@@ -62,7 +64,9 @@ describe('git/diff/getResolutionDiff', () => {
     })
 
     const resolved = 'modified\n'
-    const diff = await getResolutionDiff(repo, 'file.txt', resolved)
+    const diff = await getResolutionDiff(repo, 'file.txt', {
+      content: resolved,
+    })
 
     assert.equal(diff.kind, DiffType.Text)
     const textDiff = diff as ITextDiff

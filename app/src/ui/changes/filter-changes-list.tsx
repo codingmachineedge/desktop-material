@@ -1000,6 +1000,7 @@ export class FilterChangesList extends React.Component<
         }
         onPersistCommitMessage={this.onPersistCommitMessage}
         onGenerateCommitMessage={this.onGenerateCommitMessage}
+        onCancelGenerateCommitMessage={this.onCancelGenerateCommitMessage}
         onCommitMessageFocusSet={this.onCommitMessageFocusSet}
         onRefreshAuthor={this.onRefreshAuthor}
         onShowPopup={this.onShowPopup}
@@ -1066,6 +1067,10 @@ export class FilterChangesList extends React.Component<
           this.props.repository,
           filesSelected
         )
+  }
+
+  private onCancelGenerateCommitMessage = () => {
+    this.props.dispatcher.cancelGenerateCommitMessage(this.props.repository)
   }
 
   private onShowPopup = (p: Popup) => this.props.dispatcher.showPopup(p)

@@ -1172,6 +1172,10 @@ export class Dispatcher {
     return this.appStore._generateCommitMessage(repository, filesSelected)
   }
 
+  public cancelGenerateCommitMessage(repository: Repository) {
+    return this.appStore._cancelGenerateCommitMessage(repository)
+  }
+
   /**
    * Use Copilot to analyze and suggest resolutions for conflicts
    * from merge, rebase, or cherry-pick operations.
