@@ -119,7 +119,7 @@ export class CopilotConflictsChanges extends React.Component<
       const diff = await getResolutionDiff(
         this.props.repository,
         file.path,
-        resolution.resolvedContent,
+        { content: resolution.resolvedContent },
         this.state.hideWhitespaceInDiff
       )
 

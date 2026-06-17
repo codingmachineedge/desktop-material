@@ -401,40 +401,91 @@ export async function getWorkingDirectoryDiff(
 }
 
 /**
- * Compute a diff between the merge base version of a file and Copilot's
- * resolved content string.
+ * Compute a diff between the merge base version of a file and either
+ * Copilot's resolved content string or the content from a specific merge
+ * index stage.
  *
  * During an active merge, git stores the common ancestor at index stage 1
- * (`:1:path`). We diff that against the resolved content so the user sees
- * what changed relative to the last clean version — no conflict markers.
+ * (`git show :1:<path>`). We diff that against the target content so the
+ * user sees what changed relative to the last clean version — no conflict
+ * markers.
  *
- * Uses `git diff --no-index` with temp files, following the same pattern as
- * getWorkingDirectoryDiff for new/untracked files.
+ * Two calling conventions:
+ *
+ * 1. **Content mode** — pass a `content` string (e.g. Copilot's resolved
+ *    text) to diff directly against the merge base.
+ * 2. **Stage mode** — pass `stage: 'ours' | 'theirs'` to read from the
+ *    merge index (`git show :2:<path>` or `git show :3:<path>`).
+ *    These always refer to git's definition: `ours` = stage 2 (HEAD at
+ *    merge time), `theirs` = stage 3 (the commit being merged in). Note
+ *    that during a rebase, git swaps these — the upstream branch is "ours"
+ *    and the rebased commit is "theirs". The caller is responsible for
+ *    mapping user-facing labels to the correct git side.
+ *
+ * For stage-based diffs, follows `getWorkingDirectoryDiff` patterns:
+ * - If the stage doesn't exist but the base does (file deleted in that
+ *   branch), diffs base → empty to show all lines as deletions.
+ * - If neither base nor stage exists, returns Unrenderable.
+ * - If the base doesn't exist but the stage does (file added in that
+ *   branch), diffs empty → stage to show all lines as additions.
+ *
+ * Uses `git diff --no-index` with temp files.
  */
 export async function getResolutionDiff(
   repository: Repository,
   filePath: string,
-  resolvedContent: string,
+  options: { content: string } | { stage: 'ours' | 'theirs' },
   hideWhitespaceInDiff: boolean = false
 ): Promise<IDiff> {
-  // Read merge base (stage 1) from the index — the common ancestor before
-  // the conflict. Falls back to on-disk content if not in a merge.
+  const gitStage =
+    'stage' in options ? (options.stage === 'ours' ? ':2' : ':3') : undefined
+
   let baseContent: string
-  try {
-    const buffer = await getBlobContents(repository, ':1', filePath)
-    baseContent = buffer.toString('utf-8')
-  } catch {
-    // Not in a merge or file doesn't exist at stage 1 — fall back to
-    // reading the on-disk file (which may have conflict markers).
-    baseContent = await readFile(Path.join(repository.path, filePath), 'utf8')
+  let targetContent: string
+
+  if (gitStage === undefined) {
+    // Direct content mode (e.g. Copilot's resolved text).
+    // Read merge base from stage 1; fall back to on-disk if not in a merge.
+    const resolvedContent = (options as { content: string }).content
+    try {
+      const buffer = await getBlobContents(repository, ':1', filePath)
+      baseContent = buffer.toString('utf-8')
+    } catch {
+      baseContent = await readFile(Path.join(repository.path, filePath), 'utf8')
+    }
+    targetContent = resolvedContent
+  } else {
+    // Stage mode — read both base and target from the merge index.
+    let baseExists = true
+    try {
+      const buffer = await getBlobContents(repository, ':1', filePath)
+      baseContent = buffer.toString('utf-8')
+    } catch {
+      baseContent = ''
+      baseExists = false
+    }
+
+    let stageExists = true
+    try {
+      const buffer = await getBlobContents(repository, gitStage, filePath)
+      targetContent = buffer.toString('utf-8')
+    } catch {
+      targetContent = ''
+      stageExists = false
+    }
+
+    // Neither base nor stage exists — nothing meaningful to diff.
+    if (!baseExists && !stageExists) {
+      return { kind: DiffType.Unrenderable }
+    }
   }
 
-  const tempBase = getTempFilePath('conflict-base')
-  const tempResolved = getTempFilePath('conflict-resolved')
+  const tempBase = getTempFilePath('resolution-diff-base')
+  const tempTarget = getTempFilePath('resolution-diff-target')
 
   try {
     await writeFile(tempBase, baseContent, 'utf8')
-    await writeFile(tempResolved, resolvedContent, 'utf8')
+    await writeFile(tempTarget, targetContent, 'utf8')
 
     const args = [
       'diff',
@@ -446,7 +497,7 @@ export async function getResolutionDiff(
       '--no-index',
       '--',
       tempBase,
-      tempResolved,
+      tempTarget,
     ]
 
     const { stdout } = await git(args, repository.path, 'getResolutionDiff', {
@@ -479,7 +530,7 @@ export async function getResolutionDiff(
     }
   } finally {
     await unlink(tempBase).catch(() => {})
-    await unlink(tempResolved).catch(() => {})
+    await unlink(tempTarget).catch(() => {})
   }
 }
 
