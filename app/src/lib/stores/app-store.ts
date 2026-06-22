@@ -212,6 +212,7 @@ import {
   RepositoryType,
   listWorktrees,
   removeWorktree,
+  moveWorktree,
   getCommitRangeDiff,
   getCommitRangeChangedFiles,
   updateRemoteHEAD,
@@ -5881,7 +5882,6 @@ export class AppStore extends TypedBaseStore<IAppState> {
     force?: boolean
   ): Promise<void> {
     const isDeletingCurrentWorktree = repository.path === worktreePath
-    let path = repository.path
     let originalWorktree: WorktreeEntry | null = null
 
     if (isDeletingCurrentWorktree) {
@@ -5894,14 +5894,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
         throw new Error('Could not find main worktree')
       }
 
-      await this._switchWorktree(repository, main)
-      // Run the delete worktree action with the main worktree path since the current
-      // worktree path will be deleted after the switch.
-      path = main.path
+      // Switch to the main worktree before deleting the current one since the
+      // current worktree path will be deleted after the switch. Use the
+      // resulting repository (with the updated path) for the subsequent
+      // remove and refresh calls.
+      repository = await this._switchWorktree(repository, main)
     }
 
     try {
-      await removeWorktree(path, worktreePath, force)
+      await removeWorktree(repository.path, worktreePath, force)
     } catch (e) {
       this._closePopup(PopupType.DeleteWorktree)
       this._closePopup(PopupType.DeleteWorktreeFailed)
@@ -5916,6 +5917,29 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     await this._refreshWorktrees(repository)
     this.statsStore.increment('worktreeDeletedCount')
+  }
+
+  /** This shouldn't be called directly. See 'Dispatcher'. */
+  public async _moveWorktree(
+    repository: Repository,
+    worktreePath: string,
+    newPath: string
+  ): Promise<void> {
+    await moveWorktree(repository, worktreePath, newPath)
+
+    // If the worktree being renamed is the currently selected one, switch to
+    // its new path so that the subsequent refresh (and any further git calls)
+    // operate on the renamed directory rather than the now non-existing one.
+    if (repository.path === worktreePath) {
+      const result = await this.repositoriesStore.switchWorktree(
+        repository,
+        newPath
+      )
+      await this._selectRepository(result.repository)
+      await this._refreshWorktrees(result.repository)
+    } else {
+      await this._refreshWorktrees(repository)
+    }
   }
 
   public _setWorktreeDropdownWidth(width: number): Promise<void> {

@@ -1026,6 +1026,21 @@ export class Dispatcher {
   }
 
   /**
+   * Rename (move) a worktree to a new path and keep the worktree list in sync.
+   * If the worktree being renamed is the currently selected one, the repository
+   * is switched to its new path.
+   */
+  public async moveWorktree(
+    repository: Repository,
+    worktreePath: string,
+    newPath: string
+  ): Promise<void> {
+    await this.appStore
+      ._moveWorktree(repository, worktreePath, newPath)
+      .catch(e => this.postError(e))
+  }
+
+  /**
    * Delete a worktree. If the worktree being deleted is the currently selected
    * one, the repository is switched to the main worktree first.
    */
