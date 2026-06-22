@@ -2582,17 +2582,27 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /**
    * Determine whether the worktree dropdown is currently shown in the toolbar.
    *
-   * The dropdown is only shown when worktree support is enabled and the
-   * selected repository has at least one linked worktree (i.e. more than just
-   * the main worktree).
+   * This mirrors the render condition in `App.renderWorktreeToolbarButton`: the
+   * dropdown is shown when worktree support is enabled and either the selected
+   * repository has at least one linked worktree (i.e. more than just the main
+   * worktree) or the worktree foldout is currently open (which lets the user
+   * create their first worktree from the toolbar).
    */
   private isWorktreeDropdownVisible(): boolean {
+    if (!enableWorktreeSupport()) {
+      return false
+    }
+
+    if (this.currentFoldout?.type === FoldoutType.Worktree) {
+      return true
+    }
+
     const repository = this.selectedRepository
     const worktreeCount =
       repository instanceof Repository
         ? this.repositoryStateCache.get(repository).worktrees.length
         : 0
-    return enableWorktreeSupport() && worktreeCount > 1
+    return worktreeCount > 1
   }
 
   /**
@@ -4273,6 +4283,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** This shouldn't be called directly. See `Dispatcher`. */
   public async _showFoldout(foldout: Foldout): Promise<void> {
     this.currentFoldout = foldout
+
+    // Showing the worktree foldout makes the worktree dropdown visible even
+    // when there are no linked worktrees, so the toolbar width allocation has
+    // to be recalculated to reserve space for it.
+    if (foldout.type === FoldoutType.Worktree) {
+      this.updateResizableConstraints()
+    }
+
     this.emitUpdate()
 
     // If the user is opening the repository list and we haven't yet
@@ -4293,7 +4311,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return
     }
 
+    const wasWorktreeFoldout =
+      this.currentFoldout.type === FoldoutType.Worktree
+
     this.currentFoldout = null
+
+    if (wasWorktreeFoldout) {
+      this.updateResizableConstraints()
+    }
+
     this.emitUpdate()
   }
 
@@ -4307,7 +4333,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return
     }
 
+    const wasWorktreeFoldout =
+      this.currentFoldout.type === FoldoutType.Worktree
+
     this.currentFoldout = null
+
+    if (wasWorktreeFoldout) {
+      this.updateResizableConstraints()
+    }
+
     this.emitUpdate()
   }
 
