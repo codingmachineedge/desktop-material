@@ -2,8 +2,8 @@
   "releases": {
     "3.5.13-beta4": [
       "[Fixed] Worktree list is updated after after renaming or deleting worktrees - #22335 Thanks @pol-rivero!",
-      "[Fixed] The toolbar correctly calculates available space when worktree dropdown isn't visible - #22356 Thanks @pol-rivero!",
-      "[Fixed] Toolbar space allocation calculates available space based on order of toolbar buttons - #22364 Thanks @pol-rivero!",
+      "[Fixed] The toolbar correctly calculates available space when worktree dropdown isn't visible - #22356. Thanks @pol-rivero!",
+      "[Fixed] Toolbar space allocation calculates available space based on order of toolbar buttons - #22364. Thanks @pol-rivero!",
       "[Fixed] Resolve issue where error messages in the Preferences dialog were not displayed correctly - #22363"
     ],
     "3.5.13-beta3": [
