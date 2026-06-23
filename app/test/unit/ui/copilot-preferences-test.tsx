@@ -473,7 +473,7 @@ describe('CopilotPreferences', () => {
       />
     )
 
-    assert.ok(screen.getByRole('button', { name: /GPT-5 mini/ }))
+    assert.ok(screen.getAllByRole('button', { name: /GPT-5 mini/ }).length > 0)
     assert.strictEqual(screen.queryByText('View Copilot plans'), null)
   })
 
@@ -625,9 +625,10 @@ describe('CopilotPreferences', () => {
     assert.strictEqual(screen.queryByText(/AI credits per/), null)
     assert.ok(!button.textContent?.includes('low cost'))
 
-    const costsButton = screen.getByRole('button', {
+    const costsButtons = screen.getAllByRole('button', {
       name: 'Show Copilot model credit costs',
     })
+    const costsButton = costsButtons[0]
 
     assert.strictEqual(costsButton.getAttribute('aria-expanded'), 'false')
     assert.strictEqual(costsButton.getAttribute('aria-controls'), null)
@@ -694,11 +695,14 @@ describe('CopilotPreferences', () => {
       />
     )
 
-    assert.ok(screen.getByText('Lightweight model. Use of credits: low'))
+    assert.ok(
+      screen.getAllByText('Lightweight model. Use of credits: low').length > 0
+    )
 
-    const costsButton = screen.getByRole('button', {
+    const costsButtons = screen.getAllByRole('button', {
       name: 'Show Copilot model credit costs',
     })
+    const costsButton = costsButtons[0]
     fireEvent.click(costsButton)
 
     const costsPopover = view.container.querySelector(
@@ -728,7 +732,9 @@ describe('CopilotPreferences', () => {
       />
     )
 
-    assert.ok(screen.getByText('Lightweight model. Use of credits: low'))
+    assert.ok(
+      screen.getAllByText('Lightweight model. Use of credits: low').length > 0
+    )
     assert.strictEqual(
       screen.queryByRole('button', {
         name: 'Show Copilot model credit costs',
@@ -807,10 +813,14 @@ describe('CopilotPreferences', () => {
     )
 
     fireEvent.click(getModelPickerButton(view.container))
-    await waitFor(() =>
-      assert.ok(screen.getByText('GPT-5 mini (1x) (default)'))
-    )
-    fireEvent.click(screen.getByText('GPT-5 mini (1x) (default)'))
+
+    const defaultModelItem = await waitFor(() => {
+      const popover = document.querySelector('.popover-dropdown-content')
+      assert.ok(popover instanceof HTMLElement)
+      return within(popover).getByText('GPT-5 mini (1x) (default)')
+    })
+
+    fireEvent.click(defaultModelItem)
 
     assert.deepStrictEqual(changed, [
       {
@@ -939,74 +949,41 @@ describe('CopilotPreferences', () => {
   })
 
   describe('conflict resolution model picker', () => {
-    const previousPreviewFeatures = process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
-
-    async function withConflictResolutionEnabled(
-      enabled: boolean,
-      fn: () => Promise<void> | void
-    ) {
-      if (enabled) {
-        process.env.GITHUB_DESKTOP_PREVIEW_FEATURES = '1'
-      } else {
-        delete process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
-      }
-      try {
-        await fn()
-      } finally {
-        if (previousPreviewFeatures === undefined) {
-          delete process.env.GITHUB_DESKTOP_PREVIEW_FEATURES
-        } else {
-          process.env.GITHUB_DESKTOP_PREVIEW_FEATURES = previousPreviewFeatures
-        }
-      }
-    }
-
-    it('is hidden when the feature flag is disabled', async () => {
-      await withConflictResolutionEnabled(false, () => {
-        const view = render(<CopilotPreferences {...defaults()} />)
-        assert.strictEqual(getModelPickerButtons(view.container).length, 1)
-      })
-    })
-
-    it('renders a second picker when the feature flag is enabled', async () => {
-      await withConflictResolutionEnabled(true, () => {
-        const view = render(<CopilotPreferences {...defaults()} />)
-        assert.strictEqual(getModelPickerButtons(view.container).length, 2)
-      })
+    it('renders both pickers', () => {
+      const view = render(<CopilotPreferences {...defaults()} />)
+      assert.strictEqual(getModelPickerButtons(view.container).length, 2)
     })
 
     it('emits the conflict-resolution feature on change', async () => {
-      await withConflictResolutionEnabled(true, async () => {
-        const changed: Array<{
-          feature: CopilotFeature
-          model: string | null
-        }> = []
-        const view = render(
-          <CopilotPreferences
-            {...defaults()}
-            onSelectedCopilotModelChanged={(f, m) =>
-              changed.push({ feature: f, model: m })
-            }
-          />
-        )
-        const buttons = getModelPickerButtons(view.container)
-        const conflictPickerButton = buttons[1]
-        assert.ok(conflictPickerButton instanceof HTMLButtonElement)
+      const changed: Array<{
+        feature: CopilotFeature
+        model: string | null
+      }> = []
+      const view = render(
+        <CopilotPreferences
+          {...defaults()}
+          onSelectedCopilotModelChanged={(f, m) =>
+            changed.push({ feature: f, model: m })
+          }
+        />
+      )
+      const buttons = getModelPickerButtons(view.container)
+      const conflictPickerButton = buttons[1]
+      assert.ok(conflictPickerButton instanceof HTMLButtonElement)
 
-        fireEvent.click(conflictPickerButton)
-        await waitFor(() => assert.ok(screen.getByText('Claude Sonnet (2x)')))
-        fireEvent.click(screen.getByText('Claude Sonnet (2x)'))
+      fireEvent.click(conflictPickerButton)
+      await waitFor(() => assert.ok(screen.getByText('Claude Sonnet (2x)')))
+      fireEvent.click(screen.getByText('Claude Sonnet (2x)'))
 
-        assert.deepStrictEqual(changed, [
-          {
-            feature: 'conflict-resolution',
-            model: encodeModelKey({
-              kind: 'copilot',
-              modelId: 'claude-sonnet',
-            }),
-          },
-        ])
-      })
+      assert.deepStrictEqual(changed, [
+        {
+          feature: 'conflict-resolution',
+          model: encodeModelKey({
+            kind: 'copilot',
+            modelId: 'claude-sonnet',
+          }),
+        },
+      ])
     })
   })
 })
