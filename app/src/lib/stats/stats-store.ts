@@ -482,7 +482,7 @@ const defaultPostImplementationWithTelemetry = (body: Record<string, any>) =>
 
 const defaultPostImplementation = ENABLE_TELEMETRY
   ? defaultPostImplementationWithTelemetry
-  : Promise.resolve(new Response(null, { status: 200 }))
+  : () => Promise.resolve(new Response(null, { status: 200 }))
 
 /** The store for the app's stats. */
 export class StatsStore implements IStatsStore {
