@@ -1,5 +1,8 @@
 {
   "releases": {
+    "3.6.1-beta2": [
+      "[Fixed] Copilot Max plan users are recognized correctly - #22400"
+    ],
     "3.6.1-beta1": [
       "[Fixed] The default Copilot model is Auto",
       "[Fixed] Improved loading times for Copilot features - #22394",
