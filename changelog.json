@@ -1,5 +1,11 @@
 {
   "releases": {
+    "3.6.2-beta1": [
+      "[Fixed] Middle-clicking a diff hunk gutter does not select or deselect lines - #22432. Thanks @sergiou87!",
+      "[Fixed] Invoking Desktop from the command line inside a worktree now opens the existing repository with the worktree selected instead of prompting to add a new repository - #22416",
+      "[Fixed] Copilot sessions from generating commit messages or resolving conflicts do not show up in VS Code - #22410",
+      "[Fixed] Resolve issue where git hooks that shell out to git could break due to an incorrect GIT_EXEC_PATH on macOS - #22411"
+    ],
     "3.6.1": [
       "[Fixed] Copilot Max plan users are recognized correctly - #22400",
       "[Fixed] The default Copilot model is Auto",
