@@ -25,6 +25,12 @@ on:
         type: boolean
         default: true
         required: false
+      error-reporting-endpoint:
+        type: string
+        required: false
+      non-fatal-error-reporting-endpoint:
+        type: string
+        required: false
     secrets:
       AZURE_CODE_SIGNING_TENANT_ID:
       AZURE_CODE_SIGNING_CLIENT_ID:
@@ -38,6 +44,9 @@ on:
 
 env:
   NODE_VERSION: 24.15.0
+  DESKTOP_ERROR_REPORTING_ENDPOINT: ${{ inputs.error-reporting-endpoint }}
+  DESKTOP_NON_FATAL_ERROR_REPORTING_ENDPOINT:
+    ${{ inputs.non-fatal-error-reporting-endpoint }}
 
 jobs:
   lint:
