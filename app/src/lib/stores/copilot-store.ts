@@ -1002,6 +1002,7 @@ export class CopilotStore extends BaseStore {
             content: buildCommitMessageSystemPrompt(hasRules, tags),
           },
           availableTools: [],
+          enableSessionStore: false,
           onPermissionRequest: async () => ({
             kind: 'reject',
           }),
@@ -1298,6 +1299,7 @@ export class CopilotStore extends BaseStore {
         provider: modelConfig.provider,
         streaming: true,
         availableTools: [],
+        enableSessionStore: false,
         systemMessage: {
           mode: 'append',
           content: ConflictResolutionSystemPrompt,
