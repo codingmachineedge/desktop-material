@@ -3,10 +3,12 @@ import type {
   SessionFsFileInfo,
   SessionFsProvider,
 } from '@github/copilot-sdk'
-import type { SessionFsReaddirWithTypesEntry } from '@github/copilot-sdk/dist/generated/rpc'
 import { posix } from 'path'
 
 const InMemorySessionFsStatePath = 'state'
+type CopilotInMemorySessionFsReaddirWithTypesEntry = Awaited<
+  ReturnType<SessionFsProvider['readdirWithTypes']>
+>[number]
 
 export function getCopilotInMemorySessionFsConfig(
   repositoryPath?: string
@@ -161,8 +163,8 @@ export function createCopilotInMemorySessionFsProvider(): SessionFsProvider {
       }
 
       return getDirectChildren(normalized).map(name => {
-        const childPath = normalized === '.' ? name : `${normalized}/${name}`
-        const entry: SessionFsReaddirWithTypesEntry = {
+        const childPath = posix.join(normalized, name)
+        const entry: CopilotInMemorySessionFsReaddirWithTypesEntry = {
           name,
           type: files.has(childPath) ? 'file' : 'directory',
         }

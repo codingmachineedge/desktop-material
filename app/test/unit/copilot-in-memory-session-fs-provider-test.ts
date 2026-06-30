@@ -73,6 +73,16 @@ describe('createCopilotInMemorySessionFsProvider', () => {
     assert.deepStrictEqual(await provider.readdir('/state'), ['events.jsonl'])
   })
 
+  it('lists root-level files with the correct type', async () => {
+    const provider = createCopilotInMemorySessionFsProvider()
+
+    await provider.writeFile('/events.jsonl', 'event')
+
+    assert.deepStrictEqual(await provider.readdirWithTypes('/'), [
+      { name: 'events.jsonl', type: 'file' },
+    ])
+  })
+
   it('reports file and directory metadata', async () => {
     const provider = createCopilotInMemorySessionFsProvider()
 
