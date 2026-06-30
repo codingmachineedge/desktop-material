@@ -36,7 +36,8 @@ export function createCopilotInMemorySessionFsProvider(): SessionFsProvider {
   const directories = new Set<string>(['.', InMemorySessionFsStatePath])
 
   const normalizePath = (path: string) => {
-    return posix.normalize(path)
+    const normalized = posix.normalize(path)
+    return normalized === '/' ? normalized : normalized.replace(/\/$/, '')
   }
 
   const getParentPath = (path: string) => {
