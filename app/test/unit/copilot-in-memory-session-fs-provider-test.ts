@@ -150,6 +150,22 @@ describe('createCopilotInMemorySessionFsProvider', () => {
     ])
   })
 
+  it('does not allow files and directories to share a path', async () => {
+    const provider = createCopilotInMemorySessionFsProvider()
+
+    await assert.rejects(() => provider.writeFile('state', 'event'), /EISDIR/)
+
+    const directoryInfo = await provider.stat('state')
+    assert.strictEqual(directoryInfo.isFile, false)
+    assert.strictEqual(directoryInfo.isDirectory, true)
+
+    await provider.writeFile('state/events.jsonl', 'event')
+    await assert.rejects(
+      () => provider.mkdir('state/events.jsonl', false),
+      /EEXIST/
+    )
+  })
+
   it('removes files and directories with force and recursive semantics', async () => {
     const provider = createCopilotInMemorySessionFsProvider()
 

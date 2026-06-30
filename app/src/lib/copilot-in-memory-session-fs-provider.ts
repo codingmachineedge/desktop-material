@@ -34,8 +34,13 @@ interface ICopilotInMemorySessionFsDirectory {
   readonly updatedAt: string
 }
 
-function createCopilotInMemorySessionFsError(path: string): Error {
-  return Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' })
+type CopilotInMemorySessionFsErrorCode = 'EEXIST' | 'EISDIR' | 'ENOENT'
+
+function createCopilotInMemorySessionFsError(
+  path: string,
+  code: CopilotInMemorySessionFsErrorCode = 'ENOENT'
+): Error {
+  return Object.assign(new Error(`${code}: ${path}`), { code })
 }
 
 export function createCopilotInMemorySessionFsProvider(): SessionFsProvider {
@@ -67,6 +72,10 @@ export function createCopilotInMemorySessionFsProvider(): SessionFsProvider {
 
     if (existing !== undefined) {
       return
+    }
+
+    if (files.has(normalized)) {
+      throw createCopilotInMemorySessionFsError(normalized, 'EEXIST')
     }
 
     if (normalized !== '.' && normalized !== '/') {
@@ -112,6 +121,11 @@ export function createCopilotInMemorySessionFsProvider(): SessionFsProvider {
 
   const writeFile = (path: string, content: string) => {
     const normalized = normalizePath(path)
+
+    if (directories.has(normalized)) {
+      throw createCopilotInMemorySessionFsError(normalized, 'EISDIR')
+    }
+
     addParentDirectory(normalized)
 
     const existing = files.get(normalized)
