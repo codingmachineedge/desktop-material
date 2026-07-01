@@ -3,6 +3,7 @@ import * as Fs from 'fs'
 import { createHash } from 'crypto'
 
 import { getProductName, getVersion } from '../app/package-info'
+import { bundleFiles } from '../app/src/lib/compute-bundle-hash'
 import { join } from 'path'
 
 const productName = getProductName()
@@ -111,15 +112,6 @@ export function getBundleSizes() {
 
 export function getBundleHash() {
   const outPath = Path.join(projectRoot, 'out')
-  const bundleFiles = [
-    'main.js',
-    'renderer.js',
-    'crash.js',
-    'highlighter.js',
-    'cli.js',
-    'index.html',
-    'crash.html',
-  ]
   const hashes = bundleFiles.map(f => {
     // eslint-disable-next-line no-sync
     const content = Fs.readFileSync(Path.join(outPath, f))

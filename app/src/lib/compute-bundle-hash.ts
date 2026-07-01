@@ -13,7 +13,7 @@ import * as path from 'path'
  * While corrupted native modules could produce JS errors, these files are not
  * typical targets for intentional user modification.
  */
-const bundleFiles = [
+export const bundleFiles = [
   'main.js',
   'renderer.js',
   'crash.js',
