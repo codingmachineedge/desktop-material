@@ -107,6 +107,13 @@ export function getBundleSizes() {
     mainBundleSize: Fs.statSync(Path.join(outPath, 'main.js')).size,
   }
 }
+
+export async function getBundleHash() {
+  const { computeBundleHash } = await import(
+    '../app/src/lib/compute-bundle-hash'
+  )
+  return computeBundleHash(Path.join(projectRoot, 'out'))
+}
 export const isPublishable = () =>
   ['production', 'beta', 'test'].includes(getChannel())
 

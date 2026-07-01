@@ -1,40 +1,32 @@
 import { app, net } from 'electron'
-import { createHash } from 'crypto'
-import * as path from 'path'
 import { getArchitecture } from '../lib/get-architecture'
-import { getFileHash } from '../lib/get-file-hash'
+import { computeBundleHash } from '../lib/compute-bundle-hash'
 import { getMainGUID } from '../lib/get-main-guid'
 
 let hasSentFatalError = false
 
-/** Cached combined bundle hash, computed on first error report. */
-let cachedBundleHash: string | null = null
+/** Cached bundle hash result. Undefined means not yet attempted. */
+let cachedBundleHash: string | null | undefined = undefined
 
 /**
- * Compute a combined SHA-256 hash representing the integrity of the installed
- * main.js and renderer.js bundles.
+ * Get the combined SHA-256 bundle hash, caching the result (including failures)
+ * for the lifetime of the process. Attempted at most once per session.
  *
- * The result is cached for the lifetime of the process since bundle files
- * don't change while the app is running.
+ * The caching only benefits non-fatal errors since fatal errors terminate the
+ * process before a second report could be sent.
  */
 async function getBundleHash(): Promise<string | null> {
-  if (cachedBundleHash !== null) {
+  if (cachedBundleHash !== undefined) {
     return cachedBundleHash
   }
 
   try {
-    const appPath = app.getAppPath()
-    const [mainHash, rendererHash] = await Promise.all([
-      getFileHash(path.join(appPath, 'main.js'), 'sha256'),
-      getFileHash(path.join(appPath, 'renderer.js'), 'sha256'),
-    ])
-    cachedBundleHash = createHash('sha256')
-      .update(mainHash + rendererHash)
-      .digest('hex')
-    return cachedBundleHash
+    cachedBundleHash = await computeBundleHash(app.getAppPath())
   } catch {
-    return null
+    cachedBundleHash = null
   }
+
+  return cachedBundleHash
 }
 
 /** Report the error to Central. */

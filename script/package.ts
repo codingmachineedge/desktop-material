@@ -14,6 +14,7 @@ import {
   getUpdatesURL,
   isPublishable,
   getBundleSizes,
+  getBundleHash,
   getDistRoot,
   getDistArchitecture,
   getIconDirectory,
@@ -49,6 +50,14 @@ writeFileSync(
   path.join(getDistRoot(), 'bundle-size.json'),
   JSON.stringify(getBundleSizes())
 )
+
+console.log('Writing bundle hash…')
+getBundleHash().then(bundleHash => {
+  writeFileSync(
+    path.join(getDistRoot(), 'bundle-hash.json'),
+    JSON.stringify({ bundleHash })
+  )
+})
 
 function packageOSX() {
   const dest = getOSXZipPath()
