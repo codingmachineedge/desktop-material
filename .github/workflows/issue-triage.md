@@ -40,6 +40,9 @@ tools:
     min-integrity: none
 
 safe-outputs:
+  github-app:
+    client-id: ${{ secrets.DESKTOP_TRIAGE_APP_CLIENT_ID }}
+    private-key: ${{ secrets.DESKTOP_TRIAGE_APP_PRIVATE_KEY }}
   add-labels:
     max: 3
     allowed:
