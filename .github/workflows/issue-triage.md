@@ -95,11 +95,12 @@ potential duplicates of this issue. Note your findings for the next step.
 Follow the `issue-classifier` skill instructions. Use the `label-taxonomy` reference for
 valid labels. Incorporate your duplicate detection findings.
 
-## Step 5: Apply labels via safe outputs
+## Step 5: Suggest labels via safe outputs
 
 Based on your classification, use `add-labels` to suggest the appropriate labels (max 3,
-only from the allowlist above). Attach a clear rationale and confidence level to each label
-(issue-intents) so a maintainer can approve or reject the suggestion.
+only from the allowlist above). **Always emit labels as suggestions requiring maintainer
+approval — never apply them directly.** Set confidence to "medium" or lower so that all
+labels are held for human review. Attach a clear rationale to each suggestion.
 
 ## Required comment
 
