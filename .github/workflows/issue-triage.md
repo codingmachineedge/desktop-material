@@ -99,8 +99,7 @@ valid labels. Incorporate your duplicate detection findings.
 
 Based on your classification, use `add-labels` to suggest the appropriate labels (max 3,
 only from the allowlist above). **Always emit labels as suggestions requiring maintainer
-approval — never apply them directly.** Set confidence to "medium" or lower so that all
-labels are held for human review. Attach a clear rationale to each suggestion.
+approval — never apply them directly.** Attach a clear rationale to each suggestion.
 
 ## Required comment
 
