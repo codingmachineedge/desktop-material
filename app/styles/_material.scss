@@ -16,20 +16,29 @@
   --md-sys-color-error: #ba1a1a;
   --md-sys-color-on-error: #ffffff;
   --md-sys-color-surface: #f8f9ff;
+  --md-sys-color-surface-dim: #d8dae0;
+  --md-sys-color-surface-bright: #f8f9ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f2f3f9;
   --md-sys-color-surface-container: #eceef4;
   --md-sys-color-surface-container-high: #e6e8ee;
+  --md-sys-color-surface-container-highest: #e0e2e8;
   --md-sys-color-on-surface: #191c20;
   --md-sys-color-on-surface-variant: #41474d;
   --md-sys-color-outline: #71787e;
   --md-sys-color-outline-variant: #c1c7ce;
+  --md-sys-color-inverse-surface: #2e3135;
+  --md-sys-color-inverse-on-surface: #eff1f7;
+  --md-sys-color-scrim: #000000;
 
   --md-sys-shape-corner-small: 8px;
   --md-sys-shape-corner-medium: 12px;
   --md-sys-shape-corner-large: 16px;
   --md-sys-state-hover-opacity: 0.08;
   --md-sys-state-focus-opacity: 0.12;
-  --md-sys-elevation-level1: 0 1px 2px rgba(0, 0, 0, 0.3),
-    0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
 
   --text-color: var(--md-sys-color-on-surface);
   --text-secondary-color: var(--md-sys-color-on-surface-variant);
@@ -47,13 +56,19 @@
   --box-background-color: var(--md-sys-color-surface);
   --box-alt-background-color: var(--md-sys-color-surface-container);
   --box-border-color: var(--md-sys-color-outline-variant);
+  --box-selected-background-color: var(--md-sys-color-primary-container);
+  --box-selected-text-color: var(--md-sys-color-on-primary-container);
+  --box-selected-active-background-color: var(--md-sys-color-primary-container);
+  --box-selected-active-text-color: var(--md-sys-color-on-primary-container);
+  --box-hover-background-color: var(--md-sys-color-surface-container-high);
+  --list-item-hover-background-color: var(--md-sys-color-surface-container-high);
   --toolbar-background-color: var(--md-sys-color-surface-container);
   --toolbar-text-color: var(--md-sys-color-on-surface);
   --toolbar-border-color: var(--md-sys-color-outline-variant);
   --tab-bar-background-color: var(--md-sys-color-surface);
   --tab-bar-hover-background-color: var(--md-sys-color-surface-container-high);
-  --font-family-sans-serif: Roboto, 'Segoe UI', system-ui, sans-serif,
-    'Apple Color Emoji', 'Segoe UI Emoji';
+  --tab-bar-active-color: var(--md-sys-color-primary-container);
+  --font-family-sans-serif: Roboto, 'Segoe UI', system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --font-size: 14px;
   --font-size-sm: 12px;
   --font-size-md: 16px;
@@ -67,12 +82,19 @@ body.theme-dark {
   --md-sys-color-secondary-container: #394956;
   --md-sys-color-on-secondary-container: #d3e5f5;
   --md-sys-color-surface: #111417;
+  --md-sys-color-surface-dim: #111417;
+  --md-sys-color-surface-bright: #37393d;
+  --md-sys-color-surface-container-lowest: #0c0f12;
+  --md-sys-color-surface-container-low: #191c20;
   --md-sys-color-surface-container: #1d2024;
   --md-sys-color-surface-container-high: #282a2e;
+  --md-sys-color-surface-container-highest: #333539;
   --md-sys-color-on-surface: #e1e2e7;
   --md-sys-color-on-surface-variant: #c1c7ce;
   --md-sys-color-outline: #8b9198;
   --md-sys-color-outline-variant: #41474d;
+  --md-sys-color-inverse-surface: #e1e2e7;
+  --md-sys-color-inverse-on-surface: #2e3135;
 
   --text-color: var(--md-sys-color-on-surface);
   --text-secondary-color: var(--md-sys-color-on-surface-variant);
@@ -88,10 +110,16 @@ body.theme-dark {
   --box-background-color: var(--md-sys-color-surface);
   --box-alt-background-color: var(--md-sys-color-surface-container);
   --box-border-color: var(--md-sys-color-outline-variant);
+  --box-selected-background-color: var(--md-sys-color-primary-container);
+  --box-selected-text-color: var(--md-sys-color-on-primary-container);
+  --box-selected-active-background-color: var(--md-sys-color-primary-container);
+  --box-selected-active-text-color: var(--md-sys-color-on-primary-container);
+  --box-hover-background-color: var(--md-sys-color-surface-container-high);
+  --list-item-hover-background-color: var(--md-sys-color-surface-container-high);
   --toolbar-background-color: var(--md-sys-color-surface-container);
   --toolbar-text-color: var(--md-sys-color-on-surface);
   --toolbar-border-color: var(--md-sys-color-outline-variant);
   --tab-bar-background-color: var(--md-sys-color-surface);
   --tab-bar-hover-background-color: var(--md-sys-color-surface-container-high);
+  --tab-bar-active-color: var(--md-sys-color-primary-container);
 }
-
