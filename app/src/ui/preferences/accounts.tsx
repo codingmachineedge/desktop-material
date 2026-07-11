@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   Account,
+  getAccountKey,
   isDotComAccount,
   isEnterpriseAccount,
 } from '../../models/account'
@@ -29,19 +30,52 @@ enum SignInType {
 
 export class Accounts extends React.Component<IAccountsProps, {}> {
   public render() {
-    const { accounts } = this.props
-    const dotComAccount = accounts.find(isDotComAccount)
-
     return (
       <DialogContent className="accounts-tab">
-        <h2>GitHub.com</h2>
-        {dotComAccount
-          ? this.renderAccount(dotComAccount, SignInType.DotCom)
-          : this.renderSignIn(SignInType.DotCom)}
+        <section className="account-section" aria-labelledby="dotcom-accounts">
+          <div className="account-section-header">
+            <div>
+              <h2 id="dotcom-accounts">GitHub.com accounts</h2>
+              <p>Switch identities without signing out of your other work.</p>
+            </div>
+          </div>
+          {this.renderMultipleDotComAccounts()}
+        </section>
 
-        <h2>GitHub Enterprise</h2>
-        {this.renderMultipleEnterpriseAccounts()}
+        <section
+          className="account-section"
+          aria-labelledby="enterprise-accounts"
+        >
+          <div className="account-section-header">
+            <div>
+              <h2 id="enterprise-accounts">GitHub Enterprise accounts</h2>
+              <p>Connect every organization and Enterprise host you use.</p>
+            </div>
+          </div>
+          {this.renderMultipleEnterpriseAccounts()}
+        </section>
       </DialogContent>
+    )
+  }
+
+  private renderMultipleDotComAccounts() {
+    const dotComAccounts = this.props.accounts.filter(isDotComAccount)
+
+    return (
+      <>
+        <div className="account-card-list">
+          {dotComAccounts.map((account, index) =>
+            this.renderAccount(account, index === 0)
+          )}
+        </div>
+        {dotComAccounts.length === 0 ? (
+          this.renderSignIn(SignInType.DotCom)
+        ) : (
+          <Button onClick={this.props.onDotComSignIn}>
+            Add GitHub.com account
+          </Button>
+        )}
+      </>
     )
   }
 
@@ -50,9 +84,9 @@ export class Accounts extends React.Component<IAccountsProps, {}> {
 
     return (
       <>
-        {enterpriseAccounts.map(account => {
-          return this.renderAccount(account, SignInType.Enterprise)
-        })}
+        <div className="account-card-list">
+          {enterpriseAccounts.map(account => this.renderAccount(account))}
+        </div>
         {enterpriseAccounts.length === 0 ? (
           this.renderSignIn(SignInType.Enterprise)
         ) : (
@@ -64,7 +98,7 @@ export class Accounts extends React.Component<IAccountsProps, {}> {
     )
   }
 
-  private renderAccount(account: Account, type: SignInType) {
+  private renderAccount(account: Account, preferredFocus = false) {
     const avatarUser: IAvatarUser = {
       name: account.name,
       email: lookupPreferredEmail(account),
@@ -74,11 +108,10 @@ export class Accounts extends React.Component<IAccountsProps, {}> {
 
     // The DotCom account is shown first, so its sign in/out button should be
     // focused initially when the dialog is opened.
-    const className =
-      type === SignInType.DotCom ? DialogPreferredFocusClassName : undefined
+    const className = preferredFocus ? DialogPreferredFocusClassName : undefined
 
     return (
-      <Row className="account-info">
+      <Row key={getAccountKey(account)} className="account-info account-card">
         <div className="user-info-container">
           <Avatar accounts={this.props.accounts} user={avatarUser} />
           <div className="user-info">

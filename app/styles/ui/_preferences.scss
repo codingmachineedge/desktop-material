@@ -68,6 +68,54 @@
   }
 
   .accounts-tab {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-triple);
+
+    .account-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing);
+    }
+
+    .account-section-header {
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h2 {
+        color: var(--md-sys-color-on-surface);
+        font-size: var(--font-size-md);
+        line-height: 1.5;
+      }
+
+      p {
+        color: var(--md-sys-color-on-surface-variant);
+        margin-top: var(--spacing-half);
+      }
+    }
+
+    .account-card-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-half);
+    }
+
+    .account-card {
+      background: var(--md-sys-color-surface-container);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+      min-height: 64px;
+      padding: var(--spacing);
+      transition: background-color 120ms ease, box-shadow 120ms ease;
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-high);
+        box-shadow: var(--md-sys-elevation-level1);
+      }
+    }
+
     .account-info {
       .user-info-container {
         display: flex;
