@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Desktop Material — Material Design 3 remake of GitHub Desktop</title>
+    <meta
+      name="description"
+      content="Desktop Material is an independent Material Design 3 (M3 Expressive) remake of GitHub Desktop — browser-like repo tabs, multi-account, versioned settings, automation, GitHub Actions, and more."
+    />
+    <link rel="stylesheet" href="style.css" />
+    <!-- Set theme before paint to avoid a flash of the wrong palette -->
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('dm-theme')
+          var theme =
+            stored ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light')
+          document.documentElement.setAttribute('data-theme', theme)
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <!-- ================= Top app bar ================= -->
+    <header class="appbar">
+      <div class="wrap appbar-inner">
+        <a class="brand" href="#top" aria-label="Desktop Material home">
+          <span class="logo" aria-hidden="true">◆</span>
+          <span>Desktop Material</span>
+        </a>
+        <nav class="appbar-actions">
+          <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#screenshots">Screenshots</a>
+            <a href="https://github.com/codingmachineedge/desktop-material/wiki"
+              >Docs</a
+            >
+            <a href="https://github.com/codingmachineedge/desktop-material"
+              >GitHub</a
+            >
+          </div>
+          <button
+            class="icon-btn"
+            id="theme-toggle"
+            type="button"
+            aria-label="Toggle light and dark theme"
+            title="Toggle theme"
+          >
+            <span id="theme-icon" aria-hidden="true">☾</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- ================= Hero ================= -->
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy">
+            <span class="hero-badge"
+              ><span class="dot"></span> In active development</span
+            >
+            <h1 class="hero-title">
+              Git, rebuilt in
+              <span class="accent">Material&nbsp;Design&nbsp;3</span>.
+            </h1>
+            <p class="hero-tagline">
+              Desktop Material is an independent M3 Expressive remake of GitHub
+              Desktop — browser-like repo tabs, real multi-account, versioned
+              settings, and automation, wrapped in an animated light/dark shell.
+            </p>
+            <div class="hero-cta">
+              <a
+                class="btn btn-filled"
+                href="https://github.com/codingmachineedge/desktop-material"
+              >
+                <span aria-hidden="true">★</span> View on GitHub
+              </a>
+              <a
+                class="btn btn-tonal"
+                href="https://github.com/codingmachineedge/desktop-material/wiki"
+              >
+                <span aria-hidden="true">▤</span> Read the docs
+              </a>
+            </div>
+            <div class="hero-meta">
+              <span><span aria-hidden="true">⚖</span> MIT licensed</span>
+              <span
+                ><span aria-hidden="true">⑂</span> Fork of desktop/desktop</span
+              >
+              <span><span aria-hidden="true">◐</span> Light &amp; dark</span>
+            </div>
+          </div>
+          <figure class="hero-shot">
+            <img
+              src="../docs/assets/screenshots/workspace-changes-light.png"
+              alt="Desktop Material Changes view in light theme with browser-like repository tabs"
+              width="1280"
+              loading="eager"
+            />
+          </figure>
+        </div>
+      </section>
+
+      <!-- ================= Features ================= -->
+      <section class="features" id="features">
+        <div class="wrap">
+          <span class="eyebrow">What's inside</span>
+          <h2 class="section-title">A full Git workflow, expanded</h2>
+          <p class="section-sub">
+            Everything GitHub Desktop does, plus the features power users keep
+            asking for — reimagined around Material Design 3.
+          </p>
+          <div class="feature-grid">
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🎨</div>
+              <h3>M3 Expressive shell</h3>
+              <p>
+                Animated light/dark theming, soft elevation, pill controls, and
+                dynamic UI scaling from 50–200% with auto-fit.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🗂️</div>
+              <h3>Browser-like repo tabs</h3>
+              <p>
+                Tabs bound per-account to repositories, with inline rename and
+                per-tab title styling — bold, italic, size, colour, font,
+                alignment.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">👥</div>
+              <h3>Real multi-account</h3>
+              <p>
+                Multiple identities per host, each with its own tabs, repos, and
+                settings. Self-hosted GitLab and Bitbucket sign-in included.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🕔</div>
+              <h3>Versioned settings</h3>
+              <p>
+                Every settings and tab change auto-commits to a local git repo,
+                with a full undo/redo history manager — restore any prior state.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">⧉</div>
+              <h3>Multi-clone</h3>
+              <p>
+                Checkbox-select many repos, filter by org chips, clone in
+                parallel or one-by-one, and export/import repo lists as URLs.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🔍</div>
+              <h3>Regex-powered search</h3>
+              <p>
+                Every search bar gets filter chips, a regex toggle, and a full
+                builder — anchors, classes, quantifiers, groups, lookaround,
+                live tester.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">⚡</div>
+              <h3>Automation</h3>
+              <p>
+                One-click commit &amp; push with a Copilot-written message,
+                scheduled auto commit/push, and auto pull — global default plus
+                per-repo override.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">⑃</div>
+              <h3>Merge-all branches</h3>
+              <p>
+                Fold every branch and worktree into the default branch with
+                Copilot conflict resolution, then delete merged branches and
+                push.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">▷</div>
+              <h3>GitHub Actions panel</h3>
+              <p>
+                Browse workflow runs, filter by status/branch/event, re-run or
+                re-run-failed, inspect job steps, and read logs in-app.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🔔</div>
+              <h3>Notification centre</h3>
+              <p>
+                A bell and side panel backed by its own local git repo — unread
+                badges, mark read/unread, and delete.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🏢</div>
+              <h3>Organizations</h3>
+              <p>
+                Browse and clone full org repo lists, and publish straight into
+                an organization.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🤖</div>
+              <h3>Built-in MCP server</h3>
+              <p>
+                Drive the app from AI agents over a bundled MCP server, with a
+                local HTTP/CLI fallback. Non-modal, drag-by-header dialogs
+                throughout.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= Screenshots ================= -->
+      <section id="screenshots">
+        <div class="wrap">
+          <span class="eyebrow">Take a look</span>
+          <h2 class="section-title">Screenshots</h2>
+          <p class="section-sub">Click any image to open it full size.</p>
+          <div class="gallery-grid">
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/workspace-changes-light.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/workspace-changes-light.png"
+                  alt="Changes view in light theme"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Changes view <span class="tag">Light</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/workspace-dark.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/workspace-dark.png"
+                  alt="Workspace in dark theme"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>Workspace <span class="tag">Dark</span></figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/tab-text-style.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/tab-text-style.png"
+                  alt="Per-tab text styling popover"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Per-tab text styling <span class="tag">Tabs</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/regex-builder.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/regex-builder.png"
+                  alt="Full regex builder dialog"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Regex builder <span class="tag">Search</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/settings-history-manager.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/settings-history-manager.png"
+                  alt="Settings undo/redo/restore history manager"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Settings history <span class="tag">Undo/redo</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/07-clone.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/07-clone.png"
+                  alt="Multi-clone window with checkboxes and org chips"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Multi-clone <span class="tag">Batch</span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= CTA band ================= -->
+      <section class="cta-band">
+        <div class="wrap">
+          <div class="cta-card">
+            <h2>Build with Desktop Material</h2>
+            <p>
+              Clone the repo, follow the wiki, and try the M3 shell for
+              yourself. Contributions welcome — it's early and moving fast.
+            </p>
+            <div class="hero-cta">
+              <a
+                class="btn btn-filled"
+                href="https://github.com/codingmachineedge/desktop-material"
+              >
+                <span aria-hidden="true">★</span> View on GitHub
+              </a>
+              <a
+                class="btn btn-tonal"
+                href="https://github.com/codingmachineedge/desktop-material/wiki"
+              >
+                <span aria-hidden="true">▤</span> Read the docs
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= Footer ================= -->
+    <footer>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <div class="brand">
+              <span class="logo" aria-hidden="true">◆</span>
+              <span>Desktop Material</span>
+            </div>
+            <p>
+              An independent Material Design 3 (M3 Expressive) remake of GitHub
+              Desktop. Not affiliated with or endorsed by GitHub.
+            </p>
+          </div>
+          <div class="footer-links">
+            <div class="footer-col">
+              <h4>Project</h4>
+              <a href="https://github.com/codingmachineedge/desktop-material"
+                >Repository</a
+              >
+              <a
+                href="https://github.com/codingmachineedge/desktop-material/wiki"
+                >Documentation</a
+              >
+              <a href="#features">Features</a>
+              <a href="#screenshots">Screenshots</a>
+            </div>
+            <div class="footer-col">
+              <h4>Upstream</h4>
+              <a href="https://github.com/desktop/desktop">GitHub Desktop</a>
+              <a href="https://github.com/sib-swiss/desktop-plus"
+                >desktop-plus</a
+              >
+            </div>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 Desktop Material contributors.</span>
+          <span class="lic"><span aria-hidden="true">⚖</span> MIT License</span>
+          <span>Built on GitHub Desktop (MIT) &amp; desktop-plus (MIT).</span>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ================= Theme toggle ================= -->
+    <script>
+      ;(function () {
+        var root = document.documentElement
+        var btn = document.getElementById('theme-toggle')
+        var icon = document.getElementById('theme-icon')
+
+        function sync(theme) {
+          icon.textContent = theme === 'dark' ? '☀' : '☾'
+          btn.setAttribute(
+            'aria-label',
+            theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+          )
+        }
+        sync(root.getAttribute('data-theme') || 'light')
+
+        btn.addEventListener('click', function () {
+          var next =
+            root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+          root.setAttribute('data-theme', next)
+          try {
+            localStorage.setItem('dm-theme', next)
+          } catch (e) {}
+          sync(next)
+        })
+      })()
+    </script>
+  </body>
+</html>
