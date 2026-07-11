@@ -1,0 +1,97 @@
+// Material Design 3 foundations for Desktop Material.
+//
+// Existing components continue to consume the upstream semantic variables
+// while the redesign is migrated screen by screen. Mapping those variables to
+// M3 roles here gives every existing surface a coherent baseline immediately.
+
+:root {
+  --md-sys-color-primary: #006493;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #c9e6ff;
+  --md-sys-color-on-primary-container: #001e30;
+  --md-sys-color-secondary: #50606e;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #d3e5f5;
+  --md-sys-color-on-secondary-container: #0c1d29;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-surface: #f8f9ff;
+  --md-sys-color-surface-container: #eceef4;
+  --md-sys-color-surface-container-high: #e6e8ee;
+  --md-sys-color-on-surface: #191c20;
+  --md-sys-color-on-surface-variant: #41474d;
+  --md-sys-color-outline: #71787e;
+  --md-sys-color-outline-variant: #c1c7ce;
+
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-state-hover-opacity: 0.08;
+  --md-sys-state-focus-opacity: 0.12;
+  --md-sys-elevation-level1: 0 1px 2px rgba(0, 0, 0, 0.3),
+    0 1px 3px 1px rgba(0, 0, 0, 0.15);
+
+  --text-color: var(--md-sys-color-on-surface);
+  --text-secondary-color: var(--md-sys-color-on-surface-variant);
+  --background-color: var(--md-sys-color-surface);
+  --button-height: 40px;
+  --button-background: var(--md-sys-color-primary);
+  --button-hover-background: #0874a6;
+  --button-text-color: var(--md-sys-color-on-primary);
+  --button-border-radius: 999px;
+  --secondary-button-background: var(--md-sys-color-secondary-container);
+  --secondary-button-text-color: var(--md-sys-color-on-secondary-container);
+  --secondary-button-border-color: transparent;
+  --secondary-button-hover-border-color: transparent;
+  --secondary-button-hover-background: #c7d9e9;
+  --box-background-color: var(--md-sys-color-surface);
+  --box-alt-background-color: var(--md-sys-color-surface-container);
+  --box-border-color: var(--md-sys-color-outline-variant);
+  --toolbar-background-color: var(--md-sys-color-surface-container);
+  --toolbar-text-color: var(--md-sys-color-on-surface);
+  --toolbar-border-color: var(--md-sys-color-outline-variant);
+  --tab-bar-background-color: var(--md-sys-color-surface);
+  --tab-bar-hover-background-color: var(--md-sys-color-surface-container-high);
+  --font-family-sans-serif: Roboto, 'Segoe UI', system-ui, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-size: 14px;
+  --font-size-sm: 12px;
+  --font-size-md: 16px;
+}
+
+body.theme-dark {
+  --md-sys-color-primary: #8dcdff;
+  --md-sys-color-on-primary: #00344f;
+  --md-sys-color-primary-container: #004b70;
+  --md-sys-color-on-primary-container: #c9e6ff;
+  --md-sys-color-secondary-container: #394956;
+  --md-sys-color-on-secondary-container: #d3e5f5;
+  --md-sys-color-surface: #111417;
+  --md-sys-color-surface-container: #1d2024;
+  --md-sys-color-surface-container-high: #282a2e;
+  --md-sys-color-on-surface: #e1e2e7;
+  --md-sys-color-on-surface-variant: #c1c7ce;
+  --md-sys-color-outline: #8b9198;
+  --md-sys-color-outline-variant: #41474d;
+
+  --text-color: var(--md-sys-color-on-surface);
+  --text-secondary-color: var(--md-sys-color-on-surface-variant);
+  --background-color: var(--md-sys-color-surface);
+  --button-background: var(--md-sys-color-primary);
+  --button-hover-background: #a8d7ff;
+  --button-text-color: var(--md-sys-color-on-primary);
+  --secondary-button-background: var(--md-sys-color-secondary-container);
+  --secondary-button-text-color: var(--md-sys-color-on-secondary-container);
+  --secondary-button-border-color: transparent;
+  --secondary-button-hover-border-color: transparent;
+  --secondary-button-hover-background: #465663;
+  --box-background-color: var(--md-sys-color-surface);
+  --box-alt-background-color: var(--md-sys-color-surface-container);
+  --box-border-color: var(--md-sys-color-outline-variant);
+  --toolbar-background-color: var(--md-sys-color-surface-container);
+  --toolbar-text-color: var(--md-sys-color-on-surface);
+  --toolbar-border-color: var(--md-sys-color-outline-variant);
+  --tab-bar-background-color: var(--md-sys-color-surface);
+  --tab-bar-hover-background-color: var(--md-sys-color-surface-container-high);
+}
+
