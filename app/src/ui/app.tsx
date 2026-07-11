@@ -1717,6 +1717,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             remote={state.remote}
             dispatcher={this.props.dispatcher}
             repository={repository}
+            accounts={this.state.accounts}
             repositoryAccount={repositoryAccount}
             onDismissed={onPopupDismissedFn}
           />

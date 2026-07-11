@@ -5,6 +5,7 @@ import { RepositoriesStore } from '../../src/lib/stores/repositories-store'
 import { TestRepositoriesDatabase } from '../helpers/databases'
 import { IAPIFullRepository, getDotComAPIEndpoint } from '../../src/lib/api'
 import { assertIsRepositoryWithGitHubRepository } from '../../src/models/repository'
+import { Account, getAccountKey } from '../../src/models/account'
 
 describe('RepositoriesStore', () => {
   let repoDb = new TestRepositoriesDatabase()
@@ -43,6 +44,43 @@ describe('RepositoriesStore', () => {
 
       const repositories = await repositoriesStore.getAll()
       assert.equal(repositories.length, 2)
+    })
+  })
+
+  describe('selecting a repository account', () => {
+    it('persists a stable account binding', async () => {
+      const repoPath = '/some/account-bound/path'
+      const repository = await repositoriesStore.addRepository(
+        repoPath,
+        join(repoPath, '.git')
+      )
+      const account = new Account(
+        'octocat',
+        getDotComAPIEndpoint(),
+        'token',
+        [],
+        '',
+        42,
+        'The Octocat',
+        'free'
+      )
+
+      const updated = await repositoriesStore.updateRepositoryAccount(
+        repository,
+        getAccountKey(account)
+      )
+      const [reloaded] = await repositoriesStore.getAll()
+
+      assert.equal(updated.accountKey, getAccountKey(account))
+      assert.equal(reloaded.accountKey, getAccountKey(account))
+    })
+
+    it('loads existing repository records without a binding', async () => {
+      const repoPath = '/some/legacy/path'
+      await repositoriesStore.addRepository(repoPath, join(repoPath, '.git'))
+
+      const [reloaded] = await repositoriesStore.getAll()
+      assert.equal(reloaded.accountKey, null)
     })
   })
 

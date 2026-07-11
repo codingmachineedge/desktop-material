@@ -16,6 +16,39 @@
     }
   }
 
+  .repository-account-setting {
+    align-items: center;
+    background: var(--md-sys-color-surface-container);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-large);
+    display: flex;
+    gap: var(--spacing);
+    justify-content: space-between;
+    margin: var(--spacing-double);
+    padding: var(--spacing-double);
+
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h3 {
+      color: var(--md-sys-color-on-surface);
+      font-size: var(--font-size-md);
+    }
+
+    p {
+      color: var(--md-sys-color-on-surface-variant);
+      margin-top: var(--spacing-half);
+      max-width: 320px;
+    }
+
+    .account-picker {
+      flex: 0 0 auto;
+      min-width: 180px;
+    }
+  }
+
   .tab-container {
     display: flex;
 

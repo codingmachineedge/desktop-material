@@ -1,5 +1,5 @@
 import { Repository } from '../models/repository'
-import { Account } from '../models/account'
+import { Account, getAccountKey } from '../models/account'
 import { getAccountForEndpoint } from './api'
 import {
   enableCommitMessageGeneration,
@@ -15,6 +15,14 @@ export function getAccountForRepository(
   const gitHubRepository = repository.gitHubRepository
   if (!gitHubRepository) {
     return null
+  }
+
+  if (repository.accountKey !== null) {
+    return (
+      accounts.find(
+        account => getAccountKey(account) === repository.accountKey
+      ) ?? null
+    )
   }
 
   return getAccountForEndpoint(accounts, gitHubRepository.endpoint)

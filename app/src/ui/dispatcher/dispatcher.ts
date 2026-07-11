@@ -1857,6 +1857,14 @@ export class Dispatcher {
     )
   }
 
+  /** Select the authenticated account used for a repository. */
+  public async updateRepositoryAccount(
+    repository: Repository,
+    accountKey: string | null
+  ) {
+    await this.appStore._updateRepositoryAccount(repository, accountKey)
+  }
+
   public async setAppFocusState(isFocused: boolean): Promise<void> {
     await this.appStore._setAppFocusState(isFocused)
 

@@ -153,7 +153,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.alias,
       repo.workflowPreferences,
       repo.isTutorialRepository,
-      repo.gitDir
+      repo.gitDir,
+      repo.accountKey ?? null
     )
   }
 
@@ -293,7 +294,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.alias,
       repository.workflowPreferences,
       repository.isTutorialRepository,
-      repository.gitDir
+      repository.gitDir,
+      repository.accountKey
     )
   }
 
@@ -314,7 +316,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.alias,
       repository.workflowPreferences,
       repository.isTutorialRepository,
-      gitDir
+      gitDir,
+      repository.accountKey
     )
   }
 
@@ -348,6 +351,34 @@ export class RepositoriesStore extends TypedBaseStore<
     this.emitUpdatedRepositories()
   }
 
+  /**
+   * Select the authenticated account used for this repository.
+   *
+   * Passing null restores legacy endpoint-based selection. The stable key is
+   * derived from endpoint and numeric user id, so login renames do not break
+   * the binding.
+   */
+  public async updateRepositoryAccount(
+    repository: Repository,
+    accountKey: string | null
+  ): Promise<Repository> {
+    await this.db.repositories.update(repository.id, { accountKey })
+
+    this.emitUpdatedRepositories()
+
+    return new Repository(
+      repository.path,
+      repository.id,
+      repository.gitHubRepository,
+      repository.missing,
+      repository.alias,
+      repository.workflowPreferences,
+      repository.isTutorialRepository,
+      repository.gitDir,
+      accountKey
+    )
+  }
+
   /** Update the repository's path. */
   public async updateRepositoryPath(
     repository: Repository,
@@ -371,7 +402,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.alias,
       repository.workflowPreferences,
       repository.isTutorialRepository,
-      gitDir
+      gitDir,
+      repository.accountKey
     )
   }
 
@@ -418,7 +450,8 @@ export class RepositoriesStore extends TypedBaseStore<
         repository.alias,
         repository.workflowPreferences,
         repository.isTutorialRepository,
-        gitDir
+        gitDir,
+        repository.accountKey
       ),
       existingRepository: false,
     }
@@ -567,7 +600,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.alias,
       repo.workflowPreferences,
       repo.isTutorialRepository,
-      repo.gitDir
+      repo.gitDir,
+      repo.accountKey
     )
 
     assertIsRepositoryWithGitHubRepository(updatedRepo)

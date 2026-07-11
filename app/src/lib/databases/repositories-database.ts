@@ -68,6 +68,9 @@ export interface IDatabaseRepository {
    * of Git and GitHub.
    */
   readonly isTutorialRepository?: boolean
+
+  /** Stable account identity selected for authenticated operations. */
+  readonly accountKey?: string | null
 }
 
 /**

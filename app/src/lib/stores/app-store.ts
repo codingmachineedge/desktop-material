@@ -7860,6 +7860,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
   }
 
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _updateRepositoryAccount(
+    repository: Repository,
+    accountKey: string | null
+  ): Promise<void> {
+    await this.repositoriesStore.updateRepositoryAccount(repository, accountKey)
+  }
+
   /**
    * Add a tutorial repository.
    *

@@ -28,15 +28,17 @@ import {
   gitAuthorNameIsValid,
   InvalidGitAuthorNameMessage,
 } from '../lib/identifier-rules'
-import { Account } from '../../models/account'
+import { Account, getAccountKey } from '../../models/account'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import { AccountPicker } from '../account-picker'
 
 interface IRepositorySettingsProps {
   readonly initialSelectedTab?: RepositorySettingsTab
   readonly dispatcher: Dispatcher
   readonly remote: IRemote | null
   readonly repository: Repository
+  readonly accounts: ReadonlyArray<Account>
   readonly repositoryAccount: Account | null
   readonly onDismissed: () => void
 }
@@ -66,6 +68,7 @@ interface IRepositorySettingsState {
   readonly errors?: ReadonlyArray<JSX.Element | string>
   readonly forkContributionTarget: ForkContributionTarget
   readonly isLoadingGitConfig: boolean
+  readonly accountKey: string | null
 }
 
 export class RepositorySettings extends React.Component<
@@ -93,6 +96,11 @@ export class RepositorySettings extends React.Component<
       initialCommitterName: null,
       initialCommitterEmail: null,
       isLoadingGitConfig: true,
+      accountKey:
+        props.repository.accountKey ??
+        (props.repositoryAccount !== null
+          ? getAccountKey(props.repositoryAccount)
+          : null),
     }
   }
 
@@ -220,16 +228,19 @@ export class RepositorySettings extends React.Component<
     switch (tab) {
       case RepositorySettingsTab.Remote: {
         const remote = this.state.remote
-        if (remote) {
-          return (
-            <Remote
-              remote={remote}
-              onRemoteUrlChanged={this.onRemoteUrlChanged}
-            />
-          )
-        } else {
-          return <NoRemote onPublish={this.onPublish} />
-        }
+        return (
+          <>
+            {this.renderRepositoryAccountPicker()}
+            {remote ? (
+              <Remote
+                remote={remote}
+                onRemoteUrlChanged={this.onRemoteUrlChanged}
+              />
+            ) : (
+              <NoRemote onPublish={this.onPublish} />
+            )}
+          </>
+        )
       }
       case RepositorySettingsTab.IgnoredFiles: {
         return (
@@ -285,6 +296,54 @@ export class RepositorySettings extends React.Component<
     })
   }
 
+  private renderRepositoryAccountPicker() {
+    const endpoint = this.props.repository.gitHubRepository?.endpoint
+    if (endpoint === undefined) {
+      return null
+    }
+
+    const eligibleAccounts = this.props.accounts.filter(
+      account => account.endpoint === endpoint
+    )
+    const selectedAccount =
+      eligibleAccounts.find(
+        account => getAccountKey(account) === this.state.accountKey
+      ) ?? eligibleAccounts.at(0)
+
+    if (selectedAccount === undefined) {
+      return (
+        <section className="repository-account-setting">
+          <h3>Repository account</h3>
+          <p>
+            Sign in to this GitHub host to choose an identity for authenticated
+            operations.
+          </p>
+        </section>
+      )
+    }
+
+    return (
+      <section className="repository-account-setting">
+        <div>
+          <h3>Repository account</h3>
+          <p>
+            Used for fetch, push, pull requests, issues, and other GitHub
+            operations in this repository.
+          </p>
+        </div>
+        <AccountPicker
+          accounts={eligibleAccounts}
+          selectedAccount={selectedAccount}
+          onSelectedAccountChanged={this.onSelectedAccountChanged}
+        />
+      </section>
+    )
+  }
+
+  private onSelectedAccountChanged = (account: Account) => {
+    this.setState({ accountKey: getAccountKey(account) })
+  }
+
   private onShowGitIgnoreExamples = () => {
     this.props.dispatcher.openInBrowser('https://git-scm.com/docs/gitignore')
   }
@@ -292,6 +351,13 @@ export class RepositorySettings extends React.Component<
   private onSubmit = async () => {
     this.setState({ disabled: true, errors: undefined })
     const errors = new Array<JSX.Element | string>()
+
+    if (this.state.accountKey !== this.props.repository.accountKey) {
+      await this.props.dispatcher.updateRepositoryAccount(
+        this.props.repository,
+        this.state.accountKey
+      )
+    }
 
     if (this.state.remote && this.props.remote) {
       const trimmedUrl = this.state.remote.url.trim()

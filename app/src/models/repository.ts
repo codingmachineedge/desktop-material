@@ -54,7 +54,14 @@ export class Repository {
      * hasn't been resolved yet (e.g. for repositories added before this
      * property was introduced).
      */
-    public readonly gitDir: string | undefined = undefined
+    public readonly gitDir: string | undefined = undefined,
+    /**
+     * Stable identity of the account selected for this repository.
+     *
+     * Null preserves the legacy endpoint-based lookup for repositories that
+     * have not been assigned since multi-account support was introduced.
+     */
+    public readonly accountKey: string | null = null
   ) {
     this.name = (gitHubRepository && gitHubRepository.name) || getBaseName(path)
 
@@ -65,7 +72,8 @@ export class Repository {
       this.missing,
       this.alias,
       this.workflowPreferences.forkContributionTarget,
-      this.isTutorialRepository
+      this.isTutorialRepository,
+      this.accountKey
     )
   }
 
