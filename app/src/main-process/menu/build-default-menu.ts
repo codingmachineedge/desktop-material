@@ -26,12 +26,6 @@ const stashAllChangesLabel = __DARWIN__
   ? 'Stash All Changes'
   : '&Stash all changes'
 
-enum ZoomDirection {
-  Reset,
-  In,
-  Out,
-}
-
 export const separator: Electron.MenuItemConstructorOptions = {
   type: 'separator',
 }
@@ -248,17 +242,17 @@ export function buildDefaultMenuTemplate({
       {
         label: __DARWIN__ ? 'Reset Zoom' : 'Reset zoom',
         accelerator: 'CmdOrCtrl+0',
-        click: zoom(ZoomDirection.Reset),
+        click: emit('zoom-reset'),
       },
       {
         label: __DARWIN__ ? 'Zoom In' : 'Zoom in',
         accelerator: 'CmdOrCtrl+=',
-        click: zoom(ZoomDirection.In),
+        click: emit('zoom-in'),
       },
       {
         label: __DARWIN__ ? 'Zoom Out' : 'Zoom out',
         accelerator: 'CmdOrCtrl+-',
-        click: zoom(ZoomDirection.Out),
+        click: emit('zoom-out'),
       },
       {
         label: __DARWIN__
@@ -677,63 +671,6 @@ export function emit(name: MenuEvent): ClickHandler {
         : BrowserWindow.getAllWindows()[0]
     if (window !== undefined) {
       ipcWebContents.send(window.webContents, 'menu-event', name)
-    }
-  }
-}
-
-/** The zoom steps that we support, these factors must sorted */
-const ZoomInFactors = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
-const ZoomOutFactors = ZoomInFactors.slice().reverse()
-
-/**
- * Returns the element in the array that's closest to the value parameter. Note
- * that this function will throw if passed an empty array.
- */
-function findClosestValue(arr: Array<number>, value: number) {
-  return arr.reduce((previous, current) => {
-    return Math.abs(current - value) < Math.abs(previous - value)
-      ? current
-      : previous
-  })
-}
-
-/**
- * Figure out the next zoom level for the given direction and alert the renderer
- * about a change in zoom factor if necessary.
- */
-function zoom(direction: ZoomDirection): ClickHandler {
-  return (menuItem, window) => {
-    if (!(window instanceof BrowserWindow)) {
-      return
-    }
-
-    const { webContents } = window
-
-    if (direction === ZoomDirection.Reset) {
-      webContents.zoomFactor = 1
-      ipcWebContents.send(webContents, 'zoom-factor-changed', 1)
-    } else {
-      const rawZoom = webContents.zoomFactor
-      const zoomFactors =
-        direction === ZoomDirection.In ? ZoomInFactors : ZoomOutFactors
-
-      // So the values that we get from zoomFactor property are floating point
-      // precision numbers from chromium, that don't always round nicely, so
-      // we'll have to do a little trick to figure out which of our supported
-      // zoom factors the value is referring to.
-      const currentZoom = findClosestValue(zoomFactors, rawZoom)
-
-      const nextZoomLevel = zoomFactors.find(f =>
-        direction === ZoomDirection.In ? f > currentZoom : f < currentZoom
-      )
-
-      // If we couldn't find a zoom level (likely due to manual manipulation
-      // of the zoom factor in devtools) we'll just snap to the closest valid
-      // factor we've got.
-      const newZoom = nextZoomLevel === undefined ? currentZoom : nextZoomLevel
-
-      webContents.zoomFactor = newZoom
-      ipcWebContents.send(webContents, 'zoom-factor-changed', newZoom)
     }
   }
 }

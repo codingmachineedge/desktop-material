@@ -120,10 +120,25 @@ export interface IAppState {
   readonly windowState: WindowState | null
 
   /**
-   * The current zoom factor of the window represented as a fractional number
-   * where 1 equals 100% (ie actual size) and 2 represents 200%.
+   * The current *applied effective* zoom factor of the window represented as a
+   * fractional number where 1 equals 100% (ie actual size) and 2 represents
+   * 200%. This is `zoomBaseFactor` combined with the auto-fit multiplier and is
+   * what the ZoomInfo overlay reflects.
    */
   readonly windowZoomFactor: number
+
+  /**
+   * The user's chosen UI scale base (the Appearance scale slider value), a
+   * fractional number where 1 equals 100%. The applied `windowZoomFactor` is
+   * derived from this and the auto-fit multiplier.
+   */
+  readonly zoomBaseFactor: number
+
+  /**
+   * Whether the UI automatically shrinks (never grows) to fit smaller windows.
+   * When enabled an auto-fit multiplier ≤ 1 is applied on top of the base.
+   */
+  readonly autoFitZoomEnabled: boolean
 
   /**
    * Whether or not the currently active element is itself, or is contained

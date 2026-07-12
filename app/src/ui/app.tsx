@@ -588,6 +588,12 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.resizeActiveResizable('decrease-active-resizable-width')
       case 'toggle-changes-filter':
         return this.toggleChangesFilterVisibility()
+      case 'zoom-in':
+        return this.props.dispatcher.zoomIn()
+      case 'zoom-out':
+        return this.props.dispatcher.zoomOut()
+      case 'zoom-reset':
+        return this.props.dispatcher.zoomReset()
       default:
         if (isTestMenuEvent(name)) {
           return showTestUI(
@@ -1734,6 +1740,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
             selectedShell={this.state.selectedShell}
             selectedTheme={this.state.selectedTheme}
+            zoomBaseFactor={this.state.zoomBaseFactor}
+            autoFitZoomEnabled={this.state.autoFitZoomEnabled}
+            windowZoomFactor={this.state.windowZoomFactor}
             selectedTabSize={this.state.selectedTabSize}
             useCustomEditor={this.state.useCustomEditor}
             customEditor={this.state.customEditor}

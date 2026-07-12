@@ -105,6 +105,9 @@ interface IPreferencesProps {
   readonly selectedExternalEditor: string | null
   readonly selectedShell: Shell
   readonly selectedTheme: ApplicationTheme
+  readonly zoomBaseFactor: number
+  readonly autoFitZoomEnabled: boolean
+  readonly windowZoomFactor: number
   readonly selectedTabSize: number
   readonly useCustomEditor: boolean
   readonly customEditor: ICustomIntegration | null
@@ -635,6 +638,11 @@ export class Preferences extends React.Component<
           <Appearance
             selectedTheme={this.props.selectedTheme}
             onSelectedThemeChanged={this.onSelectedThemeChanged}
+            zoomBaseFactor={this.props.zoomBaseFactor}
+            onZoomBaseFactorChanged={this.onZoomBaseFactorChanged}
+            autoFitZoomEnabled={this.props.autoFitZoomEnabled}
+            onAutoFitZoomEnabledChanged={this.onAutoFitZoomEnabledChanged}
+            windowZoomFactor={this.props.windowZoomFactor}
             selectedTabSize={this.props.selectedTabSize}
             onSelectedTabSizeChanged={this.onSelectedTabSizeChanged}
             selectedDateFormat={
@@ -902,6 +910,14 @@ export class Preferences extends React.Component<
 
   private onSelectedThemeChanged = (theme: ApplicationTheme) => {
     this.props.dispatcher.setSelectedTheme(theme)
+  }
+
+  private onZoomBaseFactorChanged = (factor: number) => {
+    this.props.dispatcher.setZoomBaseFactor(factor)
+  }
+
+  private onAutoFitZoomEnabledChanged = (enabled: boolean) => {
+    this.props.dispatcher.setAutoFitZoomEnabled(enabled)
   }
 
   private onUnderlineLinksChanged = (underlineLinks: boolean) => {

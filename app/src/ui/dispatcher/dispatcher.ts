@@ -3029,6 +3029,31 @@ export class Dispatcher {
     return this.appStore._setSelectedTheme(theme)
   }
 
+  /** Step the UI scale up one notch on the zoom ladder. */
+  public zoomIn() {
+    return this.appStore._zoomIn()
+  }
+
+  /** Step the UI scale down one notch on the zoom ladder. */
+  public zoomOut() {
+    return this.appStore._zoomOut()
+  }
+
+  /** Reset the UI scale back to 100%. */
+  public zoomReset() {
+    return this.appStore._zoomReset()
+  }
+
+  /** Set the UI scale base factor (the scale slider value, 0.5–2.0). */
+  public setZoomBaseFactor(factor: number) {
+    return this.appStore._setZoomBaseFactor(factor)
+  }
+
+  /** Toggle whether the UI auto-shrinks to fit small windows. */
+  public setAutoFitZoomEnabled(enabled: boolean) {
+    return this.appStore._setAutoFitZoomEnabled(enabled)
+  }
+
   /**
    * Set the application-wide tab size
    */
