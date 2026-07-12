@@ -15,11 +15,14 @@ import { RepositoryTab } from './repository-tab'
 import { TabStyleEditor } from './tab-style-editor'
 import { showContextualMenu } from '../../lib/menu-item'
 import { FoldoutType } from '../../lib/app-state'
+import { NotificationBellButton } from '../notifications/notification-bell-button'
 
 interface IRepositoryTabStripProps {
   readonly tabsStore: RepositoryTabsStore
   readonly repositories: ReadonlyArray<Repository | CloningRepository>
   readonly dispatcher: Dispatcher
+  readonly unreadNotificationCount: number
+  readonly isNotificationCentreOpen: boolean
 }
 
 interface IRepositoryTabStripState {
@@ -94,6 +97,12 @@ export class RepositoryTabStrip extends React.Component<
 
   private onNewTab = () => {
     this.props.dispatcher.showFoldout({ type: FoldoutType.Repository })
+  }
+
+  private onToggleNotifications = () => {
+    this.props.dispatcher.setNotificationCentreOpen(
+      !this.props.isNotificationCentreOpen
+    )
   }
 
   private onStyleChange = (style: ITabTitleStyle) => {
@@ -199,6 +208,13 @@ export class RepositoryTabStrip extends React.Component<
         >
           <Octicon symbol={octicons.plus} />
         </button>
+        <div className="repository-tab-strip-trailing">
+          <NotificationBellButton
+            unreadCount={this.props.unreadNotificationCount}
+            isOpen={this.props.isNotificationCentreOpen}
+            onClick={this.onToggleNotifications}
+          />
+        </div>
         {this.renderStyleEditor()}
       </div>
     )

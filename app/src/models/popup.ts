@@ -36,6 +36,7 @@ export enum PopupType {
   ConfirmDiscardChanges = 'ConfirmDiscardChanges',
   Preferences = 'Preferences',
   SettingsHistory = 'SettingsHistory',
+  NotificationHistory = 'NotificationHistory',
   RepositorySettings = 'RepositorySettings',
   AddRepository = 'AddRepository',
   CreateRepository = 'CreateRepository',
@@ -158,6 +159,7 @@ export type PopupDetail =
     }
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
   | { type: PopupType.SettingsHistory }
+  | { type: PopupType.NotificationHistory }
   | {
       type: PopupType.EditCopilotBYOKProvider
       provider: IBYOKProvider | null
@@ -544,9 +546,15 @@ export type PopupDetail =
 export type Popup = IBasePopup & PopupDetail
 
 /**
- * Settings History is a non-modal side sheet. Every other popup still blocks
- * global actions, even when Settings History is stacked above it.
+ * The Settings and Notification history managers are non-modal side sheets.
+ * Every other popup still blocks global actions, even when a history manager is
+ * stacked above it.
  */
+const nonModalHistoryPopupTypes = new Set<PopupType>([
+  PopupType.SettingsHistory,
+  PopupType.NotificationHistory,
+])
+
 export function hasModalPopup(popups: ReadonlyArray<Popup>): boolean {
-  return popups.some(popup => popup.type !== PopupType.SettingsHistory)
+  return popups.some(popup => !nonModalHistoryPopupTypes.has(popup.type))
 }

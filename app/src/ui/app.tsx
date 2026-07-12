@@ -82,6 +82,8 @@ import { AppMenuBar } from './app-menu'
 import { UpdateAvailable, renderBanner } from './banners'
 import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
+import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
+import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { EditCopilotBYOKProviderDialog } from './copilot/edit-byok-provider-dialog'
 import { EditCopilotBYOKModelDialog } from './copilot/edit-byok-model-dialog'
 import { ConfirmDeleteCopilotBYOKProviderDialog } from './copilot/confirm-delete-byok-provider-dialog'
@@ -1759,6 +1761,14 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
           />
         )
+      case PopupType.NotificationHistory:
+        return (
+          <NotificationHistoryDialog
+            key="notification-history"
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       case PopupType.RepositorySettings: {
         const repository = popup.repository
         const state = this.props.repositoryStateManager.get(repository)
@@ -3285,6 +3295,23 @@ export class App extends React.Component<IAppProps, IAppState> {
         tabsStore={this.props.repositoryTabsStore}
         repositories={this.state.repositories}
         dispatcher={this.props.dispatcher}
+        unreadNotificationCount={this.state.unreadNotificationCount}
+        isNotificationCentreOpen={this.state.isNotificationCentreOpen}
+      />
+    )
+  }
+
+  private renderNotificationCentre() {
+    if (!this.state.isNotificationCentreOpen) {
+      return null
+    }
+
+    return (
+      <NotificationCentrePanel
+        dispatcher={this.props.dispatcher}
+        entries={this.state.notifications}
+        unreadCount={this.state.unreadNotificationCount}
+        repositories={this.state.repositories}
       />
     )
   }
@@ -3300,6 +3327,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.renderBanner()}
         {this.renderRepository()}
         {this.renderBuildRunPanel()}
+        {this.renderNotificationCentre()}
         {this.renderPopups()}
         {this.renderDragElement()}
       </div>

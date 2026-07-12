@@ -1,0 +1,395 @@
+// M5 notification centre (design-spec-overlays §9). The bell lives in the tab
+// strip's trailing cluster; the panel is a non-modal right side sheet that
+// persists while the user works (opposite of the click-away foldout contract).
+
+// --- Tab-strip bell -----------------------------------------------------------
+
+.repository-tab-strip-trailing {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.notification-bell-button {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 220ms var(--emph), color 220ms var(--emph);
+
+  .octicon {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  &.has-unread {
+    color: var(--md-sys-color-on-surface);
+  }
+
+  &.open {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  &:focus-visible {
+    outline: 3px solid
+      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.notification-bell-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  animation: dmBounce 320ms var(--spring);
+}
+
+// --- Panel --------------------------------------------------------------------
+
+.notification-centre-panel {
+  position: fixed;
+  z-index: var(--side-panel-z-index);
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  width: 384px;
+  max-width: calc(100vw - 20px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-sys-elevation-level3);
+  color: var(--md-sys-color-on-surface);
+  // Right side sheet entrance (overlays §0.4 dmSheetR).
+  animation: dmSheetR calc(480ms * var(--mdur, 1)) var(--spring);
+}
+
+.notification-centre-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 14px 8px 20px;
+}
+
+.notification-centre-header-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+
+  .octicon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.notification-centre-header-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+
+  h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  small {
+    overflow: hidden;
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.notification-centre-icon-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 220ms var(--emph), color 220ms var(--emph);
+
+  .octicon {
+    width: 17px;
+    height: 17px;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &.confirming {
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-error);
+  }
+
+  &:focus-visible {
+    outline: 3px solid
+      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.notification-centre-segmented {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 4px 16px 12px;
+
+  button {
+    flex: 1;
+    height: 36px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12.5px;
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+    transition: background 220ms var(--emph), color 220ms var(--emph);
+
+    &.selected {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    &:focus-visible {
+      outline: 3px solid
+        color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline-offset: 1px;
+    }
+  }
+}
+
+.notification-centre-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 12px 14px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.notification-centre-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
+  animation: dmGrow calc(380ms * var(--mdur, 1)) var(--spring);
+
+  .octicon {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+// --- List item ----------------------------------------------------------------
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 200ms var(--emph), transform 200ms var(--spring-fast);
+  animation: dmUp calc(300ms * var(--mdur, 1)) var(--spring);
+
+  &:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  &:active {
+    transform: scale(0.985);
+  }
+
+  &.unread {
+    background: var(--md-sys-color-surface);
+
+    .notification-item-title {
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid
+      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.notification-item-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+
+  .octicon {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// Kind-specific icon chip colours (design-spec-overlays §9 NK map).
+.notification-item.kind-pr-checks-failed .notification-item-icon,
+.notification-item.kind-app-error .notification-item-icon {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-error);
+}
+
+.notification-item.kind-merge-all .notification-item-icon,
+.notification-item.kind-auto-commit .notification-item-icon {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.notification-item-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-item-title {
+  color: var(--md-sys-color-on-surface);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-item-text {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.notification-item-time {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 10.5px;
+  opacity: 0.7;
+}
+
+.notification-item-unread-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: var(--md-sys-color-primary);
+  animation: dmPop calc(320ms * var(--mdur, 1)) var(--spring);
+}
+
+.notification-item-read-toggle,
+.notification-item-delete {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: background 200ms var(--emph), color 200ms var(--emph),
+    opacity 200ms var(--emph), transform 160ms var(--spring-fast);
+
+  .octicon {
+    width: 15px;
+    height: 15px;
+  }
+
+  &:hover {
+    opacity: 1;
+    background: var(--md-sys-color-surface-container-highest);
+  }
+
+  &:active {
+    transform: scale(0.8);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+    outline: 3px solid
+      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.notification-item-delete:hover {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-centre-panel,
+  .notification-item,
+  .notification-item-unread-dot,
+  .notification-bell-badge,
+  .notification-centre-empty {
+    animation: none;
+  }
+}
