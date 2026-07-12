@@ -474,6 +474,28 @@
       gap: var(--spacing-half);
     }
 
+    .provider-sign-in-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      align-items: end;
+      gap: var(--spacing);
+      padding: var(--spacing);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 18px;
+      background: var(--md-sys-color-surface-container-low);
+
+      .text-box-component,
+      .password-text-box {
+        min-width: 0;
+      }
+    }
+
+    .provider-sign-in-error {
+      margin: 0;
+      color: var(--md-sys-color-error);
+      font-size: var(--font-size-sm);
+    }
+
     .account-card {
       background: var(--md-sys-color-surface);
       border: 1px solid var(--md-sys-color-outline-variant);

@@ -2036,6 +2036,19 @@ export class Dispatcher {
     this.appStore._beginEnterpriseSignIn(resultCallback)
   }
 
+  /** Add a GitLab or Bitbucket account using token-based authentication. */
+  public authenticateProviderWithToken(
+    provider: 'gitlab' | 'bitbucket',
+    endpoint: string,
+    token: string
+  ) {
+    return this.appStore._authenticateProviderWithToken(
+      provider,
+      endpoint,
+      token
+    )
+  }
+
   /**
    * Attempt to advance from the EndpointEntry step with the given endpoint
    * url. This method must only be called when the store is in the authentication

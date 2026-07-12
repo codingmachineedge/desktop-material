@@ -1,5 +1,5 @@
 import { Disposable } from 'event-kit'
-import { Account } from '../../models/account'
+import { Account, AccountProvider } from '../../models/account'
 import { fatalError } from '../fatal-error'
 import {
   validateURL,
@@ -9,8 +9,10 @@ import {
 
 import {
   fetchUser,
+  getBitbucketAPIEndpoint,
   getDotComAPIEndpoint,
   getEnterpriseAPIURL,
+  getGitLabAPIEndpoint,
   requestOAuthToken,
   getOAuthAuthorizationURL,
 } from '../../lib/api'
@@ -227,6 +229,25 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
       loading: false,
       resultCallback: resultCallback ?? noop,
     })
+  }
+
+  /**
+   * Authenticate a GitLab or Bitbucket account with a personal access token.
+   * Provider tokens never enter profile-backed settings or the agent bridge;
+   * the resulting Account follows the normal secure account persistence path.
+   */
+  public async authenticateProviderWithToken(
+    provider: Exclude<AccountProvider, 'github'>,
+    endpoint: string,
+    token: string
+  ): Promise<Account> {
+    const normalizedEndpoint =
+      provider === 'gitlab'
+        ? getGitLabAPIEndpoint(endpoint)
+        : getBitbucketAPIEndpoint()
+    const account = await fetchUser(normalizedEndpoint, token, provider)
+    this.emitAuthenticate(account)
+    return account
   }
 
   /**

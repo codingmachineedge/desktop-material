@@ -516,6 +516,17 @@ export class Preferences extends React.Component<
     this.props.dispatcher.showEnterpriseSignInDialog()
   }
 
+  private onProviderSignIn = (
+    provider: 'gitlab' | 'bitbucket',
+    endpoint: string,
+    token: string
+  ) =>
+    this.props.dispatcher.authenticateProviderWithToken(
+      provider,
+      endpoint,
+      token
+    )
+
   private onCopilotSignIn = () => {
     this.setState({ selectedIndex: PreferencesTab.Accounts })
   }
@@ -574,6 +585,7 @@ export class Preferences extends React.Component<
             accounts={this.props.accounts}
             onDotComSignIn={this.onDotComSignIn}
             onEnterpriseSignIn={this.onEnterpriseSignIn}
+            onProviderSignIn={this.onProviderSignIn}
             onLogout={this.onLogout}
           />
         )

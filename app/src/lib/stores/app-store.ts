@@ -8943,6 +8943,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.signInStore.beginEnterpriseSignIn(resultCallback)
   }
 
+  public _authenticateProviderWithToken(
+    provider: 'gitlab' | 'bitbucket',
+    endpoint: string,
+    token: string
+  ) {
+    return this.signInStore.authenticateProviderWithToken(
+      provider,
+      endpoint,
+      token
+    )
+  }
+
   public _setSignInEndpoint(url: string): Promise<void> {
     return this.signInStore.setEndpoint(url)
   }
