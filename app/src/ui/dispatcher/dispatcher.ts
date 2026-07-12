@@ -490,6 +490,15 @@ export class Dispatcher {
     return this.appStore._closePopupById(popupId)
   }
 
+  /**
+   * Bring the popup with the given id to the front of the popup stack, making
+   * it the current (top most) popup. Used by the non-modal floating dialog
+   * framework when the user interacts with a dialog behind another one.
+   */
+  public bringPopupToFront(popupId: number) {
+    return this.appStore._bringPopupToFront(popupId)
+  }
+
   /** Show the foldout. This will close any current popup. */
   public showFoldout(foldout: Foldout): Promise<void> {
     return this.appStore._showFoldout(foldout)

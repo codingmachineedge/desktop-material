@@ -256,6 +256,15 @@ export const dialogTransitionTimeout = {
   exit: 100,
 }
 
+/**
+ * The set of popup types that should render as blocking modal dialogs (with a
+ * scrim and the native top layer). Every other popup renders as a non-modal
+ * floating dialog that leaves the app underneath interactive. Errors are
+ * deliberately left non-modal so the user can keep working while acknowledging
+ * them.
+ */
+const ModalPopupTypes = new Set<PopupType>([PopupType.InstallingUpdate])
+
 export const bannerTransitionTimeout = { enter: 500, exit: 400 }
 
 /**
@@ -293,6 +302,15 @@ export class App extends React.Component<IAppProps, IAppState> {
    */
   private getOnPopupDismissedFn = memoizeOne((popupId: number) => {
     return () => this.onPopupDismissed(popupId)
+  })
+
+  /**
+   * Returns a memoized instance of a callback that brings the popup with the
+   * given id to the front of the popup stack, so it can be passed via the
+   * DialogStackContext without creating a new function on every render.
+   */
+  private getOnPopupRequestFrontFn = memoizeOne((popupId: number) => {
+    return () => this.props.dispatcher.bringPopupToFront(popupId)
   })
 
   public constructor(props: IAppProps) {
@@ -1540,27 +1558,6 @@ export class App extends React.Component<IAppProps, IAppState> {
 
   private onUpdateAvailableDismissed = () =>
     this.props.dispatcher.setUpdateBannerVisibility(false)
-
-  private allPopupContent(): JSX.Element | null {
-    const { allPopups } = this.state
-
-    if (allPopups.length === 0) {
-      return null
-    }
-
-    return (
-      <>
-        {allPopups.map(popup => {
-          const isTopMost = this.state.currentPopup?.id === popup.id
-          return (
-            <DialogStackContext.Provider key={popup.id} value={{ isTopMost }}>
-              {this.popupContent(popup, isTopMost)}
-            </DialogStackContext.Provider>
-          )
-        })}
-      </>
-    )
-  }
 
   private popupContent(popup: Popup, isTopMost: boolean): JSX.Element | null {
     if (popup.id === undefined) {
@@ -3128,16 +3125,47 @@ export class App extends React.Component<IAppProps, IAppState> {
   private onQuitAndInstall = () => updateStore.quitAndInstallUpdate()
 
   private renderPopups() {
-    const popupContent = this.allPopupContent()
+    const { allPopups, currentPopup } = this.state
 
     return (
-      <TransitionGroup>
-        {popupContent && (
-          <CSSTransition classNames="modal" timeout={dialogTransitionTimeout}>
-            {popupContent}
-          </CSSTransition>
-        )}
-      </TransitionGroup>
+      <div id="dialog-layer">
+        <TransitionGroup>
+          {allPopups.map((popup, index) => {
+            if (popup.id === undefined) {
+              return null
+            }
+
+            const isTopMost = currentPopup?.id === popup.id
+            const content = this.popupContent(popup, isTopMost)
+
+            if (content === null) {
+              return null
+            }
+
+            const modal = ModalPopupTypes.has(popup.type)
+            const onRequestFront = this.getOnPopupRequestFrontFn(popup.id)
+
+            return (
+              <CSSTransition
+                classNames="modal"
+                timeout={dialogTransitionTimeout}
+                key={popup.id}
+              >
+                <DialogStackContext.Provider
+                  value={{
+                    isTopMost,
+                    modal,
+                    onRequestFront,
+                    stackOrder: index,
+                  }}
+                >
+                  {content}
+                </DialogStackContext.Provider>
+              </CSSTransition>
+            )
+          })}
+        </TransitionGroup>
+      </div>
     )
   }
 

@@ -1,0 +1,75 @@
+// Non-modal floating dialog framework (M4 / Design F).
+//
+// Every popup renders inside #dialog-layer. The layer itself never intercepts
+// pointer events (`pointer-events: none`) so the live app underneath stays
+// interactive; only the open <dialog> elements opt back in. This is the
+// mechanism that makes non-modal dialogs never block the app.
+//
+// Non-modal dialogs are opened with `show()` (no native top layer, no
+// backdrop), so we position and elevate them ourselves here. Modal opt-ins
+// (data-modal) are opened with `showModal()` and get a scrim.
+
+#dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--popup-z-index);
+  pointer-events: none;
+
+  dialog {
+    &[open] {
+      pointer-events: auto;
+
+      // `show()` leaves the dialog in normal flow; center it ourselves. The
+      // cascade offset nudges stacked dialogs so they don't perfectly overlap.
+      // Drag uses `transform`, kept independent of this `translate`.
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      translate: var(--dialog-cascade-offset, 0 0);
+
+      // Background dialogs sit at elevation 1; the frontmost is raised below.
+      box-shadow: var(--md-sys-elevation-level1);
+
+      animation: dmDialog calc(520ms * var(--mdur, 1)) var(--spring);
+    }
+
+    // The frontmost dialog is elevated above the rest.
+    &[data-top-most] {
+      box-shadow: var(--md-sys-elevation-level3);
+    }
+
+    // Non-modal dialogs have no meaningful backdrop; only modal opt-ins scrim.
+    &::backdrop {
+      background: transparent;
+    }
+
+    &[data-modal]::backdrop {
+      background: color-mix(in srgb, var(--md-sys-color-scrim) 42%, transparent);
+      animation: dmScrim 300ms var(--emph);
+    }
+
+    // Entrance is driven by the dmDialog keyframe above; neutralize the
+    // react-transition-group scale enter classes so the two don't fight over
+    // `transform`. Exit keeps a short opacity fade for graceful unmount.
+    &.modal-enter,
+    &.modal-enter-active {
+      transform: none;
+      opacity: 1;
+    }
+
+    &.modal-exit {
+      opacity: 1;
+    }
+
+    &.modal-exit-active {
+      opacity: 0.01;
+      transition: opacity 100ms ease-in;
+    }
+
+    // The header is the drag handle for non-modal dialogs.
+    .dialog-header {
+      cursor: move;
+      touch-action: none;
+    }
+  }
+}

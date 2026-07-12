@@ -4349,6 +4349,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
+  public _bringPopupToFront(popupId: number) {
+    if (this.popupManager.currentPopup?.id === popupId) {
+      return
+    }
+
+    this.popupManager.bringToFront(popupId)
+    this.emitUpdate()
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
   public async _showFoldout(foldout: Foldout): Promise<void> {
     this.currentFoldout = foldout
 

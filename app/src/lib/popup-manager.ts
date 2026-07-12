@@ -208,4 +208,33 @@ export class PopupManager {
   public removePopupById(popupId: number) {
     this.popupStack = this.popupStack.filter(p => p.id !== popupId)
   }
+
+  /**
+   * Brings the popup with the given id to the front of the stack so that it
+   * becomes the current (top most) popup. Used by the non-modal floating dialog
+   * framework when the user interacts with a dialog that is currently behind
+   * another one.
+   *
+   * Error popups are intentionally kept trailing at the tail of the stack (so
+   * they remain the current popup and are surfaced first); a non-error popup is
+   * therefore inserted just before any trailing error popups rather than at the
+   * absolute end, and error popups themselves are never reordered.
+   */
+  public bringToFront(popupId: number) {
+    this._bringPopupToFront(popupId)
+  }
+
+  private _bringPopupToFront(popupId: number) {
+    const popup = this.popupStack.find(p => p.id === popupId)
+
+    if (popup === undefined || popup.type === PopupType.Error) {
+      return
+    }
+
+    const withoutPopup = this.popupStack.filter(p => p.id !== popupId)
+    const errorPopups = withoutPopup.filter(p => p.type === PopupType.Error)
+    const nonErrorPopups = withoutPopup.filter(p => p.type !== PopupType.Error)
+
+    this.popupStack = [...nonErrorPopups, popup, ...errorPopups]
+  }
 }

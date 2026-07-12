@@ -18,6 +18,28 @@ export interface IDialogStackContext {
    * interacted with by the user. This will also determine if event listeners
    * will be active or not. */
   isTopMost: boolean
+
+  /**
+   * Whether this dialog should behave as a modal (blocking the rest of the app
+   * with a scrim and using the native top layer). When false (the default) the
+   * dialog is a non-modal floating panel: it is opened with `show()` rather than
+   * `showModal()`, it leaves the app underneath interactive, and it does not
+   * dismiss on backdrop clicks.
+   */
+  modal?: boolean
+
+  /**
+   * Callback invoked when the dialog wants to be brought to the front of the
+   * popup stack (i.e. the user interacted with a non-topmost floating dialog).
+   */
+  onRequestFront?: () => void
+
+  /**
+   * The dialog's position within the popup stack (0-based). Used to cascade the
+   * on-screen position of stacked non-modal dialogs so they don't perfectly
+   * overlap.
+   */
+  stackOrder?: number
 }
 
 /**
@@ -162,6 +184,14 @@ interface IDialogProps {
   /** Whether or not to override focus of first element with close button */
   readonly focusCloseButtonOnOpen?: boolean
 
+  /**
+   * Whether this dialog should behave as a modal (blocking scrim, native top
+   * layer, backdrop-dismissable). Defaults to false, in which case the dialog
+   * is a non-modal floating panel. When omitted the value is taken from the
+   * surrounding DialogStackContext (driven by the popup layer).
+   */
+  readonly modal?: boolean
+
   readonly onDialogRef?: (ref: HTMLDialogElement | null) => void
 }
 
@@ -276,6 +306,16 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
   private readonly resizeObserver: ResizeObserver
   private resizeDebounceId: number | null = null
 
+  /**
+   * Drag-by-header state for non-modal floating dialogs. `dragOffset` is the
+   * committed translation (in px) applied to the dialog on top of its cascade
+   * position; the `drag*` fields track an in-progress pointer drag.
+   */
+  private dragOffset = { x: 0, y: 0 }
+  private isDragging = false
+  private dragStartClient = { x: 0, y: 0 }
+  private dragBaseOffset = { x: 0, y: 0 }
+
   public constructor(props: DialogProps) {
     super(props)
     this.state = { isAppearing: true, titleId: this.props.titleId }
@@ -297,27 +337,106 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
    * Attempt to ensure that the entire dialog is always visible. Chromium
    * takes care of positioning the dialog when we initially show it but
    * subsequent resizes of either the dialog (such as when switching tabs
-   * in the preferences dialog) or the Window doesn't affect positioning.
+   * in the preferences dialog) or the Window don't affect positioning.
+   *
+   * For non-modal floating dialogs the position is driven by a CSS-centered
+   * layout plus a drag `transform`, so keeping the dialog on screen means
+   * clamping the committed drag offset rather than nudging `top`.
    */
   private onResized = () => {
-    if (!this.dialogElement) {
+    this.keepOnScreen()
+  }
+
+  /**
+   * Clamp the committed drag offset so the dialog remains within the viewport
+   * (leaving room for the title bar at the top). No-op when the dialog is
+   * larger than the viewport since there's nothing sensible to clamp to.
+   */
+  private keepOnScreen() {
+    const dialog = this.dialogElement
+    if (dialog === null) {
       return
     }
 
-    const { offsetTop, offsetHeight } = this.dialogElement
+    const rect = dialog.getBoundingClientRect()
+    const margin = 8
+    const minTop = titleBarHeight + margin
 
-    // Not much we can do if the dialog is bigger than the window
-    if (offsetHeight > window.innerHeight - titleBarHeight) {
+    // Nothing we can do if the dialog is bigger than the window
+    if (
+      rect.height > window.innerHeight - minTop ||
+      rect.width > window.innerWidth - margin * 2
+    ) {
       return
     }
 
-    const padding = 10
-    const overflow = offsetTop + offsetHeight + padding - window.innerHeight
+    let { x, y } = this.dragOffset
 
-    if (overflow > 0) {
-      const top = Math.max(titleBarHeight, offsetTop - overflow)
-      this.dialogElement.style.top = `${top}px`
+    if (rect.left < margin) {
+      x += margin - rect.left
+    } else if (rect.right > window.innerWidth - margin) {
+      x -= rect.right - (window.innerWidth - margin)
     }
+
+    if (rect.top < minTop) {
+      y += minTop - rect.top
+    } else if (rect.bottom > window.innerHeight - margin) {
+      y -= rect.bottom - (window.innerHeight - margin)
+    }
+
+    if (x !== this.dragOffset.x || y !== this.dragOffset.y) {
+      this.dragOffset = { x, y }
+      this.applyDragTransform()
+    }
+  }
+
+  /** Whether this dialog should behave as a modal (scrim + native top layer). */
+  private isModal() {
+    return this.props.modal ?? this.context.modal ?? false
+  }
+
+  /**
+   * Open the underlying <dialog> element. Non-modal dialogs use `show()` so the
+   * rest of the app stays interactive; modal opt-ins use `showModal()` for the
+   * native top layer + backdrop. Called once on mount; topmost transitions no
+   * longer open or close the element (non-topmost dialogs remain visible).
+   */
+  private openDialog() {
+    const dialog = this.dialogElement
+    if (dialog === null || dialog.open) {
+      return
+    }
+
+    // Feature-detect the native <dialog> open methods. They exist in Chromium
+    // but not in the jsdom environment used by the unit tests, where the dialog
+    // is never actually opened.
+    const open = this.isModal() ? dialog.showModal : dialog.show
+    if (typeof open !== 'function') {
+      return
+    }
+    open.call(dialog)
+
+    // Provide an event that components can subscribe to in order to perform
+    // tasks such as re-layout after the dialog is visible
+    dialog.dispatchEvent(
+      new CustomEvent('dialog-show', {
+        bubbles: true,
+        cancelable: false,
+      })
+    )
+
+    this.setState({ isAppearing: true })
+    this.scheduleDismissGraceTimeout()
+  }
+
+  private applyDragTransform() {
+    if (this.dialogElement === null) {
+      return
+    }
+
+    const { x, y } = this.dragOffset
+    this.dialogElement.style.transform =
+      x === 0 && y === 0 ? '' : `translate(${x}px, ${y}px)`
   }
 
   private clearDismissGraceTimeout() {
@@ -383,6 +502,10 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
 
   public componentDidMount() {
     sendDialogDidOpen()
+    // Open the element immediately on mount rather than waiting to become the
+    // top most dialog. Non-modal dialogs stay visible even when another dialog
+    // is stacked on top of them.
+    this.openDialog()
     this.checkIsTopMostDialog(this.context.isTopMost)
   }
 
@@ -391,23 +514,23 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
       return
     }
 
+    // Defensive: the element is normally opened on mount, but make sure it's
+    // open when this dialog becomes the top most one.
     if (!this.dialogElement.open) {
-      this.dialogElement.showModal()
+      this.openDialog()
     }
 
-    // Provide an event that components can subscribe to in order to perform
-    // tasks such as re-layout after the dialog is visible
-    this.dialogElement.dispatchEvent(
-      new CustomEvent('dialog-show', {
-        bubbles: true,
-        cancelable: false,
-      })
-    )
-
-    this.setState({ isAppearing: true })
-    this.scheduleDismissGraceTimeout()
-
-    this.focusFirstSuitableChild()
+    // Only steal focus if it has fallen out of this dialog (e.g. after a DOM
+    // reorder when bringing a background dialog to the front). We don't want to
+    // yank focus away from wherever the user just clicked.
+    const active = document.activeElement
+    if (
+      active === null ||
+      active === document.body ||
+      !this.dialogElement.contains(active)
+    ) {
+      this.focusFirstSuitableChild()
+    }
 
     window.addEventListener('focus', this.onWindowFocus)
 
@@ -416,10 +539,8 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
   }
 
   protected onDialogIsNotTopMost() {
-    if (this.dialogElement !== null && this.dialogElement.open) {
-      this.dialogElement?.close()
-    }
-
+    // Non-modal dialogs remain open (and visible) when they're no longer the
+    // top most dialog; we only tear down the top-most-only event listeners.
     this.clearDismissGraceTimeout()
 
     window.removeEventListener('focus', this.onWindowFocus)
@@ -644,6 +765,14 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
       return
     }
 
+    // Backdrop dismissal only applies to modal dialogs. Non-modal floating
+    // dialogs are opened with `show()` and have no interactive `::backdrop`
+    // (clicks outside the dialog fall through to the still-live app), so there's
+    // nothing to detect here.
+    if (!this.isModal()) {
+      return
+    }
+
     if (!this.isDismissable() || !this.isBackdropDismissable()) {
       return
     }
@@ -732,6 +861,73 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
 
     this.dialogElement = e
     this.props.onDialogRef?.(e)
+  }
+
+  /**
+   * Bring this dialog to the front of the popup stack when the user interacts
+   * with it while it's not already the top most dialog. Wired to both
+   * mousedown (capture) and focus so either pointer or keyboard interaction
+   * raises the dialog.
+   */
+  private onBringToFront = () => {
+    if (!this.context.isTopMost) {
+      this.context.onRequestFront?.()
+    }
+  }
+
+  /**
+   * Begin a drag when the user presses the primary pointer button on the dialog
+   * header (but not on a button within it). Only non-modal dialogs are
+   * draggable; modal dialogs are centered by the native top layer.
+   */
+  private onDialogPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 || this.isModal() || this.dialogElement === null) {
+      return
+    }
+
+    const target = e.target
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+
+    // Only the header is a drag handle, and never its buttons (close, etc).
+    if (target.closest('.dialog-header') === null || target.closest('button')) {
+      return
+    }
+
+    this.isDragging = true
+    this.dragStartClient = { x: e.clientX, y: e.clientY }
+    this.dragBaseOffset = { ...this.dragOffset }
+    this.dialogElement.setPointerCapture(e.pointerId)
+  }
+
+  private onDialogPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (!this.isDragging || this.dialogElement === null) {
+      return
+    }
+
+    const dx = e.clientX - this.dragStartClient.x
+    const dy = e.clientY - this.dragStartClient.y
+
+    this.dragOffset = {
+      x: this.dragBaseOffset.x + dx,
+      y: this.dragBaseOffset.y + dy,
+    }
+    this.applyDragTransform()
+  }
+
+  private onDialogPointerUp = (e: React.PointerEvent<HTMLElement>) => {
+    if (!this.isDragging || this.dialogElement === null) {
+      return
+    }
+
+    this.isDragging = false
+    if (this.dialogElement.hasPointerCapture(e.pointerId)) {
+      this.dialogElement.releasePointerCapture(e.pointerId)
+    }
+
+    // Make sure the drop location keeps the dialog reachable on screen.
+    this.keepOnScreen()
   }
 
   private onKeyDown = (event: React.KeyboardEvent) => {
@@ -883,6 +1079,12 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
       'tooltip-host'
     )
 
+    const isModal = this.isModal()
+    const cascade = (this.context.stackOrder ?? 0) * 24
+    const style = {
+      '--dialog-cascade-offset': `${cascade}px ${cascade}px`,
+    } as React.CSSProperties
+
     return (
       /**
        * This a11y linter is a false-positive as the mousedown and keydown
@@ -894,8 +1096,16 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
         id={this.props.id}
         role={this.props.role}
         onMouseDown={this.onDialogMouseDown}
+        onMouseDownCapture={this.onBringToFront}
+        onFocus={this.onBringToFront}
+        onPointerDown={this.onDialogPointerDown}
+        onPointerMove={this.onDialogPointerMove}
+        onPointerUp={this.onDialogPointerUp}
         onKeyDown={this.onKeyDown}
         className={className}
+        style={style}
+        data-top-most={this.context.isTopMost ? 'true' : undefined}
+        data-modal={isModal ? 'true' : undefined}
         {...this.getAriaAttributes()}
         tabIndex={-1}
       >
