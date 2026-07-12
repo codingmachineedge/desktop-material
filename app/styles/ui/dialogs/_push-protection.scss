@@ -13,8 +13,8 @@ dialog.push-protection-error-dialog {
       margin: 0;
       margin-top: var(--spacing);
       max-height: 200px;
-      overflow-y: auto;
-      // MD3 de-stock: the secret file list reads as a rounded grouped card.
+      // MD3 de-stock: the secret file list reads as a rounded grouped card
+      // (clip the corners horizontally while still scrolling vertically).
       border: 1px solid var(--md-sys-color-outline-variant);
       border-radius: var(--md-sys-shape-corner-medium);
       overflow: hidden;
