@@ -136,27 +136,47 @@ export function getDistArchitecture(): 'arm64' | 'x64' {
 }
 
 export function getUpdatesURL() {
-  // Desktop Material fork: allow a fork-operated update server to be baked in at
-  // build time. When DESKTOP_UPDATES_URL is set it fully replaces the upstream
-  // endpoint (mirrors the existing DESKTOP_E2E_UPDATES_URL override in
-  // app/app-info.ts). When it is unset we keep emitting upstream's URL so the
-  // packaging/CI delta logic is unchanged, but the renderer refuses to poll it
-  // (see `checkForUpdates` in app/src/ui/app.tsx) so a fork build never fetches
-  // — and never auto-updates itself to — the official GitHub Desktop release.
+  // Desktop Material fork: auto-update from the fork's OWN GitHub releases
+  // instead of upstream's Central deployment server. Upstream's endpoint serves
+  // the official GitHub Desktop binaries, so a fork build polling it would
+  // silently update itself back to upstream and clobber the fork.
+  //
+  // A build-time DESKTOP_UPDATES_URL still fully overrides the endpoint (for a
+  // custom update server, or the DESKTOP_E2E_UPDATES_URL local test server).
+  // When it is unset we point Squirrel.Windows at this repo's
+  // `releases/latest/download/` folder. GitHub's stable "latest" redirect makes
+  // that a fixed URL that never changes per release, and it always resolves to
+  // the newest published release's assets — the Squirrel `RELEASES` manifest
+  // and the `*-full.nupkg` package, both attached to every release by
+  // .github/workflows/build-installers.yml. Squirrel fetches `<url>RELEASES`,
+  // reads the latest version, then downloads the referenced nupkg from the same
+  // folder. The trailing slash is required so Squirrel appends `RELEASES`
+  // rather than replacing the last path segment.
   const forkUpdatesURL = process.env.DESKTOP_UPDATES_URL
   if (forkUpdatesURL !== undefined && forkUpdatesURL.length > 0) {
     return forkUpdatesURL
   }
 
-  // It is also possible to use a `x64/` path, but for now we'll leave the
-  // original URL without architecture in it (which will still work for
-  // compatibility reasons) in case anything goes wrong until we have everything
-  // sorted out.
-  const architecturePath = getDistArchitecture() === 'arm64' ? 'arm64/' : ''
-  return `https://central.github.com/api/deployments/desktop/desktop/${architecturePath}latest?version=${version}&env=${getChannel()}`
+  // Repository that publishes fork releases. Overridable so a downstream
+  // re-fork doesn't have to patch source to retarget its own release feed.
+  const repo =
+    process.env.DESKTOP_UPDATES_REPO ?? 'codingmachineedge/desktop-material'
+  return `https://github.com/${repo}/releases/latest/download/`
 }
 
 export function shouldMakeDelta() {
+  // Delta packages require a reachable previous `RELEASES` feed at build time —
+  // electron-winstaller downloads `remoteReleases` (see script/package.ts) to
+  // diff the new package against it. For the fork's per-push GitHub releases we
+  // default to full-only packages: this is robust (the very first release has
+  // no prior feed to diff against, which would otherwise fail the build) and
+  // Squirrel handles a full-only feed fine — it simply downloads the whole
+  // package. Opt back in with DESKTOP_MAKE_DELTA=1 once a stable, sequential
+  // release history exists.
+  if (process.env.DESKTOP_MAKE_DELTA !== '1') {
+    return false
+  }
+
   // Only production and beta channels include deltas. Test releases aren't
   // necessarily sequential so deltas wouldn't make sense.
   return ['production', 'beta'].includes(getChannel())
