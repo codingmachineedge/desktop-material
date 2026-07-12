@@ -19,7 +19,12 @@
   display: flex;
   width: 250px;
 
-  border-radius: var(--border-radius);
+  // MD3 floating surface: large radius, level-3 overlay elevation, tonal
+  // surface-container fill with a hairline outline (mirrors the shell popover
+  // rule). Replaces the stock 6px radius + blur shadow. No container padding —
+  // the popup height is JS-computed (virtualized list) and border-box padding
+  // would clip the last row.
+  border-radius: var(--md-sys-shape-corner-large);
 
   &.emoji {
     width: 200px;
@@ -31,29 +36,30 @@
     width: 300px;
   }
 
-  background-color: var(--background-color);
+  background-color: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
 
-  box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--md-sys-elevation-level3);
 
   .list-item,
   li {
     border-bottom: none;
+    border-radius: var(--md-sys-shape-corner-small);
 
     &:not(:first-child) {
-      border-top: var(--base-border);
+      border-top: none;
+    }
+
+    &:hover {
+      background-color: var(--md-sys-color-surface-container-high);
     }
 
     &.selected {
-      --text-color: var(--box-selected-active-text-color);
-      --text-secondary-color: var(--box-selected-active-text-color);
+      --text-color: var(--md-sys-color-on-secondary-container);
+      --text-secondary-color: var(--md-sys-color-on-secondary-container);
 
       color: var(--text-color);
-      background-color: var(--box-selected-active-background-color);
-      border-top-color: var(--box-selected-active-background-color);
-
-      & + .list-item {
-        border-top-color: var(--box-selected-active-background-color);
-      }
+      background-color: var(--md-sys-color-secondary-container);
     }
   }
 }
