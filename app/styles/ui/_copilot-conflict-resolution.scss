@@ -50,7 +50,7 @@
     min-height: 0;
     flex-grow: 1;
     border: var(--base-border);
-    border-radius: var(--border-radius);
+    border-radius: var(--md-sys-shape-corner-medium);
     margin: var(--spacing);
 
     .copilot-changes-header {
@@ -213,8 +213,8 @@
       padding-left: calc(16px + var(--spacing-half));
 
       .green-circle {
-        background-color: var(--color-new);
-        color: var(--background-color);
+        background-color: var(--dm-green);
+        color: var(--md-sys-color-surface);
         border-radius: 50%;
         height: 20px;
         width: 20px;
@@ -242,7 +242,7 @@
           line-height: 1.3;
 
           &.resolved-text {
-            color: var(--color-new);
+            color: var(--dm-green);
           }
         }
       }
@@ -385,7 +385,7 @@
         color: var(--text-secondary-color);
         padding: 0 var(--spacing-half);
         border: var(--base-border);
-        border-radius: var(--border-radius);
+        border-radius: 999px;
         flex-shrink: 0;
       }
     }

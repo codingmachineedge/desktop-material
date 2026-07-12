@@ -35,7 +35,8 @@ dialog#copilot-conflicts-loading {
       min-width: 0;
 
       .copilot-conflicts-loading-stop-icon {
-        color: var(--error-color);
+        // MD3 de-stock: stop glyph uses the Material error role.
+        color: var(--md-sys-color-error);
         width: 12px;
         height: 12px;
       }

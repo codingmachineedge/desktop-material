@@ -37,7 +37,7 @@
       gap: var(--spacing);
       padding: var(--spacing-half) var(--spacing);
       border: var(--base-border);
-      border-radius: var(--border-radius);
+      border-radius: var(--md-sys-shape-corner-medium);
       background: var(--box-alt-background-color);
       min-width: 0;
       max-width: 100%;
@@ -76,7 +76,7 @@
     .copilot-byok-provider-badge {
       display: inline-block;
       padding: 0 var(--spacing-half);
-      border-radius: var(--border-radius);
+      border-radius: 999px;
       background: var(--box-selected-background-color);
       color: var(--text-secondary-color);
       font-size: var(--font-size-sm);
@@ -128,7 +128,7 @@
     height: 18px;
     padding: 0;
     border: none;
-    border-radius: var(--border-radius);
+    border-radius: 999px;
     background: transparent;
     color: var(--text-secondary-color);
 
@@ -267,7 +267,7 @@
       gap: var(--spacing);
       padding: var(--spacing-half) var(--spacing);
       border: var(--base-border);
-      border-radius: var(--border-radius);
+      border-radius: var(--md-sys-shape-corner-medium);
       background: var(--box-alt-background-color);
       min-width: 0;
       max-width: 100%;
@@ -319,7 +319,7 @@
       font-family: var(--font-family-monospace);
       font-size: 0.95em;
       padding: 0 0.25em;
-      border-radius: var(--border-radius);
+      border-radius: var(--md-sys-shape-corner-small);
       background: var(--box-selected-background-color);
     }
   }
@@ -347,7 +347,7 @@
       font-family: var(--font-family-monospace);
       font-size: 0.95em;
       padding: 0 0.25em;
-      border-radius: var(--border-radius);
+      border-radius: var(--md-sys-shape-corner-small);
       background: var(--box-selected-background-color);
     }
   }
