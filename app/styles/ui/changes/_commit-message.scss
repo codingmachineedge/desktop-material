@@ -603,18 +603,17 @@
 }
 
 // MD3 composer compactness: the prototype's description is a two-row field
-// (spec §7, textarea rows=2), so the card must not starve the file list of
-// vertical space the way the upstream 100px minimum does.
+// (spec §7 — `<textarea rows="2">` with no min-height). The commit composer now
+// passes `rows={2}`, so we drop the upstream min-height floors (100px collapsed
+// / 80px with an action bar) and let the row count drive the collapsed height.
+// The textarea still scrolls when its content overflows two rows, which keeps
+// the `.with-overflow` scroll-fade behaviour intact.
 .commit-message-component {
   .description-focus-container textarea {
-    min-height: 56px;
+    min-height: 0;
   }
 
   &.with-action-bar .description-field textarea {
-    min-height: 48px;
-
-    @media (max-height: 500px) {
-      min-height: 10px;
-    }
+    min-height: 0;
   }
 }

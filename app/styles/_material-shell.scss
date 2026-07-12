@@ -483,8 +483,10 @@ dialog#preferences {
 .context-menu {
   background: var(--md-sys-color-surface-container);
   border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--md-sys-shape-corner-medium);
-  box-shadow: var(--md-sys-elevation-level2);
+  // MD3 popover standard (overlays §1.3 / §0.2): large radius + level-3 overlay
+  // elevation for every floating menu / popover surface.
+  border-radius: var(--md-sys-shape-corner-large);
+  box-shadow: var(--md-sys-elevation-level3);
   color: var(--md-sys-color-on-surface);
 }
 

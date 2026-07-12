@@ -59,6 +59,13 @@ interface IAutocompletingTextInputProps<ElementType, AutocompleteItemType> {
   /** Indicates if input field applies spellcheck */
   readonly spellcheck?: boolean
 
+  /**
+   * Number of visible text rows. Only meaningful for the textarea variant; it
+   * sets the collapsed height of the field (the textarea still scrolls when its
+   * content overflows).
+   */
+  readonly rows?: number
+
   /** Indicates if it should always try to autocomplete. Optional (defaults to false) */
   readonly alwaysAutocomplete?: boolean
 
@@ -437,8 +444,14 @@ export abstract class AutocompletingTextInput<
     const autocompleteVisible =
       autocompletionState !== null && autocompletionState.items.length > 0
 
+    // `rows` is only a valid attribute on <textarea>; omit it for <input> to
+    // avoid React emitting an unknown-attribute warning.
+    const rows =
+      this.getElementTagName() === 'textarea' ? this.props.rows : undefined
+
     const props = {
       type: 'text',
+      rows,
       id: this.elementId,
       role: 'combobox',
       placeholder: this.props.placeholder,

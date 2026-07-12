@@ -123,11 +123,14 @@
 }
 
 .tab-style-editor {
+  // Design-spec-shell §3 / overlays §8 tab-format popover: 320px surface with
+  // 40×40 radius-12 toggles, mono size value, radius-999 font pills, and 26px
+  // color swatch circles ringed with a 2.5px border.
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-width: 264px;
-  padding: 4px;
+  width: 288px;
+  max-width: 100%;
   color: var(--md-sys-color-on-surface);
 
   .tab-style-header {
@@ -137,18 +140,20 @@
 
     h3 {
       margin: 0;
-      font-size: var(--font-size-md);
+      font-size: 13px;
       font-weight: var(--font-weight-semibold);
     }
 
     .tab-style-reset {
-      padding: 2px 6px;
+      padding: 4px 10px;
       border: none;
-      border-radius: 6px;
+      border-radius: 999px;
       background: transparent;
       color: var(--md-sys-color-primary);
       font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
       cursor: pointer;
+      transition: background-color 200ms var(--emph);
 
       &:hover {
         background: var(--md-sys-color-surface-container-high);
@@ -159,7 +164,7 @@
   .tab-style-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .tab-style-toggle,
@@ -167,18 +172,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: 8px;
-    background: var(--md-sys-color-surface-container-low);
-    color: var(--md-sys-color-on-surface);
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
     cursor: pointer;
+    transition: background-color 200ms var(--emph), color 200ms var(--emph), transform 200ms var(--spring-fast);
+
+    &:active {
+      transform: scale(0.85);
+    }
 
     &.active {
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
-      border-color: transparent;
     }
   }
 
@@ -195,7 +204,7 @@
   .tab-style-divider {
     width: 1px;
     height: 24px;
-    margin: 0 2px;
+    margin: 0 3px;
     background: var(--md-sys-color-outline-variant);
   }
 
@@ -231,55 +240,68 @@
   }
 
   .tab-style-size {
+    gap: 8px;
+
     label {
-      font-size: var(--font-size-sm);
+      width: 32px;
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
       color: var(--md-sys-color-on-surface-variant);
     }
 
     input[type='range'] {
       flex: 1;
+      height: 20px;
       accent-color: var(--md-sys-color-primary);
     }
 
     .tab-style-size-value {
-      min-width: 48px;
+      width: 44px;
       text-align: right;
-      font-weight: var(--font-weight-semibold);
+      font-family: var(--font-family-monospace);
+      font-size: 12px;
+      font-weight: 700;
     }
   }
 
   .tab-style-families {
+    gap: 6px;
+
     .tab-style-family {
       flex: 1;
-      height: 32px;
-      border: 1px solid var(--md-sys-color-outline-variant);
-      border-radius: 8px;
-      background: var(--md-sys-color-surface-container-low);
-      color: var(--md-sys-color-on-surface);
+      height: 36px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
       cursor: pointer;
+      transition: background-color 200ms var(--emph), color 200ms var(--emph);
 
       &.active {
         background: var(--md-sys-color-secondary-container);
         color: var(--md-sys-color-on-secondary-container);
-        border-color: transparent;
       }
     }
 
     .family-serif {
-      font-family: Georgia, 'Times New Roman', serif;
+      font-family: 'Roboto Serif', Georgia, 'Times New Roman', serif;
     }
     .family-monospace {
-      font-family: monospace;
+      font-family: var(--font-family-monospace, monospace);
     }
   }
 
   .tab-style-colors {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
 
     .tab-style-colors-label {
-      font-size: var(--font-size-sm);
+      width: 32px;
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
       color: var(--md-sys-color-on-surface-variant);
     }
 
@@ -289,17 +311,37 @@
     }
 
     .tab-style-swatch {
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       padding: 0;
-      border: 2px solid transparent;
-      border-radius: 50%;
+      border: 2.5px solid var(--md-sys-color-outline-variant);
+      border-radius: 999px;
       cursor: pointer;
+      transition: transform 200ms var(--spring-fast), border-color 200ms var(--emph);
+
+      &:hover {
+        transform: scale(1.15);
+      }
+      &:active {
+        transform: scale(0.9);
+      }
 
       &.active {
         border-color: var(--md-sys-color-primary);
-        box-shadow: 0 0 0 2px var(--md-sys-color-surface);
       }
     }
+  }
+}
+
+// Tab-format popover container (overlays §8): radius 22, level3 over the shared
+// Popover chrome. Scoped via :has so only this popover picks up the geometry
+// (Chromium 136 / Electron 42 supports :has; already used elsewhere here).
+.popover-component:has(.tab-style-editor) {
+  border-radius: 22px;
+  box-shadow: var(--md-sys-elevation-level3);
+
+  .popover-content {
+    border-radius: 22px;
+    padding: 16px;
   }
 }

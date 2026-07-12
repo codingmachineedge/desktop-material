@@ -4,14 +4,17 @@
 
   background: var(--background-color);
   color: var(--text-color);
-  border-radius: var(--border-radius);
+  // MD3 popover standard (overlays §1.3 / §0.2): large radius, level-3 overlay
+  // elevation. Specific popovers (e.g. the tab-format popover) raise the radius
+  // further in their own partial.
+  border-radius: var(--md-sys-shape-corner-large);
   border: var(--base-border);
 
-  box-shadow: var(--base-box-shadow);
+  box-shadow: var(--md-sys-elevation-level3);
 
   .popover-content {
     padding: var(--spacing-double);
-    border-radius: var(--border-radius);
+    border-radius: var(--md-sys-shape-corner-large);
     max-height: var(--available-height);
     max-width: var(--available-width);
   }
