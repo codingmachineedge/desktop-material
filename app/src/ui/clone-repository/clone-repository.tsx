@@ -7,6 +7,7 @@ import {
   isDotComAccount,
   isEnterpriseAccount,
 } from '../../models/account'
+import { resolveSelectedAccount } from '../../lib/resolve-selected-account'
 import { FoldoutType } from '../../lib/app-state'
 import {
   IRepositoryIdentifier,
@@ -406,14 +407,8 @@ export class CloneRepository extends React.Component<
   private getAccountForTab(tab: CloneRepositoryTab): Account | null {
     const tabState = this.getTabState(tab)
     const tabAccounts = this.getAccountsForTab(tab, this.props.accounts)
-    const selectedAccount =
-      (tabState.selectedAccount
-        ? tabAccounts.find(
-            a => a.endpoint === tabState.selectedAccount?.endpoint
-          )
-        : undefined) ?? tabAccounts.at(0)
 
-    return selectedAccount ?? null
+    return resolveSelectedAccount(tabAccounts, tabState.selectedAccount)
   }
 
   private getGitHubTabState(
