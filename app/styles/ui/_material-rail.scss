@@ -1,0 +1,203 @@
+// MD3 left navigation rail.
+//
+// A new structural component: the `<nav class="repository-rail">` rendered as the
+// first flex child of `#repository`. It hosts the vertical section TabBar
+// (Changes / History — still carrying `id="changes-tab"` / `id="history-tab"` for
+// the aria-labelledby contract) plus Branches, Settings and account-avatar rail
+// buttons.
+//
+// Registered in `_ui.scss` after `ui/tab-bar`. Selectors are scoped under
+// `.repository-rail` with enough specificity to beat the generic vertical
+// `.tab-bar` treatment declared in `_material-shell.scss` (which still styles the
+// Preferences vertical tab bar). All colour / motion / shape values come from
+// --md-sys-* / --spring* / --emph / --mdur tokens; the literal 999/12/14px radii
+// are the design's fixed pill/squircle scale (no radius tokens exist for them).
+
+.repository-rail {
+  align-items: center;
+  animation: dmLeft calc(520ms * var(--mdur)) var(--spring) backwards;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  width: 88px;
+
+  // The vertical section TabBar sheds the shell card treatment inside the rail.
+  .tab-bar {
+    background: transparent;
+    gap: 6px;
+    padding: 0;
+  }
+
+  .tab-bar.vertical {
+    align-items: center;
+  }
+
+  // Section tabs and the Branches destination share the rail-button look: a
+  // transparent column of pill-indicator + label.
+  .tab-bar.vertical .tab-bar-item,
+  .rail-nav-button {
+    background: transparent;
+    border: 0;
+    color: var(--md-sys-color-on-surface-variant);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+    margin: 0;
+    min-height: 0;
+    min-width: 0;
+    padding: 4px 0;
+    width: 80px;
+  }
+
+  // Neutralise the shell's full-button hover fill — the hover state lives on the
+  // pill, not the 80px column.
+  .tab-bar.vertical .tab-bar-item:hover {
+    background: transparent !important;
+  }
+
+  .tab-bar.vertical .tab-bar-item.selected {
+    background: transparent;
+    color: var(--md-sys-color-on-surface);
+  }
+
+  // Inner content wrapper for the section tabs (the TabBar wraps our child in the
+  // `.tab-bar-item` button, so the column is realised here).
+  .rail-item {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  // Pill indicator (58x34) shared by Changes / History / Branches.
+  .rail-pill {
+    align-items: center;
+    border-radius: 999px;
+    color: var(--md-sys-color-on-surface-variant);
+    display: grid;
+    height: 34px;
+    justify-items: center;
+    overflow: hidden;
+    place-items: center;
+    position: relative;
+    transition: background-color 300ms var(--emph), color 300ms var(--emph), border-radius 300ms var(--spring);
+    width: 58px;
+  }
+
+  .rail-label {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11.5px;
+    font-weight: 500;
+    transition: color 300ms var(--emph);
+  }
+
+  // Hover: tonal wash + pill-to-squircle morph on the indicator.
+  .tab-bar.vertical .tab-bar-item:hover .rail-pill,
+  .rail-nav-button:hover .rail-pill {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+    border-radius: 12px;
+  }
+
+  // Press feedback.
+  .tab-bar.vertical .tab-bar-item:active .rail-pill,
+  .rail-nav-button:active .rail-pill {
+    transform: scale(0.86);
+  }
+
+  // Active section: filled secondary-container pill + bolder on-surface label.
+  .tab-bar.vertical .tab-bar-item.selected .rail-pill {
+    background: var(--md-sys-color-secondary-container);
+    border-radius: 999px;
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  .tab-bar.vertical .tab-bar-item.selected .rail-label {
+    color: var(--md-sys-color-on-surface);
+    font-weight: 700;
+  }
+
+  .rail-icon {
+    height: 20px;
+    width: 20px;
+  }
+
+  // Changed-file count badge, anchored to the Changes pill.
+  .rail-pill .counter {
+    align-items: center;
+    background: var(--md-sys-color-error);
+    border-radius: 999px;
+    box-sizing: border-box;
+    color: var(--md-sys-color-on-error);
+    display: grid;
+    font-size: 10.5px;
+    font-weight: 700;
+    height: 17px;
+    line-height: 1;
+    margin: 0;
+    min-width: 17px;
+    padding: 0 4px;
+    place-items: center;
+    position: absolute;
+    right: 8px;
+    top: 2px;
+    animation: dmBounce 460ms var(--spring-fast);
+  }
+
+  .rail-spacer {
+    flex: 1;
+  }
+
+  // Bottom icon buttons (Settings gear + account avatar) — the button itself is
+  // the pill; no label.
+  .rail-icon-button {
+    align-items: center;
+    border: 0;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    position: relative;
+  }
+
+  .rail-settings {
+    background: transparent;
+    border-radius: 999px;
+    color: var(--md-sys-color-on-surface-variant);
+    height: 40px;
+    transition: background-color 260ms var(--emph), transform 240ms var(--spring-fast), border-radius 280ms var(--spring);
+    width: 58px;
+
+    &:hover {
+      background: var(--md-sys-color-surface-container-highest);
+      border-radius: 14px;
+    }
+
+    &:active {
+      transform: rotate(60deg) scale(0.9);
+    }
+  }
+
+  .rail-avatar {
+    background: var(--md-sys-color-primary-container);
+    border-radius: 999px;
+    color: var(--md-sys-color-on-primary-container);
+    font-size: 13px;
+    font-weight: 700;
+    height: 38px;
+    margin-top: 2px;
+    transition: background-color 480ms var(--emph), transform 240ms var(--spring-fast), border-radius 280ms var(--spring);
+    width: 38px;
+
+    &:hover {
+      border-radius: 12px;
+      transform: scale(1.08);
+    }
+
+    &:active {
+      transform: scale(0.9);
+    }
+  }
+}

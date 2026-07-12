@@ -9,14 +9,18 @@ import { MultipleSelection } from './changes/multiple-selection'
 import { FilesChangedBadge } from './changes/files-changed-badge'
 import { SelectedCommits, CompareSidebar } from './history'
 import { Resizable } from './resizable'
-import { TabBar } from './tab-bar'
+import { TabBar, TabBarType } from './tab-bar'
+import { Octicon } from './octicons'
+import * as octicons from './octicons/octicons.generated'
 import {
   IRepositoryState,
   RepositorySectionTab,
   ChangesSelectionKind,
   IConstrainedValue,
   CommitOptions,
+  FoldoutType,
 } from '../lib/app-state'
+import { PreferencesTab } from '../models/preferences'
 import { Dispatcher } from './dispatcher'
 import { IssuesStore, GitHubUserStore } from '../lib/stores'
 import { assertNever } from '../lib/fatal-error'
@@ -221,16 +225,92 @@ export class RepositoryView extends React.Component<
         : Tab.History
 
     return (
-      <TabBar selectedIndex={selectedTab} onTabClicked={this.onTabClicked}>
-        <span className="with-indicator" id="changes-tab">
-          <span>Changes</span>
-          {this.renderChangesBadge()}
+      <TabBar
+        selectedIndex={selectedTab}
+        onTabClicked={this.onTabClicked}
+        type={TabBarType.Vertical}
+      >
+        <span className="rail-item" id="changes-tab">
+          <span className="rail-pill">
+            <Octicon symbol={octicons.fileDiff} className="rail-icon" />
+            {this.renderChangesBadge()}
+          </span>
+          <span className="rail-label">Changes</span>
         </span>
 
-        <div className="with-indicator" id="history-tab">
-          <span>History</span>
-        </div>
+        <span className="rail-item" id="history-tab">
+          <span className="rail-pill">
+            <Octicon symbol={octicons.history} className="rail-icon" />
+          </span>
+          <span className="rail-label">History</span>
+        </span>
       </TabBar>
+    )
+  }
+
+  private onShowBranches = () => {
+    this.props.dispatcher.showFoldout({ type: FoldoutType.Branch })
+  }
+
+  private onShowPreferences = () => {
+    this.props.dispatcher.showPopup({ type: PopupType.Preferences })
+  }
+
+  private onShowAccounts = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.Preferences,
+      initialSelectedTab: PreferencesTab.Accounts,
+    })
+  }
+
+  private renderAvatarContent(): JSX.Element | string {
+    const account = this.props.accounts[0]
+
+    if (account === undefined) {
+      return <Octicon symbol={octicons.person} className="rail-icon" />
+    }
+
+    const source = (account.name || account.login).trim()
+    const parts = source.split(/\s+/).filter(part => part.length > 0)
+    const initials =
+      parts.length >= 2 ? parts[0][0] + parts[1][0] : source.slice(0, 2)
+
+    return initials.toUpperCase()
+  }
+
+  private renderRail(): JSX.Element {
+    return (
+      <nav className="repository-rail" aria-label="Repository navigation">
+        {this.renderTabs()}
+        <button
+          type="button"
+          className="rail-nav-button"
+          onClick={this.onShowBranches}
+          aria-label="Branches"
+        >
+          <span className="rail-pill">
+            <Octicon symbol={octicons.gitBranch} className="rail-icon" />
+          </span>
+          <span className="rail-label">Branches</span>
+        </button>
+        <div className="rail-spacer" />
+        <button
+          type="button"
+          className="rail-icon-button rail-settings"
+          onClick={this.onShowPreferences}
+          aria-label="Settings"
+        >
+          <Octicon symbol={octicons.gear} className="rail-icon" />
+        </button>
+        <button
+          type="button"
+          className="rail-icon-button rail-avatar"
+          onClick={this.onShowAccounts}
+          aria-label="Switch account"
+        >
+          {this.renderAvatarContent()}
+        </button>
+      </nav>
     )
   }
 
@@ -416,7 +496,6 @@ export class RepositoryView extends React.Component<
           onResize={this.handleSidebarResize}
           description="Repository sidebar"
         >
-          {this.renderTabs()}
           {this.renderSidebarContents()}
         </Resizable>
       </FocusContainer>
@@ -645,6 +724,7 @@ export class RepositoryView extends React.Component<
   public render() {
     return (
       <UiView id="repository">
+        {this.renderRail()}
         {this.renderSidebar()}
         {this.renderContent()}
         {this.maybeRenderTutorialPanel()}
