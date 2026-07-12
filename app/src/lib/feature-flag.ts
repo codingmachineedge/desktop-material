@@ -45,9 +45,8 @@ export const enableTestMenuItems = () =>
 export const enableReadmeOverwriteWarning = () => true
 
 /** Should the app detect Windows Subsystem for Linux as a valid shell? */
-export function enableWSLDetection(): boolean {
-  return enableBetaFeatures()
-}
+// was beta-gated upstream (enableBetaFeatures); promoted for the material fork
+export const enableWSLDetection = () => true
 
 /**
  * Should we allow reporting unhandled rejections as if they were crashes?
