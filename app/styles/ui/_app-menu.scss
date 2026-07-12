@@ -12,7 +12,7 @@
   // right hand side to create a divider between them and their parent
   // menu.
   &:not(:first-child) {
-    border-left: var(--base-border);
+    border-left: 1px solid var(--md-sys-color-outline-variant);
   }
 
   &:focus {
@@ -30,18 +30,22 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    height: 30px;
+    height: 40px;
+    // 8px inset selection shape (MD3 menu row): rows sit inside a small inline
+    // margin so the tonal selection reads as a rounded pill, not a full-bleed bar.
+    margin: 0 var(--spacing-half);
+    border-radius: var(--md-sys-shape-corner-small);
 
     &.disabled {
-      opacity: 0.3;
+      opacity: 0.38;
     }
 
     &.selected {
-      --text-color: var(--box-selected-active-text-color);
-      --text-secondary-color: var(--box-selected-active-text-color);
+      --text-color: var(--md-sys-color-on-secondary-container);
+      --text-secondary-color: var(--md-sys-color-on-secondary-container);
 
       color: var(--text-color);
-      background-color: var(--box-selected-active-background-color);
+      background-color: var(--md-sys-color-secondary-container);
     }
 
     .label {
@@ -53,7 +57,9 @@
 
     .submenu-arrow {
       flex-shrink: 0;
-      opacity: 0.7;
+      // Tracks --text-secondary-color so it flips to on-secondary-container on
+      // selected rows; on-surface-variant otherwise.
+      color: var(--text-secondary-color);
       // TODO: Draw a custom path here instead of resizing the existing arrow
       height: 12px;
       margin-right: var(--spacing);
@@ -89,6 +95,6 @@
     width: 100%;
     border: none;
     height: 1px;
-    border-bottom: 1px solid var(--app-menu-divider-color);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
   }
 }
