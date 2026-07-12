@@ -78,4 +78,161 @@
   textarea.gitignore {
     height: 130px;
   }
+
+  // MD3 Build & Run tab — mirrors the gitignore manager's section language
+  // (surface cards, staggered entrances, tokenised colours).
+  .build-run-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    .build-run-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: dmUp calc(300ms * var(--mdur, 1)) var(--spring) both;
+
+      @for $i from 1 through 3 {
+        &:nth-child(#{$i}) {
+          animation-delay: #{40 + ($i - 1) * 40}ms;
+        }
+      }
+    }
+
+    .build-run-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+      color: var(--md-sys-color-on-surface);
+
+      .octicon {
+        color: var(--md-sys-color-on-surface-variant);
+        flex-shrink: 0;
+      }
+    }
+
+    .build-run-section-description {
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 13px;
+
+      code {
+        font-family: var(--font-family-monospace);
+        font-size: 12px;
+        padding: 1px 5px;
+        border-radius: 6px;
+        background: var(--md-sys-color-surface-container-high);
+      }
+    }
+
+    .build-run-empty {
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 13px;
+    }
+
+    // --- Detected profile radio list -------------------------------------
+    .build-run-profile-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .radio-button-component {
+        label {
+          align-items: flex-start;
+          gap: 10px;
+          padding: 8px 12px;
+          border-radius: 14px;
+          transition: background-color 200ms var(--emph), border-radius 260ms var(--spring);
+
+          &:hover {
+            background: var(--md-sys-color-surface-container-high);
+          }
+        }
+      }
+    }
+
+    .build-run-profile {
+      display: inline-flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .build-run-profile-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .build-run-profile-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .build-run-profile-label {
+      font-size: 13.5px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--md-sys-color-on-surface);
+    }
+
+    .build-run-profile-reasons {
+      font-size: 11.5px;
+      color: var(--md-sys-color-on-surface-variant);
+      opacity: 0.85;
+    }
+
+    // --- Command overrides ------------------------------------------------
+    .build-run-overrides {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--md-sys-color-surface);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 18px;
+      padding: 14px;
+
+      .build-run-override {
+        .text-box-component,
+        input {
+          font-family: var(--font-family-monospace);
+          font-size: 12.5px;
+        }
+      }
+    }
+
+    // --- Behaviour toggles ------------------------------------------------
+    .build-run-toggles {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .build-run-toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .build-run-toggle-tip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      cursor: help;
+
+      .octicon {
+        width: 14px;
+        height: 14px;
+      }
+    }
+  }
 }

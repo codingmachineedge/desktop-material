@@ -2,6 +2,7 @@ import * as React from 'react'
 import { TabBar, TabBarType } from '../tab-bar'
 import { Remote } from './remote'
 import { GitIgnore } from './git-ignore'
+import { BuildRunSettings } from './build-run-settings'
 import { assertNever } from '../../lib/fatal-error'
 import { IRemote } from '../../models/remote'
 import { Dispatcher } from '../dispatcher'
@@ -29,6 +30,10 @@ import {
   InvalidGitAuthorNameMessage,
 } from '../lib/identifier-rules'
 import { Account, getAccountKey } from '../../models/account'
+import {
+  IBuildRunPreferences,
+  defaultBuildRunPreferences,
+} from '../../models/build-run-preferences'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { AccountPicker } from '../account-picker'
@@ -47,6 +52,10 @@ export enum RepositorySettingsTab {
   Remote = 0,
   IgnoredFiles,
   GitConfig,
+  // Note: BuildRun is placed before the conditionally-rendered ForkSettings tab
+  // so the enum values keep matching the TabBar positions whether or not the
+  // fork tab is shown.
+  BuildRun,
   ForkSettings,
 }
 
@@ -69,6 +78,8 @@ interface IRepositorySettingsState {
   readonly forkContributionTarget: ForkContributionTarget
   readonly isLoadingGitConfig: boolean
   readonly accountKey: string | null
+  readonly buildRunPreferences: IBuildRunPreferences
+  readonly buildRunPreferencesHaveChanged: boolean
 }
 
 export class RepositorySettings extends React.Component<
@@ -101,6 +112,9 @@ export class RepositorySettings extends React.Component<
         (props.repositoryAccount !== null
           ? getAccountKey(props.repositoryAccount)
           : null),
+      buildRunPreferences:
+        props.repository.buildRunPreferences ?? defaultBuildRunPreferences,
+      buildRunPreferencesHaveChanged: false,
     }
   }
 
@@ -203,6 +217,10 @@ export class RepositorySettings extends React.Component<
               <Octicon className="icon" symbol={octicons.gitCommit} />
               {__DARWIN__ ? 'Git Config' : 'Git config'}
             </span>
+            <span>
+              <Octicon className="icon" symbol={octicons.play} />
+              {__DARWIN__ ? 'Build & Run' : 'Build & run'}
+            </span>
             {showForkSettings && (
               <span>
                 <Octicon className="icon" symbol={octicons.repoForked} />
@@ -249,6 +267,15 @@ export class RepositorySettings extends React.Component<
             text={this.state.ignoreText}
             onIgnoreTextChanged={this.onIgnoreTextChanged}
             onShowExamples={this.onShowGitIgnoreExamples}
+          />
+        )
+      }
+      case RepositorySettingsTab.BuildRun: {
+        return (
+          <BuildRunSettings
+            repository={this.props.repository}
+            preferences={this.state.buildRunPreferences}
+            onPreferencesChanged={this.onBuildRunPreferencesChanged}
           />
         )
       }
@@ -409,6 +436,21 @@ export class RepositorySettings extends React.Component<
       )
     }
 
+    if (this.state.buildRunPreferencesHaveChanged) {
+      try {
+        await this.props.dispatcher.updateRepositoryBuildRunPreferences(
+          this.props.repository,
+          this.state.buildRunPreferences
+        )
+      } catch (e) {
+        log.error(
+          `RepositorySettings: unable to save Build & Run preferences at ${this.props.repository.path}`,
+          e
+        )
+        errors.push(`Failed saving the Build & Run preferences: ${e}`)
+      }
+    }
+
     let shouldRefreshAuthor = false
     const gitLocationChanged =
       this.state.gitConfigLocation !== this.state.initialGitConfigLocation
@@ -468,6 +510,15 @@ export class RepositorySettings extends React.Component<
 
   private onIgnoreTextChanged = (text: string) => {
     this.setState({ ignoreText: text, ignoreTextHasChanged: true })
+  }
+
+  private onBuildRunPreferencesChanged = (
+    buildRunPreferences: IBuildRunPreferences
+  ) => {
+    this.setState({
+      buildRunPreferences,
+      buildRunPreferencesHaveChanged: true,
+    })
   }
 
   private onTabClicked = (index: number) => {
