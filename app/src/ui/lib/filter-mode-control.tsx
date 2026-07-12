@@ -55,6 +55,13 @@ interface IFilterModeControlProps {
    * should switch to regex mode and set the filter text.
    */
   readonly onRegexPatternApply: (pattern: string) => void
+
+  /**
+   * Whether to render the inline regex-builder launcher button. Defaults to
+   * true. Surfaces that provide their own regex-builder affordance (e.g. the
+   * Changes filter's §6.3 chip row) pass `false` to avoid a duplicate launcher.
+   */
+  readonly showRegexBuilder?: boolean
 }
 
 interface IFilterModeControlState {
@@ -98,7 +105,7 @@ export class FilterModeControl extends React.Component<
   }
 
   private renderBuilder() {
-    if (!this.state.isBuilderOpen) {
+    if (this.props.showRegexBuilder === false || !this.state.isBuilderOpen) {
       return null
     }
 
@@ -139,14 +146,16 @@ export class FilterModeControl extends React.Component<
         >
           Aa
         </button>
-        <button
-          className="filter-regex-builder-button"
-          aria-label="Open regex builder"
-          onClick={this.onOpenBuilder}
-        >
-          <span className="filter-mode-glyph">.*</span>
-          <span className="filter-regex-builder-label">Regex builder</span>
-        </button>
+        {this.props.showRegexBuilder !== false && (
+          <button
+            className="filter-regex-builder-button"
+            aria-label="Open regex builder"
+            onClick={this.onOpenBuilder}
+          >
+            <span className="filter-mode-glyph">.*</span>
+            <span className="filter-regex-builder-label">Regex builder</span>
+          </button>
+        )}
         {this.renderBuilder()}
       </div>
     )
