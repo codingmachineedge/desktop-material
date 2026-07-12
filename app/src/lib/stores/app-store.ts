@@ -127,13 +127,13 @@ import {
   API,
   getAccountForEndpoint,
   IAPIOrganization,
-  getEndpointForRepository,
   IAPIFullRepository,
   IAPIComment,
   IAPIRepoRuleset,
   deleteToken,
   IAPICreatePushProtectionBypassResponse,
 } from '../api'
+import { findAccountForRemoteURL } from '../find-account'
 import { shell } from '../app-shell'
 import {
   CompareAction,
@@ -2677,8 +2677,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   public async fetchPullRequest(repoUrl: string, pr: string) {
-    const endpoint = getEndpointForRepository(repoUrl)
-    const account = getAccountForEndpoint(this.accounts, endpoint)
+    const account = await findAccountForRemoteURL(repoUrl, this.accounts)
 
     if (account) {
       const api = API.fromAccount(account)

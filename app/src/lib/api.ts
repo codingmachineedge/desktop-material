@@ -2464,10 +2464,14 @@ export async function fetchUser(
 }
 
 export function getGitLabAPIEndpoint(endpoint = 'https://gitlab.com'): string {
-  const url = new window.URL(endpoint)
-  url.pathname = url.pathname.replace(/\/$/, '')
-  if (!url.pathname.endsWith('/api/v4')) {
-    url.pathname = '/api/v4'
+  const url = new window.URL(
+    /^[a-z][a-z\d+.-]*:\/\//i.test(endpoint) ? endpoint : `https://${endpoint}`
+  )
+  const path = url.pathname.replace(/\/+$/, '')
+  if (!path.endsWith('/api/v4')) {
+    url.pathname = `${path}/api/v4`
+  } else {
+    url.pathname = path
   }
   url.search = ''
   url.hash = ''
@@ -2488,6 +2492,10 @@ export function getEndpointForRepository(url: string): string {
   const parsed = URL.parse(url)
   if (parsed.hostname === 'github.com') {
     return getDotComAPIEndpoint()
+  } else if (parsed.hostname === 'gitlab.com') {
+    return getGitLabAPIEndpoint()
+  } else if (parsed.hostname === 'bitbucket.org') {
+    return getBitbucketAPIEndpoint()
   } else {
     return `${parsed.protocol}//${parsed.hostname}/api`
   }
@@ -3019,7 +3027,12 @@ abstract class ThirdPartyAPI extends API {
     return undefined
   }
 
-  public override async fetchRefCheckRuns(): Promise<null> {
+  public override async fetchRefCheckRuns(
+    _owner: string,
+    _name: string,
+    _ref: string,
+    _reloadCache = false
+  ): Promise<IAPIRefCheckRuns | null> {
     return null
   }
 
@@ -3190,6 +3203,20 @@ export class GitLabAPI extends ThirdPartyAPI {
     return this.mapMergeRequests(mrs)
   }
 
+  public override async fetchPullRequest(
+    owner: string,
+    name: string,
+    prNumber: string
+  ) {
+    const project = encodeURIComponent(`${owner}/${name}`)
+    const response = await this.requestGitLab(
+      'GET',
+      `projects/${project}/merge_requests/${encodeURIComponent(prNumber)}`
+    )
+    const mr = await parsedResponse<IGitLabMergeRequest>(response)
+    return (await this.mapMergeRequests([mr]))[0]
+  }
+
   public override async fetchUpdatedPullRequests(
     owner: string,
     name: string,
@@ -3268,6 +3295,68 @@ export class GitLabAPI extends ThirdPartyAPI {
       }
     } catch (error) {
       log.warn(`Failed fetching GitLab pipelines for ${owner}/${name}`, error)
+      return null
+    }
+  }
+
+  public override async fetchRefCheckRuns(
+    owner: string,
+    name: string,
+    ref: string
+  ): Promise<IAPIRefCheckRuns | null> {
+    const match = ref.match(/refs\/pull\/(\d+)\/head/)
+    if (match === null) {
+      return null
+    }
+
+    try {
+      const project = encodeURIComponent(`${owner}/${name}`)
+      const pipelines = await this.fetchGitLabPages<IGitLabPipeline>(
+        `projects/${project}/merge_requests/${match[1]}/pipelines?per_page=100`
+      )
+      return {
+        total_count: pipelines.length,
+        check_runs: pipelines.map(pipeline => {
+          const completed = [
+            'success',
+            'failed',
+            'canceled',
+            'skipped',
+            'manual',
+          ].includes(pipeline.status)
+          return {
+            id: pipeline.id,
+            url: pipeline.web_url,
+            status: completed
+              ? APICheckStatus.Completed
+              : pipeline.status === 'running'
+              ? APICheckStatus.InProgress
+              : APICheckStatus.Queued,
+            conclusion:
+              pipeline.status === 'success'
+                ? APICheckConclusion.Success
+                : pipeline.status === 'failed'
+                ? APICheckConclusion.Failure
+                : pipeline.status === 'canceled'
+                ? APICheckConclusion.Canceled
+                : pipeline.status === 'skipped'
+                ? APICheckConclusion.Skipped
+                : null,
+            name: pipeline.name ?? `Pipeline ${pipeline.id}`,
+            check_suite: { id: pipeline.id },
+            app: { name: 'GitLab CI' },
+            completed_at: completed ? pipeline.updated_at : '',
+            started_at: pipeline.created_at,
+            html_url: pipeline.web_url,
+            pull_requests: [],
+          }
+        }),
+      }
+    } catch (error) {
+      log.warn(
+        `Failed fetching GitLab MR pipelines for ${owner}/${name}`,
+        error
+      )
       return null
     }
   }
@@ -3390,6 +3479,22 @@ export class BitbucketAPI extends ThirdPartyAPI {
       )}/pullrequests?state=OPEN&pagelen=50`
     )
     return prs.map(bitbucketPullRequest)
+  }
+
+  public override async fetchPullRequest(
+    owner: string,
+    name: string,
+    prNumber: string
+  ) {
+    const response = await this.requestBitbucket(
+      'GET',
+      `repositories/${encodeURIComponent(owner)}/${encodeURIComponent(
+        name
+      )}/pullrequests/${encodeURIComponent(prNumber)}`
+    )
+    return bitbucketPullRequest(
+      await parsedResponse<IBitbucketPullRequest>(response)
+    )
   }
 
   public override async fetchUpdatedPullRequests(

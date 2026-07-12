@@ -4,6 +4,9 @@ import {
   API,
   ActionsLogMaximumBytes,
   ActionsLogTruncationMarker,
+  getBitbucketAPIEndpoint,
+  getEndpointForRepository,
+  getGitLabAPIEndpoint,
   getNextPagePathWithIncreasingPageSize,
 } from '../../src/lib/api'
 import { APIError } from '../../src/lib/http'
@@ -56,6 +59,31 @@ function assertNext(current: IPageInfo, expected: IPageInfo) {
 }
 
 describe('API', () => {
+  describe('third-party provider endpoints', () => {
+    it('normalizes GitLab.com and self-hosted subpath endpoints', () => {
+      assert.equal(getGitLabAPIEndpoint(), 'https://gitlab.com/api/v4')
+      assert.equal(
+        getGitLabAPIEndpoint('gitlab.example.com/gitlab/'),
+        'https://gitlab.example.com/gitlab/api/v4'
+      )
+      assert.equal(
+        getGitLabAPIEndpoint('https://gitlab.example.com/api/v4'),
+        'https://gitlab.example.com/api/v4'
+      )
+    })
+
+    it('maps GitLab.com and Bitbucket remotes to their API endpoints', () => {
+      assert.equal(
+        getEndpointForRepository('https://gitlab.com/group/project.git'),
+        getGitLabAPIEndpoint()
+      )
+      assert.equal(
+        getEndpointForRepository('https://bitbucket.org/team/project.git'),
+        getBitbucketAPIEndpoint()
+      )
+    })
+  })
+
   describe('fetchOrgRepositories', () => {
     it('requests the encoded organization repository endpoint', async () => {
       const api = new API('https://api.github.com', 'token')
