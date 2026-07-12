@@ -8,6 +8,7 @@ import { Repository } from '../../models/repository'
 import { CloningRepository } from '../../models/cloning-repository'
 import { IProfileTabsState, IRepositoryTab } from '../../models/repository-tab'
 import { RepositoryTab } from './repository-tab'
+import { TabStyleEditor } from './tab-style-editor'
 import { showContextualMenu } from '../../lib/menu-item'
 import { FoldoutType } from '../../lib/app-state'
 
@@ -19,6 +20,8 @@ interface IRepositoryTabStripProps {
 
 interface IRepositoryTabStripState {
   readonly tabs: IProfileTabsState
+  readonly styleEditorTabId: string | null
+  readonly styleEditorAnchor: HTMLElement | null
 }
 
 /** The browser-style repository tab strip shown above the toolbar. */
@@ -30,7 +33,11 @@ export class RepositoryTabStrip extends React.Component<
 
   public constructor(props: IRepositoryTabStripProps) {
     super(props)
-    this.state = { tabs: props.tabsStore.getState() }
+    this.state = {
+      tabs: props.tabsStore.getState(),
+      styleEditorTabId: null,
+      styleEditorAnchor: null,
+    }
   }
 
   public componentDidMount() {
@@ -90,7 +97,17 @@ export class RepositoryTabStrip extends React.Component<
     event: React.MouseEvent<HTMLElement>
   ) => {
     event.preventDefault()
+    const anchor = event.currentTarget as HTMLElement
     showContextualMenu([
+      {
+        label: 'Customize Appearance…',
+        action: () =>
+          this.setState({
+            styleEditorTabId: tab.id,
+            styleEditorAnchor: anchor,
+          }),
+      },
+      { type: 'separator' },
       {
         label: 'Close Tab',
         action: () => this.onClose(tab),
@@ -101,6 +118,30 @@ export class RepositoryTabStrip extends React.Component<
         enabled: this.state.tabs.tabs.length > 1,
       },
     ])
+  }
+
+  private renderStyleEditor() {
+    const { styleEditorTabId, styleEditorAnchor } = this.state
+    if (styleEditorTabId === null) {
+      return null
+    }
+
+    const tab = this.state.tabs.tabs.find(t => t.id === styleEditorTabId)
+    if (tab === undefined) {
+      return null
+    }
+
+    return (
+      <TabStyleEditor
+        tab={tab}
+        anchor={styleEditorAnchor}
+        onStyleChange={style => this.props.tabsStore.setTabStyle(tab.id, style)}
+        onReset={() => this.props.tabsStore.setTabStyle(tab.id, null)}
+        onClose={() =>
+          this.setState({ styleEditorTabId: null, styleEditorAnchor: null })
+        }
+      />
+    )
   }
 
   private closeOtherTabs(keep: IRepositoryTab) {
@@ -137,6 +178,7 @@ export class RepositoryTabStrip extends React.Component<
         >
           <Octicon symbol={octicons.plus} />
         </button>
+        {this.renderStyleEditor()}
       </div>
     )
   }
