@@ -60,6 +60,37 @@ describe('AccountsStore', () => {
       assert.equal(users.find(x => x.id === 1)?.token, 'new-token')
       assert.equal(users.find(x => x.id === 2)?.login, 'sibling')
     })
+
+    it('persists provider metadata without writing tokens to the data store', async () => {
+      const dataStore = new InMemoryStore()
+      const secureStore = new AsyncInMemoryStore()
+      accountsStore = new AccountsStore(dataStore, secureStore)
+      const account = new Account(
+        'fox',
+        'https://gitlab.example.com/api/v4',
+        'secret-provider-token',
+        [],
+        '',
+        42,
+        'Fox',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'gitlab'
+      )
+
+      await accountsStore.addAccount(account)
+
+      const persisted = dataStore.getItem('users')
+      assert.match(persisted, /"provider":"gitlab"/)
+      assert.doesNotMatch(persisted, /secret-provider-token/)
+      const reloaded = new AccountsStore(dataStore, secureStore)
+      const [result] = await reloaded.getAll()
+      assert.equal(result.provider, 'gitlab')
+      assert.equal(result.token, 'secret-provider-token')
+    })
   })
 
   describe('loading persisted users', () => {
