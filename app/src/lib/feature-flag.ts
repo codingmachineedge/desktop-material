@@ -52,9 +52,8 @@ export function enableWSLDetection(): boolean {
 /**
  * Should we allow reporting unhandled rejections as if they were crashes?
  */
-export function enableUnhandledRejectionReporting(): boolean {
-  return enableBetaFeatures()
-}
+// was beta-gated upstream (enableBetaFeatures); promoted for the material fork
+export const enableUnhandledRejectionReporting = () => true
 
 /**
  * Should we allow x64 apps running under ARM translation to auto-update to
