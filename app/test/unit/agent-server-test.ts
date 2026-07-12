@@ -4,8 +4,13 @@ import { promises as Fs } from 'fs'
 import * as Http from 'http'
 import * as Os from 'os'
 import * as Path from 'path'
+import { execFile as execFileCallback, spawn } from 'child_process'
+import { once } from 'events'
+import { promisify } from 'util'
 import { AgentServer } from '../../src/main-process/agent-server/agent-server'
 import { IAgentCommandEnvelope } from '../../src/lib/agent-commands'
+
+const execFile = promisify(execFileCallback)
 
 interface IResponse {
   readonly status: number
@@ -174,6 +179,14 @@ describe('agent server', () => {
         JSON.stringify(credential.body).includes('must-not-cross'),
         false
       )
+
+      const oversized = await request(
+        port,
+        '/api/v1/command/list-repositories',
+        token,
+        { body: { value: 'x'.repeat(70 * 1024) } }
+      )
+      assert.equal(oversized.status, 413)
     })
   })
 
@@ -196,6 +209,39 @@ describe('agent server', () => {
       )
       await server.stop()
       await assert.rejects(Fs.stat(connection.configPath))
+    })
+  })
+
+  it('supports the dependency-free CLI and stdio MCP proxy', async () => {
+    await withServer(async (_server, connection) => {
+      const root = process.cwd()
+      const cli = Path.join(root, 'script', 'agent', 'desktop-agent.js')
+      const proxy = Path.join(root, 'script', 'agent', 'mcp-stdio-proxy.js')
+      const info = await execFile(
+        process.execPath,
+        [cli, '--config', connection.configPath, 'info'],
+        { cwd: root }
+      )
+      const parsedInfo = JSON.parse(info.stdout)
+      assert.equal(parsedInfo.name, 'desktop-material')
+      assert.equal(info.stdout.includes(connection.token), false)
+
+      const child = spawn(
+        process.execPath,
+        [proxy, '--config', connection.configPath],
+        { cwd: root, stdio: ['pipe', 'pipe', 'pipe'] }
+      )
+      let output = ''
+      child.stdout.setEncoding('utf8')
+      child.stdout.on('data', data => (output += data))
+      child.stdin.end(
+        `${JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'initialize' })}\n`
+      )
+      await once(child, 'close')
+      const response = JSON.parse(output.trim())
+      assert.equal(response.id, 9)
+      assert.equal(response.result.protocolVersion, '2025-03-26')
+      assert.equal(output.includes(connection.token), false)
     })
   })
 })

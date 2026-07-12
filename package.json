@@ -6,6 +6,8 @@
   "description": "GitHub Desktop build dependencies",
   "scripts": {
     "cli": "ts-node app/src/cli/main.ts",
+    "agent": "node script/agent/desktop-agent.js",
+    "agent:mcp": "node script/agent/mcp-stdio-proxy.js",
     "check:eslint": "tsc -P eslint-rules/",
     "test:eslint": "node script/test.mjs eslint-rules",
     "test:script": "node script/test.mjs script",
