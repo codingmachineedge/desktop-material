@@ -3529,6 +3529,12 @@ export class Dispatcher {
     this.appStore._setShowRecentRepositories(showRecentRepositories)
   }
 
+  public setShowBranchNameInRepoList(
+    setting: import('../../models/show-branch-name-in-repo-list').ShowBranchNameInRepoListSetting
+  ) {
+    this.appStore._setShowBranchNameInRepoList(setting)
+  }
+
   public setCommitSpellcheckEnabled(commitSpellcheckEnabled: boolean) {
     this.appStore._setCommitSpellcheckEnabled(commitSpellcheckEnabled)
   }

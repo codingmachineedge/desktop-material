@@ -176,6 +176,12 @@ export interface ILocalRepositoryState {
    * The number of uncommitted changes currently in the repository.
    */
   readonly changedFilesCount: number
+
+  /** The checked out branch, or null while detached or unavailable. */
+  readonly branchName: string | null
+
+  /** The inferred or customized default branch for this repository. */
+  readonly defaultBranchName: string | null
 }
 
 /**

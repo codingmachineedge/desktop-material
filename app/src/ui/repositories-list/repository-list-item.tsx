@@ -27,6 +27,9 @@ interface IRepositoryListItemProps {
 
   /** Number of uncommitted changes */
   readonly changedFilesCount: number
+
+  /** Current branch to show beside the repository name, or null to hide it. */
+  readonly branchName: string | null
 }
 
 /** A repository item. */
@@ -76,6 +79,13 @@ export class RepositoryListItem extends React.Component<
           />
         </div>
 
+        {this.props.branchName !== null && (
+          <span className="repository-branch-pill">
+            <Octicon symbol={octicons.gitBranch} />
+            {this.props.branchName}
+          </span>
+        )}
+
         {repository instanceof Repository &&
           renderRepoIndicators({
             aheadBehind: this.props.aheadBehind,
@@ -120,7 +130,10 @@ export class RepositoryListItem extends React.Component<
     ) {
       return (
         nextProps.repository.id !== this.props.repository.id ||
-        nextProps.matches !== this.props.matches
+        nextProps.matches !== this.props.matches ||
+        nextProps.aheadBehind !== this.props.aheadBehind ||
+        nextProps.changedFilesCount !== this.props.changedFilesCount ||
+        nextProps.branchName !== this.props.branchName
       )
     } else {
       return true

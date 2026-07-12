@@ -40,6 +40,7 @@ import {
 } from '../../lib/helpers/default-branch'
 import { Prompts } from './prompts'
 import { Repository } from '../../models/repository'
+import { ShowBranchNameInRepoListSetting } from '../../models/show-branch-name-in-repo-list'
 import { Notifications } from './notifications'
 import { Accessibility } from './accessibility'
 import { AutomationPreferences } from './automation'
@@ -122,6 +123,7 @@ interface IPreferencesProps {
   readonly useCustomShell: boolean
   readonly customShell: ICustomIntegration | null
   readonly showRecentRepositories: boolean
+  readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
   readonly branchSortOrder: BranchSortOrder
   readonly repositoryIndicatorsEnabled: boolean
   readonly onEditGlobalGitConfig: () => void
@@ -168,6 +170,7 @@ interface IPreferencesState {
   readonly availableShells: ReadonlyArray<Shell>
   readonly selectedShell: Shell
   readonly showRecentRepositories: boolean
+  readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
   readonly branchSortOrder: BranchSortOrder
   readonly showCommitAuthorInfo: boolean
 
@@ -267,6 +270,7 @@ export class Preferences extends React.Component<
       availableShells: [],
       selectedShell: this.props.selectedShell,
       showRecentRepositories: this.props.showRecentRepositories,
+      showBranchNameInRepoList: this.props.showBranchNameInRepoList,
       branchSortOrder: this.props.branchSortOrder,
       showCommitAuthorInfo: getShowCommitAuthorInfo(),
       repositoryIndicatorsEnabled: this.props.repositoryIndicatorsEnabled,
@@ -700,6 +704,10 @@ export class Preferences extends React.Component<
             onShowRecentRepositoriesChanged={
               this.onShowRecentRepositoriesChanged
             }
+            showBranchNameInRepoList={this.state.showBranchNameInRepoList}
+            onShowBranchNameInRepoListChanged={
+              this.onShowBranchNameInRepoListChanged
+            }
             branchSortOrder={this.state.branchSortOrder}
             onBranchSortOrderChanged={this.onBranchSortOrderChanged}
           />
@@ -957,6 +965,12 @@ export class Preferences extends React.Component<
     this.setState({ showRecentRepositories })
   }
 
+  private onShowBranchNameInRepoListChanged = (
+    showBranchNameInRepoList: ShowBranchNameInRepoListSetting
+  ) => {
+    this.setState({ showBranchNameInRepoList })
+  }
+
   private onBranchSortOrderChanged = (branchSortOrder: BranchSortOrder) => {
     this.setState({ branchSortOrder })
   }
@@ -1111,6 +1125,15 @@ export class Preferences extends React.Component<
         this.state.showRecentRepositories !== this.props.showRecentRepositories
       ) {
         dispatcher.setShowRecentRepositories(this.state.showRecentRepositories)
+      }
+
+      if (
+        this.state.showBranchNameInRepoList !==
+        this.props.showBranchNameInRepoList
+      ) {
+        dispatcher.setShowBranchNameInRepoList(
+          this.state.showBranchNameInRepoList
+        )
       }
 
       if (this.state.branchSortOrder !== this.props.branchSortOrder) {

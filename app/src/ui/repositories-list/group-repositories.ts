@@ -64,6 +64,8 @@ export interface IRepositoryListItem extends IFilterListItem {
   readonly needsDisambiguation: boolean
   readonly aheadBehind: IAheadBehind | null
   readonly changedFilesCount: number
+  readonly branchName: string | null
+  readonly defaultBranchName: string | null
 }
 
 const recentRepositoriesThreshold = 7
@@ -183,6 +185,8 @@ const toSortedListItems = (
           ((allNames.get(title) ?? 0) > 1 && group.kind === 'recent'),
         aheadBehind: repoState?.aheadBehind ?? null,
         changedFilesCount: repoState?.changedFilesCount ?? 0,
+        branchName: repoState?.branchName ?? null,
+        defaultBranchName: repoState?.defaultBranchName ?? null,
       }
     })
     .sort(({ repository: x }, { repository: y }) =>

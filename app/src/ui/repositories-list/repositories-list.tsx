@@ -29,6 +29,10 @@ import { SectionFilterList } from '../lib/section-filter-list'
 import { assertNever } from '../../lib/fatal-error'
 import { IAheadBehind } from '../../models/branch'
 import {
+  ShowBranchNameInRepoListSetting,
+  shouldShowBranchName,
+} from '../../models/show-branch-name-in-repo-list'
+import {
   addPinnedRepository,
   getPinnedRepositories,
   removePinnedRepository,
@@ -41,6 +45,7 @@ interface IRepositoriesListProps {
   readonly repositories: ReadonlyArray<Repositoryish>
   readonly recentRepositories: ReadonlyArray<number>
   readonly showRecentRepositories: boolean
+  readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
 
   /** A cache of the latest repository state values, keyed by the repository id */
   readonly localRepositoryStateLookup: ReadonlyMap<
@@ -176,6 +181,15 @@ export class RepositoriesList extends React.Component<
         matches={matches}
         aheadBehind={item.aheadBehind}
         changedFilesCount={item.changedFilesCount}
+        branchName={
+          shouldShowBranchName(
+            this.props.showBranchNameInRepoList,
+            item.branchName,
+            item.defaultBranchName
+          )
+            ? item.branchName
+            : null
+        }
       />
     )
   }

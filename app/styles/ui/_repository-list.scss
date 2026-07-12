@@ -65,6 +65,28 @@
     .alias {
       font-style: italic;
     }
+
+    .repository-branch-pill {
+      align-items: center;
+      background: var(--md-sys-color-secondary-container);
+      border-radius: 999px;
+      color: var(--md-sys-color-on-secondary-container);
+      display: inline-flex;
+      flex: 0 1 auto;
+      font-size: var(--font-size-xs);
+      gap: 3px;
+      margin-left: var(--spacing-half);
+      max-width: 40%;
+      min-width: 0;
+      overflow: hidden;
+      padding: 1px 6px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      .octicon {
+        flex-shrink: 0;
+      }
+    }
   }
 
   .filter-list-group-header {

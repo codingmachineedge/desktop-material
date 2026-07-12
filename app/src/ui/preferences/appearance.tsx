@@ -24,6 +24,7 @@ import {
 import { formatNumber } from '../../lib/format-number'
 import { assertNever } from '../../lib/fatal-error'
 import { BranchSortOrder } from '../../models/branch-sort-order'
+import { ShowBranchNameInRepoListSetting } from '../../models/show-branch-name-in-repo-list'
 
 interface IAppearanceProps {
   readonly selectedTheme: ApplicationTheme
@@ -45,6 +46,10 @@ interface IAppearanceProps {
   readonly onPreferAbsoluteDatesChanged: (value: boolean) => void
   readonly showRecentRepositories: boolean
   readonly onShowRecentRepositoriesChanged: (show: boolean) => void
+  readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
+  readonly onShowBranchNameInRepoListChanged: (
+    setting: ShowBranchNameInRepoListSetting
+  ) => void
   readonly branchSortOrder: BranchSortOrder
   readonly onBranchSortOrderChanged: (sortOrder: BranchSortOrder) => void
 }
@@ -275,6 +280,14 @@ export class Appearance extends React.Component<
     )
   }
 
+  private onShowBranchNameInRepoListChanged = (
+    event: React.FormEvent<HTMLSelectElement>
+  ) => {
+    this.props.onShowBranchNameInRepoListChanged(
+      event.currentTarget.value as ShowBranchNameInRepoListSetting
+    )
+  }
+
   private renderSelectedTheme() {
     const selectedTheme = this.state.selectedTheme
 
@@ -403,6 +416,17 @@ export class Appearance extends React.Component<
           }
           onChange={this.onShowRecentRepositoriesChanged}
         />
+        <Select
+          label="Show branch name"
+          value={this.props.showBranchNameInRepoList}
+          onChange={this.onShowBranchNameInRepoListChanged}
+        >
+          <option value={ShowBranchNameInRepoListSetting.Always}>Always</option>
+          <option value={ShowBranchNameInRepoListSetting.WhenNotDefault}>
+            When not default
+          </option>
+          <option value={ShowBranchNameInRepoListSetting.Never}>Never</option>
+        </Select>
       </div>
     )
   }

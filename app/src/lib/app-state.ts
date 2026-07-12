@@ -14,6 +14,7 @@ import { IDiff, ImageDiffType } from '../models/diff'
 import { Repository, ILocalRepositoryState } from '../models/repository'
 import { Branch, IAheadBehind } from '../models/branch'
 import { BranchSortOrder } from '../models/branch-sort-order'
+import { ShowBranchNameInRepoListSetting } from '../models/show-branch-name-in-repo-list'
 import { Tip } from '../models/tip'
 import { Commit } from '../models/commit'
 import { CommittedFileChange, WorkingDirectoryStatus } from '../models/status'
@@ -342,6 +343,9 @@ export interface IAppState {
 
   /** Whether the Recent group is shown in the repository list. */
   readonly showRecentRepositories: boolean
+
+  /** Controls when the current branch appears beside repository names. */
+  readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
 
   /**
    * A map keyed on a user account (GitHub.com or GitHub Enterprise)
