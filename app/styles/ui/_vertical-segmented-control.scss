@@ -16,22 +16,18 @@ fieldset.vertical-segmented-control {
   // Make the component use the whole width of its container.
   width: 100%;
 
+  // Discrete MD3 rows (no shared borders) — mirrors the interstitial's grouped
+  // choice list. Each row is an independent rounded card with a gap between.
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-half);
+
   .radio-button-component {
     margin: 0;
-    border: var(--base-border);
-    // Last child to have a border-bottom
-    border-bottom: 0;
-
-    &:first-child {
-      border-top-left-radius: var(--border-radius);
-      border-top-right-radius: var(--border-radius);
-    }
-
-    &:last-child {
-      border-bottom: var(--base-border);
-      border-bottom-left-radius: var(--border-radius);
-      border-bottom-right-radius: var(--border-radius);
-    }
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+    background: var(--md-sys-color-surface-container-low);
+    transition: background-color 120ms ease, border-color 120ms ease;
 
     label > span {
       min-width: 0;
@@ -43,7 +39,7 @@ fieldset.vertical-segmented-control {
     }
 
     p {
-      color: var(--text-secondary-color);
+      color: var(--md-sys-color-on-surface-variant);
     }
 
     input[type='radio'] {
@@ -52,14 +48,24 @@ fieldset.vertical-segmented-control {
       align-self: flex-start;
       margin-top: 4px;
     }
-    &:has(input[type='radio']:focus),
+
     &:hover {
-      background: var(--box-hover-background-color);
-      color: var(--box-hover-text-color);
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    // Selected row → secondary-container tonal fill (matches list selection).
+    &:has(input[type='radio']:checked) {
+      background: var(--md-sys-color-secondary-container);
+      border-color: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
 
       p {
-        color: var(--box-hover-text-color);
+        color: var(--md-sys-color-on-secondary-container);
       }
+    }
+
+    &:has(input[type='radio']:focus) {
+      border-color: var(--md-sys-color-primary);
     }
 
     > label {
