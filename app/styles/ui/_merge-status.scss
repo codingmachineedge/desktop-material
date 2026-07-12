@@ -14,20 +14,21 @@
     }
   }
 
+  // MD3 de-stock: merge state colors route through Material roles.
   .merge-status-loading {
-    color: $yellow-700;
+    color: var(--dm-amber);
   }
 
   .merge-status-conflicts {
-    color: var(--color-conflicted);
+    color: var(--dm-amber);
   }
 
   .merge-status-invalid {
-    color: $red-500;
+    color: var(--md-sys-color-error);
   }
 
   .merge-status-clean {
-    color: $green-500;
+    color: var(--dm-green);
   }
 
   .merge-message,

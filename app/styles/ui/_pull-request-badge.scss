@@ -30,7 +30,8 @@
 
   align-items: center;
 
-  border-radius: var(--border-radius);
+  // MD3: the PR/CI badge reads as a full-radius pill.
+  border-radius: 999px;
   border-width: 0;
   border: none;
 
@@ -58,13 +59,13 @@
 }
 
 .toolbar-dropdown.open .ci-status-pending {
-  color: $yellow-700;
+  color: var(--dm-amber);
 }
 
 .toolbar-dropdown.open .ci-status-failure {
-  color: $red-500;
+  color: var(--md-sys-color-error);
 }
 
 .toolbar-dropdown.open .ci-status-success {
-  color: $green-500;
+  color: var(--dm-green);
 }

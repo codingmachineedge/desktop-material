@@ -6,6 +6,16 @@
   // as the available vertical space is computed as zero
   height: 100%;
 
+  // MD3 de-stock: map the status glyph colors (consumed by the octicon-status
+  // mixin below) onto Material roles instead of the stock raw green/red/yellow.
+  // (The History file list overrides these more specifically in
+  // history/_file-list.scss; this covers PR / stash / generic file lists.)
+  --color-new: var(--dm-green);
+  --color-modified: var(--dm-amber);
+  --color-renamed: var(--md-sys-color-primary);
+  --color-deleted: var(--md-sys-color-error);
+  --color-conflicted: var(--dm-amber);
+
   .list-item {
     border-bottom: var(--base-border);
   }

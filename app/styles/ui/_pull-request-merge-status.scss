@@ -10,22 +10,23 @@
     font-weight: var(--font-weight-semibold);
   }
 
+  // MD3 de-stock: PR merge state colors route through Material roles.
   .pr-merge-status-loading {
     strong {
-      color: var(--file-warning-color);
+      color: var(--dm-amber);
     }
   }
 
   .pr-merge-status-invalid,
   .pr-merge-status-conflicts {
     strong {
-      color: var(--status-error-color);
+      color: var(--md-sys-color-error);
     }
   }
 
   .pr-merge-status-clean {
     strong {
-      color: var(--status-success-color);
+      color: var(--dm-green);
     }
   }
 }

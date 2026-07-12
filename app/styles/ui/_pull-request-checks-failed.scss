@@ -16,7 +16,8 @@
     > .octicon {
       width: 20px;
       height: 20px;
-      color: var(--status-error-color);
+      // MD3 de-stock: failed-checks header glyph uses the Material error role.
+      color: var(--md-sys-color-error);
       margin-right: var(--spacing);
     }
 
@@ -36,10 +37,10 @@
 
         .octicon {
           vertical-align: bottom; // For some reason, `bottom` places the text in the middle
-          color: var(--pr-open-icon-color);
+          color: var(--dm-green);
 
           &.draft {
-            color: var(--pr-draft-icon-color);
+            color: var(--md-sys-color-on-surface-variant);
           }
         }
       }
