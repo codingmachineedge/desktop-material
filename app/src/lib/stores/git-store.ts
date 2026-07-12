@@ -1542,6 +1542,26 @@ export class GitStore extends BaseStore {
     return wasSuccessful
   }
 
+  /** Adds a new remote with the given name and URL. */
+  public async addRemote(name: string, url: string): Promise<void> {
+    await this.performFailableOperation(() =>
+      addRemote(this.repository, name, url)
+    )
+    await this.loadRemotes()
+
+    this.emitUpdate()
+  }
+
+  /** Removes the remote that matches the given name. */
+  public async removeRemote(name: string): Promise<void> {
+    await this.performFailableOperation(() =>
+      removeRemote(this.repository, name)
+    )
+    await this.loadRemotes()
+
+    this.emitUpdate()
+  }
+
   public async discardChanges(
     files: ReadonlyArray<WorkingDirectoryFileChange>,
     moveToTrash: boolean = true,

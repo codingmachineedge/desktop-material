@@ -1785,6 +1785,20 @@ export class Dispatcher {
     return this.appStore._setRemoteURL(repository, name, url)
   }
 
+  /** Adds a new remote with the given name and URL. */
+  public addRemote(
+    repository: Repository,
+    name: string,
+    url: string
+  ): Promise<void> {
+    return this.appStore._addRemote(repository, name, url)
+  }
+
+  /** Removes the remote that matches the given name. */
+  public removeRemote(repository: Repository, name: string): Promise<void> {
+    return this.appStore._removeRemote(repository, name)
+  }
+
   /** Open the URL in a browser */
   public openInBrowser(url: string): Promise<boolean> {
     return this.appStore._openInBrowser(url)
