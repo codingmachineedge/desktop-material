@@ -15,6 +15,7 @@ type StatusListener = (status: IAgentServerStatus) => void
 /** Owns server lifecycle and correlates HTTP requests with renderer results. */
 export class AgentServerController {
   private readonly server: AgentServer
+  private lifecycle: Promise<void> = Promise.resolve()
   private readonly pending = new Map<
     string,
     {
@@ -38,17 +39,13 @@ export class AgentServerController {
   }
 
   public async setEnabled(enabled: boolean): Promise<IAgentServerStatus> {
-    const status = enabled
-      ? await this.server.start()
-      : await this.server.stop()
-    this.onStatusChanged(status)
-    return status
+    return this.queueLifecycle(() =>
+      enabled ? this.server.start() : this.server.stop()
+    )
   }
 
   public async regenerateToken(): Promise<IAgentServerStatus> {
-    const status = await this.server.regenerateToken()
-    this.onStatusChanged(status)
-    return status
+    return this.queueLifecycle(() => this.server.regenerateToken())
   }
 
   public acceptRendererResult(id: string, result: AgentCommandResult): void {
@@ -62,6 +59,7 @@ export class AgentServerController {
   }
 
   public async stop(): Promise<void> {
+    await this.lifecycle
     for (const request of this.pending.values()) {
       clearTimeout(request.timeout)
       request.resolve(
@@ -70,6 +68,20 @@ export class AgentServerController {
     }
     this.pending.clear()
     await this.server.stop()
+  }
+
+  private queueLifecycle(
+    operation: () => Promise<IAgentServerStatus>
+  ): Promise<IAgentServerStatus> {
+    const result = this.lifecycle.then(operation)
+    this.lifecycle = result.then(
+      () => undefined,
+      () => undefined
+    )
+    return result.then(status => {
+      this.onStatusChanged(status)
+      return status
+    })
   }
 
   private executeInRenderer(

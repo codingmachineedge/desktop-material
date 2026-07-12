@@ -170,7 +170,16 @@ export class AgentServer {
     }
     this.server = server
     this.port = address.port
-    await this.writeConfig()
+    try {
+      await this.writeConfig()
+    } catch (error) {
+      this.server = null
+      this.port = null
+      this.token = null
+      this.enabled = false
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      throw error
+    }
     return this.getStatus()
   }
 

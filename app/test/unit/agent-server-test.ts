@@ -209,6 +209,9 @@ describe('agent server', () => {
       )
       await server.stop()
       await assert.rejects(Fs.stat(connection.configPath))
+      const restarted = await server.start()
+      assert.notEqual(restarted.token, rotated.token)
+      assert.equal(restarted.running, true)
     })
   })
 

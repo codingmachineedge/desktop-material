@@ -138,7 +138,9 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   // Ensure no Build & Run child process (or its tree) outlives the app.
   buildRunner.killAll()
-  void agentServerController?.stop()
+  agentServerController
+    ?.stop()
+    .catch(error => log.error('Failed to stop agent server cleanly', error))
 })
 
 process.on('uncaughtException', (error: Error) => {
