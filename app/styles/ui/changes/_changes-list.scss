@@ -330,3 +330,301 @@
     flex-shrink: 0;
   }
 }
+
+// ---------------------------------------------------------------------------
+// MD3 Expressive restyle (Commit 6 — Changes card: search pill, filter chips,
+// "N changed files" row, tri-state checkbox, file rows + status chips).
+// Scoping notes: the filter/search/checkbox row lives inside
+// `.filtered-changes-list` (custom filter row), while the file rows and their
+// status octicons live inside the virtualized `#changes-list` (SectionList).
+// Overrides win on specificity (id / extra class) over the shared base layers
+// (`_file-list.scss`, `_octicon-status.scss`, and the shell input rule).
+// ---------------------------------------------------------------------------
+
+.filtered-changes-list {
+  // The filter/search area floats on the card surface — drop the alt-tint
+  // background + divider the base `.header` rule paints behind it.
+  .header {
+    background: transparent;
+    border-bottom: 0;
+  }
+
+  // Filter/search row -------------------------------------------------------
+  // `.header` is included so this matches/exceeds the connected-border rules
+  // defined higher up in this file (`.filtered-changes-list .header
+  // .filter-box-container …`) and wins on source order.
+  .header .filter-box-container {
+    gap: 6px;
+    align-items: center;
+
+    // Search field becomes a 46px pill (§6.2). Sits left, flex-grows; the
+    // filter (tune) button is pushed to the right via order.
+    .filter-list-filter-field {
+      order: 0;
+      flex: 1 1 auto;
+      min-width: 0;
+      position: relative;
+
+      // Leading masked search glyph (tokenised colour, no baked hex).
+      &::before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        width: 18px;
+        height: 18px;
+        transform: translateY(-50%);
+        pointer-events: none;
+        z-index: 1;
+        background-color: var(--md-sys-color-on-surface-variant);
+        $search-mask: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.28.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z'/></svg>";
+        -webkit-mask: url($search-mask) center / contain no-repeat;
+        mask: url($search-mask) center / contain no-repeat;
+      }
+
+      input {
+        height: 46px;
+        min-height: 46px;
+        border-radius: 999px;
+        background: var(--md-sys-color-surface-container-high);
+        border: 2px solid transparent;
+        padding: 0 14px 0 42px;
+        font-size: 13.5px;
+        box-shadow: none;
+        transition: border-color 160ms var(--emph), background-color 200ms var(--emph);
+
+        &:hover:not(:disabled):not(:read-only) {
+          border-color: transparent;
+        }
+
+        &:focus {
+          border-color: var(--md-sys-color-primary);
+          box-shadow: none;
+          outline: none;
+        }
+      }
+
+      // TextBox's own clear button → round tonal affordance.
+      .clear-button {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: var(--md-sys-color-on-surface-variant);
+        transition: background-color 160ms var(--emph), transform 200ms var(--spring-fast);
+
+        &:hover {
+          background: var(--md-sys-color-surface-container-highest);
+        }
+
+        &:active {
+          transform: scale(0.85);
+        }
+      }
+    }
+
+    // Filter-options ("tune") button → compact rounded icon-button that morphs
+    // pill → squircle on hover (§6.2 filters toggle).
+    .filter-button {
+      order: 1;
+      flex: 0 0 auto;
+      min-width: 38px;
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      display: inline-grid;
+      grid-auto-flow: column;
+      place-items: center;
+      gap: 2px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      box-shadow: none;
+      transition: background-color 200ms var(--emph), border-radius 260ms var(--spring), transform 200ms var(--spring-fast);
+
+      &:not([aria-disabled='true']):hover {
+        background: var(--md-sys-color-surface-container-high);
+        border-radius: var(--md-sys-shape-corner-medium);
+        box-shadow: none;
+        color: var(--md-sys-color-on-surface);
+      }
+
+      &:active {
+        transform: scale(0.88);
+      }
+
+      &.active {
+        color: var(--md-sys-color-primary);
+
+        span:first-child {
+          color: var(--md-sys-color-primary);
+        }
+      }
+
+      // The trailing caret is redundant against the pill; keep it subtle.
+      .octicon:last-child {
+        width: 10px;
+        height: 10px;
+        opacity: 0.7;
+      }
+
+      .active-badge {
+        right: 6px;
+        top: 3px;
+
+        .badge {
+          background-color: var(--md-sys-color-primary);
+        }
+      }
+    }
+  }
+
+  // "N changed files" checkbox row (§6.4).
+  .changes-list-check-all {
+    label {
+      font-size: 12.5px;
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.02em;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  // Filter-options popover — tonal MD3 surface + spaced options.
+  .filter-popover {
+    .filter-options {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-half);
+    }
+
+    .filter-popover-header h3 {
+      font-size: 15px;
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+}
+
+// Shared MD3 tri-state checkbox (§6.4/§6.5): 19×19 radius-6, filled primary
+// when checked/indeterminate. Applies to the include-all checkbox, the
+// per-file checkboxes, and the filter-popover option checkboxes.
+.filtered-changes-list .changes-list-check-all input[type='checkbox'],
+.filtered-changes-list .filter-popover .checkbox-component input[type='checkbox'],
+#changes-list .file .checkbox-component input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  border-radius: 6px; // radius-6 checkbox (§6.4/§6.5)
+  border: 2px solid var(--md-sys-color-outline);
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color 160ms var(--emph), border-color 160ms var(--emph), transform 200ms var(--spring-fast);
+
+  &:checked,
+  &:indeterminate {
+    background: var(--md-sys-color-primary);
+    border-color: var(--md-sys-color-primary);
+  }
+
+  // Check glyph (rotated border), springs in via the box transition.
+  &:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--md-sys-color-on-primary);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  // Indeterminate dash.
+  &:indeterminate::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 7px;
+    width: 9px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--md-sys-color-on-primary);
+  }
+
+  &:active {
+    transform: scale(0.78);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+// File rows + status chips (inside the virtualized list) ---------------------
+#changes-list {
+  .list-item {
+    border-bottom: 0;
+    // Start at the large-file-row radius (14) and morph to 18 on hover (§6.5).
+    border-radius: 14px;
+    transition: background-color 140ms var(--emph), border-radius 260ms var(--spring), transform 180ms var(--spring-fast);
+
+    &:not(.not-selectable):hover {
+      border-radius: 18px;
+    }
+
+    &:active {
+      transform: scale(0.985);
+    }
+  }
+
+  .file {
+    // Status octicon → 24×24 radius-8 tonal chip. `content-box` keeps the
+    // ~16px glyph and adds 4px padding around it inside the coloured box.
+    .status {
+      box-sizing: content-box;
+      width: 16px;
+      height: 16px;
+      padding: 4px;
+      border-radius: var(--md-sys-shape-corner-small);
+      vertical-align: middle;
+      transition: transform 200ms var(--spring-fast);
+    }
+
+    &:hover .status {
+      transform: scale(1.12);
+    }
+
+    // New / added / copied / resolved → green container.
+    .status-new,
+    .status-copied,
+    .status-resolved {
+      background: var(--dm-green-container);
+      fill: var(--dm-green);
+    }
+
+    // Modified / renamed → amber container.
+    .status-modified,
+    .status-renamed {
+      background: var(--dm-amber-container);
+      fill: var(--dm-amber);
+    }
+
+    // Deleted → error container.
+    .status-deleted {
+      background: var(--md-sys-color-error-container);
+      fill: var(--md-sys-color-on-error-container);
+    }
+
+    // Conflicted → error container with strong error glyph.
+    .status-conflicted {
+      background: var(--md-sys-color-error-container);
+      fill: var(--md-sys-color-error);
+    }
+  }
+}
