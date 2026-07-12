@@ -1,8 +1,8 @@
 #!/bin/sh
 
-# The least terrible way to resolve a symlink to its real path.
-function realpath() {
-  /usr/bin/perl -e "use Cwd;print Cwd::abs_path(@ARGV[0])" "$0";
+# Resolve this symlink to the wrapper packaged inside Desktop Material.app.
+realpath() {
+  /usr/bin/perl -e "use Cwd;print Cwd::abs_path(@ARGV[0])" "$0"
 }
 
 CONTENTS="$(command dirname "$(command dirname "$(command dirname "$(command dirname "$(realpath "$0")")")")")"

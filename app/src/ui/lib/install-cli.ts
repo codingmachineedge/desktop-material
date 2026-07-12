@@ -2,17 +2,22 @@ import * as Path from 'path'
 
 import * as fsAdmin from 'fs-admin'
 import { mkdir, readlink, symlink, unlink } from 'fs/promises'
+import { DesktopMaterialCLIName } from '../../lib/desktop-material-cli'
 
 /** The path for the installed command line tool. */
-export const InstalledCLIPath = '/usr/local/bin/github'
+export const InstalledCLIPath = `/usr/local/bin/${DesktopMaterialCLIName}`
 
 /** The path to the packaged CLI. */
-const PackagedPath = Path.resolve(__dirname, 'static', 'github.sh')
+export const PackagedCLIPath = Path.resolve(
+  __dirname,
+  'static',
+  `${DesktopMaterialCLIName}.sh`
+)
 
 /** Install the command line tool on macOS. */
 export async function installCLI(): Promise<void> {
   const installedPath = await getResolvedInstallPath()
-  if (installedPath === PackagedPath) {
+  if (installedPath === PackagedCLIPath) {
     return
   }
 
@@ -34,15 +39,19 @@ async function getResolvedInstallPath(): Promise<string | null> {
 
 function removeExistingSymlink(asAdmin: boolean) {
   if (!asAdmin) {
-    return unlink(InstalledCLIPath)
+    return unlink(InstalledCLIPath).catch(error => {
+      if (!isNoEntryError(error)) {
+        throw error
+      }
+    })
   }
 
   return new Promise<void>((resolve, reject) => {
     fsAdmin.unlink(InstalledCLIPath, error => {
-      if (error !== null) {
+      if (error !== null && !isNoEntryError(error)) {
         reject(
           new Error(
-            `Failed to remove file at ${InstalledCLIPath}. Authorization of GitHub Desktop Helper is required.`
+            `Failed to remove file at ${InstalledCLIPath}. Authorization of Desktop Material Helper is required.`
           )
         )
         return
@@ -78,14 +87,16 @@ function createDirectories(asAdmin: boolean) {
 
 function createNewSymlink(asAdmin: boolean) {
   if (!asAdmin) {
-    return symlink(PackagedPath, InstalledCLIPath)
+    return symlink(PackagedCLIPath, InstalledCLIPath)
   }
 
   return new Promise<void>((resolve, reject) => {
-    fsAdmin.symlink(PackagedPath, InstalledCLIPath, error => {
+    fsAdmin.symlink(PackagedCLIPath, InstalledCLIPath, error => {
       if (error !== null) {
         reject(
-          new Error(`Failed to symlink ${PackagedPath} to ${InstalledCLIPath}`)
+          new Error(
+            `Failed to symlink ${PackagedCLIPath} to ${InstalledCLIPath}`
+          )
         )
         return
       }
@@ -93,6 +104,15 @@ function createNewSymlink(asAdmin: boolean) {
       resolve()
     })
   })
+}
+
+function isNoEntryError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'ENOENT'
+  )
 }
 
 async function symlinkCLI(asAdmin: boolean): Promise<void> {

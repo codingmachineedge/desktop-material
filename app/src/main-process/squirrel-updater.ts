@@ -1,14 +1,17 @@
 import * as Path from 'path'
 import * as Os from 'os'
 
-import { mkdir, writeFile } from 'fs/promises'
+import { mkdir, rm, writeFile } from 'fs/promises'
 import { spawn, getPathSegments, setPathSegments } from '../lib/process/win32'
 import { pathExists } from '../lib/path-exists'
+import { DesktopMaterialCLIName } from '../lib/desktop-material-cli'
 
 const appFolder = Path.resolve(process.execPath, '..')
 const rootAppDir = Path.resolve(appFolder, '..')
 const updateDotExe = Path.resolve(Path.join(rootAppDir, 'Update.exe'))
 const exeName = Path.basename(process.execPath)
+
+export const WindowsCLIName = DesktopMaterialCLIName
 
 // A lot of this code was cargo-culted from our Atom collaborators:
 // https://github.com/atom/atom/blob/7c9f39e3f1d05ee423e0093e6b83f042ce11c90a/src/main-process/squirrel-update.coffee.
@@ -51,6 +54,12 @@ export async function installWindowsCLI(): Promise<void> {
   await mkdir(binPath, { recursive: true })
   await writeBatchScriptCLITrampoline(binPath)
   await writeShellScriptCLITrampoline(binPath)
+  // These private-bin trampolines were created by earlier Desktop builds.
+  // Removing them avoids continuing to claim the unrelated `github` command.
+  await Promise.all([
+    rm(Path.join(binPath, 'github.bat'), { force: true }),
+    rm(Path.join(binPath, 'github'), { force: true }),
+  ])
   try {
     const paths = getPathSegments()
     if (paths.indexOf(binPath) < 0) {
@@ -61,12 +70,17 @@ export async function installWindowsCLI(): Promise<void> {
   }
 }
 
-export async function uninstallWindowsCLI() {
+export async function uninstallWindowsCLI(): Promise<void> {
+  const binPath = getBinPath()
+  await Promise.all([
+    rm(Path.join(binPath, `${WindowsCLIName}.bat`), { force: true }),
+    rm(Path.join(binPath, WindowsCLIName), { force: true }),
+  ])
+
   try {
     const paths = getPathSegments()
-    const binPath = getBinPath()
     const pathsWithoutBinPath = paths.filter(p => p !== binPath)
-    return setPathSegments(pathsWithoutBinPath)
+    await setPathSegments(pathsWithoutBinPath)
   } catch (e) {
     log.error('Failed removing bin path from PATH environment variable', e)
   }
@@ -99,11 +113,11 @@ function resolveVersionedPath(binPath: string, relativePath: string): string {
 function writeBatchScriptCLITrampoline(binPath: string): Promise<void> {
   const versionedPath = resolveVersionedPath(
     binPath,
-    'resources/app/static/github.bat'
+    `resources/app/static/${WindowsCLIName}.bat`
   )
 
   const trampoline = `@echo off\n"%~dp0\\${versionedPath}" %*`
-  const trampolinePath = Path.join(binPath, 'github.bat')
+  const trampolinePath = Path.join(binPath, `${WindowsCLIName}.bat`)
 
   return writeFile(trampolinePath, trampoline)
 }
@@ -115,15 +129,18 @@ function writeShellScriptCLITrampoline(binPath: string): Promise<void> {
   // to resolve it. See https://github.com/desktop/desktop/issues/4998
   const versionedPath = resolveVersionedPath(
     binPath,
-    'resources/app/static/github.sh'
+    `resources/app/static/${WindowsCLIName}.sh`
   ).replace(/\\/g, '/')
 
   const trampoline = `#!/usr/bin/env bash
   DIR="$( cd "$( dirname "\$\{BASH_SOURCE[0]\}" )" && pwd )"
   sh "$DIR/${versionedPath}" "$@"`
-  const trampolinePath = Path.join(binPath, 'github')
+  const trampolinePath = Path.join(binPath, WindowsCLIName)
 
-  return writeFile(trampolinePath, trampoline, { encoding: 'utf8', mode: 755 })
+  return writeFile(trampolinePath, trampoline, {
+    encoding: 'utf8',
+    mode: 0o755,
+  })
 }
 
 /** Spawn the Squirrel.Windows `Update.exe` with a command. */

@@ -5,15 +5,11 @@ ELECTRON="$CONTENTS/GitHubDesktop.exe"
 
 if grep -q Microsoft /proc/version; then
 	if [ -x /bin/wslpath ]; then
-		# On recent WSL builds, we just need to set WSLENV so that
-		# ELECTRON_RUN_AS_NODE is visible to the win32 process
+		# On recent WSL builds, WSLENV makes the Node-mode flag visible to Windows.
 		export WSLENV=ELECTRON_RUN_AS_NODE/w:$WSLENV
 		CLI=$(wslpath -m "$CONTENTS/resources/app/cli.js")
 	else
-		# If running under older WSL, don't pass cli.js to Electron as
-		# environment vars cannot be transferred from WSL to Windows
-		# See: https://github.com/Microsoft/BashOnWindows/issues/1363
-		#      https://github.com/Microsoft/BashOnWindows/issues/1494
+		# Older WSL builds cannot transfer the environment required by Electron.
 		"$ELECTRON" "$@"
 		exit $?
 	fi

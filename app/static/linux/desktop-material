@@ -1,0 +1,12 @@
+#!/bin/sh
+
+SCRIPT_PATH="$(readlink -f "$0")"
+STATIC_PATH="$(dirname "$SCRIPT_PATH")"
+APP_PATH="$(dirname "$STATIC_PATH")"
+INSTALL_PATH="$(dirname "$(dirname "$APP_PATH")")"
+ELECTRON="$INSTALL_PATH/desktop"
+CLI="$APP_PATH/cli.js"
+
+ELECTRON_RUN_AS_NODE=1 "$ELECTRON" "$CLI" "$@"
+
+exit $?
