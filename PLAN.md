@@ -195,7 +195,7 @@ Every milestone ends with: `yarn lint` + `yarn test:unit` green → screenshot r
 - **M1 — Profile foundation — COMPLETE** (`9826361`): per-account settings git repos, allowlist registry, commit queue, recovery.
 - **M2 — Repository tabs — COMPLETE** (`18b3876`, `007845c`): tab strip, persistence/migration, and per-tab styling editor.
 - **M3 — Settings history manager — COMPLETE** (`4114fa2`): reusable Git-backed history UI, lazy diffs, logical multi-level undo/redo, restore-to-point, audit commits, menu/shortcut, reconciliation, tests, and live Headless Desktop verification.
-- **M4 — Non-modal dialogs — NEXT** (F): broaden non-blocking floating-panel/side-sheet behavior across the remaining dialogs, using M3 Settings history as the reference surface and retaining escape hatches for actions that must block.
+- **M4 — Non-modal dialogs — COMPLETE** (`690ea60a6d`, `e9cf5b3d48`): non-modal floating dialog framework (drag-by-header, bring-to-front, cascade, pointer-events-none layer so the app stays interactive behind open dialogs) plus Preferences rebuilt as the MD3 940×660 dialog with a left rail, Active chip, and pill footer; repository/branch foldouts became MD3 side sheets and the clone dialog was restyled. Verified live headless: the app is interactive behind open dialogs.
 - **M5 — Notification centre** (F, uses M1 helpers): bell + panel, git-backed log, history manager (generalized from M3's dialog if clean).
 - **M6 — Search upgrades** (B-3/4): filter modes (fuzzy/substring/regex) + per-list filters on ALL search bars; full regex builder.
 - **M7 — Multi-clone + export/import** (B-1/2): checkboxes, parallel/sequential batch engine, progress popup; repo list export (URLs only)/import→auto-clone.
@@ -209,7 +209,7 @@ Every milestone ends with: `yarn lint` + `yarn test:unit` green → screenshot r
 - **M15 — Desktop-plus M4** stashes + CLI.
 - **M16 — Desktop-plus M5** multi-window (tabs become per-window; settle design in M2's model early).
 - **M17 — Desktop-plus M6 + 16a** GitLab/Bitbucket integration on OUR accountKey model + self-hosted GitLab endpoint entry + PAT login. (Register OAuth apps early — external dependency.)
-- **M18 — Claude design integration**: the ZIP is supplied and already informed M3; complete the later full-app restyle/alignment pass across all remaining surfaces.
+- **M18 — Claude design integration — shell alignment pass COMPLETE 2026-07-12**: the visual clone of the design prototype landed — full MD3 color/motion/shape tokens + keyframes, the Desktop Material app-bar branding and pill inline menu, the floating pill toolbar (repo/branch chips + sync pill with ahead badge), the left icon navigation rail, floating radius-24 workspace cards, and the full MD3 workspace surfaces (Changes tri-state checkboxes, tonal status chips, token diff colors, inverse-surface undo banner, redesigned welcome/blank-slate, MD3 settings dialog, side sheets, clone/overlay restyle). Remaining M18 scope = pixel-polish follow-ups across the remaining surfaces.
 
 ## Cross-workstream contracts (must hold across milestones)
 
