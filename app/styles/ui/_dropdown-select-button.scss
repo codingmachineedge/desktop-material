@@ -1,16 +1,21 @@
 .dropdown-select-button {
   position: relative;
 
+  // Split-button rendered as one full-radius primary pill: the primary action
+  // and the disclosure arrow are flat segments sharing a rounded wrapper with a
+  // flat inset divider (mirrors the app-bar split-sync pill in _material-shell).
   .dropdown-button-wrappers {
     display: flex;
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: var(--md-sys-elevation-level1);
   }
 
+  // When the options menu opens, flatten the pill on the touching edge so it
+  // reads as continuous with the menu, and square the menu's joining corners.
   &.open-bottom {
-    .invoke-button {
+    .dropdown-button-wrappers {
       border-bottom-left-radius: 0;
-    }
-
-    .dropdown-button {
       border-bottom-right-radius: 0;
     }
 
@@ -21,11 +26,8 @@
   }
 
   &.open-top {
-    .invoke-button {
+    .dropdown-button-wrappers {
       border-top-left-radius: 0;
-    }
-
-    .dropdown-button {
       border-top-right-radius: 0;
     }
 
@@ -37,32 +39,30 @@
 
   .invoke-button {
     display: inline;
-    border-bottom-right-radius: 0;
-    border-top-right-radius: 0;
+    border-radius: 0;
+    border: 0;
     margin-right: 0;
-    height: 30px;
+    height: 36px;
     flex-grow: 1;
   }
 
   .dropdown-button {
-    min-width: 30px;
     padding: var(--spacing-half);
     margin: 0;
-    border-bottom-left-radius: 0;
-    border-top-left-radius: 0;
+    border-radius: 0;
     min-width: auto;
-    height: 30px;
+    height: 36px;
     background-color: var(--button-background);
     color: var(--button-text-color);
-    border: 1px solid var(--button-background);
+    border: 0;
+    // Flat inset divider between the primary action and the arrow segment.
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--md-sys-color-on-primary) 45%, transparent);
 
     &:focus {
-      border-color: var(--button-background);
       background-color: var(--button-hover-background);
     }
 
     &:not(:disabled):hover {
-      border-color: var(--button-background);
       background-color: var(--button-hover-background);
     }
 
@@ -75,24 +75,27 @@
     position: absolute;
     overflow: hidden;
     font-size: var(--font-size);
-    color: var(--text-color);
-    background-color: var(--box-alt-background-color);
+    color: var(--md-sys-color-on-surface);
+    background-color: var(--md-sys-color-surface-container);
     background-clip: padding-box;
-    border-radius: var(--border-radius);
+    border-radius: var(--md-sys-shape-corner-large);
     z-index: 100;
-    box-shadow: var(--base-box-shadow);
+    box-shadow: var(--md-sys-elevation-level3);
     width: 100%;
     padding: 0;
     margin: 0;
-    outline: 1px solid var(--box-border-color);
+    outline: 1px solid var(--md-sys-color-outline-variant);
 
     .menu-pane {
       padding-bottom: 0;
     }
 
     .menu-item {
-      border-bottom: 1px solid var(--box-border-color);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
       height: auto;
+      // Neutralise the shared MenuPane inset margin so these split-button option
+      // rows stay full-bleed (their own layout below).
+      margin: 0;
       padding: var(--spacing) var(--spacing-double);
       padding-left: var(--spacing-triple);
       align-items: normal;
@@ -122,7 +125,8 @@
 
 body.theme-dark {
   .dropdown-select-button-options {
-    box-shadow: none;
+    // Keep MD3 level-3 elevation in dark (matches shell popovers); only retain
+    // the 1px seam alignment from upstream.
     margin-top: 1px;
     width: 100%;
   }
