@@ -13,9 +13,31 @@ build, run, and verify the app. The full feature plan lives in
 | **CI fixes** | `e50a6df` | Formatted a pre-existing Prettier violation (`app/styles/ui/_button.scss`); switched CI off the unavailable `macos-14-xlarge` runner to `macos-14`. |
 | **M1 — Per-account profiles** | `9826361` | Each account gets a git repo under `userData/profiles/<sanitized>/` that auto-commits UI-settings changes. Verified: 15 unit tests, built + passed Windows E2E-smoke on CI. |
 | **M2 — Repository tabs** | `18b3876`, `007845c` | Browser-style tab strip + per-tab "Tab text style" editor. **Verified headlessly matching the design prototype.** |
-| **M3 — Settings history manager** | `4114fa2` | Shared Git-backed history UI, lazy diffs, logical undo/redo, restore-to-point, audit commits, menu/shortcut wiring, and tab/settings reconciliation. Verified live on an isolated Win32 Headless Desktop. |
+| **M3 — Settings history manager** | `4114fa2`, `b89b9ce` | Shared Git-backed history UI, lazy diffs, logical undo/redo, restore-to-point, audit commits, menu/shortcut wiring, tab/settings reconciliation, live screenshot, and published docs. Verified live on an isolated Win32 Headless Desktop. |
 
 Working tree is clean; everything is pushed.
+
+## Published M3 state
+
+- Published M3 content SHA: `b89b9cedb2d232b2ea313f7bc11b7508c1573d54`
+  (the later handoff-only update does not alter the shipped app, site, or image).
+- Code SHA `4114fa2bb00d8dfc67c84b7ed16d0f506050bb30` passed
+  [CI](https://github.com/codingmachineedge/desktop-material/actions/runs/29176909891)
+  and [Build Installers](https://github.com/codingmachineedge/desktop-material/actions/runs/29176909881).
+- Documentation SHA `b89b9cedb2d232b2ea313f7bc11b7508c1573d54`
+  passed [CI](https://github.com/codingmachineedge/desktop-material/actions/runs/29177022962)
+  and [Deploy Pages](https://github.com/codingmachineedge/desktop-material/actions/runs/29177022975).
+- The [live project site](https://codingmachineedge.github.io/desktop-material/)
+  and its Settings history image return HTTP 200. The live PNG is 108,337
+  bytes and exactly matches the tracked SHA-256
+  `abbcc34aa02949d2144f008c9ed10b4414f721843890643d65d8e0b9360c3da1`.
+- [Release `v3.6.3-beta3-build.8`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-build.8)
+  is public, non-draft, non-prerelease, cites the exact code SHA, and contains
+  three non-empty GitHub-digested assets (NUPKG, EXE, MSI).
+- Canonical wiki Markdown and raw-main screenshot embeds are ready under
+  `docs/wiki/`. The GitHub wiki git remote is still uninitialized; its first
+  public `Home` page must be created once through the web UI after action-time
+  confirmation, then all six canonical pages can be pushed normally.
 
 ## Critical environment setup
 
