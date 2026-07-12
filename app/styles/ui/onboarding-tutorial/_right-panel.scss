@@ -98,24 +98,26 @@
     .hang-right {
       margin-left: auto;
     }
+    // MD3 de-stock: completed step → dm-green, current step → primary, and the
+    // pending step ring → outline, instead of the stock raw green/blue palette.
     .green-circle {
       @extend %circle;
-      background-color: $green;
-      border-color: $green;
-      color: var(--badge-icon-color);
+      background-color: var(--dm-green);
+      border-color: var(--dm-green);
+      color: var(--md-sys-color-surface);
     }
     .blue-circle {
       @extend %circle;
-      background-color: $blue;
-      border-color: $blue;
-      color: var(--badge-icon-color);
+      background-color: var(--md-sys-color-primary);
+      border-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
     }
     .empty-circle {
       @extend %circle;
       background-color: transparent;
-      border-color: var(--text-color);
+      border-color: var(--md-sys-color-outline);
       opacity: 0.5;
-      color: var(--text-color);
+      color: var(--md-sys-color-on-surface-variant);
     }
   }
 
