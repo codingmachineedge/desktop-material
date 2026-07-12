@@ -88,6 +88,7 @@ import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { MergeAllDialog } from './merge-all'
+import { PullAllDialog } from './pull-all'
 import { EditCopilotBYOKProviderDialog } from './copilot/edit-byok-provider-dialog'
 import { EditCopilotBYOKModelDialog } from './copilot/edit-byok-model-dialog'
 import { ConfirmDeleteCopilotBYOKProviderDialog } from './copilot/confirm-delete-byok-provider-dialog'
@@ -1834,6 +1835,14 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       }
+      case PopupType.PullAllRepositories:
+        return (
+          <PullAllDialog
+            key="pull-all-repositories"
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       case PopupType.RepositorySettings: {
         const repository = popup.repository
         const state = this.props.repositoryStateManager.get(repository)

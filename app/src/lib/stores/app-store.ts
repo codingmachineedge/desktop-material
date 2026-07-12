@@ -331,6 +331,7 @@ import {
   selectBranchCandidates,
   selectWorktreeCandidates,
 } from '../automation/merge-all'
+import { IPullAllResult, runBoundedPullAll } from '../automation/pull-all'
 import { BranchPruner } from './helpers/branch-pruner'
 import {
   enableCopilotConflictResolution,
@@ -6471,6 +6472,74 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.withRefreshedGitHubRepository(repository, repository => {
       return this.performPull(repository)
     })
+  }
+
+  /** Pull every available repository with bounded network concurrency. */
+  public async _pullAllRepositories(): Promise<ReadonlyArray<IPullAllResult>> {
+    const repositories = await this.repositoriesStore.getAll()
+    const repositoriesById = new Map(repositories.map(repo => [repo.id, repo]))
+
+    return runBoundedPullAll(
+      repositories.map(repository => ({
+        id: repository.id,
+        name: repository.name,
+      })),
+      async candidate => {
+        const repository = repositoriesById.get(candidate.id)
+        if (repository === undefined) {
+          return { status: 'skipped', detail: 'Repository was removed.' }
+        }
+        return this.performPullAllRepository(repository)
+      }
+    )
+  }
+
+  private async performPullAllRepository(repository: Repository) {
+    if (repository.missing) {
+      return { status: 'skipped' as const, detail: 'Repository is missing.' }
+    }
+
+    await this._refreshRepository(repository)
+    const gitStore = this.gitStoreCache.get(repository)
+    const remote = gitStore.currentRemote
+    if (remote === null) {
+      return { status: 'skipped' as const, detail: 'No pull remote.' }
+    }
+
+    const tip = gitStore.tip
+    if (tip.kind !== TipState.Valid) {
+      return {
+        status: 'skipped' as const,
+        detail:
+          tip.kind === TipState.Detached
+            ? 'Detached HEAD.'
+            : 'No active branch.',
+      }
+    }
+    if (tip.branch.upstream === null) {
+      return {
+        status: 'skipped' as const,
+        detail: `Branch ${tip.branch.name} has no upstream.`,
+      }
+    }
+
+    const state = this.repositoryStateCache.get(repository)
+    if (state.isPushPullFetchInProgress) {
+      return {
+        status: 'skipped' as const,
+        detail: 'Another network operation is in progress.',
+      }
+    }
+
+    await this.withPushPullFetch(repository, async () => {
+      await pullRepo(repository, remote)
+      await updateRemoteHEAD(repository, remote, false).catch(error =>
+        log.error('Failed updating remote HEAD after Pull all', error)
+      )
+      await this._refreshRepository(repository)
+    })
+
+    return { status: 'pulled' as const, detail: 'Pull completed.' }
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */

@@ -440,16 +440,30 @@ export class RepositoriesList extends React.Component<
 
   private renderPostFilter = () => {
     return (
-      <Button
-        className="new-repository-button"
-        onClick={this.onNewRepositoryButtonClick}
-        ariaExpanded={this.state.newRepositoryMenuExpanded}
-        onKeyDown={this.onNewRepositoryButtonKeyDown}
-      >
-        Add
-        <Octicon symbol={octicons.triangleDown} />
-      </Button>
+      <div className="repository-list-actions">
+        <Button
+          className="pull-all-repositories-button"
+          onClick={this.onPullAllRepositories}
+        >
+          <Octicon symbol={octicons.arrowDown} /> Pull all
+        </Button>
+        <Button
+          className="new-repository-button"
+          onClick={this.onNewRepositoryButtonClick}
+          ariaExpanded={this.state.newRepositoryMenuExpanded}
+          onKeyDown={this.onNewRepositoryButtonKeyDown}
+        >
+          Add
+          <Octicon symbol={octicons.triangleDown} />
+        </Button>
+      </div>
     )
+  }
+
+  private onPullAllRepositories = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.PullAllRepositories,
+    })
   }
 
   private onNewRepositoryButtonKeyDown = (

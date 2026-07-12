@@ -14,6 +14,11 @@ describe('hasModalPopup', () => {
     assert.equal(hasModalPopup([history]), false)
     assert.equal(hasModalPopup([preferences, history]), true)
   })
+
+  it('keeps Pull all non-modal while repository work continues', () => {
+    const pullAll: Popup = { type: PopupType.PullAllRepositories }
+    assert.equal(hasModalPopup([pullAll]), false)
+  })
 })
 
 describe('PopupManager', () => {
