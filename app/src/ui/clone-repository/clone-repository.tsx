@@ -28,9 +28,14 @@ import { merge } from '../../lib/merge'
 import { ClickSource } from '../lib/list'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { showOpenDialog, showSaveDialog } from '../main-process-proxy'
-import { readdir } from 'fs/promises'
 import { isTopMostDialog } from '../dialog/is-top-most'
 import memoizeOne from 'memoize-one'
+import { validateEmptyFolder } from '../../lib/path-validation'
+import {
+  BatchCloneMode,
+  IBatchCloneInput,
+  buildBatchCloneItems,
+} from '../../models/batch-clone'
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -87,6 +92,9 @@ interface ICloneRepositoryState {
 
   /** Are we currently trying to load the entered repository? */
   readonly loading: boolean
+
+  /** The parallel/sequential mode used when cloning multiple repositories. */
+  readonly batchMode: BatchCloneMode
 
   /**
    * The persisted state of the CloneGitHubRepository component for
@@ -149,6 +157,12 @@ interface IGitHubTabState extends IBaseTabState {
    * is selected.
    */
   readonly selectedItem: IAPIRepository | null
+
+  /**
+   * The clone URLs checked for multi-clone. Empty means the tab behaves as a
+   * single-select clone.
+   */
+  readonly checkedUrls: Set<string>
 }
 
 /** The component for cloning a repository. */
@@ -193,16 +207,19 @@ export class CloneRepository extends React.Component<
     this.state = {
       initialPath: defaultDirectory,
       loading: false,
+      batchMode: BatchCloneMode.Parallel,
       dotComTabState: {
         kind: 'dotComTabState',
         filterText: '',
         selectedItem: null,
+        checkedUrls: new Set<string>(),
         ...initialBaseTabState,
       },
       enterpriseTabState: {
         kind: 'enterpriseTabState',
         filterText: '',
         selectedItem: null,
+        checkedUrls: new Set<string>(),
         ...initialBaseTabState,
       },
       urlTabState: {
@@ -386,6 +403,11 @@ export class CloneRepository extends React.Component<
               onFilterTextChanged={this.onFilterTextChanged}
               onItemClicked={this.onItemClicked}
               onSelectedAccountChanged={this.onSelectedAccountChanged}
+              checkedUrls={tabState.checkedUrls}
+              onToggleItemChecked={this.onToggleRepositoryChecked}
+              batchMode={this.state.batchMode}
+              onBatchModeChanged={this.onBatchModeChanged}
+              onCloneBatch={this.onCloneBatch}
             />
           )
         }
@@ -561,6 +583,73 @@ export class CloneRepository extends React.Component<
     }
   }
 
+  private onToggleRepositoryChecked = (url: string) => {
+    const tab = this.props.selectedTab
+    if (tab === CloneRepositoryTab.Generic) {
+      return
+    }
+
+    const tabState = this.getGitHubTabState(tab)
+    const checkedUrls = new Set(tabState.checkedUrls)
+    if (checkedUrls.has(url)) {
+      checkedUrls.delete(url)
+    } else {
+      checkedUrls.add(url)
+    }
+
+    this.setGitHubTabState({ checkedUrls }, tab)
+  }
+
+  private onBatchModeChanged = (batchMode: BatchCloneMode) => {
+    this.setState({ batchMode })
+  }
+
+  private onCloneBatch = () => {
+    const tab = this.props.selectedTab
+    if (tab === CloneRepositoryTab.Generic) {
+      return
+    }
+
+    const tabState = this.getGitHubTabState(tab)
+    const baseDirectory = tabState.path
+
+    if (baseDirectory === null || baseDirectory.length === 0) {
+      this.setGitHubTabState(
+        { error: new Error('Please choose a base directory to clone into.') },
+        tab
+      )
+      return
+    }
+
+    const account = this.getAccountForTab(tab)
+    const accountState = account
+      ? this.props.apiRepositories.get(account)
+      : undefined
+    const repositories = accountState?.repositories ?? null
+
+    const inputs: ReadonlyArray<IBatchCloneInput> = Array.from(
+      tabState.checkedUrls
+    ).map(url => {
+      const repo = repositories?.find(r => r.clone_url === url) ?? null
+      return {
+        url,
+        ...(repo ? { name: repo.name, defaultBranch: repo.default_branch } : {}),
+      }
+    })
+
+    if (inputs.length === 0) {
+      return
+    }
+
+    const items = buildBatchCloneItems(inputs, baseDirectory)
+
+    this.props.dispatcher.closeFoldout(FoldoutType.Repository)
+    this.props.dispatcher.cloneBatch(items, this.state.batchMode)
+
+    setDefaultDir(baseDirectory)
+    this.props.onDismissed()
+  }
+
   private validatePath = async () => {
     const tabState = this.getSelectedTabState()
     const { path, url, error } = tabState
@@ -573,7 +662,7 @@ export class CloneRepository extends React.Component<
         this.setSelectedTabState({ error: null })
       }
     } else {
-      const pathValidation = await this.validateEmptyFolder(path)
+      const pathValidation = await validateEmptyFolder(path)
 
       // We only care about the result if the path hasn't
       // changed since we went async
@@ -672,47 +761,6 @@ export class CloneRepository extends React.Component<
       },
       this.validatePath
     )
-  }
-
-  private async validateEmptyFolder(
-    path: string | null
-  ): Promise<null | Error> {
-    if (path === null) {
-      return new Error(
-        'Unable to read path on disk. Please check the path and try again.'
-      )
-    }
-
-    try {
-      const directoryFiles = await readdir(path)
-
-      if (directoryFiles.length === 0) {
-        return null
-      } else {
-        return new Error(
-          'This folder contains files. Git can only clone to empty folders.'
-        )
-      }
-    } catch (error) {
-      if (error.code === 'ENOTDIR') {
-        // path refers to a file or other file system entry
-        return new Error(
-          'There is already a file with this name. Git can only clone to a folder.'
-        )
-      }
-
-      if (error.code === 'ENOENT') {
-        // Folder does not exist
-        return null
-      }
-
-      log.error(
-        'CloneRepository: Path validation failed. Error: ' + error.message
-      )
-      return new Error(
-        'Unable to read path on disk. Please check the path and try again.'
-      )
-    }
   }
 
   /**

@@ -34,6 +34,8 @@ export type MenuIDs =
   | 'new-repository'
   | 'add-local-repository'
   | 'clone-repository'
+  | 'export-repository-list'
+  | 'import-repository-list'
   | 'about'
   | 'create-pull-request'
   | 'compare-to-branch'

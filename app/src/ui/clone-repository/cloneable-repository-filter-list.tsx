@@ -17,6 +17,7 @@ import { LinkButton } from '../lib/link-button'
 import { Ref } from '../lib/ref'
 import { SectionFilterList } from '../lib/section-filter-list'
 import { TooltippedContent } from '../lib/tooltipped-content'
+import { Checkbox, CheckboxValue } from '../lib/checkbox'
 
 interface ICloneableRepositoryFilterListProps {
   /** The account to clone from. */
@@ -78,6 +79,15 @@ interface ICloneableRepositoryFilterListProps {
   ) => void
 
   readonly renderPreFilter?: () => JSX.Element | null
+
+  /**
+   * The set of clone URLs currently checked for multi-clone. When provided (and
+   * `onToggleItemChecked` is set) each row renders a checkbox.
+   */
+  readonly checkedUrls?: ReadonlySet<string>
+
+  /** Called when the user toggles a row's multi-clone checkbox. */
+  readonly onToggleItemChecked?: (url: string) => void
 }
 
 const RowHeight = 31
@@ -182,7 +192,7 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
         renderItem={this.renderItem}
         renderGroupHeader={this.renderGroupHeader}
         onSelectionChanged={this.onSelectionChanged}
-        invalidationProps={groups}
+        invalidationProps={{ groups, checkedUrls: this.props.checkedUrls }}
         groups={groups}
         filterText={this.props.filterText}
         onFilterTextChanged={this.props.onFilterTextChanged}
@@ -239,12 +249,33 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
     )
   }
 
+  private onCheckboxClick = (event: React.MouseEvent<HTMLSpanElement>) => {
+    // Prevent the row's own click/selection handler from firing when the user
+    // is only toggling the multi-clone checkbox.
+    event.stopPropagation()
+  }
+
   private renderItem = (
     item: ICloneableRepositoryListItem,
     matches: IMatches
   ) => {
+    const { onToggleItemChecked, checkedUrls } = this.props
+    const checkable = onToggleItemChecked !== undefined
+
     return (
       <div className="clone-repository-list-item">
+        {checkable && (
+          <span className="checkbox" onClick={this.onCheckboxClick}>
+            <Checkbox
+              value={
+                checkedUrls?.has(item.url)
+                  ? CheckboxValue.On
+                  : CheckboxValue.Off
+              }
+              onChange={() => onToggleItemChecked(item.url)}
+            />
+          </span>
+        )}
         <Octicon className="icon" symbol={item.icon} />
         <TooltippedContent
           className="name"

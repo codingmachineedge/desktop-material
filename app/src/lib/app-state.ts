@@ -8,6 +8,7 @@ import type {
 } from './copilot-conflict-resolution'
 import { Account } from '../models/account'
 import { INotificationEntry } from '../models/notification-centre'
+import { IBatchCloneState } from '../models/batch-clone'
 import { CommitIdentity } from '../models/commit-identity'
 import { IDiff, ImageDiffType } from '../models/diff'
 import { Repository, ILocalRepositoryState } from '../models/repository'
@@ -460,6 +461,12 @@ export interface IAppState {
    * (opposite of the click-away foldout contract).
    */
   readonly isNotificationCentreOpen: boolean
+
+  /**
+   * State of an in-flight (or just-finished) batch clone, or null when no batch
+   * is active. Drives the batch clone progress popup.
+   */
+  readonly batchCloneState: IBatchCloneState | null
 }
 
 export enum FoldoutType {

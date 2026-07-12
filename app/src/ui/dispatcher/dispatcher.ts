@@ -69,6 +69,7 @@ import { Author, UnknownAuthor } from '../../models/author'
 import { Branch, IAheadBehind } from '../../models/branch'
 import { BranchesTab } from '../../models/branches-tab'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
+import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
 import { CloningRepository } from '../../models/cloning-repository'
 import { Commit, ICommitContext, CommitOneLine } from '../../models/commit'
 import { ICommitMessage } from '../../models/commit-message'
@@ -1065,6 +1066,33 @@ export class Dispatcher {
 
       return addedRepository
     })
+  }
+
+  /**
+   * Clone several repositories at once, showing the batch progress popup. The
+   * batch runs in the background; the popup can be hidden while it continues.
+   */
+  public cloneBatch(
+    items: ReadonlyArray<IBatchCloneItem>,
+    mode: BatchCloneMode
+  ): Promise<void> {
+    this.showPopup({ type: PopupType.BatchCloneProgress })
+    return this.appStore._cloneBatch(items, mode)
+  }
+
+  /** Retry every repository that failed in the current batch clone. */
+  public retryBatchCloneFailed(): Promise<void> {
+    return this.appStore._retryBatchCloneFailed()
+  }
+
+  /** Cancel a running batch clone (skips items that haven't started). */
+  public cancelBatchClone(): void {
+    this.appStore._cancelBatchClone()
+  }
+
+  /** Dismiss the batch clone popup and clear its state. */
+  public dismissBatchClone(): void {
+    this.appStore._dismissBatchClone()
   }
 
   /** Changes the repository alias to a new name. */

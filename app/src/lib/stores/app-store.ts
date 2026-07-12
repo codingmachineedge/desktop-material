@@ -2,6 +2,7 @@ import * as Path from 'path'
 import { writeFile } from 'fs/promises'
 import {
   AccountsStore,
+  BatchCloneStore,
   CloningRepositoriesStore,
   CopilotStore,
   GitHubUserStore,
@@ -387,6 +388,11 @@ import {
   INotificationEntry,
   INotificationInput,
 } from '../../models/notification-centre'
+import {
+  BatchCloneMode,
+  IBatchCloneItem,
+  IBatchCloneState,
+} from '../../models/batch-clone'
 import { IProfileHistoryPage } from '../../models/profile'
 import * as ipcRenderer from '../ipc-renderer'
 import { pathExists } from '../path-exists'
@@ -757,6 +763,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private unreadNotificationCount = 0
   private isNotificationCentreOpen = false
 
+  /** Coordinates cloning many repositories at once (see BatchCloneStore). */
+  private readonly batchCloneStore: BatchCloneStore
+  private batchCloneState: IBatchCloneState | null = null
+
   public constructor(
     private readonly gitHubUserStore: GitHubUserStore,
     private readonly cloningRepositoriesStore: CloningRepositoriesStore,
@@ -773,6 +783,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     private readonly notificationCentreStore: NotificationCentreStore
   ) {
     super()
+
+    this.batchCloneStore = new BatchCloneStore(this.cloningRepositoriesStore)
 
     this.showWelcomeFlow = !hasShownWelcomeFlow()
 
@@ -1174,6 +1186,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.cloningRepositoriesStore.onDidError(e => this.emitError(e))
 
+    this.batchCloneStore.onDidUpdate(state => {
+      this.batchCloneState = state
+      this.emitUpdate()
+    })
+
     this.signInStore.onDidAuthenticate(account => this._addAccount(account))
     this.signInStore.onDidUpdate(() => this.emitUpdate())
     this.signInStore.onDidError(error => this.emitError(error))
@@ -1458,6 +1475,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       notifications: this.notifications,
       unreadNotificationCount: this.unreadNotificationCount,
       isNotificationCentreOpen: this.isNotificationCentreOpen,
+      batchCloneState: this.batchCloneState,
     }
   }
 
@@ -5859,6 +5877,68 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   public _removeCloningRepository(repository: CloningRepository) {
     this.cloningRepositoriesStore.remove(repository)
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _cloneBatch(
+    items: ReadonlyArray<IBatchCloneItem>,
+    mode: BatchCloneMode
+  ): Promise<void> {
+    await this.batchCloneStore.startBatch(items, mode)
+    await this.finalizeBatchClone()
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _retryBatchCloneFailed(): Promise<void> {
+    await this.batchCloneStore.retryFailed()
+    await this.finalizeBatchClone()
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _dismissBatchClone(): void {
+    this.batchCloneStore.dismiss()
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _cancelBatchClone(): void {
+    this.batchCloneStore.requestCancel()
+  }
+
+  /**
+   * Add every successfully-cloned repository from the current batch to the
+   * repository list and post a summary notification.
+   */
+  private async finalizeBatchClone(): Promise<void> {
+    const state = this.batchCloneState
+    if (state === null) {
+      return
+    }
+
+    const clonedPaths = state.items
+      .filter(item => state.statuses.get(item.path)?.kind === 'done')
+      .map(item => item.path)
+
+    if (clonedPaths.length > 0) {
+      await this._addRepositories(clonedPaths)
+      this.statsStore.recordCloneRepository()
+    }
+
+    const failed = state.items.filter(
+      item => state.statuses.get(item.path)?.kind === 'failed'
+    ).length
+
+    const body =
+      failed > 0
+        ? `Cloned ${clonedPaths.length} of ${state.items.length} repositories (${failed} failed).`
+        : `Cloned ${clonedPaths.length} ${
+            clonedPaths.length === 1 ? 'repository' : 'repositories'
+          }.`
+
+    this.postNotification({
+      kind: 'clone-batch',
+      title: 'Batch clone finished',
+      body,
+    })
   }
 
   public async _discardChanges(

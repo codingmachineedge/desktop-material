@@ -97,7 +97,11 @@ import {
 import { AppError } from './app-error'
 import { MissingRepository } from './missing-repository'
 import { AddExistingRepository, CreateRepository } from './add-repository'
-import { CloneRepository } from './clone-repository'
+import { CloneRepository, BatchCloneProgress } from './clone-repository'
+import {
+  ExportRepositoriesDialog,
+  ImportRepositoriesDialog,
+} from './repository-list-transfer'
 import { CreateBranch } from './create-branch'
 import { SignIn } from './sign-in'
 import { InstallGit } from './install-git'
@@ -558,6 +562,10 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.openCurrentRepositoryInShell()
       case 'clone-repository':
         return this.showCloneRepo()
+      case 'export-repository-list':
+        return this.showExportRepositoryList()
+      case 'import-repository-list':
+        return this.showImportRepositoryList()
       case 'show-about':
         return this.showAbout()
       case 'go-to-commit-message':
@@ -896,6 +904,28 @@ export class App extends React.Component<IAppProps, IAppState> {
     return this.props.dispatcher.showPopup({
       type: PopupType.CloneRepository,
       initialURL,
+    })
+  }
+
+  private showExportRepositoryList = () => {
+    const repositories = this.state.repositories.filter(
+      (r): r is Repository => r instanceof Repository
+    )
+
+    return this.props.dispatcher.showPopup({
+      type: PopupType.ExportRepositoryList,
+      repositories,
+    })
+  }
+
+  private showImportRepositoryList = () => {
+    const existingRepositories = this.state.repositories.filter(
+      (r): r is Repository => r instanceof Repository
+    )
+
+    return this.props.dispatcher.showPopup({
+      type: PopupType.ImportRepositoryList,
+      existingRepositories,
     })
   }
 
@@ -1839,6 +1869,33 @@ export class App extends React.Component<IAppProps, IAppState> {
             apiRepositories={this.state.apiRepositories}
             onRefreshRepositories={this.onRefreshRepositories}
             isTopMost={isTopMost}
+          />
+        )
+      case PopupType.BatchCloneProgress:
+        return (
+          <BatchCloneProgress
+            key="batch-clone-progress"
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+            batchCloneState={this.state.batchCloneState}
+            isTopMost={isTopMost}
+          />
+        )
+      case PopupType.ExportRepositoryList:
+        return (
+          <ExportRepositoriesDialog
+            key="export-repositories"
+            onDismissed={onPopupDismissedFn}
+            repositories={popup.repositories}
+          />
+        )
+      case PopupType.ImportRepositoryList:
+        return (
+          <ImportRepositoriesDialog
+            key="import-repositories"
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+            existingRepositories={popup.existingRepositories}
           />
         )
       case PopupType.CreateBranch: {

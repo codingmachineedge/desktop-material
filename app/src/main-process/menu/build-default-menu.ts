@@ -120,6 +120,21 @@ export function buildDefaultMenuTemplate({
         accelerator: 'CmdOrCtrl+Shift+O',
         click: emit('clone-repository'),
       },
+      separator,
+      {
+        label: __DARWIN__
+          ? 'Export Repository List…'
+          : '&Export repository list…',
+        id: 'export-repository-list',
+        click: emit('export-repository-list'),
+      },
+      {
+        label: __DARWIN__
+          ? 'Import Repository List…'
+          : '&Import repository list…',
+        id: 'import-repository-list',
+        click: emit('import-repository-list'),
+      },
     ],
   }
 

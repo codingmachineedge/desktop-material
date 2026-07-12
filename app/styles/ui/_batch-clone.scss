@@ -1,0 +1,156 @@
+// M7 — Multi-clone: per-repo checkboxes in the clone list, the batch-mode
+// controls beneath the base-directory field, and the batch progress popup.
+// All colours reference MD3 system tokens.
+
+dialog.clone-repository {
+  .clone-repository-list-item {
+    .checkbox {
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+      margin-right: 4px;
+
+      // The checkbox owns its own click handling (stopPropagation) so it never
+      // triggers row selection.
+      .checkbox-component {
+        margin: 0;
+      }
+    }
+  }
+
+  .batch-clone-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-half);
+    margin-top: var(--spacing-half);
+    padding: var(--spacing);
+    border-radius: 16px;
+    background: var(--md-sys-color-surface-container-high);
+
+    .batch-mode-row {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing);
+      margin: 0;
+
+      .label {
+        color: var(--md-sys-color-on-surface-variant);
+        font-weight: var(--font-weight-semibold);
+      }
+
+      .batch-mode-radio {
+        display: flex;
+        gap: var(--spacing);
+      }
+    }
+
+    .batch-action-row {
+      margin: 0;
+      justify-content: flex-end;
+
+      .button-component {
+        background: var(--md-sys-color-primary);
+        color: var(--md-sys-color-on-primary);
+      }
+    }
+  }
+}
+
+dialog#batch-clone-progress {
+  .batch-clone-overall {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'summary percent'
+      'bar bar';
+    align-items: center;
+    gap: var(--spacing-half) var(--spacing);
+    margin-bottom: var(--spacing);
+
+    .summary {
+      grid-area: summary;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .percent {
+      grid-area: percent;
+      font-variant-numeric: tabular-nums;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    progress {
+      grid-area: bar;
+      width: 100%;
+    }
+  }
+
+  .batch-clone-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .batch-clone-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    padding: var(--spacing-half) var(--spacing);
+    border-radius: 12px;
+
+    & + .batch-clone-item {
+      margin-top: 2px;
+    }
+
+    .status {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+
+      &.done {
+        fill: var(--md-sys-color-primary);
+      }
+
+      &.failed {
+        fill: var(--md-sys-color-error);
+      }
+
+      &.skipped,
+      &.pending {
+        fill: var(--md-sys-color-on-surface-variant);
+      }
+
+      &.cloning {
+        fill: var(--md-sys-color-primary);
+      }
+    }
+
+    .details {
+      flex-grow: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .name {
+        font-weight: var(--font-weight-semibold);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .error {
+        color: var(--md-sys-color-error);
+        font-size: var(--font-size-sm);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      progress {
+        width: 100%;
+      }
+    }
+  }
+}
