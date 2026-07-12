@@ -274,12 +274,18 @@
       background: var(--md-sys-color-surface-container-high);
     }
 
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 42%, transparent);
+      outline-offset: -2px;
+    }
+
     &.selected {
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
     }
 
     .text {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;

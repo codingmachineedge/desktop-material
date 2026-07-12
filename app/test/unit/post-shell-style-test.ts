@@ -17,4 +17,10 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(readStyle('_actions-view.scss'), /max-width: 620px/)
     assert.match(readStyle('_agent-access.scss'), /max-width: 430px/)
   })
+
+  it('makes Pull all results horizontally scrollable on narrow windows', () => {
+    const style = readStyle('_pull-all.scss')
+    assert.match(style, /pull-all-results-container/)
+    assert.match(style, /overflow: auto/)
+  })
 })

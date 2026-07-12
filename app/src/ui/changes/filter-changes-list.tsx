@@ -288,6 +288,9 @@ interface IFilterChangesListState {
 /** Persistence key for the Changes filter's mode + regex-builder target label. */
 const ChangesFilterListId = 'changes'
 
+export const isStashContextMenuKey = (key: string, shiftKey: boolean) =>
+  key === 'ContextMenu' || (shiftKey && key === 'F10')
+
 function getSelectedItemsFromProps(
   props: IFilterChangesListProps
 ): ReadonlyArray<IChangesListItem> {
@@ -1184,16 +1187,29 @@ export class FilterChangesList extends React.Component<
   private onStashEntryContextMenu =
     (entry: IStashEntry) => (event: React.MouseEvent) => {
       event.preventDefault()
-      showContextualMenu(
-        generateStashListContextMenu({
-          stashEntry: entry,
-          repository: this.props.repository,
-          dispatcher: this.props.dispatcher,
-          askForConfirmationOnDiscardStash:
-            this.props.askForConfirmationOnDiscardStash,
-        })
-      )
+      this.showStashEntryContextMenu(entry)
     }
+
+  private onStashEntryKeyDown =
+    (entry: IStashEntry) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (!isStashContextMenuKey(event.key, event.shiftKey)) {
+        return
+      }
+      event.preventDefault()
+      this.showStashEntryContextMenu(entry)
+    }
+
+  private showStashEntryContextMenu(entry: IStashEntry) {
+    showContextualMenu(
+      generateStashListContextMenu({
+        stashEntry: entry,
+        repository: this.props.repository,
+        dispatcher: this.props.dispatcher,
+        askForConfirmationOnDiscardStash:
+          this.props.askForConfirmationOnDiscardStash,
+      })
+    )
+  }
 
   private renderStashedChanges() {
     const { stashEntries } = this.props
@@ -1225,10 +1241,13 @@ export class FilterChangesList extends React.Component<
                 )}
                 onClick={this.onStashEntryClickedFn(entry)}
                 onContextMenu={this.onStashEntryContextMenu(entry)}
-                tabIndex={0}
+                onKeyDown={this.onStashEntryKeyDown(entry)}
                 aria-expanded={selected}
                 aria-controls={selected ? StashDiffViewerId : undefined}
-                title="Right-click for restore and discard actions"
+                aria-haspopup="menu"
+                aria-label={`${stashEntryLabel(
+                  entry
+                )}. Press Enter to open. Press Shift+F10 for actions.`}
               >
                 <span className="text">{stashEntryLabel(entry)}</span>
                 <Octicon symbol={octicons.chevronRight} />

@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- scroll regions need keyboard focus */
 import * as React from 'react'
 import { IPullAllResult } from '../../lib/automation/pull-all'
 import { Dispatcher } from '../dispatcher'
@@ -72,34 +73,46 @@ export class PullAllDialog extends React.Component<
               three repositories at a time…
             </p>
           )}
-          {error !== null && <p className="pull-all-error">{error}</p>}
+          {error !== null && (
+            <p className="pull-all-error" role="alert">
+              {error}
+            </p>
+          )}
           {results !== null && (
             <>
               <p className="pull-all-summary" role="status">
                 {pulled} pulled, {skipped} skipped, {failed} failed.
               </p>
-              <table className="pull-all-results">
-                <thead>
-                  <tr>
-                    <th>Repository</th>
-                    <th>Result</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map(result => (
-                    <tr key={result.id}>
-                      <td>{result.name}</td>
-                      <td>
-                        <span className={`pull-all-status ${result.status}`}>
-                          {result.status}
-                        </span>
-                      </td>
-                      <td>{result.detail}</td>
+              {/* Keyboard focus makes the two-axis scroll region operable. */}
+              <div
+                className="pull-all-results-container"
+                role="region"
+                aria-label="Pull results"
+                tabIndex={0}
+              >
+                <table className="pull-all-results">
+                  <thead>
+                    <tr>
+                      <th>Repository</th>
+                      <th>Result</th>
+                      <th>Details</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {results.map(result => (
+                      <tr key={result.id}>
+                        <td>{result.name}</td>
+                        <td>
+                          <span className={`pull-all-status ${result.status}`}>
+                            {result.status}
+                          </span>
+                        </td>
+                        <td>{result.detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </DialogContent>
