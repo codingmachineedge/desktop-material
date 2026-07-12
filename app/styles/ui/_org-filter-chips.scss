@@ -1,0 +1,80 @@
+dialog.clone-repository {
+  .org-filter-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 20px 10px;
+    scrollbar-width: thin;
+  }
+
+  .org-filter-chip {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    min-height: 34px;
+    padding: 0 13px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 999px;
+    color: var(--md-sys-color-on-surface-variant);
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: background-color 180ms ease, border-radius 220ms var(--spring), transform 160ms var(--spring-fast);
+
+    &:hover {
+      border-radius: 12px;
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    &.selected {
+      border-color: transparent;
+      color: var(--md-sys-color-on-secondary-container);
+      background: var(--md-sys-color-secondary-container);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .org-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+  }
+
+  .org-filter-loading {
+    align-self: center;
+    flex: 0 0 auto;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+  }
+
+  .org-repositories-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 20px 10px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    color: var(--md-sys-color-on-error-container);
+    background: var(--md-sys-color-error-container);
+    font-size: 12.5px;
+
+    .button-component {
+      flex: 0 0 auto;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+    }
+  }
+}

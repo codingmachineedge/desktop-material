@@ -5,12 +5,13 @@ import { DialogContent } from '../dialog'
 import { TextBox } from '../lib/text-box'
 import { Row } from '../lib/row'
 import { Button } from '../lib/button'
-import { IAPIRepository } from '../../lib/api'
+import { IAPIOrganization, IAPIRepository } from '../../lib/api'
 import { CloneableRepositoryFilterList } from './cloneable-repository-filter-list'
 import { ClickSource } from '../lib/list'
 import { AccountPicker } from '../account-picker'
 import { RadioGroup } from '../lib/radio-group'
 import { BatchCloneMode } from '../../models/batch-clone'
+import { OrgFilterChips } from './org-filter-chips'
 
 interface ICloneGithubRepositoryProps {
   /** The account to clone from. */
@@ -50,6 +51,15 @@ interface ICloneGithubRepositoryProps {
    * indicator is shown or not.
    */
   readonly loading: boolean
+
+  readonly organizations: ReadonlyArray<IAPIOrganization>
+  readonly organizationsLoading: boolean
+  readonly selectedOrganization: string | null
+  readonly organizationError: Error | null
+  readonly onSelectedOrganizationChanged: (
+    organization: IAPIOrganization | null
+  ) => void
+  readonly onRefreshOrganization: () => void
 
   /**
    * The contents of the filter text box used to filter the list of
@@ -164,6 +174,22 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
       <DialogContent className="clone-github-repository-content">
         {this.props.accounts.length > 1 && (
           <Row className="account-picker-row">{this.renderAccountPicker()}</Row>
+        )}
+        <OrgFilterChips
+          organizations={this.props.organizations}
+          selectedOrganization={this.props.selectedOrganization}
+          loading={this.props.organizationsLoading}
+          onSelect={this.props.onSelectedOrganizationChanged}
+        />
+        {this.props.organizationError !== null && (
+          <div className="org-repositories-error" role="alert">
+            <span>
+              We couldn't load every repository for this organization.
+            </span>
+            <Button onClick={this.props.onRefreshOrganization}>
+              Try again
+            </Button>
+          </div>
         )}
         <Row>
           <CloneableRepositoryFilterList

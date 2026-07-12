@@ -8256,7 +8256,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     // in order to have the list of repositories ready for them when they
     // get to the blankslate.
     if (this.showWelcomeFlow && storedAccount !== null) {
-      this.apiRepositoriesStore.loadRepositories(storedAccount)
+      this.apiRepositoriesStore.loadAll(storedAccount)
     }
   }
 
@@ -8608,7 +8608,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
    * See ApiRepositoriesStore for more details.
    */
   public _refreshApiRepositories(account: Account) {
-    return this.apiRepositoriesStore.loadRepositories(account)
+    return this.apiRepositoriesStore.loadAll(account)
+  }
+
+  public _refreshApiOrganizationRepositories(
+    account: Account,
+    organization: IAPIOrganization
+  ) {
+    return this.apiRepositoriesStore.loadOrganizationRepositories(
+      account,
+      organization
+    )
   }
 
   public _changeBranchesTab(tab: BranchesTab): Promise<void> {

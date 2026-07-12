@@ -50,6 +50,20 @@ function assertNext(current: IPageInfo, expected: IPageInfo) {
 }
 
 describe('API', () => {
+  describe('fetchOrgRepositories', () => {
+    it('requests the encoded organization repository endpoint', async () => {
+      const api = new API('https://api.github.com', 'token')
+      let path = ''
+      Reflect.set(api, 'fetchAll', async (value: string) => {
+        path = value
+        return []
+      })
+
+      await api.fetchOrgRepositories('desktop material')
+      assert.equal(path, 'orgs/desktop%20material/repos')
+    })
+  })
+
   describe('getNextPagePathWithIncreasingPageSize', () => {
     it("returns null when there's no link header", () => {
       assert(getNextPagePathWithIncreasingPageSize(new Response()) === null)

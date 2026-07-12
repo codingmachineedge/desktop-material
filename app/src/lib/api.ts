@@ -1100,6 +1100,28 @@ export class API {
     }
   }
 
+  /**
+   * Fetch every repository visible to the authenticated user in an
+   * organization. Unlike the user repository stream this endpoint also
+   * includes organization repositories which aren't returned through one of
+   * the user's explicit affiliation buckets.
+   */
+  public async fetchOrgRepositories(
+    org: string
+  ): Promise<ReadonlyArray<IAPIRepository>> {
+    try {
+      return await this.fetchAll<IAPIRepository>(
+        `orgs/${encodeURIComponent(org)}/repos`
+      )
+    } catch (e) {
+      log.warn(
+        `fetchOrgRepositories: failed for ${org} with endpoint ${this.endpoint}`,
+        e
+      )
+      throw e
+    }
+  }
+
   /** Create a new GitHub repository with the given properties. */
   public async createRepository(
     org: IAPIOrganization | null,

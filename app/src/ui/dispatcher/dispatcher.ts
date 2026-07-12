@@ -2960,6 +2960,17 @@ export class Dispatcher {
     return this.appStore._refreshApiRepositories(account)
   }
 
+  /** Load every repository visible in one of the account's organizations. */
+  public refreshApiOrganizationRepositories(
+    account: Account,
+    organization: IAPIOrganization
+  ) {
+    return this.appStore._refreshApiOrganizationRepositories(
+      account,
+      organization
+    )
+  }
+
   /** Change the selected Branches foldout tab. */
   public changeBranchesTab(tab: BranchesTab): Promise<void> {
     return this.appStore._changeBranchesTab(tab)
