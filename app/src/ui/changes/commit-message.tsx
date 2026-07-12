@@ -1627,7 +1627,12 @@ export class CommitMessage extends React.Component<
       >
         <>
           {loading}
-          {commitButton}
+          {/* Keep the label (text + branch <strong>) in a single inline span so
+              it truncates with an ellipsis when the branch name is long, and so
+              the button's flex `gap` doesn't render as an extra space before the
+              bold branch. The `action` string itself stays one text node to
+              preserve the screen-reader spacing noted in getCommittingButtonText. */}
+          <span className="commit-button-label">{commitButton}</span>
         </>
       </Button>
     )

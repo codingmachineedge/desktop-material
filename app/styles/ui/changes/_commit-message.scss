@@ -445,7 +445,7 @@
     }
 
     textarea {
-      padding: 10px 12px;
+      padding: 8px 12px;
       background: transparent;
       color: var(--md-sys-color-on-surface);
       font-size: 13px;
@@ -590,9 +590,24 @@
     }
 
     .octicon {
+      // Keep the leading glyph/spinner at its intrinsic size so only the label
+      // truncates (this MD3 button is a centered flex row, so the upstream
+      // `@include ellipsis` on the button itself no longer truncates).
+      flex: none;
       height: 18px;
       margin-right: 0;
       margin-bottom: 0;
+    }
+
+    // Inner label span: truncates a long "Commit N files to <branch>" with an
+    // ellipsis instead of clipping on both ends. Wrapping the text + branch
+    // <strong> in one inline span also collapses the flex `gap` that otherwise
+    // rendered as an extra space in front of the bold branch name.
+    .commit-button-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     // Committing spinner.
@@ -602,18 +617,23 @@
   }
 }
 
-// MD3 composer compactness: the prototype's description is a two-row field
-// (spec §7 — `<textarea rows="2">` with no min-height). The commit composer now
-// passes `rows={2}`, so we drop the upstream min-height floors (100px collapsed
-// / 80px with an action bar) and let the row count drive the collapsed height.
-// The textarea still scrolls when its content overflows two rows, which keeps
-// the `.with-overflow` scroll-fade behaviour intact.
-.commit-message-component {
-  .description-focus-container textarea {
+// MD3 composer compactness (spec §7). The prototype's description is a compact
+// two-row field. Upstream floored the textarea at 100px (base) / 80px (with an
+// action bar); merely zeroing those floors and leaning on the `rows="2"`
+// attribute is fragile — any stray min-height silently overrides `rows`, which is
+// how the built composer ended up ~150px tall and eating the vertical space that
+// should go to the changed-files list. So instead of a floor we pin the collapsed
+// height deterministically to two rows (8px block padding + 2×~19.5px line boxes
+// ≈ 56px, box-sizing: border-box). An EMPTY description is now a tidy ~2-row box;
+// typing past two rows scrolls the textarea, so the `.with-overflow` scroll-fade
+// still works. Covers both selectors for the textarea (`.description-field` is the
+// autocompletion wrapper, `.description-focus-container` the focus wrapper) and
+// both the base and always-present `with-action-bar` states.
+.commit-message-component,
+.commit-message-component.with-action-bar {
+  .description-focus-container textarea,
+  .description-field textarea {
     min-height: 0;
-  }
-
-  &.with-action-bar .description-field textarea {
-    min-height: 0;
+    height: 56px;
   }
 }
