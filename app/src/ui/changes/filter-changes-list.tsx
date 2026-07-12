@@ -61,7 +61,7 @@ import { AugmentedSectionFilterList } from '../lib/augmented-filter-list'
 import { IFilterListGroup, IFilterListItem } from '../lib/filter-list'
 import { ClickSource } from '../lib/list'
 import memoizeOne from 'memoize-one'
-import { IMatches } from '../../lib/fuzzy-find'
+import { FilterMode, IMatches } from '../../lib/fuzzy-find'
 import { TextBox } from '../lib/text-box'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
@@ -72,7 +72,16 @@ import {
   hasActiveFilters,
   applyFilters,
 } from './filter-changes-logic'
-import { ChangesListFilterOptions } from './changes-list-filter-options'
+import {
+  ChangesFilterButton,
+  ChangesFilterChipRow,
+} from './changes-list-filter-options'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import { RegexBuilder } from '../lib/regex-builder/regex-builder'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
 
@@ -255,7 +264,22 @@ interface IFilterChangesListState {
   readonly selectedItems: ReadonlyArray<IChangesListItem>
   readonly focusedRow: string | null
   readonly groups: ReadonlyArray<IFilterListGroup<IChangesListItem>>
+
+  /** The text-matching mode driving the search field (fuzzy/substring/regex). */
+  readonly filterMode: FilterMode
+
+  /** Whether text matching is case sensitive (substring/regex only). */
+  readonly caseSensitive: boolean
+
+  /** Whether the inline MD3 filter chip row (§6.3) is shown. */
+  readonly showFilterChips: boolean
+
+  /** Whether the regex builder dialog is open. */
+  readonly isRegexBuilderOpen: boolean
 }
+
+/** Persistence key for the Changes filter's mode + regex-builder target label. */
+const ChangesFilterListId = 'changes'
 
 function getSelectedItemsFromProps(
   props: IFilterChangesListProps
@@ -303,7 +327,6 @@ export class FilterChangesList extends React.Component<
 > {
   private filterTextBox: TextBox | undefined = undefined
   private headerRef = createObservableRef<HTMLDivElement>()
-  private filterOptionsButtonRef: HTMLButtonElement | null = null
   private includeAllCheckBoxRef = React.createRef<Checkbox>()
   private filterListRef =
     React.createRef<AugmentedSectionFilterList<IChangesListItem>>()
@@ -367,6 +390,10 @@ export class FilterChangesList extends React.Component<
       selectedItems: getSelectedItemsFromProps(props),
       focusedRow: null,
       groups,
+      filterMode: readPersistedFilterMode(ChangesFilterListId),
+      caseSensitive: false,
+      showFilterChips: false,
+      isRegexBuilderOpen: false,
     }
   }
 
@@ -1151,7 +1178,7 @@ export class FilterChangesList extends React.Component<
 
   public focus() {
     if (this.props.showChangesFilter) {
-      this.filterOptionsButtonRef?.focus()
+      this.filterTextBox?.focus()
       return
     }
 
@@ -1237,8 +1264,8 @@ export class FilterChangesList extends React.Component<
    * secondary-container count chip carrying the number of changed files.
    * Rendered via the filter list's `renderPreList` hook so it sits above the
    * search field. The filter affordance is intentionally not duplicated here —
-   * the existing tune control (`ChangesListFilterOptions`) already lives in the
-   * search row and remains the single filter toggle (§6.1 note).
+   * the tune control (`ChangesFilterButton`) lives in the search row and
+   * toggles the inline filter chip row (§6.3) below it.
    */
   private renderPanelHeader = () => {
     const fileCount = this.props.workingDirectory.files.length
@@ -1263,6 +1290,7 @@ export class FilterChangesList extends React.Component<
         ref={this.headerRef}
       >
         {this.renderFilterBox()}
+        {this.renderFilterChips()}
         {this.renderCheckBoxRow()}
       </div>
     )
@@ -1310,19 +1338,6 @@ export class FilterChangesList extends React.Component<
 
     return (
       <div className="filter-box-container">
-        <span>
-          <ChangesListFilterOptions
-            fileListFilter={this.props.fileListFilter}
-            filteredItems={this.state.filteredItems}
-            onFilterToIncludedInCommit={this.onFilterToIncludedInCommit}
-            onFilterExcludedFiles={this.onFilterExcludedFiles}
-            onFilterDeletedFiles={this.onFilterDeletedFiles}
-            onFilterModifiedFiles={this.onFilterModifiedFiles}
-            onFilterNewFiles={this.onFilterNewFiles}
-            onClearAllFilters={this.onClearAllFilters}
-            workingDirectory={this.props.workingDirectory}
-          />
-        </span>
         <TextBox
           ref={this.onTextBoxRef}
           displayClearButton={true}
@@ -1332,8 +1347,98 @@ export class FilterChangesList extends React.Component<
           onKeyDown={this.onFilterKeyDown}
           value={this.props.fileListFilter.filterText}
         />
+        <FilterModeControl
+          mode={this.state.filterMode}
+          caseSensitive={this.state.caseSensitive}
+          onModeChange={this.onFilterModeChange}
+          onCaseSensitiveChange={this.onCaseSensitiveChange}
+          regexBuilderTarget="Changes"
+          getSampleItems={this.getFilterSampleItems}
+          filterText={this.props.fileListFilter.filterText}
+          onRegexPatternApply={this.onApplyRegexPattern}
+          showRegexBuilder={false}
+        />
+        <ChangesFilterButton
+          fileListFilter={this.props.fileListFilter}
+          isOpen={this.state.showFilterChips}
+          onToggle={this.onToggleFilterChips}
+        />
       </div>
     )
+  }
+
+  private renderFilterChips = () => {
+    if (!this.props.showChangesFilter || !this.state.showFilterChips) {
+      return null
+    }
+
+    return (
+      <ChangesFilterChipRow
+        fileListFilter={this.props.fileListFilter}
+        filteredItems={this.state.filteredItems}
+        workingDirectory={this.props.workingDirectory}
+        onFilterToIncludedInCommit={this.onFilterToIncludedInCommit}
+        onFilterExcludedFiles={this.onFilterExcludedFiles}
+        onFilterDeletedFiles={this.onFilterDeletedFiles}
+        onFilterModifiedFiles={this.onFilterModifiedFiles}
+        onFilterNewFiles={this.onFilterNewFiles}
+        onOpenRegexBuilder={this.onOpenRegexBuilder}
+      />
+    )
+  }
+
+  private renderRegexBuilder = () => {
+    if (!this.state.isRegexBuilderOpen) {
+      return null
+    }
+
+    return (
+      <RegexBuilder
+        targetLabel="Changes"
+        initialPattern={this.props.fileListFilter.filterText}
+        sampleItems={this.getFilterSampleItems()}
+        onApply={this.onApplyRegexPattern}
+        onDismissed={this.onCloseRegexBuilder}
+      />
+    )
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> => {
+    const items = new Array<string>()
+    for (const item of this.state.filteredItems.values()) {
+      items.push(item.change.path)
+      if (items.length >= 50) {
+        break
+      }
+    }
+    return items
+  }
+
+  private onToggleFilterChips = () => {
+    this.setState(prev => ({ showFilterChips: !prev.showFilterChips }))
+  }
+
+  private onFilterModeChange = (filterMode: FilterMode) => {
+    persistFilterMode(ChangesFilterListId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onCaseSensitiveChange = (caseSensitive: boolean) => {
+    this.setState({ caseSensitive })
+  }
+
+  private onOpenRegexBuilder = () => {
+    this.setState({ isRegexBuilderOpen: true })
+  }
+
+  private onCloseRegexBuilder = () => {
+    this.setState({ isRegexBuilderOpen: false })
+  }
+
+  private onApplyRegexPattern = (pattern: string) => {
+    persistFilterMode(ChangesFilterListId, FilterMode.Regex)
+    this.setState({ filterMode: FilterMode.Regex, isRegexBuilderOpen: false })
+    this.onFilterTextChanged(pattern)
   }
 
   private applyFilters = (item: IChangesListItem) => {
@@ -1364,6 +1469,8 @@ export class FilterChangesList extends React.Component<
                 ? this.props.fileListFilter.filterText
                 : ''
             }
+            filterMode={this.state.filterMode}
+            caseSensitive={this.state.caseSensitive}
             filterTextBox={this.filterTextBox}
             onFilterListResultsChanged={this.onFilterListResultsChanged}
             selectedItems={this.state.selectedItems}
@@ -1408,6 +1515,7 @@ export class FilterChangesList extends React.Component<
             )}
           />
         </div>
+        {this.renderRegexBuilder()}
         {this.renderStashedChanges()}
         {this.renderHiddenChangesWarning()}
         {this.renderCommitMessageForm()}

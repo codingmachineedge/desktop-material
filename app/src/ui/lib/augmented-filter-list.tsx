@@ -246,6 +246,19 @@ interface IAugmentedSectionFilterListProps<T extends IFilterListItem> {
   readonly filterListId?: string
 
   /**
+   * Controlled filter mode. When provided the list uses this mode for text
+   * matching instead of its internal state. Used by surfaces that render their
+   * own {@link FilterModeControl} outside the standard filter row (e.g. the
+   * Changes filter, via `renderCustomFilterRow`).
+   */
+  // eslint-disable-next-line react/no-unused-prop-types
+  readonly filterMode?: FilterMode
+
+  /** Controlled case sensitivity, paired with {@link filterMode}. */
+  // eslint-disable-next-line react/no-unused-prop-types
+  readonly caseSensitive?: boolean
+
+  /**
    * Optional toggleable predicate filters rendered as chips below the search
    * field.
    */
@@ -943,14 +956,22 @@ function getFilterSettings<T extends IFilterListItem>(
   props: IAugmentedSectionFilterListProps<T>,
   state: IAugmentedSectionFilterListState<T> | null
 ): IFilterModeSettings {
-  if (state === null) {
-    return initialFilterModeSettings(props.filterListId)
-  }
+  const base =
+    state === null
+      ? initialFilterModeSettings(props.filterListId)
+      : {
+          filterMode: state.filterMode,
+          caseSensitive: state.caseSensitive,
+          activeFilterIds: state.activeFilterIds,
+        }
 
+  // When the consumer drives the mode (controlled props), it wins over the
+  // internal state so the list matches against the mode shown in the
+  // consumer-rendered FilterModeControl.
   return {
-    filterMode: state.filterMode,
-    caseSensitive: state.caseSensitive,
-    activeFilterIds: state.activeFilterIds,
+    ...base,
+    filterMode: props.filterMode ?? base.filterMode,
+    caseSensitive: props.caseSensitive ?? base.caseSensitive,
   }
 }
 

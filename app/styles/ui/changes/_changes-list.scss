@@ -516,6 +516,90 @@
     }
   }
 
+  // Inline MD3 filter chip row (§6.3) — shown below the search field when the
+  // tune button is toggled. Tonal-selectable predicate chips (leading check
+  // when active) + a trailing primary-container "Regex builder" chip.
+  .changes-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    animation: dmUp 340ms var(--spring) backwards;
+
+    .changes-filter-chip,
+    .changes-regex-builder-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 30px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: background-color 220ms var(--emph), color 220ms var(--emph),
+        transform 200ms var(--spring-fast);
+
+      &:active {
+        transform: scale(0.92);
+      }
+    }
+
+    // Predicate chips — neutral until toggled, then tonal-selected.
+    .changes-filter-chip {
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+
+      &:hover {
+        background: color-mix(
+          in srgb,
+          var(--md-sys-color-surface-container-high) 82%,
+          var(--md-sys-color-on-surface)
+        );
+      }
+
+      &.active {
+        background: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+      }
+
+      .chip-check {
+        width: 14px;
+        height: 14px;
+        animation: dmPop 300ms var(--spring-fast) backwards;
+      }
+
+      .chip-count {
+        opacity: 0.7;
+        font-weight: 600;
+      }
+    }
+
+    // Trailing regex-builder launcher chip.
+    .changes-regex-builder-chip {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+
+      &:hover {
+        background: color-mix(
+          in srgb,
+          var(--md-sys-color-primary-container) 82%,
+          var(--md-sys-color-on-primary-container)
+        );
+      }
+
+      .chip-glyph {
+        font-family: var(--font-family-monospace, monospace);
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+      }
+    }
+  }
+
   // "N changed files" checkbox row (§6.4).
   .changes-list-check-all {
     label {

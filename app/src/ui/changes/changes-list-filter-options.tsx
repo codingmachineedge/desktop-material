@@ -1,24 +1,67 @@
 import * as React from 'react'
-import {
-  Popover,
-  PopoverAnchorPosition,
-  PopoverDecoration,
-} from '../lib/popover'
-import {
-  countActiveFilterOptions,
-  hasActiveFilters,
-} from './filter-changes-logic'
+import { countActiveFilterOptions } from './filter-changes-logic'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { IFileListFilterState } from '../../lib/app-state'
-import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import memoizeOne from 'memoize-one'
 import { Button } from '../lib/button'
 import classNames from 'classnames'
 import { IChangesListItem } from './filter-changes-list'
 import { WorkingDirectoryStatus } from '../../models/status'
 
-interface IChangesListFilterOptionsProps {
+interface IChangesFilterButtonProps {
+  /** The current file-list filter state (drives the active-count badge). */
+  readonly fileListFilter: IFileListFilterState
+
+  /** Whether the inline filter chip row is currently shown. */
+  readonly isOpen: boolean
+
+  /** Toggles the inline filter chip row. */
+  readonly onToggle: () => void
+}
+
+/**
+ * The "tune" toggle button that lives in the Changes search row (§6.2). Unlike
+ * the historical implementation it no longer opens a checkbox popover — it
+ * toggles the inline MD3 filter chip row rendered below the search field
+ * (§6.3).
+ */
+export class ChangesFilterButton extends React.Component<IChangesFilterButtonProps> {
+  public render() {
+    const activeFiltersCount = countActiveFilterOptions(
+      this.props.fileListFilter
+    )
+    const hasActiveFilters = activeFiltersCount > 0
+    const buttonTextLabel = `Filter Options ${
+      hasActiveFilters ? `(${activeFiltersCount} applied)` : ''
+    }`
+
+    return (
+      <Button
+        className={classNames('filter-button', {
+          active: hasActiveFilters || this.props.isOpen,
+        })}
+        onClick={this.props.onToggle}
+        ariaExpanded={this.props.isOpen}
+        tooltip={buttonTextLabel}
+        ariaLabel={buttonTextLabel}
+      >
+        <span>
+          <Octicon symbol={octicons.filter} />
+        </span>
+        {hasActiveFilters ? (
+          <span className="active-badge">
+            <div className="badge-bg">
+              <div className="badge"></div>
+            </div>
+          </span>
+        ) : null}
+      </Button>
+    )
+  }
+}
+
+interface IChangesFilterChipRowProps {
   readonly fileListFilter: IFileListFilterState
   readonly filteredItems: Map<string, IChangesListItem>
   readonly workingDirectory: WorkingDirectoryStatus
@@ -27,23 +70,27 @@ interface IChangesListFilterOptionsProps {
   readonly onFilterDeletedFiles: () => void
   readonly onFilterModifiedFiles: () => void
   readonly onFilterNewFiles: () => void
-  readonly onClearAllFilters: () => void
+
+  /** Opens the full regex builder dialog (§6.3 trailing chip). */
+  readonly onOpenRegexBuilder: () => void
 }
 
-interface IChangesListFilterOptionsState {
-  readonly isFilterOptionsOpen: boolean
+interface IFilterChipConfig {
+  readonly id: string
+  readonly label: string
+  readonly count: number
+  readonly on: boolean
+  readonly onToggle: () => void
 }
 
 /**
- * Component to render filter options for the changes list.
- *
- * Allows users to filter files based on their status (new, modified, deleted, etc.)
- * and includes a button to clear all filters.
+ * The inline MD3 filter chip row shown under the Changes search field when the
+ * tune button is toggled (design-spec-shell §6.3). Each predicate is rendered
+ * as a tonal-selectable chip carrying a leading check when active, followed by
+ * a "Regex builder" chip that launches the full regex builder. The predicates
+ * are identical to the previous checkbox popover.
  */
-export class ChangesListFilterOptions extends React.Component<
-  IChangesListFilterOptionsProps,
-  IChangesListFilterOptionsState
-> {
+export class ChangesFilterChipRow extends React.Component<IChangesFilterChipRowProps> {
   private getFilterCounts = memoizeOne(
     (
       wd: WorkingDirectoryStatus,
@@ -82,187 +129,84 @@ export class ChangesListFilterOptions extends React.Component<
     }
   )
 
-  private filterOptionsButtonRef: HTMLButtonElement | null = null
-
-  public constructor(props: IChangesListFilterOptionsProps) {
-    super(props)
-
-    this.state = {
-      isFilterOptionsOpen: false,
-    }
+  private renderChip(chip: IFilterChipConfig) {
+    return (
+      <button
+        key={chip.id}
+        className={classNames('changes-filter-chip', { active: chip.on })}
+        aria-pressed={chip.on}
+        onClick={chip.onToggle}
+      >
+        {chip.on && <Octicon className="chip-check" symbol={octicons.check} />}
+        <span className="chip-label">{chip.label}</span>
+        <span className="chip-count">{chip.count}</span>
+      </button>
+    )
   }
 
-  private closeFilterOptions = () => {
-    this.setState({ isFilterOptionsOpen: false })
-  }
-
-  private onFilterToIncludedInCommit = () => {
-    this.props.onFilterToIncludedInCommit()
-    this.closeFilterOptions()
-  }
-
-  private onFilterExcludedFiles = () => {
-    this.props.onFilterExcludedFiles()
-    this.closeFilterOptions()
-  }
-
-  private onFilterDeletedFiles = () => {
-    this.props.onFilterDeletedFiles()
-    this.closeFilterOptions()
-  }
-
-  private onFilterModifiedFiles = () => {
-    this.props.onFilterModifiedFiles()
-    this.closeFilterOptions()
-  }
-
-  private onFilterNewFiles = () => {
-    this.props.onFilterNewFiles()
-    this.closeFilterOptions()
-  }
-
-  private onClearAllFilters = () => {
-    this.props.onClearAllFilters()
-    this.closeFilterOptions()
-  }
-
-  // Opens the filter options popover, or closes it if it's already open.
-  private toggleFilterOptionsOpen = () => {
-    this.setState(prevState => ({
-      isFilterOptionsOpen: !prevState.isFilterOptionsOpen,
-    }))
-  }
-
-  private renderFilterOptions() {
-    // Check if any filters are active
-    const filtersActive = hasActiveFilters(this.props.fileListFilter)
-
+  public render() {
+    const { fileListFilter: filter } = this.props
     const {
       newFilesCount,
       modifiedFilesCount,
       deletedFilesCount,
-      excludedFilesCount,
       includedFilesCount,
+      excludedFilesCount,
     } = this.getFilterCounts(
       this.props.workingDirectory,
       this.props.filteredItems
     )
 
-    return (
-      <Popover
-        className="filter-popover"
-        ariaLabelledby="filter-options-header"
-        anchor={this.filterOptionsButtonRef}
-        anchorPosition={PopoverAnchorPosition.BottomRight}
-        decoration={PopoverDecoration.Balloon}
-        onMousedownOutside={this.closeFilterOptions}
-        onClickOutside={this.closeFilterOptions}
-      >
-        <div className="filter-popover-header">
-          <h3 id="filter-options-header">Filter Options</h3>
-          <button
-            className="close"
-            onClick={this.closeFilterOptions}
-            aria-label="Close"
-          >
-            <Octicon symbol={octicons.x} />
-          </button>
-        </div>
-        <div className="filter-options">
-          <Checkbox
-            value={
-              this.props.fileListFilter.isIncludedInCommit
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onFilterToIncludedInCommit}
-            label={`Included in commit (${includedFilesCount})`}
-          />
-          <Checkbox
-            value={
-              this.props.fileListFilter.isExcludedFromCommit
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onFilterExcludedFiles}
-            label={`Excluded from commit (${excludedFilesCount})`}
-          />
-          <Checkbox
-            value={
-              this.props.fileListFilter.isNewFile
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onFilterNewFiles}
-            label={`New files (${newFilesCount})`}
-          />
-          <Checkbox
-            value={
-              this.props.fileListFilter.isModifiedFile
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onFilterModifiedFiles}
-            label={`Modified files (${modifiedFilesCount})`}
-          />
-          <Checkbox
-            value={
-              this.props.fileListFilter.isDeletedFile
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onFilterDeletedFiles}
-            label={`Deleted files (${deletedFilesCount})`}
-          />
-        </div>
-        {filtersActive && (
-          <div className="filter-options-footer">
-            <Button onClick={this.onClearAllFilters}>Clear filters</Button>
-          </div>
-        )}
-      </Popover>
-    )
-  }
-
-  private onFilterOptionsButtonRef = (buttonRef: HTMLButtonElement | null) => {
-    this.filterOptionsButtonRef = buttonRef
-  }
-
-  public render() {
-    const activeFiltersCount = countActiveFilterOptions(
-      this.props.fileListFilter
-    )
-    const hasActiveFilters = activeFiltersCount > 0
-    const buttonTextLabel = `Filter Options ${
-      hasActiveFilters ? `(${activeFiltersCount} applied)` : ''
-    }`
+    const chips: ReadonlyArray<IFilterChipConfig> = [
+      {
+        id: 'new',
+        label: 'New',
+        count: newFilesCount,
+        on: filter.isNewFile,
+        onToggle: this.props.onFilterNewFiles,
+      },
+      {
+        id: 'modified',
+        label: 'Modified',
+        count: modifiedFilesCount,
+        on: filter.isModifiedFile,
+        onToggle: this.props.onFilterModifiedFiles,
+      },
+      {
+        id: 'deleted',
+        label: 'Deleted',
+        count: deletedFilesCount,
+        on: filter.isDeletedFile,
+        onToggle: this.props.onFilterDeletedFiles,
+      },
+      {
+        id: 'included',
+        label: 'Included in commit',
+        count: includedFilesCount,
+        on: filter.isIncludedInCommit,
+        onToggle: this.props.onFilterToIncludedInCommit,
+      },
+      {
+        id: 'excluded',
+        label: 'Excluded',
+        count: excludedFilesCount,
+        on: filter.isExcludedFromCommit,
+        onToggle: this.props.onFilterExcludedFiles,
+      },
+    ]
 
     return (
-      <>
-        <Button
-          className={classNames('filter-button', {
-            active: hasActiveFilters,
-          })}
-          onClick={this.toggleFilterOptionsOpen}
-          ariaExpanded={this.state.isFilterOptionsOpen}
-          onButtonRef={this.onFilterOptionsButtonRef}
-          tooltip={buttonTextLabel}
-          ariaLabel={buttonTextLabel}
+      <div className="changes-filter-chips" role="group" aria-label="Filters">
+        {chips.map(chip => this.renderChip(chip))}
+        <button
+          className="changes-regex-builder-chip"
+          aria-label="Open regex builder"
+          onClick={this.props.onOpenRegexBuilder}
         >
-          <span>
-            <Octicon symbol={octicons.filter} />
-          </span>
-          {hasActiveFilters ? (
-            <span className="active-badge">
-              <div className="badge-bg">
-                <div className="badge"></div>
-              </div>
-            </span>
-          ) : null}
-          <Octicon symbol={octicons.triangleDown} />
-        </Button>
-        {this.state.isFilterOptionsOpen && this.renderFilterOptions()}
-      </>
+          <span className="chip-glyph">.*</span>
+          <span className="chip-label">Regex builder</span>
+        </button>
+      </div>
     )
   }
 }
