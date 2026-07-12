@@ -1,6 +1,11 @@
 import { IDataStore, ISecureStore } from './stores'
 import { getKeyForAccount } from '../auth'
-import { Account, getAccountKey, isDotComAccount } from '../../models/account'
+import {
+  Account,
+  AccountProvider,
+  getAccountKey,
+  isDotComAccount,
+} from '../../models/account'
 import { fetchUser, EmailVisibility, getEnterpriseAPIURL } from '../api'
 import { fatalError } from '../fatal-error'
 import { TypedBaseStore } from './base-store'
@@ -60,6 +65,7 @@ interface IAccount {
   readonly id: number
   readonly name: string
   readonly plan?: string
+  readonly provider?: AccountProvider
 }
 
 /** The store for logged in accounts. */
@@ -225,7 +231,12 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
         account.avatarURL,
         account.id,
         account.name,
-        account.plan
+        account.plan,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        account.provider ?? 'github'
       )
 
       const key = getKeyForAccount(accountWithoutToken)
@@ -265,5 +276,5 @@ async function updatedAccount(account: Account): Promise<Account> {
     )
   }
 
-  return fetchUser(account.endpoint, account.token)
+  return fetchUser(account.endpoint, account.token, account.provider)
 }

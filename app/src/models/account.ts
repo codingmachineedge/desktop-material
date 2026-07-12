@@ -1,5 +1,7 @@
 import { getDotComAPIEndpoint, getHTMLURL, IAPIEmail } from '../lib/api'
 
+export type AccountProvider = 'github' | 'gitlab' | 'bitbucket'
+
 /**
  * Returns a value indicating whether two account instances
  * can be considered equal. Equality is determined by comparing
@@ -65,7 +67,8 @@ export class Account {
     public readonly copilotEndpoint?: string,
     public readonly isCopilotDesktopEnabled?: boolean,
     public readonly features?: ReadonlyArray<string>,
-    public readonly copilotLicenseType?: string
+    public readonly copilotLicenseType?: string,
+    public readonly provider: AccountProvider = 'github'
   ) {}
 
   public withToken(token: string): Account {
@@ -81,7 +84,8 @@ export class Account {
       this.copilotEndpoint,
       this.isCopilotDesktopEnabled,
       this.features,
-      this.copilotLicenseType
+      this.copilotLicenseType,
+      this.provider
     )
   }
 
@@ -103,9 +107,15 @@ export class Account {
    * hostname without the protocol and/or path.
    */
   public get friendlyEndpoint(): string {
+    const prefix =
+      this.provider === 'github'
+        ? ''
+        : this.provider === 'gitlab'
+        ? 'GitLab · '
+        : 'Bitbucket · '
     return (this._friendlyEndpoint ??= isDotComAccount(this)
       ? 'GitHub.com'
-      : new URL(getHTMLURL(this.endpoint)).hostname)
+      : prefix + new URL(getHTMLURL(this.endpoint)).hostname)
   }
 }
 
@@ -114,11 +124,17 @@ export class Account {
  * a GitHub Enteprise account.
  */
 export const isDotComAccount = (account: Account) =>
-  account.endpoint === getDotComAPIEndpoint()
+  account.provider === 'github' && account.endpoint === getDotComAPIEndpoint()
 
 /**
  * Whether or not the given account is a GitHub Enterprise account (as opposed to
  * a GitHub.com account)
  */
 export const isEnterpriseAccount = (account: Account) =>
-  !isDotComAccount(account)
+  account.provider === 'github' && !isDotComAccount(account)
+
+export const isGitLabAccount = (account: Account) =>
+  account.provider === 'gitlab'
+
+export const isBitbucketAccount = (account: Account) =>
+  account.provider === 'bitbucket'
