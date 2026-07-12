@@ -244,6 +244,7 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
     'open-working-directory',
     'show-repository-settings',
     'manage-gitignore',
+    'build-and-run',
     'go-to-commit-message',
     'show-changes',
     'show-history',

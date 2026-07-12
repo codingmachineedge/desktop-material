@@ -6,6 +6,10 @@ import {
   WorkflowPreferences,
   ForkContributionTarget,
 } from './workflow-preferences'
+import {
+  IBuildRunPreferences,
+  defaultBuildRunPreferences,
+} from './build-run-preferences'
 import { assertNever, fatalError } from '../lib/fatal-error'
 import { createEqualityHash } from './equality-hash'
 
@@ -61,7 +65,12 @@ export class Repository {
      * Null preserves the legacy endpoint-based lookup for repositories that
      * have not been assigned since multi-account support was introduced.
      */
-    public readonly accountKey: string | null = null
+    public readonly accountKey: string | null = null,
+    /**
+     * Per-repository Build & Run preferences. Defaults are applied for
+     * repositories added before this property was introduced.
+     */
+    public readonly buildRunPreferences: IBuildRunPreferences = defaultBuildRunPreferences
   ) {
     this.name = (gitHubRepository && gitHubRepository.name) || getBaseName(path)
 
@@ -73,7 +82,11 @@ export class Repository {
       this.alias,
       this.workflowPreferences.forkContributionTarget,
       this.isTutorialRepository,
-      this.accountKey
+      this.accountKey,
+      this.buildRunPreferences.defaultProfileId,
+      this.buildRunPreferences.elevated,
+      this.buildRunPreferences.autoRunAfterBuild,
+      this.buildRunPreferences.autoIgnoreBuildOutputs
     )
   }
 

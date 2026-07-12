@@ -27,6 +27,7 @@ export type MenuEvent =
   | 'rebase-branch'
   | 'show-repository-settings'
   | 'manage-gitignore'
+  | 'build-and-run'
   | 'open-in-shell'
   | 'compare-on-github'
   | 'branch-on-github'

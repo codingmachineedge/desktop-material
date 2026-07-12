@@ -25,6 +25,7 @@ import {
 } from '../api'
 import { TypedBaseStore } from './base-store'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
+import { IBuildRunPreferences } from '../../models/build-run-preferences'
 import { clearTagsToPush } from './helpers/tags-to-push-storage'
 import { IMatchedGitHubRepository } from '../repository-matching'
 import { shallowEquals } from '../equality'
@@ -154,7 +155,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.workflowPreferences,
       repo.isTutorialRepository,
       repo.gitDir,
-      repo.accountKey ?? null
+      repo.accountKey ?? null,
+      repo.buildRunPreferences
     )
   }
 
@@ -295,7 +297,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.workflowPreferences,
       repository.isTutorialRepository,
       repository.gitDir,
-      repository.accountKey
+      repository.accountKey,
+      repository.buildRunPreferences
     )
   }
 
@@ -317,7 +320,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.workflowPreferences,
       repository.isTutorialRepository,
       gitDir,
-      repository.accountKey
+      repository.accountKey,
+      repository.buildRunPreferences
     )
   }
 
@@ -352,6 +356,21 @@ export class RepositoriesStore extends TypedBaseStore<
   }
 
   /**
+   * Update the Build & Run preferences for the specified repository.
+   *
+   * @param repository            The repository to update.
+   * @param buildRunPreferences   The object with the Build & Run settings.
+   */
+  public async updateRepositoryBuildRunPreferences(
+    repository: Repository,
+    buildRunPreferences: IBuildRunPreferences
+  ): Promise<void> {
+    await this.db.repositories.update(repository.id, { buildRunPreferences })
+
+    this.emitUpdatedRepositories()
+  }
+
+  /**
    * Select the authenticated account used for this repository.
    *
    * Passing null restores legacy endpoint-based selection. The stable key is
@@ -375,7 +394,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.workflowPreferences,
       repository.isTutorialRepository,
       repository.gitDir,
-      accountKey
+      accountKey,
+      repository.buildRunPreferences
     )
   }
 
@@ -403,7 +423,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repository.workflowPreferences,
       repository.isTutorialRepository,
       gitDir,
-      repository.accountKey
+      repository.accountKey,
+      repository.buildRunPreferences
     )
   }
 
@@ -451,7 +472,8 @@ export class RepositoriesStore extends TypedBaseStore<
         repository.workflowPreferences,
         repository.isTutorialRepository,
         gitDir,
-        repository.accountKey
+        repository.accountKey,
+        repository.buildRunPreferences
       ),
       existingRepository: false,
     }
@@ -601,7 +623,8 @@ export class RepositoriesStore extends TypedBaseStore<
       repo.workflowPreferences,
       repo.isTutorialRepository,
       repo.gitDir,
-      repo.accountKey
+      repo.accountKey,
+      repo.buildRunPreferences
     )
 
     assertIsRepositoryWithGitHubRepository(updatedRepo)

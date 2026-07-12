@@ -53,6 +53,7 @@ import { ILaunchStats, StatsStore } from '../../lib/stats'
 import { AppStore } from '../../lib/stores/app-store'
 import { ProfileStore } from '../../lib/stores/profile-store'
 import { RepositoryTabsStore } from '../../lib/stores/repository-tabs-store'
+import { BuildRunStore } from '../../lib/stores/build-run-store'
 import type {
   CopilotFeature,
   CopilotModelSelections,
@@ -112,6 +113,22 @@ import { MergeTreeResult } from '../../models/merge'
 import { UncommittedChangesStrategy } from '../../models/uncommitted-changes-strategy'
 import { IStashEntry } from '../../models/stash-entry'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
+import {
+  IBuildRunPreferences,
+  defaultBuildRunPreferences,
+} from '../../models/build-run-preferences'
+import {
+  IBuildProfile,
+  IBuildRunPlan,
+  IBuildRunStage,
+  ICommand,
+  detectProfiles,
+  probeRepository,
+  resolveRunEnv,
+  buildIgnoreText,
+} from '../../lib/build-run'
+import { readGitIgnoreAtRoot } from '../../lib/git/gitignore'
+import { startBuildRun, cancelBuildRun } from '../main-process-proxy'
 import { resolveWithin } from '../../lib/path'
 import { CherryPickResult } from '../../lib/git/cherry-pick'
 import { sleep } from '../../lib/promise'
@@ -132,7 +149,8 @@ import { UnreachableCommitsTab } from '../history/unreachable-commits-dialog'
 import { sendNonFatalException } from '../../lib/helpers/non-fatal-exception'
 import { SignInResult } from '../../lib/stores/sign-in-store'
 import { ICustomIntegration } from '../../lib/custom-integration'
-import { isAbsolute } from 'path'
+import { isAbsolute, join } from 'path'
+import { randomUUID } from 'crypto'
 import { CLIAction } from '../../lib/cli-action'
 import { BypassReasonType } from '../secret-scanning/bypass-push-protection-dialog'
 import {
@@ -154,6 +172,35 @@ export type ErrorHandler = (
 ) => Promise<Error | null>
 
 /**
+ * Tokenise a user-provided Build & Run command-line override into an argv
+ * {@link ICommand}, honouring single/double quotes. Returns `null` for a blank
+ * override so the detected command is used. The result is always an explicit
+ * argv array — it is never passed to a shell (`spawn(exe, args, shell:false)`).
+ */
+function parseOverrideCommand(override: string | undefined): ICommand | null {
+  if (override === undefined) {
+    return null
+  }
+  const trimmed = override.trim()
+  if (trimmed.length === 0) {
+    return null
+  }
+
+  const tokens: string[] = []
+  const matcher = /"([^"]*)"|'([^']*)'|(\S+)/g
+  let match: RegExpExecArray | null
+  while ((match = matcher.exec(trimmed)) !== null) {
+    tokens.push(match[1] ?? match[2] ?? match[3])
+  }
+  if (tokens.length === 0) {
+    return null
+  }
+
+  const [exe, ...args] = tokens
+  return { exe, args, label: trimmed }
+}
+
+/**
  * The Dispatcher acts as the hub for state. The StateHub if you will. It
  * decouples the consumer of state from where/how it is stored.
  */
@@ -167,7 +214,8 @@ export class Dispatcher {
     private readonly statsStore: StatsStore,
     private readonly commitStatusStore: CommitStatusStore,
     private readonly profileStore: ProfileStore,
-    private readonly repositoryTabsStore: RepositoryTabsStore
+    private readonly repositoryTabsStore: RepositoryTabsStore,
+    private readonly buildRunStore: BuildRunStore
   ) {
     this.incrementMetric = statsStore.increment.bind(statsStore)
   }
@@ -1932,6 +1980,224 @@ export class Dispatcher {
       repository,
       workflowPreferences
     )
+  }
+
+  // ── Build & Run ───────────────────────────────────────────────────────────
+
+  /**
+   * Detect the ranked build profiles for a repository and publish them to the
+   * Build & Run view store. Idempotent and safe to call whenever the selected
+   * repository changes; the pill only appears once at least one profile exists.
+   */
+  public async detectBuildRunProfiles(repository: Repository): Promise<void> {
+    try {
+      const probe = await probeRepository(repository.path)
+      const profiles = detectProfiles(probe)
+      this.buildRunStore.setDetectedProfiles(
+        repository.id,
+        profiles,
+        repository.buildRunPreferences.defaultProfileId
+      )
+    } catch (e) {
+      log.error(`Failed to detect build profiles for ${repository.name}`, e)
+      this.buildRunStore.setDetectedProfiles(repository.id, [])
+    }
+  }
+
+  /** Choose which detected profile the Build & Run pill will run. */
+  public selectBuildRunProfile(repository: Repository, profileId: string) {
+    this.buildRunStore.setSelectedProfile(repository.id, profileId)
+  }
+
+  /** Open or close the Build & Run log panel for a repository. */
+  public setBuildRunPanelOpen(repository: Repository, open: boolean) {
+    this.buildRunStore.setPanelOpen(repository.id, open)
+  }
+
+  /** Clear the Build & Run log buffer for a repository. */
+  public clearBuildRunLog(repository: Repository) {
+    this.buildRunStore.clearLog(repository.id)
+  }
+
+  /** Persist the per-repository Build & Run preferences. */
+  public async updateRepositoryBuildRunPreferences(
+    repository: Repository,
+    buildRunPreferences: IBuildRunPreferences
+  ) {
+    await this.appStore._updateRepositoryBuildRunPreferences(
+      repository,
+      buildRunPreferences
+    )
+  }
+
+  /**
+   * Kick off a one-click build & run for the repository.
+   *
+   * Detection, PATH/env resolution and (optionally) auto-gitignore all happen
+   * here in the renderer; a fully-resolved, serialisable plan is then handed to
+   * the main-process runner, which never re-inspects the working tree.
+   */
+  public async startBuildRun(repository: Repository): Promise<void> {
+    const prefs = repository.buildRunPreferences ?? defaultBuildRunPreferences
+    const runId = randomUUID()
+    this.buildRunStore.beginRun(repository.id, runId)
+
+    // (1) Detect — resolve the profile the user asked for (or the top-ranked).
+    this.buildRunStore.addLocalLogLine(
+      repository.id,
+      'toolchain',
+      'meta',
+      'Detecting build profile…'
+    )
+    let probe
+    try {
+      probe = await probeRepository(repository.path)
+    } catch (e) {
+      log.error(`Build & Run detection failed for ${repository.name}`, e)
+      this.buildRunStore.addLocalLogLine(
+        repository.id,
+        'toolchain',
+        'meta',
+        `Could not read the repository: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      )
+      this.buildRunStore.setPhase(repository.id, 'failed')
+      return
+    }
+
+    const profiles = detectProfiles(probe)
+    this.buildRunStore.setDetectedProfiles(
+      repository.id,
+      profiles,
+      prefs.defaultProfileId
+    )
+
+    const selectedId = this.buildRunStore.getStateForRepository(
+      repository.id
+    ).selectedProfileId
+    const profile =
+      profiles.find(p => p.id === selectedId) ?? profiles[0] ?? null
+    if (profile === null) {
+      this.buildRunStore.addLocalLogLine(
+        repository.id,
+        'toolchain',
+        'meta',
+        'No runnable build profile was detected for this repository.'
+      )
+      this.buildRunStore.setPhase(repository.id, 'failed')
+      return
+    }
+
+    // (2) Auto-gitignore — seed build-output rules before install (opt-out).
+    if (prefs.autoIgnoreBuildOutputs) {
+      this.buildRunStore.setPhase(repository.id, 'gitignore')
+      try {
+        const current = await readGitIgnoreAtRoot(repository)
+        const result = buildIgnoreText(current, profile)
+        if (result !== null) {
+          await this.saveGitIgnore(repository, result.text)
+          this.buildRunStore.addLocalLogLine(
+            repository.id,
+            'toolchain',
+            'meta',
+            `Auto-ignored build outputs — ${result.appliedLabel}.`
+          )
+        }
+      } catch (e) {
+        // A gitignore hiccup should never block the build itself.
+        log.warn(`Build & Run auto-gitignore failed for ${repository.name}`, e)
+      }
+    }
+
+    // (3) Resolve the plan and hand it to the main-process runner.
+    const plan = this.buildRunPlan(repository, profile, probe, runId, prefs)
+    if (plan.stages.length === 0) {
+      this.buildRunStore.addLocalLogLine(
+        repository.id,
+        'toolchain',
+        'meta',
+        `${profile.label} has nothing to install, build or run.`
+      )
+      this.buildRunStore.setPhase(repository.id, 'failed')
+      return
+    }
+
+    try {
+      await startBuildRun(plan)
+    } catch (e) {
+      log.error(`Failed to start build & run for ${repository.name}`, e)
+      this.buildRunStore.addLocalLogLine(
+        repository.id,
+        'toolchain',
+        'meta',
+        `Failed to start: ${e instanceof Error ? e.message : String(e)}`
+      )
+      this.buildRunStore.setPhase(repository.id, 'failed')
+    }
+  }
+
+  /** Cancel the in-flight build & run for a repository, if any. */
+  public async cancelBuildRun(repository: Repository): Promise<void> {
+    const { activeRunId } = this.buildRunStore.getStateForRepository(
+      repository.id
+    )
+    if (activeRunId !== null) {
+      await cancelBuildRun(activeRunId)
+    }
+  }
+
+  /** Assemble a serialisable {@link IBuildRunPlan} from a detected profile. */
+  private buildRunPlan(
+    repository: Repository,
+    profile: IBuildProfile,
+    probe: { exists: (p: string) => boolean },
+    runId: string,
+    prefs: IBuildRunPreferences
+  ): IBuildRunPlan {
+    const cwd =
+      profile.cwd === ''
+        ? repository.path
+        : join(repository.path, ...profile.cwd.split('/'))
+
+    const overrides = prefs.overrides?.[profile.id]
+    const stages = new Array<IBuildRunStage>()
+
+    const addStage = (
+      kind: 'install' | 'build' | 'run',
+      detected: ReadonlyArray<ICommand> | undefined,
+      override: string | undefined
+    ) => {
+      const parsed = parseOverrideCommand(override)
+      const commands = parsed !== null ? [parsed] : detected
+      if (commands !== undefined && commands.length > 0) {
+        stages.push({ kind, commands })
+      }
+    }
+
+    addStage('install', profile.install, overrides?.install)
+    addStage('build', profile.build, overrides?.build)
+    if (prefs.autoRunAfterBuild) {
+      addStage('run', profile.run, overrides?.run)
+    }
+
+    const prefix = profile.cwd === '' ? '' : `${profile.cwd}/`
+
+    return {
+      runId,
+      repositoryId: repository.id,
+      cwd,
+      ecosystem: profile.ecosystem,
+      elevated: prefs.elevated || profile.needsElevation,
+      stages,
+      env: resolveRunEnv(process.env),
+      toolchainCheck: profile.toolchainCheck,
+      probeFlags: {
+        hasYarnLock: probe.exists(`${prefix}yarn.lock`),
+        hasPnpmLock: probe.exists(`${prefix}pnpm-lock.yaml`),
+        hasVenv: probe.exists(`${prefix}.venv`),
+      },
+    }
   }
 
   /** Select the authenticated account used for a repository. */

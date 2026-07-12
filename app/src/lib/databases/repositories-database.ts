@@ -1,6 +1,7 @@
 import Dexie, { Transaction } from 'dexie'
 import { BaseDatabase } from './base-database'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
+import { IBuildRunPreferences } from '../../models/build-run-preferences'
 import { assertNonNullable } from '../fatal-error'
 import { GitHubAccountType } from '../api'
 
@@ -60,6 +61,12 @@ export interface IDatabaseRepository {
   readonly lastStashCheckDate?: number | null
 
   readonly workflowPreferences?: WorkflowPreferences
+
+  /**
+   * Per-repository Build & Run preferences. Stored as an un-indexed blob (no
+   * schema migration needed), mirroring `workflowPreferences`.
+   */
+  readonly buildRunPreferences?: IBuildRunPreferences
 
   /**
    * True if the repository is a tutorial repository created as part

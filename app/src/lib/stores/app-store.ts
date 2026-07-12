@@ -326,6 +326,7 @@ import { createTutorialRepository } from './helpers/create-tutorial-repository'
 import { sendNonFatalException } from '../helpers/non-fatal-exception'
 import { getDefaultDir } from '../../ui/lib/default-dir'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
+import { IBuildRunPreferences } from '../../models/build-run-preferences'
 import { RepositoryIndicatorUpdater } from './helpers/repository-indicator-updater'
 import { isAttributableEmailFor } from '../email'
 import { TrashNameLabel } from '../../ui/lib/context-menu'
@@ -7867,6 +7868,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
     await this.repositoriesStore.updateRepositoryWorkflowPreferences(
       repository,
       workflowPreferences
+    )
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _updateRepositoryBuildRunPreferences(
+    repository: Repository,
+    buildRunPreferences: IBuildRunPreferences
+  ): Promise<void> {
+    await this.repositoriesStore.updateRepositoryBuildRunPreferences(
+      repository,
+      buildRunPreferences
     )
   }
 

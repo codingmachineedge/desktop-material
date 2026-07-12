@@ -411,6 +411,13 @@ export function buildDefaultMenuTemplate({
         id: 'manage-gitignore',
         click: emit('manage-gitignore'),
       },
+      separator,
+      {
+        label: __DARWIN__ ? 'Build and Run' : '&Build and run',
+        id: 'build-and-run',
+        accelerator: 'CmdOrCtrl+Shift+B',
+        click: emit('build-and-run'),
+      },
     ],
   })
 

@@ -36,6 +36,7 @@ import {
   PullRequestStore,
   ProfileStore,
   RepositoryTabsStore,
+  BuildRunStore,
 } from '../lib/stores'
 import { GitHubUserDatabase } from '../lib/databases'
 import { SelectionType, IAppState } from '../lib/app-state'
@@ -351,13 +352,16 @@ profileStore
   .then(() => repositoryTabsStore.initialize())
   .catch(err => log.error('Failed to initialize profile stores', err))
 
+const buildRunStore = new BuildRunStore()
+
 const dispatcher = new Dispatcher(
   appStore,
   repositoryStateManager,
   statsStore,
   commitStatusStore,
   profileStore,
-  repositoryTabsStore
+  repositoryTabsStore,
+  buildRunStore
 )
 
 dispatcher.registerErrorHandler(defaultErrorHandler)
@@ -454,6 +458,7 @@ ReactDOM.render(
     aheadBehindStore={aheadBehindStore}
     notificationsDebugStore={notificationsDebugStore}
     repositoryTabsStore={repositoryTabsStore}
+    buildRunStore={buildRunStore}
     startTime={startTime}
   />,
   document.getElementById('desktop-app-container')!

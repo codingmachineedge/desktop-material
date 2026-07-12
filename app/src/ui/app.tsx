@@ -16,8 +16,11 @@ import {
   GitHubUserStore,
   IssuesStore,
   RepositoryTabsStore,
+  BuildRunStore,
 } from '../lib/stores'
 import { RepositoryTabStrip } from './repository-tabs/repository-tab-strip'
+import { BuildRunToolbarButton } from './build-run/build-run-toolbar-button'
+import { BuildRunPanel } from './build-run/build-run-panel'
 import { assertNever } from '../lib/fatal-error'
 import { shell } from '../lib/app-shell'
 import { updateStore, UpdateStatus } from './lib/update-store'
@@ -251,6 +254,7 @@ interface IAppProps {
   readonly aheadBehindStore: AheadBehindStore
   readonly notificationsDebugStore: NotificationsDebugStore
   readonly repositoryTabsStore: RepositoryTabsStore
+  readonly buildRunStore: BuildRunStore
   readonly startTime: number
 }
 
@@ -538,6 +542,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.showRepositorySettings()
       case 'manage-gitignore':
         return this.showRepositorySettings(RepositorySettingsTab.IgnoredFiles)
+      case 'build-and-run':
+        return this.buildAndRun()
       case 'view-repository-on-github':
         return this.viewRepositoryOnGitHub()
       case 'compare-on-github':
@@ -1366,6 +1372,19 @@ export class App extends React.Component<IAppProps, IAppState> {
       repository,
       initialSelectedTab,
     })
+  }
+
+  private buildAndRun() {
+    const repository = this.getRepository()
+
+    if (!repository || repository instanceof CloningRepository) {
+      return
+    }
+
+    this.props.dispatcher.setBuildRunPanelOpen(repository, true)
+    this.props.dispatcher
+      .startBuildRun(repository)
+      .catch(err => log.error('Failed to start build & run', err))
   }
 
   /**
@@ -3280,6 +3299,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.renderToolbar()}
         {this.renderBanner()}
         {this.renderRepository()}
+        {this.renderBuildRunPanel()}
         {this.renderPopups()}
         {this.renderDragElement()}
       </div>
@@ -3846,7 +3866,40 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.renderWorktreeToolbarButton()}
         {this.renderBranchToolbarButton()}
         {this.renderPushPullToolbarButton()}
+        {this.renderBuildRunToolbarButton()}
       </Toolbar>
+    )
+  }
+
+  private renderBuildRunToolbarButton() {
+    const selection = this.state.selectedState
+    if (!selection || selection.type !== SelectionType.Repository) {
+      return null
+    }
+
+    return (
+      <BuildRunToolbarButton
+        key={selection.repository.id}
+        repository={selection.repository}
+        dispatcher={this.props.dispatcher}
+        buildRunStore={this.props.buildRunStore}
+      />
+    )
+  }
+
+  private renderBuildRunPanel() {
+    const selection = this.state.selectedState
+    if (!selection || selection.type !== SelectionType.Repository) {
+      return null
+    }
+
+    return (
+      <BuildRunPanel
+        key={selection.repository.id}
+        repository={selection.repository}
+        dispatcher={this.props.dispatcher}
+        buildRunStore={this.props.buildRunStore}
+      />
     )
   }
 

@@ -1,6 +1,7 @@
 import { ExecutableMenuItem } from '../models/app-menu'
 import { RequestResponseChannels, RequestChannels } from '../lib/ipc-shared'
 import * as ipcRenderer from '../lib/ipc-renderer'
+import { IBuildRunLogEvent, IBuildRunStateEvent } from '../lib/build-run/types'
 import { stat } from 'fs/promises'
 import { isApplicationBundle } from '../lib/is-application-bundle'
 import { pathExists } from '../lib/path-exists'
@@ -400,3 +401,26 @@ export const requestNotificationsPermission = invokeProxy(
 /** Tell the main process to (un)install the CLI on Windows */
 export const installWindowsCLI = sendProxy('install-windows-cli', 0)
 export const uninstallWindowsCLI = sendProxy('uninstall-windows-cli', 0)
+
+/** Hand a resolved Build & Run plan to the main-process runner. */
+export const startBuildRun = invokeProxy('start-build-run', 1)
+
+/** Request cancellation of an in-flight Build & Run. */
+export const cancelBuildRun = invokeProxy('cancel-build-run', 1)
+
+/** Subscribe to streamed Build & Run log lines pushed from the main process. */
+export function onBuildRunLog(
+  handler: (event: Electron.IpcRendererEvent, log: IBuildRunLogEvent) => void
+) {
+  ipcRenderer.on('build-run-log', handler)
+}
+
+/** Subscribe to Build & Run phase transitions pushed from the main process. */
+export function onBuildRunState(
+  handler: (
+    event: Electron.IpcRendererEvent,
+    state: IBuildRunStateEvent
+  ) => void
+) {
+  ipcRenderer.on('build-run-state', handler)
+}
