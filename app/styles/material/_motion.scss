@@ -1,0 +1,182 @@
+// Material Design 3 Expressive global keyframes for Desktop Material.
+//
+// These @keyframes are referenced by name throughout the MD3 restyle
+// (entrance staggers, ripple state layers, indeterminate progress, badge
+// pops, theme reveal). They are global and must be declared before any
+// partial that consumes them, so this file is imported from the top of
+// `_material.scss`. Definitions mirror `Desktop Material v2.dc.html` 1:1.
+
+@keyframes dmDown {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dmUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dmLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dmRight {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dmPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dmGrow {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dmSheet {
+  from {
+    transform: translateX(-104%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes dmSheetR {
+  from {
+    transform: translateX(104%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes dmScrim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dmDialog {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(26px);
+  }
+  65% {
+    transform: scale(1.015) translateY(-3px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dmRipple {
+  from {
+    transform: scale(0);
+    opacity: 0.28;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes dmSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dmBar {
+  0% {
+    left: -34%;
+    width: 34%;
+  }
+  55% {
+    left: 42%;
+    width: 46%;
+  }
+  100% {
+    left: 104%;
+    width: 34%;
+  }
+}
+
+@keyframes dmPulse {
+  0% {
+    background-color: color-mix(in srgb, var(--md-sys-color-primary) 26%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes dmBounce {
+  0% {
+    transform: scale(0.3);
+  }
+  55% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes dmReveal {
+  from {
+    opacity: 0.9;
+    transform: scale(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
