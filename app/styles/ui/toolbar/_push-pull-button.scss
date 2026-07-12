@@ -1,3 +1,28 @@
+// MD3 ahead/behind marker on the sync pill: a primary tonal count badge with
+// a springy entrance. Overrides the neutral upstream `.ahead-behind` badge
+// (defined in `_toolbar.scss`, which loads before this partial).
+.push-pull-button .ahead-behind {
+  align-items: center;
+  animation: dmBounce calc(500ms * var(--mdur)) var(--spring-fast);
+  background: var(--md-sys-color-primary);
+  border-radius: 999px;
+  box-sizing: border-box;
+  color: var(--md-sys-color-on-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 1px;
+  height: 22px;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 7px;
+
+  .octicon {
+    height: 12px;
+    margin-left: 2px;
+    width: 12px;
+  }
+}
+
 .push-pull-dropdown {
   display: flex;
   flex-direction: column;

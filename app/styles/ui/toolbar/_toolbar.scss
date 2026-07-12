@@ -40,22 +40,29 @@
       max-height: var(--toolbar-height);
     }
 
+    // Widths relaxed from a fixed 230px to a min/max range so the MD3 pill
+    // chips size to their content. The `.resizable` variants keep filling
+    // their Resizable/section wrapper (whose width the shell layer relaxes to
+    // `auto` in the app bar).
     &.push-pull-button {
-      width: 230px;
+      min-width: 130px;
+      max-width: 100%;
 
       &.resizable {
         width: 100%;
       }
     }
     &.branch-toolbar-button {
-      width: 230px;
+      min-width: 130px;
+      max-width: 100%;
 
       &.resizable {
         width: 100%;
       }
     }
     &.revert-progress {
-      width: 230px;
+      min-width: 130px;
+      max-width: 100%;
 
       &.resizable {
         width: 100%;

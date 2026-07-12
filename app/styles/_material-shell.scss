@@ -42,40 +42,228 @@ body {
   }
 }
 
+// Top app bar (toolbar row): transparent surface holding floating pill chips.
+// Repo + branch read as 54px elevated pills with a tonal icon tile; the sync
+// (push/pull/fetch) control reads as a full-radius pill pushed to the right.
 #desktop-app-toolbar {
-  background: var(--md-sys-color-surface-container) !important;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  align-items: center;
+  background: transparent !important;
+  border-bottom: 0;
   color: var(--md-sys-color-on-surface);
-  gap: var(--spacing-half);
-  padding: var(--spacing-half) var(--spacing);
+  gap: 10px;
+  height: auto;
+  min-height: 72px;
+  padding: 6px 16px 12px 16px;
 
+  // Neutralise the inline (sidebarWidth / Resizable) and fixed widths so the
+  // pills size to their content. Foldouts anchor off live client rects and
+  // their own independent widths, so this does not affect dropdown placement.
+  // The app-bar chips are not user-resizable in the MD3 design — hide handles.
+  .sidebar-section {
+    width: auto !important;
+  }
+
+  .resizable-component {
+    max-width: none !important;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+
+  .resize-handle {
+    display: none;
+  }
+
+  // Push the sync pill (the element wrapping the push/pull/fetch button) to the
+  // right edge, leaving repo + branch grouped on the left.
+  & > *:has(.push-pull-button) {
+    margin-left: auto;
+  }
+
+  // Let the 54px chips escape the upstream 50px toolbar-height cap.
+  .toolbar-button {
+    max-height: none;
+  }
+
+  // ---- Pill chip base (repo / branch, and single-button sync states) ------
   .toolbar-button > button {
+    align-items: center;
+    background: var(--md-sys-color-surface);
     border: 0;
-    border-radius: var(--md-sys-shape-corner-medium);
+    border-radius: var(--md-sys-shape-corner-large);
+    box-shadow: var(--md-sys-elevation-level1);
     color: var(--md-sys-color-on-surface);
-    padding-inline: var(--spacing);
-    transition: background-color 120ms ease, box-shadow 120ms ease;
+    display: flex;
+    gap: 12px;
+    height: 54px;
+    overflow: hidden;
+    padding: 0 18px 0 14px;
+    position: relative;
+    transition: background-color 260ms var(--emph), border-radius 320ms var(--spring), box-shadow 260ms var(--emph), transform 220ms var(--spring-fast);
+
+    &:not(:disabled):hover {
+      background: var(--md-sys-color-surface);
+      border-radius: 24px;
+      box-shadow: var(--md-sys-elevation-level2);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline-offset: -3px;
+    }
+
+    // Leading icon → 34x34 radius-12 tonal tile (primary-container default;
+    // branch overrides to secondary-container below).
+    .icon {
+      background: var(--md-sys-color-primary-container);
+      border-radius: var(--md-sys-shape-corner-medium);
+      box-sizing: border-box;
+      color: var(--md-sys-color-on-primary-container);
+      flex: none;
+      height: 34px;
+      margin: 0;
+      padding: 7px;
+      width: 34px;
+    }
+
+    .text {
+      flex: 1 1 auto;
+      gap: 1px;
+      margin: 0;
+      min-width: 0;
+    }
+
+    .title {
+      color: var(--md-sys-color-on-surface);
+      font-size: 14.5px;
+      font-weight: var(--font-weight-semibold);
+    }
 
     .description {
       color: var(--md-sys-color-on-surface-variant);
+      font-size: 11px;
+      letter-spacing: 0.03em;
     }
 
-    &:not(:disabled):hover,
-    &:focus-visible {
-      background: var(--md-sys-color-surface-container-highest);
-      color: var(--md-sys-color-on-surface);
+    .dropdownArrow {
+      color: var(--md-sys-color-on-surface-variant);
+      flex: none;
     }
 
-    &:focus-visible {
-      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
-      outline-offset: -3px;
+    // Soften the upstream full-bleed determinate progress fill (used for the
+    // branch-checkout progress on this chip).
+    .progress {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 16%, transparent);
     }
   }
 
-  .toolbar-button.active > button,
-  .toolbar-button > button[aria-expanded='true'] {
+  // Branch chip → secondary-container icon tile.
+  .branch-toolbar-button > button .icon {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  // Opened repo/branch chip → primary-container tonal fill (mirrors the
+  // prototype's repoChipBg/branchChipBg while its sheet is open).
+  .toolbar-button > button[aria-expanded='true'],
+  .toolbar-button.active > button {
     background: var(--md-sys-color-primary-container);
     color: var(--md-sys-color-on-primary-container);
+
+    .title {
+      color: var(--md-sys-color-on-primary-container);
+    }
+  }
+
+  // ---- Sync pill (push / pull / fetch) ------------------------------------
+  // Single-button states (fetch, publish): one full-radius tonal pill.
+  .push-pull-button > button {
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: 999px;
+    color: var(--md-sys-color-on-surface);
+    padding: 0 20px 0 16px;
+
+    &:not(:disabled):hover {
+      background: var(--md-sys-color-surface-container-high);
+      border-radius: 999px;
+      box-shadow: var(--md-sys-elevation-level2);
+    }
+
+    // Sync glyph rides inline (no tonal tile).
+    .icon {
+      background: transparent;
+      border-radius: 0;
+      color: currentColor;
+      height: 22px;
+      padding: 0;
+      width: 22px;
+    }
+
+    .title {
+      color: currentColor;
+      font-size: 14px;
+    }
+
+    .description {
+      color: currentColor;
+      font-size: 11px;
+      letter-spacing: 0;
+      opacity: 0.75;
+    }
+  }
+
+  // Split-button states (push / pull / force-push): main + disclosure arrow
+  // are wrapped as one full-radius pill; the inner buttons are flat segments.
+  .toolbar-dropdown:has(.push-pull-button) {
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: 999px;
+    box-shadow: var(--md-sys-elevation-level1);
+    overflow: hidden;
+    transition: box-shadow 260ms var(--emph);
+
+    &:hover {
+      box-shadow: var(--md-sys-elevation-level2);
+    }
+
+    > .toolbar-button > button {
+      background: transparent;
+      border-radius: 0;
+      box-shadow: none;
+
+      &:not(:disabled):hover {
+        background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+        box-shadow: none;
+      }
+    }
+
+    // Divider between the primary action and the disclosure arrow.
+    .toolbar-dropdown-arrow-button > button {
+      box-shadow: inset 1px 0 0 color-mix(in srgb, var(--md-sys-color-outline) 45%, transparent);
+      padding: 0;
+    }
+  }
+
+  // Indeterminate progress bar shown while a push/pull/fetch is in flight
+  // (the progress state renders a disabled has-progress button).
+  .push-pull-button.has-progress > button {
+    .progress {
+      display: none;
+    }
+
+    &::after {
+      animation: dmBar calc(1100ms * var(--mdur)) var(--emph) infinite;
+      background: currentColor;
+      border-radius: 999px;
+      bottom: 7px;
+      content: '';
+      height: 3px;
+      left: -34%;
+      position: absolute;
+      width: 34%;
+    }
   }
 }
 
