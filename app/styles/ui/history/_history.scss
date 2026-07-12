@@ -198,3 +198,86 @@
     }
   }
 }
+
+// === History commit search bar (design §9.1) ================================
+// A 46px pill search field with the shared filter-mode control (fuzzy /
+// substring / regex), filtering the loaded commit list client-side by summary,
+// author or SHA. Lives above #commit-list inside .compare-commit-list.
+.history-commit-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--spacing-half);
+  flex: 0 0 auto;
+  padding: 10px 14px;
+
+  .history-commit-filter-field {
+    // Fill the row; the min-width doubles as the wrap threshold so the mode
+    // control drops below the field rather than clipping the placeholder.
+    flex: 1 1 auto;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    height: 46px;
+    box-sizing: border-box;
+    padding: 0 8px 0 16px;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background: var(--md-sys-color-surface-container-high);
+    transition: border-color 200ms var(--emph), background-color 200ms var(--emph);
+
+    &:focus-within {
+      border-color: var(--md-sys-color-primary);
+    }
+
+    // The leading search glyph flows inline inside the pill rather than being
+    // absolutely positioned (the stock text-box treatment).
+    .prefixed-icon {
+      position: static;
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      margin-right: 6px;
+      fill: var(--md-sys-color-on-surface-variant);
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font-size: 13.5px;
+
+      &:focus {
+        outline: none;
+      }
+    }
+
+    .clear-button {
+      position: static;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      cursor: pointer;
+      transition: background-color 220ms var(--emph), transform 200ms var(--spring-fast);
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-highest);
+      }
+
+      &:active {
+        transform: scale(0.85);
+      }
+    }
+  }
+}

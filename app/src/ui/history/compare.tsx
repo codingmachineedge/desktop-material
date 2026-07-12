@@ -21,7 +21,12 @@ import { CompareBranchListItem } from './compare-branch-list-item'
 import { FancyTextBox } from '../lib/fancy-text-box'
 import * as octicons from '../octicons/octicons.generated'
 import { SelectionSource } from '../lib/filter-list'
-import { IMatches } from '../../lib/fuzzy-find'
+import { FilterMode, IMatches, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Ref } from '../lib/ref'
 import { MergeCallToActionWithConflicts } from './merge-call-to-action-with-conflicts'
 import { AheadBehindStore } from '../../lib/stores/ahead-behind-store'
@@ -73,7 +78,22 @@ interface ICompareSidebarState {
 
   /** Data to be reordered via keyboard */
   readonly keyboardReorderData?: KeyboardInsertionData
+
+  /**
+   * Free-text filter applied client-side to the History commit list
+   * (matches commit summary / author / SHA). Empty string means no filter.
+   */
+  readonly commitFilterText: string
+
+  /** The matching strategy used by the History commit filter. */
+  readonly commitFilterMode: FilterMode
+
+  /** Whether the History commit filter matches case-sensitively. */
+  readonly commitFilterCaseSensitive: boolean
 }
+
+/** localStorage key used to persist the History commit filter mode. */
+const CommitFilterListId = 'history-commits'
 
 /** If we're within this many rows from the bottom, load the next history batch. */
 const CloseToBottomThreshold = 10
@@ -92,7 +112,12 @@ export class CompareSidebar extends React.Component<
   public constructor(props: ICompareSidebarProps) {
     super(props)
 
-    this.state = { focusedBranch: null }
+    this.state = {
+      focusedBranch: null,
+      commitFilterText: '',
+      commitFilterMode: readPersistedFilterMode(CommitFilterListId),
+      commitFilterCaseSensitive: false,
+    }
   }
 
   public componentWillReceiveProps(nextProps: ICompareSidebarProps) {
@@ -215,11 +240,121 @@ export class CompareSidebar extends React.Component<
     })
   }
 
+  /**
+   * Filter the loaded commit SHAs client-side using the current History filter
+   * text / mode. When comparing branches (or with an empty filter) the list is
+   * returned unchanged.
+   */
+  private getFilteredCommitSHAs(
+    commitSHAs: ReadonlyArray<string>
+  ): ReadonlyArray<string> {
+    const query = this.state.commitFilterText.trim()
+
+    if (query.length === 0) {
+      return commitSHAs
+    }
+
+    // Two keys so fuzzy mode (which only scores the first two) still matches on
+    // author and SHA: the summary is the "title", and author + full/short SHA
+    // are folded into the "subtitle". Substring / regex modes test every key.
+    const getKey = (sha: string): ReadonlyArray<string> => {
+      const commit = this.props.commitLookup.get(sha)
+      if (commit === undefined) {
+        return [sha]
+      }
+      return [
+        commit.summary,
+        `${commit.author.name} ${commit.sha} ${commit.shortSha}`,
+      ]
+    }
+
+    const { results } = matchWithMode(query, commitSHAs, getKey, {
+      mode: this.state.commitFilterMode,
+      caseSensitive: this.state.commitFilterCaseSensitive,
+    })
+
+    return results.map(r => r.item)
+  }
+
+  private getCommitFilterSampleItems = (): ReadonlyArray<string> => {
+    const items = new Array<string>()
+    for (const sha of this.props.compareState.commitSHAs) {
+      const commit = this.props.commitLookup.get(sha)
+      if (commit !== undefined) {
+        items.push(commit.summary)
+      }
+      if (items.length >= 50) {
+        break
+      }
+    }
+    return items
+  }
+
+  private onCommitFilterTextChanged = (commitFilterText: string) => {
+    this.setState({ commitFilterText })
+  }
+
+  private onCommitFilterCleared = () => {
+    this.setState({ commitFilterText: '' })
+  }
+
+  private onCommitFilterModeChanged = (commitFilterMode: FilterMode) => {
+    persistFilterMode(CommitFilterListId, commitFilterMode)
+    this.setState({ commitFilterMode })
+  }
+
+  private onCommitFilterCaseSensitiveChanged = (
+    commitFilterCaseSensitive: boolean
+  ) => {
+    this.setState({ commitFilterCaseSensitive })
+  }
+
+  private onCommitFilterRegexPatternApply = (pattern: string) => {
+    this.setState({ commitFilterText: pattern })
+  }
+
+  private renderCommitFilter() {
+    return (
+      <div className="history-commit-filter">
+        <TextBox
+          className="history-commit-filter-field"
+          type="search"
+          displayClearButton={true}
+          prefixedIcon={octicons.search}
+          placeholder="Filter commits"
+          ariaLabel="Filter commits"
+          value={this.state.commitFilterText}
+          onValueChanged={this.onCommitFilterTextChanged}
+          onSearchCleared={this.onCommitFilterCleared}
+        />
+        <FilterModeControl
+          mode={this.state.commitFilterMode}
+          caseSensitive={this.state.commitFilterCaseSensitive}
+          onModeChange={this.onCommitFilterModeChanged}
+          onCaseSensitiveChange={this.onCommitFilterCaseSensitiveChanged}
+          regexBuilderTarget="Commits"
+          getSampleItems={this.getCommitFilterSampleItems}
+          filterText={this.state.commitFilterText}
+          onRegexPatternApply={this.onCommitFilterRegexPatternApply}
+        />
+      </div>
+    )
+  }
+
   private renderCommitList() {
     const { formState, commitSHAs } = this.props.compareState
 
+    const isHistory = formState.kind === HistoryTabMode.History
+    const filteredCommitSHAs = isHistory
+      ? this.getFilteredCommitSHAs(commitSHAs)
+      : commitSHAs
+    const isCommitFilterActive =
+      isHistory && this.state.commitFilterText.trim().length > 0
+
     let emptyListMessage: string | JSX.Element
-    if (formState.kind === HistoryTabMode.History) {
+    if (isCommitFilterActive && filteredCommitSHAs.length === 0) {
+      emptyListMessage = 'No matching commits'
+    } else if (formState.kind === HistoryTabMode.History) {
       emptyListMessage = 'No history'
     } else {
       const currentlyComparedBranchName = formState.comparisonBranch.name
@@ -238,56 +373,67 @@ export class CompareSidebar extends React.Component<
         )
     }
 
+    // While a text filter is active the displayed commits are a non-contiguous
+    // subset of history, so row indices no longer map to the real commit graph.
+    // Disable the history-mutating affordances (reorder / squash / reset / undo
+    // / amend) until the filter is cleared to avoid operating on the wrong
+    // commit. Read-only actions (checkout, view, copy SHA, cherry-pick) stay
+    // available.
+    const allowHistoryOps = isHistory && !isCommitFilterActive
+
     return (
-      <CommitList
-        ref={this.commitListRef}
-        gitHubRepository={this.props.repository.gitHubRepository}
-        isLocalRepository={this.props.isLocalRepository}
-        commitLookup={this.props.commitLookup}
-        commitSHAs={commitSHAs}
-        selectedSHAs={this.props.selectedCommitShas}
-        shasToHighlight={this.props.shasToHighlight}
-        localCommitSHAs={this.props.localCommitSHAs}
-        canResetToCommits={formState.kind === HistoryTabMode.History}
-        canUndoCommits={formState.kind === HistoryTabMode.History}
-        canAmendCommits={formState.kind === HistoryTabMode.History}
-        emoji={this.props.emoji}
-        reorderingEnabled={formState.kind === HistoryTabMode.History}
-        onViewCommitOnGitHub={this.props.onViewCommitOnGitHub}
-        onUndoCommit={this.onUndoCommit}
-        onResetToCommit={this.onResetToCommit}
-        onRevertCommit={
-          ableToRevertCommit(this.props.compareState.formState)
-            ? this.props.onRevertCommit
-            : undefined
-        }
-        onAmendCommit={this.props.onAmendCommit}
-        onCommitsSelected={this.onCommitsSelected}
-        onScroll={this.onScroll}
-        onCreateBranch={this.onCreateBranch}
-        onCheckoutCommit={this.onCheckoutCommit}
-        onCreateTag={this.onCreateTag}
-        onDeleteTag={this.onDeleteTag}
-        onCherryPick={this.onCherryPick}
-        onDropCommitInsertion={this.onDropCommitInsertion}
-        onKeyboardReorder={this.onKeyboardReorder}
-        onCancelKeyboardReorder={this.onCancelKeyboardReorder}
-        onSquash={this.onSquash}
-        emptyListMessage={emptyListMessage}
-        onCompareListScrolled={this.props.onCompareListScrolled}
-        compareListScrollTop={this.props.compareListScrollTop}
-        tagsToPush={this.props.tagsToPush ?? []}
-        onRenderCommitDragElement={this.onRenderCommitDragElement}
-        onRemoveCommitDragElement={this.onRemoveCommitDragElement}
-        disableReordering={formState.kind === HistoryTabMode.Compare}
-        disableSquashing={formState.kind === HistoryTabMode.Compare}
-        isMultiCommitOperationInProgress={
-          this.props.isMultiCommitOperationInProgress
-        }
-        keyboardReorderData={this.state.keyboardReorderData}
-        accounts={this.props.accounts}
-        preferAbsoluteDates={this.props.preferAbsoluteDates}
-      />
+      <>
+        {isHistory && commitSHAs.length > 0 ? this.renderCommitFilter() : null}
+        <CommitList
+          ref={this.commitListRef}
+          gitHubRepository={this.props.repository.gitHubRepository}
+          isLocalRepository={this.props.isLocalRepository}
+          commitLookup={this.props.commitLookup}
+          commitSHAs={filteredCommitSHAs}
+          selectedSHAs={this.props.selectedCommitShas}
+          shasToHighlight={this.props.shasToHighlight}
+          localCommitSHAs={this.props.localCommitSHAs}
+          canResetToCommits={allowHistoryOps}
+          canUndoCommits={allowHistoryOps}
+          canAmendCommits={allowHistoryOps}
+          emoji={this.props.emoji}
+          reorderingEnabled={allowHistoryOps}
+          onViewCommitOnGitHub={this.props.onViewCommitOnGitHub}
+          onUndoCommit={this.onUndoCommit}
+          onResetToCommit={this.onResetToCommit}
+          onRevertCommit={
+            ableToRevertCommit(this.props.compareState.formState)
+              ? this.props.onRevertCommit
+              : undefined
+          }
+          onAmendCommit={this.props.onAmendCommit}
+          onCommitsSelected={this.onCommitsSelected}
+          onScroll={this.onScroll}
+          onCreateBranch={this.onCreateBranch}
+          onCheckoutCommit={this.onCheckoutCommit}
+          onCreateTag={this.onCreateTag}
+          onDeleteTag={this.onDeleteTag}
+          onCherryPick={this.onCherryPick}
+          onDropCommitInsertion={this.onDropCommitInsertion}
+          onKeyboardReorder={this.onKeyboardReorder}
+          onCancelKeyboardReorder={this.onCancelKeyboardReorder}
+          onSquash={this.onSquash}
+          emptyListMessage={emptyListMessage}
+          onCompareListScrolled={this.props.onCompareListScrolled}
+          compareListScrollTop={this.props.compareListScrollTop}
+          tagsToPush={this.props.tagsToPush ?? []}
+          onRenderCommitDragElement={this.onRenderCommitDragElement}
+          onRemoveCommitDragElement={this.onRemoveCommitDragElement}
+          disableReordering={!allowHistoryOps}
+          disableSquashing={!allowHistoryOps}
+          isMultiCommitOperationInProgress={
+            this.props.isMultiCommitOperationInProgress
+          }
+          keyboardReorderData={this.state.keyboardReorderData}
+          accounts={this.props.accounts}
+          preferAbsoluteDates={this.props.preferAbsoluteDates}
+        />
+      </>
     )
   }
 
