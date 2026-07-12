@@ -33,6 +33,9 @@ export class APIError extends Error {
   /** The HTTP response code that the error was delivered with */
   public readonly responseStatus: number
 
+  /** Rate-limit reset time reported by GitHub, when available. */
+  public readonly rateLimitReset: Date | null
+
   public constructor(response: Response, apiError: IAPIError | null) {
     let message
     if (apiError && apiError.message) {
@@ -51,6 +54,8 @@ export class APIError extends Error {
 
     this.responseStatus = response.status
     this.apiError = apiError
+    const reset = response.headers.get('X-RateLimit-Reset')
+    this.rateLimitReset = reset ? new Date(Number(reset) * 1000) : null
   }
 }
 
@@ -120,7 +125,8 @@ export function request(
   path: string,
   jsonBody?: Object,
   customHeaders?: Object,
-  reloadCache: boolean = false
+  reloadCache: boolean = false,
+  redirect?: RequestRedirect
 ): Promise<Response> {
   const url = getAbsoluteUrl(endpoint, path)
 
@@ -143,6 +149,10 @@ export function request(
     headers,
     method,
     body: JSON.stringify(jsonBody),
+  }
+
+  if (redirect !== undefined) {
+    options.redirect = redirect
   }
 
   if (reloadCache) {

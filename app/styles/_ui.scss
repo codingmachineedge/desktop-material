@@ -33,6 +33,8 @@
 @import 'ui/material-rail';
 @import 'ui/material-cards';
 @import 'ui/material-build-run';
+@import 'ui/actions-view';
+@import 'ui/actions-log-viewer';
 @import 'ui/panel';
 @import 'ui/popup';
 @import 'ui/progress';
@@ -90,6 +92,7 @@
 @import 'ui/merge-status';
 @import 'ui/rebase-status';
 @import 'ui/cloneable-repository-filter-list';
+@import 'ui/org-filter-chips';
 @import 'ui/batch-clone';
 @import 'ui/repository-list-transfer';
 @import 'ui/stash-diff-viewer';

@@ -427,10 +427,39 @@ export interface IAPIRefCheckRuns {
   readonly check_runs: IAPIRefCheckRun[]
 }
 
-interface IAPIWorkflowRuns {
+export interface IAPIWorkflowRuns {
   readonly total_count: number
   readonly workflow_runs: ReadonlyArray<IAPIWorkflowRun>
 }
+
+export interface IAPIWorkflow {
+  readonly id: number
+  readonly name: string
+  readonly path: string
+  readonly state:
+    | 'active'
+    | 'deleted'
+    | 'disabled_fork'
+    | 'disabled_inactivity'
+    | 'disabled_manually'
+  readonly html_url: string
+  readonly created_at: string
+  readonly updated_at: string
+}
+
+export interface IAPIWorkflows {
+  readonly total_count: number
+  readonly workflows: ReadonlyArray<IAPIWorkflow>
+}
+
+export interface IAPIWorkflowRunsFilter {
+  readonly workflowId?: number
+  readonly branch?: string
+  readonly event?: string
+  readonly status?: string
+  readonly perPage?: number
+}
+
 // NB. Only partially mapped
 export interface IAPIWorkflowRun {
   readonly id: number
@@ -445,6 +474,16 @@ export interface IAPIWorkflowRun {
   readonly rerun_url: string
   readonly check_suite_id: number
   readonly event: string
+  readonly display_title?: string
+  readonly run_number?: number
+  readonly run_attempt?: number
+  readonly head_branch?: string | null
+  readonly head_sha?: string
+  readonly status?: APICheckStatus
+  readonly conclusion?: APICheckConclusion | null
+  readonly updated_at?: string
+  readonly html_url?: string
+  readonly actor?: IAPIIdentity
 }
 
 export interface IAPIWorkflowJobs {
@@ -473,6 +512,10 @@ export interface IAPIWorkflowJobStep {
   readonly started_at: string
   readonly log: string
 }
+
+export const ActionsLogMaximumBytes = 5 * 1024 * 1024
+export const ActionsLogTruncationMarker =
+  '\n\n--- Log truncated after 5 MB by Desktop Material ---\n'
 
 /** Protected branch information returned by the GitHub API */
 export interface IAPIPushControl {
@@ -1106,6 +1149,28 @@ export class API {
     }
   }
 
+  /**
+   * Fetch every repository visible to the authenticated user in an
+   * organization. Unlike the user repository stream this endpoint also
+   * includes organization repositories which aren't returned through one of
+   * the user's explicit affiliation buckets.
+   */
+  public async fetchOrgRepositories(
+    org: string
+  ): Promise<ReadonlyArray<IAPIRepository>> {
+    try {
+      return await this.fetchAll<IAPIRepository>(
+        `orgs/${encodeURIComponent(org)}/repos`
+      )
+    } catch (e) {
+      log.warn(
+        `fetchOrgRepositories: failed for ${org} with endpoint ${this.endpoint}`,
+        e
+      )
+      throw e
+    }
+  }
+
   /** Create a new GitHub repository with the given properties. */
   public async createRepository(
     org: IAPIOrganization | null,
@@ -1528,6 +1593,127 @@ export class API {
     return null
   }
 
+  /** List workflows configured for a repository. */
+  public async fetchWorkflows(
+    owner: string,
+    name: string
+  ): Promise<IAPIWorkflows> {
+    const path = `repos/${owner}/${name}/actions/workflows?per_page=100`
+    const response = await this.ghRequest('GET', path)
+    return await parsedResponse<IAPIWorkflows>(response)
+  }
+
+  /** List recent workflow runs, optionally scoped by workflow/branch/status. */
+  public async fetchWorkflowRuns(
+    owner: string,
+    name: string,
+    filter: IAPIWorkflowRunsFilter = {}
+  ): Promise<IAPIWorkflowRuns> {
+    const path = filter.workflowId
+      ? `repos/${owner}/${name}/actions/workflows/${filter.workflowId}/runs`
+      : `repos/${owner}/${name}/actions/runs`
+    const query = new URLSearchParams()
+    query.set('per_page', String(filter.perPage ?? 50))
+    if (filter.branch) {
+      query.set('branch', filter.branch)
+    }
+    if (filter.event) {
+      query.set('event', filter.event)
+    }
+    if (filter.status) {
+      query.set('status', filter.status)
+    }
+
+    const response = await this.ghRequest('GET', `${path}?${query}`)
+    return await parsedResponse<IAPIWorkflowRuns>(response)
+  }
+
+  /** Re-run every job in a workflow run. */
+  public async rerunWorkflowRun(
+    owner: string,
+    name: string,
+    workflowRunId: number
+  ): Promise<void> {
+    const path = `repos/${owner}/${name}/actions/runs/${workflowRunId}/rerun`
+    const response = await this.ghRequest('POST', path)
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Dispatch a workflow supporting the workflow_dispatch event. */
+  public async dispatchWorkflow(
+    owner: string,
+    name: string,
+    workflowId: number,
+    ref: string,
+    inputs: Readonly<Record<string, string>> = {}
+  ): Promise<void> {
+    const path = `repos/${owner}/${name}/actions/workflows/${workflowId}/dispatches`
+    const response = await this.ghRequest('POST', path, {
+      body: { ref, inputs },
+    })
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Fetch a workflow YAML file as raw text. */
+  public async fetchWorkflowFileContent(
+    owner: string,
+    name: string,
+    path: string,
+    ref?: string
+  ): Promise<string> {
+    const query = ref ? `?ref=${encodeURIComponent(ref)}` : ''
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${owner}/${name}/contents/${path}${query}`,
+      { customHeaders: { Accept: 'application/vnd.github.raw+json' } }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+    return await response.text()
+  }
+
+  /**
+   * Fetch one job's plaintext log. The API redirect is followed without the
+   * GitHub Authorization header so credentials never reach signed blob hosts.
+   */
+  public async fetchWorkflowJobLogs(
+    owner: string,
+    name: string,
+    jobId: number
+  ): Promise<string> {
+    const path = `repos/${owner}/${name}/actions/jobs/${jobId}/logs`
+    const response = await this.ghRequest('GET', path, { redirect: 'manual' })
+
+    if (response.status === 410) {
+      throw new APIError(response, { message: 'Workflow logs have expired.' })
+    }
+
+    let logResponse = response
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('Location')
+      if (location === null) {
+        throw new Error('GitHub did not provide a workflow log download URL.')
+      }
+      logResponse = await fetch(location)
+    }
+
+    if (!logResponse.ok) {
+      throw new APIError(logResponse, null)
+    }
+
+    const bytes = new Uint8Array(await logResponse.arrayBuffer())
+    const truncated = bytes.byteLength > ActionsLogMaximumBytes
+    const content = new TextDecoder().decode(
+      truncated ? bytes.slice(0, ActionsLogMaximumBytes) : bytes
+    )
+    return truncated ? content + ActionsLogTruncationMarker : content
+  }
+
   /**
    * Triggers GitHub to rerequest an existing check suite, without pushing new
    * code to a repository.
@@ -1812,6 +1998,7 @@ export class API {
       body?: Object
       customHeaders?: Object
       reloadCache?: boolean
+      redirect?: RequestRedirect
     } = {}
   ): Promise<Response> {
     return await request(
@@ -1821,7 +2008,8 @@ export class API {
       path,
       options.body,
       options.customHeaders,
-      options.reloadCache
+      options.reloadCache,
+      options.redirect
     )
   }
 
@@ -1836,6 +2024,7 @@ export class API {
       body?: Object
       customHeaders?: Object
       reloadCache?: boolean
+      redirect?: RequestRedirect
     } = {}
   ): Promise<Response> {
     const response = await this.request(this.endpoint, method, path, options)

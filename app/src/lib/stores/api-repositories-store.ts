@@ -1,6 +1,6 @@
 import { BaseStore } from './base-store'
 import { AccountsStore } from './accounts-store'
-import { IAPIRepository, API } from '../api'
+import { IAPIOrganization, IAPIRepository, API } from '../api'
 import { Account, accountEquals } from '../../models/account'
 import { merge } from '../merge'
 
@@ -75,6 +75,32 @@ export interface IAccountRepositories {
    * being loaded for the first time or refreshed.
    */
   readonly loading: boolean
+
+  /** Organizations to which the authenticated account belongs. */
+  readonly organizations: ReadonlyArray<IAPIOrganization>
+
+  /** Whether organization membership is being loaded. */
+  readonly organizationsLoading: boolean
+
+  /** Full repository lists loaded on demand for individual organizations. */
+  readonly organizationRepositories: ReadonlyMap<
+    string,
+    IOrganizationRepositories
+  >
+}
+
+export interface IOrganizationRepositories {
+  readonly repositories: ReadonlyArray<IAPIRepository>
+  readonly loading: boolean
+  readonly error: Error | null
+}
+
+const EmptyAccountRepositories: IAccountRepositories = {
+  loading: false,
+  repositories: [],
+  organizations: [],
+  organizationsLoading: false,
+  organizationRepositories: new Map(),
 }
 
 /**
@@ -145,7 +171,7 @@ export class ApiRepositoriesStore extends BaseStore {
 
     const newRepositories =
       existingRepositories === undefined
-        ? merge({ loading: false, repositories: [] }, repositories)
+        ? merge(EmptyAccountRepositories, repositories)
         : merge(existingRepositories, repositories)
 
     newState.set(newOrExistingAccount, newRepositories)
@@ -156,6 +182,94 @@ export class ApiRepositoriesStore extends BaseStore {
 
   private getAccountState(account: Account) {
     return this.accountState.get(resolveAccount(account, this.accountState))
+  }
+
+  private updateOrganizationRepositories(
+    account: Account,
+    organization: string,
+    update: Partial<IOrganizationRepositories>
+  ) {
+    const state = this.getAccountState(account) ?? EmptyAccountRepositories
+    const organizationRepositories = new Map(state.organizationRepositories)
+    const key = organization.toLowerCase()
+    const existing = organizationRepositories.get(key) ?? {
+      repositories: [],
+      loading: false,
+      error: null,
+    }
+
+    organizationRepositories.set(key, { ...existing, ...update })
+    this.updateAccount(account, { organizationRepositories })
+  }
+
+  /** Load organization memberships for an account. */
+  public async loadOrganizations(account: Account) {
+    const currentState = this.getAccountState(account)
+    if (currentState?.organizationsLoading) {
+      return
+    }
+
+    this.updateAccount(account, { organizationsLoading: true })
+    try {
+      const api = API.fromAccount(resolveAccount(account, this.accountState))
+      const organizations = (await api.fetchOrgs())
+        .slice()
+        .sort((a, b) =>
+          a.login.localeCompare(b.login, undefined, { sensitivity: 'base' })
+        )
+      const known = new Set(organizations.map(x => x.login.toLowerCase()))
+      const organizationRepositories = new Map(
+        this.getAccountState(account)?.organizationRepositories ?? []
+      )
+      for (const login of organizationRepositories.keys()) {
+        if (!known.has(login)) {
+          organizationRepositories.delete(login)
+        }
+      }
+      this.updateAccount(account, { organizations, organizationRepositories })
+    } finally {
+      this.updateAccount(account, { organizationsLoading: false })
+    }
+  }
+
+  /** Load the complete visible repository list for one organization. */
+  public async loadOrganizationRepositories(
+    account: Account,
+    organization: IAPIOrganization
+  ) {
+    const key = organization.login.toLowerCase()
+    const current =
+      this.getAccountState(account)?.organizationRepositories.get(key)
+    if (current?.loading) {
+      return
+    }
+
+    this.updateOrganizationRepositories(account, key, {
+      loading: true,
+      error: null,
+    })
+    try {
+      const api = API.fromAccount(resolveAccount(account, this.accountState))
+      const repositories = await api.fetchOrgRepositories(organization.login)
+      this.updateOrganizationRepositories(account, key, {
+        repositories,
+        error: null,
+      })
+    } catch (error) {
+      this.updateOrganizationRepositories(account, key, {
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+    } finally {
+      this.updateOrganizationRepositories(account, key, { loading: false })
+    }
+  }
+
+  /** Refresh the account repository list and organization memberships. */
+  public async loadAll(account: Account) {
+    await Promise.all([
+      this.loadRepositories(account),
+      this.loadOrganizations(account),
+    ])
   }
 
   /**

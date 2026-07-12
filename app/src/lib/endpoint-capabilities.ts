@@ -156,6 +156,12 @@ export const supportsRetrieveActionWorkflowByCheckSuiteId = endpointSatisfies({
   dotcom: true,
 })
 
+/** Whether the endpoint exposes the repository Actions REST API. */
+export const supportsActions = endpointSatisfies({
+  dotcom: true,
+  es: '>= 3.1.0',
+})
+
 export const supportsAliveSessions = endpointSatisfies({ dotcom: true })
 
 export const supportsRepoRules = endpointSatisfies({ dotcom: true })

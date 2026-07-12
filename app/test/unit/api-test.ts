@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { API, getNextPagePathWithIncreasingPageSize } from '../../src/lib/api'
+import {
+  API,
+  ActionsLogMaximumBytes,
+  ActionsLogTruncationMarker,
+  getNextPagePathWithIncreasingPageSize,
+} from '../../src/lib/api'
+import { APIError } from '../../src/lib/http'
 import { CopilotError } from '../../src/lib/copilot-error'
 import * as URL from 'url'
 
@@ -50,6 +56,116 @@ function assertNext(current: IPageInfo, expected: IPageInfo) {
 }
 
 describe('API', () => {
+  describe('fetchOrgRepositories', () => {
+    it('requests the encoded organization repository endpoint', async () => {
+      const api = new API('https://api.github.com', 'token')
+      let path = ''
+      Reflect.set(api, 'fetchAll', async (value: string) => {
+        path = value
+        return []
+      })
+
+      await api.fetchOrgRepositories('desktop material')
+      assert.equal(path, 'orgs/desktop%20material/repos')
+    })
+  })
+
+  describe('Actions endpoints', () => {
+    it('builds workflow run filters and dispatch bodies', async () => {
+      const api = new API('https://api.github.com', 'token')
+      const requests = new Array<{
+        method: string
+        path: string
+        body?: Object
+      }>()
+      Reflect.set(
+        api,
+        'ghRequest',
+        async (method: string, path: string, options?: { body?: Object }) => {
+          requests.push({ method, path, body: options?.body })
+          return path.endsWith('/dispatches')
+            ? new Response(null, { status: 204 })
+            : new Response(
+                JSON.stringify({ total_count: 0, workflow_runs: [] }),
+                {
+                  status: 200,
+                }
+              )
+        }
+      )
+
+      await api.fetchWorkflowRuns('owner', 'repo', {
+        workflowId: 42,
+        branch: 'feature/a',
+        event: 'push',
+        status: 'success',
+      })
+      await api.dispatchWorkflow('owner', 'repo', 42, 'main', {
+        target: 'prod',
+      })
+
+      assert.equal(
+        requests[0].path,
+        'repos/owner/repo/actions/workflows/42/runs?per_page=50&branch=feature%2Fa&event=push&status=success'
+      )
+      assert.deepEqual(requests[1].body, {
+        ref: 'main',
+        inputs: { target: 'prod' },
+      })
+    })
+
+    it('follows job log redirects without forwarding request options', async () => {
+      const api = new API('https://api.github.com', 'secret')
+      Reflect.set(
+        api,
+        'ghRequest',
+        async () =>
+          new Response(null, {
+            status: 302,
+            headers: { Location: 'https://blob.example.test/job.txt' },
+          })
+      )
+      const originalFetch = globalThis.fetch
+      let receivedOptions: RequestInit | undefined
+      globalThis.fetch = async (_input, options) => {
+        receivedOptions = options
+        return new Response('hello from the job')
+      }
+
+      try {
+        assert.equal(
+          await api.fetchWorkflowJobLogs('owner', 'repo', 7),
+          'hello from the job'
+        )
+        assert.equal(receivedOptions, undefined)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
+    it('caps oversized job logs and identifies expired logs', async () => {
+      const api = new API('https://api.github.com', 'secret')
+      Reflect.set(
+        api,
+        'ghRequest',
+        async () =>
+          new Response(new Uint8Array(ActionsLogMaximumBytes + 10).fill(65))
+      )
+      const log = await api.fetchWorkflowJobLogs('owner', 'repo', 7)
+      assert(log.endsWith(ActionsLogTruncationMarker))
+
+      Reflect.set(
+        api,
+        'ghRequest',
+        async () => new Response(null, { status: 410 })
+      )
+      await assert.rejects(
+        api.fetchWorkflowJobLogs('owner', 'repo', 7),
+        error => error instanceof APIError && error.responseStatus === 410
+      )
+    })
+  })
+
   describe('getNextPagePathWithIncreasingPageSize', () => {
     it("returns null when there's no link header", () => {
       assert(getNextPagePathWithIncreasingPageSize(new Response()) === null)

@@ -3,6 +3,9 @@ import { createUniqueId, releaseUniqueId } from './id-pool'
 import classNames from 'classnames'
 
 interface ISelectProps {
+  /** Form name used to identify this select in shared change handlers. */
+  readonly name?: string
+
   /** The label for the select control. */
   readonly label?: string
 
@@ -62,6 +65,7 @@ export class Select extends React.Component<ISelectProps, ISelectState> {
       <div className={classNames('select-component', this.props.className)}>
         {this.renderLabel()}
         <select
+          name={this.props.name}
           id={this.state.inputId}
           onChange={this.props.onChange}
           value={this.props.value}

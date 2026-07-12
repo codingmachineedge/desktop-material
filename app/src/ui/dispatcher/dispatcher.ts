@@ -1,6 +1,7 @@
 import { Disposable } from 'event-kit'
 
 import {
+  API,
   IAPIOrganization,
   IAPIPullRequest,
   IAPIFullRepository,
@@ -9,6 +10,7 @@ import {
   getDotComAPIEndpoint,
   IAPICreatePushProtectionBypassResponse,
 } from '../../lib/api'
+import { getAccountForRepository } from '../../lib/get-account-for-repository'
 import { shell } from '../../lib/app-shell'
 import {
   CompareAction,
@@ -232,6 +234,35 @@ export class Dispatcher {
   /** Load the initial state for the app. */
   public loadInitialState(): Promise<void> {
     return this.appStore.loadInitialState()
+  }
+
+  /** Trigger a workflow_dispatch event for a repository workflow. */
+  public async triggerWorkflow(
+    repository: Repository,
+    workflowId: number,
+    ref: string,
+    inputs: Readonly<Record<string, string>>
+  ): Promise<void> {
+    const gitHubRepository = repository.gitHubRepository
+    if (gitHubRepository === null) {
+      throw new Error('The repository is not hosted on GitHub.')
+    }
+    const account = getAccountForRepository(
+      this.appStore.getState().accounts,
+      repository
+    )
+    if (account === null) {
+      throw new Error(
+        `Sign in to ${gitHubRepository.endpoint} to run workflows.`
+      )
+    }
+    await API.fromAccount(account).dispatchWorkflow(
+      gitHubRepository.owner.login,
+      gitHubRepository.name,
+      workflowId,
+      ref,
+      inputs
+    )
   }
 
   /** Load a newest-first page of commits from the active settings profile. */
@@ -3022,6 +3053,17 @@ export class Dispatcher {
    */
   public refreshApiRepositories(account: Account) {
     return this.appStore._refreshApiRepositories(account)
+  }
+
+  /** Load every repository visible in one of the account's organizations. */
+  public refreshApiOrganizationRepositories(
+    account: Account,
+    organization: IAPIOrganization
+  ) {
+    return this.appStore._refreshApiOrganizationRepositories(
+      account,
+      organization
+    )
   }
 
   /** Change the selected Branches foldout tab. */

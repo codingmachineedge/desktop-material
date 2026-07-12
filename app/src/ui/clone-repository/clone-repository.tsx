@@ -15,7 +15,12 @@ import {
   parseRemote,
 } from '../../lib/remote-parsing'
 import { findAccountForRemoteURL } from '../../lib/find-account'
-import { API, IAPIRepository, IAPIRepositoryCloneInfo } from '../../lib/api'
+import {
+  API,
+  IAPIOrganization,
+  IAPIRepository,
+  IAPIRepositoryCloneInfo,
+} from '../../lib/api'
 import { Dialog, DialogError, DialogFooter, DialogContent } from '../dialog'
 import { TabBar } from '../tab-bar'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
@@ -36,6 +41,7 @@ import {
   IBatchCloneInput,
   buildBatchCloneItems,
 } from '../../models/batch-clone'
+import { mergeOrganizationRepositories } from './org-filter-chips'
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -163,6 +169,9 @@ interface IGitHubTabState extends IBaseTabState {
    * single-select clone.
    */
   readonly checkedUrls: Set<string>
+
+  /** Organization login currently filtering this tab, or all repositories. */
+  readonly selectedOrganization: string | null
 }
 
 /** The component for cloning a repository. */
@@ -213,6 +222,7 @@ export class CloneRepository extends React.Component<
         filterText: '',
         selectedItem: null,
         checkedUrls: new Set<string>(),
+        selectedOrganization: null,
         ...initialBaseTabState,
       },
       enterpriseTabState: {
@@ -220,6 +230,7 @@ export class CloneRepository extends React.Component<
         filterText: '',
         selectedItem: null,
         checkedUrls: new Set<string>(),
+        selectedOrganization: null,
         ...initialBaseTabState,
       },
       urlTabState: {
@@ -384,6 +395,25 @@ export class CloneRepository extends React.Component<
           const accountState = this.props.apiRepositories.get(selectedAccount)
           const repositories =
             accountState === undefined ? null : accountState.repositories
+          const organization =
+            tabState.selectedOrganization === null
+              ? null
+              : accountState?.organizations.find(
+                  x => x.login === tabState.selectedOrganization
+                ) ?? null
+          const organizationState = organization
+            ? accountState?.organizationRepositories.get(
+                organization.login.toLowerCase()
+              )
+            : undefined
+          const visibleRepositories =
+            repositories === null || organization === null
+              ? repositories
+              : mergeOrganizationRepositories(
+                  repositories,
+                  organizationState?.repositories ?? [],
+                  organization.login
+                )
           const loading =
             accountState === undefined ? false : accountState.loading
 
@@ -396,8 +426,14 @@ export class CloneRepository extends React.Component<
               onSelectionChanged={this.onSelectionChanged}
               onPathChanged={this.onPathChanged}
               onChooseDirectory={this.onChooseDirectory}
-              repositories={repositories}
-              loading={loading}
+              repositories={visibleRepositories}
+              loading={loading || organizationState?.loading === true}
+              organizations={accountState?.organizations ?? []}
+              organizationsLoading={accountState?.organizationsLoading ?? false}
+              selectedOrganization={tabState.selectedOrganization}
+              organizationError={organizationState?.error ?? null}
+              onSelectedOrganizationChanged={this.onSelectedOrganizationChanged}
+              onRefreshOrganization={this.onRefreshOrganization}
               onRefreshRepositories={this.props.onRefreshRepositories}
               filterText={tabState.filterText}
               onFilterTextChanged={this.onFilterTextChanged}
@@ -420,8 +456,60 @@ export class CloneRepository extends React.Component<
   private onSelectedAccountChanged = (account: Account) => {
     if (this.props.selectedTab !== CloneRepositoryTab.Generic) {
       this.setGitHubTabState(
-        { selectedAccount: account },
+        {
+          selectedAccount: account,
+          selectedOrganization: null,
+          selectedItem: null,
+          checkedUrls: new Set<string>(),
+        },
         this.props.selectedTab
+      )
+    }
+  }
+
+  private onSelectedOrganizationChanged = (
+    organization: IAPIOrganization | null
+  ) => {
+    const tab = this.props.selectedTab
+    if (tab === CloneRepositoryTab.Generic) {
+      return
+    }
+
+    this.setGitHubTabState(
+      {
+        selectedOrganization: organization?.login ?? null,
+        selectedItem: null,
+        url: '',
+      },
+      tab
+    )
+
+    const account = this.getAccountForTab(tab)
+    if (account !== null && organization !== null) {
+      this.props.dispatcher.refreshApiOrganizationRepositories(
+        account,
+        organization
+      )
+    }
+  }
+
+  private onRefreshOrganization = () => {
+    const tab = this.props.selectedTab
+    if (tab === CloneRepositoryTab.Generic) {
+      return
+    }
+    const account = this.getAccountForTab(tab)
+    const login = this.getGitHubTabState(tab).selectedOrganization
+    const organization =
+      account === null || login === null
+        ? null
+        : this.props.apiRepositories
+            .get(account)
+            ?.organizations.find(x => x.login === login) ?? null
+    if (account !== null && organization !== null) {
+      this.props.dispatcher.refreshApiOrganizationRepositories(
+        account,
+        organization
       )
     }
   }
@@ -625,7 +713,14 @@ export class CloneRepository extends React.Component<
     const accountState = account
       ? this.props.apiRepositories.get(account)
       : undefined
-    const repositories = accountState?.repositories ?? null
+    const repositories = accountState
+      ? [
+          ...accountState.repositories,
+          ...Array.from(accountState.organizationRepositories.values()).flatMap(
+            x => x.repositories
+          ),
+        ]
+      : null
 
     const inputs: ReadonlyArray<IBatchCloneInput> = Array.from(
       tabState.checkedUrls
