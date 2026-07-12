@@ -769,9 +769,7 @@ export class Preferences extends React.Component<
           <AutomationPreferences
             accounts={this.props.accounts}
             settings={this.state.automationSettings}
-            onSettingsChanged={automationSettings =>
-              this.setState({ automationSettings })
-            }
+            onSettingsChanged={this.onAutomationSettingsChanged}
           />
         )
         break
@@ -794,6 +792,12 @@ export class Preferences extends React.Component<
     repositoryIndicatorsEnabled: boolean
   ) => {
     this.setState({ repositoryIndicatorsEnabled })
+  }
+
+  private onAutomationSettingsChanged = (
+    automationSettings: IAutomationSettingsState
+  ) => {
+    this.setState({ automationSettings })
   }
 
   private onLockFileDeleted = () => {

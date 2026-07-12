@@ -332,9 +332,7 @@ export class RepositorySettings extends React.Component<
         return (
           <AutomationOverrides
             overrides={this.state.automationOverrides}
-            onChanged={automationOverrides =>
-              this.setState({ automationOverrides })
-            }
+            onChanged={this.onAutomationOverridesChanged}
           />
         )
       }
@@ -646,6 +644,12 @@ export class RepositorySettings extends React.Component<
       buildRunPreferences,
       buildRunPreferencesHaveChanged: true,
     })
+  }
+
+  private onAutomationOverridesChanged = (
+    automationOverrides: IAutomationSettingsOverrides
+  ) => {
+    this.setState({ automationOverrides })
   }
 
   private onTabClicked = (index: number) => {
