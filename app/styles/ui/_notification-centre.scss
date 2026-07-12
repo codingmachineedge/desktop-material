@@ -46,8 +46,7 @@
   }
 
   &:focus-visible {
-    outline: 3px solid
-      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
     outline-offset: 1px;
   }
 }
@@ -173,8 +172,7 @@
   }
 
   &:focus-visible {
-    outline: 3px solid
-      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
     outline-offset: 1px;
   }
 }
@@ -203,8 +201,7 @@
     }
 
     &:focus-visible {
-      outline: 3px solid
-        color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
       outline-offset: 1px;
     }
   }
@@ -248,7 +245,6 @@
   padding: 12px;
   border-radius: 16px;
   background: transparent;
-  cursor: pointer;
   transition: background 200ms var(--emph), transform 200ms var(--spring-fast);
   animation: dmUp calc(300ms * var(--mdur, 1)) var(--spring);
 
@@ -267,11 +263,28 @@
       font-weight: var(--font-weight-bold);
     }
   }
+}
+
+// The primary clickable region of a row (icon + body). Rendered as a real
+// <button> for keyboard/AT support; the action chips sit outside it.
+.notification-item-activate {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 
   &:focus-visible {
-    outline: 3px solid
-      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
-    outline-offset: 1px;
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: 2px;
+    border-radius: 12px;
   }
 }
 
@@ -354,8 +367,7 @@
   color: var(--md-sys-color-on-surface-variant);
   opacity: 0.6;
   cursor: pointer;
-  transition: background 200ms var(--emph), color 200ms var(--emph),
-    opacity 200ms var(--emph), transform 160ms var(--spring-fast);
+  transition: background 200ms var(--emph), color 200ms var(--emph), opacity 200ms var(--emph), transform 160ms var(--spring-fast);
 
   .octicon {
     width: 15px;
@@ -373,8 +385,7 @@
 
   &:focus-visible {
     opacity: 1;
-    outline: 3px solid
-      color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
     outline-offset: 1px;
   }
 }

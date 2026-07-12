@@ -9,10 +9,10 @@ import {
   NotificationCentreCap,
   NotificationDedupeWindowMs,
   INotificationEntry,
-  NotificationInput,
+  INotificationInput,
 } from '../../src/models/notification-centre'
 
-const baseInput: NotificationInput = {
+const baseInput: INotificationInput = {
   kind: 'auto-commit',
   title: 'Auto commit',
   body: 'Committed 3 files',

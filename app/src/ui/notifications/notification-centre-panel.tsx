@@ -145,7 +145,6 @@ export class NotificationCentrePanel extends React.Component<
           type="button"
           className="notification-centre-icon-button"
           aria-label="Mark all as read"
-          title="Mark all as read"
           disabled={this.props.unreadCount === 0}
           onClick={this.onMarkAllRead}
         >
@@ -155,7 +154,6 @@ export class NotificationCentrePanel extends React.Component<
           type="button"
           className="notification-centre-icon-button"
           aria-label="Notification history"
-          title="Notification history"
           onClick={this.onShowHistory}
         >
           <Octicon symbol={octicons.history} />
@@ -168,7 +166,6 @@ export class NotificationCentrePanel extends React.Component<
           aria-label={
             this.state.confirmingClear ? 'Confirm clear all' : 'Clear all'
           }
-          title={this.state.confirmingClear ? 'Click again to clear' : 'Clear all'}
           disabled={this.props.entries.length === 0}
           onClick={this.onClearAll}
         >
@@ -178,7 +175,6 @@ export class NotificationCentrePanel extends React.Component<
           type="button"
           className="notification-centre-icon-button notification-centre-close"
           aria-label="Close notifications"
-          title="Close notifications"
           onClick={this.onClose}
         >
           <Octicon symbol={octicons.x} />
@@ -207,7 +203,8 @@ export class NotificationCentrePanel extends React.Component<
           className={classNames({ selected: filter === 'unread' })}
           onClick={this.onSelectUnread}
         >
-          Unread{this.props.unreadCount > 0 ? ` (${this.props.unreadCount})` : ''}
+          Unread
+          {this.props.unreadCount > 0 ? ` (${this.props.unreadCount})` : ''}
         </button>
       </div>
     )

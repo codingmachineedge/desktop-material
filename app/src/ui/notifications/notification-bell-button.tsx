@@ -31,7 +31,6 @@ export class NotificationBellButton extends React.Component<INotificationBellBut
         type="button"
         className={className}
         aria-label={label}
-        title={label}
         aria-pressed={isOpen}
         onClick={this.props.onClick}
       >

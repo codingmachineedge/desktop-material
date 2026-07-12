@@ -18,7 +18,7 @@ interface INotificationListItemProps {
 }
 
 /** The octicon shown in each notification's kind chip. */
-const kindIcons: Record<NotificationCentreKind, OcticonSymbolVariant> = {
+const kindIcons: Record<NotificationCentreKind, OcticonSymbol> = {
   'pr-review-submit': octicons.eye,
   'pr-comment': octicons.comment,
   'pr-checks-failed': octicons.xCircle,
@@ -44,13 +44,6 @@ export class NotificationListItem extends React.Component<INotificationListItemP
     this.props.onDelete(this.props.entry)
   }
 
-  private onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      this.onActivate()
-    }
-  }
-
   public render() {
     const { entry } = this.props
     const className = classNames('notification-item', `kind-${entry.kind}`, {
@@ -58,35 +51,30 @@ export class NotificationListItem extends React.Component<INotificationListItemP
     })
 
     return (
-      <li
-        className={className}
-        role="button"
-        tabIndex={0}
-        onClick={this.onActivate}
-        onKeyDown={this.onKeyDown}
-      >
-        <span className="notification-item-icon" aria-hidden="true">
-          <Octicon symbol={kindIcons[entry.kind] ?? octicons.info} />
-        </span>
-        <span className="notification-item-body">
-          <span className="notification-item-title">{entry.title}</span>
-          <span className="notification-item-text">{entry.body}</span>
-          <span className="notification-item-time">
-            <RelativeTime date={new Date(entry.createdAt)} />
+      <li className={className}>
+        <button
+          type="button"
+          className="notification-item-activate"
+          onClick={this.onActivate}
+        >
+          <span className="notification-item-icon" aria-hidden="true">
+            <Octicon symbol={kindIcons[entry.kind] ?? octicons.info} />
           </span>
-        </span>
+          <span className="notification-item-body">
+            <span className="notification-item-title">{entry.title}</span>
+            <span className="notification-item-text">{entry.body}</span>
+            <span className="notification-item-time">
+              <RelativeTime date={new Date(entry.createdAt)} />
+            </span>
+          </span>
+        </button>
         {!entry.read ? (
-          <span
-            className="notification-item-unread-dot"
-            aria-label="Unread"
-            title="Unread"
-          />
+          <span className="notification-item-unread-dot" aria-hidden="true" />
         ) : null}
         <button
           type="button"
           className="notification-item-read-toggle"
           aria-label={entry.read ? 'Mark as unread' : 'Mark as read'}
-          title={entry.read ? 'Mark as unread' : 'Mark as read'}
           onClick={this.onToggleRead}
         >
           <Octicon symbol={entry.read ? octicons.dotFill : octicons.check} />
@@ -95,7 +83,6 @@ export class NotificationListItem extends React.Component<INotificationListItemP
           type="button"
           className="notification-item-delete"
           aria-label="Delete notification"
-          title="Delete notification"
           onClick={this.onDelete}
         >
           <Octicon symbol={octicons.trash} />

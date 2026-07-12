@@ -37,8 +37,7 @@ export function NotificationHistoryDialog(
 ) {
   const { dispatcher } = props
   const source: IVersionedStoreHistorySource = {
-    getHistory: (skip, limit) =>
-      dispatcher.getNotificationHistory(skip, limit),
+    getHistory: (skip, limit) => dispatcher.getNotificationHistory(skip, limit),
     getFiles: sha => dispatcher.getNotificationHistoryFiles(sha),
     getDiff: (sha, file) => dispatcher.getNotificationHistoryDiff(sha, file),
     undoLastChange: () => dispatcher.undoLastNotificationChange(),

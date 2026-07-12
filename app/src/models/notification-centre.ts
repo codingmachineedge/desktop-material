@@ -37,7 +37,7 @@ export interface INotificationEntry {
 }
 
 /** The shape a caller supplies to create a notification. */
-export interface NotificationInput {
+export interface INotificationInput {
   readonly kind: NotificationCentreKind
   readonly title: string
   readonly body: string
@@ -76,9 +76,9 @@ export interface INotificationInsertResult {
   readonly pruned: number
 }
 
-/** Shape a {@link NotificationInput} into a full, unread entry. */
+/** Shape a {@link INotificationInput} into a full, unread entry. */
 export function shapeNotificationEntry(
-  input: NotificationInput,
+  input: INotificationInput,
   id: string,
   createdAt: Date
 ): INotificationEntry {
@@ -108,7 +108,7 @@ export function shapeNotificationEntry(
  */
 export function insertNotification(
   entries: ReadonlyArray<INotificationEntry>,
-  input: NotificationInput,
+  input: INotificationInput,
   id: string,
   now: Date,
   dedupeWindowMs: number = NotificationDedupeWindowMs,
@@ -199,19 +199,18 @@ export function parseNotificationLog(raw: string): INotificationLog | null {
   return { version: NotificationLogVersion, entries: valid }
 }
 
-const notificationKinds: ReadonlySet<NotificationCentreKind> = new Set<
-  NotificationCentreKind
->([
-  'pr-review-submit',
-  'pr-comment',
-  'pr-checks-failed',
-  'app-error',
-  'clone-batch',
-  'auto-commit',
-  'merge-all',
-  'auto-pull',
-  'info',
-])
+const notificationKinds: ReadonlySet<NotificationCentreKind> =
+  new Set<NotificationCentreKind>([
+    'pr-review-submit',
+    'pr-comment',
+    'pr-checks-failed',
+    'app-error',
+    'clone-batch',
+    'auto-commit',
+    'merge-all',
+    'auto-pull',
+    'info',
+  ])
 
 function coerceEntry(value: unknown): INotificationEntry | null {
   if (typeof value !== 'object' || value === null) {

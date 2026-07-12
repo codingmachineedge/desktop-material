@@ -379,7 +379,7 @@ import {
 import { NotificationCentreStore } from './notification-centre-store'
 import {
   INotificationEntry,
-  NotificationInput,
+  INotificationInput,
 } from '../../models/notification-centre'
 import { IProfileHistoryPage } from '../../models/profile'
 import * as ipcRenderer from '../ipc-renderer'
@@ -5072,7 +5072,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
    * other orchestrators (clone-batch, auto-commit, merge-all, auto-pull) that
    * post their summaries to the notification centre. Never throws.
    */
-  public postNotification(input: NotificationInput): void {
+  public postNotification(input: INotificationInput): void {
     this.notificationCentreStore
       .post(input)
       .catch(err => log.error('Failed to record notification', err))

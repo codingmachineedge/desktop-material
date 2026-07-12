@@ -22,7 +22,7 @@ import {
   parseNotificationLog,
   serializeNotificationLog,
   INotificationEntry,
-  NotificationInput,
+  INotificationInput,
 } from '../../models/notification-centre'
 import { IProfileHistoryPage } from '../../models/profile'
 
@@ -45,7 +45,7 @@ export interface INotificationCentreState {
  * mark read/unread, delete, mark-all, clear) updates the in-memory list, emits,
  * and queues a granular commit so the full history can be browsed and restored.
  *
- * Like {@link ProfileStore} the store is defensive: if it cannot initialize it
+ * Like `ProfileStore` the store is defensive: if it cannot initialize it
  * disables itself and every method becomes a no-op, so a failure here can never
  * break the rest of the application.
  */
@@ -70,10 +70,7 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
   public initialize(): Promise<void> {
     if (this.initialization === null) {
       this.initialization = this.initializeOnce().catch(err => {
-        log.error(
-          'NotificationCentreStore failed to initialize; disabled',
-          err
-        )
+        log.error('NotificationCentreStore failed to initialize; disabled', err)
         this.enabled = false
       })
     }
@@ -119,7 +116,7 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
   }
 
   /** Record a new notification (or coalesce a recent duplicate). */
-  public async post(input: NotificationInput): Promise<void> {
+  public async post(input: INotificationInput): Promise<void> {
     await this.initialize()
     if (!this.enabled) {
       return
@@ -127,7 +124,7 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
     await this.postInternal(input)
   }
 
-  private async postInternal(input: NotificationInput): Promise<void> {
+  private async postInternal(input: INotificationInput): Promise<void> {
     const { entries, entry, deduped, pruned } = insertNotification(
       this.entries,
       input,
@@ -324,7 +321,7 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
 
   /**
    * Write the current entries to disk and queue a commit. File writes are
-   * serialized behind {@link writeChain}; because each write serializes the full
+   * serialized behind `queue`; because each write serializes the full
    * entry list, the last write always reflects the final in-memory state even
    * when several mutations race.
    */

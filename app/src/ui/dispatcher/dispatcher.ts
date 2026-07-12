@@ -77,7 +77,7 @@ import { GitHubRepository } from '../../models/github-repository'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { Popup, PopupType } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
-import { NotificationInput } from '../../models/notification-centre'
+import { INotificationInput } from '../../models/notification-centre'
 import {
   PullRequest,
   PullRequestSuggestedNextAction,
@@ -266,7 +266,7 @@ export class Dispatcher {
    * Record an in-app notification. Public API for other workstreams
    * (clone-batch, auto-commit, merge-all, auto-pull) to surface events.
    */
-  public postNotification(input: NotificationInput): void {
+  public postNotification(input: INotificationInput): void {
     this.appStore.postNotification(input)
   }
 
