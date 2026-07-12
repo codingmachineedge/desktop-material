@@ -265,6 +265,8 @@ export class RepositoriesList extends React.Component<
       return group.owner.login
     } else if (kind === 'recent') {
       return 'Recent'
+    } else if (kind === 'custom') {
+      return group.name
     } else {
       assertNever(kind, `Unknown repository group kind ${kind}`)
     }
@@ -312,6 +314,8 @@ export class RepositoriesList extends React.Component<
       externalEditorLabel: this.props.externalEditorLabel,
       onChangeRepositoryAlias: this.onChangeRepositoryAlias,
       onRemoveRepositoryAlias: this.onRemoveRepositoryAlias,
+      onChangeRepositoryGroupName: this.onChangeRepositoryGroupName,
+      onRemoveRepositoryGroupName: this.onRemoveRepositoryGroupName,
       onViewOnGitHub: this.props.onViewOnGitHub,
       onCreateWorktree: enableWorktreeSupport()
         ? this.onCreateWorktree
@@ -509,6 +513,17 @@ export class RepositoriesList extends React.Component<
 
   private onRemoveRepositoryAlias = (repository: Repository) => {
     this.props.dispatcher.changeRepositoryAlias(repository, null)
+  }
+
+  private onChangeRepositoryGroupName = (repository: Repository) => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.ChangeRepositoryGroupName,
+      repository,
+    })
+  }
+
+  private onRemoveRepositoryGroupName = (repository: Repository) => {
+    this.props.dispatcher.changeRepositoryGroupName(repository, null)
   }
 
   private onCreateWorktree = (repository: Repository) => {

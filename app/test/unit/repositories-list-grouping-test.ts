@@ -175,4 +175,42 @@ describe('repository list grouping', () => {
       [2]
     )
   })
+
+  it('combines repositories from different hosts in a custom group', () => {
+    const customLocal = new Repository(
+      'custom-local',
+      10,
+      null,
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      null,
+      undefined,
+      'Clients'
+    )
+    const customGitHub = new Repository(
+      'custom-github',
+      11,
+      gitHubRepoFixture({ owner: 'octocat', name: 'custom-github' }),
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      null,
+      undefined,
+      'Clients'
+    )
+    const grouped = groupRepositories([customGitHub, customLocal], cache, [])
+
+    assert.equal(grouped.length, 1)
+    assert.equal(grouped[0].identifier.kind, 'custom')
+    assert.equal((grouped[0].identifier as any).name, 'Clients')
+    assert.deepEqual(
+      grouped[0].items.map(item => item.repository.id),
+      [11, 10]
+    )
+  })
 })

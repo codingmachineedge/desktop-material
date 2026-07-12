@@ -5933,6 +5933,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.repositoriesStore.updateRepositoryAlias(repository, newAlias)
   }
 
+  public async _changeRepositoryGroupName(
+    repository: Repository,
+    newGroupName: string | null
+  ): Promise<void> {
+    return this.repositoriesStore.updateRepositoryGroupName(
+      [repository],
+      newGroupName
+    )
+  }
+
   /** This shouldn't be called directly. See `Dispatcher`. */
   public async _renameBranch(
     repository: Repository,

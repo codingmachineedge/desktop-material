@@ -20,6 +20,8 @@ interface IRepositoryListItemContextMenuConfig {
   onRemoveRepository: (repository: Repositoryish) => void
   onChangeRepositoryAlias: (repository: Repository) => void
   onRemoveRepositoryAlias: (repository: Repository) => void
+  onChangeRepositoryGroupName: (repository: Repository) => void
+  onRemoveRepositoryGroupName: (repository: Repository) => void
   onCreateWorktree?: (repository: Repository) => void
   onShowWorktrees?: (repository: Repository) => void
   isPinned?: boolean
@@ -57,6 +59,7 @@ export const generateRepositoryListContextMenu = (
         ]
       : []),
     ...buildAliasMenuItems(config),
+    ...buildGroupNameMenuItems(config),
     ...buildWorktreeMenuItems(config),
     {
       label: __DARWIN__ ? 'Copy Repo Name' : 'Copy repo name',
@@ -94,6 +97,29 @@ export const generateRepositoryListContextMenu = (
     },
   ]
 
+  return items
+}
+
+const buildGroupNameMenuItems = (
+  config: IRepositoryListItemContextMenuConfig
+): ReadonlyArray<IMenuItem> => {
+  const { repository } = config
+  if (!(repository instanceof Repository)) {
+    return []
+  }
+
+  const items: Array<IMenuItem> = [
+    {
+      label: __DARWIN__ ? 'Change Group Name…' : 'Change group name…',
+      action: () => config.onChangeRepositoryGroupName(repository),
+    },
+  ]
+  if (repository.groupName !== null) {
+    items.push({
+      label: __DARWIN__ ? 'Restore Group Name' : 'Restore group name',
+      action: () => config.onRemoveRepositoryGroupName(repository),
+    })
+  }
   return items
 }
 

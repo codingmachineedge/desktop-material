@@ -19,6 +19,10 @@ export type RepositoryListGroup =
       kind: 'pinned' | 'recent' | 'other'
     }
   | {
+      kind: 'custom'
+      name: string
+    }
+  | {
       kind: 'dotcom'
       owner: Owner
     }
@@ -39,12 +43,14 @@ export const getGroupKey = (group: RepositoryListGroup) => {
       return `0:pinned`
     case 'recent':
       return `1:recent`
+    case 'custom':
+      return `2:custom:${group.name.toLocaleLowerCase()}`
     case 'dotcom':
-      return `2:dotcom:${group.owner.login}`
+      return `3:dotcom:${group.owner.login}`
     case 'enterprise':
-      return `3:enterprise:${group.host}`
+      return `4:enterprise:${group.host}`
     case 'other':
-      return `4:other`
+      return `5:other`
     default:
       assertNever(group, `Unknown repository group kind ${kind}`)
   }
@@ -66,6 +72,9 @@ const getHostForRepository = (repo: RepositoryWithGitHubRepository) =>
   new URL(getHTMLURL(repo.gitHubRepository.endpoint)).host
 
 const getGroupForRepository = (repo: Repositoryish): RepositoryListGroup => {
+  if (repo instanceof Repository && repo.groupName !== null) {
+    return { kind: 'custom', name: repo.groupName }
+  }
   if (repo instanceof Repository && isRepositoryWithGitHubRepository(repo)) {
     return isDotCom(repo.gitHubRepository.endpoint)
       ? { kind: 'dotcom', owner: repo.gitHubRepository.owner }
