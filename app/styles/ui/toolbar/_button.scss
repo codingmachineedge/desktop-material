@@ -66,7 +66,10 @@
     }
 
     &:not(:disabled):hover {
-      background-color: var(--toolbar-button-hover-background-color);
+      // MD3 de-stock: non-app-bar toolbar buttons pick up an on-surface state
+      // layer instead of the stock flat gray fill. (App-bar chips get their own
+      // more-specific hover treatment in _material-shell.scss.)
+      background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
       color: var(--toolbar-button-hover-color);
       border-color: var(--toolbar-button-hover-border-color);
 
@@ -97,7 +100,9 @@
     background-color: var(--toolbar-button-background-color);
     color: var(--toolbar-button-color);
 
-    border-right: 1px solid var(--toolbar-button-border-color);
+    // MD3 de-stock: segment divider uses the Material outline instead of the
+    // stock black/box border (app-bar chips drop this border in the shell).
+    border-right: 1px solid var(--md-sys-color-outline-variant);
 
     .icon {
       flex-shrink: 0;

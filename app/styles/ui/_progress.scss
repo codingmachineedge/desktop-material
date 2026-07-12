@@ -1,18 +1,23 @@
 progress {
   -webkit-appearance: none;
   height: 10px;
-  background-color: var(--box-alt-background-color);
+  // MD3 de-stock: tonal track + primary indicator, rounded like an M3 linear
+  // progress bar instead of the stock on-surface fill on a container track.
+  background-color: var(--md-sys-color-surface-container-highest);
+  border-radius: 999px;
+  overflow: hidden;
 
   &::-webkit-progress-bar {
     background-color: transparent;
   }
 
   &::-webkit-progress-value {
-    background-color: var(--text-color);
+    background-color: var(--md-sys-color-primary);
+    border-radius: 999px;
   }
 
   &:indeterminate {
-    background-image: -webkit-linear-gradient(-45deg, transparent 33%, var(--text-color) 33%, var(--text-color) 66%, transparent 66%);
+    background-image: -webkit-linear-gradient(-45deg, transparent 33%, var(--md-sys-color-primary) 33%, var(--md-sys-color-primary) 66%, transparent 66%);
     background-size: 25px 10px, 100% 100%, 100% 100%;
 
     -webkit-animation: progress-indeterminate-animation 5s linear infinite;
