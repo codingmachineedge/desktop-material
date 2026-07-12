@@ -46,6 +46,7 @@ These features are implemented and live on `main`.
 
 **Repository safety and cleanup**
 - A context-menu option can permanently discard changes without sending files to the trash, including untracked files, for large cleanup operations where the regular discard flow would be slow
+- Local-only branches use a clear publish indicator, including branches whose configured upstream was deleted
 
 **Dynamic UI scaling**
 - A UI-scale slider (50–200%) in Preferences → Appearance plus auto-fit-to-window that shrinks the interface to fit smaller windows (on by default), composing with `Ctrl` `+` / `-` / `0`

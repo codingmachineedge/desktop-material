@@ -76,6 +76,26 @@ describe('BranchListItem', () => {
     assert.equal(droppedOnBranch, 'release')
   })
 
+  it('marks a local-only branch as unpublished', () => {
+    const view = render(
+      <BranchListItem
+        name="topic"
+        isCurrentBranch={false}
+        isLocalOnly={true}
+        matches={noMatches}
+        authorDate={undefined}
+      />
+    )
+
+    const item = view.container.querySelector('.branches-list-item')
+    assert.notEqual(item, null)
+    assert(item?.classList.contains('local-only'))
+    assert.equal(
+      screen.getByLabelText('Branch has not been published').tagName,
+      'svg'
+    )
+  })
+
   it('drops dragged commits onto the current branch callback', () => {
     let droppedOnCurrentBranch = 0
 

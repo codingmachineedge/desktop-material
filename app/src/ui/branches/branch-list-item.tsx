@@ -21,6 +21,9 @@ interface IBranchListItemProps {
   /** Specifies whether this item is currently selected */
   readonly isCurrentBranch: boolean
 
+  /** Whether the local branch has no live upstream branch. */
+  readonly isLocalOnly?: boolean
+
   /** The characters in the branch name to highlight */
   readonly matches: IMatches
 
@@ -93,14 +96,20 @@ export class BranchListItem extends React.Component<
   }
 
   public render() {
-    const { authorDate, isCurrentBranch, name } = this.props
+    const {
+      authorDate,
+      isCurrentBranch,
+      isLocalOnly = false,
+      name,
+    } = this.props
 
     // The leading glyph stays the branch icon for every row; the "current"
     // branch is marked instead by a trailing check_circle (spec-overlays §4.3).
-    const icon = octicons.gitBranch
+    const icon = isLocalOnly ? octicons.upload : octicons.gitBranch
     const className = classNames('branches-list-item', {
       'drop-target': this.state.isDragInProgress,
       'current-branch': isCurrentBranch,
+      'local-only': isLocalOnly,
     })
 
     return (
@@ -115,7 +124,11 @@ export class BranchListItem extends React.Component<
         onMouseLeave={this.onMouseLeave}
         onMouseUp={this.onMouseUp}
       >
-        <Octicon className="icon" symbol={icon} />
+        <Octicon
+          className="icon"
+          symbol={icon}
+          title={isLocalOnly ? 'Branch has not been published' : undefined}
+        />
         <TooltippedContent
           className="name"
           tooltip={name}

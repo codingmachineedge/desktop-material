@@ -18,6 +18,7 @@ export async function getBranches(
     fullName: '%(refname)',
     shortName: '%(refname:short)',
     upstreamShortName: '%(upstream:short)',
+    upstreamTrackingBranch: '%(upstream:track)',
     sha: '%(objectname)',
     symRef: '%(symref)',
   })
@@ -57,7 +58,11 @@ export async function getBranches(
     const upstream =
       ref.upstreamShortName.length > 0 ? ref.upstreamShortName : null
 
-    branches.push(new Branch(ref.shortName, upstream, tip, type, ref.fullName))
+    const isGone = ['[gone]', '(gone)'].includes(ref.upstreamTrackingBranch)
+
+    branches.push(
+      new Branch(ref.shortName, upstream, tip, type, ref.fullName, isGone)
+    )
   }
 
   return branches

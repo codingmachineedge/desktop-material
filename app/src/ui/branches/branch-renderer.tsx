@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import { Branch } from '../../models/branch'
+import { Branch, BranchType } from '../../models/branch'
 
 import { IBranchListItem } from './group-branches'
 import { BranchListItem } from './branch-list-item'
@@ -18,10 +18,13 @@ export function renderDefaultBranch(
 ): JSX.Element {
   const branch = item.branch
   const currentBranchName = currentBranch ? currentBranch.name : null
+  const isLocalOnly =
+    branch.type === BranchType.Local && (branch.upstream === null || branch.isGone)
   return (
     <BranchListItem
       name={branch.name}
       isCurrentBranch={branch.name === currentBranchName}
+      isLocalOnly={isLocalOnly}
       authorDate={authorDate}
       matches={matches}
       onDropOntoBranch={onDropOntoBranch}
@@ -35,9 +38,13 @@ export function getDefaultAriaLabelForBranch(
   authorDate: Date | undefined
 ): string {
   const branch = item.branch
+  const localOnlySuffix =
+    branch.type === BranchType.Local && (branch.upstream === null || branch.isGone)
+      ? ', not published'
+      : ''
 
   if (!authorDate) {
-    return branch.name
+    return `${branch.name}${localOnlySuffix}`
   }
 
   const { relativeText, absoluteText } = getRelativeTimeInfoFromDate(
@@ -45,7 +52,7 @@ export function getDefaultAriaLabelForBranch(
     true
   )
 
-  return `${item.branch.name} ${
+  return `${item.branch.name}${localOnlySuffix} ${
     getPreferAbsoluteDates() ? absoluteText : relativeText
   }`
 }
