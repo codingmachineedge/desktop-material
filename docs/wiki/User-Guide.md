@@ -1,17 +1,44 @@
 # User Guide
 
-A task-oriented tour of Desktop Material's headline features. It assumes you already know the basic
-GitHub Desktop workflow (clone, commit, push, branch, pull request) — that all still works. This
-guide focuses on what Desktop Material adds on top.
+A task-oriented tour of Desktop Material's features. It assumes you already know the basic GitHub
+Desktop workflow (clone, commit, push, branch, pull request) — that all still works. This guide
+focuses on what Desktop Material adds on top.
 
+**Shipped today**
+
+- [The shell](#the-shell)
 - [Signing in](#signing-in)
 - [Repository tabs](#repository-tabs)
 - [Settings history](#settings-history)
+- [Non-modal dialogs](#non-modal-dialogs)
+
+**On the roadmap** (not yet implemented)
+
 - [Multi-clone](#multi-clone)
 - [One-click commit & push](#one-click-commit--push)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
 - [UI scaling](#ui-scaling)
+
+---
+
+## The shell
+
+Desktop Material rebuilds the GitHub Desktop shell around Material Design 3. The chrome you work in
+every day is made of a few pieces:
+
+- **A left icon navigation rail** with entries for **Changes** (with a count badge), **History**,
+  **Branches**, **Settings**, and your **account avatar** at the bottom.
+- **A floating pill toolbar** across the top carrying a **repository chip** and a **branch chip**,
+  plus a **sync pill** that shows an ahead badge when you have commits to push.
+- **Browser-like repository tabs** (see [Repository tabs](#repository-tabs)) above the workspace.
+- **Floating, radius-24 workspace cards** for Changes, the diff, History, and the empty/welcome
+  states, with tri-state selection checkboxes, tonal status chips, token-based diff colors, and an
+  inverse-surface undo banner.
+
+The whole shell has an **animated light/dark theme**. Everything below tells you how to drive it.
+
+![Desktop Material Changes view with the MD3 shell](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-workspace-changes.png)
 
 ---
 
@@ -102,9 +129,33 @@ non-modal right-side sheet; the workspace remains usable while it is open.
 
 ---
 
+## Non-modal dialogs
+
+Desktop Material's dialogs are **non-modal floating surfaces** — the main window stays fully
+interactive while a dialog is open.
+
+- **Drag a dialog by its header** to reposition it, and keep working in the app behind it.
+- **Click or focus a dialog to bring it to front**; multiple open dialogs **cascade** so you can see
+  them all.
+- OS-native pickers (file open/save) stay native.
+
+**Preferences** is the reference surface: an MD3 940×660 dialog with a left navigation rail, an
+**Active** chip on the current section, and a pill footer. The **repository** and **branch** pickers
+open as MD3 **side sheets** rather than blocking modals.
+
+![Preferences as an MD3 dialog](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-settings.png)
+
+---
+
+# On the roadmap
+
+> Everything below this line is **planned and not yet implemented**. It is documented here as a
+> preview of the queued milestones; today it is not available in the app. Track progress in the
+> project's [`PLAN.md`](https://github.com/codingmachineedge/desktop-material/blob/main/PLAN.md).
+
 ## Multi-clone
 
-The multi-clone window (see `07-clone.png`) clones **many repositories in one pass**.
+The planned multi-clone window will clone **many repositories in one pass**.
 
 1. Open **Clone → Multiple repositories** (or the multi-clone entry in the repositories menu).
 2. The list shows every repository available to the active account. Use the **search bar** — with
