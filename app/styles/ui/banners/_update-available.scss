@@ -1,8 +1,12 @@
 #update-available {
+  // MD3 tonal update banner (primary-container).
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+
   .download-icon,
   .warning-icon {
     margin-right: var(--spacing);
-    color: var(--banner-warning-icon-color);
+    color: var(--md-sys-color-on-primary-container);
   }
 
   .banner-emoji {
@@ -10,12 +14,22 @@
     margin-right: var(--spacing-half);
   }
 
+  a {
+    color: var(--md-sys-color-on-primary-container);
+  }
+
+  // Urgent updates escalate to an amber tonal banner.
   &.priority {
-    background-color: var(--banner-warning-background);
-    color: var(--banner-warning-text-color);
+    background: var(--dm-amber-container);
+    color: var(--md-sys-color-on-surface);
+
+    .download-icon,
+    .warning-icon {
+      color: var(--dm-amber);
+    }
 
     a {
-      color: var(--banner-warning-link-color);
+      color: var(--md-sys-color-on-surface);
     }
   }
 }

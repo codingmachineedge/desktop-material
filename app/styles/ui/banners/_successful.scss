@@ -1,5 +1,9 @@
 #successful,
 #successful-merge {
+  // MD3 tonal success banner.
+  background: var(--dm-green-container);
+  color: var(--md-sys-color-on-surface);
+
   .banner-message {
     span {
       max-width: 100%;
@@ -12,7 +16,7 @@
   }
 
   .green-circle {
-    color: var(--color-new);
+    color: var(--dm-green);
     display: flex;
     justify-content: center;
     align-items: center;

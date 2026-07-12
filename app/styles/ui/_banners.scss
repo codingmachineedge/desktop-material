@@ -5,7 +5,7 @@
 @import 'banners/os-not-supported';
 
 .banner {
-  $banner-height: 30px;
+  $banner-height: 48px;
   height: $banner-height;
   position: relative;
   display: flex;
@@ -14,7 +14,7 @@
   align-content: center;
   align-items: center;
   justify-content: space-between;
-  padding-left: var(--spacing);
+  padding-left: var(--spacing-double);
 
   // Prevents the notification banner from decreasing its height
   // when a large diff is rendered.
@@ -40,15 +40,21 @@
     }
 
     button {
-      width: 16px;
-      height: 16px;
+      // MD3 icon button: round 32px hit target with a state-layer hover.
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
       border: 0;
       padding: 0;
-      color: var(--text-secondary-color);
+      border-radius: 999px;
+      color: currentColor;
       background: transparent;
+      transition: background-color 120ms ease;
 
       &:hover {
-        color: var(--text-color);
+        background: color-mix(in srgb, currentColor 12%, transparent);
       }
     }
   }

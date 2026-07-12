@@ -2,6 +2,10 @@
 #rebase-conflicts-banner,
 #cherry-pick-conflicts-banner,
 #conflicts-found-banner {
+  // MD3 tonal conflict banner.
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+
   .banner-message {
     span {
       max-width: 100%;
@@ -13,6 +17,6 @@
     flex: 1 1 auto;
   }
   .alert-icon {
-    fill: var(--color-conflicted);
+    fill: var(--md-sys-color-on-error-container);
   }
 }
