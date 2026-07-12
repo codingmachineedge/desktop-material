@@ -45,6 +45,15 @@ export function getActionsRepositoryKey(repository: GitHubRepository): string {
   return `${repository.endpoint}/${repository.owner.login}/${repository.name}`
 }
 
+/** GitHub Actions is available only for GitHub-backed authenticated accounts. */
+export function accountSupportsActions(
+  repository: GitHubRepository,
+  accounts: ReadonlyArray<Account>
+): boolean {
+  const account = getAccountForEndpoint(accounts, repository.endpoint)
+  return account?.provider === 'github' && supportsActions(repository.endpoint)
+}
+
 /** Compare the API fields used by the run list before notifying subscribers. */
 export function workflowRunsEqual(
   left: ReadonlyArray<IAPIWorkflowRun>,
@@ -98,7 +107,8 @@ export class ActionsStore {
     subscription.callbacks.add(callback)
 
     const state =
-      this.states.get(key) ?? emptyState(supportsActions(repository.endpoint))
+      this.states.get(key) ??
+      emptyState(accountSupportsActions(repository, this.accounts))
     this.states.set(key, state)
     callback(state)
     this.startPolling()
@@ -153,7 +163,7 @@ export class ActionsStore {
 
   private apiFor(repository: GitHubRepository): API {
     const account = getAccountForEndpoint(this.accounts, repository.endpoint)
-    if (account === null) {
+    if (account === null || account.provider !== 'github') {
       throw new Error(`Sign in to ${repository.endpoint} to use Actions.`)
     }
     return API.fromAccount(account)
@@ -165,7 +175,8 @@ export class ActionsStore {
   ): Promise<void> {
     const key = getActionsRepositoryKey(repository)
     const existing =
-      this.states.get(key) ?? emptyState(supportsActions(repository.endpoint))
+      this.states.get(key) ??
+      emptyState(accountSupportsActions(repository, this.accounts))
     if (!existing.supported) {
       this.notify(repository, existing)
       return

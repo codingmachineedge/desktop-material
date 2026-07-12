@@ -40,7 +40,10 @@ import { PullRequestSuggestedNextAction } from '../models/pull-request'
 import { clamp } from '../lib/clamp'
 import { Emoji } from '../lib/emoji'
 import { PopupType } from '../models/popup'
-import { ActionsStore } from '../lib/stores/actions-store'
+import {
+  accountSupportsActions,
+  ActionsStore,
+} from '../lib/stores/actions-store'
 import { ActionsView } from './actions'
 
 interface IRepositoryViewProps {
@@ -165,6 +168,20 @@ export class RepositoryView extends React.Component<
   IRepositoryViewProps,
   IRepositoryViewState
 > {
+  private supportsGitHubActions() {
+    const repository = this.props.repository.gitHubRepository
+    return (
+      repository !== null &&
+      accountSupportsActions(repository, this.props.accounts)
+    )
+  }
+
+  private getSelectedSection() {
+    return this.props.state.selectedSection === RepositorySectionTab.Actions &&
+      !this.supportsGitHubActions()
+      ? RepositorySectionTab.Changes
+      : this.props.state.selectedSection
+  }
   private previousSection: RepositorySectionTab =
     this.props.state.selectedSection
 
@@ -223,10 +240,11 @@ export class RepositoryView extends React.Component<
   }
 
   private renderTabs(): JSX.Element {
+    const selectedSection = this.getSelectedSection()
     const selectedTab =
-      this.props.state.selectedSection === RepositorySectionTab.Changes
+      selectedSection === RepositorySectionTab.Changes
         ? Tab.Changes
-        : this.props.state.selectedSection === RepositorySectionTab.History
+        : selectedSection === RepositorySectionTab.History
         ? Tab.History
         : Tab.Actions
 
@@ -250,7 +268,7 @@ export class RepositoryView extends React.Component<
           </span>
           <span className="rail-label">History</span>
         </span>
-        {this.props.repository.gitHubRepository !== null && (
+        {this.supportsGitHubActions() && (
           <span className="rail-item" id="actions-tab">
             <span className="rail-pill">
               <Octicon symbol={octicons.workflow} className="rail-icon" />
@@ -482,7 +500,7 @@ export class RepositoryView extends React.Component<
   }
 
   private renderSidebarContents(): JSX.Element | null {
-    const selectedSection = this.props.state.selectedSection
+    const selectedSection = this.getSelectedSection()
 
     if (selectedSection === RepositorySectionTab.Changes) {
       return this.renderChangesSidebar()
@@ -504,7 +522,7 @@ export class RepositoryView extends React.Component<
   }
 
   private renderSidebar(): JSX.Element {
-    if (this.props.state.selectedSection === RepositorySectionTab.Actions) {
+    if (this.getSelectedSection() === RepositorySectionTab.Actions) {
       return <React.Fragment />
     }
     return (
@@ -749,7 +767,7 @@ export class RepositoryView extends React.Component<
   }
 
   private renderContent(): JSX.Element | null {
-    const selectedSection = this.props.state.selectedSection
+    const selectedSection = this.getSelectedSection()
     if (selectedSection === RepositorySectionTab.Changes) {
       return this.renderContentForChanges()
     } else if (selectedSection === RepositorySectionTab.History) {
@@ -833,7 +851,7 @@ export class RepositoryView extends React.Component<
           ? RepositorySectionTab.Changes
           : event.key === '2'
           ? RepositorySectionTab.History
-          : event.key === '3' && this.props.repository.gitHubRepository !== null
+          : event.key === '3' && this.supportsGitHubActions()
           ? RepositorySectionTab.Actions
           : null
       if (shortcut !== null) {
@@ -854,14 +872,13 @@ export class RepositoryView extends React.Component<
   }
 
   private changeTab() {
-    const sections =
-      this.props.repository.gitHubRepository === null
-        ? [RepositorySectionTab.Changes, RepositorySectionTab.History]
-        : [
-            RepositorySectionTab.Changes,
-            RepositorySectionTab.History,
-            RepositorySectionTab.Actions,
-          ]
+    const sections = !this.supportsGitHubActions()
+      ? [RepositorySectionTab.Changes, RepositorySectionTab.History]
+      : [
+          RepositorySectionTab.Changes,
+          RepositorySectionTab.History,
+          RepositorySectionTab.Actions,
+        ]
     const current = sections.indexOf(this.props.state.selectedSection)
     const section = sections[(current + 1) % sections.length]
 
