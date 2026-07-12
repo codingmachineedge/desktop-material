@@ -227,9 +227,7 @@ export class Appearance extends React.Component<
           className="auto-fit-zoom"
           label="Automatically shrink the interface to fit small windows"
           value={
-            this.props.autoFitZoomEnabled
-              ? CheckboxValue.On
-              : CheckboxValue.Off
+            this.props.autoFitZoomEnabled ? CheckboxValue.On : CheckboxValue.Off
           }
           onChange={this.onAutoFitZoomEnabledChanged}
         />
