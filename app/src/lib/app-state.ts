@@ -67,6 +67,7 @@ import { ICustomIntegration } from './custom-integration'
 import { Emoji } from './emoji'
 import { IUpdateState } from '../ui/lib/update-store'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
+import type { IAutomationSettingsState } from './automation/automation-settings'
 
 export enum SelectionType {
   Repository,
@@ -89,6 +90,7 @@ export type PossibleSelections =
 
 /** All of the shared app state. */
 export interface IAppState {
+  readonly automationSettings: IAutomationSettingsState
   readonly accounts: ReadonlyArray<Account>
   /**
    * The current list of repositories tracked in the application

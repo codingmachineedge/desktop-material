@@ -297,6 +297,13 @@ import {
   selectWorkingDirectoryFiles,
 } from './updates/changes-state'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
+import {
+  IAutomationSettingsState,
+  loadAutomationSettings,
+  saveAutomationSettings,
+  saveRepositoryAutomationOverrides,
+  IAutomationSettingsOverrides,
+} from '../automation/automation-settings'
 import { BranchPruner } from './helpers/branch-pruner'
 import {
   enableCopilotConflictResolution,
@@ -585,6 +592,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private recentRepositories: ReadonlyArray<number> = new Array<number>()
 
   private selectedRepository: Repository | CloningRepository | null = null
+  private automationSettings: IAutomationSettingsState =
+    loadAutomationSettings()
 
   /** The background fetcher for the currently selected repository. */
   private currentBackgroundFetcher: BackgroundFetcher | null = null
@@ -1375,6 +1384,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     return {
       accounts: this.accounts,
+      automationSettings: this.automationSettings,
       repositories,
       recentRepositories: this.recentRepositories,
       localRepositoryStateLookup: this.localRepositoryStateLookup,
@@ -5100,6 +5110,43 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.notificationCentreStore
       .post(input)
       .catch(err => log.error('Failed to record notification', err))
+  }
+
+  public _setGlobalAutomationSettings(
+    settings: IAutomationSettingsState['global']
+  ): void {
+    this.automationSettings = { ...this.automationSettings, global: settings }
+    saveAutomationSettings(this.automationSettings)
+    this.emitUpdate()
+  }
+
+  public _setAccountAutomationOverrides(
+    accountKey: string,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    this.automationSettings = {
+      ...this.automationSettings,
+      accounts: {
+        ...this.automationSettings.accounts,
+        [accountKey]: overrides,
+      },
+    }
+    saveAutomationSettings(this.automationSettings)
+    this.emitUpdate()
+  }
+
+  public _setAutomationSettings(settings: IAutomationSettingsState): void {
+    this.automationSettings = settings
+    saveAutomationSettings(settings)
+    this.emitUpdate()
+  }
+
+  public _setRepositoryAutomationOverrides(
+    repositoryId: number,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    saveRepositoryAutomationOverrides(repositoryId, overrides)
+    this.emitUpdate()
   }
 
   /** Open or close the notification centre side sheet. */

@@ -42,6 +42,8 @@ import { Prompts } from './prompts'
 import { Repository } from '../../models/repository'
 import { Notifications } from './notifications'
 import { Accessibility } from './accessibility'
+import { AutomationPreferences } from './automation'
+import { IAutomationSettingsState } from '../../lib/automation/automation-settings'
 import { CopilotPreferences } from './copilot'
 import type {
   CopilotFeature,
@@ -121,6 +123,7 @@ interface IPreferencesProps {
   readonly copilotModels: ReadonlyArray<Model> | null
   readonly byokProviders: ReadonlyArray<IBYOKProvider>
   readonly alwaysUseCopilotForConflictResolution: boolean
+  readonly automationSettings: IAutomationSettingsState
 }
 
 interface IPreferencesState {
@@ -189,6 +192,7 @@ interface IPreferencesState {
   readonly selectedTimeFormat?: TimeFormat
   readonly selectedNumberFormat?: INumberFormat
   readonly preferAbsoluteDates?: boolean
+  readonly automationSettings: IAutomationSettingsState
 }
 
 /**
@@ -268,6 +272,7 @@ export class Preferences extends React.Component<
       selectedTimeFormat: getTimeFormatPreference(),
       selectedNumberFormat: getNumberFormatPreference(),
       preferAbsoluteDates: getPreferAbsoluteDates(),
+      automationSettings: this.props.automationSettings,
     }
   }
 
@@ -413,6 +418,10 @@ export class Preferences extends React.Component<
                 <Octicon className="icon" symbol={octicons.accessibility} />
                 Accessibility
               </span>
+              <span id={this.getTabId(PreferencesTab.Automation)}>
+                <Octicon className="icon" symbol={octicons.sync} />
+                Automation
+              </span>
             </TabBar>
             <div className="preferences-version">Desktop Material 0.1.0</div>
           </div>
@@ -465,6 +474,9 @@ export class Preferences extends React.Component<
         break
       case PreferencesTab.Accessibility:
         suffix = 'accessibility'
+        break
+      case PreferencesTab.Automation:
+        suffix = 'automation'
         break
       default:
         return assertNever(tab, `Unknown tab type: ${tab}`)
@@ -749,6 +761,17 @@ export class Preferences extends React.Component<
             showDiffCheckMarks={this.state.showDiffCheckMarks}
             onShowDiffCheckMarksChanged={this.onShowDiffCheckMarksChanged}
             onUnderlineLinksChanged={this.onUnderlineLinksChanged}
+          />
+        )
+        break
+      case PreferencesTab.Automation:
+        View = (
+          <AutomationPreferences
+            accounts={this.props.accounts}
+            settings={this.state.automationSettings}
+            onSettingsChanged={automationSettings =>
+              this.setState({ automationSettings })
+            }
           />
         )
         break
@@ -1146,6 +1169,8 @@ export class Preferences extends React.Component<
     dispatcher.setAlwaysUseCopilotForConflictResolution(
       this.state.alwaysUseCopilotForConflictResolution
     )
+
+    dispatcher.setAutomationSettings(this.state.automationSettings)
 
     if (enableFormattingPreferences()) {
       if (this.state.selectedDateFormat !== undefined) {

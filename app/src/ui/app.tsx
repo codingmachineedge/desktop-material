@@ -1787,6 +1787,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             alwaysUseCopilotForConflictResolution={
               this.state.alwaysUseCopilotForConflictResolution
             }
+            automationSettings={this.state.automationSettings}
           />
         )
       case PopupType.SettingsHistory:

@@ -38,6 +38,11 @@ import {
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { AccountPicker } from '../account-picker'
+import { AutomationOverrides } from './automation-overrides'
+import {
+  IAutomationSettingsOverrides,
+  loadRepositoryAutomationOverrides,
+} from '../../lib/automation/automation-settings'
 
 interface IRepositorySettingsProps {
   readonly initialSelectedTab?: RepositorySettingsTab
@@ -61,6 +66,7 @@ export enum RepositorySettingsTab {
   // so each enum value equals its TabBar position.
   BuildRun,
   Submodules,
+  Automation,
   ForkSettings,
 }
 
@@ -89,6 +95,7 @@ interface IRepositorySettingsState {
   readonly accountKey: string | null
   readonly buildRunPreferences: IBuildRunPreferences
   readonly buildRunPreferencesHaveChanged: boolean
+  readonly automationOverrides: IAutomationSettingsOverrides
 }
 
 export class RepositorySettings extends React.Component<
@@ -126,6 +133,9 @@ export class RepositorySettings extends React.Component<
       buildRunPreferences:
         props.repository.buildRunPreferences ?? defaultBuildRunPreferences,
       buildRunPreferencesHaveChanged: false,
+      automationOverrides: loadRepositoryAutomationOverrides(
+        props.repository.id
+      ),
     }
   }
 
@@ -246,6 +256,10 @@ export class RepositorySettings extends React.Component<
               <Octicon className="icon" symbol={octicons.fileSubmodule} />
               Submodules
             </span>
+            <span>
+              <Octicon className="icon" symbol={octicons.sync} />
+              Automation
+            </span>
             {showForkSettings && (
               <span>
                 <Octicon className="icon" symbol={octicons.repoForked} />
@@ -311,6 +325,16 @@ export class RepositorySettings extends React.Component<
           <Submodules
             repository={this.props.repository}
             dispatcher={this.props.dispatcher}
+          />
+        )
+      }
+      case RepositorySettingsTab.Automation: {
+        return (
+          <AutomationOverrides
+            overrides={this.state.automationOverrides}
+            onChanged={automationOverrides =>
+              this.setState({ automationOverrides })
+            }
           />
         )
       }
@@ -414,6 +438,11 @@ export class RepositorySettings extends React.Component<
   private onSubmit = async () => {
     this.setState({ disabled: true, errors: undefined })
     const errors = new Array<JSX.Element | string>()
+
+    this.props.dispatcher.setRepositoryAutomationOverrides(
+      this.props.repository.id,
+      this.state.automationOverrides
+    )
 
     if (this.state.accountKey !== this.props.repository.accountKey) {
       await this.props.dispatcher.updateRepositoryAccount(

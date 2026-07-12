@@ -62,6 +62,10 @@ import type {
 import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { getTipSha } from '../../lib/tip'
+import type {
+  IAutomationSettingsOverrides,
+  IAutomationSettingsState,
+} from '../../lib/automation/automation-settings'
 
 import { Account } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
@@ -270,6 +274,30 @@ export class Dispatcher {
    */
   public postNotification(input: INotificationInput): void {
     this.appStore.postNotification(input)
+  }
+
+  public setAutomationSettings(settings: IAutomationSettingsState): void {
+    this.appStore._setAutomationSettings(settings)
+  }
+
+  public setGlobalAutomationSettings(
+    settings: IAutomationSettingsState['global']
+  ): void {
+    this.appStore._setGlobalAutomationSettings(settings)
+  }
+
+  public setAccountAutomationOverrides(
+    accountKey: string,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    this.appStore._setAccountAutomationOverrides(accountKey, overrides)
+  }
+
+  public setRepositoryAutomationOverrides(
+    repositoryId: number,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    this.appStore._setRepositoryAutomationOverrides(repositoryId, overrides)
   }
 
   /** Open or close the notification centre side sheet. */
