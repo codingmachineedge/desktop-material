@@ -1,6 +1,13 @@
 .versioned-store-history-panel {
   position: fixed;
   z-index: var(--popup-z-index);
+  // This panel is a custom `<section role="dialog">` (not the standard
+  // `<Dialog>`/`<dialog>` element), so it never matches the
+  // `dialog[open] { pointer-events: auto }` rule in the M4 dialog layer. Without
+  // this it inherits `pointer-events: none` from `#dialog-layer` and every click
+  // falls straight through to the app underneath — the panel reads as
+  // completely unclickable. Opt the sheet back into pointer events explicitly.
+  pointer-events: auto;
   top: 10px;
   right: 10px;
   bottom: 10px;
@@ -127,8 +134,20 @@
   }
 
   .versioned-store-history-undo {
+    border-color: transparent;
     background: var(--md-sys-color-primary-container);
     color: var(--md-sys-color-on-primary-container);
+  }
+
+  // A disabled action (a greyed Redo with nothing to redo, or a greyed Undo at
+  // the start of history) must read as clearly inert — never mistakeable for the
+  // enabled, filled Undo. Flatten the tonal fill to a neutral surface tint and
+  // drop to the MD3 disabled opacity so enabled vs disabled is unambiguous.
+  .button-component[aria-disabled='true'] {
+    border-color: transparent;
+    background: var(--md-sys-color-surface-container-highest);
+    color: var(--md-sys-color-on-surface-variant);
+    opacity: 0.38;
   }
 }
 
@@ -191,9 +210,14 @@
   overflow: hidden;
   border-radius: var(--md-sys-shape-corner-medium);
   background: transparent;
+  // These rows are the primary "Select to inspect" affordance, so make the
+  // whole row read as clickable — not just the inner button.
+  cursor: pointer;
   transition: background 120ms ease;
 
-  &:hover {
+  // Hover state-layer: surface-container-high tint signals the row is
+  // interactive before the user commits to a click.
+  &:not(.selected):hover {
     background: var(--md-sys-color-surface-container-high);
   }
 
