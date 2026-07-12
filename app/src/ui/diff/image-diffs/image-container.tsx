@@ -2,6 +2,7 @@ import * as React from 'react'
 
 import { Image } from '../../../models/diff'
 import { convertDDSImage } from './dds-converter'
+import { sanitizeSVG } from './svg-sanitizer'
 
 interface IImageProps {
   /** The image contents to render */
@@ -37,6 +38,18 @@ export class ImageContainer extends React.Component<IImageProps, IImageState> {
         console.error('Error loading DDS image:', error)
         this.setState({ imageSource: null })
       }
+    } else if (image.mediaType === 'image/svg+xml') {
+      const source = Buffer.from(image.contents, 'base64').toString('utf8')
+      const sanitized = sanitizeSVG(source)
+      this.setState({
+        imageSource:
+          sanitized.length === 0
+            ? null
+            : `data:image/svg+xml;base64,${Buffer.from(
+                sanitized,
+                'utf8'
+              ).toString('base64')}`,
+      })
     } else {
       this.setState({
         imageSource: `data:${image.mediaType};base64,${image.contents}`,
