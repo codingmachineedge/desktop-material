@@ -275,6 +275,13 @@ import {
   setObject,
   getFloatNumber,
 } from '../local-storage'
+import {
+  clampZoom,
+  computeAutoFitMultiplier,
+  stepZoom,
+  EffectiveZoomEpsilon,
+  AutoFitDebounceMs,
+} from '../zoom'
 import { ExternalEditorError, suggestedExternalEditor } from '../editors/shared'
 import { ApiRepositoriesStore } from './api-repositories-store'
 import {
@@ -610,7 +617,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private pushPullButtonWidth = constrain(defaultPushPullButtonWidth)
 
   private windowState: WindowState | null = null
+
+  /** The applied effective zoom (base × auto-fit multiplier, clamped). */
   private windowZoomFactor: number = 1
+  /** The user's chosen scale base (slider value, persisted to 'zoom-factor'). */
+  private zoomBaseFactor: number = 1
+  /** Whether the auto-fit-to-window multiplier is applied. Default ON. */
+  private autoFitZoomEnabled: boolean = true
+  /** The current auto-fit shrink multiplier (≤ 1). Never persisted. */
+  private autoFitMultiplier: number = 1
+  /** Pending debounced resize recompute timer id, if any. */
+  private zoomResizeDebounceId: number | null = null
+
   private resizablePaneActive = false
   private isUpdateAvailableBannerVisible: boolean = false
   private isUpdateShowcaseVisible: boolean = false
@@ -762,6 +780,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
     window.addEventListener('resize', () => {
       this.updateResizableConstraints()
       this.emitUpdate()
+
+      // Debounce the auto-fit recompute so dragging a window edge doesn't
+      // thrash the zoom. The epsilon guard inside applyEffectiveZoom prevents
+      // oscillation once we do recompute.
+      if (this.zoomResizeDebounceId !== null) {
+        window.clearTimeout(this.zoomResizeDebounceId)
+      }
+      this.zoomResizeDebounceId = window.setTimeout(() => {
+        this.zoomResizeDebounceId = null
+        this.recomputeAutoFit()
+      }, AutoFitDebounceMs)
     })
 
     this.initializeWindowState()
@@ -823,11 +852,131 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   private initializeZoomFactor = async () => {
-    const zoomFactor = await this.getWindowZoomFactor()
-    if (zoomFactor === undefined) {
+    // Recover the user's chosen scale as the *base*. On WIN32 after an update
+    // chromium resets zoomFactor to 1, so getWindowZoomFactor restores the
+    // locally stored value; we treat whatever we get as the base (free
+    // migration — the old applied-zoom value becomes the new base).
+    const recovered = await this.getWindowZoomFactor()
+    this.zoomBaseFactor = clampZoom(
+      getFloatNumber('zoom-factor', recovered ?? 1)
+    )
+    this.autoFitZoomEnabled = getBoolean('zoom-auto-fit-enabled', true)
+
+    // Seed the applied value with the base so the first auto-fit computation has
+    // a sensible currently-applied zoom to reconstruct DIPs from.
+    this.windowZoomFactor = this.zoomBaseFactor
+
+    // Compute the initial auto-fit multiplier from the current window size, then
+    // force-apply the effective zoom once (bypassing the epsilon guard) so the
+    // saved base and any shrink take effect on startup regardless of chromium's
+    // current zoom state.
+    if (this.autoFitZoomEnabled) {
+      const dipW = window.innerWidth * this.windowZoomFactor
+      const dipH = window.innerHeight * this.windowZoomFactor
+      this.autoFitMultiplier = computeAutoFitMultiplier(
+        dipW,
+        dipH,
+        this.zoomBaseFactor
+      )
+    } else {
+      this.autoFitMultiplier = 1
+    }
+
+    const effective = this.computeEffectiveZoom()
+    this.windowZoomFactor = effective
+    setWindowZoomFactor(effective)
+    this.updateResizableConstraints()
+    this.emitUpdate()
+  }
+
+  /** The effective zoom = base × (auto-fit multiplier when enabled), clamped. */
+  private computeEffectiveZoom(): number {
+    const multiplier = this.autoFitZoomEnabled ? this.autoFitMultiplier : 1
+    return clampZoom(this.zoomBaseFactor * multiplier)
+  }
+
+  /**
+   * Push the current effective zoom into the single sink (webContents via
+   * setWindowZoomFactor). No-ops when the change is within the epsilon to avoid
+   * oscillation. Does NOT persist — only the base is persisted, when it changes.
+   */
+  private applyEffectiveZoom() {
+    const next = this.computeEffectiveZoom()
+    if (Math.abs(next - this.windowZoomFactor) <= EffectiveZoomEpsilon) {
       return
     }
-    this.onWindowZoomFactorChanged(zoomFactor)
+    this.windowZoomFactor = next
+    setWindowZoomFactor(next)
+    this.updateResizableConstraints()
+    this.emitUpdate()
+  }
+
+  /**
+   * Recompute the auto-fit multiplier from the current window size and apply the
+   * resulting effective zoom. The DIP input is reconstructed as
+   * `innerWidth × appliedEffectiveZoom` so applying a zoom doesn't move the
+   * input (a fixed point) — this is the feedback-loop guard.
+   */
+  private recomputeAutoFit() {
+    if (!this.autoFitZoomEnabled) {
+      this.autoFitMultiplier = 1
+      this.applyEffectiveZoom()
+      return
+    }
+
+    const applied = this.windowZoomFactor
+    const dipW = window.innerWidth * applied
+    const dipH = window.innerHeight * applied
+    this.autoFitMultiplier = computeAutoFitMultiplier(
+      dipW,
+      dipH,
+      this.zoomBaseFactor
+    )
+    this.applyEffectiveZoom()
+  }
+
+  /** Step the scale base up one notch on the zoom ladder. */
+  public _zoomIn = () => {
+    this._setZoomBaseFactor(stepZoom(this.zoomBaseFactor, 'in'))
+  }
+
+  /** Step the scale base down one notch on the zoom ladder. */
+  public _zoomOut = () => {
+    this._setZoomBaseFactor(stepZoom(this.zoomBaseFactor, 'out'))
+  }
+
+  /** Reset the scale base to 100%. */
+  public _zoomReset = () => {
+    this._setZoomBaseFactor(1)
+  }
+
+  /** Set the scale base (slider value), persist it, and re-derive the applied zoom. */
+  public _setZoomBaseFactor = (factor: number) => {
+    const base = clampZoom(factor)
+    if (base === this.zoomBaseFactor) {
+      return
+    }
+    this.zoomBaseFactor = base
+    setNumber('zoom-factor', base)
+    // Re-derive the multiplier against the new base, then apply.
+    this.recomputeAutoFit()
+    // Always emit so the (controlled) scale slider reflects the new base even
+    // when the applied effective zoom didn't cross the epsilon (e.g. auto-fit
+    // floor is already clamping).
+    this.emitUpdate()
+  }
+
+  /** Toggle whether auto-fit is applied, persist it, and re-derive. */
+  public _setAutoFitZoomEnabled = (enabled: boolean) => {
+    if (enabled === this.autoFitZoomEnabled) {
+      return
+    }
+    this.autoFitZoomEnabled = enabled
+    setBoolean('zoom-auto-fit-enabled', enabled)
+    this.recomputeAutoFit()
+    // Always emit so the auto-fit checkbox reflects the new value even when the
+    // applied effective zoom didn't change.
+    this.emitUpdate()
   }
 
   /**
@@ -1131,20 +1280,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /**
-   * Called when we have reason to suspect that the zoom factor
-   * has changed. Note that this doesn't necessarily mean that it
-   * has changed with regards to our internal state which is why
-   * we double check before emitting an update.
+   * Called when an *external* zoom change is reported (e.g. a pinch gesture on
+   * platforms that surface it). AppStore is the single owner of the applied
+   * zoom, so we treat such a change as a change to the user's scale base and
+   * re-derive the effective zoom from there. Changes that match our currently
+   * applied value (within the epsilon) are ignored to avoid re-entrancy from
+   * our own setWindowZoomFactor writes.
    */
   private onWindowZoomFactorChanged(zoomFactor: number) {
-    const current = this.windowZoomFactor
-    this.windowZoomFactor = zoomFactor
-
-    if (zoomFactor !== current) {
-      setNumber('zoom-factor', zoomFactor)
-      this.updateResizableConstraints()
-      this.emitUpdate()
+    if (Math.abs(zoomFactor - this.windowZoomFactor) <= EffectiveZoomEpsilon) {
+      return
     }
+    this._setZoomBaseFactor(zoomFactor)
   }
 
   private getSelectedState(): PossibleSelections | null {
@@ -1191,6 +1338,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       localRepositoryStateLookup: this.localRepositoryStateLookup,
       windowState: this.windowState,
       windowZoomFactor: this.windowZoomFactor,
+      zoomBaseFactor: this.zoomBaseFactor,
+      autoFitZoomEnabled: this.autoFitZoomEnabled,
       appIsFocused: this.appIsFocused,
       selectedState: this.getSelectedState(),
       signInState: this.signInStore.getState(),

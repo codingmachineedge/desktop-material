@@ -26,6 +26,11 @@ import { formatNumber } from '../../lib/format-number'
 interface IAppearanceProps {
   readonly selectedTheme: ApplicationTheme
   readonly onSelectedThemeChanged: (theme: ApplicationTheme) => void
+  readonly zoomBaseFactor: number
+  readonly onZoomBaseFactorChanged: (factor: number) => void
+  readonly autoFitZoomEnabled: boolean
+  readonly onAutoFitZoomEnabledChanged: (enabled: boolean) => void
+  readonly windowZoomFactor: number
   readonly selectedTabSize: number
   readonly onSelectedTabSizeChanged: (tabSize: number) => void
   readonly selectedDateFormat: DateFormat
@@ -90,6 +95,19 @@ export class Appearance extends React.Component<
 
   private onSelectedThemeChanged = (theme: ApplicationTheme) => {
     this.props.onSelectedThemeChanged(theme)
+  }
+
+  private onZoomSliderChanged = (event: React.FormEvent<HTMLInputElement>) => {
+    const percent = parseInt(event.currentTarget.value, 10)
+    if (!Number.isNaN(percent)) {
+      this.props.onZoomBaseFactorChanged(percent / 100)
+    }
+  }
+
+  private onAutoFitZoomEnabledChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onAutoFitZoomEnabledChanged(event.currentTarget.checked)
   }
 
   private onSelectedTabSizeChanged = (
@@ -166,6 +184,67 @@ export class Appearance extends React.Component<
           </span>
         )
     }
+  }
+
+  private renderScaling() {
+    const percent = Math.round(this.props.zoomBaseFactor * 100)
+    const effectivePercent = Math.round(this.props.windowZoomFactor * 100)
+    const isTrimmed =
+      this.props.autoFitZoomEnabled && effectivePercent !== percent
+
+    return (
+      <div className="appearance-section scaling-section">
+        <h2 id="scaling-heading">Scale</h2>
+
+        <div
+          className="scaling-slider-row"
+          role="group"
+          aria-labelledby="scaling-heading"
+        >
+          <input
+            type="range"
+            className="scaling-slider"
+            min={50}
+            max={200}
+            step={5}
+            value={percent}
+            aria-labelledby="scaling-heading"
+            aria-valuetext={`${percent}%`}
+            onChange={this.onZoomSliderChanged}
+          />
+          <span className="scaling-value" aria-hidden={true}>
+            {percent}%
+          </span>
+        </div>
+
+        <div className="scaling-ticks" aria-hidden={true}>
+          <span>50%</span>
+          <span>100%</span>
+          <span>200%</span>
+        </div>
+
+        <Checkbox
+          className="auto-fit-zoom"
+          label="Automatically shrink the interface to fit small windows"
+          value={
+            this.props.autoFitZoomEnabled
+              ? CheckboxValue.On
+              : CheckboxValue.Off
+          }
+          onChange={this.onAutoFitZoomEnabledChanged}
+        />
+        <p className="scaling-caption">
+          Recommended. Keeps the whole app visible on smaller screens.
+        </p>
+
+        {isTrimmed && (
+          <p className="scaling-effective">
+            Auto-fit is currently showing the interface at {effectivePercent}%
+            to fit this window.
+          </p>
+        )}
+      </div>
+    )
   }
 
   private renderSelectedTheme() {
@@ -286,6 +365,7 @@ export class Appearance extends React.Component<
   public render() {
     return (
       <DialogContent>
+        {this.renderScaling()}
         {this.renderSelectedTheme()}
         {this.renderFormatting()}
         {this.renderSelectedTabSize()}

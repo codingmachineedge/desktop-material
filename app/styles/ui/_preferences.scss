@@ -304,6 +304,114 @@
     }
   }
 
+  // --- Scale slider + auto-fit switch (Appearance) -----------------------
+  // A styled native range rendered as an MD3 slider. Track uses the surface
+  // variant, the active portion and thumb use the primary colour. No literal
+  // colours — tokens only.
+  .scaling-section {
+    margin-bottom: var(--spacing-double);
+
+    .scaling-slider-row {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing);
+      margin-top: var(--spacing);
+    }
+
+    .scaling-slider {
+      appearance: none;
+      -webkit-appearance: none;
+      flex: 1;
+      height: 20px;
+      margin: 0;
+      background: transparent;
+      cursor: pointer;
+
+      &::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 999px;
+        background: var(--md-sys-color-surface-variant);
+      }
+
+      &::-moz-range-track {
+        height: 4px;
+        border-radius: 999px;
+        background: var(--md-sys-color-surface-variant);
+      }
+
+      &::-moz-range-progress {
+        height: 4px;
+        border-radius: 999px;
+        background: var(--md-sys-color-primary);
+      }
+
+      &::-webkit-slider-thumb {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        margin-top: -8px;
+        border-radius: 999px;
+        border: 0;
+        background: var(--md-sys-color-primary);
+        transition: box-shadow 200ms var(--emph);
+      }
+
+      &::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        border: 0;
+        background: var(--md-sys-color-primary);
+      }
+
+      &:focus-visible {
+        outline: none;
+
+        &::-webkit-slider-thumb {
+          box-shadow: 0 0 0 6px
+            color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
+        }
+
+        &::-moz-range-thumb {
+          box-shadow: 0 0 0 6px
+            color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
+        }
+      }
+    }
+
+    .scaling-value {
+      min-width: 48px;
+      text-align: right;
+      font-weight: var(--font-weight-bold);
+      color: var(--md-sys-color-on-surface);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .scaling-ticks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--spacing-half);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: var(--font-size-sm);
+    }
+
+    .auto-fit-zoom {
+      margin-top: var(--spacing);
+    }
+
+    .scaling-caption,
+    .scaling-effective {
+      margin: var(--spacing-half) 0 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: var(--font-size-sm);
+    }
+
+    .scaling-effective {
+      color: var(--md-sys-color-primary);
+    }
+  }
+
   .accounts-tab {
     display: flex;
     flex-direction: column;

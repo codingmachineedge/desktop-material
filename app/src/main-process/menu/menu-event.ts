@@ -51,6 +51,9 @@ export type MenuEvent =
   | 'decrease-active-resizable-width'
   | 'increase-active-resizable-width'
   | 'toggle-changes-filter'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'zoom-reset'
   | TestMenuEvent
 
 /**
