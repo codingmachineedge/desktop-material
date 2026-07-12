@@ -292,10 +292,17 @@ export async function redoLastProfileChange(
   )
 }
 
-/** Restore profile-backed files from a commit and append an audit commit. */
+/**
+ * Restore Git-backed state files from a commit and append an audit commit.
+ *
+ * The set of files to restore defaults to the settings profile's own state
+ * files, but callers backing other stores (e.g. the notification centre) pass
+ * their own file list so the same non-destructive restore mechanism applies.
+ */
 export async function restoreProfileTo(
   repository: Repository,
-  sha: string
+  sha: string,
+  stateFiles: ReadonlyArray<string> = profileStateFiles
 ): Promise<void> {
   await assertReachableProfileCommit(repository, sha)
   const traversal = await getProfileHistoryTraversal(repository)
@@ -308,7 +315,7 @@ export async function restoreProfileTo(
     repository,
     head.sha,
     async () => {
-      for (const file of profileStateFiles) {
+      for (const file of stateFiles) {
         if (await profileFileExistsAtCommit(repository, sha, file)) {
           await git(
             ['checkout', sha, '--', file],
