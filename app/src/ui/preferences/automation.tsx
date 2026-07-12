@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-no-bind */
 import * as React from 'react'
 import { Account, getAccountKey } from '../../models/account'
 import {
@@ -101,11 +102,29 @@ export class AutomationPreferences extends React.Component<IAutomationPreference
                       })
                     }
                   />
+                  <OverrideIntervalSelect
+                    label="Commit interval"
+                    value={overrides.autoCommitPushInterval}
+                    globalValue={settings.autoCommitPushInterval}
+                    onChange={value =>
+                      this.onAccountChanged(key, {
+                        autoCommitPushInterval: value,
+                      })
+                    }
+                  />
                   <OverrideSelect
                     label="Pull"
                     value={overrides.autoPullEnabled}
                     onChange={value =>
                       this.onAccountChanged(key, { autoPullEnabled: value })
+                    }
+                  />
+                  <OverrideIntervalSelect
+                    label="Pull interval"
+                    value={overrides.autoPullInterval}
+                    globalValue={settings.autoPullInterval}
+                    onChange={value =>
+                      this.onAccountChanged(key, { autoPullInterval: value })
                     }
                   />
                 </div>
@@ -116,6 +135,36 @@ export class AutomationPreferences extends React.Component<IAutomationPreference
       </DialogContent>
     )
   }
+}
+
+function OverrideIntervalSelect(props: {
+  readonly label: string
+  readonly value: AutomationInterval | undefined
+  readonly globalValue: AutomationInterval
+  readonly onChange: (value: AutomationInterval | undefined) => void
+}) {
+  return (
+    <label>
+      <span>{props.label}</span>
+      <select
+        value={props.value ?? 'inherit'}
+        onChange={event =>
+          props.onChange(
+            event.currentTarget.value === 'inherit'
+              ? undefined
+              : (Number(event.currentTarget.value) as AutomationInterval)
+          )
+        }
+      >
+        <option value="inherit">Use global ({props.globalValue} min)</option>
+        {AutomationIntervals.map(interval => (
+          <option key={interval} value={interval}>
+            Every {interval} minutes
+          </option>
+        ))}
+      </select>
+    </label>
+  )
 }
 
 function AutomationToggle(props: {
