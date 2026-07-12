@@ -1,0 +1,414 @@
+// Regex builder — a self-contained, non-modal, draggable overlay dialog.
+// Design reference: design-spec-overlays.md §6 + regex-builder.png.
+
+.regex-builder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  // Empty margin lets clicks pass through to the live app behind.
+  pointer-events: none;
+}
+
+.regex-builder-dialog {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: 900px;
+  height: 644px;
+  max-width: calc(100vw - 50px);
+  max-height: calc(100vh - 50px);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  border-radius: 28px;
+  box-shadow: var(--md-sys-elevation-level3);
+  overflow: hidden;
+
+  .octicon {
+    fill: currentColor;
+  }
+}
+
+.regex-builder-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 18px 12px 20px;
+  cursor: move;
+  touch-action: none;
+
+  .regex-builder-glyph {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .regex-builder-heading {
+    flex: 1;
+    min-width: 0;
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 2px 0 0;
+      font-size: 11.5px;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  .regex-builder-close {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), transform 200ms
+      var(--spring-fast);
+
+    &:hover {
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    &:active {
+      transform: scale(0.86) rotate(90deg);
+    }
+  }
+}
+
+.regex-builder-pattern-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 22px 12px;
+
+  .regex-builder-pattern-field {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 50px;
+    padding: 0 14px;
+    border-radius: 16px;
+    background: var(--md-sys-color-surface);
+    border: 2px solid var(--md-sys-color-outline-variant);
+    transition: border-color 220ms var(--emph);
+  }
+
+  &.invalid .regex-builder-pattern-field {
+    border-color: var(--md-sys-color-error);
+  }
+
+  .regex-delimiter {
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 15px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .regex-pattern-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--md-sys-color-on-surface);
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 14px;
+    outline: none;
+  }
+
+  .regex-validity {
+    &.valid {
+      color: var(--dm-green);
+    }
+    &.invalid {
+      color: var(--md-sys-color-error);
+    }
+    &.empty {
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  .regex-builder-icon-button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 18px;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), color 220ms var(--emph);
+
+    &.destructive:hover {
+      background: var(--md-sys-color-error-container);
+      color: var(--md-sys-color-error);
+    }
+  }
+}
+
+.regex-builder-flags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 22px 14px;
+
+  .regex-builder-flags-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .regex-flag-chip {
+    height: 32px;
+    padding: 0 13px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), color 220ms var(--emph);
+
+    &.on {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+  }
+}
+
+.regex-builder-palette {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+
+  .regex-builder-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 176px;
+    padding: 14px 10px;
+    border-right: 1px solid var(--md-sys-color-outline-variant);
+    overflow-y: auto;
+  }
+
+  .regex-builder-category {
+    height: 38px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), color 220ms var(--emph);
+
+    &:hover {
+      background: color-mix(
+        in srgb,
+        var(--md-sys-color-on-surface) 8%,
+        transparent
+      );
+    }
+
+    &.selected {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+      font-weight: 700;
+    }
+  }
+
+  .regex-builder-tokens {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 8px;
+    padding: 14px 18px;
+    overflow-y: auto;
+  }
+
+  .regex-builder-token {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    height: 44px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--md-sys-color-surface);
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), border-radius 260ms
+      var(--spring);
+
+    &:hover {
+      background: var(--md-sys-color-secondary-container);
+      border-radius: 999px;
+    }
+
+    &:active {
+      transform: scale(0.92);
+    }
+  }
+
+  .regex-builder-token-glyph {
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--md-sys-color-primary);
+  }
+
+  .regex-builder-token-desc {
+    font-size: 11.5px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+}
+
+.regex-test-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+
+  .regex-test-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .regex-test-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .regex-test-count {
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+
+    &.empty {
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    &.matched {
+      background: var(--dm-green-container);
+      color: var(--dm-green);
+    }
+    &.invalid {
+      background: var(--md-sys-color-error-container);
+      color: var(--md-sys-color-error);
+    }
+  }
+
+  .regex-test-sample {
+    resize: none;
+    border: 0;
+    border-radius: 12px;
+    padding: 8px 10px;
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 12px;
+    outline: none;
+  }
+
+  .regex-test-preview {
+    max-height: 66px;
+    overflow-y: auto;
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    mark {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+      border-radius: 4px;
+    }
+  }
+}
+
+.regex-builder-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+
+  .regex-builder-cancel {
+    height: 42px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--md-sys-color-primary);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph);
+
+    &:hover {
+      background: var(--md-sys-color-surface-container-high);
+    }
+  }
+
+  .regex-builder-apply {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 22px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), border-radius 260ms
+      var(--spring);
+
+    &:hover {
+      border-radius: 16px;
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .octicon {
+      fill: currentColor;
+    }
+  }
+}

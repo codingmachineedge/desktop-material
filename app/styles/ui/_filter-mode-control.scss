@@ -1,0 +1,121 @@
+// Filter mode control (fuzzy / substring / regex) + custom filter chips.
+// Rendered inside a filter list's search row per the Desktop Material v2 spec.
+
+.filter-mode-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+
+  .filter-mode-button,
+  .filter-case-button {
+    display: grid;
+    place-items: center;
+    height: 30px;
+    min-width: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), color 220ms var(--emph);
+
+    &:hover {
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    &.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  .filter-mode-glyph {
+    font-family: var(--font-family-monospace, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .filter-regex-builder-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph);
+
+    &:hover {
+      background: color-mix(
+        in srgb,
+        var(--md-sys-color-primary-container) 82%,
+        var(--md-sys-color-on-primary-container)
+      );
+    }
+  }
+
+  .filter-regex-builder-label {
+    white-space: nowrap;
+  }
+}
+
+// Custom filter chip row rendered below the search field.
+.filter-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--spacing) var(--spacing-half);
+
+  .filter-chip {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), color 220ms var(--emph),
+      transform 200ms var(--spring-fast);
+
+    &:hover {
+      background: color-mix(
+        in srgb,
+        var(--md-sys-color-surface-container-high) 82%,
+        var(--md-sys-color-on-surface)
+      );
+    }
+
+    &.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    &:active {
+      transform: scale(0.92);
+    }
+  }
+}
+
+// Invalid-regex affordance on the filter field.
+.filter-list.filter-list-regex-error {
+  .filter-list-filter-field input {
+    border-color: var(--md-sys-color-error);
+  }
+}
