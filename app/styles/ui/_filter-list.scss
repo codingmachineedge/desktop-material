@@ -10,9 +10,19 @@
   .filter-field-row {
     margin: var(--spacing);
     min-width: 0;
+    // Let the mode controls (and any trailing "Add" button) wrap below the
+    // search field on a cramped row rather than crushing the input until its
+    // placeholder clips. See #34.
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: var(--spacing-half);
 
     .filter-list-filter-field {
-      min-width: 0;
+      // Fill the available width. The min-width acts as the wrap threshold: the
+      // field keeps enough room to show its full placeholder, and the controls
+      // wrap to the next line once the row can no longer fit both side by side.
+      flex: 1 1 auto;
+      min-width: 160px;
     }
   }
 

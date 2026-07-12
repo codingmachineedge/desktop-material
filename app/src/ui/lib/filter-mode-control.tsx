@@ -126,36 +126,45 @@ export class FilterModeControl extends React.Component<
 
     return (
       <div className="filter-mode-control">
-        <button
-          className={classNames('filter-mode-button', {
-            active: mode !== FilterMode.Fuzzy,
-          })}
-          aria-label={`Filter mode: ${ModeLabels[mode]} (click to change)`}
-          onClick={this.onCycleMode}
-        >
-          <span className="filter-mode-glyph">.*</span>
-        </button>
-        <button
-          className={classNames('filter-case-button', {
-            active: !caseDisabled && caseSensitive,
-          })}
-          aria-label="Match case"
-          aria-pressed={caseSensitive}
-          disabled={caseDisabled}
-          onClick={this.onToggleCase}
-        >
-          Aa
-        </button>
-        {this.props.showRegexBuilder !== false && (
+        {/*
+         * The interactive controls live in their own flex cluster so they can
+         * wrap independently (e.g. the regex-builder chip dropping below the
+         * `.*` / `Aa` buttons) on a cramped search row without dragging the
+         * fixed-position regex-builder overlay into a containing block.
+         */}
+        <div className="filter-mode-control-cluster">
           <button
-            className="filter-regex-builder-button"
-            aria-label="Open regex builder"
-            onClick={this.onOpenBuilder}
+            className={classNames('filter-mode-button', {
+              active: mode !== FilterMode.Fuzzy,
+            })}
+            aria-label={`Filter mode: ${ModeLabels[mode]} (click to change)`}
+            onClick={this.onCycleMode}
           >
             <span className="filter-mode-glyph">.*</span>
-            <span className="filter-regex-builder-label">Regex builder</span>
           </button>
-        )}
+          <button
+            className={classNames('filter-case-button', {
+              active: !caseDisabled && caseSensitive,
+            })}
+            aria-label="Match case"
+            aria-pressed={caseSensitive}
+            disabled={caseDisabled}
+            onClick={this.onToggleCase}
+          >
+            Aa
+          </button>
+          {this.props.showRegexBuilder !== false && (
+            <button
+              className="filter-regex-builder-button"
+              aria-label="Open regex builder"
+              title="Regex builder"
+              onClick={this.onOpenBuilder}
+            >
+              <span className="filter-mode-glyph">.*</span>
+              <span className="filter-regex-builder-label">Regex builder</span>
+            </button>
+          )}
+        </div>
         {this.renderBuilder()}
       </div>
     )

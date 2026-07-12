@@ -3,9 +3,21 @@
 
 .filter-mode-control {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  // Hug the right edge of the (flex-growing) search field and allow the whole
+  // control to shrink so its inner cluster can wrap on a cramped row.
+  margin-left: auto;
+  min-width: 0;
+  flex-shrink: 1;
+
+  // The buttons themselves. Right-aligned and allowed to wrap so the
+  // regex-builder chip can drop below the `.*` / `Aa` pair when space is tight.
+  .filter-mode-control-cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+  }
 
   .filter-mode-button,
   .filter-case-button {
