@@ -68,10 +68,8 @@ export function enableUpdateFromEmulatedX64ToARM64(): boolean {
   return enableBetaFeatures()
 }
 
-/** Should we show previous tags as suggestions? */
-export function enablePreviousTagSuggestions(): boolean {
-  return enableBetaFeatures()
-}
+// was beta-gated upstream (enableBetaFeatures); promoted for the material fork
+export const enablePreviousTagSuggestions = () => true
 
 /** Should we show a pull-requests quick view? */
 export function enablePullRequestQuickView(): boolean {
