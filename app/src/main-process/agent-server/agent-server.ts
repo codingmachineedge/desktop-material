@@ -179,6 +179,7 @@ export class AgentServer {
     const server = this.server
     this.server = null
     this.port = null
+    this.token = null
     if (server !== null) {
       await new Promise<void>(resolve => server.close(() => resolve()))
     }
@@ -261,9 +262,9 @@ export class AgentServer {
       throw new HTTPError(404, 'Endpoint not found')
     }
     if (
-      !String(request.headers['content-type'] ?? '')
-        .toLowerCase()
-        .includes('application/json')
+      !/^application\/json(?:\s*;|$)/i.test(
+        String(request.headers['content-type'] ?? '')
+      )
     ) {
       throw new HTTPError(415, 'Content-Type must be application/json')
     }

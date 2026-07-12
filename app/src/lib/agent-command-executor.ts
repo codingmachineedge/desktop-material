@@ -400,10 +400,15 @@ async function execute(
         throw new Error(`Tab '${tabId}' was not found`)
       }
       await tabs.activateTab(tabId)
-      const repository = repositoryFromArgs(
-        { repositoryId: tab.repositoryId },
-        getState
-      )
+      let repository: Repository
+      try {
+        repository = repositoryFromArgs(
+          { repositoryId: tab.repositoryId },
+          getState
+        )
+      } catch {
+        repository = repositoryFromArgs({ path: tab.repositoryPath }, getState)
+      }
       await dispatcher.selectRepository(repository)
       return { selected: tabId, repositoryId: repository.id }
     }
@@ -413,6 +418,16 @@ async function execute(
         throw new Error(`Tab '${tabId}' was not found`)
       }
       const activeTabId = await tabs.closeTab(tabId)
+      if (activeTabId !== null) {
+        const activeTab = tabs.getState().tabs.find(x => x.id === activeTabId)
+        if (activeTab !== undefined) {
+          const repository = repositoryFromArgs(
+            { path: activeTab.repositoryPath },
+            getState
+          )
+          await dispatcher.selectRepository(repository)
+        }
+      }
       return { closed: tabId, activeTabId }
     }
     case 'get-automation-status': {
@@ -421,15 +436,18 @@ async function execute(
       }
       let repositoryState: (IRepositoryState & Record<string, unknown>) | null =
         null
-      try {
+      if (
+        typeof args.repositoryId === 'number' ||
+        typeof args.path === 'string' ||
+        (getState().selectedState !== null &&
+          getState().selectedState!.type === SelectionType.Repository)
+      ) {
         const repository = repositoryFromArgs(args, getState, true)
         repositoryState = (await selectedRepositoryState(
           repository,
           dispatcher,
           getState
         )) as IRepositoryState & Record<string, unknown>
-      } catch {
-        // Global settings are still useful when no repository is selected.
       }
       return {
         available:

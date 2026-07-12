@@ -71,10 +71,14 @@ const repositorySelectorProperties = {
   path: { type: 'string', minLength: 1, maxLength: 4096 },
 } as const
 
-const repositorySchema = (extra: Readonly<Record<string, unknown>> = {}) => ({
+const repositorySchema = (
+  extra: Readonly<Record<string, unknown>> = {},
+  required: ReadonlyArray<string> = []
+) => ({
   type: 'object',
   additionalProperties: false,
   properties: { ...repositorySelectorProperties, ...extra },
+  ...(required.length === 0 ? {} : { required }),
   anyOf: [{ required: ['repositoryId'] }, { required: ['path'] }],
 })
 
@@ -148,10 +152,13 @@ export const AgentToolDefinitions: ReadonlyArray<IAgentToolDefinition> = [
   {
     name: 'commit',
     description: 'Commit the changes currently included in Desktop Material.',
-    inputSchema: repositorySchema({
-      summary: { type: 'string', minLength: 1, maxLength: 998 },
-      description: { type: 'string', maxLength: 32768 },
-    }),
+    inputSchema: repositorySchema(
+      {
+        summary: { type: 'string', minLength: 1, maxLength: 998 },
+        description: { type: 'string', maxLength: 32768 },
+      },
+      ['summary']
+    ),
   },
   {
     name: 'push',
@@ -176,18 +183,24 @@ export const AgentToolDefinitions: ReadonlyArray<IAgentToolDefinition> = [
   {
     name: 'create-branch',
     description: 'Create and check out a branch.',
-    inputSchema: repositorySchema({
-      name: { type: 'string', minLength: 1, maxLength: 255 },
-      startPoint: { type: 'string', maxLength: 255 },
-    }),
+    inputSchema: repositorySchema(
+      {
+        name: { type: 'string', minLength: 1, maxLength: 255 },
+        startPoint: { type: 'string', maxLength: 255 },
+      },
+      ['name']
+    ),
   },
   {
     name: 'merge-branch',
     description: 'Merge a named branch into the current branch.',
-    inputSchema: repositorySchema({
-      branch: { type: 'string', minLength: 1, maxLength: 255 },
-      squash: { type: 'boolean' },
-    }),
+    inputSchema: repositorySchema(
+      {
+        branch: { type: 'string', minLength: 1, maxLength: 255 },
+        squash: { type: 'boolean' },
+      },
+      ['branch']
+    ),
   },
   {
     name: 'open-repository',
@@ -236,24 +249,30 @@ export const AgentToolDefinitions: ReadonlyArray<IAgentToolDefinition> = [
   {
     name: 'run-automation',
     description: 'Run a supported automation operation now.',
-    inputSchema: repositorySchema({
-      action: {
-        enum: ['commit-and-push', 'merge-branches', 'merge-worktrees'],
+    inputSchema: repositorySchema(
+      {
+        action: {
+          enum: ['commit-and-push', 'merge-branches', 'merge-worktrees'],
+        },
       },
-    }),
+      ['action']
+    ),
   },
   {
     name: 'trigger-workflow',
     description: 'Dispatch a GitHub Actions workflow.',
-    inputSchema: repositorySchema({
-      workflowId: { type: 'integer', minimum: 1 },
-      ref: { type: 'string', minLength: 1, maxLength: 255 },
-      inputs: {
-        type: 'object',
-        maxProperties: 50,
-        additionalProperties: { type: 'string', maxLength: 4096 },
+    inputSchema: repositorySchema(
+      {
+        workflowId: { type: 'integer', minimum: 1 },
+        ref: { type: 'string', minLength: 1, maxLength: 255 },
+        inputs: {
+          type: 'object',
+          maxProperties: 50,
+          additionalProperties: { type: 'string', maxLength: 4096 },
+        },
       },
-    }),
+      ['workflowId', 'ref']
+    ),
   },
 ]
 
@@ -286,6 +305,12 @@ export function redactAgentValue(value: unknown, depth = 0): unknown {
   }
   if (Array.isArray(value)) {
     return value.slice(0, 500).map(x => redactAgentValue(x, depth + 1))
+  }
+  if (typeof value === 'string') {
+    return value
+      .replace(/(bearer\s+)[a-z0-9._~+\/-]+/gi, '$1[redacted]')
+      .replace(/:\/\/[^/@\s]+:[^/@\s]+@/g, '://[redacted]@')
+      .replace(/\b[a-f0-9]{64}\b/gi, '[redacted-64-hex]')
   }
   if (value !== null && typeof value === 'object') {
     const result: Record<string, unknown> = {}

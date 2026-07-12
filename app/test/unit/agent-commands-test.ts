@@ -29,6 +29,13 @@ describe('agent command contract', () => {
         nested: { api_key: '[redacted]', value: 42 },
       }
     )
+
+    const text = redactAgentValue(
+      'Bearer abc.def https://user:pass@example.test ' + 'a'.repeat(64)
+    )
+    assert.equal(String(text).includes('abc.def'), false)
+    assert.equal(String(text).includes('user:pass'), false)
+    assert.equal(String(text).includes('a'.repeat(64)), false)
   })
 
   it('rejects credentials and excessive argument nesting', () => {
