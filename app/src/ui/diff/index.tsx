@@ -146,6 +146,14 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
   }
 
   private renderImage(imageDiff: IImageDiff) {
+    const { textDiff } = imageDiff
+    const codeDiff = textDiff
+      ? this.renderTextDiff({
+          kind: DiffType.Text,
+          ...textDiff,
+        })
+      : undefined
+
     if (imageDiff.current && imageDiff.previous) {
       return (
         <ModifiedImageDiff
@@ -153,6 +161,7 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
           diffType={this.props.imageDiffType}
           current={imageDiff.current}
           previous={imageDiff.previous}
+          codeDiff={codeDiff}
         />
       )
     }
@@ -162,14 +171,16 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
       (this.props.file.status.kind === AppFileStatusKind.New ||
         this.props.file.status.kind === AppFileStatusKind.Untracked)
     ) {
-      return <NewImageDiff current={imageDiff.current} />
+      return <NewImageDiff current={imageDiff.current} codeDiff={codeDiff} />
     }
 
     if (
       imageDiff.previous &&
       this.props.file.status.kind === AppFileStatusKind.Deleted
     ) {
-      return <DeletedImageDiff previous={imageDiff.previous} />
+      return (
+        <DeletedImageDiff previous={imageDiff.previous} codeDiff={codeDiff} />
+      )
     }
 
     return null

@@ -8,6 +8,7 @@ import { OnionSkin } from './onion-skin'
 import { Swipe } from './swipe'
 import { assertNever } from '../../../lib/fatal-error'
 import { ISize, getMaxFitSize } from './sizing'
+import { getSvgDiffShowCode, saveSvgDiffShowCode } from './svg-diff-preferences'
 
 interface IModifiedImageDiffProps {
   readonly previous: Image
@@ -18,6 +19,7 @@ interface IModifiedImageDiffProps {
    * to change the diff presentation mode.
    */
   readonly onChangeDiffType: (type: ImageDiffType) => void
+  readonly codeDiff?: React.ReactNode
 }
 
 export interface ICommonImageDiffProperties {
@@ -53,6 +55,8 @@ interface IModifiedImageDiffState {
 
   /** The size of the container element. */
   readonly containerSize: ISize | null
+
+  readonly showCode: boolean
 }
 
 /** A component which renders the changes to an image in the repository */
@@ -91,6 +95,7 @@ export class ModifiedImageDiff extends React.Component<
       previousImageSize: null,
       currentImageSize: null,
       containerSize: null,
+      showCode: props.codeDiff !== undefined && getSvgDiffShowCode(),
     }
   }
 
@@ -145,23 +150,76 @@ export class ModifiedImageDiff extends React.Component<
     }
   }
 
-  public render() {
-    return (
-      <div className="panel image" id="diff">
-        <TabBar
-          selectedIndex={this.props.diffType}
-          onTabClicked={this.props.onChangeDiffType}
-          type={TabBarType.Switch}
-        >
-          <span>2-up</span>
-          <span>Swipe</span>
-          <span>Onion Skin</span>
-          <span>Difference</span>
-        </TabBar>
+  public componentDidUpdate(prevProps: IModifiedImageDiffProps) {
+    if (prevProps.codeDiff === undefined && this.props.codeDiff !== undefined) {
+      this.setState({ showCode: getSvgDiffShowCode() })
+    }
+  }
 
+  public render() {
+    return this.props.codeDiff === undefined
+      ? this.renderImageDiff()
+      : this.renderSvgDiff()
+  }
+
+  private renderSvgDiff() {
+    if (this.state.showCode) {
+      return (
+        <div className="panel svg-diff-container">
+          {this.renderTabs(0, this.onSvgTabClicked, true)}
+          {this.props.codeDiff}
+        </div>
+      )
+    }
+
+    return (
+      <div className="panel image svg-image" id="diff">
+        {this.renderTabs(1 + this.props.diffType, this.onSvgTabClicked, true)}
         {this.renderCurrentDiffType()}
       </div>
     )
+  }
+
+  private renderImageDiff() {
+    return (
+      <div className="panel image" id="diff">
+        {this.renderTabs(
+          this.props.diffType,
+          this.props.onChangeDiffType,
+          false
+        )}
+        {this.renderCurrentDiffType()}
+      </div>
+    )
+  }
+
+  private renderTabs(
+    selectedIndex: number,
+    onTabClicked: (index: number) => void,
+    includeCode: boolean
+  ) {
+    return (
+      <TabBar
+        selectedIndex={selectedIndex}
+        onTabClicked={onTabClicked}
+        type={TabBarType.Switch}
+      >
+        {includeCode ? <span>Code</span> : null}
+        <span>2-up</span>
+        <span>Swipe</span>
+        <span>Onion Skin</span>
+        <span>Difference</span>
+      </TabBar>
+    )
+  }
+
+  private onSvgTabClicked = (index: number) => {
+    const showCode = index === 0
+    saveSvgDiffShowCode(showCode)
+    this.setState({ showCode })
+    if (!showCode) {
+      this.props.onChangeDiffType((index - 1) as ImageDiffType)
+    }
   }
 
   private renderCurrentDiffType() {
