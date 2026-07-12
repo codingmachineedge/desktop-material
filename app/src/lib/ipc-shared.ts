@@ -84,7 +84,7 @@ export type RequestChannels = {
   'accounts-changed': () => void
   'quit-and-install-updates': () => void
   'quit-app': () => void
-  'open-repository-in-new-window': (path: string) => void
+  'open-repository-in-new-window': (path: string | null) => void
   'set-window-title': (title: string) => void
   'set-window-repository-state': (
     selectedRepositoryPath: string | null,

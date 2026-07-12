@@ -685,14 +685,18 @@ app.on('ready', () => {
 
   ipcMain.on('quit-app', () => app.quit())
 
-  ipcMain.on('open-repository-in-new-window', (_, path: string) => {
-    createWindow(window => {
-      window.sendCLIAction({
-        kind: 'open-repository',
-        path,
-        persistSelection: false,
-      })
-    })
+  ipcMain.on('open-repository-in-new-window', (_, path: string | null) => {
+    createWindow(
+      path === null
+        ? undefined
+        : window => {
+            window.sendCLIAction({
+              kind: 'open-repository',
+              path,
+              persistSelection: false,
+            })
+          }
+    )
   })
 
   ipcMain.on('set-window-title', (event, title: string) =>

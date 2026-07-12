@@ -491,7 +491,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     switch (name) {
       case 'open-new-window':
-        return this.openRepositoryInNewWindow(this.getRepository())
+        return this.openNewWindow()
       case 'push':
         return this.push()
       case 'force-push':
@@ -3484,6 +3484,15 @@ export class App extends React.Component<IAppProps, IAppState> {
       return
     }
     openRepositoryInNewWindow(repository.path)
+  }
+
+  private openNewWindow = () => {
+    const repository = this.getRepository()
+    openRepositoryInNewWindow(
+      repository instanceof Repository && !repository.missing
+        ? repository.path
+        : null
+    )
   }
 
   private openFileInExternalEditor = (fullPath: string) => {
