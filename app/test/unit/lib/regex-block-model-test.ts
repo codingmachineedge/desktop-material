@@ -25,14 +25,28 @@ describe('regex-block-model', () => {
   describe('flagsToString', () => {
     it('emits flags in canonical order', () => {
       assert.equal(
-        flagsToString({ g: true, i: true, m: false, s: false, u: true, y: false }),
+        flagsToString({
+          g: true,
+          i: true,
+          m: false,
+          s: false,
+          u: true,
+          y: false,
+        }),
         'giu'
       )
     })
 
     it('returns an empty string when no flags are set', () => {
       assert.equal(
-        flagsToString({ g: false, i: false, m: false, s: false, u: false, y: false }),
+        flagsToString({
+          g: false,
+          i: false,
+          m: false,
+          s: false,
+          u: false,
+          y: false,
+        }),
         ''
       )
     })
@@ -172,7 +186,11 @@ describe('regex-block-model', () => {
           groupType: 'capturing',
           children: [
             { kind: RegexBlockKind.CharClass, value: '\\w' },
-            { kind: RegexBlockKind.Quantifier, quantifier: 'plus', lazy: false },
+            {
+              kind: RegexBlockKind.Quantifier,
+              quantifier: 'plus',
+              lazy: false,
+            },
           ],
         },
         { kind: RegexBlockKind.Literal, value: '.ts' },

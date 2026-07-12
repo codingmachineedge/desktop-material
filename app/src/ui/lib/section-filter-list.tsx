@@ -357,7 +357,9 @@ export class SectionFilterList<
 
   private setFilterMode = (filterMode: FilterMode) => {
     persistFilterMode(this.props.filterListId, filterMode)
-    this.setState(prev => createStateUpdate(this.props, { ...prev, filterMode }))
+    this.setState(prev =>
+      createStateUpdate(this.props, { ...prev, filterMode })
+    )
   }
 
   private setCaseSensitive = (caseSensitive: boolean) => {
@@ -902,7 +904,8 @@ function createStateUpdate<T extends IFilterListItem, GroupIdentifier>(
     selectedRow = getFirstVisibleRow(rows)
   }
 
-  const hasActiveFilter = filter.length > 0 || settings.activeFilterIds.length > 0
+  const hasActiveFilter =
+    filter.length > 0 || settings.activeFilterIds.length > 0
 
   // Stay true if already set, otherwise become true if the filter has content
   const filterValueChanged = state?.filterValueChanged ? true : hasActiveFilter

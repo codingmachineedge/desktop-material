@@ -2,10 +2,7 @@ import * as React from 'react'
 import classNames from 'classnames'
 import { Octicon } from '../../octicons'
 import * as octicons from '../../octicons/octicons.generated'
-import {
-  IRegexFlags,
-  flagsToString,
-} from './regex-block-model'
+import { IRegexFlags, flagsToString } from './regex-block-model'
 import { RegexCategories, RegexBuilderPalette } from './regex-builder-palette'
 import { RegexTestArea } from './regex-test-area'
 
@@ -54,6 +51,34 @@ const FlagChips: ReadonlyArray<{
   { key: 'u', tooltip: 'unicode' },
   { key: 'y', tooltip: 'sticky' },
 ]
+
+interface IFlagChipProps {
+  readonly flagKey: keyof IRegexFlags
+  readonly tooltip: string
+  readonly on: boolean
+  readonly onToggleFlag: (key: keyof IRegexFlags) => void
+}
+
+/** A single toggleable regex flag chip (g, i, m, s, u, y). */
+class FlagChip extends React.Component<IFlagChipProps> {
+  private onClick = () => {
+    this.props.onToggleFlag(this.props.flagKey)
+  }
+
+  public render() {
+    const { flagKey, tooltip, on } = this.props
+    return (
+      <button
+        aria-label={`${flagKey} — ${tooltip}`}
+        aria-pressed={on}
+        className={classNames('regex-flag-chip', { on })}
+        onClick={this.onClick}
+      >
+        {flagKey}
+      </button>
+    )
+  }
+}
 
 /**
  * A self-contained, non-modal, draggable regex builder overlay. It floats over
@@ -129,6 +154,10 @@ export class RegexBuilder extends React.Component<
     }))
   }
 
+  private onCategoryChange = (index: number) => {
+    this.setState({ activeCategory: index })
+  }
+
   private onSampleChanged = (sample: string) => {
     this.setState({ sample })
   }
@@ -180,10 +209,7 @@ export class RegexBuilder extends React.Component<
   private renderValidityIcon() {
     if (this.state.pattern.length === 0) {
       return (
-        <Octicon
-          className="regex-validity empty"
-          symbol={octicons.pencil}
-        />
+        <Octicon className="regex-validity empty" symbol={octicons.pencil} />
       )
     }
 
@@ -225,9 +251,7 @@ export class RegexBuilder extends React.Component<
             </button>
           </div>
 
-          <div
-            className={classNames('regex-builder-pattern-row', { invalid })}
-          >
+          <div className={classNames('regex-builder-pattern-row', { invalid })}>
             <div className="regex-builder-pattern-field">
               <span className="regex-delimiter">/</span>
               <input
@@ -260,23 +284,20 @@ export class RegexBuilder extends React.Component<
           <div className="regex-builder-flags">
             <span className="regex-builder-flags-label">FLAGS</span>
             {FlagChips.map(({ key, tooltip }) => (
-              <button
+              <FlagChip
                 key={key}
-                title={tooltip}
-                className={classNames('regex-flag-chip', {
-                  on: this.state.flags[key],
-                })}
-                onClick={() => this.onToggleFlag(key)}
-              >
-                {key}
-              </button>
+                flagKey={key}
+                tooltip={tooltip}
+                on={this.state.flags[key]}
+                onToggleFlag={this.onToggleFlag}
+              />
             ))}
           </div>
 
           <RegexBuilderPalette
             categories={RegexCategories}
             activeCategory={this.state.activeCategory}
-            onCategoryChange={i => this.setState({ activeCategory: i })}
+            onCategoryChange={this.onCategoryChange}
             onInsertToken={this.onInsertToken}
           />
 

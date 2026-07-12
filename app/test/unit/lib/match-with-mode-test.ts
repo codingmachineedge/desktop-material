@@ -1,10 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import {
-  FilterMode,
-  match,
-  matchWithMode,
-} from '../../../src/lib/fuzzy-find'
+import { FilterMode, match, matchWithMode } from '../../../src/lib/fuzzy-find'
 import { getText } from '../../../src/ui/lib/filter-list'
 
 describe('matchWithMode', () => {

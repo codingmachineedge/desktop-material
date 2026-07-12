@@ -61,11 +61,7 @@
     transition: background-color 220ms var(--emph);
 
     &:hover {
-      background: color-mix(
-        in srgb,
-        var(--md-sys-color-primary-container) 82%,
-        var(--md-sys-color-on-primary-container)
-      );
+      background: color-mix(in srgb, var(--md-sys-color-primary-container) 82%, var(--md-sys-color-on-primary-container));
     }
   }
 
@@ -91,15 +87,10 @@
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-    transition: background-color 220ms var(--emph), color 220ms var(--emph),
-      transform 200ms var(--spring-fast);
+    transition: background-color 220ms var(--emph), color 220ms var(--emph), transform 200ms var(--spring-fast);
 
     &:hover {
-      background: color-mix(
-        in srgb,
-        var(--md-sys-color-surface-container-high) 82%,
-        var(--md-sys-color-on-surface)
-      );
+      background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 82%, var(--md-sys-color-on-surface));
     }
 
     &.active {

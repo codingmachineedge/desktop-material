@@ -118,7 +118,14 @@ export interface IRegexFlags {
 }
 
 /** The order flags are emitted in a `/pattern/flags` literal. */
-const FlagOrder: ReadonlyArray<keyof IRegexFlags> = ['g', 'i', 'm', 's', 'u', 'y']
+const FlagOrder: ReadonlyArray<keyof IRegexFlags> = [
+  'g',
+  'i',
+  'm',
+  's',
+  'u',
+  'y',
+]
 
 /** Serialise a set of flags into the trailing portion of a regex literal. */
 export function flagsToString(flags: IRegexFlags): string {
@@ -230,7 +237,9 @@ function quantifierToExplanation(block: IQuantifierBlock): string {
     case 'atLeast':
       return `repeated at least ${block.min ?? 0} times${lazy}`
     case 'range':
-      return `repeated between ${block.min ?? 0} and ${block.max ?? 0} times${lazy}`
+      return `repeated between ${block.min ?? 0} and ${
+        block.max ?? 0
+      } times${lazy}`
     default:
       return 'repeated'
   }

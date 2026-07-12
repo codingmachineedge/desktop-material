@@ -73,7 +73,10 @@ function passthrough<T>(items: ReadonlyArray<T>): ReadonlyArray<IMatch<T>> {
   }))
 }
 
-function contiguousIndices(start: number, length: number): ReadonlyArray<number> {
+function contiguousIndices(
+  start: number,
+  length: number
+): ReadonlyArray<number> {
   const indices = new Array<number>(length)
   for (let i = 0; i < length; i++) {
     indices[i] = start + i

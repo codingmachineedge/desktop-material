@@ -419,7 +419,9 @@ export class AugmentedSectionFilterList<
 
   private setFilterMode = (filterMode: FilterMode) => {
     persistFilterMode(this.props.filterListId, filterMode)
-    this.setState(prev => createStateUpdate(this.props, { ...prev, filterMode }))
+    this.setState(prev =>
+      createStateUpdate(this.props, { ...prev, filterMode })
+    )
   }
 
   private setCaseSensitive = (caseSensitive: boolean) => {

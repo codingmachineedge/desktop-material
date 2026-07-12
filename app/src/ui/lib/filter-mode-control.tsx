@@ -123,8 +123,7 @@ export class FilterModeControl extends React.Component<
           className={classNames('filter-mode-button', {
             active: mode !== FilterMode.Fuzzy,
           })}
-          title={`Filter mode: ${ModeLabels[mode]} (click to change)`}
-          aria-label={`Filter mode: ${ModeLabels[mode]}`}
+          aria-label={`Filter mode: ${ModeLabels[mode]} (click to change)`}
           onClick={this.onCycleMode}
         >
           <span className="filter-mode-glyph">.*</span>
@@ -133,7 +132,6 @@ export class FilterModeControl extends React.Component<
           className={classNames('filter-case-button', {
             active: !caseDisabled && caseSensitive,
           })}
-          title="Match case"
           aria-label="Match case"
           aria-pressed={caseSensitive}
           disabled={caseDisabled}
@@ -143,7 +141,6 @@ export class FilterModeControl extends React.Component<
         </button>
         <button
           className="filter-regex-builder-button"
-          title="Open regex builder"
           aria-label="Open regex builder"
           onClick={this.onOpenBuilder}
         >

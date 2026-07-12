@@ -100,7 +100,10 @@ export function matchGroup<T>(
   items: ReadonlyArray<T>,
   getKey: KeyFunction<T>,
   options: IFilterOptions
-): { readonly results: ReadonlyArray<IMatch<T>>; readonly regexError: string | null } {
+): {
+  readonly results: ReadonlyArray<IMatch<T>>
+  readonly regexError: string | null
+} {
   if (filterText.length === 0) {
     return {
       results: items.map(item => ({
@@ -113,6 +116,32 @@ export function matchGroup<T>(
   }
 
   return matchWithMode(filterText, items, getKey, options)
+}
+
+interface IFilterChipProps<T> {
+  readonly filter: IListFilter<T>
+  readonly active: boolean
+  readonly onToggleFilter: (id: string) => void
+}
+
+/** A single toggleable custom-filter chip. */
+class FilterChip<T> extends React.Component<IFilterChipProps<T>> {
+  private onClick = () => {
+    this.props.onToggleFilter(this.props.filter.id)
+  }
+
+  public render() {
+    const { filter, active } = this.props
+    return (
+      <button
+        className={classNames('filter-chip', { active })}
+        aria-pressed={active}
+        onClick={this.onClick}
+      >
+        {filter.label}
+      </button>
+    )
+  }
 }
 
 interface IFilterChipsRowProps<T> {
@@ -132,19 +161,14 @@ export class FilterChipsRow<T> extends React.Component<
 
     return (
       <div className="filter-chips-row">
-        {this.props.customFilters.map(filter => {
-          const active = this.props.activeFilterIds.includes(filter.id)
-          return (
-            <button
-              key={filter.id}
-              className={classNames('filter-chip', { active })}
-              aria-pressed={active}
-              onClick={() => this.props.onToggleFilter(filter.id)}
-            >
-              {filter.label}
-            </button>
-          )
-        })}
+        {this.props.customFilters.map(filter => (
+          <FilterChip
+            key={filter.id}
+            filter={filter}
+            active={this.props.activeFilterIds.includes(filter.id)}
+            onToggleFilter={this.props.onToggleFilter}
+          />
+        ))}
       </div>
     )
   }

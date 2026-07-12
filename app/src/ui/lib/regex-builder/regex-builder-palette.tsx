@@ -97,6 +97,62 @@ interface IRegexBuilderPaletteProps {
  * The two-column palette body of the regex builder: a category rail on the left
  * and the grid of insertable token chips for the active category on the right.
  */
+interface IRegexCategoryTabProps {
+  readonly name: string
+  readonly index: number
+  readonly selected: boolean
+  readonly onCategoryChange: (index: number) => void
+}
+
+class RegexCategoryTab extends React.Component<IRegexCategoryTabProps> {
+  private onClick = () => {
+    this.props.onCategoryChange(this.props.index)
+  }
+
+  public render() {
+    const { name, selected } = this.props
+    return (
+      <button
+        role="tab"
+        aria-selected={selected}
+        className={
+          selected
+            ? 'regex-builder-category selected'
+            : 'regex-builder-category'
+        }
+        onClick={this.onClick}
+      >
+        {name}
+      </button>
+    )
+  }
+}
+
+interface IRegexTokenChipProps {
+  readonly token: IRegexToken
+  readonly onInsertToken: (token: string) => void
+}
+
+class RegexTokenChip extends React.Component<IRegexTokenChipProps> {
+  private onClick = () => {
+    this.props.onInsertToken(this.props.token.token)
+  }
+
+  public render() {
+    const { token, description } = this.props.token
+    return (
+      <button
+        className="regex-builder-token"
+        aria-label={description}
+        onClick={this.onClick}
+      >
+        <span className="regex-builder-token-glyph">{token}</span>
+        <span className="regex-builder-token-desc">{description}</span>
+      </button>
+    )
+  }
+}
+
 export class RegexBuilderPalette extends React.Component<IRegexBuilderPaletteProps> {
   public render() {
     const { categories, activeCategory } = this.props
@@ -106,32 +162,22 @@ export class RegexBuilderPalette extends React.Component<IRegexBuilderPalettePro
       <div className="regex-builder-palette">
         <div className="regex-builder-categories" role="tablist">
           {categories.map((category, index) => (
-            <button
+            <RegexCategoryTab
               key={category.name}
-              role="tab"
-              aria-selected={index === activeCategory}
-              className={
-                index === activeCategory
-                  ? 'regex-builder-category selected'
-                  : 'regex-builder-category'
-              }
-              onClick={() => this.props.onCategoryChange(index)}
-            >
-              {category.name}
-            </button>
+              name={category.name}
+              index={index}
+              selected={index === activeCategory}
+              onCategoryChange={this.props.onCategoryChange}
+            />
           ))}
         </div>
         <div className="regex-builder-tokens">
           {active.tokens.map(t => (
-            <button
+            <RegexTokenChip
               key={t.token}
-              className="regex-builder-token"
-              title={t.description}
-              onClick={() => this.props.onInsertToken(t.token)}
-            >
-              <span className="regex-builder-token-glyph">{t.token}</span>
-              <span className="regex-builder-token-desc">{t.description}</span>
-            </button>
+              token={t}
+              onInsertToken={this.props.onInsertToken}
+            />
           ))}
         </div>
       </div>

@@ -78,8 +78,7 @@
     background: transparent;
     color: var(--md-sys-color-on-surface-variant);
     cursor: pointer;
-    transition: background-color 220ms var(--emph), transform 200ms
-      var(--spring-fast);
+    transition: background-color 220ms var(--emph), transform 200ms var(--spring-fast);
 
     &:hover {
       background: var(--md-sys-color-surface-container-high);
@@ -226,11 +225,7 @@
     transition: background-color 220ms var(--emph), color 220ms var(--emph);
 
     &:hover {
-      background: color-mix(
-        in srgb,
-        var(--md-sys-color-on-surface) 8%,
-        transparent
-      );
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
     }
 
     &.selected {
@@ -261,8 +256,7 @@
     border-radius: 14px;
     background: var(--md-sys-color-surface);
     cursor: pointer;
-    transition: background-color 220ms var(--emph), border-radius 260ms
-      var(--spring);
+    transition: background-color 220ms var(--emph), border-radius 260ms var(--spring);
 
     &:hover {
       background: var(--md-sys-color-secondary-container);
@@ -395,8 +389,7 @@
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
-    transition: background-color 220ms var(--emph), border-radius 260ms
-      var(--spring);
+    transition: background-color 220ms var(--emph), border-radius 260ms var(--spring);
 
     &:hover {
       border-radius: 16px;

@@ -130,9 +130,7 @@ export class RegexTestArea extends React.Component<IRegexTestAreaProps> {
     return <span className={className}>{label}</span>
   }
 
-  private onSampleChanged = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
-  ) => {
+  private onSampleChanged = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     this.props.onSampleChanged(event.currentTarget.value)
   }
 
