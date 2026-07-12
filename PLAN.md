@@ -30,7 +30,7 @@ The user wants a large feature expansion:
 ## Confirmed environment facts
 
 - Remote: `origin = https://github.com/codingmachineedge/desktop-material.git`, branch `main`.
-- GitHub Pages is live at https://codingmachineedge.github.io/desktop-material/. The wiki is enabled; its canonical Markdown source is under `docs/wiki/` and publication requires the one-time browser bootstrap described below.
+- GitHub Pages is live at https://codingmachineedge.github.io/desktop-material/. The [GitHub wiki](https://github.com/codingmachineedge/desktop-material/wiki) is initialized and its six canonical pages are published from `docs/wiki/` (wiki commit `c818fd5`).
 - Copilot integration already in codebase: `app/src/lib/copilot-commit-message.ts`, `app/src/lib/stores/copilot-store.ts`, BYOK providers, Copilot conflict resolution (`app/src/lib/copilot-conflict-resolution.ts`, `app/src/ui/multi-commit-operation/dialog/copilot-*`).
 - Worktree support already in codebase: `app/src/ui/worktrees/*`, `app/src/ui/toolbar/worktree-dropdown.tsx`, `app/src/models/worktree.ts`.
 
@@ -240,7 +240,7 @@ Every milestone ends with: `yarn lint` + `yarn test:unit` green → screenshot r
 
 ## External dependencies / one-time user actions
 
-1. **Wiki bootstrap** (one-time): the wiki git repo does not exist until the first page is created in GitHub's web UI. After explicit browser confirmation, create `Home`, then push the canonical `docs/wiki/` mirror normally.
+1. **Wiki bootstrap — COMPLETE**: the first page was created, then all six canonical `docs/wiki/` pages were pushed to `desktop-material.wiki.git` at `c818fd5`. Future wiki updates use ordinary git pushes.
 2. **GitLab/Bitbucket OAuth apps** (M17): cloud OAuth needs client IDs registered under your account (desktop-plus's are org-owned). Self-hosted GitLab uses PAT auth and needs nothing. PAT-only is the fallback for cloud too if you prefer not to register apps.
 3. **Claude design ZIP** (M18): supplied. M3 already uses its Settings History layout; the remaining dependency is the later full-app alignment pass.
 
