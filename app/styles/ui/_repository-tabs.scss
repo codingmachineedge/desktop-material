@@ -175,9 +175,10 @@
 }
 
 .tab-style-editor {
-  // Design-spec-shell §3 / overlays §8 tab-format popover: 320px surface with
-  // 40×40 radius-12 toggles, mono size value, radius-999 font pills, and 26px
-  // color swatch circles ringed with a 2.5px border.
+  // Design-spec-shell §3 / overlays §8 tab-format popover: 288px surface with
+  // 40×40 radius-12 toggles, mono size value, a Word-style searchable font
+  // dropdown, and a wrapping palette of 26px color swatch circles (2.5px ring)
+  // plus a native custom-color picker and a persisted "recent" row.
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -316,50 +317,226 @@
     }
   }
 
-  .tab-style-families {
-    gap: 6px;
+  .tab-style-font {
+    gap: 8px;
 
-    .tab-style-family {
-      flex: 1;
-      height: 36px;
-      border: 0;
-      border-radius: 999px;
-      background: var(--md-sys-color-surface-container-high);
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: 12px;
-      font-weight: var(--font-weight-semibold);
-      cursor: pointer;
-      transition: background-color 200ms var(--emph), color 200ms var(--emph);
-
-      &.active {
-        background: var(--md-sys-color-secondary-container);
-        color: var(--md-sys-color-on-secondary-container);
-      }
-    }
-
-    .family-serif {
-      font-family: 'Roboto Serif', Georgia, 'Times New Roman', serif;
-    }
-    .family-monospace {
-      font-family: var(--font-family-monospace, monospace);
-    }
-  }
-
-  .tab-style-colors {
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-
-    .tab-style-colors-label {
+    > label {
       width: 32px;
       font-size: 12px;
       font-weight: var(--font-weight-semibold);
       color: var(--md-sys-color-on-surface-variant);
     }
 
+    .tab-style-font-picker {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tab-style-font-select {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      height: 40px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 200ms var(--emph);
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-highest);
+      }
+
+      .tab-style-font-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .octicon {
+        flex-shrink: 0;
+        width: 12px;
+        height: 12px;
+        color: var(--md-sys-color-on-surface-variant);
+      }
+    }
+
+    .tab-style-font-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      border-radius: 16px;
+      background: var(--md-sys-color-surface-container-high);
+      box-shadow: var(--md-sys-elevation-level3);
+      overflow: hidden;
+    }
+
+    .tab-style-font-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+
+      .octicon {
+        width: 14px;
+        height: 14px;
+        color: var(--md-sys-color-on-surface-variant);
+      }
+
+      input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: var(--md-sys-color-on-surface);
+        font-size: 13px;
+      }
+    }
+
+    .tab-style-font-list {
+      display: flex;
+      flex-direction: column;
+      max-height: 220px;
+      padding: 4px;
+      overflow-y: auto;
+    }
+
+    .tab-style-font-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface);
+      font-size: 15px;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 150ms var(--emph);
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-highest);
+      }
+
+      &.selected {
+        background: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+      }
+
+      .tab-style-font-check {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 16px;
+
+        .octicon {
+          width: 14px;
+          height: 14px;
+        }
+      }
+
+      .tab-style-font-option-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .tab-style-font-empty {
+      padding: 12px;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 13px;
+      text-align: center;
+    }
+  }
+
+  .tab-style-colors {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+
+    .tab-style-colors-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tab-style-colors-label {
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .tab-style-color-custom {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px 4px 4px;
+      border-radius: 999px;
+      background: var(--md-sys-color-surface-container-high);
+      cursor: pointer;
+      transition: background-color 200ms var(--emph);
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-highest);
+      }
+
+      .tab-style-color-custom-swatch {
+        width: 22px;
+        height: 22px;
+        border: 2px solid var(--md-sys-color-outline-variant);
+        border-radius: 999px;
+      }
+
+      .tab-style-color-custom-label {
+        font-size: 12px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--md-sys-color-on-surface-variant);
+      }
+
+      input[type='color'] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        border: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+    }
+
     .tab-style-swatches {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
+    }
+
+    .tab-style-recent {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      .tab-style-recent-label {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--md-sys-color-on-surface-variant);
+      }
     }
 
     .tab-style-swatch {
