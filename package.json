@@ -30,6 +30,7 @@
     "build:prod": "yarn compile:prod && cross-env NODE_ENV=production ts-node -P script/tsconfig.json script/build.ts",
     "package": "ts-node -P script/tsconfig.json script/package.ts",
     "generate-octicons": "ts-node -P script/tsconfig.json script/generate-octicons.ts",
+    "generate-gitignore-catalog": "ts-node -P script/tsconfig.json script/generate-gitignore-catalog.ts",
     "compile:script": "tsc -P script/tsconfig.json",
     "lint": "yarn prettier && yarn lint:src",
     "lint:fix": "yarn prettier --write && yarn lint:src:fix",
