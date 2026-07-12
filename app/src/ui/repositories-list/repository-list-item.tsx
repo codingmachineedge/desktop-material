@@ -81,6 +81,17 @@ export class RepositoryListItem extends React.Component<
             aheadBehind: this.props.aheadBehind,
             hasChanges: hasChanges,
           })}
+
+        {/*
+          Trailing "current repository" marker (spec-overlays §3.3). Always
+          rendered; the side-sheet SCSS only reveals it on the selected
+          (current) row, matching the existing primary-container icon-tile
+          treatment.
+        */}
+        <Octicon
+          className="current-repo-indicator"
+          symbol={octicons.checkCircle}
+        />
       </div>
     )
   }

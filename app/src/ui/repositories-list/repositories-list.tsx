@@ -24,6 +24,7 @@ import memoizeOne from 'memoize-one'
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
 import { generateRepositoryListContextMenu } from '../repositories-list/repository-list-item-context-menu'
 import { enableWorktreeSupport } from '../../lib/feature-flag'
+import { FoldoutType } from '../../lib/app-state'
 import { SectionFilterList } from '../lib/section-filter-list'
 import { assertNever } from '../../lib/fatal-error'
 import { IAheadBehind } from '../../models/branch'
@@ -339,6 +340,7 @@ export class RepositoriesList extends React.Component<
 
     return (
       <div className="repository-list">
+        {this.renderSheetHeader()}
         <SectionFilterList<IRepositoryListItem, RepositoryListGroup>
           rowHeight={RowHeight}
           selectedItem={selectedItem}
@@ -366,6 +368,28 @@ export class RepositoriesList extends React.Component<
 
   private onSelectionChanged = (selectedItem: IRepositoryListItem | null) => {
     this.setState({ selectedItem })
+  }
+
+  // In-sheet header (spec-overlays §3.1): title + close ✕. The Add split-button
+  // stays in the filter row; the scrim handles outside-click dismissal.
+  private renderSheetHeader() {
+    return (
+      <header className="side-sheet-header">
+        <h2 className="side-sheet-title">Repositories</h2>
+        <button
+          type="button"
+          className="side-sheet-close"
+          onClick={this.onCloseClick}
+          aria-label="Close"
+        >
+          <Octicon symbol={octicons.x} />
+        </button>
+      </header>
+    )
+  }
+
+  private onCloseClick = () => {
+    this.props.dispatcher.closeFoldout(FoldoutType.Repository)
   }
 
   private renderPostFilter = () => {

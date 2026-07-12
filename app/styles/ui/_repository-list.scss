@@ -133,6 +133,9 @@
 // applies where the repository list lives inside the foldout sheet.
 #foldout-container .repository-list {
   background: var(--md-sys-color-surface-container-low);
+  // Stack the in-sheet header above the filter list (the base rule lays the
+  // list out as a row for the legacy Add-repository foldout).
+  flex-direction: column;
 
   // Uppercase group labels (RECENT / <account login>) per the design spec.
   .filter-list-group-header {
@@ -182,13 +185,33 @@
     .name {
       font-weight: var(--font-weight-semibold);
     }
+
+    // Trailing "current repository" marker (spec-overlays §3.3): 20px
+    // check_circle in primary. Hidden by default; only the current (selected)
+    // row reveals it.
+    .current-repo-indicator {
+      flex-shrink: 0;
+      margin-left: 8px;
+      width: 20px;
+      height: 20px;
+      color: var(--md-sys-color-primary);
+      display: none;
+    }
   }
 
-  // Current repository (the selected item) — primary-container icon chip acts as
-  // the current marker, echoing the design's check_circle treatment.
-  .list-item.selected .repository-list-item .icon-for-repository {
-    background: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
+  // Current repository (the selected item) — primary-container icon chip plus a
+  // trailing check_circle marker, matching the design's current-row treatment.
+  .list-item.selected .repository-list-item {
+    .icon-for-repository {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+
+    .current-repo-indicator {
+      display: grid;
+      place-items: center;
+      animation: dmPop 320ms var(--spring);
+    }
   }
 }
 

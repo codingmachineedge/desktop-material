@@ -219,6 +219,8 @@
 // override layer without `!important`, matching the repository sheet approach.
 #foldout-container .branches-container {
   width: 100%;
+  // Positioning context for the bottom-right "New branch" extended FAB.
+  position: relative;
 
   .branches-list,
   .pull-request-list {
@@ -272,9 +274,9 @@
     }
   }
 
-  // Rows: 34x34 radius-11 leading icon chip. The current branch already renders
-  // the `check` octicon here (branch-list-item.tsx), so the chip doubles as the
-  // check_circle-style current marker using the existing octicon.
+  // Rows: 34x34 radius-11 leading branch-icon chip. The current branch is
+  // marked by a trailing check_circle (see .current-branch-indicator) and a
+  // tinted leading chip, rather than swapping the leading glyph.
   .branches-list-item {
     padding: 8px;
 
@@ -295,19 +297,47 @@
       font-size: 12.5px;
       font-weight: var(--font-weight-semibold);
     }
+
+    // Trailing "current branch" marker: 20px check_circle in primary.
+    .current-branch-indicator {
+      flex-shrink: 0;
+      margin-left: auto;
+      width: 20px;
+      height: 20px;
+      color: var(--md-sys-color-primary);
+      animation: dmPop 320ms var(--spring);
+    }
+
+    &.current-branch .icon {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
   }
 
-  // "New branch" as an extended FAB-style button (kept inline in the filter
-  // row): radius 18 morphing to 999 on hover, level2 elevation.
+  // Give the branch list extra bottom padding so its last rows clear the FAB.
+  .branches-list .filter-list-container {
+    padding-bottom: 84px;
+  }
+
+  // "New branch" as a bottom-right extended FAB (spec-overlays §4.3). The button
+  // keeps its .new-branch-button class (used by E2E) and stays in the filter
+  // row's DOM; it is lifted out visually by absolute positioning against the
+  // .branches-container. Radius 18 morphing to 999 on hover, level2 → level3.
   .new-branch-button {
-    height: 44px;
-    padding: 0 18px;
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    z-index: 2;
+    height: 56px;
+    padding: 0 20px;
     border: 0;
     border-radius: 18px;
     background: var(--md-sys-color-primary-container);
     color: var(--md-sys-color-on-primary-container);
     box-shadow: var(--md-sys-elevation-level2);
+    font-size: 14px;
     font-weight: 700;
+    animation: dmPop 380ms var(--spring) 240ms backwards;
     transition: border-radius 320ms var(--spring), box-shadow 260ms var(--emph), transform 240ms var(--spring-fast), background-color 480ms var(--emph);
 
     &:hover {
@@ -318,7 +348,7 @@
     }
 
     &:active {
-      transform: scale(0.96);
+      transform: scale(0.92);
     }
 
     .octicon {

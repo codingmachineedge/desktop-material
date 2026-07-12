@@ -127,12 +127,35 @@ export class BranchesContainer extends React.Component<
     })
     return (
       <div className={classes}>
+        {this.renderSheetHeader()}
         {this.renderTabBar()}
         {this.renderSelectedTab()}
         {this.renderMergeButtonRow()}
         {this.renderPullRequestQuickView()}
       </div>
     )
+  }
+
+  // In-sheet header (spec-overlays §4.1): title + close ✕. The scrim already
+  // handles outside-click dismissal; the ✕ gives an explicit affordance.
+  private renderSheetHeader() {
+    return (
+      <header className="side-sheet-header">
+        <h2 className="side-sheet-title">Branches</h2>
+        <button
+          type="button"
+          className="side-sheet-close"
+          onClick={this.onCloseClick}
+          aria-label="Close"
+        >
+          <Octicon symbol={octicons.x} />
+        </button>
+      </header>
+    )
+  }
+
+  private onCloseClick = () => {
+    this.props.dispatcher.closeFoldout(FoldoutType.Branch)
   }
 
   private renderPullRequestQuickView = (): JSX.Element | null => {

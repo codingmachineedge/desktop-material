@@ -95,9 +95,12 @@ export class BranchListItem extends React.Component<
   public render() {
     const { authorDate, isCurrentBranch, name } = this.props
 
-    const icon = isCurrentBranch ? octicons.check : octicons.gitBranch
+    // The leading glyph stays the branch icon for every row; the "current"
+    // branch is marked instead by a trailing check_circle (spec-overlays §4.3).
+    const icon = octicons.gitBranch
     const className = classNames('branches-list-item', {
       'drop-target': this.state.isDragInProgress,
+      'current-branch': isCurrentBranch,
     })
 
     return (
@@ -133,6 +136,12 @@ export class BranchListItem extends React.Component<
               tooltip={!enableAccessibleListToolTips()}
             />
           ))}
+        {isCurrentBranch && (
+          <Octicon
+            className="current-branch-indicator"
+            symbol={octicons.checkCircle}
+          />
+        )}
       </div>
     )
   }
