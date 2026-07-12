@@ -900,35 +900,111 @@
   min-width: 0;
   max-height: 100%;
 
+  // MD3 diff palette remap: retints every diff row / gutter / hunk / sign /
+  // text through the theme-aware `--diff-*` / `--dm-*` token set defined in
+  // `_material.scss`. Because those tokens carry both the light and
+  // `body.theme-dark` values, both themes flip automatically with zero row-DOM
+  // changes. This scope covers the diff header, the CodeMirror diff view and the
+  // side-by-side view (both mount inside `.diff-container`).
+  --diff-text-color: var(--md-sys-color-on-surface);
+  --diff-alt-text-color: var(--md-sys-color-on-surface-variant);
+  --diff-border-color: var(--md-sys-color-outline-variant);
+  --diff-gutter-color: var(--md-sys-color-outline-variant);
+  --diff-gutter-background-color: transparent;
+  --diff-line-number-color: var(--md-sys-color-on-surface-variant);
+
+  --diff-add-background-color: var(--diff-add-bg);
+  --diff-add-gutter-background-color: var(--diff-add-gutter);
+  --diff-add-border-color: var(--diff-add-gutter);
+  --diff-add-gutter-color: var(--diff-add-gutter);
+  --diff-add-text-color: color-mix(in srgb, var(--dm-green) 55%, var(--md-sys-color-on-surface));
+
+  --diff-delete-background-color: var(--diff-del-bg);
+  --diff-delete-gutter-background-color: var(--diff-del-gutter);
+  --diff-delete-border-color: var(--diff-del-gutter);
+  --diff-delete-gutter-color: var(--diff-del-gutter);
+  --diff-delete-text-color: color-mix(in srgb, var(--md-sys-color-error) 50%, var(--md-sys-color-on-surface));
+
+  --diff-hunk-background-color: var(--diff-hunk-bg);
+  --diff-hunk-gutter-background-color: var(--diff-hunk-bg);
+  --diff-hunk-border-color: var(--diff-hunk-text);
+  --diff-hunk-gutter-color: var(--diff-hunk-text);
+  --diff-hunk-text-color: var(--diff-hunk-text);
+
+  --diff-empty-row-background-color: transparent;
+  --diff-empty-row-gutter-background-color: transparent;
+  --diff-empty-hunk-handle: var(--md-sys-color-outline-variant);
+
   .header {
     span {
       user-select: text;
     }
 
-    background: var(--box-alt-background-color);
-    border-bottom: 1px solid var(--diff-border-color);
+    background: transparent;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
 
     display: flex;
     flex-direction: row;
     flex-shrink: 0;
     flex-grow: 0;
     align-items: center;
+    gap: 12px;
 
-    padding: var(--spacing-half) var(--spacing);
+    padding: 14px 18px;
 
     @include octicon-status;
 
+    .path-label-component {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--font-family-monospace);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--md-sys-color-on-surface);
+    }
+
     .diff-options-component {
-      margin-right: var(--spacing-half);
+      margin-left: auto;
+      margin-right: 0;
       flex-shrink: 0;
     }
 
+    // 36x36 radius-12 tonal status chip, moved ahead of the path (spec §8.1).
     .octicon.status {
+      order: -1;
+      box-sizing: border-box;
+      width: 36px;
+      height: 36px;
+      padding: 9px;
+      border-radius: 12px;
       flex-shrink: 0;
       vertical-align: text-bottom;
       position: relative;
       align-self: center;
-      flex-shrink: 0;
+
+      &.status-new,
+      &.status-copied,
+      &.status-resolved,
+      &.status-untracked {
+        fill: var(--dm-green);
+        background: var(--dm-green-container);
+      }
+
+      &.status-modified,
+      &.status-renamed {
+        fill: var(--dm-amber);
+        background: var(--dm-amber-container);
+      }
+
+      &.status-deleted {
+        fill: var(--md-sys-color-error);
+        background: var(--md-sys-color-error-container);
+      }
+
+      &.status-conflicted {
+        fill: var(--md-sys-color-error);
+        background: var(--md-sys-color-error-container);
+      }
     }
 
     .line-endings {

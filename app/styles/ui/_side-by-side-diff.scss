@@ -4,6 +4,40 @@
   --hunk-handle-width-with-check-all: 16px;
   --hunk-handle-width: 4px;
 
+  // MD3 diff palette remap (see `_diff.scss` for the full rationale). Repeated
+  // here so standalone mounts of the side-by-side view — e.g. the stash diff
+  // viewer, which is *not* wrapped in `.diff-container` — pick up the same
+  // theme-aware `--diff-*` / `--dm-*` tokens. Colors/spacing only; the row DOM
+  // asserted by `side-by-side-diff-row-test.tsx` is left untouched.
+  --diff-text-color: var(--md-sys-color-on-surface);
+  --diff-alt-text-color: var(--md-sys-color-on-surface-variant);
+  --diff-border-color: var(--md-sys-color-outline-variant);
+  --diff-gutter-color: var(--md-sys-color-outline-variant);
+  --diff-gutter-background-color: transparent;
+  --diff-line-number-color: var(--md-sys-color-on-surface-variant);
+
+  --diff-add-background-color: var(--diff-add-bg);
+  --diff-add-gutter-background-color: var(--diff-add-gutter);
+  --diff-add-border-color: var(--diff-add-gutter);
+  --diff-add-gutter-color: var(--diff-add-gutter);
+  --diff-add-text-color: color-mix(in srgb, var(--dm-green) 55%, var(--md-sys-color-on-surface));
+
+  --diff-delete-background-color: var(--diff-del-bg);
+  --diff-delete-gutter-background-color: var(--diff-del-gutter);
+  --diff-delete-border-color: var(--diff-del-gutter);
+  --diff-delete-gutter-color: var(--diff-del-gutter);
+  --diff-delete-text-color: color-mix(in srgb, var(--md-sys-color-error) 50%, var(--md-sys-color-on-surface));
+
+  --diff-hunk-background-color: var(--diff-hunk-bg);
+  --diff-hunk-gutter-background-color: var(--diff-hunk-bg);
+  --diff-hunk-border-color: var(--diff-hunk-text);
+  --diff-hunk-gutter-color: var(--diff-hunk-text);
+  --diff-hunk-text-color: var(--diff-hunk-text);
+
+  --diff-empty-row-background-color: transparent;
+  --diff-empty-row-gutter-background-color: transparent;
+  --diff-empty-hunk-handle: var(--md-sys-color-outline-variant);
+
   display: flex;
   flex-direction: column;
   width: 100%;
