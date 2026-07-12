@@ -354,50 +354,53 @@ export class Preferences extends React.Component<
       >
         {this.renderDisallowedCharactersError()}
         <div className="preferences-container">
-          <TabBar
-            onTabClicked={this.onTabClicked}
-            selectedIndex={this.tabToVisualIndex(this.state.selectedIndex)}
-            type={TabBarType.Vertical}
-          >
-            <span id={this.getTabId(PreferencesTab.Accounts)}>
-              <Octicon className="icon" symbol={octicons.home} />
-              Accounts
-            </span>
-            <span id={this.getTabId(PreferencesTab.Integrations)}>
-              <Octicon className="icon" symbol={octicons.person} />
-              Integrations
-            </span>
-            {this.isCopilotSdkEnabled && (
-              <span id={this.getTabId(PreferencesTab.Copilot)}>
-                <Octicon className="icon" symbol={octicons.copilot} />
-                Copilot
+          <div className="preferences-rail">
+            <TabBar
+              onTabClicked={this.onTabClicked}
+              selectedIndex={this.tabToVisualIndex(this.state.selectedIndex)}
+              type={TabBarType.Vertical}
+            >
+              <span id={this.getTabId(PreferencesTab.Accounts)}>
+                <Octicon className="icon" symbol={octicons.home} />
+                Accounts
               </span>
-            )}
-            <span id={this.getTabId(PreferencesTab.Git)}>
-              <Octicon className="icon" symbol={octicons.gitCommit} />
-              Git
-            </span>
-            <span id={this.getTabId(PreferencesTab.Appearance)}>
-              <Octicon className="icon" symbol={octicons.paintbrush} />
-              Appearance
-            </span>
-            <span id={this.getTabId(PreferencesTab.Notifications)}>
-              <Octicon className="icon" symbol={octicons.bell} />
-              Notifications
-            </span>
-            <span id={this.getTabId(PreferencesTab.Prompts)}>
-              <Octicon className="icon" symbol={octicons.question} />
-              Prompts
-            </span>
-            <span id={this.getTabId(PreferencesTab.Advanced)}>
-              <Octicon className="icon" symbol={octicons.gear} />
-              Advanced
-            </span>
-            <span id={this.getTabId(PreferencesTab.Accessibility)}>
-              <Octicon className="icon" symbol={octicons.accessibility} />
-              Accessibility
-            </span>
-          </TabBar>
+              <span id={this.getTabId(PreferencesTab.Integrations)}>
+                <Octicon className="icon" symbol={octicons.person} />
+                Integrations
+              </span>
+              {this.isCopilotSdkEnabled && (
+                <span id={this.getTabId(PreferencesTab.Copilot)}>
+                  <Octicon className="icon" symbol={octicons.copilot} />
+                  Copilot
+                </span>
+              )}
+              <span id={this.getTabId(PreferencesTab.Git)}>
+                <Octicon className="icon" symbol={octicons.gitCommit} />
+                Git
+              </span>
+              <span id={this.getTabId(PreferencesTab.Appearance)}>
+                <Octicon className="icon" symbol={octicons.paintbrush} />
+                Appearance
+              </span>
+              <span id={this.getTabId(PreferencesTab.Notifications)}>
+                <Octicon className="icon" symbol={octicons.bell} />
+                Notifications
+              </span>
+              <span id={this.getTabId(PreferencesTab.Prompts)}>
+                <Octicon className="icon" symbol={octicons.question} />
+                Prompts
+              </span>
+              <span id={this.getTabId(PreferencesTab.Advanced)}>
+                <Octicon className="icon" symbol={octicons.gear} />
+                Advanced
+              </span>
+              <span id={this.getTabId(PreferencesTab.Accessibility)}>
+                <Octicon className="icon" symbol={octicons.accessibility} />
+                Accessibility
+              </span>
+            </TabBar>
+            <div className="preferences-version">Desktop Material 0.1.0</div>
+          </div>
 
           {this.renderActiveTab()}
         </div>

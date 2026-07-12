@@ -15,46 +15,232 @@
     }
   }
 
+  // --- MD3 settings card (commit 12) -------------------------------------
+  // The card geometry (940x660, surface-container-low) is locked in
+  // _material-shell.scss so it beats the generic dialog rules. Here we lay out
+  // the interior: a 236px left rail + a scrollable content column.
+
+  // Slim, transparent header (the design has no title strip; we keep the
+  // Dialog's built-in header for behavior/close-button, just make it minimal).
+  .dialog-header {
+    background: transparent;
+    min-height: 0;
+    padding: 14px 14px 0 20px;
+
+    h1 {
+      font-size: 15px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
   .preferences-container {
     display: flex;
-    .tab-container {
-      border-left: var(--base-border);
+    flex: 1;
+    min-height: 0;
+  }
+
+  // Left navigation rail
+  .preferences-rail {
+    width: 236px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    background: var(--md-sys-color-surface-container);
+    padding: 10px 12px 16px;
+
+    .tab-bar.vertical {
       flex: 1;
-      // Without this, a tab whose content has long unbroken text can
-      // grow past the dialog's max-width and break out the right edge.
-      min-width: 0;
+      background: transparent;
+      gap: 2px;
+      padding: 0;
+      overflow-y: auto;
+
+      .tab-bar-item {
+        min-height: 44px;
+        min-width: 0;
+        border-radius: 999px !important;
+        padding: 0 14px;
+        font-size: 13.5px;
+        // Staggered entrance for the rail items.
+        animation: dmLeft calc(320ms * var(--mdur, 1)) var(--spring) both;
+
+        @for $i from 1 through 9 {
+          &:nth-child(#{$i}) {
+            animation-delay: #{60 + ($i - 1) * 40}ms;
+          }
+        }
+
+        &.selected {
+          background: var(--md-sys-color-secondary-container);
+          color: var(--md-sys-color-on-secondary-container);
+          font-weight: var(--font-weight-bold);
+        }
+
+        .icon {
+          width: 16px;
+          margin-right: 12px;
+        }
+      }
     }
 
-    fieldset {
-      border: none;
-      margin-left: 0;
-      margin-right: 0;
-      padding-left: 0;
-      padding-right: 0;
+    .preferences-version {
+      margin-top: 12px;
+      margin-left: 12px;
+      font-size: 11px;
+      color: var(--md-sys-color-on-surface-variant);
+      opacity: 0.7;
+    }
+  }
+
+  .tab-container {
+    flex: 1;
+    // Without this, a tab whose content has long unbroken text can
+    // grow past the dialog's max-width and break out the right edge.
+    min-width: 0;
+    overflow-y: auto;
+    padding: 4px 30px 20px;
+
+    .dialog-content {
+      padding: 8px 0 0;
+    }
+  }
+
+  fieldset {
+    border: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .advanced-section {
+    &:not(:last-child) {
+      margin-bottom: var(--spacing);
     }
 
-    .advanced-section {
-      &:not(:last-child) {
-        margin-bottom: var(--spacing);
+    .checkbox-component:not(:last-child) {
+      margin-bottom: var(--spacing-half);
+    }
+
+    .setting-hint-warning {
+      margin-top: var(--spacing);
+    }
+
+    .warning-icon {
+      color: var(--warning-badge-icon-color);
+    }
+  }
+
+  // Footer: text Cancel + filled primary Save pill.
+  .dialog-footer {
+    background: transparent;
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px 22px 18px;
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    button[type='submit'] {
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border: 0;
+      border-radius: 999px;
+      height: 42px;
+      padding: 0 24px;
+      font-weight: var(--font-weight-bold);
+      box-shadow: none;
+      transition: border-radius 260ms var(--spring), transform 200ms var(--spring-fast);
+
+      &:hover {
+        border-radius: 14px;
       }
 
-      .checkbox-component:not(:last-child) {
-        margin-bottom: var(--spacing-half);
+      &:active {
+        transform: scale(0.95);
       }
+    }
 
-      .setting-hint-warning {
-        margin-top: var(--spacing);
-      }
+    button[type='reset'] {
+      background: transparent;
+      color: var(--md-sys-color-primary);
+      border: 0;
+      border-radius: 999px;
+      height: 42px;
+      padding: 0 20px;
+      font-weight: var(--font-weight-bold);
+      box-shadow: none;
 
-      .warning-icon {
-        color: var(--warning-badge-icon-color);
+      &:hover {
+        background: var(--md-sys-color-surface-container-high);
       }
     }
   }
 
-  .tab-bar {
-    .icon {
-      width: 16px;
+  // --- Toggle switches for the Notifications & Prompts panes --------------
+  // Visual-only: the underlying <input type="checkbox"> and its label/a11y
+  // are preserved; we restyle the input into a 54x32 MD3 switch.
+  .tab-container[aria-labelledby='preferences-tab-notifications'],
+  .tab-container[aria-labelledby='preferences-tab-prompts'] {
+    .checkbox-component {
+      flex-direction: row-reverse;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 6px 0;
+
+      label {
+        margin: 0;
+        flex: 1;
+      }
+
+      input[type='checkbox'] {
+        appearance: none;
+        -webkit-appearance: none;
+        position: relative;
+        flex-shrink: 0;
+        width: 54px;
+        height: 32px;
+        margin: 0;
+        border-radius: 999px;
+        border: 2px solid var(--md-sys-color-outline);
+        background: var(--md-sys-color-surface-container-high);
+        cursor: pointer;
+        transition: background-color 280ms var(--emph), border-color 280ms var(--emph);
+
+        &::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 3px;
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: var(--md-sys-color-outline);
+          transform: translateY(-50%);
+          transition: transform 320ms var(--spring), width 200ms var(--spring-fast), height 200ms var(--spring-fast), background-color 280ms var(--emph);
+        }
+
+        &:checked {
+          background: var(--md-sys-color-primary);
+          border-color: var(--md-sys-color-primary);
+
+          &::before {
+            width: 24px;
+            height: 24px;
+            background: var(--md-sys-color-on-primary);
+            transform: translateY(-50%) translateX(22px);
+          }
+        }
+
+        &:focus-visible {
+          outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+          outline-offset: 1px;
+        }
+      }
     }
   }
 
@@ -103,12 +289,21 @@
     }
 
     .account-card {
-      background: var(--md-sys-color-surface-container);
+      background: var(--md-sys-color-surface);
       border: 1px solid var(--md-sys-color-outline-variant);
-      border-radius: var(--md-sys-shape-corner-large);
+      border-radius: 18px;
       min-height: 64px;
-      padding: var(--spacing);
+      padding: 14px 16px;
+      // Staggered entrance per the design (60ms / 120ms).
+      animation: dmUp calc(320ms * var(--mdur, 1)) var(--spring) both;
       transition: background-color 120ms ease, box-shadow 120ms ease;
+
+      &:nth-child(1) {
+        animation-delay: 60ms;
+      }
+      &:nth-child(2) {
+        animation-delay: 120ms;
+      }
 
       &:hover {
         background: var(--md-sys-color-surface-container-high);
@@ -119,16 +314,54 @@
     .account-info {
       .user-info-container {
         display: flex;
+        align-items: center;
         flex-grow: 1;
-        gap: var(--spacing);
+        gap: 14px;
       }
 
       .avatar {
-        // 32px for the image + 2 on each side for the base border.
-        width: 34px;
-        height: 34px;
+        // 44px avatar per the design spec.
+        width: 44px;
+        height: 44px;
 
         align-self: center;
+      }
+
+      // "Active" status chip on the account active for the current repository.
+      .account-active-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--dm-green-container);
+        color: var(--dm-green);
+        font-size: 11.5px;
+        font-weight: var(--font-weight-bold);
+        white-space: nowrap;
+
+        .account-active-check {
+          width: 13px;
+          height: 13px;
+          fill: currentColor;
+        }
+      }
+
+      // Outlined "Sign out" pill.
+      .sign-out-button {
+        background: transparent;
+        color: var(--md-sys-color-primary);
+        border: 0;
+        box-shadow: inset 0 0 0 1.5px var(--md-sys-color-outline-variant);
+        border-radius: 999px;
+        height: 36px;
+        padding: 0 14px;
+        font-weight: var(--font-weight-bold);
+
+        &:hover {
+          background: var(--md-sys-color-surface-container-high);
+        }
       }
 
       .user-info {
@@ -200,55 +433,92 @@
     cursor: default !important;
   }
 
+  // MD3 theme preview cards (Light / Dark / System). The existing theme SVG
+  // swatches are reused as the previews; here we frame them as selectable
+  // cards with a 2.5px primary border on the selected theme.
   .theme-selector {
     display: flex;
-    margin: 0 calc(var(--spacing-half) * -1);
+    gap: 12px;
+    margin: 0;
 
     .radio-button-component {
+      flex: 1;
+      max-width: 190px;
       display: block;
-      padding: var(--spacing-half);
+      padding: 0;
       position: relative;
       margin: 0;
 
       label {
         input[type='radio'] {
+          // Keep the input accessible/focusable but visually replaced by the
+          // card frame.
           position: absolute;
-          left: calc(var(--spacing) + var(--spacing-half));
-          margin-top: calc(50.5%);
+          top: 0;
+          left: 0;
+          width: 1px;
+          height: 1px;
+          margin: 0;
+          opacity: 0;
 
           &:checked + span {
-            border-color: var(--box-selected-active-background-color);
+            border-color: var(--md-sys-color-primary);
+          }
+
+          &:focus-visible + span {
+            outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+            outline-offset: 1px;
           }
         }
 
         > span {
-          border-radius: var(--border-radius);
-          border: var(--base-border);
-          float: left;
+          border-radius: 20px;
+          border: 2.5px solid var(--md-sys-color-outline-variant);
+          background: var(--md-sys-color-surface);
+          display: block;
           overflow: hidden;
-          padding-bottom: var(--spacing-half);
+          padding: 0 0 12px;
           width: 100%;
           margin: 0;
+          text-align: center;
+          cursor: pointer;
+          transition: border-color 220ms var(--emph), transform 200ms var(--spring-fast);
+
+          &:hover {
+            transform: translateY(-3px);
+          }
+
+          &:active {
+            transform: scale(0.96);
+          }
 
           .theme-value-label {
-            margin-left: calc(var(--spacing-triple));
+            display: block;
+            margin: 10px 0 0;
+            font-size: 13px;
+            font-weight: var(--font-weight-bold);
           }
 
           img {
             width: 100%;
-            border-bottom: var(--base-border);
-            margin-bottom: var(--spacing-half);
+            height: 84px;
+            object-fit: cover;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
             display: block;
           }
 
           .system-theme-swatch {
             width: 100%;
+            height: 84px;
             position: relative;
             display: block;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
 
             img {
               position: absolute;
               top: 0;
+              height: 84px;
+              border-bottom: 0;
 
               &:first-child {
                 position: inherit;

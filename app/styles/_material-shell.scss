@@ -439,6 +439,43 @@ dialog {
   }
 }
 
+// MD3 940x660 settings card (commit 12). Locks the card geometry here (shell
+// loads last) so it beats the generic `dialog` rule, the 600px rule in
+// ui/_dialog.scss, and `#dialog-layer dialog[open]`. The rail / pane / footer
+// styling lives in ui/_preferences.scss.
+dialog#preferences {
+  width: 940px;
+  height: 660px;
+  max-width: calc(100vw - 60px);
+  max-height: calc(100vh - 60px);
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  > form {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+
+    > fieldset {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+  }
+
+  .dialog-content {
+    background: transparent;
+    min-height: 0;
+  }
+}
+
 .popover,
 .popup,
 .toolbar-dropdown .foldout,

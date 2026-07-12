@@ -1,10 +1,13 @@
 import * as React from 'react'
+import classNames from 'classnames'
 import {
   Account,
   getAccountKey,
   isDotComAccount,
   isEnterpriseAccount,
 } from '../../models/account'
+import { Octicon } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 import { IAvatarUser } from '../../models/avatar'
 import { lookupPreferredEmail } from '../../lib/email'
 import { assertNever } from '../../lib/fatal-error'
@@ -108,7 +111,9 @@ export class Accounts extends React.Component<IAccountsProps, {}> {
 
     // The DotCom account is shown first, so its sign in/out button should be
     // focused initially when the dialog is opened.
-    const className = preferredFocus ? DialogPreferredFocusClassName : undefined
+    const className = classNames('sign-out-button', {
+      [DialogPreferredFocusClassName]: preferredFocus,
+    })
 
     return (
       <Row key={getAccountKey(account)} className="account-info account-card">
@@ -131,6 +136,15 @@ export class Accounts extends React.Component<IAccountsProps, {}> {
               </>
             )}
           </div>
+          {preferredFocus && (
+            <span className="account-active-chip">
+              <Octicon
+                className="account-active-check"
+                symbol={octicons.check}
+              />
+              Active
+            </span>
+          )}
         </div>
         <Button onClick={this.logout(account)} className={className}>
           {__DARWIN__ ? 'Sign Out' : 'Sign out'}
