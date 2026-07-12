@@ -56,6 +56,11 @@ dialog {
   color: var(--text-color);
   background: var(--background-color);
 
+  // MD3 de-stock: route the inline validation icon colors through Material
+  // roles (error → error, warning → amber) instead of the raw stock red/yellow.
+  --dialog-warning-color: var(--dm-amber);
+  --dialog-error-color: var(--md-sys-color-error);
+
   // This resets the properties we animate in the transition group
   // such that if there's ever a race condition between the JS timing
   // and the CSS transition we'll always revert back to a known good
@@ -339,18 +344,26 @@ dialog {
       overflow-x: hidden;
     }
 
+    // MD3 de-stock: the top-of-dialog banners read as inset tonal cards
+    // (error → error-container, success → dm-green-container) instead of the
+    // stock full-bleed red/green strips with hard top/bottom rules.
+    &.dialog-error,
+    &.dialog-success {
+      border: 1px solid transparent;
+      border-radius: var(--md-sys-shape-corner-medium);
+      margin: var(--spacing) var(--spacing-double) 0;
+    }
+
     &.dialog-error {
-      color: var(--form-error-text-color);
-      background: var(--form-error-background);
-      border-bottom: 1px solid var(--form-error-border-color);
-      border-top: 1px solid var(--form-error-border-color);
+      color: var(--md-sys-color-on-error-container);
+      background: var(--md-sys-color-error-container);
+      border-color: color-mix(in srgb, var(--md-sys-color-error) 40%, transparent);
     }
 
     &.dialog-success {
-      color: var(--dialog-banner-success-text-color);
-      background: var(--dialog-banner-success-background);
-      border-top: 1px solid var(--dialog-banner-success-border-color);
-      border-bottom: 1px solid var(--dialog-banner-success-border-color);
+      color: var(--dm-green);
+      background: var(--dm-green-container);
+      border-color: color-mix(in srgb, var(--dm-green) 40%, transparent);
     }
   }
 

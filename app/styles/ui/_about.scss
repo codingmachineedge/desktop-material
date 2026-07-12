@@ -10,7 +10,12 @@ dialog#about {
     }
 
     h1 {
-      font-size: var(--font-size-md);
+      // MD3 headline: the app name reads as display type rather than the
+      // stock 16px heading.
+      font-size: 28px;
+      font-weight: 400;
+      letter-spacing: 0;
+      line-height: 1.2;
     }
 
     // The version, EULA link, and acknowledgements are conceptually two lines
@@ -40,14 +45,14 @@ dialog#about {
     .version-text {
       cursor: pointer;
       .octicon {
-        color: transparentize(black, 0.5);
+        color: var(--md-sys-color-on-surface-variant);
         height: 12px;
         margin-bottom: -1px;
         transition: color 0.4s;
         cursor: pointer;
       }
       &:hover .octicon {
-        color: black;
+        color: var(--md-sys-color-on-surface);
       }
     }
   }
@@ -61,11 +66,24 @@ dialog#about {
   }
 
   .update-status {
+    // MD3 de-stock: the update-check state reads as a tonal status pill that
+    // shrinks to its content and stays centered regardless of parent layout.
     display: flex;
     flex-direction: row;
+    align-items: center;
     justify-content: center;
     text-align: center;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: var(--spacing-half);
     margin-bottom: var(--spacing);
+    margin-left: auto;
+    margin-right: auto;
+    padding: var(--spacing-half) var(--spacing);
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-highest);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-sm);
     .octicon.spin {
       // Make sure the spinner is aligned with the text.
       align-self: center;
