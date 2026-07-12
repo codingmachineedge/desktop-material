@@ -62,6 +62,11 @@ import type {
 import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { getTipSha } from '../../lib/tip'
+import type {
+  IAutomationSettingsOverrides,
+  IAutomationSettingsState,
+} from '../../lib/automation/automation-settings'
+import type { MergeAllMode } from '../../lib/automation/merge-all'
 
 import { Account } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
@@ -271,6 +276,45 @@ export class Dispatcher {
    */
   public postNotification(input: INotificationInput): void {
     this.appStore.postNotification(input)
+  }
+
+  public setAutomationSettings(settings: IAutomationSettingsState): void {
+    this.appStore._setAutomationSettings(settings)
+  }
+
+  public setGlobalAutomationSettings(
+    settings: IAutomationSettingsState['global']
+  ): void {
+    this.appStore._setGlobalAutomationSettings(settings)
+  }
+
+  public setAccountAutomationOverrides(
+    accountKey: string,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    this.appStore._setAccountAutomationOverrides(accountKey, overrides)
+  }
+
+  public setRepositoryAutomationOverrides(
+    repositoryId: number,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    this.appStore._setRepositoryAutomationOverrides(repositoryId, overrides)
+  }
+
+  public oneClickCommitAndPush(repository: Repository): Promise<void> {
+    return this.appStore._oneClickCommitAndPush(repository)
+  }
+
+  public mergeAllIntoDefaultBranch(
+    repository: Repository,
+    mode: MergeAllMode
+  ): Promise<void> {
+    return this.appStore._mergeAllIntoDefaultBranch(repository, mode)
+  }
+
+  public cancelMergeAll(repository: Repository): void {
+    this.appStore._cancelMergeAll(repository)
   }
 
   /** Open or close the notification centre side sheet. */

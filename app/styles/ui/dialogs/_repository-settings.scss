@@ -1,4 +1,28 @@
 #repository-settings {
+  .repository-automation-settings {
+    padding: var(--spacing-double);
+
+    .automation-override-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--spacing-double);
+      padding: var(--spacing) 0;
+
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-half);
+      }
+
+      select {
+        border: 1px solid var(--md-sys-color-outline-variant);
+        border-radius: 12px;
+        padding: 6px 10px;
+        color: var(--md-sys-color-on-surface);
+        background: var(--md-sys-color-surface-container-high);
+      }
+    }
+  }
   width: 600px;
 
   .dialog-content {

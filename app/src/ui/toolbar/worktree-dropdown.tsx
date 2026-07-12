@@ -84,6 +84,15 @@ export class WorktreeDropdown extends React.Component<
     })
   }
 
+  private onMergeAllWorktrees = () => {
+    this.props.dispatcher.closeFoldout(FoldoutType.Worktree)
+    this.props.dispatcher.showPopup({
+      type: PopupType.MergeAll,
+      repository: this.props.repository,
+      mode: 'worktrees',
+    })
+  }
+
   private onContextMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
 
@@ -125,6 +134,7 @@ export class WorktreeDropdown extends React.Component<
         onFilterTextChanged={this.onFilterTextChanged}
         canCreateNewWorktree={true}
         onCreateNewWorktree={this.onCreateNewWorktree}
+        onMergeAllWorktrees={this.onMergeAllWorktrees}
         onWorktreeContextMenu={this.onWorktreeContextMenu}
       />
     )

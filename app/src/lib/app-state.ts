@@ -68,6 +68,8 @@ import { ICustomIntegration } from './custom-integration'
 import { Emoji } from './emoji'
 import { IUpdateState } from '../ui/lib/update-store'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
+import type { IAutomationSettingsState } from './automation/automation-settings'
+import type { IMergeAllState } from './automation/merge-all'
 
 export enum SelectionType {
   Repository,
@@ -90,6 +92,7 @@ export type PossibleSelections =
 
 /** All of the shared app state. */
 export interface IAppState {
+  readonly automationSettings: IAutomationSettingsState
   readonly accounts: ReadonlyArray<Account>
   /**
    * The current list of repositories tracked in the application
@@ -582,6 +585,8 @@ export type ConflictState =
   | CherryPickConflictState
 
 export interface IRepositoryState {
+  readonly oneClickCommitPushPhase: OneClickCommitPushPhase
+  readonly mergeAllState: IMergeAllState | null
   readonly commitSelection: ICommitSelection
   readonly changesState: IChangesState
   readonly compareState: ICompareState
@@ -702,6 +707,12 @@ export interface IRepositoryState {
    */
   readonly allowEmptyCommit: boolean
 }
+
+export type OneClickCommitPushPhase =
+  | 'generating'
+  | 'committing'
+  | 'pushing'
+  | null
 
 export type CommitOptions = Pick<
   IRepositoryState,

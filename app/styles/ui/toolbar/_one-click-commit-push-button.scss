@@ -1,0 +1,11 @@
+.one-click-commit-push-button {
+  > button {
+    border-radius: 999px;
+    color: var(--md-sys-color-on-secondary-container);
+    background: var(--md-sys-color-secondary-container);
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--md-sys-color-secondary-container) 88%, var(--md-sys-color-on-secondary-container));
+    }
+  }
+}

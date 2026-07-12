@@ -42,6 +42,8 @@ import { Prompts } from './prompts'
 import { Repository } from '../../models/repository'
 import { Notifications } from './notifications'
 import { Accessibility } from './accessibility'
+import { AutomationPreferences } from './automation'
+import { IAutomationSettingsState } from '../../lib/automation/automation-settings'
 import { CopilotPreferences } from './copilot'
 import type {
   CopilotFeature,
@@ -129,6 +131,7 @@ interface IPreferencesProps {
   readonly copilotModels: ReadonlyArray<Model> | null
   readonly byokProviders: ReadonlyArray<IBYOKProvider>
   readonly alwaysUseCopilotForConflictResolution: boolean
+  readonly automationSettings: IAutomationSettingsState
 }
 
 interface IPreferencesState {
@@ -200,6 +203,7 @@ interface IPreferencesState {
   readonly selectedTimeFormat?: TimeFormat
   readonly selectedNumberFormat?: INumberFormat
   readonly preferAbsoluteDates?: boolean
+  readonly automationSettings: IAutomationSettingsState
 }
 
 /**
@@ -282,6 +286,7 @@ export class Preferences extends React.Component<
       selectedTimeFormat: getTimeFormatPreference(),
       selectedNumberFormat: getNumberFormatPreference(),
       preferAbsoluteDates: getPreferAbsoluteDates(),
+      automationSettings: this.props.automationSettings,
     }
   }
 
@@ -431,6 +436,10 @@ export class Preferences extends React.Component<
                 <Octicon className="icon" symbol={octicons.server} />
                 Agent access
               </span>
+              <span id={this.getTabId(PreferencesTab.Automation)}>
+                <Octicon className="icon" symbol={octicons.sync} />
+                Automation
+              </span>
             </TabBar>
             <div className="preferences-version">Desktop Material 0.1.0</div>
           </div>
@@ -486,6 +495,9 @@ export class Preferences extends React.Component<
         break
       case PreferencesTab.AgentAccess:
         suffix = 'agent-access'
+        break
+      case PreferencesTab.Automation:
+        suffix = 'automation'
         break
       default:
         return assertNever(tab, `Unknown tab type: ${tab}`)
@@ -784,6 +796,15 @@ export class Preferences extends React.Component<
       case PreferencesTab.AgentAccess:
         View = <AgentAccess />
         break
+      case PreferencesTab.Automation:
+        View = (
+          <AutomationPreferences
+            accounts={this.props.accounts}
+            settings={this.state.automationSettings}
+            onSettingsChanged={this.onAutomationSettingsChanged}
+          />
+        )
+        break
       default:
         return assertNever(index, `Unknown tab index: ${index}`)
     }
@@ -803,6 +824,12 @@ export class Preferences extends React.Component<
     repositoryIndicatorsEnabled: boolean
   ) => {
     this.setState({ repositoryIndicatorsEnabled })
+  }
+
+  private onAutomationSettingsChanged = (
+    automationSettings: IAutomationSettingsState
+  ) => {
+    this.setState({ automationSettings })
   }
 
   private onLockFileDeleted = () => {
@@ -1203,6 +1230,8 @@ export class Preferences extends React.Component<
       this.state.alwaysUseCopilotForConflictResolution
     )
 
+    setShowCommitAuthorInfo(this.state.showCommitAuthorInfo)
+    dispatcher.setAutomationSettings(this.state.automationSettings)
     setShowCommitAuthorInfo(this.state.showCommitAuthorInfo)
 
     if (enableFormattingPreferences()) {

@@ -65,7 +65,9 @@ import {
   BranchDropdown,
   WorktreeDropdown,
   RevertProgress,
+  OneClickCommitPushButton,
 } from './toolbar'
+import { canAutoCommitPush } from '../lib/automation/automation-guards'
 import { iconForRepository, OcticonSymbol } from './octicons'
 import * as octicons from './octicons/octicons.generated'
 import {
@@ -84,6 +86,7 @@ import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
+import { MergeAllDialog } from './merge-all'
 import { EditCopilotBYOKProviderDialog } from './copilot/edit-byok-provider-dialog'
 import { EditCopilotBYOKModelDialog } from './copilot/edit-byok-model-dialog'
 import { ConfirmDeleteCopilotBYOKProviderDialog } from './copilot/confirm-delete-byok-provider-dialog'
@@ -1787,6 +1790,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             alwaysUseCopilotForConflictResolution={
               this.state.alwaysUseCopilotForConflictResolution
             }
+            automationSettings={this.state.automationSettings}
           />
         )
       case PopupType.SettingsHistory:
@@ -1805,6 +1809,21 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
           />
         )
+      case PopupType.MergeAll: {
+        const mergeState = this.props.repositoryStateManager.get(
+          popup.repository
+        ).mergeAllState
+        return (
+          <MergeAllDialog
+            key="merge-all"
+            repository={popup.repository}
+            mode={popup.mode}
+            state={mergeState}
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
       case PopupType.RepositorySettings: {
         const repository = popup.repository
         const state = this.props.repositoryStateManager.get(repository)
@@ -3959,6 +3978,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.renderWorktreeToolbarButton()}
         {this.renderBranchToolbarButton()}
         {this.renderPushPullToolbarButton()}
+        {this.renderOneClickCommitPushButton()}
         {this.renderBuildRunToolbarButton()}
       </Toolbar>
     )
@@ -3976,6 +3996,40 @@ export class App extends React.Component<IAppProps, IAppState> {
         repository={selection.repository}
         dispatcher={this.props.dispatcher}
         buildRunStore={this.props.buildRunStore}
+      />
+    )
+  }
+
+  private renderOneClickCommitPushButton() {
+    const selection = this.state.selectedState
+    if (!selection || selection.type !== SelectionType.Repository) {
+      return null
+    }
+    const state = selection.state
+    const tip = state.branchesState.tip
+    const message = state.changesState.commitMessage
+    const guard = canAutoCommitPush({
+      tipIsValid: tip.kind === TipState.Valid,
+      hasChanges: state.changesState.workingDirectory.files.length > 0,
+      hasConflict: state.changesState.conflictState !== null,
+      hasMultiCommitOperation: state.multiCommitOperationState !== null,
+      isCommitting: state.isCommitting,
+      isGeneratingCommitMessage: state.isGeneratingCommitMessage,
+      isPushPullFetchInProgress: state.isPushPullFetchInProgress,
+      isCheckingOut: state.checkoutProgress !== null,
+      hasDraftCommitMessage:
+        message.summary.trim().length > 0 ||
+        (message.description?.trim().length ?? 0) > 0,
+      hasUpstream:
+        tip.kind === TipState.Valid && tip.branch.upstreamRemoteName !== null,
+      mergeHeadSet: false,
+    })
+    return (
+      <OneClickCommitPushButton
+        repository={selection.repository}
+        dispatcher={this.props.dispatcher}
+        phase={state.oneClickCommitPushPhase}
+        disabledReason={guard.safe ? null : guard.reason}
       />
     )
   }

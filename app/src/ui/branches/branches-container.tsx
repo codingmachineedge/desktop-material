@@ -213,6 +213,14 @@ export class BranchesContainer extends React.Component<
           <Octicon className="icon" symbol={octicons.gitMerge} />
           Choose a branch to merge into <strong>{currentBranch.name}</strong>
         </Button>
+        <Button
+          className="merge-all-button"
+          onClick={this.onMergeAllClick}
+          tooltip={`Merge every eligible local branch into ${currentBranch.name}`}
+        >
+          <Octicon className="icon" symbol={octicons.stack} />
+          Merge all into default
+        </Button>
       </Row>
     )
   }
@@ -454,6 +462,15 @@ export class BranchesContainer extends React.Component<
   private onMergeClick = () => {
     this.props.dispatcher.closeFoldout(FoldoutType.Branch)
     this.props.dispatcher.startMergeBranchOperation(this.props.repository)
+  }
+
+  private onMergeAllClick = () => {
+    this.props.dispatcher.closeFoldout(FoldoutType.Branch)
+    this.props.dispatcher.showPopup({
+      type: PopupType.MergeAll,
+      repository: this.props.repository,
+      mode: 'branches',
+    })
   }
 
   private onBranchItemClick = (branch: Branch) => {

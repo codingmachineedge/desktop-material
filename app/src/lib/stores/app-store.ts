@@ -30,7 +30,7 @@ import type {
   CopilotModelRequest,
   CopilotProviderConfig,
 } from './copilot-store'
-import { Account, isDotComAccount } from '../../models/account'
+import { Account, getAccountKey, isDotComAccount } from '../../models/account'
 import { AppMenu, IMenu } from '../../models/app-menu'
 import { Author } from '../../models/author'
 import { Branch, BranchType, IAheadBehind } from '../../models/branch'
@@ -160,6 +160,7 @@ import {
   IConstrainedValue,
   ICompareState,
   CommitOptions,
+  OneClickCommitPushPhase,
 } from '../app-state'
 import {
   findEditorOrDefault,
@@ -228,6 +229,7 @@ import {
   getRemoteURL,
   getGlobalConfigPath,
   getFilesDiffText,
+  isMergeHeadSet,
   TerminalOutput,
   HookProgress,
   git,
@@ -301,6 +303,30 @@ import {
   selectWorkingDirectoryFiles,
 } from './updates/changes-state'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
+import {
+  IAutomationSettingsState,
+  loadAutomationSettings,
+  saveAutomationSettings,
+  saveRepositoryAutomationOverrides,
+  IAutomationSettingsOverrides,
+  loadRepositoryAutomationOverrides,
+  resolveAutomationSettings,
+} from '../automation/automation-settings'
+import { buildFallbackCommitMessage } from '../automation/fallback-commit-message'
+import {
+  IAutomationGuardState,
+  canAutoCommitPush,
+  canAutoPull,
+} from '../automation/automation-guards'
+import { AutomationScheduler } from './helpers/automation-scheduler'
+import {
+  IMergeAllCandidate,
+  IMergeAllResult,
+  IMergeAllState,
+  MergeAllMode,
+  selectBranchCandidates,
+  selectWorktreeCandidates,
+} from '../automation/merge-all'
 import { BranchPruner } from './helpers/branch-pruner'
 import {
   enableCopilotConflictResolution,
@@ -591,9 +617,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private recentRepositories: ReadonlyArray<number> = new Array<number>()
 
   private selectedRepository: Repository | CloningRepository | null = null
+  private automationSettings: IAutomationSettingsState =
+    loadAutomationSettings()
 
   /** The background fetcher for the currently selected repository. */
   private currentBackgroundFetcher: BackgroundFetcher | null = null
+  private currentAutomationScheduler: AutomationScheduler | null = null
+  private readonly mergeAllControllers = new Map<number, AbortController>()
 
   private currentBranchPruner: BranchPruner | null = null
 
@@ -1384,6 +1414,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     return {
       accounts: this.accounts,
+      automationSettings: this.automationSettings,
       repositories,
       recentRepositories: this.recentRepositories,
       localRepositoryStateLookup: this.localRepositoryStateLookup,
@@ -2270,6 +2301,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.emitUpdate()
     this.stopBackgroundFetching()
+    this.stopAutomationScheduler()
     this.stopPullRequestUpdater()
     this._clearBanner()
     this.stopBackgroundPruner()
@@ -2372,10 +2404,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
     // for edge cases where _selectRepository is re-entract, calling this here
     // ensures we clean up the existing background fetcher correctly (if set)
     this.stopBackgroundFetching()
+    this.stopAutomationScheduler()
     this.stopPullRequestUpdater()
     this.stopBackgroundPruner()
 
     this.startBackgroundFetching(repository, !previouslySelectedRepository)
+    this.startAutomationScheduler(repository)
     this.startPullRequestUpdater(repository)
 
     this.startBackgroundPruner(repository)
@@ -2431,6 +2465,186 @@ export class AppStore extends TypedBaseStore<IAppState> {
       backgroundFetcher.stop()
       this.currentBackgroundFetcher = null
     }
+  }
+
+  private stopAutomationScheduler(): void {
+    this.currentAutomationScheduler?.stop()
+    this.currentAutomationScheduler = null
+  }
+
+  private restartAutomationScheduler(): void {
+    this.stopAutomationScheduler()
+    if (this.selectedRepository instanceof Repository) {
+      this.startAutomationScheduler(this.selectedRepository)
+    }
+  }
+
+  private startAutomationScheduler(repository: Repository): void {
+    this.stopAutomationScheduler()
+    const repositoryAccount = getAccountForRepository(this.accounts, repository)
+    const accountKey =
+      repository.accountKey ??
+      (repositoryAccount === null ? null : getAccountKey(repositoryAccount))
+    this.currentAutomationScheduler = new AutomationScheduler(
+      () =>
+        resolveAutomationSettings(
+          this.automationSettings,
+          accountKey,
+          loadRepositoryAutomationOverrides(repository.id)
+        ),
+      () => this.runScheduledCommitPush(repository),
+      () => this.runScheduledPull(repository),
+      (operation, error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error))
+        log.error(`Scheduled automation ${operation} failed`, normalizedError)
+        this.postNotification({
+          kind: operation === 'pull' ? 'auto-pull' : 'auto-commit',
+          title:
+            operation === 'pull'
+              ? 'Automatic pull failed'
+              : 'Automatic commit failed',
+          body: normalizedError.message,
+          repositoryId: repository.id,
+          action: { kind: 'open-repository', repositoryId: repository.id },
+        })
+      }
+    )
+    this.currentAutomationScheduler.start()
+  }
+
+  private async runScheduledCommitPush(repository: Repository): Promise<void> {
+    if (this.selectedRepository !== repository) {
+      return
+    }
+    await this._refreshRepository(repository)
+    const guard = canAutoCommitPush(this.getAutomationGuardState(repository))
+    if (!guard.safe) {
+      log.info(`Automatic commit and push skipped: ${guard.reason}`)
+      return
+    }
+    await this.performScheduledCommitPush(repository)
+  }
+
+  private async runScheduledPull(repository: Repository): Promise<void> {
+    if (this.selectedRepository !== repository) {
+      return
+    }
+    await this._refreshRepository(repository)
+    const mergeHeadSet = await isMergeHeadSet(repository)
+    const guard = canAutoPull(
+      this.getAutomationGuardState(repository, mergeHeadSet)
+    )
+    if (!guard.safe) {
+      log.info(`Automatic pull skipped: ${guard.reason}`)
+      return
+    }
+
+    await this.performScheduledPull(repository)
+    this.postNotification({
+      kind: 'auto-pull',
+      title: 'Automatic pull completed',
+      body: `Updated ${repository.name}.`,
+      repositoryId: repository.id,
+      action: { kind: 'open-repository', repositoryId: repository.id },
+    })
+  }
+
+  private async performScheduledCommitPush(
+    repository: Repository
+  ): Promise<void> {
+    const initial = this.repositoryStateCache.get(repository)
+    const files = initial.changesState.workingDirectory.files
+    let context = buildFallbackCommitMessage(files, new Date())
+
+    try {
+      this.setOneClickCommitPushPhase(repository, 'generating')
+      context =
+        (await this.generateAutomationCommitMessage(repository, files)) ??
+        context
+      await this._changeIncludeAllFiles(repository, true)
+      this.setOneClickCommitPushPhase(repository, 'committing')
+
+      const state = this.repositoryStateCache.get(repository)
+      const message = await formatCommitMessage(repository, context)
+      const committed = await this.withIsCommitting(repository, async () => {
+        await createCommit(repository, message, files, {
+          noVerify: state.skipCommitHooks,
+          signOff: state.signOffCommits,
+          onHookFailure: async () => 'abort',
+        })
+        return true
+      })
+      if (!committed) {
+        throw new Error('Another commit started before automation could run.')
+      }
+      await this._refreshRepository(repository)
+
+      this.setOneClickCommitPushPhase(repository, 'pushing')
+      await this.performScheduledPush(repository)
+      this.postNotification({
+        kind: 'auto-commit',
+        title: 'Automatic commit and push completed',
+        body: context.summary,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+    } finally {
+      this.setOneClickCommitPushPhase(repository, null)
+    }
+  }
+
+  private async performScheduledPush(repository: Repository): Promise<void> {
+    const state = this.repositoryStateCache.get(repository)
+    const remote = state.remote
+    const tip = state.branchesState.tip
+    if (remote === null || tip.kind !== TipState.Valid) {
+      throw new Error('The current branch has no push remote.')
+    }
+    if (state.isPushPullFetchInProgress) {
+      throw new Error('Another network operation is already in progress.')
+    }
+    const remoteName = tip.branch.upstreamRemoteName ?? remote.name
+    const safeRemote: IRemote = { name: remoteName, url: remote.url }
+    const gitStore = this.gitStoreCache.get(repository)
+
+    await this.withPushPullFetch(repository, async () => {
+      await pushRepo(
+        repository,
+        safeRemote,
+        tip.branch.name,
+        tip.branch.upstreamWithoutRemote,
+        gitStore.tagsToPush,
+        { onHookFailure: async () => 'abort' }
+      )
+      gitStore.clearTagsToPush()
+      await this._refreshRepository(repository)
+    })
+  }
+
+  private async performScheduledPull(repository: Repository): Promise<void> {
+    const state = this.repositoryStateCache.get(repository)
+    const remote = state.remote
+    if (remote === null) {
+      throw new Error('The current branch has no pull remote.')
+    }
+    if (state.isPushPullFetchInProgress) {
+      throw new Error('Another network operation is already in progress.')
+    }
+
+    await this.withPushPullFetch(repository, async () => {
+      // This path deliberately bypasses performFailableOperation: scheduler
+      // failures are logged and posted to the notification centre, never
+      // promoted to an interrupting error dialog.
+      await pullRepo(repository, remote)
+      await updateRemoteHEAD(repository, remote, false).catch(error =>
+        log.error(
+          'Failed updating remote HEAD after automatic pull',
+          error instanceof Error ? error : new Error(String(error))
+        )
+      )
+      await this._refreshRepository(repository)
+    })
   }
 
   private refreshMentionables(repository: GitHubRepository) {
@@ -5125,6 +5339,524 @@ export class AppStore extends TypedBaseStore<IAppState> {
       .catch(err => log.error('Failed to record notification', err))
   }
 
+  public _setGlobalAutomationSettings(
+    settings: IAutomationSettingsState['global']
+  ): void {
+    this.automationSettings = { ...this.automationSettings, global: settings }
+    saveAutomationSettings(this.automationSettings)
+    this.emitUpdate()
+    this.restartAutomationScheduler()
+  }
+
+  public _setAccountAutomationOverrides(
+    accountKey: string,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    this.automationSettings = {
+      ...this.automationSettings,
+      accounts: {
+        ...this.automationSettings.accounts,
+        [accountKey]: overrides,
+      },
+    }
+    saveAutomationSettings(this.automationSettings)
+    this.emitUpdate()
+    this.restartAutomationScheduler()
+  }
+
+  public _setAutomationSettings(settings: IAutomationSettingsState): void {
+    this.automationSettings = settings
+    saveAutomationSettings(settings)
+    this.emitUpdate()
+    this.restartAutomationScheduler()
+  }
+
+  public _setRepositoryAutomationOverrides(
+    repositoryId: number,
+    overrides: IAutomationSettingsOverrides
+  ): void {
+    saveRepositoryAutomationOverrides(repositoryId, overrides)
+    this.emitUpdate()
+    if (
+      this.selectedRepository instanceof Repository &&
+      this.selectedRepository.id === repositoryId
+    ) {
+      this.restartAutomationScheduler()
+    }
+  }
+
+  private setOneClickCommitPushPhase(
+    repository: Repository,
+    phase: OneClickCommitPushPhase
+  ): void {
+    this.repositoryStateCache.update(repository, () => ({
+      oneClickCommitPushPhase: phase,
+    }))
+    this.emitUpdate()
+  }
+
+  private getAutomationGuardState(
+    repository: Repository,
+    mergeHeadSet: boolean = false
+  ): IAutomationGuardState {
+    const state = this.repositoryStateCache.get(repository)
+    const { tip } = state.branchesState
+    const message = state.changesState.commitMessage
+    return {
+      tipIsValid: tip.kind === TipState.Valid,
+      hasChanges: state.changesState.workingDirectory.files.length > 0,
+      hasConflict: state.changesState.conflictState !== null,
+      hasMultiCommitOperation: state.multiCommitOperationState !== null,
+      isCommitting: state.isCommitting,
+      isGeneratingCommitMessage: state.isGeneratingCommitMessage,
+      isPushPullFetchInProgress: state.isPushPullFetchInProgress,
+      isCheckingOut: state.checkoutProgress !== null,
+      hasDraftCommitMessage:
+        message.summary.trim().length > 0 ||
+        (message.description?.trim().length ?? 0) > 0,
+      hasUpstream:
+        tip.kind === TipState.Valid && tip.branch.upstreamRemoteName !== null,
+      mergeHeadSet,
+    }
+  }
+
+  public async _oneClickCommitAndPush(repository: Repository): Promise<void> {
+    const guard = canAutoCommitPush(this.getAutomationGuardState(repository))
+    if (!guard.safe) {
+      this.postNotification({
+        kind: 'info',
+        title: 'Commit and push skipped',
+        body: guard.reason,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+      return
+    }
+
+    const files =
+      this.repositoryStateCache.get(repository).changesState.workingDirectory
+        .files
+    let context: ICommitContext = buildFallbackCommitMessage(files, new Date())
+
+    try {
+      this.setOneClickCommitPushPhase(repository, 'generating')
+      context =
+        (await this.generateAutomationCommitMessage(repository, files)) ??
+        context
+
+      await this._changeIncludeAllFiles(repository, true)
+      this.setOneClickCommitPushPhase(repository, 'committing')
+      const committed = await this._commitIncludedChanges(repository, context)
+      if (!committed) {
+        throw new Error('The commit did not complete.')
+      }
+
+      this.setOneClickCommitPushPhase(repository, 'pushing')
+      await this._push(repository)
+      this.postNotification({
+        kind: 'auto-commit',
+        title: 'Committed and pushed',
+        body: context.summary,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.error('One-click commit and push failed', error)
+      this.postNotification({
+        kind: 'auto-commit',
+        title: 'Commit and push failed',
+        body: message,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+    } finally {
+      this.setOneClickCommitPushPhase(repository, null)
+    }
+  }
+
+  private async generateAutomationCommitMessage(
+    repository: Repository,
+    files: ReadonlyArray<WorkingDirectoryFileChange>
+  ): Promise<ICommitContext | null> {
+    const account = getAccountForCommitMessageGeneration(
+      this.accounts,
+      repository
+    )
+    const disclaimerFresh =
+      this.commitMessageGenerationDisclaimerLastSeen !== null &&
+      offsetFromNow(-30, 'days') <=
+        this.commitMessageGenerationDisclaimerLastSeen
+    if (!account || !disclaimerFresh) {
+      return null
+    }
+
+    let context: ICommitContext | null = null
+    await this.withIsGeneratingCommitMessage(repository, async signal => {
+      try {
+        const diff = await getFilesDiffText(repository, files)
+        if (!diff) {
+          return false
+        }
+        const response = enableCopilotSdkCommitMessageGeneration(account)
+          ? await this.copilotStore.generateCommitMessage(
+              account,
+              diff,
+              repository.path,
+              await this.resolveCopilotModelRequest(
+                this.selectedCopilotModels['commit-message-generation'] ?? null
+              ),
+              this.repositoryStateCache
+                .get(repository)
+                .changesState.currentRepoRulesInfo?.commitMessagePatterns.getRules() ??
+                [],
+              signal
+            )
+          : await API.fromAccount(account).getDiffChangesCommitMessage(diff)
+        context = {
+          summary: response.title,
+          description: response.description,
+          messageGeneratedByCopilot: true,
+        }
+        this.statsStore.increment('generateCommitMessageCount')
+        return true
+      } catch (error) {
+        log.warn(
+          'Automation commit-message generation failed; using fallback',
+          error
+        )
+        return false
+      }
+    })
+    return context
+  }
+
+  private updateMergeAllState(
+    repository: Repository,
+    update: Partial<IMergeAllState>
+  ): void {
+    const current = this.repositoryStateCache.get(repository).mergeAllState
+    if (current === null) {
+      return
+    }
+    this.repositoryStateCache.update(repository, () => ({
+      mergeAllState: { ...current, ...update },
+    }))
+    this.emitUpdate()
+  }
+
+  public _cancelMergeAll(repository: Repository): void {
+    this.mergeAllControllers.get(repository.id)?.abort()
+  }
+
+  public async _mergeAllIntoDefaultBranch(
+    repository: Repository,
+    mode: MergeAllMode
+  ): Promise<void> {
+    if (this.mergeAllControllers.has(repository.id)) {
+      return
+    }
+
+    const controller = new AbortController()
+    this.mergeAllControllers.set(repository.id, controller)
+    this.stopAutomationScheduler()
+    this.repositoryStateCache.update(repository, () => ({
+      mergeAllState: {
+        phase: 'preparing',
+        mode,
+        currentBranch: null,
+        copilotProgress: null,
+        results: [],
+        pushed: false,
+      },
+    }))
+    this.emitUpdate()
+
+    try {
+      await this.performMergeAll(repository, mode, controller.signal)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const current = this.repositoryStateCache.get(repository).mergeAllState
+      this.updateMergeAllState(repository, {
+        phase: controller.signal.aborted ? 'cancelled' : 'complete',
+        currentBranch: null,
+        results: [
+          ...(current?.results ?? []),
+          {
+            branch: 'Merge all',
+            status: controller.signal.aborted ? 'skipped' : 'failed',
+            detail: controller.signal.aborted ? 'Cancelled.' : message,
+          },
+        ],
+      })
+      log.error(
+        'Merge-all operation stopped',
+        error instanceof Error ? error : new Error(message)
+      )
+    } finally {
+      this.mergeAllControllers.delete(repository.id)
+      const state = this.repositoryStateCache.get(repository).mergeAllState
+      const results = state?.results ?? []
+      this.postNotification({
+        kind: 'merge-all',
+        title: `Merge all ${
+          state?.phase === 'cancelled' ? 'cancelled' : 'complete'
+        }`,
+        body: `${results.filter(r => r.status === 'merged').length} merged, ${
+          results.filter(r => r.status === 'up-to-date').length
+        } up to date, ${
+          results.filter(r => r.status === 'skipped').length
+        } skipped, ${
+          results.filter(r => r.status === 'failed').length
+        } failed.`,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+      if (this.selectedRepository === repository) {
+        this.restartAutomationScheduler()
+      }
+    }
+  }
+
+  private async performMergeAll(
+    repository: Repository,
+    mode: MergeAllMode,
+    signal: AbortSignal
+  ): Promise<void> {
+    await this._refreshRepository(repository)
+    const initial = this.repositoryStateCache.get(repository)
+    const defaultBranch = initial.branchesState.defaultBranch
+    if (defaultBranch === null) {
+      throw new Error('No default branch is configured.')
+    }
+    if (
+      initial.changesState.workingDirectory.files.length > 0 ||
+      initial.changesState.conflictState !== null ||
+      initial.multiCommitOperationState !== null ||
+      initial.isPushPullFetchInProgress ||
+      initial.isCommitting ||
+      initial.isGeneratingCommitMessage ||
+      initial.oneClickCommitPushPhase !== null ||
+      initial.checkoutProgress !== null
+    ) {
+      throw new Error('The repository must be clean and idle before merging.')
+    }
+
+    const worktrees = await listWorktrees(repository)
+    if (
+      worktrees.some(
+        worktree =>
+          worktree.path !== repository.path &&
+          worktree.branch === defaultBranch.ref
+      )
+    ) {
+      throw new Error('The default branch is checked out in another worktree.')
+    }
+
+    if (
+      initial.branchesState.tip.kind !== TipState.Valid ||
+      initial.branchesState.tip.branch.name !== defaultBranch.name
+    ) {
+      await this._checkoutBranch(repository, defaultBranch)
+      await this._refreshRepository(repository)
+    }
+
+    const refreshed = this.repositoryStateCache.get(repository)
+    if (
+      refreshed.branchesState.tip.kind !== TipState.Valid ||
+      refreshed.branchesState.tip.branch.name !== defaultBranch.name
+    ) {
+      throw new Error('Could not check out the default branch.')
+    }
+    let candidates: ReadonlyArray<IMergeAllCandidate>
+    let results: ReadonlyArray<IMergeAllResult> = []
+    if (mode === 'branches') {
+      candidates = selectBranchCandidates(
+        refreshed.branchesState.allBranches,
+        defaultBranch.name,
+        new Set(
+          worktrees.map(worktree => worktree.branch).filter(Boolean) as string[]
+        )
+      )
+    } else {
+      const selection = selectWorktreeCandidates(
+        worktrees,
+        refreshed.branchesState.allBranches
+      )
+      candidates = selection.candidates
+      results = selection.skipped
+    }
+    this.updateMergeAllState(repository, { results })
+
+    let mergedAny = false
+    for (const candidate of candidates) {
+      if (signal.aborted) {
+        throw new Error('Merge all cancelled.')
+      }
+      this.updateMergeAllState(repository, {
+        phase: 'merging',
+        currentBranch: candidate.branch.name,
+        copilotProgress: null,
+      })
+
+      const outcome = await this.mergeAllCandidate(
+        repository,
+        candidate,
+        signal
+      )
+      mergedAny ||= outcome.status === 'merged'
+      results = [...results, outcome]
+      this.updateMergeAllState(repository, { results })
+    }
+
+    if (mergedAny && !signal.aborted) {
+      this.updateMergeAllState(repository, {
+        phase: 'pushing',
+        currentBranch: null,
+      })
+      await this._push(repository)
+      this.updateMergeAllState(repository, { pushed: true })
+    }
+
+    this.updateMergeAllState(repository, {
+      phase: signal.aborted ? 'cancelled' : 'complete',
+      currentBranch: null,
+      copilotProgress: null,
+    })
+    await this._refreshRepository(repository)
+  }
+
+  private async mergeAllCandidate(
+    repository: Repository,
+    candidate: IMergeAllCandidate,
+    signal: AbortSignal
+  ): Promise<IMergeAllResult> {
+    const base = {
+      branch: candidate.branch.name,
+      ...(candidate.worktree ? { path: candidate.worktree.path } : {}),
+    }
+    let completedStatus: 'merged' | 'up-to-date' | null = null
+    try {
+      if (candidate.worktree !== undefined) {
+        const status = await git(
+          ['status', '--porcelain'],
+          candidate.worktree.path,
+          'mergeAllWorktreeStatus'
+        )
+        if (status.stdout.trim().length > 0) {
+          return {
+            ...base,
+            status: 'skipped',
+            detail: 'Worktree has uncommitted changes.',
+          }
+        }
+      }
+
+      const gitStore = this.gitStoreCache.get(repository)
+      const mergeResult = await gitStore.merge(candidate.branch)
+      let status: IMergeAllResult['status']
+      if (mergeResult === MergeResult.Success) {
+        status = 'merged'
+      } else if (mergeResult === MergeResult.AlreadyUpToDate) {
+        status = 'up-to-date'
+      } else if (await isMergeHeadSet(repository)) {
+        await this._refreshRepository(repository)
+        this.updateMergeAllState(repository, {
+          phase: 'resolving',
+          currentBranch: candidate.branch.name,
+        })
+        const resolution = await this._resolveConflictsWithCopilot(
+          repository,
+          progress =>
+            this.updateMergeAllState(repository, {
+              copilotProgress:
+                progress.reasoningSnippet ??
+                `Resolved ${progress.filesResolved} of ${progress.filesTotal} files`,
+            }),
+          signal
+        )
+        if (resolution === null || signal.aborted) {
+          await abortMerge(repository)
+          await this._refreshRepository(repository)
+          return {
+            ...base,
+            status: 'skipped',
+            detail: signal.aborted
+              ? 'Cancelled during conflict resolution.'
+              : 'Copilot could not resolve the conflicts.',
+          }
+        }
+        await this.applyCopilotResolutionsToDisk(
+          repository,
+          resolution.resolutions,
+          new Map<string, ManualConflictResolution>()
+        )
+        const conflictState = this.repositoryStateCache.get(repository)
+        const commit = await this._finishConflictedMerge(
+          repository,
+          conflictState.changesState.workingDirectory,
+          new Map<string, ManualConflictResolution>()
+        )
+        if (commit === undefined || (await isMergeHeadSet(repository))) {
+          await abortMerge(repository)
+          await this._refreshRepository(repository)
+          return {
+            ...base,
+            status: 'skipped',
+            detail: 'The resolved merge could not be committed.',
+          }
+        }
+        status = 'merged'
+      } else {
+        return {
+          ...base,
+          status: 'skipped',
+          detail: 'Git could not merge this branch.',
+        }
+      }
+      completedStatus = status
+
+      this.updateMergeAllState(repository, {
+        phase: 'cleaning',
+        currentBranch: candidate.branch.name,
+      })
+      if (candidate.worktree !== undefined) {
+        await removeWorktree(repository.path, candidate.worktree.path, false)
+        await this._refreshWorktrees(repository)
+      }
+      await deleteLocalBranch(repository, candidate.branch.name)
+      return {
+        ...base,
+        status,
+        detail:
+          status === 'merged'
+            ? 'Merged, cleaned up, and deleted.'
+            : 'Already up to date; cleaned up and deleted.',
+      }
+    } catch (error) {
+      if (await isMergeHeadSet(repository)) {
+        // If aborting itself fails, stop the entire run rather than carrying a
+        // poisoned merge state into the next candidate.
+        await abortMerge(repository)
+        await this._refreshRepository(repository)
+      }
+      if (completedStatus !== null) {
+        return {
+          ...base,
+          status: completedStatus,
+          detail: `Merge completed, but cleanup failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        }
+      }
+      return {
+        ...base,
+        status: 'failed',
+        detail: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+
   /** Open or close the notification centre side sheet. */
   public _setNotificationCentreOpen(open: boolean): void {
     this.notificationCentreStore.setOpen(open)
@@ -7416,13 +8148,23 @@ export class AppStore extends TypedBaseStore<IAppState> {
       this.statsStore.increment('copilotConflictResolutionWithOverridesCount')
     }
 
-    const pathsToStage: string[] = []
+    await this.applyCopilotResolutionsToDisk(
+      repository,
+      copilotResolutions,
+      manualResolutions
+    )
+  }
 
-    for (const resolution of copilotResolutions) {
+  private async applyCopilotResolutionsToDisk(
+    repository: Repository,
+    resolutions: ReadonlyArray<IFileResolution>,
+    manualResolutions: ReadonlyMap<string, ManualConflictResolution>
+  ): Promise<void> {
+    const pathsToStage: string[] = []
+    for (const resolution of resolutions) {
       if (manualResolutions.has(resolution.path)) {
         continue
       }
-
       const absolutePath = await resolveWithin(repository.path, resolution.path)
       if (absolutePath === null) {
         log.warn(
@@ -7430,11 +8172,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         )
         continue
       }
-
       await writeFile(absolutePath, resolution.resolvedContent, 'utf8')
       pathsToStage.push(resolution.path)
     }
-
     if (pathsToStage.length > 0) {
       await git(
         ['add', '--', ...pathsToStage],

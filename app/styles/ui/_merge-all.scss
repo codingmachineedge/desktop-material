@@ -1,0 +1,55 @@
+#merge-all {
+  .dialog-content {
+    min-width: 680px;
+  }
+
+  .merge-all-current,
+  .merge-all-copilot,
+  .merge-all-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    padding: var(--spacing);
+    border-radius: 12px;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  .merge-all-results {
+    width: 100%;
+    margin-top: var(--spacing-double);
+    border-collapse: collapse;
+
+    th,
+    td {
+      padding: var(--spacing);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      text-align: left;
+    }
+  }
+
+  .merge-result {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: capitalize;
+    background: var(--md-sys-color-surface-container-highest);
+
+    &.merged,
+    &.up-to-date {
+      color: var(--md-sys-color-on-primary-container);
+      background: var(--md-sys-color-primary-container);
+    }
+
+    &.failed {
+      color: var(--md-sys-color-on-error-container);
+      background: var(--md-sys-color-error-container);
+    }
+  }
+}
+
+.merge-button-row,
+.worktree-list-actions {
+  display: flex;
+  gap: var(--spacing);
+}

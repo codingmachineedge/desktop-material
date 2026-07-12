@@ -28,6 +28,7 @@ import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-d
 import { TerminalOutput, TerminalOutputListener } from '../lib/git'
 import type { IBYOKModel, IBYOKProvider } from '../lib/copilot/byok'
 import { WorktreeEntry } from './worktree'
+import { MergeAllMode } from '../lib/automation/merge-all'
 
 export enum PopupType {
   RenameBranch = 'RenameBranch',
@@ -124,6 +125,7 @@ export enum PopupType {
   BatchCloneProgress = 'BatchCloneProgress',
   ExportRepositoryList = 'ExportRepositoryList',
   ImportRepositoryList = 'ImportRepositoryList',
+  MergeAll = 'MergeAll',
 }
 
 interface IBasePopup {
@@ -164,6 +166,7 @@ export type PopupDetail =
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
   | { type: PopupType.SettingsHistory }
   | { type: PopupType.NotificationHistory }
+  | { type: PopupType.MergeAll; repository: Repository; mode: MergeAllMode }
   | {
       type: PopupType.EditCopilotBYOKProvider
       provider: IBYOKProvider | null

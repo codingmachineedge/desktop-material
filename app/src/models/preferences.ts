@@ -9,4 +9,5 @@ export enum PreferencesTab {
   Advanced,
   Accessibility,
   AgentAccess,
+  Automation,
 }
