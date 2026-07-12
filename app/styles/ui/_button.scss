@@ -63,6 +63,32 @@
   }
 }
 
+.button-component.destructive {
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  border: 1px solid var(--md-sys-color-error);
+
+  &:not([aria-disabled='true']):hover {
+    border-color: var(--md-sys-color-error);
+    background-color: color-mix(
+      in srgb,
+      var(--md-sys-color-error-container) 82%,
+      var(--md-sys-color-error)
+    );
+  }
+
+  &:focus {
+    background-color: var(--md-sys-color-error-container);
+    border-color: var(--md-sys-color-error);
+    outline-color: color-mix(
+      in srgb,
+      var(--md-sys-color-error) 40%,
+      transparent
+    );
+    outline-offset: 4px;
+  }
+}
+
 .link-button-component {
   color: var(--link-button-color);
   text-decoration: none;

@@ -1,6 +1,8 @@
 import * as React from 'react'
 import classNames from 'classnames'
 import { Button } from '../lib/button'
+import { Octicon, OcticonSymbol } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 
 interface IOkCancelButtonGroupProps {
   /**
@@ -66,6 +68,9 @@ interface IOkCancelButtonGroupProps {
 
   /** Whether the Cancel button will be disabled or not, defaults to false */
   readonly cancelButtonDisabled?: boolean
+
+  /** Aria description of the cancel button */
+  readonly cancelButtonAriaDescribedBy?: string
 }
 
 /**
@@ -142,17 +147,40 @@ export class OkCancelButtonGroup extends React.Component<
   }
 
   private renderOkButton() {
+    const okButtonIcon =
+      typeof this.props.okButtonText === 'string'
+        ? this.getOkButtonIcon(this.props.okButtonText)
+        : null
+
     return (
       <Button
         onClick={this.onOkButtonClick}
         disabled={this.props.okButtonDisabled}
         tooltip={this.props.okButtonTitle}
         type={this.props.destructive === true ? 'button' : 'submit'}
+        className={classNames({
+          destructive: this.props.destructive === true,
+          'button-with-icon': okButtonIcon !== null,
+        })}
         ariaDescribedBy={this.props.okButtonAriaDescribedBy}
       >
+        {okButtonIcon && <Octicon symbol={okButtonIcon} className="mr" />}
         {this.props.okButtonText || 'Ok'}
       </Button>
     )
+  }
+
+  private getOkButtonIcon(text: string): OcticonSymbol | null {
+    switch (text.split(' ')[0].toLowerCase()) {
+      case 'delete':
+      case 'remove':
+      case 'discard':
+        return octicons.trash
+      case 'save':
+        return octicons.check
+      default:
+        return null
+    }
   }
 
   private renderCancelButton() {
@@ -166,6 +194,7 @@ export class OkCancelButtonGroup extends React.Component<
         disabled={this.props.cancelButtonDisabled}
         tooltip={this.props.cancelButtonTitle}
         type={this.props.destructive === true ? 'submit' : 'reset'}
+        ariaDescribedBy={this.props.cancelButtonAriaDescribedBy}
       >
         {this.props.cancelButtonText || 'Cancel'}
       </Button>
