@@ -121,6 +121,7 @@ export enum PopupType {
   ConfirmDeleteCopilotBYOKProvider = 'ConfirmDeleteCopilotBYOKProvider',
   CopilotConflictResolutionAlwaysNudge = 'CopilotConflictResolutionAlwaysNudge',
   DeleteWorktreeFailed = 'DeleteWorktreeFailed',
+  BatchCloneProgress = 'BatchCloneProgress',
 }
 
 interface IBasePopup {
@@ -543,16 +544,21 @@ export type PopupDetail =
       error: Error
       originalWorktree: WorktreeEntry | null
     }
+  | {
+      type: PopupType.BatchCloneProgress
+    }
 export type Popup = IBasePopup & PopupDetail
 
 /**
- * The Settings and Notification history managers are non-modal side sheets.
- * Every other popup still blocks global actions, even when a history manager is
- * stacked above it.
+ * The Settings and Notification history managers are non-modal side sheets, and
+ * the batch clone progress popup is non-modal so the app stays interactive while
+ * repositories clone in the background. Every other popup still blocks global
+ * actions, even when one of these is stacked above it.
  */
 const nonModalHistoryPopupTypes = new Set<PopupType>([
   PopupType.SettingsHistory,
   PopupType.NotificationHistory,
+  PopupType.BatchCloneProgress,
 ])
 
 export function hasModalPopup(popups: ReadonlyArray<Popup>): boolean {

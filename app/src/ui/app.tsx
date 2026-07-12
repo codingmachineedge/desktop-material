@@ -97,7 +97,7 @@ import {
 import { AppError } from './app-error'
 import { MissingRepository } from './missing-repository'
 import { AddExistingRepository, CreateRepository } from './add-repository'
-import { CloneRepository } from './clone-repository'
+import { CloneRepository, BatchCloneProgress } from './clone-repository'
 import { CreateBranch } from './create-branch'
 import { SignIn } from './sign-in'
 import { InstallGit } from './install-git'
@@ -1838,6 +1838,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             onTabSelected={this.onCloneRepositoriesTabSelected}
             apiRepositories={this.state.apiRepositories}
             onRefreshRepositories={this.onRefreshRepositories}
+            isTopMost={isTopMost}
+          />
+        )
+      case PopupType.BatchCloneProgress:
+        return (
+          <BatchCloneProgress
+            key="batch-clone-progress"
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+            batchCloneState={this.state.batchCloneState}
             isTopMost={isTopMost}
           />
         )

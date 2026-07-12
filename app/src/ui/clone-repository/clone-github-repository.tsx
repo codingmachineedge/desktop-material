@@ -9,6 +9,8 @@ import { IAPIRepository } from '../../lib/api'
 import { CloneableRepositoryFilterList } from './cloneable-repository-filter-list'
 import { ClickSource } from '../lib/list'
 import { AccountPicker } from '../account-picker'
+import { RadioGroup } from '../lib/radio-group'
+import { BatchCloneMode } from '../../models/batch-clone'
 
 interface ICloneGithubRepositoryProps {
   /** The account to clone from. */
@@ -83,6 +85,21 @@ interface ICloneGithubRepositoryProps {
   ) => void
 
   readonly onSelectedAccountChanged: (account: Account) => void
+
+  /** The clone URLs currently checked for multi-clone. */
+  readonly checkedUrls: ReadonlySet<string>
+
+  /** Called when a repository row's multi-clone checkbox is toggled. */
+  readonly onToggleItemChecked: (url: string) => void
+
+  /** The parallel/sequential mode for a batch clone. */
+  readonly batchMode: BatchCloneMode
+
+  /** Called when the batch clone mode changes. */
+  readonly onBatchModeChanged: (mode: BatchCloneMode) => void
+
+  /** Called when the user clicks "Clone N Repositories". */
+  readonly onCloneBatch: () => void
 }
 
 export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepositoryProps> {
@@ -97,7 +114,52 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
     )
   }
 
+  private renderBatchModeContents = (mode: BatchCloneMode) =>
+    mode === BatchCloneMode.Parallel ? 'Parallel' : 'One at a time'
+
+  private renderBatchControls() {
+    const checkedCount = this.props.checkedUrls.size
+    if (checkedCount === 0) {
+      return null
+    }
+
+    return (
+      <div className="batch-clone-controls">
+        <Row className="batch-mode-row">
+          <span className="label">Clone mode:</span>
+          <RadioGroup<BatchCloneMode>
+            className="batch-mode-radio"
+            selectedKey={this.props.batchMode}
+            radioButtonKeys={[
+              BatchCloneMode.Parallel,
+              BatchCloneMode.Sequential,
+            ]}
+            onSelectionChanged={this.props.onBatchModeChanged}
+            renderRadioButtonLabelContents={this.renderBatchModeContents}
+          />
+        </Row>
+        <Row className="batch-action-row">
+          <Button onClick={this.props.onCloneBatch}>
+            {`Clone ${checkedCount} ${
+              checkedCount === 1 ? 'Repository' : 'Repositories'
+            }`}
+          </Button>
+        </Row>
+      </div>
+    )
+  }
+
   public render() {
+    const checkedCount = this.props.checkedUrls.size
+    const pathLabel =
+      checkedCount > 0
+        ? __DARWIN__
+          ? 'Base Directory'
+          : 'Base directory'
+        : __DARWIN__
+        ? 'Local Path'
+        : 'Local path'
+
     return (
       <DialogContent className="clone-github-repository-content">
         {this.props.accounts.length > 1 && (
@@ -114,18 +176,22 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
             onFilterTextChanged={this.props.onFilterTextChanged}
             onRefreshRepositories={this.props.onRefreshRepositories}
             onItemClicked={this.props.onItemClicked}
+            checkedUrls={this.props.checkedUrls}
+            onToggleItemChecked={this.props.onToggleItemChecked}
           />
         </Row>
 
         <Row className="local-path-field">
           <TextBox
             value={this.props.path}
-            label={__DARWIN__ ? 'Local Path' : 'Local path'}
+            label={pathLabel}
             placeholder="repository path"
             onValueChanged={this.props.onPathChanged}
           />
           <Button onClick={this.props.onChooseDirectory}>Choose…</Button>
         </Row>
+
+        {this.renderBatchControls()}
       </DialogContent>
     )
   }

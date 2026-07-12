@@ -20,7 +20,20 @@ export class CloningRepositoriesStore extends BaseStore {
   public async clone(
     url: string,
     path: string,
-    options: CloneOptions
+    options: CloneOptions,
+    opts?: {
+      /**
+       * When provided the error is passed here instead of being emitted as a
+       * global error. Used by batch clone so a failing repo yields a batch
+       * summary rather than a per-repo error dialog.
+       */
+      readonly onError?: (error: Error) => void
+      /**
+       * Called with each raw progress event, on top of the store's own
+       * bookkeeping, so composing stores can mirror progress per item.
+       */
+      readonly onProgress?: (progress: ICloneProgress) => void
+    }
   ): Promise<boolean> {
     const repository = new CloningRepository(path, url)
     this._repositories.push(repository)
@@ -34,6 +47,7 @@ export class CloningRepositoriesStore extends BaseStore {
     try {
       await cloneRepo(url, path, options, progress => {
         this.stateByID.set(repository.id, progress)
+        opts?.onProgress?.(progress)
         this.emitUpdate()
       })
     } catch (e) {
@@ -48,7 +62,11 @@ export class CloningRepositoriesStore extends BaseStore {
       }
       e = new ErrorWithMetadata(e, { retryAction, repository })
 
-      this.emitError(e)
+      if (opts?.onError !== undefined) {
+        opts.onError(e)
+      } else {
+        this.emitError(e)
+      }
     }
 
     this.remove(repository)
