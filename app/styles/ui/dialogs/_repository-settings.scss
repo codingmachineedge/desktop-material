@@ -235,4 +235,205 @@
       }
     }
   }
+
+  // MD3 Submodules tab — surface cards + list rows, sharing the section
+  // language of the Build & Run and gitignore tabs.
+  .submodules-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    .submodules-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .submodules-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing);
+    }
+
+    .submodules-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+      color: var(--md-sys-color-on-surface);
+
+      .octicon {
+        color: var(--md-sys-color-on-surface-variant);
+        flex-shrink: 0;
+      }
+    }
+
+    .submodules-empty {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 13px;
+    }
+
+    .submodules-error {
+      margin: 0;
+      color: var(--md-sys-color-error);
+      font-size: 13px;
+    }
+
+    .submodules-progress {
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-family: var(--font-family-monospace);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    // --- Submodule list ---------------------------------------------------
+    .submodule-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .submodule-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing);
+      padding: 12px 14px;
+      background: var(--md-sys-color-surface-container);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+    }
+
+    .submodule-row-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .submodule-row-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .submodule-row-icon {
+      color: var(--md-sys-color-on-surface-variant);
+      flex-shrink: 0;
+    }
+
+    .submodule-row-path {
+      font-size: 13.5px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--md-sys-color-on-surface);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .submodule-row-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      font-size: 11.5px;
+      color: var(--md-sys-color-on-surface-variant);
+
+      .octicon {
+        width: 12px;
+        height: 12px;
+        margin-right: 4px;
+        vertical-align: -1px;
+      }
+    }
+
+    .submodule-row-url {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 260px;
+    }
+
+    .submodule-row-branch,
+    .submodule-row-sha {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .submodule-row-sha {
+      font-family: var(--font-family-monospace);
+    }
+
+    .submodule-row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    // --- Status pills -----------------------------------------------------
+    .submodule-status {
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+      padding: 1px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .submodule-status-up-to-date {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    .submodule-status-out-of-date {
+      background: var(--md-sys-color-tertiary-container);
+      color: var(--md-sys-color-on-tertiary-container);
+    }
+
+    .submodule-status-conflicted {
+      background: var(--md-sys-color-error-container);
+      color: var(--md-sys-color-on-error-container);
+    }
+
+    // --- Add form ---------------------------------------------------------
+    .submodules-add-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--md-sys-color-surface);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 18px;
+      padding: 14px;
+    }
+
+    .submodules-add-actions {
+      display: flex;
+      justify-content: flex-end;
+
+      .button-component {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+    }
+  }
 }

@@ -3,6 +3,7 @@ import { TabBar, TabBarType } from '../tab-bar'
 import { Remote } from './remote'
 import { GitIgnore } from './git-ignore'
 import { BuildRunSettings } from './build-run-settings'
+import { Submodules } from './submodules'
 import { assertNever } from '../../lib/fatal-error'
 import { IRemote } from '../../models/remote'
 import { Dispatcher } from '../dispatcher'
@@ -52,10 +53,14 @@ export enum RepositorySettingsTab {
   Remote = 0,
   IgnoredFiles,
   GitConfig,
-  // Note: BuildRun is placed before the conditionally-rendered ForkSettings tab
-  // so the enum values keep matching the TabBar positions whether or not the
-  // fork tab is shown.
+  // Note: BuildRun and Submodules are placed before the conditionally-rendered
+  // ForkSettings tab so the enum values keep matching the TabBar positions
+  // whether or not the fork tab is shown. Integrator note: if the remotes work
+  // (b2:remotes) also inserts a tab here, keep the unconditionally-rendered
+  // tabs contiguous and leave ForkSettings last; reconcile the numeric indices
+  // so each enum value equals its TabBar position.
   BuildRun,
+  Submodules,
   ForkSettings,
 }
 
@@ -221,6 +226,10 @@ export class RepositorySettings extends React.Component<
               <Octicon className="icon" symbol={octicons.play} />
               {__DARWIN__ ? 'Build & Run' : 'Build & run'}
             </span>
+            <span>
+              <Octicon className="icon" symbol={octicons.fileSubmodule} />
+              Submodules
+            </span>
             {showForkSettings && (
               <span>
                 <Octicon className="icon" symbol={octicons.repoForked} />
@@ -276,6 +285,14 @@ export class RepositorySettings extends React.Component<
             repository={this.props.repository}
             preferences={this.state.buildRunPreferences}
             onPreferencesChanged={this.onBuildRunPreferencesChanged}
+          />
+        )
+      }
+      case RepositorySettingsTab.Submodules: {
+        return (
+          <Submodules
+            repository={this.props.repository}
+            dispatcher={this.props.dispatcher}
           />
         )
       }
