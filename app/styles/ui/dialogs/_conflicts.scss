@@ -16,8 +16,9 @@ dialog#conflicts-dialog {
   }
 
   .green-circle {
-    background-color: var(--color-new);
-    color: var(--background-color);
+    // MD3 de-stock: resolved marker uses the Material success accent.
+    background-color: var(--dm-green);
+    color: var(--md-sys-color-surface);
     border-radius: 50%;
     height: 22px;
     width: 22px;
@@ -93,12 +94,12 @@ dialog#conflicts-dialog {
     }
 
     .unmerged-file-status-resolved .file-conflicts-status {
-      color: var(--color-new);
+      color: var(--dm-green);
     }
 
     .unmerged-file-status-conflicts {
       .file-conflicts-status {
-        color: var(--color-conflicted);
+        color: var(--dm-amber);
       }
 
       .command-line-hint {
