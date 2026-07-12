@@ -1,0 +1,53 @@
+// MD3 floating rounded elevated workspace cards.
+//
+// The left panel (Changes / History / Actions sidebar, `#repository-sidebar`) and
+// the main content pane both read as surface cards floating on the workspace
+// canvas. Each has a springy `dmUp` entrance and its own internal scroll region
+// so content never bleeds past the rounded corners. The rail (Commit 4) stays
+// transparent and hugs the window edge; the 12px inter-card gap + 16px frame
+// inset and the surface-container canvas colour live in `_material-shell.scss`'s
+// `#repository` block (the final override layer).
+//
+// Registered in `_ui.scss` after `ui/material-rail`. The 24px card radius is the
+// design's fixed extra-large-panel corner (no shape token exists for it, matching
+// the literal-radius precedent set by the earlier shell commits); every colour /
+// motion / shape value otherwise comes from --md-sys-* / --spring / --mdur tokens.
+
+// ---- Left panel card ------------------------------------------------------
+// `#repository-sidebar` is the `Resizable` element itself (it carries the id and
+// an inline width). Keep that inline width — and the drag handle — working; only
+// wrap the panel in card chrome. `overflow: hidden` clips the inner list and
+// commit composer to the rounded corners, so the resize handle (normally at
+// `right: -3px`, outside the box) is nudged fully inside to stay grabbable.
+#repository-sidebar {
+  animation: dmUp calc(560ms * var(--mdur)) var(--spring) backwards;
+  animation-delay: calc(80ms * var(--mdur));
+  background: var(--md-sys-color-surface);
+  border-radius: 24px;
+  box-shadow: var(--md-sys-elevation-level1);
+  overflow: hidden;
+
+  .resize-handle {
+    right: 0;
+  }
+}
+
+// ---- Main content pane card ----------------------------------------------
+// The pane root element varies by section (`.diff-container` for a selected
+// change, `#history` for a commit detail, `.changes-interstitial` /
+// `.blankslate` for empty states, `#stash-diff-viewer` for a stash). Style every
+// direct child of `#repository` that is not the rail, the sidebar wrapper
+// (`.focus-container`), or the tutorial overlay (`.tutorial-panel-component`).
+// `min-height: 0` + `overflow: hidden` force scrolling into each pane's own
+// inner region rather than growing the card.
+#repository > *:not(.repository-rail):not(.focus-container):not(.tutorial-panel-component) {
+  animation: dmUp calc(560ms * var(--mdur)) var(--spring) backwards;
+  animation-delay: calc(140ms * var(--mdur));
+  background: var(--md-sys-color-surface);
+  border-radius: 24px;
+  box-shadow: var(--md-sys-elevation-level1);
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}

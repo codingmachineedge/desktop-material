@@ -267,14 +267,27 @@ body {
   }
 }
 
+// Workspace canvas: the region holding the tab strip, toolbar and the floating
+// cards reads as surface-container (per spec §0), so the level1 cards lift off a
+// slightly recessed backdrop. Overrides the shared surface fill declared above.
+#desktop-app-contents {
+  background: var(--md-sys-color-surface-container);
+}
+
+// Body row: the rail hugs the left window edge (no left padding); the 16px
+// right/bottom inset frames the cards and the 12px gap separates rail / panel /
+// main pane. Card surface, radius and elevation live in _material-cards.scss.
 #repository {
-  background: var(--md-sys-color-surface);
+  background: var(--md-sys-color-surface-container);
   border-top: 0;
-  gap: 1px;
+  gap: 12px;
+  min-height: 0;
+  padding: 0 16px 16px 0;
 
   &-sidebar {
-    background: var(--md-sys-color-surface-container-low);
-    border-right: 1px solid var(--md-sys-color-outline-variant);
+    // Drop the upstream divider so the panel reads as a floating card; the card
+    // surface / radius / shadow / entrance are applied in _material-cards.scss.
+    border-right: 0;
   }
 }
 
