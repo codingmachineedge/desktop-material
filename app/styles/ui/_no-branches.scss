@@ -20,6 +20,8 @@
 
     text-align: center;
     font-size: var(--font-size-sm);
+    // MD3 de-stock: helper copy reads as on-surface-variant.
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .create-branch-button {
@@ -33,6 +35,7 @@
 
     text-align: center;
     font-size: var(--font-size-sm);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   p {

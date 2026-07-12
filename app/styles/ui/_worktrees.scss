@@ -63,10 +63,15 @@
     color: var(--text-secondary-color);
   }
 
+  // MD3 de-stock: worktree group header reads as an on-surface-variant overline.
   .filter-list-group-header {
     @include ellipsis;
     padding: 0 var(--spacing);
     font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    color: var(--md-sys-color-on-surface-variant);
   }
 }
 
