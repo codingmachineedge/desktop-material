@@ -194,7 +194,11 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
       const endpointURL = new URL(endpoint)
       // Migrate endpoints of subdomains of `.ghe.com` that use the `/api/v3`
       // path to the correct URL using the `api.` subdomain.
-      if (isGHE(endpoint) && !endpointURL.hostname.startsWith('api.')) {
+      if (
+        (account.provider ?? 'github') === 'github' &&
+        isGHE(endpoint) &&
+        !endpointURL.hostname.startsWith('api.')
+      ) {
         endpoint = getEnterpriseAPIURL(endpoint)
         migrated = true
       }
