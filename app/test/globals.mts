@@ -2,6 +2,16 @@ import 'fake-indexeddb/auto'
 import 'global-jsdom/register'
 import { mock } from 'node:test'
 
+// global-jsdom exposes Storage on window, but Node 26 no longer mirrors it to
+// the Node global. A number of application modules read localStorage during
+// evaluation, so make the browser-backed instance available before imports.
+if (globalThis.localStorage === undefined) {
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: window.localStorage,
+  })
+}
+
 // These constants are defined by Webpack at build time, but since tests aren't
 // built with Webpack we need to make sure these exist at runtime.
 const packageInfo = await import('../package.json')

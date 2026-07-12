@@ -39,6 +39,7 @@ import { KeyboardInsertionData } from '../lib/list'
 import { Account } from '../../models/account'
 import { Emoji } from '../../lib/emoji'
 import { formatNumber } from '../../lib/format-number'
+import { getCommitSearchKeys } from '../../lib/commit-search'
 
 interface ICompareSidebarProps {
   readonly repository: Repository
@@ -107,6 +108,9 @@ export class CompareSidebar extends React.Component<
   private branchList: BranchList | null = null
   private commitListRef = React.createRef<CommitList>()
   private loadingMoreCommitsPromise: Promise<void> | null = null
+  private loadingSearchCommitsPromise: Promise<void> | null = null
+  private exhaustedSearchQuery: string | null = null
+  private isUnmounted = false
   private resultCount = 0
 
   public constructor(props: ICompareSidebarProps) {
@@ -151,6 +155,8 @@ export class CompareSidebar extends React.Component<
   }
 
   public componentDidUpdate(prevProps: ICompareSidebarProps) {
+    this.ensureCommitSearchDepth()
+
     const { showBranchList } = this.props.compareState
 
     if (showBranchList === prevProps.compareState.showBranchList) {
@@ -166,6 +172,40 @@ export class CompareSidebar extends React.Component<
     }
   }
 
+  private ensureCommitSearchDepth() {
+    const query = this.state.commitFilterText.trim()
+    const { formState, commitSHAs } = this.props.compareState
+    if (
+      query.length === 0 ||
+      formState.kind !== HistoryTabMode.History ||
+      this.getFilteredCommitSHAs(commitSHAs).length >= 50 ||
+      this.exhaustedSearchQuery === query ||
+      this.loadingSearchCommitsPromise !== null
+    ) {
+      return
+    }
+
+    this.loadingSearchCommitsPromise = this.props.dispatcher
+      .loadNextCommitBatch(this.props.repository)
+      .then(loaded => {
+        if (loaded === 0) {
+          this.exhaustedSearchQuery = query
+        }
+      })
+      .catch(error => {
+        if (this.state.commitFilterText.trim() === query) {
+          this.exhaustedSearchQuery = query
+        }
+        defaultErrorHandler(error, this.props.dispatcher)
+      })
+      .then(() => {
+        this.loadingSearchCommitsPromise = null
+        if (!this.isUnmounted) {
+          this.ensureCommitSearchDepth()
+        }
+      })
+  }
+
   public focusHistory() {
     this.commitListRef.current?.focus()
   }
@@ -175,6 +215,7 @@ export class CompareSidebar extends React.Component<
   }
 
   public componentWillUnmount() {
+    this.isUnmounted = true
     this.textbox = null
 
     // by hiding the branch list here when the component is torn down
@@ -262,10 +303,7 @@ export class CompareSidebar extends React.Component<
       if (commit === undefined) {
         return [sha]
       }
-      return [
-        commit.summary,
-        `${commit.author.name} ${commit.sha} ${commit.shortSha}`,
-      ]
+      return getCommitSearchKeys(commit)
     }
 
     const { results } = matchWithMode(query, commitSHAs, getKey, {
@@ -281,7 +319,7 @@ export class CompareSidebar extends React.Component<
     for (const sha of this.props.compareState.commitSHAs) {
       const commit = this.props.commitLookup.get(sha)
       if (commit !== undefined) {
-        items.push(commit.summary)
+        items.push(...getCommitSearchKeys(commit))
       }
       if (items.length >= 50) {
         break
@@ -291,7 +329,8 @@ export class CompareSidebar extends React.Component<
   }
 
   private onCommitFilterTextChanged = (commitFilterText: string) => {
-    this.setState({ commitFilterText })
+    this.exhaustedSearchQuery = null
+    this.setState({ commitFilterText }, this.ensureCommitSearchDepth)
   }
 
   private onCommitFilterCleared = () => {
@@ -321,8 +360,8 @@ export class CompareSidebar extends React.Component<
           type="search"
           displayClearButton={true}
           prefixedIcon={octicons.search}
-          placeholder="Filter commits"
-          ariaLabel="Filter commits"
+          placeholder="Search title, message, tag or hash"
+          ariaLabel="Search commits by title, message, tag, or hash"
           value={this.state.commitFilterText}
           onValueChanged={this.onCommitFilterTextChanged}
           onSearchCleared={this.onCommitFilterCleared}
