@@ -431,6 +431,7 @@ function getInitialRepositoryState(): IRepositoryState {
     isPushPullFetchInProgress: false,
     isCommitting: false,
     oneClickCommitPushPhase: null,
+    mergeAllState: null,
     hookProgress: null,
     subscribeToCommitOutput: null,
     isGeneratingCommitMessage: false,

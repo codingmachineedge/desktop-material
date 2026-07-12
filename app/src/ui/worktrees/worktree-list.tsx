@@ -29,6 +29,7 @@ interface IWorktreeListProps {
   readonly filterText: string
   readonly canCreateNewWorktree: boolean
   readonly onCreateNewWorktree?: () => void
+  readonly onMergeAllWorktrees?: () => void
   readonly onWorktreeContextMenu?: (
     worktree: WorktreeEntry,
     event: React.MouseEvent<HTMLDivElement>
@@ -98,12 +99,22 @@ export class WorktreeList extends React.Component<IWorktreeListProps> {
       return null
     }
     return (
-      <Button
-        className="new-worktree-button"
-        onClick={this.props.onCreateNewWorktree}
-      >
-        {__DARWIN__ ? 'New Worktree' : 'New worktree'}
-      </Button>
+      <div className="worktree-list-actions">
+        <Button
+          className="new-worktree-button"
+          onClick={this.props.onCreateNewWorktree}
+        >
+          {__DARWIN__ ? 'New Worktree' : 'New worktree'}
+        </Button>
+        {this.props.onMergeAllWorktrees && (
+          <Button
+            className="merge-all-worktrees-button"
+            onClick={this.props.onMergeAllWorktrees}
+          >
+            Merge all worktrees
+          </Button>
+        )}
+      </div>
     )
   }
 

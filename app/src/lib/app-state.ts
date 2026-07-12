@@ -68,6 +68,7 @@ import { Emoji } from './emoji'
 import { IUpdateState } from '../ui/lib/update-store'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
 import type { IAutomationSettingsState } from './automation/automation-settings'
+import type { IMergeAllState } from './automation/merge-all'
 
 export enum SelectionType {
   Repository,
@@ -579,6 +580,7 @@ export type ConflictState =
 
 export interface IRepositoryState {
   readonly oneClickCommitPushPhase: OneClickCommitPushPhase
+  readonly mergeAllState: IMergeAllState | null
   readonly commitSelection: ICommitSelection
   readonly changesState: IChangesState
   readonly compareState: ICompareState

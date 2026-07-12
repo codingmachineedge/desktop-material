@@ -315,6 +315,14 @@ import {
   canAutoPull,
 } from '../automation/automation-guards'
 import { AutomationScheduler } from './helpers/automation-scheduler'
+import {
+  IMergeAllCandidate,
+  IMergeAllResult,
+  IMergeAllState,
+  MergeAllMode,
+  selectBranchCandidates,
+  selectWorktreeCandidates,
+} from '../automation/merge-all'
 import { BranchPruner } from './helpers/branch-pruner'
 import {
   enableCopilotConflictResolution,
@@ -609,6 +617,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** The background fetcher for the currently selected repository. */
   private currentBackgroundFetcher: BackgroundFetcher | null = null
   private currentAutomationScheduler: AutomationScheduler | null = null
+  private readonly mergeAllControllers = new Map<number, AbortController>()
 
   private currentBranchPruner: BranchPruner | null = null
 
@@ -5398,6 +5407,323 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return context
   }
 
+  private updateMergeAllState(
+    repository: Repository,
+    update: Partial<IMergeAllState>
+  ): void {
+    const current = this.repositoryStateCache.get(repository).mergeAllState
+    if (current === null) {
+      return
+    }
+    this.repositoryStateCache.update(repository, () => ({
+      mergeAllState: { ...current, ...update },
+    }))
+    this.emitUpdate()
+  }
+
+  public _cancelMergeAll(repository: Repository): void {
+    this.mergeAllControllers.get(repository.id)?.abort()
+  }
+
+  public async _mergeAllIntoDefaultBranch(
+    repository: Repository,
+    mode: MergeAllMode
+  ): Promise<void> {
+    if (this.mergeAllControllers.has(repository.id)) {
+      return
+    }
+
+    const controller = new AbortController()
+    this.mergeAllControllers.set(repository.id, controller)
+    this.stopAutomationScheduler()
+    this.repositoryStateCache.update(repository, () => ({
+      mergeAllState: {
+        phase: 'preparing',
+        mode,
+        currentBranch: null,
+        copilotProgress: null,
+        results: [],
+        pushed: false,
+      },
+    }))
+    this.emitUpdate()
+
+    try {
+      await this.performMergeAll(repository, mode, controller.signal)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const current = this.repositoryStateCache.get(repository).mergeAllState
+      this.updateMergeAllState(repository, {
+        phase: controller.signal.aborted ? 'cancelled' : 'complete',
+        currentBranch: null,
+        results: [
+          ...(current?.results ?? []),
+          {
+            branch: 'Merge all',
+            status: controller.signal.aborted ? 'skipped' : 'failed',
+            detail: controller.signal.aborted ? 'Cancelled.' : message,
+          },
+        ],
+      })
+      log.error(
+        'Merge-all operation stopped',
+        error instanceof Error ? error : new Error(message)
+      )
+    } finally {
+      this.mergeAllControllers.delete(repository.id)
+      const state = this.repositoryStateCache.get(repository).mergeAllState
+      const results = state?.results ?? []
+      this.postNotification({
+        kind: 'merge-all',
+        title: `Merge all ${
+          state?.phase === 'cancelled' ? 'cancelled' : 'complete'
+        }`,
+        body: `${results.filter(r => r.status === 'merged').length} merged, ${
+          results.filter(r => r.status === 'up-to-date').length
+        } up to date, ${
+          results.filter(r => r.status === 'skipped').length
+        } skipped, ${
+          results.filter(r => r.status === 'failed').length
+        } failed.`,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+      if (this.selectedRepository === repository) {
+        this.restartAutomationScheduler()
+      }
+    }
+  }
+
+  private async performMergeAll(
+    repository: Repository,
+    mode: MergeAllMode,
+    signal: AbortSignal
+  ): Promise<void> {
+    await this._refreshRepository(repository)
+    const initial = this.repositoryStateCache.get(repository)
+    const defaultBranch = initial.branchesState.defaultBranch
+    if (defaultBranch === null) {
+      throw new Error('No default branch is configured.')
+    }
+    if (
+      initial.changesState.workingDirectory.files.length > 0 ||
+      initial.changesState.conflictState !== null ||
+      initial.multiCommitOperationState !== null ||
+      initial.isPushPullFetchInProgress ||
+      initial.isCommitting ||
+      initial.checkoutProgress !== null
+    ) {
+      throw new Error('The repository must be clean and idle before merging.')
+    }
+
+    const worktrees = await listWorktrees(repository)
+    if (
+      worktrees.some(
+        worktree =>
+          worktree.type === 'linked' && worktree.branch === defaultBranch.ref
+      )
+    ) {
+      throw new Error('The default branch is checked out in another worktree.')
+    }
+
+    if (
+      initial.branchesState.tip.kind !== TipState.Valid ||
+      initial.branchesState.tip.branch.name !== defaultBranch.name
+    ) {
+      await this._checkoutBranch(repository, defaultBranch)
+      await this._refreshRepository(repository)
+    }
+
+    const refreshed = this.repositoryStateCache.get(repository)
+    let candidates: ReadonlyArray<IMergeAllCandidate>
+    let results: ReadonlyArray<IMergeAllResult> = []
+    if (mode === 'branches') {
+      candidates = selectBranchCandidates(
+        refreshed.branchesState.allBranches,
+        defaultBranch.name,
+        new Set(
+          worktrees.map(worktree => worktree.branch).filter(Boolean) as string[]
+        )
+      )
+    } else {
+      const selection = selectWorktreeCandidates(
+        worktrees,
+        refreshed.branchesState.allBranches
+      )
+      candidates = selection.candidates
+      results = selection.skipped
+    }
+    this.updateMergeAllState(repository, { results })
+
+    let mergedAny = false
+    for (const candidate of candidates) {
+      if (signal.aborted) {
+        throw new Error('Merge all cancelled.')
+      }
+      this.updateMergeAllState(repository, {
+        phase: 'merging',
+        currentBranch: candidate.branch.name,
+        copilotProgress: null,
+      })
+
+      const outcome = await this.mergeAllCandidate(
+        repository,
+        candidate,
+        signal
+      )
+      mergedAny ||= outcome.status === 'merged'
+      results = [...results, outcome]
+      this.updateMergeAllState(repository, { results })
+    }
+
+    if (mergedAny && !signal.aborted) {
+      this.updateMergeAllState(repository, {
+        phase: 'pushing',
+        currentBranch: null,
+      })
+      await this._push(repository)
+      this.updateMergeAllState(repository, { pushed: true })
+    }
+
+    this.updateMergeAllState(repository, {
+      phase: signal.aborted ? 'cancelled' : 'complete',
+      currentBranch: null,
+      copilotProgress: null,
+    })
+    await this._refreshRepository(repository)
+  }
+
+  private async mergeAllCandidate(
+    repository: Repository,
+    candidate: IMergeAllCandidate,
+    signal: AbortSignal
+  ): Promise<IMergeAllResult> {
+    const base = {
+      branch: candidate.branch.name,
+      ...(candidate.worktree ? { path: candidate.worktree.path } : {}),
+    }
+    let completedStatus: 'merged' | 'up-to-date' | null = null
+    try {
+      if (candidate.worktree !== undefined) {
+        const status = await git(
+          ['status', '--porcelain'],
+          candidate.worktree.path,
+          'mergeAllWorktreeStatus'
+        )
+        if (status.stdout.trim().length > 0) {
+          return {
+            ...base,
+            status: 'skipped',
+            detail: 'Worktree has uncommitted changes.',
+          }
+        }
+      }
+
+      const gitStore = this.gitStoreCache.get(repository)
+      const mergeResult = await gitStore.merge(candidate.branch)
+      let status: IMergeAllResult['status']
+      if (mergeResult === MergeResult.Success) {
+        status = 'merged'
+      } else if (mergeResult === MergeResult.AlreadyUpToDate) {
+        status = 'up-to-date'
+      } else if (await isMergeHeadSet(repository)) {
+        await this._refreshRepository(repository)
+        this.updateMergeAllState(repository, {
+          phase: 'resolving',
+          currentBranch: candidate.branch.name,
+        })
+        const resolution = await this._resolveConflictsWithCopilot(
+          repository,
+          progress =>
+            this.updateMergeAllState(repository, {
+              copilotProgress:
+                progress.reasoningSnippet ??
+                `Resolved ${progress.filesResolved} of ${progress.filesTotal} files`,
+            }),
+          signal
+        )
+        if (resolution === null || signal.aborted) {
+          await abortMerge(repository)
+          await this._refreshRepository(repository)
+          return {
+            ...base,
+            status: 'skipped',
+            detail: signal.aborted
+              ? 'Cancelled during conflict resolution.'
+              : 'Copilot could not resolve the conflicts.',
+          }
+        }
+        await this.applyCopilotResolutionsToDisk(
+          repository,
+          resolution.resolutions,
+          new Map<string, ManualConflictResolution>()
+        )
+        const conflictState = this.repositoryStateCache.get(repository)
+        const commit = await this._finishConflictedMerge(
+          repository,
+          conflictState.changesState.workingDirectory,
+          new Map<string, ManualConflictResolution>()
+        )
+        if (commit === undefined || (await isMergeHeadSet(repository))) {
+          await abortMerge(repository)
+          await this._refreshRepository(repository)
+          return {
+            ...base,
+            status: 'skipped',
+            detail: 'The resolved merge could not be committed.',
+          }
+        }
+        status = 'merged'
+      } else {
+        return {
+          ...base,
+          status: 'skipped',
+          detail: 'Git could not merge this branch.',
+        }
+      }
+      completedStatus = status
+
+      this.updateMergeAllState(repository, {
+        phase: 'cleaning',
+        currentBranch: candidate.branch.name,
+      })
+      if (candidate.worktree !== undefined) {
+        await removeWorktree(repository.path, candidate.worktree.path, false)
+        await this._refreshWorktrees(repository)
+      }
+      await deleteLocalBranch(repository, candidate.branch.name)
+      return {
+        ...base,
+        status,
+        detail:
+          status === 'merged'
+            ? 'Merged, cleaned up, and deleted.'
+            : 'Already up to date; cleaned up and deleted.',
+      }
+    } catch (error) {
+      if (await isMergeHeadSet(repository)) {
+        // If aborting itself fails, stop the entire run rather than carrying a
+        // poisoned merge state into the next candidate.
+        await abortMerge(repository)
+        await this._refreshRepository(repository)
+      }
+      if (completedStatus !== null) {
+        return {
+          ...base,
+          status: completedStatus,
+          detail: `Merge completed, but cleanup failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        }
+      }
+      return {
+        ...base,
+        status: 'failed',
+        detail: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+
   /** Open or close the notification centre side sheet. */
   public _setNotificationCentreOpen(open: boolean): void {
     this.notificationCentreStore.setOpen(open)
@@ -7687,13 +8013,23 @@ export class AppStore extends TypedBaseStore<IAppState> {
       this.statsStore.increment('copilotConflictResolutionWithOverridesCount')
     }
 
-    const pathsToStage: string[] = []
+    await this.applyCopilotResolutionsToDisk(
+      repository,
+      copilotResolutions,
+      manualResolutions
+    )
+  }
 
-    for (const resolution of copilotResolutions) {
+  private async applyCopilotResolutionsToDisk(
+    repository: Repository,
+    resolutions: ReadonlyArray<IFileResolution>,
+    manualResolutions: ReadonlyMap<string, ManualConflictResolution>
+  ): Promise<void> {
+    const pathsToStage: string[] = []
+    for (const resolution of resolutions) {
       if (manualResolutions.has(resolution.path)) {
         continue
       }
-
       const absolutePath = await resolveWithin(repository.path, resolution.path)
       if (absolutePath === null) {
         log.warn(
@@ -7701,11 +8037,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         )
         continue
       }
-
       await writeFile(absolutePath, resolution.resolvedContent, 'utf8')
       pathsToStage.push(resolution.path)
     }
-
     if (pathsToStage.length > 0) {
       await git(
         ['add', '--', ...pathsToStage],

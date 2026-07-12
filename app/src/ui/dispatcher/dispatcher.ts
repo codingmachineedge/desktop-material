@@ -66,6 +66,7 @@ import type {
   IAutomationSettingsOverrides,
   IAutomationSettingsState,
 } from '../../lib/automation/automation-settings'
+import type { MergeAllMode } from '../../lib/automation/merge-all'
 
 import { Account } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
@@ -302,6 +303,17 @@ export class Dispatcher {
 
   public oneClickCommitAndPush(repository: Repository): Promise<void> {
     return this.appStore._oneClickCommitAndPush(repository)
+  }
+
+  public mergeAllIntoDefaultBranch(
+    repository: Repository,
+    mode: MergeAllMode
+  ): Promise<void> {
+    return this.appStore._mergeAllIntoDefaultBranch(repository, mode)
+  }
+
+  public cancelMergeAll(repository: Repository): void {
+    this.appStore._cancelMergeAll(repository)
   }
 
   /** Open or close the notification centre side sheet. */
