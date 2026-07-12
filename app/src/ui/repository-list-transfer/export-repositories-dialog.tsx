@@ -21,6 +21,38 @@ interface IExportEntry {
   readonly url: string | null
 }
 
+interface IExportEntryRowProps {
+  readonly entry: IExportEntry
+  readonly checked: boolean
+  readonly onToggle: (id: number) => void
+}
+
+/** A repository export row with a stable checkbox event handler. */
+class ExportEntryRow extends React.PureComponent<IExportEntryRowProps> {
+  private onChange = () => this.props.onToggle(this.props.entry.repository.id)
+
+  public render() {
+    const { repository, url } = this.props.entry
+    const disabled = url === null
+
+    return (
+      <li className={`transfer-item ${disabled ? 'disabled' : ''}`}>
+        <Checkbox
+          value={this.props.checked ? CheckboxValue.On : CheckboxValue.Off}
+          onChange={this.onChange}
+          disabled={disabled}
+        />
+        <div className="details">
+          <div className="name">{repository.name}</div>
+          <div className="url">
+            {url ?? 'No remote URL — cannot be exported'}
+          </div>
+        </div>
+      </li>
+    )
+  }
+}
+
 interface IExportRepositoriesDialogState {
   readonly loading: boolean
   readonly entries: ReadonlyArray<IExportEntry>
