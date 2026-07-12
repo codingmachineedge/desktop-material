@@ -36,20 +36,37 @@ These features are implemented and live on `main`.
 - Preferences rebuilt as an MD3 940×660 dialog with a left rail, an Active chip, and a pill footer
 - Repository and branch pickers are MD3 side sheets; the clone dialog is restyled to match
 
+**Notification centre**
+- A bell and right-hand side sheet backed by its own local git repo — unread badges, mark read/unread, delete, mark-all, and a git-backed history you can undo/restore
+
+**Search everywhere, with a regex builder**
+- Every search bar gains fuzzy / substring / regex filter modes, a case toggle, and per-list filter chips
+- A full regex builder — anchors, character classes, quantifiers, groups, alternation, lookaround, all six flags, and a live tester — reachable from the search bars
+
+**Dynamic UI scaling**
+- A UI-scale slider (50–200%) in Preferences → Appearance plus auto-fit-to-window that shrinks the interface to fit smaller windows (on by default), composing with `Ctrl` `+` / `-` / `0`
+
+**Per-repo `.gitignore` manager**
+- Open **Repository → Manage .gitignore…** for a manager that auto-suggests templates from your repo's contents, a searchable catalog of ~19 templates grouped by category, one-click apply/remove, and a raw editor — all merged into marked, reversible sections
+
+**One-click Build & Run**
+- Detects the project's build profile (Node/pnpm/yarn, Rust, Go, .NET, Python, Java, Make/CMake), then installs dependencies, builds, and runs it in one action, streaming output to an MD3 log panel
+- Auto-ignores build outputs (applies the matching `.gitignore` template + an artifacts section) before building
+- Bounded auto-fix on failure, a per-repo Build & Run settings tab, and optional single-prompt UAC pre-elevation
+
+**Fully Material, everywhere**
+- The remaining stock surfaces — tooltips, menus, banners, autocomplete popups, segmented controls, split-buttons, dialog internals, History/CI surfaces — are re-tinted through the Material token system in both light and dark themes
+
 ## On the roadmap
 
 These are planned milestones — **not yet implemented**. They are tracked in [`PLAN.md`](PLAN.md).
 
-- **Notification centre** — a bell and side panel backed by its own local git repo, with unread badges and mark read/unread/delete
-- **Regex-powered search everywhere** — filter chips, a regex-mode toggle, and a full regex builder (anchors, classes, quantifiers, groups, alternation, lookaround, all six flags, live tester) on every search bar
 - **Multi-clone** — select many repos with checkboxes, org filter chips, parallel or one-by-one cloning, plus export/import of repo lists (URLs only)
 - **Automation** — one-click commit & push with a Copilot-written message; scheduled auto commit & push and auto pull (global default plus per-repo override); merge-all branches/worktrees with Copilot conflict resolution
 - **GitHub Actions panel** — workflow runs, status/branch/event filters, re-run / re-run-failed, job steps, an in-app log viewer, and a `workflow_dispatch` dialog
 - **Built-in agent server** — an MCP server plus a local HTTP/CLI fallback for AI-agent control
-- **Gitignore manager** — per-repo `.gitignore` editing with template auto-suggest
-- **One-click Build & Run** — detect the project, install dependencies, and run it in one action
 - **GitHub organization support** — browse and clone full org repo lists, and publish into an org
-- **Dynamic UI scaling** — a 50–200% slider plus auto-fit to window
+- **Self-updating** — the app checks the project's own GitHub releases and updates itself
 - **Self-hosted GitLab sign-in** (endpoint plus personal access token) and GitLab/Bitbucket integration
 - **Desktop-plus parity** — commit search, commit graph, multiple stashes, repo pinning/grouping, pull-all, and more
 
