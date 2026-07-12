@@ -214,6 +214,119 @@
   }
 }
 
+// Commit 13 — Branch side-sheet content (FoldoutType.Branch).
+// Scoped under `#foldout-container` so the id lifts specificity above the shell
+// override layer without `!important`, matching the repository sheet approach.
+#foldout-container .branches-container {
+  width: 100%;
+
+  .branches-list,
+  .pull-request-list {
+    width: 100%;
+  }
+
+  // Segmented Branches / Pull requests tabs styled as the design's segmented
+  // control: full-width pills, secondary-container selected.
+  & > .tab-bar {
+    background: transparent;
+    border-top: 0;
+    gap: 6px;
+    padding: 0 16px 10px;
+
+    .tab-bar-item {
+      flex: 1;
+      justify-content: center;
+      min-height: 40px;
+      border-radius: 999px !important;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      font-weight: 700;
+    }
+
+    &.tabs .tab-bar-item.selected {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+  }
+
+  // Uppercase group labels (DEFAULT / RECENT / OTHER BRANCHES).
+  .filter-list-group-header {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 12px 12px 6px;
+  }
+
+  .branches-list .list-item {
+    border-radius: 14px;
+    transition: background-color 240ms var(--emph), border-radius 260ms var(--spring), transform 200ms var(--spring-fast);
+
+    &:hover {
+      border-radius: 18px;
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+
+  // Rows: 34x34 radius-11 leading icon chip. The current branch already renders
+  // the `check` octicon here (branch-list-item.tsx), so the chip doubles as the
+  // check_circle-style current marker using the existing octicon.
+  .branches-list-item {
+    padding: 8px;
+
+    .icon {
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      margin-right: 12px;
+      border-radius: 11px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      display: grid;
+      place-items: center;
+    }
+
+    .name {
+      font-family: var(--font-family-monospace);
+      font-size: 12.5px;
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+
+  // "New branch" as an extended FAB-style button (kept inline in the filter
+  // row): radius 18 morphing to 999 on hover, level2 elevation.
+  .new-branch-button {
+    height: 44px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 18px;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    box-shadow: var(--md-sys-elevation-level2);
+    font-weight: 700;
+    transition: border-radius 320ms var(--spring), box-shadow 260ms var(--emph), transform 240ms var(--spring-fast), background-color 480ms var(--emph);
+
+    &:hover {
+      border-radius: 999px;
+      box-shadow: var(--md-sys-elevation-level3);
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+
+    .octicon {
+      margin-left: 6px;
+    }
+  }
+}
+
 .no-pull-requests {
   width: 365px;
   display: flex;

@@ -21,3 +21,44 @@
     color: var(--text-color);
   }
 }
+
+// Commit 13 — Repository (FoldoutType.Repository) and Branch (FoldoutType.Branch)
+// foldouts rendered as left MD3 side sheets.
+//
+// ToolbarDropdown anchors these foldouts with inline styles (position/margin/
+// top/width/height) under their toolbar chips. Rather than fight that anchor
+// math with a hard fixed-position override, we keep them anchored under the
+// chips and apply the full side-sheet visual language: surface-container-low,
+// 28px radius, level3 elevation, ~390px wide, dmSheet slide-in, and the modal
+// scrim the design marks for these two surfaces. The width/height are the only
+// inline values we override (they don't affect the horizontal anchor point).
+//
+// Scoped by content (`:has()`, supported in the app's Chromium) so the app-menu
+// foldout and any other dropdowns keep their existing look. Uses the id in the
+// selector for enough specificity to beat the generic `.toolbar-dropdown
+// .foldout` rule in the shell override layer.
+#foldout-container {
+  &:has(.repository-list),
+  &:has(.branches-container) {
+    // Modal scrim (design marks the repository + branches sheets modal).
+    .overlay {
+      background: color-mix(in srgb, var(--md-sys-color-scrim) 42%, transparent);
+      animation: dmScrim 300ms var(--emph);
+    }
+
+    .foldout {
+      width: 390px !important;
+      min-width: 390px !important;
+      max-width: calc(100vw - 20px);
+      height: calc(100% - 12px) !important;
+      margin-top: 6px;
+      background: var(--md-sys-color-surface-container-low);
+      border: 0;
+      border-radius: var(--md-sys-shape-corner-extra-large, 28px);
+      box-shadow: var(--md-sys-elevation-level3);
+      color: var(--md-sys-color-on-surface);
+      overflow: hidden;
+      animation: dmSheet calc(480ms * var(--mdur, 1)) var(--spring);
+    }
+  }
+}

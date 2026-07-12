@@ -127,6 +127,71 @@
   }
 }
 
+// Commit 13 — Repository side-sheet content (FoldoutType.Repository).
+// Scoped under `#foldout-container` so the id gives us enough specificity to win
+// over the shell override layer without `!important`, and so the styling only
+// applies where the repository list lives inside the foldout sheet.
+#foldout-container .repository-list {
+  background: var(--md-sys-color-surface-container-low);
+
+  // Uppercase group labels (RECENT / <account login>) per the design spec.
+  .filter-list-group-header {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 12px 12px 6px;
+  }
+
+  // Rows: 34x34 radius-11 icon chip + name/owner, radius morph on hover.
+  .list-item {
+    border-radius: 14px;
+    transition: background-color 240ms var(--emph), border-radius 260ms var(--spring), transform 200ms var(--spring-fast);
+
+    &:hover {
+      border-radius: 18px;
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+
+  .repository-list-item {
+    padding: 10px 8px;
+
+    .icon-for-repository {
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      margin-right: 12px;
+      border-radius: 11px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      display: grid;
+      place-items: center;
+      transition: background-color 240ms var(--emph), color 240ms var(--emph);
+
+      .octicon {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .name {
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+
+  // Current repository (the selected item) — primary-container icon chip acts as
+  // the current marker, echoing the design's check_circle treatment.
+  .list-item.selected .repository-list-item .icon-for-repository {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+}
+
 .list-focus-container {
   /** Ahead/behind badge colors when list item is selected but not focused */
   .list-item.selected {
