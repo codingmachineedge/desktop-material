@@ -188,4 +188,55 @@ describe('versioned store history', () => {
       assert.deepEqual(requestedFiles, [first.sha, second.sha])
     )
   })
+
+  it('filters the shared timeline with substring and regex modes', async () => {
+    const entries = [
+      historyEntry('11111111', 'Changed theme'),
+      historyEntry('22222222', 'Marked notification read'),
+      historyEntry('33333333', 'Restored settings'),
+    ]
+    const source: IVersionedStoreHistorySource = {
+      getHistory: () => Promise.resolve(historyPage(entries, false)),
+      getFiles: () => Promise.resolve([]),
+      getDiff: () => Promise.resolve(''),
+      undoLastChange: () => Promise.resolve(),
+      redoLastChange: () => Promise.resolve(),
+      restoreTo: () => Promise.resolve(),
+    }
+
+    render(
+      <VersionedStoreHistory
+        title="Settings history"
+        timelineLabel="Settings timeline"
+        description="Test history"
+        source={source}
+        onDismissed={() => {}}
+      />
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('option', { name: /Changed theme/i }))
+    )
+    fireEvent.change(screen.getByLabelText('Search version history'), {
+      target: { value: 'notification' },
+    })
+    await waitFor(() => {
+      assert.equal(
+        screen.queryByRole('option', { name: /Changed theme/i }),
+        null
+      )
+      assert.ok(
+        screen.getByRole('option', { name: /Marked notification read/i })
+      )
+    })
+
+    fireEvent.click(screen.getByLabelText(/Filter mode: Fuzzy/))
+    fireEvent.click(screen.getByLabelText(/Filter mode: Substring/))
+    fireEvent.change(screen.getByLabelText('Search version history'), {
+      target: { value: '^Restored' },
+    })
+    await waitFor(() =>
+      assert.ok(screen.getByRole('option', { name: /Restored settings/i }))
+    )
+  })
 })

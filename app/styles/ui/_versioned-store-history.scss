@@ -197,6 +197,47 @@
   background: var(--md-sys-color-surface-container-low);
 }
 
+.versioned-store-history-filter {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.versioned-store-history-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .versioned-store-history-filter-input {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .filter-mode-control-cluster {
+    flex-wrap: nowrap;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
+  }
+}
+
+.versioned-store-history-filter-status {
+  min-height: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+}
+
+.versioned-store-history-filter-error {
+  color: var(--md-sys-color-error);
+}
+
 .versioned-store-history-list {
   display: flex;
   flex-direction: column;

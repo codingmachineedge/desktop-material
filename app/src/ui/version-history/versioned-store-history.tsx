@@ -5,6 +5,9 @@ import { Button } from '../lib/button'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { RelativeTime } from '../relative-time'
+import { TextBox } from '../lib/text-box'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
 
 const VersionHistoryPageSize = 50
 
@@ -73,6 +76,9 @@ interface IVersionedStoreHistoryState {
   readonly operation: VersionHistoryOperation | null
   readonly confirmRestoreSha: string | null
   readonly error: string | null
+  readonly filterText: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
 }
 
 export type VersionHistoryDiffLineKind =
@@ -149,6 +155,9 @@ export class VersionedStoreHistory extends React.Component<
       operation: null,
       confirmRestoreSha: null,
       error: null,
+      filterText: '',
+      filterMode: FilterMode.Fuzzy,
+      filterCaseSensitive: false,
     }
   }
 
@@ -403,6 +412,102 @@ export class VersionedStoreHistory extends React.Component<
 
   private loadMore = () => this.loadHistory(false)
 
+  private onFilterTextChanged = (filterText: string) => {
+    this.setState({ filterText })
+  }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive })
+  }
+
+  private getFilterSamples = () =>
+    (this.state.page?.entries ?? []).map(entry =>
+      [entry.summary, entry.body, entry.shortSha].filter(Boolean).join(' · ')
+    )
+
+  private getFilteredEntries() {
+    const entries = this.state.page?.entries ?? []
+    const { filterText, filterMode, filterCaseSensitive, filesBySha } =
+      this.state
+    if (filterText.length === 0) {
+      return { entries, regexError: null }
+    }
+
+    const result = matchWithMode(
+      filterText,
+      entries,
+      entry => [
+        entry.summary,
+        entry.body,
+        entry.sha,
+        entry.shortSha,
+        entry.committedAt.toISOString(),
+        entry.undoOf === null ? '' : 'undo',
+        entry.redoOf === null ? '' : 'redo',
+        entry.restoreOf === null ? '' : 'restore',
+        ...(filesBySha[entry.sha] ?? []),
+      ],
+      { mode: filterMode, caseSensitive: filterCaseSensitive }
+    )
+
+    return {
+      entries: result.results.map(match => match.item),
+      regexError: result.regexError,
+    }
+  }
+
+  private renderFilter() {
+    const { filterText, filterMode, filterCaseSensitive, page } = this.state
+    const result = this.getFilteredEntries()
+    return (
+      <div className="versioned-store-history-filter">
+        <div className="versioned-store-history-filter-row">
+          <TextBox
+            className="versioned-store-history-filter-input"
+            type="search"
+            ariaLabel="Search version history"
+            placeholder="Search messages, hashes, dates, or files"
+            value={filterText}
+            displayClearButton={true}
+            prefixedIcon={octicons.search}
+            onValueChanged={this.onFilterTextChanged}
+          />
+          <FilterModeControl
+            mode={filterMode}
+            caseSensitive={filterCaseSensitive}
+            onModeChange={this.onFilterModeChanged}
+            onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+            regexBuilderTarget="version history"
+            getSampleItems={this.getFilterSamples}
+            filterText={filterText}
+            onRegexPatternApply={this.onFilterTextChanged}
+          />
+        </div>
+        <div
+          className="versioned-store-history-filter-status"
+          aria-live="polite"
+        >
+          {result.regexError !== null ? (
+            <span className="versioned-store-history-filter-error">
+              {result.regexError}
+            </span>
+          ) : filterText.length > 0 ? (
+            <span>
+              {result.entries.length} of {page?.entries.length ?? 0} loaded
+              commits match
+            </span>
+          ) : (
+            <span>Search the loaded timeline</span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   private renderToolbar() {
     const { page, operation } = this.state
     const busy = operation !== null
@@ -555,11 +660,24 @@ export class VersionedStoreHistory extends React.Component<
       )
     }
 
+    const result = this.getFilteredEntries()
+
     return (
       <>
-        <ol className="versioned-store-history-list" role="listbox">
-          {page.entries.map((entry, index) => this.renderEntry(entry, index))}
-        </ol>
+        {this.renderFilter()}
+        {result.entries.length === 0 ? (
+          <div className="versioned-store-history-empty filtered">
+            <Octicon symbol={octicons.search} />
+            <strong>No matching history</strong>
+            <span>Try another term or matching mode.</span>
+          </div>
+        ) : (
+          <ol className="versioned-store-history-list" role="listbox">
+            {result.entries.map(entry =>
+              this.renderEntry(entry, page.entries.indexOf(entry))
+            )}
+          </ol>
+        )}
         {page.hasMore ? (
           <Button
             className="versioned-store-history-load-more"
