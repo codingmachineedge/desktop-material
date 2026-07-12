@@ -22,6 +22,11 @@ import {
   IBuildRunPlan,
   IBuildRunStateEvent,
 } from './build-run/types'
+import {
+  AgentCommandResult,
+  IAgentCommandEnvelope,
+  IAgentServerStatus,
+} from './agent-commands'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -30,6 +35,10 @@ import {
  * the two over the untyped IPC framework.
  */
 export type RequestChannels = {
+  'agent-command': (command: IAgentCommandEnvelope) => void
+  'agent-command-result': (id: string, result: AgentCommandResult) => void
+  'agent-server-status': (status: IAgentServerStatus) => void
+  'set-agent-server-enabled': (enabled: boolean) => void
   'select-all-window-contents': () => void
   'dialog-did-open': () => void
   'update-menu-state': (
@@ -105,6 +114,8 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  'get-agent-server-status': () => Promise<IAgentServerStatus>
+  'regenerate-agent-server-token': () => Promise<IAgentServerStatus>
   'get-path': (path: PathType) => Promise<string>
   'get-app-architecture': () => Promise<Architecture>
   'get-app-path': () => Promise<string>

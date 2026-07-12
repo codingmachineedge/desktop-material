@@ -80,6 +80,8 @@ import { trampolineServer } from '../lib/trampoline/trampoline-server'
 import { TrampolineCommandIdentifier } from '../lib/trampoline/trampoline-command'
 import { createAskpassTrampolineHandler } from '../lib/trampoline/trampoline-askpass-handler'
 import { createCredentialHelperTrampolineHandler } from '../lib/trampoline/trampoline-credential-helper'
+import { installAgentCommandExecutor } from '../lib/agent-command-executor'
+import { getBoolean } from '../lib/local-storage'
 
 if (__DEV__) {
   installDevGlobals()
@@ -376,6 +378,16 @@ const dispatcher = new Dispatcher(
   profileStore,
   repositoryTabsStore,
   buildRunStore
+)
+
+installAgentCommandExecutor(
+  dispatcher,
+  () => appStore.getState(),
+  repositoryTabsStore
+)
+ipcRenderer.send(
+  'set-agent-server-enabled',
+  getBoolean('agent-server-enabled', false)
 )
 
 dispatcher.registerErrorHandler(defaultErrorHandler)

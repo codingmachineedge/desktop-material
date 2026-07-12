@@ -10,6 +10,7 @@ import {
   nativeTheme,
 } from 'electron'
 import * as Fs from 'fs'
+import * as Path from 'path'
 
 import { AppWindow } from './app-window'
 import { buildDefaultMenu, getAllMenuItems } from './menu'
@@ -52,11 +53,13 @@ import { initializeDesktopNotifications } from './notifications'
 import parseCommandLineArgs from 'minimist'
 import { CLIAction } from '../lib/cli-action'
 import { buildRunner, registerBuildRunIpc } from './build-run'
+import { AgentServerController } from './agent-server'
 
 app.setAppLogsPath()
 enableSourceMaps()
 
 let mainWindow: AppWindow | null = null
+let agentServerController: AgentServerController | null = null
 
 const launchTime = now()
 
@@ -135,6 +138,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   // Ensure no Build & Run child process (or its tree) outlives the app.
   buildRunner.killAll()
+  void agentServerController?.stop()
 })
 
 process.on('uncaughtException', (error: Error) => {
@@ -339,6 +343,35 @@ app.on('ready', () => {
   possibleProtocols.forEach(protocol => setAsDefaultProtocolClient(protocol))
 
   createWindow()
+
+  agentServerController = new AgentServerController(
+    Path.join(app.getPath('userData'), 'agent-server.json'),
+    command => {
+      if (mainWindow === null) {
+        return false
+      }
+      mainWindow.sendAgentCommand(command)
+      return true
+    },
+    status => mainWindow?.sendAgentServerStatus(status)
+  )
+
+  ipcMain.on('set-agent-server-enabled', (_event, enabled) => {
+    agentServerController
+      ?.setEnabled(enabled)
+      .catch(error =>
+        log.error('Failed to update agent server lifecycle', error)
+      )
+  })
+  ipcMain.on('agent-command-result', (_event, id, result) => {
+    agentServerController?.acceptRendererResult(id, result)
+  })
+  ipcMain.handle('get-agent-server-status', async () =>
+    agentServerController!.getStatus()
+  )
+  ipcMain.handle('regenerate-agent-server-token', async () =>
+    agentServerController!.regenerateToken()
+  )
 
   const orderedWebRequest = new OrderedWebRequest(
     session.defaultSession.webRequest

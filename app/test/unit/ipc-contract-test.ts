@@ -20,6 +20,10 @@ describe('IPC channel contract', () => {
     : never
 
   const expectedRequestChannels = [
+    'agent-command',
+    'agent-command-result',
+    'agent-server-status',
+    'set-agent-server-enabled',
     'select-all-window-contents',
     'dialog-did-open',
     'update-menu-state',
@@ -74,6 +78,8 @@ describe('IPC channel contract', () => {
   ] as const
 
   const expectedResponseChannels = [
+    'get-agent-server-status',
+    'regenerate-agent-server-token',
     'get-path',
     'get-app-architecture',
     'get-app-path',

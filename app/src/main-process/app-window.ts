@@ -29,6 +29,10 @@ import {
 import { addTrustedIPCSender } from './trusted-ipc-sender'
 import { getUpdaterGUID } from '../lib/get-updater-guid'
 import { CLIAction } from '../lib/cli-action'
+import {
+  IAgentCommandEnvelope,
+  IAgentServerStatus,
+} from '../lib/agent-commands'
 
 export class AppWindow {
   private window: Electron.BrowserWindow
@@ -308,6 +312,16 @@ export class AppWindow {
     this.show()
 
     ipcWebContents.send(this.window.webContents, 'cli-action', action)
+  }
+
+  /** Send an authenticated local-agent command to the trusted renderer. */
+  public sendAgentCommand(command: IAgentCommandEnvelope) {
+    ipcWebContents.send(this.window.webContents, 'agent-command', command)
+  }
+
+  /** Reflect agent server lifecycle changes in the Preferences pane. */
+  public sendAgentServerStatus(status: IAgentServerStatus) {
+    ipcWebContents.send(this.window.webContents, 'agent-server-status', status)
   }
 
   /** Send the app launch timing stats to the renderer. */
