@@ -217,7 +217,7 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
       }
 
       hasPublishedBranch = !!tip.branch.upstream
-      branchHasStashEntry = changesState.stashEntry !== null
+      branchHasStashEntry = changesState.stashEntries.length > 0
     } else {
       onNonDefaultBranch = true
     }

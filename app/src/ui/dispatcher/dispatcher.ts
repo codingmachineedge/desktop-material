@@ -533,9 +533,10 @@ export class Dispatcher {
    */
   public selectStashedFile(
     repository: Repository,
+    stashEntry?: IStashEntry,
     file?: CommittedFileChange | null
   ): Promise<void> {
-    return this.appStore._selectStashedFile(repository, file)
+    return this.appStore._selectStashedFile(repository, stashEntry, file)
   }
 
   /**
@@ -1163,6 +1164,14 @@ export class Dispatcher {
       diff,
       selection
     )
+  }
+
+  /** Stash only the selected files as a new entry for the current branch. */
+  public stashChanges(
+    repository: Repository,
+    files: ReadonlyArray<WorkingDirectoryFileChange>
+  ): Promise<void> {
+    return this.appStore._stashChanges(repository, files)
   }
 
   /** Start amending the most recent commit. */
@@ -2887,6 +2896,8 @@ export class Dispatcher {
           retryAction.files,
           false
         )
+      case RetryActionType.StashChanges:
+        return this.stashChanges(retryAction.repository, retryAction.files)
       case RetryActionType.PopStash:
         return this.popStash(retryAction.repository, retryAction.stashEntry)
       default:
@@ -3380,21 +3391,10 @@ export class Dispatcher {
   }
 
   /**
-   * Creates a stash for the current branch. Note that this will
-   * override any stash that already exists for the current branch.
-   *
-   * @param repository
-   * @param showConfirmationDialog  Whether to show a confirmation dialog if an
-   *                                existing stash exists (defaults to true).
+   * Creates an additional stash for the current branch.
    */
-  public createStashForCurrentBranch(
-    repository: Repository,
-    showConfirmationDialog: boolean = true
-  ) {
-    return this.appStore._createStashForCurrentBranch(
-      repository,
-      showConfirmationDialog
-    )
+  public createStashForCurrentBranch(repository: Repository) {
+    return this.appStore._createStashForCurrentBranch(repository)
   }
 
   /** Drops the given stash in the given repository */

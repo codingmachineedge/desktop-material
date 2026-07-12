@@ -19,6 +19,7 @@ export enum RetryActionType {
   Squash,
   Reorder,
   DiscardChanges,
+  StashChanges,
   PopStash,
 }
 
@@ -84,6 +85,11 @@ export type RetryAction =
     }
   | {
       type: RetryActionType.DiscardChanges
+      repository: Repository
+      files: ReadonlyArray<WorkingDirectoryFileChange>
+    }
+  | {
+      type: RetryActionType.StashChanges
       repository: Repository
       files: ReadonlyArray<WorkingDirectoryFileChange>
     }

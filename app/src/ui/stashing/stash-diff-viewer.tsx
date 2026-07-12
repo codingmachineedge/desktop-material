@@ -69,7 +69,11 @@ export const StashDiffViewerId = 'stash-diff-viewer'
  */
 export class StashDiffViewer extends React.PureComponent<IStashDiffViewerProps> {
   private onSelectedFileChanged = (file: CommittedFileChange) =>
-    this.props.dispatcher.selectStashedFile(this.props.repository, file)
+    this.props.dispatcher.selectStashedFile(
+      this.props.repository,
+      this.props.stashEntry,
+      file
+    )
 
   private onRowDoubleClick = (row: number) => {
     const files = this.getFiles()

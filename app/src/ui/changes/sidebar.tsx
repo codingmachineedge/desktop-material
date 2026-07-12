@@ -67,6 +67,7 @@ interface IChangesSidebarProps {
   readonly gitHubUserStore: GitHubUserStore
   readonly focusCommitMessage: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
+  readonly askForConfirmationOnDiscardStash: boolean
   readonly askForConfirmationOnCommitFilteredChanges: boolean
   readonly accounts: ReadonlyArray<Account>
   readonly isShowingModal: boolean
@@ -268,6 +269,10 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
     })
   }
 
+  private onStashChangesFromFiles = (
+    files: ReadonlyArray<WorkingDirectoryFileChange>
+  ) => this.props.dispatcher.stashChanges(this.props.repository, files)
+
   private onIgnoreFile = (file: string | string[]) => {
     this.props.dispatcher.appendIgnoreFile(this.props.repository, file)
   }
@@ -443,6 +448,7 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
             this.props.askForConfirmationOnCommitFilteredChanges
           }
           onDiscardChangesFromFiles={this.onDiscardChangesFromFiles}
+          onStashChangesFromFiles={this.onStashChangesFromFiles}
           onOpenItem={this.onOpenItem}
           onRowClick={this.onChangedItemClick}
           commitAuthor={this.props.commitAuthor}
@@ -469,8 +475,16 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
           onOpenItemInExternalEditor={this.onOpenItemInExternalEditor}
           onChangesListScrolled={this.props.onChangesListScrolled}
           changesListScrollTop={this.props.changesListScrollTop}
-          stashEntry={this.props.changes.stashEntry}
+          stashEntries={this.props.changes.stashEntries}
           isShowingStashEntry={isShowingStashEntry}
+          selectedStashEntry={
+            selection.kind === ChangesSelectionKind.Stash
+              ? selection.selectedStashEntry
+              : null
+          }
+          askForConfirmationOnDiscardStash={
+            this.props.askForConfirmationOnDiscardStash
+          }
           currentBranchProtected={currentBranchProtected}
           shouldNudgeToCommit={this.props.shouldNudgeToCommit}
           commitSpellcheckEnabled={this.props.commitSpellcheckEnabled}

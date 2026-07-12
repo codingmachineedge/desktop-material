@@ -19,7 +19,7 @@ export function createState<K extends keyof IChangesState>(
     showCoAuthoredBy: false,
     coAuthors: [],
     conflictState: null,
-    stashEntry: null,
+    stashEntries: [],
     currentBranchProtected: false,
     currentRepoRulesInfo: new RepoRulesInfo(),
     fileListFilter: {

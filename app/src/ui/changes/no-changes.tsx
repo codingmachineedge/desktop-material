@@ -403,20 +403,28 @@ export class NoChanges extends React.Component<
       return null
     }
 
-    const { stashEntry } = changesState
-    if (stashEntry === null) {
+    const { stashEntries } = changesState
+    if (stashEntries.length === 0) {
       return null
     }
-
-    if (stashEntry.files.kind !== StashedChangesLoadStates.Loaded) {
+    const stashEntry = stashEntries[0]
+    if (
+      stashEntries.length === 1 &&
+      stashEntry.files.kind !== StashedChangesLoadStates.Loaded
+    ) {
       return null
     }
-
-    const numChanges = stashEntry.files.files.length
+    const numChanges =
+      stashEntry.files.kind === StashedChangesLoadStates.Loaded
+        ? stashEntry.files.files.length
+        : 0
     const description = (
       <>
-        You have {numChanges} {numChanges === 1 ? 'change' : 'changes'} in
-        progress that you have not yet committed.
+        {stashEntries.length === 1
+          ? `You have ${numChanges} ${
+              numChanges === 1 ? 'change' : 'changes'
+            } saved in a stash.`
+          : `You have ${stashEntries.length} stashes on this branch.`}
       </>
     )
     const discoverabilityContent = (
@@ -439,7 +447,7 @@ export class NoChanges extends React.Component<
         menuItemId={itemId}
         description={description}
         discoverabilityContent={discoverabilityContent}
-        buttonText="View stash"
+        buttonText={stashEntries.length === 1 ? 'View stash' : 'View stashes'}
         type="primary"
         disabled={menuItem !== null && !menuItem.enabled}
         onClick={this.onViewStashClicked}

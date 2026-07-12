@@ -42,3 +42,23 @@ export type StashedFileChanges =
     }
 
 export type StashCallback = (stashEntry: IStashEntry) => Promise<void>
+
+/** A compact, stable-enough label for a stash row in the Changes sidebar. */
+export function stashEntryLabel(stashEntry: IStashEntry): string {
+  const ordinalMatch = /stash@\{(\d+)\}/.exec(stashEntry.name)
+  const ordinal = ordinalMatch === null ? '' : ` ${Number(ordinalMatch[1]) + 1}`
+  const prefix = `Stash${ordinal}`
+
+  if (stashEntry.files.kind !== StashedChangesLoadStates.Loaded) {
+    return `${prefix} · Loading…`
+  }
+  const files = stashEntry.files.files
+  if (files.length === 0) {
+    return `${prefix} · No changes`
+  }
+  const separator = __WIN32__ ? '\\' : '/'
+  const name = files[0].path.split(separator).pop() ?? files[0].path
+  return files.length === 1
+    ? `${prefix} · ${name}`
+    : `${prefix} · ${name} + ${files.length - 1} more`
+}

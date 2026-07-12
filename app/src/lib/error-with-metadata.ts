@@ -67,6 +67,20 @@ export class DiscardChangesError extends ErrorWithMetadata {
   }
 }
 
+/** A retriable failure while creating a stash from selected files. */
+export class StashChangesError extends ErrorWithMetadata {
+  public constructor(
+    error: Error,
+    repository: Repository,
+    files: ReadonlyArray<WorkingDirectoryFileChange>
+  ) {
+    super(error, {
+      retryAction: { type: RetryActionType.StashChanges, files, repository },
+      repository,
+    })
+  }
+}
+
 export class CreateRepositoryError extends ErrorWithMetadata {
   public constructor(error: Error) {
     super(error, {

@@ -154,7 +154,7 @@ export class GitStore extends BaseStore {
 
   private _lastFetched: Date | null = null
 
-  private _desktopStashEntries = new Map<string, IStashEntry>()
+  private _desktopStashEntries = new Map<string, ReadonlyArray<IStashEntry>>()
 
   private _stashEntryCount = 0
 
@@ -1194,44 +1194,42 @@ export class GitStore extends BaseStore {
    * Refreshes the list of GitHub Desktop created stash entries for the repository
    */
   public async loadStashEntries(): Promise<void> {
-    const map = new Map<string, IStashEntry>()
+    const map = new Map<string, IStashEntry[]>()
     const stash = await getStashes(this.repository)
 
     for (const entry of stash.desktopEntries) {
-      // we only want the first entry we find for each branch,
-      // so we skip all subsequent ones
-      if (!map.has(entry.branchName)) {
-        const existing = this._desktopStashEntries.get(entry.branchName)
-
-        // If we've already loaded the files for this stash there's
-        // no point in us doing it again. We know the contents haven't
-        // changed since the SHA is the same.
-        if (existing !== undefined && existing.stashSha === entry.stashSha) {
-          map.set(entry.branchName, { ...entry, files: existing.files })
-        } else {
-          map.set(entry.branchName, entry)
-        }
-      }
+      const entries = map.get(entry.branchName) ?? []
+      const existing = this._desktopStashEntries
+        .get(entry.branchName)
+        ?.find(candidate => candidate.stashSha === entry.stashSha)
+      entries.push(
+        existing === undefined ? entry : { ...entry, files: existing.files }
+      )
+      map.set(entry.branchName, entries)
     }
 
     this._desktopStashEntries = map
     this._stashEntryCount = stash.stashEntryCount
     this.emitUpdate()
 
-    this.loadFilesForCurrentStashEntry()
+    this.loadFilesForCurrentStashEntries().catch(error =>
+      log.error('Failed loading files for Desktop stashes', error)
+    )
   }
 
   /**
-   * A GitHub Desktop created stash entries for the current branch or
-   * null if no entry exists
+   * Desktop-created stash entries for the current branch, newest first.
    */
-  public get currentBranchStashEntry() {
+  public get currentBranchStashEntries(): ReadonlyArray<IStashEntry> {
     return this._tip && this._tip.kind === TipState.Valid
-      ? this._desktopStashEntries.get(this._tip.branch.name) || null
-      : null
+      ? this._desktopStashEntries.get(this._tip.branch.name) ?? []
+      : []
   }
 
-  public get desktopStashEntries(): ReadonlyMap<string, IStashEntry> {
+  public get desktopStashEntries(): ReadonlyMap<
+    string,
+    ReadonlyArray<IStashEntry>
+  > {
     return this._desktopStashEntries
   }
 
@@ -1242,28 +1240,39 @@ export class GitStore extends BaseStore {
 
   /** The number of stash entries created by Desktop */
   public get desktopStashEntryCount(): number {
-    return this._desktopStashEntries.size
+    let count = 0
+    for (const entries of this._desktopStashEntries.values()) {
+      count += entries.length
+    }
+    return count
   }
 
   /**
-   * Updates the latest stash entry with a list of files that it changes
+   * Load file metadata for every stash on the current branch.
    */
-  private async loadFilesForCurrentStashEntry() {
-    const stashEntry = this.currentBranchStashEntry
+  private async loadFilesForCurrentStashEntries(): Promise<void> {
+    await Promise.all(
+      this.currentBranchStashEntries.map(entry =>
+        this.loadFilesForStashEntry(entry)
+      )
+    )
+  }
 
-    if (
-      !stashEntry ||
-      stashEntry.files.kind !== StashedChangesLoadStates.NotLoaded
-    ) {
+  private async loadFilesForStashEntry(stashEntry: IStashEntry): Promise<void> {
+    if (stashEntry.files.kind !== StashedChangesLoadStates.NotLoaded) {
       return
     }
 
     const { branchName } = stashEntry
-
-    this._desktopStashEntries.set(branchName, {
-      ...stashEntry,
-      files: { kind: StashedChangesLoadStates.Loading },
-    })
+    const loadingEntries = this.currentBranchStashEntries.map(entry =>
+      entry.stashSha === stashEntry.stashSha
+        ? {
+            ...entry,
+            files: { kind: StashedChangesLoadStates.Loading } as const,
+          }
+        : entry
+    )
+    this._desktopStashEntries.set(branchName, loadingEntries)
     this.emitUpdate()
 
     const files = await getStashedFiles(this.repository, stashEntry.stashSha)
@@ -1271,19 +1280,25 @@ export class GitStore extends BaseStore {
     // It's possible that we've refreshed the list of stash entries since we
     // started getStashedFiles. Load the latest entry for the branch and make
     // sure the SHAs match up.
-    const currentEntry = this._desktopStashEntries.get(branchName)
-
-    if (!currentEntry || currentEntry.stashSha !== stashEntry.stashSha) {
+    const currentEntries = this._desktopStashEntries.get(branchName)
+    if (
+      currentEntries === undefined ||
+      !currentEntries.some(entry => entry.stashSha === stashEntry.stashSha)
+    ) {
       return
     }
 
-    this._desktopStashEntries.set(branchName, {
-      ...currentEntry,
-      files: {
-        kind: StashedChangesLoadStates.Loaded,
-        files,
-      },
-    })
+    this._desktopStashEntries.set(
+      branchName,
+      currentEntries.map(entry =>
+        entry.stashSha === stashEntry.stashSha
+          ? {
+              ...entry,
+              files: { kind: StashedChangesLoadStates.Loaded, files } as const,
+            }
+          : entry
+      )
+    )
     this.emitUpdate()
   }
 

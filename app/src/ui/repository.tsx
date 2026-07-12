@@ -384,6 +384,9 @@ export class RepositoryView extends React.Component<
         askForConfirmationOnDiscardChanges={
           this.props.askForConfirmationOnDiscardChanges
         }
+        askForConfirmationOnDiscardStash={
+          this.props.askForConfirmationOnDiscardStash
+        }
         askForConfirmationOnCommitFilteredChanges={
           this.props.askForConfirmationOnCommitFilteredChanges
         }
@@ -515,11 +518,15 @@ export class RepositoryView extends React.Component<
 
   private renderStashedChangesContent(): JSX.Element | null {
     const { changesState } = this.props.state
-    const { selection, stashEntry } = changesState
+    const { selection } = changesState
 
-    if (selection.kind !== ChangesSelectionKind.Stash || stashEntry === null) {
+    if (
+      selection.kind !== ChangesSelectionKind.Stash ||
+      selection.selectedStashEntry === null
+    ) {
       return null
     }
+    const stashEntry = selection.selectedStashEntry
 
     if (stashEntry.files.kind === StashedChangesLoadStates.Loaded) {
       return (

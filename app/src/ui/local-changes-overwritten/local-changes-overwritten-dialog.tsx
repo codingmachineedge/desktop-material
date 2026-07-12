@@ -16,10 +16,6 @@ interface ILocalChangesOverwrittenDialogProps {
   readonly repository: Repository
   readonly dispatcher: Dispatcher
   /**
-   * Whether there's already a stash entry for the local branch.
-   */
-  readonly hasExistingStash: boolean
-  /**
    * The action that should get executed if the user selects "Stash and Continue".
    */
   readonly retryAction: RetryAction
@@ -101,7 +97,6 @@ export class LocalChangesOverwrittenDialog extends React.Component<
 
   private get canStashChanges() {
     return (
-      !this.props.hasExistingStash &&
       !this.state.stashing &&
       this.props.retryAction.type !== RetryActionType.PopStash
     )
@@ -136,24 +131,12 @@ export class LocalChangesOverwrittenDialog extends React.Component<
   }
 
   private onSubmit = async () => {
-    const { hasExistingStash, repository, dispatcher, retryAction } = this.props
-
-    if (hasExistingStash) {
-      // When there's an existing stash we don't let the user stash the changes
-      // and we only show a "Close" button on the modal. In that case, the
-      // "Close" button submits the dialog and should only dismiss it.
-      this.props.onDismissed()
-      return
-    }
+    const { repository, dispatcher, retryAction } = this.props
 
     this.setState({ stashing: true })
 
-    // We know that there's no stash for the current branch so we can safely
-    // tell createStashForCurrentBranch not to show a confirmation dialog which
-    // would disrupt the async flow (since you can't await a dialog).
     const createdStash = await dispatcher.createStashForCurrentBranch(
-      repository,
-      false
+      repository
     )
 
     this.props.onDismissed()
@@ -191,6 +174,8 @@ export class LocalChangesOverwrittenDialog extends React.Component<
         return 'reorder'
       case RetryActionType.DiscardChanges:
         return 'discard changes'
+      case RetryActionType.StashChanges:
+        return 'stash changes'
       case RetryActionType.PopStash:
         return 'restore stashed changes'
       default:

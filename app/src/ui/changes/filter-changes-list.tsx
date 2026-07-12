@@ -47,7 +47,7 @@ import {
 import { ContinueRebase } from './continue-rebase'
 import { Octicon, OcticonSymbolVariant } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
-import { IStashEntry } from '../../models/stash-entry'
+import { IStashEntry, stashEntryLabel } from '../../models/stash-entry'
 import classNames from 'classnames'
 import { hasWritePermission } from '../../models/github-repository'
 import { hasConflictedFiles } from '../../lib/status'
@@ -84,6 +84,7 @@ import {
 } from '../lib/filter-list-mode'
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
+import { generateStashListContextMenu } from '../stashing/stash-list-item-context-menu'
 
 export interface IChangesListItem extends IFilterListItem {
   readonly id: string
@@ -139,6 +140,9 @@ interface IFilterChangesListProps {
     files: ReadonlyArray<WorkingDirectoryFileChange>,
     isDiscardingAllChanges: boolean,
     permanently: boolean
+  ) => void
+  readonly onStashChangesFromFiles: (
+    files: ReadonlyArray<WorkingDirectoryFileChange>
   ) => void
 
   /** Callback that fires on page scroll to pass the new scrollTop location */
@@ -212,9 +216,11 @@ interface IFilterChangesListProps {
   /** The name of the currently selected external editor */
   readonly externalEditorLabel?: string
 
-  readonly stashEntry: IStashEntry | null
+  readonly stashEntries: ReadonlyArray<IStashEntry>
 
   readonly isShowingStashEntry: boolean
+  readonly selectedStashEntry: IStashEntry | null
+  readonly askForConfirmationOnDiscardStash: boolean
 
   /**
    * Whether we should show the onboarding tutorial nudge
@@ -518,8 +524,17 @@ export class FilterChangesList extends React.Component<
     )
   }
 
-  private onStashChanges = () => {
+  private onStashAllChanges = () => {
     this.props.dispatcher.createStashForCurrentBranch(this.props.repository)
+  }
+
+  private onStashFiles = (paths: ReadonlyArray<string>) => {
+    const files = paths
+      .map(path => this.props.workingDirectory.files.find(f => f.path === path))
+      .filter((file): file is WorkingDirectoryFileChange => file !== undefined)
+    if (files.length > 0) {
+      this.props.onStashChangesFromFiles(files)
+    }
   }
 
   private onDiscardChanges = (files: ReadonlyArray<string>) => {
@@ -570,6 +585,15 @@ export class FilterChangesList extends React.Component<
     return this.props.askForConfirmationOnDiscardChanges ? `${label}…` : label
   }
 
+  private getStashChangesMenuItemLabel = (files: ReadonlyArray<string>) =>
+    files.length === 1
+      ? __DARWIN__
+        ? 'Stash Changes'
+        : 'Stash changes'
+      : __DARWIN__
+      ? `Stash ${files.length} Selected Changes`
+      : `Stash ${files.length} selected changes`
+
   private onContextMenu = (event: React.MouseEvent<any>) => {
     event.preventDefault()
 
@@ -579,7 +603,6 @@ export class FilterChangesList extends React.Component<
     }
 
     const hasLocalChanges = this.props.workingDirectory.files.length > 0
-    const hasStash = this.props.stashEntry !== null
     const hasConflicts =
       this.props.conflictState !== null ||
       hasConflictedFiles(this.props.workingDirectory)
@@ -587,10 +610,6 @@ export class FilterChangesList extends React.Component<
     const stashAllChangesLabel = __DARWIN__
       ? 'Stash All Changes'
       : 'Stash all changes'
-    const confirmStashAllChangesLabel = __DARWIN__
-      ? 'Stash All Changes…'
-      : 'Stash all changes…'
-
     const items: IMenuItem[] = [
       {
         label: __DARWIN__ ? 'Discard All Changes…' : 'Discard all changes…',
@@ -605,8 +624,8 @@ export class FilterChangesList extends React.Component<
         enabled: hasLocalChanges,
       },
       {
-        label: hasStash ? confirmStashAllChangesLabel : stashAllChangesLabel,
-        action: this.onStashChanges,
+        label: stashAllChangesLabel,
+        action: this.onStashAllChanges,
         enabled: hasLocalChanges && this.props.branch !== null && !hasConflicts,
       },
     ]
@@ -622,6 +641,13 @@ export class FilterChangesList extends React.Component<
       action: () => this.onDiscardChanges(paths),
     }
   }
+
+  private getStashChangesMenuItem = (
+    paths: ReadonlyArray<string>
+  ): IMenuItem => ({
+    label: this.getStashChangesMenuItemLabel(paths),
+    action: () => this.onStashFiles(paths),
+  })
 
   private getCopyPathMenuItem = (
     file: WorkingDirectoryFileChange
@@ -738,6 +764,7 @@ export class FilterChangesList extends React.Component<
 
     const items: IMenuItem[] = [
       this.getDiscardChangesMenuItem(paths),
+      this.getStashChangesMenuItem(paths),
       { type: 'separator' },
     ]
     if (paths.length === 1) {
@@ -1133,44 +1160,83 @@ export class FilterChangesList extends React.Component<
     }
   }
 
-  private onStashEntryClicked = () => {
-    const { isShowingStashEntry, dispatcher, repository } = this.props
+  private onStashEntryClicked = (entry: IStashEntry) => {
+    const { isShowingStashEntry, selectedStashEntry, dispatcher, repository } =
+      this.props
 
-    if (isShowingStashEntry) {
+    if (
+      isShowingStashEntry &&
+      selectedStashEntry?.stashSha === entry.stashSha
+    ) {
       dispatcher.selectWorkingDirectoryFiles(repository)
 
       // If the button is clicked, that implies the stash was not restored or discarded
       dispatcher.incrementMetric('noActionTakenOnStashCount')
     } else {
-      dispatcher.selectStashedFile(repository)
+      dispatcher.selectStashedFile(repository, entry)
       dispatcher.incrementMetric('stashViewCount')
     }
   }
 
+  private onStashEntryClickedFn = (entry: IStashEntry) => () =>
+    this.onStashEntryClicked(entry)
+
+  private onStashEntryContextMenu =
+    (entry: IStashEntry) => (event: React.MouseEvent) => {
+      event.preventDefault()
+      showContextualMenu(
+        generateStashListContextMenu({
+          stashEntry: entry,
+          repository: this.props.repository,
+          dispatcher: this.props.dispatcher,
+          askForConfirmationOnDiscardStash:
+            this.props.askForConfirmationOnDiscardStash,
+        })
+      )
+    }
+
   private renderStashedChanges() {
-    if (this.props.stashEntry === null) {
+    const { stashEntries } = this.props
+    if (stashEntries.length === 0) {
       return null
     }
 
-    const className = classNames(
-      'stashed-changes-button',
-      this.props.isShowingStashEntry ? 'selected' : null
-    )
-
     return (
-      <button
-        className={className}
-        onClick={this.onStashEntryClicked}
-        tabIndex={0}
-        aria-expanded={this.props.isShowingStashEntry}
-        aria-controls={
-          this.props.isShowingStashEntry ? StashDiffViewerId : undefined
-        }
-      >
-        <Octicon className="stack-icon" symbol={StashIcon} />
-        <div className="text">Stashed Changes</div>
-        <Octicon symbol={octicons.chevronRight} />
-      </button>
+      <section className="stashed-changes-section" aria-label="Stashes">
+        <div className="stashed-changes-header">
+          <Octicon className="stack-icon" symbol={StashIcon} />
+          <span>
+            {stashEntries.length === 1
+              ? '1 stash'
+              : `${stashEntries.length} stashes`}
+          </span>
+        </div>
+        <div className="stashed-changes-list">
+          {stashEntries.map(entry => {
+            const selected =
+              this.props.isShowingStashEntry &&
+              this.props.selectedStashEntry?.stashSha === entry.stashSha
+            return (
+              <button
+                key={entry.stashSha}
+                className={classNames(
+                  'stashed-changes-button',
+                  selected ? 'selected' : null
+                )}
+                onClick={this.onStashEntryClickedFn(entry)}
+                onContextMenu={this.onStashEntryContextMenu(entry)}
+                tabIndex={0}
+                aria-expanded={selected}
+                aria-controls={selected ? StashDiffViewerId : undefined}
+                title="Right-click for restore and discard actions"
+              >
+                <span className="text">{stashEntryLabel(entry)}</span>
+                <Octicon symbol={octicons.chevronRight} />
+              </button>
+            )
+          })}
+        </div>
+      </section>
     )
   }
 

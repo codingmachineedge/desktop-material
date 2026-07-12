@@ -12,6 +12,7 @@ import {
   dropDesktopStashEntry,
   popStashEntry,
   getStashes,
+  getStashedFiles,
 } from '../../../src/lib/git/stash'
 import { getStatusOrThrow } from '../../helpers/status'
 import { AppFileStatusKind } from '../../../src/models/status'
@@ -101,6 +102,48 @@ describe('git/stash', () => {
       files = status.workingDirectory.files
 
       assert.equal(files.length, 0)
+    })
+
+    it('keeps multiple Desktop stashes for the same branch', async t => {
+      const repository = await setup(t)
+      const readme = join(repository.path, 'README.md')
+
+      await appendFile(readme, 'first stash')
+      await createDesktopStashEntry(repository, 'master', [])
+      await appendFile(readme, 'second stash')
+      await createDesktopStashEntry(repository, 'master', [])
+
+      const entries = (await getStashes(repository)).desktopEntries
+      assert.equal(entries.length, 2)
+      assert.equal(entries[0].name, 'refs/stash@{0}')
+      assert.equal(entries[1].name, 'refs/stash@{1}')
+      assert.notEqual(entries[0].stashSha, entries[1].stashSha)
+    })
+
+    it('stashes only explicitly selected paths', async t => {
+      const repository = await setup(t)
+      const first = join(repository.path, 'first.txt')
+      const second = join(repository.path, 'second.txt')
+      await writeFile(first, 'initial')
+      await writeFile(second, 'initial')
+      await exec(['add', 'first.txt', 'second.txt'], repository.path)
+      await exec(['commit', '-m', 'add files'], repository.path)
+      await appendFile(first, ' selected change')
+      await appendFile(second, ' remaining change')
+
+      await createDesktopStashEntry(repository, 'master', [], ['first.txt'])
+
+      const status = await getStatusOrThrow(repository)
+      assert.deepEqual(
+        status.workingDirectory.files.map(file => file.path),
+        ['second.txt']
+      )
+      const entry = (await getStashes(repository)).desktopEntries[0]
+      const stashedFiles = await getStashedFiles(repository, entry.stashSha)
+      assert.deepEqual(
+        stashedFiles.map(file => file.path),
+        ['first.txt']
+      )
     })
   })
 
