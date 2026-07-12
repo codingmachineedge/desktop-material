@@ -31,6 +31,7 @@ export interface ITrackingBranch {
 /** Basic data about the latest commit on the branch. */
 export interface IBranchTip {
   readonly sha: string
+  readonly author?: { readonly date: Date }
 }
 
 /** Default rules for where to create a branch from */

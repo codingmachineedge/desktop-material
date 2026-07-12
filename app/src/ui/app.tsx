@@ -1776,6 +1776,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             useCustomShell={this.state.useCustomShell}
             customShell={this.state.customShell}
             showRecentRepositories={this.state.showRecentRepositories}
+            branchSortOrder={this.state.branchSortOrder}
             repositoryIndicatorsEnabled={this.state.repositoryIndicatorsEnabled}
             onEditGlobalGitConfig={this.editGlobalGitConfig}
             underlineLinks={this.state.underlineLinks}
@@ -3832,6 +3833,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         emoji={this.state.emoji}
         enableFocusTrap={enableFocusTrap}
         underlineLinks={this.state.underlineLinks}
+        branchSortOrder={this.state.branchSortOrder}
       />
     )
   }

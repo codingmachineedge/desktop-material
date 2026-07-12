@@ -22,6 +22,8 @@ import {
   numberFormatToKey,
 } from '../../models/formatting-preferences'
 import { formatNumber } from '../../lib/format-number'
+import { assertNever } from '../../lib/fatal-error'
+import { BranchSortOrder } from '../../models/branch-sort-order'
 
 interface IAppearanceProps {
   readonly selectedTheme: ApplicationTheme
@@ -43,6 +45,8 @@ interface IAppearanceProps {
   readonly onPreferAbsoluteDatesChanged: (value: boolean) => void
   readonly showRecentRepositories: boolean
   readonly onShowRecentRepositoriesChanged: (show: boolean) => void
+  readonly branchSortOrder: BranchSortOrder
+  readonly onBranchSortOrderChanged: (sortOrder: BranchSortOrder) => void
 }
 
 interface IAppearanceState {
@@ -155,6 +159,24 @@ export class Appearance extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onShowRecentRepositoriesChanged(event.currentTarget.checked)
+  }
+
+  private onBranchSortOrderChanged = (branchSortOrder: BranchSortOrder) => {
+    this.props.onBranchSortOrderChanged(branchSortOrder)
+  }
+
+  private renderBranchSortOptionLabel = (branchSortOrder: BranchSortOrder) => {
+    switch (branchSortOrder) {
+      case BranchSortOrder.Alphabetical:
+        return 'Alphabetical'
+      case BranchSortOrder.LastModified:
+        return 'Last modified'
+      default:
+        return assertNever(
+          branchSortOrder,
+          `Unknown branch sort order: ${branchSortOrder}`
+        )
+    }
   }
 
   public renderThemeSwatch = (theme: ApplicationTheme) => {
@@ -385,12 +407,31 @@ export class Appearance extends React.Component<
     )
   }
 
+  private renderBranchSorting() {
+    return (
+      <div className="appearance-section">
+        <h2 id="branch-sort-order-heading">Sort branches</h2>
+        <RadioGroup<BranchSortOrder>
+          ariaLabelledBy="branch-sort-order-heading"
+          selectedKey={this.props.branchSortOrder}
+          radioButtonKeys={[
+            BranchSortOrder.LastModified,
+            BranchSortOrder.Alphabetical,
+          ]}
+          onSelectionChanged={this.onBranchSortOrderChanged}
+          renderRadioButtonLabelContents={this.renderBranchSortOptionLabel}
+        />
+      </div>
+    )
+  }
+
   public render() {
     return (
       <DialogContent>
         {this.renderScaling()}
         {this.renderSelectedTheme()}
         {this.renderRepositoryList()}
+        {this.renderBranchSorting()}
         {this.renderFormatting()}
         {this.renderSelectedTabSize()}
       </DialogContent>

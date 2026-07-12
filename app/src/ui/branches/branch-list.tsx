@@ -23,6 +23,10 @@ import memoizeOne from 'memoize-one'
 import { getAuthors } from '../../lib/git/log'
 import { Repository } from '../../models/repository'
 import { formatDate } from '../../lib/format-date'
+import {
+  BranchSortOrder,
+  DefaultBranchSortOrder,
+} from '../../models/branch-sort-order'
 
 const RowHeight = 30
 
@@ -48,6 +52,8 @@ interface IBranchListProps {
    * See IBranchesState.recentBranches
    */
   readonly recentBranches: ReadonlyArray<Branch>
+
+  readonly branchSortOrder?: BranchSortOrder
 
   /**
    * The currently selected branch in the list, see the onSelectionChanged prop.
@@ -185,7 +191,8 @@ export class BranchList extends React.Component<
       this.props.defaultBranch,
       this.props.currentBranch,
       this.props.allBranches,
-      this.props.recentBranches
+      this.props.recentBranches,
+      this.props.branchSortOrder ?? DefaultBranchSortOrder
     )
   }
 

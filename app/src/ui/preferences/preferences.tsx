@@ -79,6 +79,7 @@ import {
 } from '../../models/formatting-preferences'
 import { enableFormattingPreferences } from '../../lib/feature-flag'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
+import { BranchSortOrder } from '../../models/branch-sort-order'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -114,6 +115,7 @@ interface IPreferencesProps {
   readonly useCustomShell: boolean
   readonly customShell: ICustomIntegration | null
   readonly showRecentRepositories: boolean
+  readonly branchSortOrder: BranchSortOrder
   readonly repositoryIndicatorsEnabled: boolean
   readonly onEditGlobalGitConfig: () => void
   readonly underlineLinks: boolean
@@ -158,6 +160,7 @@ interface IPreferencesState {
   readonly availableShells: ReadonlyArray<Shell>
   readonly selectedShell: Shell
   readonly showRecentRepositories: boolean
+  readonly branchSortOrder: BranchSortOrder
 
   /**
    * If unable to save Git configuration values (name, email)
@@ -254,6 +257,7 @@ export class Preferences extends React.Component<
       availableShells: [],
       selectedShell: this.props.selectedShell,
       showRecentRepositories: this.props.showRecentRepositories,
+      branchSortOrder: this.props.branchSortOrder,
       repositoryIndicatorsEnabled: this.props.repositoryIndicatorsEnabled,
       initiallySelectedTheme: this.props.selectedTheme,
       initiallySelectedTabSize: this.props.selectedTabSize,
@@ -668,6 +672,8 @@ export class Preferences extends React.Component<
             onShowRecentRepositoriesChanged={
               this.onShowRecentRepositoriesChanged
             }
+            branchSortOrder={this.state.branchSortOrder}
+            onBranchSortOrderChanged={this.onBranchSortOrderChanged}
           />
         )
         break
@@ -905,6 +911,10 @@ export class Preferences extends React.Component<
     this.setState({ showRecentRepositories })
   }
 
+  private onBranchSortOrderChanged = (branchSortOrder: BranchSortOrder) => {
+    this.setState({ branchSortOrder })
+  }
+
   private onUseCustomEditorChanged = (useCustomEditor: boolean) => {
     this.setState({ useCustomEditor })
   }
@@ -1051,6 +1061,10 @@ export class Preferences extends React.Component<
         this.state.showRecentRepositories !== this.props.showRecentRepositories
       ) {
         dispatcher.setShowRecentRepositories(this.state.showRecentRepositories)
+      }
+
+      if (this.state.branchSortOrder !== this.props.branchSortOrder) {
+        dispatcher.setBranchSortOrder(this.state.branchSortOrder)
       }
 
       if (this.state.hooksPreferencesDirty) {

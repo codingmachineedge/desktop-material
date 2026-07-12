@@ -30,6 +30,7 @@ import { generateBranchContextMenuItems } from '../branches/branch-list-item-con
 import { showContextualMenu } from '../../lib/menu-item'
 import { Emoji } from '../../lib/emoji'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
+import { BranchSortOrder } from '../../models/branch-sort-order'
 
 interface IBranchDropdownProps {
   readonly dispatcher: Dispatcher
@@ -84,6 +85,7 @@ interface IBranchDropdownProps {
   readonly enableFocusTrap: boolean
 
   readonly underlineLinks: boolean
+  readonly branchSortOrder: BranchSortOrder
 }
 
 /**
@@ -102,6 +104,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
       <BranchesContainer
         allBranches={branchesState.allBranches}
         recentBranches={branchesState.recentBranches}
+        branchSortOrder={this.props.branchSortOrder}
         currentBranch={currentBranch}
         defaultBranch={branchesState.defaultBranch}
         dispatcher={this.props.dispatcher}

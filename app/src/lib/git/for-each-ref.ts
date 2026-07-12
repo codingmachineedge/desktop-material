@@ -21,6 +21,7 @@ export async function getBranches(
     upstreamTrackingBranch: '%(upstream:track)',
     sha: '%(objectname)',
     symRef: '%(symref)',
+    authorDate: '%(authordate:iso8601)',
   })
 
   if (!prefixes || !prefixes.length) {
@@ -49,7 +50,13 @@ export async function getBranches(
       continue
     }
 
-    const tip: IBranchTip = { sha: ref.sha }
+    const authorDate = new Date(ref.authorDate)
+    const tip: IBranchTip = {
+      sha: ref.sha,
+      author: Number.isNaN(authorDate.getTime())
+        ? undefined
+        : { date: authorDate },
+    }
 
     const type = ref.fullName.startsWith('refs/heads')
       ? BranchType.Local

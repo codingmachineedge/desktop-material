@@ -68,6 +68,7 @@ import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
 import { Author, UnknownAuthor } from '../../models/author'
 import { Branch, IAheadBehind } from '../../models/branch'
 import { BranchesTab } from '../../models/branches-tab'
+import { BranchSortOrder } from '../../models/branch-sort-order'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
 import { CloningRepository } from '../../models/cloning-repository'
@@ -4754,6 +4755,10 @@ export class Dispatcher {
 
   public setPreferAbsoluteDates(value: boolean) {
     return this.appStore._setPreferAbsoluteDates(value)
+  }
+
+  public setBranchSortOrder(branchSortOrder: BranchSortOrder) {
+    this.appStore._setBranchSortOrder(branchSortOrder)
   }
 
   public testPruneBranches() {

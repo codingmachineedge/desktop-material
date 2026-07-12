@@ -1,4 +1,8 @@
 import { Branch } from '../../models/branch'
+import {
+  BranchSortOrder,
+  DefaultBranchSortOrder,
+} from '../../models/branch-sort-order'
 import { IFilterListGroup, IFilterListItem } from '../lib/filter-list'
 
 export type BranchGroupIdentifier = 'default' | 'recent' | 'other'
@@ -13,7 +17,8 @@ export function groupBranches(
   defaultBranch: Branch | null,
   currentBranch: Branch | null,
   allBranches: ReadonlyArray<Branch>,
-  recentBranches: ReadonlyArray<Branch>
+  recentBranches: ReadonlyArray<Branch>,
+  sortOrder = DefaultBranchSortOrder
 ): ReadonlyArray<IFilterListGroup<IBranchListItem>> {
   const groups = new Array<IFilterListGroup<IBranchListItem>>()
 
@@ -60,11 +65,25 @@ export function groupBranches(
       !b.isDesktopForkRemoteBranch
   )
 
-  const remainingItems = remainingBranches.map(b => ({
-    text: [b.name],
-    id: b.name,
-    branch: b,
-  }))
+  const remainingItems = [...remainingBranches]
+    .sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type - b.type
+      }
+
+      if (sortOrder === BranchSortOrder.Alphabetical) {
+        return a.name.localeCompare(b.name)
+      }
+
+      const aDate = a.tip.author?.date.getTime() ?? 0
+      const bDate = b.tip.author?.date.getTime() ?? 0
+      return bDate - aDate || a.name.localeCompare(b.name)
+    })
+    .map(b => ({
+      text: [b.name],
+      id: b.name,
+      branch: b,
+    }))
   groups.push({
     identifier: 'other',
     items: remainingItems,

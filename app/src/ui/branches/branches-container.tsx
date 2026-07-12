@@ -39,6 +39,7 @@ import {
 import { PullRequestQuickView } from '../pull-request-quick-view'
 import { Emoji } from '../../lib/emoji'
 import classNames from 'classnames'
+import { BranchSortOrder } from '../../models/branch-sort-order'
 
 interface IBranchesContainerProps {
   readonly dispatcher: Dispatcher
@@ -48,6 +49,7 @@ interface IBranchesContainerProps {
   readonly defaultBranch: Branch | null
   readonly currentBranch: Branch | null
   readonly recentBranches: ReadonlyArray<Branch>
+  readonly branchSortOrder: BranchSortOrder
   readonly pullRequests: ReadonlyArray<PullRequest>
   readonly onRenameBranch: (branchName: string) => void
   readonly onDeleteBranch: (branchName: string) => void
@@ -302,6 +304,7 @@ export class BranchesContainer extends React.Component<
             currentBranch={this.props.currentBranch}
             allBranches={this.props.allBranches}
             recentBranches={this.props.recentBranches}
+            branchSortOrder={this.props.branchSortOrder}
             onItemClick={this.onBranchItemClick}
             filterText={this.state.branchFilterText}
             onFilterTextChanged={this.onBranchFilterTextChanged}

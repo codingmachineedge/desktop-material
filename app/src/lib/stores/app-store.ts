@@ -35,6 +35,10 @@ import { AppMenu, IMenu } from '../../models/app-menu'
 import { Author } from '../../models/author'
 import { Branch, BranchType, IAheadBehind } from '../../models/branch'
 import { BranchesTab } from '../../models/branches-tab'
+import {
+  BranchSortOrder,
+  DefaultBranchSortOrder,
+} from '../../models/branch-sort-order'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import { CloningRepository } from '../../models/cloning-repository'
 import {
@@ -529,6 +533,7 @@ const shellKey = 'shell'
 
 const showRecentRepositoriesKey = 'show-recent-repositories'
 const repositoryIndicatorsEnabledKey = 'enable-repository-indicators'
+const branchSortOrderKey = 'branch-sort-order'
 
 // background fetching should occur hourly when Desktop is active, but this
 // lower interval ensures user interactions like switching repositories and
@@ -741,6 +746,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private showDiffCheckMarks: boolean = showDiffCheckMarksDefault
 
   private preferAbsoluteDates: boolean = false
+  private branchSortOrder = DefaultBranchSortOrder
 
   private cachedRepoRulesets = new Map<number, IAPIRepoRuleset>()
 
@@ -845,8 +851,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.repositoryIndicatorsEnabled =
       getBoolean(repositoryIndicatorsEnabledKey) ?? true
-    this.showRecentRepositories =
-      getBoolean(showRecentRepositoriesKey) ?? true
+    this.showRecentRepositories = getBoolean(showRecentRepositoriesKey) ?? true
 
     this.repositoryIndicatorUpdater = new RepositoryIndicatorUpdater(
       this.getRepositoriesForIndicatorRefresh,
@@ -1462,6 +1467,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       underlineLinks: this.underlineLinks,
       showDiffCheckMarks: this.showDiffCheckMarks,
       preferAbsoluteDates: this.preferAbsoluteDates,
+      branchSortOrder: this.branchSortOrder,
       updateState: updateStore.state,
       commitMessageGenerationDisclaimerLastSeen:
         this.commitMessageGenerationDisclaimerLastSeen,
@@ -2737,6 +2743,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
 
     this.preferAbsoluteDates = getPreferAbsoluteDates()
+    this.branchSortOrder =
+      getEnum(branchSortOrderKey, BranchSortOrder) ?? DefaultBranchSortOrder
 
     this.commitMessageGenerationDisclaimerLastSeen =
       getNumber(commitMessageGenerationDisclaimerLastSeenKey) ?? null
@@ -10970,6 +10978,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
       setPreferAbsoluteDates(value)
       this.emitUpdate()
     }
+  }
+
+  public _setBranchSortOrder(branchSortOrder: BranchSortOrder) {
+    if (branchSortOrder === this.branchSortOrder) {
+      return
+    }
+
+    this.branchSortOrder = branchSortOrder
+    localStorage.setItem(branchSortOrderKey, branchSortOrder)
+    this.emitUpdate()
   }
 
   public _updateFileListFilter(

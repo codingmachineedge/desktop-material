@@ -13,6 +13,7 @@ import { CommitIdentity } from '../models/commit-identity'
 import { IDiff, ImageDiffType } from '../models/diff'
 import { Repository, ILocalRepositoryState } from '../models/repository'
 import { Branch, IAheadBehind } from '../models/branch'
+import { BranchSortOrder } from '../models/branch-sort-order'
 import { Tip } from '../models/tip'
 import { Commit } from '../models/commit'
 import { CommittedFileChange, WorkingDirectoryStatus } from '../models/status'
@@ -410,6 +411,8 @@ export interface IAppState {
 
   /** Whether the user prefers absolute dates over relative time in lists */
   readonly preferAbsoluteDates: boolean
+
+  readonly branchSortOrder: BranchSortOrder
 
   /**
    * Cached repo rulesets. Used to prevent repeatedly querying the same

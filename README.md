@@ -47,6 +47,7 @@ These features are implemented and live on `main`.
 **Repository safety and cleanup**
 - A context-menu option can permanently discard changes without sending files to the trash, including untracked files, for large cleanup operations where the regular discard flow would be slow
 - Local-only branches use a clear publish indicator, including branches whose configured upstream was deleted
+- Branch lists can be sorted by last activity or alphabetically from **Settings → Appearance**
 - Merge commits use a distinct, subdued italic summary in History so integration points are easy to scan
 
 **Dynamic UI scaling**
