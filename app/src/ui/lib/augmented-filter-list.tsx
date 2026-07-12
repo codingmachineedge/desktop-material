@@ -254,7 +254,7 @@ interface IAugmentedSectionFilterListProps<T extends IFilterListItem> {
   // eslint-disable-next-line react/no-unused-prop-types
   readonly filterMode?: FilterMode
 
-  /** Controlled case sensitivity, paired with {@link filterMode}. */
+  /** Controlled case sensitivity, paired with `filterMode`. */
   // eslint-disable-next-line react/no-unused-prop-types
   readonly caseSensitive?: boolean
 
