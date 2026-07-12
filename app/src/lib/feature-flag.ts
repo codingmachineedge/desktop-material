@@ -113,7 +113,10 @@ export const enableAccessibleListToolTips = () => true
 
 export const enableHooksEnvironment = () => true
 
-export const enableHooksByDefault = enableBetaFeatures
+// was beta-gated upstream (enableBetaFeatures); promoted for the material fork.
+// Only changes the DEFAULT value of the git-hooks-env-enabled preference; the
+// stored opt-out (setHooksEnvEnabled(false)) still wins via getBoolean.
+export const enableHooksByDefault = () => true
 
 export const enableFormattingPreferences = () => true
 
