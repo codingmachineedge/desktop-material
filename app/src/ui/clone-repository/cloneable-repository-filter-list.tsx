@@ -176,6 +176,8 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
       <SectionFilterList<ICloneableRepositoryListItem>
         className={'clone-github-repo'}
         rowHeight={RowHeight}
+        filterListId="clone-repositories"
+        filterListLabel="Clone"
         selectedItem={selectedListItem}
         renderItem={this.renderItem}
         renderGroupHeader={this.renderGroupHeader}

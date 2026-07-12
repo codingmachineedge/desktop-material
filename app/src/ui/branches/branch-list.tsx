@@ -255,6 +255,8 @@ export class BranchList extends React.Component<
         ref={this.onBranchesFilterListRef}
         className="branches-list"
         rowHeight={RowHeight}
+        filterListId="branches"
+        filterListLabel="Branches"
         filterText={this.props.filterText}
         onFilterTextChanged={this.props.onFilterTextChanged}
         onFilterKeyDown={this.props.onFilterKeyDown}

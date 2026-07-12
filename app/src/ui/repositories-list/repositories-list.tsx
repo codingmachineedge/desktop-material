@@ -344,6 +344,8 @@ export class RepositoriesList extends React.Component<
         <SectionFilterList<IRepositoryListItem, RepositoryListGroup>
           rowHeight={RowHeight}
           selectedItem={selectedItem}
+          filterListId="repositories"
+          filterListLabel="Repositories"
           filterText={this.props.filterText}
           onFilterTextChanged={this.props.onFilterTextChanged}
           renderItem={this.renderItem}

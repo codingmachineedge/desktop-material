@@ -157,6 +157,8 @@ export class PullRequestList extends React.Component<
         <SectionFilterList<IPullRequestListItem>
           className="pull-request-list"
           rowHeight={RowHeight}
+          filterListId="pull-requests"
+          filterListLabel="Pull requests"
           groups={this.state.groupedItems}
           selectedItem={this.state.selectedItem}
           renderItem={this.renderPullRequest}
