@@ -3,6 +3,46 @@
     display: flex;
     flex: 1;
 
-    border-right: var(--base-border);
+    border-right: 1px solid var(--md-sys-color-outline-variant);
+  }
+
+  // === MD3 restyle (Commit 9 — style(history)) =============================
+  // "N changed files" rail header.
+  .file-list-header {
+    padding: 12px 14px 8px;
+    font-size: 12.5px;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.02em;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  // Committed file rows: name typography + status-tinted glyph. The row
+  // background/selection is owned by the shared list layer; here we only
+  // refine the row content (CSS-only, DOM untouched).
+  .file-list .file {
+    padding: 0 4px;
+
+    .path {
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+
+    .octicon.status {
+      &.status-new,
+      &.status-added,
+      &.status-untracked,
+      &.status-copied {
+        fill: var(--dm-green);
+      }
+
+      &.status-modified,
+      &.status-renamed {
+        fill: var(--dm-amber);
+      }
+
+      &.status-deleted {
+        fill: var(--md-sys-color-error);
+      }
+    }
   }
 }

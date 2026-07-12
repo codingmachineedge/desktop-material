@@ -196,3 +196,38 @@
     border-bottom: var(--base-border);
   }
 }
+
+// === MD3 restyle (Commit 9 — style(history)) ===============================
+// Legacy commit-summary path (superseded by #expandable-commit-summary in the
+// current render tree). Kept token-aligned so any fallback usage matches the
+// M3 palette rather than the retired --color-new / --color-deleted vars.
+.commit-summary {
+  &-title,
+  &-meta {
+    .lines-added {
+      color: var(--dm-green);
+    }
+
+    .lines-deleted {
+      color: var(--md-sys-color-error);
+    }
+  }
+
+  &-header {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+}
+
+#commit-summary {
+  img.avatar {
+    background: var(--md-sys-color-primary-container);
+    color: transparent;
+    font-size: 0;
+    object-fit: cover;
+  }
+
+  svg.avatar {
+    fill: var(--md-sys-color-on-primary-container);
+    background: var(--md-sys-color-primary-container);
+  }
+}

@@ -215,3 +215,114 @@
     }
   }
 }
+
+// === MD3 restyle (Commit 9 — style(history)) ===============================
+// Refine the commit rows to the M3-Expressive language: tonal avatars,
+// 13.5/500 summary + 11.5 byline, pill (radius-999) tag chip, and a
+// primary-container unpushed marker that bounces in. Structure is preserved
+// (CSS-only); DOM hooks (.commit / .info / .commit-indicators) are untouched.
+#commit-drag-element .commit,
+#commit-list .commit {
+  gap: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: none;
+  border-radius: 14px;
+  transition: border-radius 260ms var(--spring), background-color 200ms var(--emph);
+
+  .info {
+    gap: 2px;
+    margin-top: 0;
+
+    .summary {
+      font-size: 13.5px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: var(--md-sys-color-on-surface);
+
+      &.empty-summary {
+        color: var(--md-sys-color-on-surface-variant);
+      }
+    }
+
+    .description {
+      align-items: center;
+      gap: 8px;
+      margin-top: 1px;
+    }
+
+    .byline {
+      font-size: 11.5px;
+      color: var(--md-sys-color-on-surface-variant);
+      opacity: 0.85;
+    }
+  }
+
+  // The indicator cluster hosts the tag pill + unpushed marker; grow it so the
+  // 24px round marker isn't clipped by the legacy 16px line-height.
+  .commit-indicators {
+    height: auto;
+    align-items: center;
+    gap: var(--spacing-half);
+  }
+
+  // Radius-999 tonal tag chip (leading `sell` glyph from the prototype is
+  // omitted — the app renders Octicon SVGs, not the Material Symbols font, and
+  // the tag DOM carries no icon node to style).
+  .tag-indicator .tag-name {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-highest);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: none;
+  }
+
+  .tag-indicator .tag-indicator-more {
+    border-radius: 0 999px 999px 0;
+    background: var(--md-sys-color-surface-container-highest);
+  }
+
+  // Unpushed marker → primary-container circle w/ bounce entrance.
+  .unpushed-indicator {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin-left: var(--spacing-half);
+    border-radius: 999px;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    animation: dmBounce calc(480ms * var(--mdur)) var(--spring-fast) backwards;
+
+    .octicon {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+// Graceful MD3 avatar fallback: when the avatar image can't load the browser
+// otherwise shows a broken-image checkerboard. Back every history avatar with a
+// tonal primary-container fill and suppress the broken glyph / alt text so a
+// clean tonal disc shows through instead. (Avatar TSX is out of scope — this is
+// purely CSS.)
+#commit-drag-element,
+#commit-list {
+  img.avatar {
+    background: var(--md-sys-color-primary-container);
+    color: transparent;
+    font-size: 0;
+    object-fit: cover;
+  }
+
+  svg.avatar {
+    fill: var(--md-sys-color-on-primary-container);
+    background: var(--md-sys-color-primary-container);
+  }
+}

@@ -146,3 +146,53 @@
     }
   }
 }
+
+// === MD3 restyle (Commit 9 — style(history)) =================================
+// The History sidebar's compare/branch-filter box → 46px pill search field per
+// design-spec-shell §6.2 (surface-container-high fill, radius-999, 2px border
+// that lights to primary on focus). Tokens only; behaviour untouched.
+#compare-view {
+  .compare-form {
+    background: transparent;
+    border-bottom: none;
+    padding: 12px 14px 10px;
+
+    .fancy-text-box-component {
+      display: flex;
+      align-items: center;
+      height: 46px;
+      border-radius: 999px;
+      background: var(--md-sys-color-surface-container-high);
+      border: 2px solid transparent;
+      padding: 0 8px 0 16px;
+      transition: border-color 200ms var(--emph), background-color 200ms var(--emph);
+
+      &.focused {
+        border-color: var(--md-sys-color-primary);
+      }
+
+      &.disabled {
+        opacity: 0.6;
+      }
+
+      .fancy-octicon {
+        fill: var(--md-sys-color-on-surface-variant);
+        margin-right: 5px;
+      }
+
+      // Let the inner TextBox be a flush, transparent field inside the pill.
+      .text-box-component {
+        flex: 1;
+        border: none;
+        background: transparent;
+
+        input {
+          border: none;
+          background: transparent;
+          font-size: 13.5px;
+          padding: 0;
+        }
+      }
+    }
+  }
+}
