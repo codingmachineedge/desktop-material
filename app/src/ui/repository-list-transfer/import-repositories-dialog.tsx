@@ -87,9 +87,7 @@ export class ImportRepositoriesDialog extends React.Component<
 
       if (parsed === null) {
         this.setState({
-          error: new Error(
-            'That file is not a valid repository list export.'
-          ),
+          error: new Error('That file is not a valid repository list export.'),
           filePath: path,
           urls: [],
           checkedUrls: new Set<string>(),

@@ -56,19 +56,17 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
         )
       case 'cloning':
         return (
-          <Octicon
-            className="status cloning spin"
-            symbol={octicons.sync}
-          />
+          <Octicon className="status cloning spin" symbol={octicons.sync} />
         )
       default:
-        return (
-          <Octicon className="status pending" symbol={octicons.dotFill} />
-        )
+        return <Octicon className="status pending" symbol={octicons.dotFill} />
     }
   }
 
-  private renderItem(item: IBatchCloneItem, status: IBatchCloneItemStatus | undefined) {
+  private renderItem(
+    item: IBatchCloneItem,
+    status: IBatchCloneItemStatus | undefined
+  ) {
     const kind = status?.kind ?? 'pending'
     const progressValue =
       kind === 'cloning' ? status?.progress || undefined : undefined
@@ -133,18 +131,15 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
       : `Cloning ${state.items.length} repositories`
 
     return (
-      <Dialog
-        id="batch-clone-progress"
-        title={title}
-        onDismissed={this.onDone}
-      >
+      <Dialog id="batch-clone-progress" title={title} onDismissed={this.onDone}>
         <DialogContent>
           <div className="batch-clone-overall">
             <div className="summary">
               {summary.done} done
               {summary.failed > 0 ? `, ${summary.failed} failed` : ''}
-              {summary.skipped > 0 ? `, ${summary.skipped} skipped` : ''} of{' '}
-              {summary.total}
+              {summary.skipped > 0
+                ? `, ${summary.skipped} skipped`
+                : ''} of {summary.total}
             </div>
             <progress value={state.overallProgress || undefined} />
             <div className="percent">{overall}%</div>

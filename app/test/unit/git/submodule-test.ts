@@ -144,8 +144,7 @@ describe('git/submodule', () => {
     })
 
     it('ignores blank lines', () => {
-      const stdout =
-        '\n 5555555555555555555555555555555555555555 sub (v1)\n'
+      const stdout = '\n 5555555555555555555555555555555555555555 sub (v1)\n'
       const result = parseSubmoduleStatus(stdout)
       assert.equal(result.length, 1)
       assert.equal(result[0].sha, '5555555555555555555555555555555555555555')

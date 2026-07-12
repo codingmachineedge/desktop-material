@@ -80,7 +80,9 @@ export class Remote extends React.Component<IRemoteProps, IRemoteState> {
           placeholder="Remote URL"
           ariaLabel={`${remote.name} remote URL`}
           value={remote.url}
-          onValueChanged={url => this.props.onRemoteUrlChanged(remote.name, url)}
+          onValueChanged={url =>
+            this.props.onRemoteUrlChanged(remote.name, url)
+          }
         />
         <Button
           className="remote-remove"

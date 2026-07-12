@@ -633,7 +633,9 @@ export class CloneRepository extends React.Component<
       const repo = repositories?.find(r => r.clone_url === url) ?? null
       return {
         url,
-        ...(repo ? { name: repo.name, defaultBranch: repo.default_branch } : {}),
+        ...(repo
+          ? { name: repo.name, defaultBranch: repo.default_branch }
+          : {}),
       }
     })
 

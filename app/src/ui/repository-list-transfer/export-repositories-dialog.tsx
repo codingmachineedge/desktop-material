@@ -133,7 +133,10 @@ export class ExportRepositoriesDialog extends React.Component<
     const disabled = url === null
 
     return (
-      <li key={repository.id} className={`transfer-item ${disabled ? 'disabled' : ''}`}>
+      <li
+        key={repository.id}
+        className={`transfer-item ${disabled ? 'disabled' : ''}`}
+      >
         <Checkbox
           value={
             this.state.checkedIds.has(repository.id)

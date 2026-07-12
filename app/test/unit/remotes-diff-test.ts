@@ -3,7 +3,10 @@ import assert from 'node:assert'
 import { diffRemotes, IRemote } from '../../src/models/remote'
 
 const origin: IRemote = { name: 'origin', url: 'https://github.com/o/r.git' }
-const upstream: IRemote = { name: 'upstream', url: 'https://github.com/u/r.git' }
+const upstream: IRemote = {
+  name: 'upstream',
+  url: 'https://github.com/u/r.git',
+}
 
 describe('diffRemotes', () => {
   it('reports no changes when the lists are identical', () => {
@@ -18,7 +21,10 @@ describe('diffRemotes', () => {
   })
 
   it('detects an added remote', () => {
-    const { added, removed, changed } = diffRemotes([origin], [origin, upstream])
+    const { added, removed, changed } = diffRemotes(
+      [origin],
+      [origin, upstream]
+    )
 
     assert.deepStrictEqual(added, [upstream])
     assert.deepStrictEqual(removed, [])
@@ -26,7 +32,10 @@ describe('diffRemotes', () => {
   })
 
   it('detects a removed remote', () => {
-    const { added, removed, changed } = diffRemotes([origin, upstream], [origin])
+    const { added, removed, changed } = diffRemotes(
+      [origin, upstream],
+      [origin]
+    )
 
     assert.deepStrictEqual(added, [])
     assert.deepStrictEqual(removed, [upstream])
@@ -55,10 +64,7 @@ describe('diffRemotes', () => {
     const changedOrigin: IRemote = { name: 'origin', url: 'git@host:o/r.git' }
     const added: IRemote = { name: 'mirror', url: 'https://x/y.git' }
 
-    const diff = diffRemotes(
-      [origin, upstream],
-      [changedOrigin, added]
-    )
+    const diff = diffRemotes([origin, upstream], [changedOrigin, added])
 
     assert.deepStrictEqual(diff.added, [added])
     assert.deepStrictEqual(diff.removed, [upstream])

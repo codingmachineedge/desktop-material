@@ -40,7 +40,9 @@ export async function validateEmptyFolder(
       return null
     }
 
-    log.error('validateEmptyFolder: Path validation failed. Error: ' + error.message)
+    log.error(
+      'validateEmptyFolder: Path validation failed. Error: ' + error.message
+    )
     return new Error(
       'Unable to read path on disk. Please check the path and try again.'
     )

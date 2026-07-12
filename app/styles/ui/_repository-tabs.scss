@@ -632,8 +632,7 @@
       font-size: 13px;
       font-weight: var(--font-weight-semibold);
       cursor: pointer;
-      transition: background-color 200ms var(--emph), color 200ms var(--emph),
-        transform 200ms var(--spring-fast);
+      transition: background-color 200ms var(--emph), color 200ms var(--emph), transform 200ms var(--spring-fast);
 
       &:hover {
         background: var(--md-sys-color-surface-container-highest);

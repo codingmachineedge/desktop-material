@@ -121,9 +121,7 @@ describe('repo-list-file', () => {
 
     it('returns null for an unsupported version', () => {
       assert.equal(
-        parseRepoList(
-          JSON.stringify({ version: 2, repositories: [] })
-        ),
+        parseRepoList(JSON.stringify({ version: 2, repositories: [] })),
         null
       )
     })

@@ -265,9 +265,7 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     if (!this.state.tabs.some(t => t.id === id)) {
       return this.state.activeTabId
     }
-    const ids = new Set(
-      this.state.tabs.filter(t => t.id !== id).map(t => t.id)
-    )
+    const ids = new Set(this.state.tabs.filter(t => t.id !== id).map(t => t.id))
     return this.closeTabsByIds(ids, 'Close other tabs')
   }
 

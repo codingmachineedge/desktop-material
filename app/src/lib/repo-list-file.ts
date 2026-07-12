@@ -113,7 +113,9 @@ export function parseRepoList(raw: string): IRepoListFile | null {
 
   const exportedAtRaw = (parsed as { exportedAt?: unknown }).exportedAt
   const exportedAt =
-    typeof exportedAtRaw === 'string' ? exportedAtRaw : new Date(0).toISOString()
+    typeof exportedAtRaw === 'string'
+      ? exportedAtRaw
+      : new Date(0).toISOString()
 
   return {
     version: RepoListFileVersion,
