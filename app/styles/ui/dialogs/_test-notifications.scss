@@ -51,26 +51,27 @@
       text-align: center;
     }
 
+    // MD3 de-stock: review-status badges use tonal Material containers.
     &.pr-review-approved {
-      color: var(--pr-approved-icon-color);
-      background-color: var(--pr-approved-icon-background-color);
+      color: var(--dm-green);
+      background-color: var(--dm-green-container);
     }
     &.pr-review-changes-requested {
-      color: var(--pr-changes-requested-icon-color);
-      background-color: var(--pr-changes-requested-icon-background-color);
+      color: var(--md-sys-color-on-error-container);
+      background-color: var(--md-sys-color-error-container);
     }
     &.pr-review-commented {
-      color: var(--pr-commented-icon-color);
-      background-color: var(--pr-commented-icon-background-color);
+      color: var(--md-sys-color-on-surface-variant);
+      background-color: var(--md-sys-color-surface-container-highest);
     }
   }
 
   .pr-icon {
-    color: var(--pr-open-icon-color);
+    color: var(--dm-green);
   }
 
   .pr-draft-icon {
-    color: var(--pr-draft-icon-color);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .link-button-component {
