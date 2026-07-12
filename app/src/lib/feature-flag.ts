@@ -41,9 +41,8 @@ function enableBetaFeatures(): boolean {
 export const enableTestMenuItems = () =>
   enableDevelopmentFeatures() || __RELEASE_CHANNEL__ === 'test'
 
-export function enableReadmeOverwriteWarning(): boolean {
-  return enableBetaFeatures()
-}
+// was beta-gated upstream (enableBetaFeatures); promoted for the material fork
+export const enableReadmeOverwriteWarning = () => true
 
 /** Should the app detect Windows Subsystem for Linux as a valid shell? */
 export function enableWSLDetection(): boolean {
