@@ -165,6 +165,58 @@ describe('detectProfiles', () => {
       assert.equal(profile.ecosystem, 'dotnet')
       assert.equal(profile.run, undefined)
     })
+
+    it('uses --project for a single project so run is unambiguous', () => {
+      const probe = makeProbe({ files: ['App.csproj'] })
+      const [profile] = detectProfiles(probe)
+      assert.deepEqual(profile.run?.[0].args, ['run', '--project', 'App.csproj'])
+      assert.deepEqual(profile.build?.[0].args, ['build', 'App.csproj'])
+    })
+
+    it('returns one profile per project when several .csproj exist', () => {
+      const probe = makeProbe({ files: ['Api.csproj', 'Worker.csproj'] })
+      const dotnet = detectProfiles(probe).filter(p => p.ecosystem === 'dotnet')
+      assert.equal(dotnet.length, 2)
+      const ids = dotnet.map(p => p.id).sort()
+      assert.deepEqual(ids, ['dotnet:Api', 'dotnet:Worker'])
+      const api = dotnet.find(p => p.id === 'dotnet:Api')!
+      assert.equal(api.label, '.NET · Api')
+      assert.deepEqual(api.run?.[0].args, ['run', '--project', 'Api.csproj'])
+      // Each project targets only its own file, never a bare `dotnet run`.
+      for (const p of dotnet) {
+        assert.ok(p.run?.[0].args.includes('--project'))
+      }
+    })
+
+    it('returns one build-only profile per solution when several .sln exist', () => {
+      const probe = makeProbe({ files: ['One.sln', 'Two.sln'] })
+      const dotnet = detectProfiles(probe).filter(p => p.ecosystem === 'dotnet')
+      assert.equal(dotnet.length, 2)
+      assert.deepEqual(dotnet.map(p => p.id).sort(), [
+        'dotnet:One',
+        'dotnet:Two',
+      ])
+      for (const p of dotnet) {
+        assert.equal(p.run, undefined)
+        assert.ok(p.build?.[0].args.some(a => a.endsWith('.sln')))
+      }
+    })
+
+    it('surfaces a solution build plus a profile per nested project', () => {
+      const probe = makeProbe({
+        files: ['My.sln', 'src/Api/Api.csproj', 'src/Web/Web.csproj'],
+      })
+      const dotnet = detectProfiles(probe).filter(p => p.ecosystem === 'dotnet')
+      // One solution (root) + two nested project profiles.
+      assert.equal(dotnet.length, 3)
+      const solution = dotnet.find(p => p.cwd === '')!
+      assert.equal(solution.run, undefined)
+      const projects = dotnet.filter(p => p.cwd !== '')
+      assert.equal(projects.length, 2)
+      for (const p of projects) {
+        assert.ok(p.run !== undefined)
+      }
+    })
   })
 
   describe('python', () => {

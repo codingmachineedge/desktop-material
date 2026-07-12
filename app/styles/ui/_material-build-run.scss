@@ -131,6 +131,17 @@
   z-index: 30;
   animation: dmUp calc(420ms * var(--mdur, 1)) var(--spring) backwards;
 
+  // Minimized → collapse to just the slim header bar; drop the tall min-height
+  // and let the panel hug its header. The log region is not rendered.
+  &.is-minimized {
+    max-height: none;
+    min-height: 0;
+
+    .build-run-panel-header {
+      padding: 8px 12px;
+    }
+  }
+
   .build-run-panel-header {
     align-items: center;
     display: flex;

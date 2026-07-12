@@ -18,6 +18,14 @@ export interface IBuildRunPreferences {
   readonly autoIgnoreBuildOutputs: boolean
 
   /**
+   * Automatically install a missing toolchain (via winget / corepack) when the
+   * pre-build toolchain probe fails, instead of only printing a hint. Optional
+   * for back-compat with preferences persisted before this field existed;
+   * treat an absent value as enabled (see {@link defaultBuildRunPreferences}).
+   */
+  readonly autoInstallMissingTools?: boolean
+
+  /**
    * Per-profile command-line overrides. A blank / absent value for a stage
    * means "use the detected command". Stored as raw command-line strings; the
    * dispatcher tokenises them into an argv array (never a shell string).
@@ -36,4 +44,5 @@ export const defaultBuildRunPreferences: IBuildRunPreferences = {
   elevated: false,
   autoRunAfterBuild: true,
   autoIgnoreBuildOutputs: true,
+  autoInstallMissingTools: true,
 }

@@ -11,6 +11,8 @@ import {
   ICommand,
 } from '../../lib/build-run/types'
 import { planRemediation } from '../../lib/build-run/auto-fix'
+import { planToolchainInstall } from '../../lib/build-run/toolchain-install'
+import { resolveRunEnv } from '../../lib/build-run/resolve-user-path'
 import { assertNever } from '../../lib/fatal-error'
 import { killTree } from './kill-tree'
 import { IElevatedRun, startElevatedRun } from './elevated-runner'
@@ -54,6 +56,12 @@ interface IExecResult {
 interface IActiveRun {
   readonly plan: IBuildRunPlan
   readonly sender: WebContents
+  /**
+   * The live environment child processes run in. Seeded from the plan, but
+   * mutable: after an auto-install the PATH is re-resolved from the registry so
+   * the freshly installed toolchain is visible to the re-check and the stages.
+   */
+  env: Record<string, string>
   seq: number
   cancelled: boolean
   child: ChildProcessWithoutNullStreams | null
@@ -130,6 +138,7 @@ export class BuildRunner {
     const run: IActiveRun = {
       plan,
       sender,
+      env: { ...plan.env },
       seq: 0,
       cancelled: false,
       child: null,
@@ -258,19 +267,131 @@ export class BuildRunner {
     }
   }
 
-  /** Run the cheap toolchain probe; false → missing toolchain, hint emitted. */
+  /**
+   * Ensure the toolchain is available before any stage runs.
+   *
+   * Runs the cheap probe; on failure, if the plan opted into auto-install, it
+   * installs the missing tool (winget behind a single UAC prompt, or corepack),
+   * refreshes PATH from the registry, and re-checks exactly once. Returns false
+   * only when the toolchain is still missing after that, having emitted the
+   * profile's hint.
+   */
   private async runToolchain(run: IActiveRun): Promise<boolean> {
+    if (await this.probeToolchain(run)) {
+      return true
+    }
+
+    if (run.plan.autoInstall) {
+      const installed = await this.autoInstallToolchain(run)
+      if (run.cancelled) {
+        throw new CancelledError()
+      }
+      if (installed) {
+        // Re-resolve PATH from the registry so a just-installed tool is found.
+        run.env = resolveRunEnv(run.env)
+        this.emitLog(
+          run,
+          'toolchain',
+          'meta',
+          'Refreshed PATH — re-checking the toolchain…'
+        )
+        if (await this.probeToolchain(run)) {
+          return true
+        }
+      }
+    }
+
+    this.emitLog(run, 'toolchain', 'meta', run.plan.toolchainCheck.missingHint)
+    return false
+  }
+
+  /** Run the toolchain probe once; true when the tool ran successfully. */
+  private async probeToolchain(run: IActiveRun): Promise<boolean> {
     const check = run.plan.toolchainCheck
     this.emitLog(run, 'toolchain', 'command', check.cmd.label)
     const res = await this.exec(run, 'toolchain', check.cmd)
     if (run.cancelled) {
       throw new CancelledError()
     }
-    if (res.spawnError || res.code !== 0) {
-      this.emitLog(run, 'toolchain', 'meta', check.missingHint)
+    return !res.spawnError && res.code === 0
+  }
+
+  /**
+   * Install the missing toolchain from the pure {@link planToolchainInstall}
+   * mapping. Elevated steps (winget) are batched into a single UAC prompt via
+   * the elevated runner; non-elevated steps (corepack) run inline. Returns true
+   * only when every step succeeded.
+   */
+  private async autoInstallToolchain(run: IActiveRun): Promise<boolean> {
+    const installPlan = planToolchainInstall(
+      run.plan.ecosystem,
+      run.plan.toolchainCheck.cmd.exe,
+      process.platform
+    )
+    if (installPlan === null || installPlan.steps.length === 0) {
       return false
     }
+
+    const elevatedSteps = installPlan.steps.filter(s => s.needsElevation)
+    const localSteps = installPlan.steps.filter(s => !s.needsElevation)
+
+    // Elevated batch first (a just-installed SDK enables the local steps).
+    if (elevatedSteps.length > 0) {
+      for (const step of elevatedSteps) {
+        this.emitLog(run, 'toolchain', 'meta', `Installing ${step.toolLabel}…`)
+      }
+      const ok = await this.runElevatedInstall(
+        run,
+        elevatedSteps.map(s => s.command)
+      )
+      if (!ok || run.cancelled) {
+        return false
+      }
+    }
+
+    for (const step of localSteps) {
+      this.emitLog(run, 'toolchain', 'meta', `Installing ${step.toolLabel}…`)
+      this.emitLog(run, 'toolchain', 'command', step.command.label)
+      const res = await this.exec(run, 'toolchain', step.command)
+      if (run.cancelled || res.spawnError || res.code !== 0) {
+        return false
+      }
+    }
+
     return true
+  }
+
+  /**
+   * Run install commands elevated behind a single UAC prompt, reusing the
+   * elevated runner's temp-dir log tail. Resolves true on a clean (code 0,
+   * non-cancelled) completion.
+   */
+  private runElevatedInstall(
+    run: IActiveRun,
+    commands: ReadonlyArray<ICommand>
+  ): Promise<boolean> {
+    const installPlan: IBuildRunPlan = {
+      ...run.plan,
+      elevated: true,
+      env: run.env,
+      stages: [{ kind: 'install', commands }],
+    }
+    return new Promise<boolean>(resolve => {
+      const elevated = startElevatedRun(installPlan, (_stage, stream, text) =>
+        this.emitLog(run, 'toolchain', stream, text)
+      )
+      run.elevated = elevated
+      elevated.whenDone.then(
+        result => {
+          run.elevated = null
+          resolve(!result.cancelled && result.code === 0)
+        },
+        () => {
+          run.elevated = null
+          resolve(false)
+        }
+      )
+    })
   }
 
   /**
@@ -338,14 +459,14 @@ export class BuildRunner {
     command: ICommand,
     onSpawn?: (pid: number | undefined) => void
   ): Promise<IExecResult> {
-    const exe = await resolveExecutable(command.exe, run.plan.env)
+    const exe = await resolveExecutable(command.exe, run.env)
 
     return new Promise<IExecResult>(resolve => {
       let child: ChildProcessWithoutNullStreams
       try {
         child = spawn(exe, [...command.args], {
           cwd: run.plan.cwd,
-          env: run.plan.env,
+          env: run.env,
           windowsHide: true,
           shell: false,
         })

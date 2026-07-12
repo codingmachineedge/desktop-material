@@ -137,6 +137,14 @@ export class BuildRunPanel extends React.Component<
     this.props.dispatcher.setBuildRunPanelOpen(this.props.repository, false)
   }
 
+  private onMinimize = () => {
+    this.props.dispatcher.setBuildRunPanelMinimized(this.props.repository, true)
+  }
+
+  private onRestore = () => {
+    this.props.dispatcher.setBuildRunPanelMinimized(this.props.repository, false)
+  }
+
   private onStop = () => {
     this.props.dispatcher.cancelBuildRun(this.props.repository).catch(() => {})
   }
@@ -173,14 +181,43 @@ export class BuildRunPanel extends React.Component<
     )
     const chip = phaseChip(view.phase)
     const isActive = view.activeRunId !== null
+    const title = selected?.label ?? 'Build & run'
+
+    // Minimized: collapse to a slim bar (title + status + restore + close).
+    if (view.panelMinimized) {
+      return (
+        <div className="build-run-panel is-minimized">
+          <div className="build-run-panel-header">
+            <Octicon className="header-icon" symbol={octicons.terminal} />
+            <span className="header-title">{title}</span>
+            <span className={classNames('status-chip', chip.className)}>
+              {chip.label}
+            </span>
+            <div className="header-spacer" />
+            <Button
+              className="header-action"
+              onClick={this.onRestore}
+              ariaLabel="Restore panel"
+            >
+              <Octicon symbol={octicons.chevronUp} />
+            </Button>
+            <Button
+              className="header-action"
+              onClick={this.onClose}
+              ariaLabel="Close panel"
+            >
+              <Octicon symbol={octicons.x} />
+            </Button>
+          </div>
+        </div>
+      )
+    }
 
     return (
       <div className="build-run-panel">
         <div className="build-run-panel-header">
           <Octicon className="header-icon" symbol={octicons.terminal} />
-          <span className="header-title">
-            {selected?.label ?? 'Build & run'}
-          </span>
+          <span className="header-title">{title}</span>
           <span className={classNames('status-chip', chip.className)}>
             {chip.label}
           </span>
@@ -208,6 +245,13 @@ export class BuildRunPanel extends React.Component<
             ariaLabel="Clear output"
           >
             <Octicon symbol={octicons.trash} />
+          </Button>
+          <Button
+            className="header-action"
+            onClick={this.onMinimize}
+            ariaLabel="Minimize panel"
+          >
+            <Octicon symbol={octicons.dash} />
           </Button>
           <Button
             className="header-action"

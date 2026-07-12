@@ -1,5 +1,6 @@
 export * from './types'
 export * from './detect'
 export * from './auto-fix'
+export * from './toolchain-install'
 export * from './gitignore-integration'
 export * from './resolve-user-path'

@@ -42,6 +42,8 @@ export interface IRepositoryBuildRunState {
   readonly exitCode: number | null
   readonly runPid: number | null
   readonly panelOpen: boolean
+  /** Collapsed to the slim header bar (still open, output hidden). */
+  readonly panelMinimized: boolean
   /** True once detection has completed at least once for this repository. */
   readonly detected: boolean
 }
@@ -58,6 +60,7 @@ const emptyState: IRepositoryBuildRunState = {
   exitCode: null,
   runPid: null,
   panelOpen: false,
+  panelMinimized: false,
   detected: false,
 }
 
@@ -146,6 +149,8 @@ export class BuildRunStore extends TypedBaseStore<number | null> {
       runPid: null,
       logLines: [],
       panelOpen: true,
+      // A fresh run always restores the panel so its output is visible.
+      panelMinimized: false,
     })
   }
 
@@ -165,7 +170,17 @@ export class BuildRunStore extends TypedBaseStore<number | null> {
 
   /** Open or close the log panel for a repository. */
   public setPanelOpen(repositoryId: number, panelOpen: boolean): void {
-    this.mutate(repositoryId, { panelOpen })
+    const current = this.getStateForRepository(repositoryId)
+    // Re-opening a closed panel should never leave it stuck minimized.
+    this.mutate(repositoryId, {
+      panelOpen,
+      panelMinimized: panelOpen ? false : current.panelMinimized,
+    })
+  }
+
+  /** Collapse the log panel to its slim header bar, or restore it. */
+  public setPanelMinimized(repositoryId: number, panelMinimized: boolean): void {
+    this.mutate(repositoryId, { panelMinimized })
   }
 
   /** Clear the log buffer for a repository. */

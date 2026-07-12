@@ -2091,6 +2091,11 @@ export class Dispatcher {
     this.buildRunStore.setPanelOpen(repository.id, open)
   }
 
+  /** Collapse the Build & Run log panel to its slim bar, or restore it. */
+  public setBuildRunPanelMinimized(repository: Repository, minimized: boolean) {
+    this.buildRunStore.setPanelMinimized(repository.id, minimized)
+  }
+
   /** Clear the Build & Run log buffer for a repository. */
   public clearBuildRunLog(repository: Repository) {
     this.buildRunStore.clearLog(repository.id)
@@ -2266,6 +2271,7 @@ export class Dispatcher {
       cwd,
       ecosystem: profile.ecosystem,
       elevated: prefs.elevated || profile.needsElevation,
+      autoInstall: prefs.autoInstallMissingTools ?? true,
       stages,
       env: resolveRunEnv(process.env),
       toolchainCheck: profile.toolchainCheck,

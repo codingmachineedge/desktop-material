@@ -204,6 +204,15 @@ export class BuildRunSettings extends React.Component<
     })
   }
 
+  private onAutoInstallMissingToolsChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onPreferencesChanged({
+      ...this.props.preferences,
+      autoInstallMissingTools: event.currentTarget.checked,
+    })
+  }
+
   private renderProfileLabel(profile: IBuildProfile): JSX.Element {
     const location = profile.cwd.length === 0 ? 'repository root' : profile.cwd
     const reasons =
@@ -351,6 +360,22 @@ export class BuildRunSettings extends React.Component<
       </span>
     )
 
+    const autoInstallLabel = (
+      <span className="build-run-toggle-label">
+        {__DARWIN__
+          ? 'Auto-Install Missing Tools'
+          : 'Auto-install missing tools'}
+        <ToggledtippedContent
+          className="build-run-toggle-tip"
+          ariaLabel="About auto-installing tools"
+          ariaLiveMessage="When a required toolchain is missing, install it automatically with winget or Corepack, refresh PATH, and continue the build. May prompt for administrator access."
+          tooltip="When a required toolchain (Node, Python, Go, Rust, .NET…) is missing, install it automatically with winget or Corepack behind a single UAC prompt, refresh PATH, then continue the build."
+        >
+          <Octicon symbol={octicons.info} />
+        </ToggledtippedContent>
+      </span>
+    )
+
     return (
       <section className="build-run-section">
         <h3 className="build-run-section-title">
@@ -358,6 +383,15 @@ export class BuildRunSettings extends React.Component<
           Behaviour
         </h3>
         <div className="build-run-toggles">
+          <Checkbox
+            label={autoInstallLabel}
+            value={
+              (prefs.autoInstallMissingTools ?? true)
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onAutoInstallMissingToolsChanged}
+          />
           <Checkbox
             label={elevatedLabel}
             value={prefs.elevated ? CheckboxValue.On : CheckboxValue.Off}

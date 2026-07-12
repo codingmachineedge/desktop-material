@@ -98,16 +98,33 @@ function scopeProbe(probe: IRepoFileProbe, dir: string): IScopedProbe {
   }
 }
 
-function hasGlob(probe: IScopedProbe, suffix: string): boolean {
-  return probe.sampleFiles.some(
+/** Top-level files in the scoped directory whose name ends with `suffix`. */
+function globFiles(probe: IScopedProbe, suffix: string): ReadonlyArray<string> {
+  return probe.sampleFiles.filter(
     f => f.endsWith(suffix) && !f.slice(0, -suffix.length).includes('/')
   )
 }
 
-/** A detector's output before the wrapper assigns id / cwd / nested penalty. */
-type DetectionResult = Omit<IBuildProfile, 'id' | 'cwd'>
+/** The basename of a file with its extension stripped (e.g. `App.csproj`→`App`). */
+function projectName(file: string): string {
+  const slash = file.lastIndexOf('/')
+  const base = slash === -1 ? file : file.slice(slash + 1)
+  const dot = base.lastIndexOf('.')
+  return dot === -1 ? base : base.slice(0, dot)
+}
 
-type Detector = (probe: IScopedProbe) => DetectionResult | null
+/**
+ * A detector's output before the wrapper assigns id / cwd / nested penalty.
+ * An optional `subId` disambiguates multiple profiles a single detector may
+ * emit for the same directory (e.g. one per .NET project).
+ */
+type DetectionResult = Omit<IBuildProfile, 'id' | 'cwd'> & {
+  readonly subId?: string
+}
+
+type Detector = (
+  probe: IScopedProbe
+) => DetectionResult | ReadonlyArray<DetectionResult> | null
 
 // ── Node ───────────────────────────────────────────────────────────────────
 
@@ -312,43 +329,66 @@ const detectGo: Detector = probe => {
 
 // ── .NET ─────────────────────────────────────────────────────────────────────
 
-const detectDotnet: Detector = probe => {
-  const hasSln = hasGlob(probe, '.sln')
-  const hasCsproj = hasGlob(probe, '.csproj')
-  if (!hasSln && !hasCsproj) {
-    return null
-  }
-  const reasons: string[] = []
-  let score = 10
-  if (hasSln) {
-    reasons.push('solution file')
-    score += 3
-  }
-  if (hasCsproj) {
-    reasons.push('project file')
-  }
-  // `dotnet run` only applies to a runnable project, not a bare solution.
-  const run: ICommand[] | undefined = hasCsproj
-    ? [cmd('dotnet', ['run'])]
-    : undefined
+const dotnetToolchainCheck: IToolchainCheck = {
+  cmd: cmd('dotnet', ['--version']),
+  missingHint:
+    'dotnet was not found on your PATH. Install the .NET SDK from https://dotnet.microsoft.com/download.',
+}
+
+/** A single .NET project (.csproj) or solution (.sln) as a build result. */
+function dotnetResult(
+  file: string,
+  kind: 'project' | 'solution',
+  multiple: boolean,
+  hasSln: boolean
+): DetectionResult {
+  const name = projectName(file)
+  const label = multiple ? `.NET · ${name}` : '.NET'
+  // A project is runnable; a bare solution builds but has no single entrypoint.
+  const run: ICommand[] | undefined =
+    kind === 'project'
+      ? [cmd('dotnet', ['run', '--project', file], `dotnet run (${name})`)]
+      : undefined
+  const reasons =
+    kind === 'project'
+      ? [`project ${file}`, ...(hasSln ? ['solution file'] : [])]
+      : [`solution ${file}`]
   return {
     ecosystem: 'dotnet',
-    label: '.NET',
+    subId: multiple ? name : undefined,
+    label,
     toolIcon: 'container',
-    install: [cmd('dotnet', ['restore'])],
-    build: [cmd('dotnet', ['build'])],
+    install: [cmd('dotnet', ['restore', file], `dotnet restore (${name})`)],
+    build: [cmd('dotnet', ['build', file], `dotnet build (${name})`)],
     run,
-    toolchainCheck: {
-      cmd: cmd('dotnet', ['--version']),
-      missingHint:
-        'dotnet was not found on your PATH. Install the .NET SDK from https://dotnet.microsoft.com/download.',
-    },
+    toolchainCheck: dotnetToolchainCheck,
     needsElevation: false,
     gitignoreTemplateId: 'visualstudio',
     extraIgnores: ['bin/', 'obj/'],
-    score,
+    // A solution file is a stronger "this is the thing to build" signal.
+    score: 10 + (kind === 'solution' || hasSln ? 3 : 0),
     reasons,
   }
+}
+
+const detectDotnet: Detector = probe => {
+  const csprojs = globFiles(probe, '.csproj')
+  const slns = globFiles(probe, '.sln')
+  if (csprojs.length === 0 && slns.length === 0) {
+    return null
+  }
+
+  // Prefer runnable projects: when any .csproj is present, emit one profile per
+  // project so the user picks which to run instead of the detector guessing.
+  // With only solution files, emit one build-only profile per solution.
+  if (csprojs.length > 0) {
+    const multiple = csprojs.length > 1
+    const hasSln = slns.length > 0
+    return csprojs.map(f => dotnetResult(f, 'project', multiple, hasSln))
+  }
+
+  const multiple = slns.length > 1
+  return slns.map(f => dotnetResult(f, 'solution', multiple, true))
 }
 
 // ── Python ───────────────────────────────────────────────────────────────────
@@ -599,8 +639,13 @@ function collectCandidateDirs(probe: IRepoFileProbe): ReadonlyArray<string> {
   return [...dirs]
 }
 
-function makeId(ecosystem: BuildRunEcosystem, dir: string): string {
-  return dir === '' ? ecosystem : `${ecosystem}:${dir}`
+function makeId(
+  ecosystem: BuildRunEcosystem,
+  dir: string,
+  subId?: string
+): string {
+  const base = dir === '' ? ecosystem : `${ecosystem}:${dir}`
+  return subId ? `${base}:${subId}` : base
 }
 
 /**
@@ -619,8 +664,12 @@ export function detectProfiles(
     const dirResults: DetectionResult[] = []
     for (const detector of DETECTORS) {
       const result = detector(scoped)
-      if (result !== null) {
-        dirResults.push(result)
+      if (result === null) {
+        continue
+      }
+      const results = Array.isArray(result) ? result : [result]
+      for (const r of results) {
+        dirResults.push(r)
       }
     }
 
@@ -634,9 +683,10 @@ export function detectProfiles(
       if (score <= 0) {
         continue
       }
+      const { subId, ...rest } = result
       profiles.push({
-        ...result,
-        id: makeId(result.ecosystem, dir),
+        ...rest,
+        id: makeId(result.ecosystem, dir, subId),
         cwd: dir,
         score,
         reasons: nested
