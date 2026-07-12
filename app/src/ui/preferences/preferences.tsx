@@ -79,6 +79,7 @@ import {
 } from '../../models/formatting-preferences'
 import { enableFormattingPreferences } from '../../lib/feature-flag'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
+import { AgentAccess } from './agent-access'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -413,6 +414,10 @@ export class Preferences extends React.Component<
                 <Octicon className="icon" symbol={octicons.accessibility} />
                 Accessibility
               </span>
+              <span id={this.getTabId(PreferencesTab.AgentAccess)}>
+                <Octicon className="icon" symbol={octicons.server} />
+                Agent access
+              </span>
             </TabBar>
             <div className="preferences-version">Desktop Material 0.1.0</div>
           </div>
@@ -465,6 +470,9 @@ export class Preferences extends React.Component<
         break
       case PreferencesTab.Accessibility:
         suffix = 'accessibility'
+        break
+      case PreferencesTab.AgentAccess:
+        suffix = 'agent-access'
         break
       default:
         return assertNever(tab, `Unknown tab type: ${tab}`)
@@ -751,6 +759,9 @@ export class Preferences extends React.Component<
             onUnderlineLinksChanged={this.onUnderlineLinksChanged}
           />
         )
+        break
+      case PreferencesTab.AgentAccess:
+        View = <AgentAccess />
         break
       default:
         return assertNever(index, `Unknown tab index: ${index}`)

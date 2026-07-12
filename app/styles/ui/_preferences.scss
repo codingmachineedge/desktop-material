@@ -66,7 +66,7 @@
         // Staggered entrance for the rail items.
         animation: dmLeft calc(320ms * var(--mdur, 1)) var(--spring) both;
 
-        @for $i from 1 through 9 {
+        @for $i from 1 through 10 {
           &:nth-child(#{$i}) {
             animation-delay: #{60 + ($i - 1) * 40}ms;
           }
