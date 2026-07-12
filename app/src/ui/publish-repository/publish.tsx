@@ -6,6 +6,7 @@ import {
   isDotComAccount,
   isEnterpriseAccount,
 } from '../../models/account'
+import { resolveSelectedAccount } from '../../lib/resolve-selected-account'
 import { Repository } from '../../models/repository'
 import { Dialog, DialogFooter, DialogContent, DialogError } from '../dialog'
 import { TabBar } from '../tab-bar'
@@ -261,13 +262,9 @@ export class Publish extends React.Component<IPublishProps, IPublishState> {
     const tabState = this.getTabState(tab)
     const tabAccounts = this.getAccountsForTab(tab, this.props.accounts)
     const selectedAccount =
-      (tabState.kind === 'enterprise'
-        ? tabAccounts.find(
-            a => a.endpoint === tabState.selectedAccount?.endpoint
-          )
-        : undefined) ?? tabAccounts.at(0)
+      tabState.kind === 'enterprise' ? tabState.selectedAccount : null
 
-    return selectedAccount ?? null
+    return resolveSelectedAccount(tabAccounts, selectedAccount)
   }
 
   private renderSignInTab(tab: PublishTab) {
