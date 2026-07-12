@@ -37,6 +37,13 @@
   --md-sys-color-inverse-on-surface: #eff1f7;
   --md-sys-color-scrim: #000000;
 
+  // Tooltips read as MD3 inverse-surface pills. These upstream vars were never
+  // remapped, so every hover tooltip resolved to a raw stock gray. The inverse
+  // roles are already theme-aware, so mapping here covers light + dark.
+  --tooltip-background-color: var(--md-sys-color-inverse-surface);
+  --tooltip-color: var(--md-sys-color-inverse-on-surface);
+  --tooltip-shadow-color: color-mix(in srgb, var(--md-sys-color-scrim) 22%, transparent);
+
   // App-specific accent + diff tokens (light).
   --dm-green: #1b7f37;
   --dm-green-container: #d2f2d8;
