@@ -2512,7 +2512,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       log.info(`Automatic commit and push skipped: ${guard.reason}`)
       return
     }
-    await this._oneClickCommitAndPush(repository)
+    await this.performScheduledCommitPush(repository)
   }
 
   private async runScheduledPull(repository: Repository): Promise<void> {
@@ -2529,13 +2529,110 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return
     }
 
-    await this._pull(repository)
+    await this.performScheduledPull(repository)
     this.postNotification({
       kind: 'auto-pull',
       title: 'Automatic pull completed',
       body: `Updated ${repository.name}.`,
       repositoryId: repository.id,
       action: { kind: 'open-repository', repositoryId: repository.id },
+    })
+  }
+
+  private async performScheduledCommitPush(
+    repository: Repository
+  ): Promise<void> {
+    const initial = this.repositoryStateCache.get(repository)
+    const files = initial.changesState.workingDirectory.files
+    let context = buildFallbackCommitMessage(files, new Date())
+
+    try {
+      this.setOneClickCommitPushPhase(repository, 'generating')
+      context =
+        (await this.generateAutomationCommitMessage(repository, files)) ??
+        context
+      await this._changeIncludeAllFiles(repository, true)
+      this.setOneClickCommitPushPhase(repository, 'committing')
+
+      const state = this.repositoryStateCache.get(repository)
+      const message = await formatCommitMessage(repository, context)
+      const committed = await this.withIsCommitting(repository, async () => {
+        await createCommit(repository, message, files, {
+          noVerify: state.skipCommitHooks,
+          signOff: state.signOffCommits,
+          onHookFailure: async () => 'abort',
+        })
+        return true
+      })
+      if (!committed) {
+        throw new Error('Another commit started before automation could run.')
+      }
+      await this._refreshRepository(repository)
+
+      this.setOneClickCommitPushPhase(repository, 'pushing')
+      await this.performScheduledPush(repository)
+      this.postNotification({
+        kind: 'auto-commit',
+        title: 'Automatic commit and push completed',
+        body: context.summary,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+    } finally {
+      this.setOneClickCommitPushPhase(repository, null)
+    }
+  }
+
+  private async performScheduledPush(repository: Repository): Promise<void> {
+    const state = this.repositoryStateCache.get(repository)
+    const remote = state.remote
+    const tip = state.branchesState.tip
+    if (remote === null || tip.kind !== TipState.Valid) {
+      throw new Error('The current branch has no push remote.')
+    }
+    if (state.isPushPullFetchInProgress) {
+      throw new Error('Another network operation is already in progress.')
+    }
+    const remoteName = tip.branch.upstreamRemoteName ?? remote.name
+    const safeRemote: IRemote = { name: remoteName, url: remote.url }
+    const gitStore = this.gitStoreCache.get(repository)
+
+    await this.withPushPullFetch(repository, async () => {
+      await pushRepo(
+        repository,
+        safeRemote,
+        tip.branch.name,
+        tip.branch.upstreamWithoutRemote,
+        gitStore.tagsToPush,
+        { onHookFailure: async () => 'abort' }
+      )
+      gitStore.clearTagsToPush()
+      await this._refreshRepository(repository)
+    })
+  }
+
+  private async performScheduledPull(repository: Repository): Promise<void> {
+    const state = this.repositoryStateCache.get(repository)
+    const remote = state.remote
+    if (remote === null) {
+      throw new Error('The current branch has no pull remote.')
+    }
+    if (state.isPushPullFetchInProgress) {
+      throw new Error('Another network operation is already in progress.')
+    }
+
+    await this.withPushPullFetch(repository, async () => {
+      // This path deliberately bypasses performFailableOperation: scheduler
+      // failures are logged and posted to the notification centre, never
+      // promoted to an interrupting error dialog.
+      await pullRepo(repository, remote)
+      await updateRemoteHEAD(repository, remote, false).catch(error =>
+        log.error(
+          'Failed updating remote HEAD after automatic pull',
+          error instanceof Error ? error : new Error(String(error))
+        )
+      )
+      await this._refreshRepository(repository)
     })
   }
 
