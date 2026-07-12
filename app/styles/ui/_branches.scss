@@ -355,6 +355,24 @@
       margin-left: 6px;
     }
   }
+
+  // The persistent "Choose a branch to merge into <branch>" bar (.merge-button-row)
+  // is a full-width footer at the bottom of the sheet. When it is present, the
+  // bottom-right FAB collides with it, so lift the FAB clear above the bar and
+  // give the branch list matching bottom padding. The bar's height is the merge
+  // button (--button-height) + var(--spacing) padding top/bottom + its 1px top
+  // border.
+  &:has(.merge-button-row) {
+    --dm-merge-bar-height: calc(var(--button-height) + var(--spacing) * 2 + 1px);
+
+    .new-branch-button {
+      bottom: calc(var(--dm-merge-bar-height) + 18px);
+    }
+
+    .branches-list .filter-list-container {
+      padding-bottom: calc(84px + var(--dm-merge-bar-height));
+    }
+  }
 }
 
 .no-pull-requests {
