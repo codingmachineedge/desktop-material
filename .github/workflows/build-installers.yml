@@ -48,6 +48,22 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           arch: x64
+      - name: Stamp monotonic build version
+        id: version
+        shell: bash
+        # Squirrel only offers an update when the feed's newest package version
+        # is strictly greater than the installed one. The committed app version
+        # is constant across pushes, so append the ever-increasing run number as
+        # a numeric semver-2 pre-release identifier (e.g. 3.6.3-beta3 ->
+        # 3.6.3-beta3.<run_number>). Numeric identifiers compare numerically in
+        # both the JS `semver` lib and Squirrel/NuGet, so each release is newer
+        # than the last. No leading zeros (invalid semver-2 numeric identifier).
+        run: |
+          base=$(node -p "require('./app/package.json').version")
+          version="${base}.${{ github.run_number }}"
+          node -e "const f='./app/package.json';const p=require(f);p.version='${version}';require('fs').writeFileSync(f, JSON.stringify(p, null, 2) + '\n')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Fork build version: ${version}"
       - name: Build production app
         run: yarn build:prod
         env:
@@ -75,16 +91,42 @@ jobs:
             "dist/GitHubDesktopSetup-x64.msi"; do
             [ -e "$f" ] && cp "$f" installers/
           done
+          # Publish the Squirrel update feed so the app can auto-update from this
+          # repo's releases (feed base = releases/latest/download/, wired up by
+          # getUpdatesURL in script/dist-info.ts). The RELEASES manifest
+          # references each nupkg by the name Squirrel generated (without the
+          # -x64 arch infix that script/package.ts adds afterwards), so attach a
+          # copy of each package under the exact referenced name — otherwise
+          # releases/latest/download/<name> would 404 during the client update.
+          if [ -e dist/RELEASES ]; then
+            cp dist/RELEASES installers/
+            while read -r _sha name _size; do
+              [ -z "$name" ] && continue
+              [ -e "installers/$name" ] && continue
+              case "$name" in
+                *-full.nupkg) src=$(ls dist/*-full.nupkg 2>/dev/null | head -n1) ;;
+                *-delta.nupkg) src=$(ls dist/*-delta.nupkg 2>/dev/null | head -n1) ;;
+                *) src="" ;;
+              esac
+              [ -n "$src" ] && [ -e "$src" ] && cp "$src" "installers/$name"
+            done < dist/RELEASES
+          fi
           ls -la installers
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.6.3-beta3-build.${{ github.run_number }}
-          name: Desktop Material build ${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Desktop Material ${{ steps.version.outputs.version }}
           body: |
             Automated Desktop Material Windows build from commit ${{ github.sha }}.
 
-            Unsigned installer built by `.github/workflows/build-installers.yml`.
+            Version `${{ steps.version.outputs.version }}`. Unsigned installer
+            built by `.github/workflows/build-installers.yml`.
+
+            This release doubles as the auto-update feed: the `RELEASES` manifest
+            and `*-full.nupkg` attached here are what the in-app updater pulls
+            from `releases/latest/download/` (see `getUpdatesURL` in
+            `script/dist-info.ts`).
           prerelease: false
           make_latest: true
           files: installers/**

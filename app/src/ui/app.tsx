@@ -691,18 +691,15 @@ export class App extends React.Component<IAppProps, IAppState> {
       return
     }
 
-    // Desktop Material fork: never poll upstream's update endpoint. When no
-    // fork-operated update server is configured at build time (via
-    // DESKTOP_UPDATES_URL, see getUpdatesURL in script/dist-info.ts) the baked
-    // __UPDATES_URL__ still points at central.github.com, which serves the
-    // official GitHub Desktop binaries — checking it would silently auto-update
-    // this fork back to upstream and clobber it. Fail closed here so BOTH the
-    // automatic background check and the manual "Check for Updates" button do
-    // nothing (a graceful no-op) until the fork ships its own update server.
-    if (__UPDATES_URL__.includes('central.github.com')) {
-      log.info(
-        'Skipping update check: no Desktop Material update server is configured (would otherwise poll upstream).'
-      )
+    // Desktop Material fork: getUpdatesURL() (script/dist-info.ts) bakes this
+    // fork's OWN GitHub releases feed into __UPDATES_URL__, so update checks
+    // target the fork — never upstream's Central endpoint (which serves the
+    // official GitHub Desktop binaries and would clobber the fork). Guard only
+    // against an update feed that was deliberately blanked out at build time so
+    // both the automatic background check and the manual "Check for Updates"
+    // button become graceful no-ops rather than throwing on an empty URL.
+    if (__UPDATES_URL__.length === 0) {
+      log.info('Skipping update check: no update feed is configured.')
       return
     }
 
