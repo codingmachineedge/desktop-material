@@ -17,7 +17,7 @@ claiming that its remaining README roadmap items are finished.
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Integration checkpoint `8516bcff0a` contains the
+`codex/guided-final-gate`. Integration checkpoint `36eb02992b` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -25,8 +25,10 @@ complete worktree lifecycle administration, branch pin/hide/solo/restore,
 exact merge-tree conflict paths, signing and Git LFS administration,
 structured local-commit rewriting, guided bisect sessions, the complete
 repository-wide native stash manager, and reviewed GitHub Releases/assets
-management with secure arbitrary asset transfers, plus the complete guarded
-Remote Manager for every named remote. Each completed phase was
+management with secure arbitrary asset transfers, the complete guarded
+Remote Manager for every named remote, and a safe Repository Hooks Manager
+that honors the effective `core.hooksPath` while withholding script contents
+and absolute paths. Each completed phase was
 committed and pushed after its focused security, TypeScript, lint, formatting,
 and privacy gates passed. The bisect integration union passed 75 focused
 Git/model/UI/style/sibling tests; the stash integration passed 46 focused
@@ -35,11 +37,14 @@ before root repeated its focused transfer/API/store/UI gate and TypeScript
 check. Remote Manager passed 30 root-repeated model/Git/UI/style tests after
 its bounded default-ref inspection, exact mutation revalidation, masked URL
 preservation, rename-swap, partial-state, and current hosted-remote warning
-review.
+review. Repository Hooks passed all 349 test files in Windows-safe batches on
+its final worktree, then passed 35/35 focused manager, style, Repository Tools,
+and compact-settings checks again after integration. Its reviewed mutations
+revalidate the hooks directory, source and destination identity, configuration,
+and cancellation boundary before changing an exact known client hook.
 
-Repository hooks and richer Issue workflows remain in isolated worktrees;
-provider-neutral triage is active in its own worktree from the reviewed Remote
-Manager checkpoint. Nothing in this live section claims publication on
+Richer Issue workflows and provider-neutral triage remain active in isolated
+worktrees. Nothing in this live section claims publication on
 `main`: final production build, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
