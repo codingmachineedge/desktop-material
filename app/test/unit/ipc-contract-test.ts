@@ -20,6 +20,7 @@ describe('IPC channel contract', () => {
     : never
 
   const expectedRequestChannels = [
+    'cancel-actions-artifact-provenance',
     'cancel-actions-artifact-subject-operation',
     'release-actions-artifact-download',
     'cancel-actions-transfer',
@@ -88,6 +89,7 @@ describe('IPC channel contract', () => {
   ] as const
 
   const expectedResponseChannels = [
+    'verify-actions-artifact-provenance',
     'inspect-actions-artifact-subjects',
     'prepare-actions-artifact-subject',
     'download-actions-artifact',

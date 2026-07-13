@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { createHash } from 'crypto'
 import { EventEmitter } from 'events'
-import { mkdtemp, readdir, rm, writeFile } from 'fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { deflateRawSync } from 'zlib'
@@ -11,6 +11,7 @@ import {
   cancelActionsArtifactSubjectOperation,
   inspectActionsArtifactSubjects,
   prepareActionsArtifactSubject,
+  withRevalidatedActionsArtifactSubject,
 } from '../../../src/main-process/actions-artifact-subjects'
 import {
   IActionsArtifactDownloadSender,
@@ -393,6 +394,129 @@ describe('Actions artifact subject service', () => {
         }),
         { ok: false, reason: 'not-found' }
       )
+    })
+  })
+
+  it('leases a closed revalidated subject path only during the awaited callback', async () => {
+    const data = Buffer.from('callback-scoped trusted subject')
+    await withArchive(rawZip({ data }), async ({ sender, downloadId }) => {
+      const inventory = await inspectActionsArtifactSubjects(sender, {
+        operationId: operationId('9'),
+        downloadId,
+      })
+      assert.equal(inventory.ok, true)
+      if (!inventory.ok) {
+        return
+      }
+      const digest = `sha256:${createHash('sha256').update(data).digest('hex')}`
+      let leasedPath = ''
+      const value = await withRevalidatedActionsArtifactSubject(
+        sender,
+        {
+          operationId: operationId('a'),
+          downloadId,
+          inventoryId: inventory.inventoryId,
+          entryId: inventory.entries[0].entryId,
+          expectedDigest: digest,
+        },
+        async (subject, signal) => {
+          leasedPath = subject.filePath
+          assert.equal(signal.aborted, false)
+          assert.deepEqual(await readFile(subject.filePath), data)
+          assert.equal(subject.digest, digest)
+          return 'used'
+        }
+      )
+      assert.equal(value, 'used')
+      await assert.rejects(readFile(leasedPath), { code: 'ENOENT' })
+
+      let called = false
+      await assert.rejects(
+        withRevalidatedActionsArtifactSubject(
+          sender,
+          {
+            operationId: operationId('b'),
+            downloadId,
+            inventoryId: inventory.inventoryId,
+            entryId: inventory.entries[0].entryId,
+            expectedDigest: `sha256:${'0'.repeat(64)}`,
+          },
+          async () => {
+            called = true
+          }
+        ),
+        (error: unknown) =>
+          error instanceof Error &&
+          (error as { reason?: string }).reason === 'changed'
+      )
+      assert.equal(called, false)
+    })
+  })
+
+  it('binds duplicate and cross-sender cancellation and aborts on download release', async () => {
+    await withArchive(rawZip(), async ({ sender, other, downloadId }) => {
+      const inventory = await inspectActionsArtifactSubjects(sender, {
+        operationId: operationId('c'),
+        downloadId,
+      })
+      assert.equal(inventory.ok, true)
+      if (!inventory.ok) {
+        return
+      }
+      const digest = `sha256:${createHash('sha256')
+        .update('trusted artifact subject')
+        .digest('hex')}`
+      let entered!: () => void
+      const callbackEntered = new Promise<void>(resolve => {
+        entered = resolve
+      })
+      let leasedPath = ''
+      const pending = withRevalidatedActionsArtifactSubject(
+        sender,
+        {
+          operationId: operationId('d'),
+          downloadId,
+          inventoryId: inventory.inventoryId,
+          entryId: inventory.entries[0].entryId,
+          expectedDigest: digest,
+        },
+        async (subject, signal) => {
+          leasedPath = subject.filePath
+          entered()
+          await new Promise<void>(resolveAbort =>
+            signal.addEventListener('abort', () => resolveAbort(), {
+              once: true,
+            })
+          )
+        }
+      )
+      await callbackEntered
+      assert.equal(
+        cancelActionsArtifactSubjectOperation(other.id, operationId('d')),
+        false
+      )
+      await assert.rejects(
+        withRevalidatedActionsArtifactSubject(
+          sender,
+          {
+            operationId: operationId('d'),
+            downloadId,
+            inventoryId: inventory.inventoryId,
+            entryId: inventory.entries[0].entryId,
+            expectedDigest: digest,
+          },
+          async () => undefined
+        ),
+        (error: unknown) =>
+          error instanceof Error &&
+          (error as { reason?: string }).reason === 'invalid-request'
+      )
+      assert.equal(
+        releaseCompletedActionsArtifactDownload(sender.id, downloadId),
+        true
+      )
+      await assert.rejects(pending, { name: 'AbortError' })
+      await assert.rejects(readFile(leasedPath), { code: 'ENOENT' })
     })
   })
 })

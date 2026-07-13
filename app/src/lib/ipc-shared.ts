@@ -46,6 +46,10 @@ import {
   IActionsArtifactSubjectInspectRequest,
   IActionsArtifactSubjectPrepareRequest,
 } from './actions-artifact-subjects'
+import {
+  ActionsArtifactProvenanceResult,
+  IActionsArtifactProvenanceVerifyRequest,
+} from './actions-artifact-provenance'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -54,6 +58,7 @@ import {
  * the two over the untyped IPC framework.
  */
 export type RequestChannels = {
+  'cancel-actions-artifact-provenance': (operationId: string) => void
   'cancel-actions-artifact-subject-operation': (operationId: string) => void
   'release-actions-artifact-download': (downloadId: string) => void
   'cancel-actions-transfer': (operationId: string) => void
@@ -146,6 +151,9 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  'verify-actions-artifact-provenance': (
+    request: IActionsArtifactProvenanceVerifyRequest
+  ) => Promise<ActionsArtifactProvenanceResult>
   'inspect-actions-artifact-subjects': (
     request: IActionsArtifactSubjectInspectRequest
   ) => Promise<ActionsArtifactSubjectInventoryResult>

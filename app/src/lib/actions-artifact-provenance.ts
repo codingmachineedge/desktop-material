@@ -78,6 +78,20 @@ export interface IActionsArtifactVerificationPolicy {
   readonly repositoryVisibility: ActionsArtifactRepositoryVisibility
 }
 
+/**
+ * Opaque renderer-to-main request for the fixed verifier. Filesystem paths,
+ * credentials, endpoints, executables, and argv are deliberately absent.
+ */
+export interface IActionsArtifactProvenanceVerifyRequest {
+  readonly operationId: string
+  readonly downloadId: string
+  readonly inventoryId: string
+  readonly entryId: string
+  readonly expectedSubjectDigest: string
+  readonly bundles: ReadonlyArray<string>
+  readonly policy: IActionsArtifactVerificationPolicy
+}
+
 export type ActionsArtifactRepositoryVisibility =
   | 'public'
   | 'private'

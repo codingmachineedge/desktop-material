@@ -69,9 +69,28 @@ interface IInventoryRecord {
 }
 
 interface IActiveOperation {
+  readonly operationId: string
   readonly sender: IActionsArtifactDownloadSender
   readonly controller: AbortController
   readonly cancel: () => void
+  readonly done: Promise<void>
+  readonly finish: () => void
+  downloadId: string | null
+}
+
+export interface IRevalidatedActionsArtifactSubjectRequest
+  extends IActionsArtifactSubjectPrepareRequest {
+  readonly expectedDigest: string
+}
+
+/** This lease is main-process-only and is valid only during its callback. */
+export interface IRevalidatedActionsArtifactSubject {
+  readonly filePath: string
+  readonly entryId: string
+  readonly entryPath: string
+  readonly bytes: number
+  readonly digest: string
+  readonly archiveDigest: string
 }
 
 type AuditedZipFile = Omit<YauzlZipFile, 'readEntryCursor'> & {
@@ -138,7 +157,19 @@ function beginOperation(
   }
   const controller = new AbortController()
   const cancel = () => controller.abort()
-  const active = { sender, controller, cancel }
+  let finish!: () => void
+  const done = new Promise<void>(resolve => {
+    finish = resolve
+  })
+  const active = {
+    operationId,
+    sender,
+    controller,
+    cancel,
+    done,
+    finish,
+    downloadId: null,
+  }
   activeOperations.set(key, active)
   sender.on('did-start-navigation', cancel)
   sender.once('destroyed', cancel)
@@ -148,12 +179,13 @@ function beginOperation(
   return active
 }
 
-function endOperation(operationId: string, active: IActiveOperation): void {
-  activeOperations.delete(operationKey(active.sender.id, operationId))
+function endOperation(active: IActiveOperation): void {
+  activeOperations.delete(operationKey(active.sender.id, active.operationId))
   active.sender.removeListener('did-start-navigation', active.cancel)
   if (!active.sender.isDestroyed()) {
     active.sender.removeListener('destroyed', active.cancel)
   }
+  active.finish()
 }
 
 function openFd(path: string): Promise<number> {
@@ -786,6 +818,58 @@ function openZip(fd: number): Promise<AuditedZipFile> {
   )
 }
 
+function closeZip(zip: AuditedZipFile): Promise<void> {
+  if (!zip.isOpen) {
+    return Promise.reject(
+      new ActionsArtifactSubjectError(
+        'io',
+        'The artifact archive close state is uncertain.'
+      )
+    )
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let closeError: Error | undefined
+    const finish = (error?: Error) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      zip.removeListener('close', onClose)
+      zip.removeListener('error', onError)
+      if (error === undefined) {
+        resolve()
+      } else {
+        reject(error)
+      }
+    }
+    const onClose = () => finish(closeError)
+    const onError = () => {
+      closeError = new ActionsArtifactSubjectError(
+        'io',
+        'The artifact archive could not be closed safely.'
+      )
+    }
+    zip.once('close', onClose)
+    zip.once('error', onError)
+    const timeout = setTimeout(() => {
+      finish(
+        closeError ??
+          new ActionsArtifactSubjectError(
+            'io',
+            'The artifact archive did not close safely.'
+          )
+      )
+    }, 5_000)
+    try {
+      zip.close()
+    } catch {
+      onError()
+    }
+  })
+}
+
 async function readValidatedEntries(
   fd: number,
   zip: AuditedZipFile,
@@ -963,9 +1047,27 @@ async function withValidatedArchive<T>(
     }
     throw error
   } finally {
-    zip?.close()
-    if (fd !== null) {
-      await closeFd(fd).catch(() => undefined)
+    if (zip !== null) {
+      try {
+        await closeZip(zip)
+      } catch (error) {
+        if (signal.aborted) {
+          throw abortError()
+        }
+        if (error instanceof ActionsArtifactSubjectError) {
+          throw error
+        }
+        subjectError('io', 'The artifact archive could not be closed safely.')
+      }
+    } else if (fd !== null) {
+      try {
+        await closeFd(fd)
+      } catch {
+        if (signal.aborted) {
+          throw abortError()
+        }
+        subjectError('io', 'The artifact archive could not be closed safely.')
+      }
     }
   }
 }
@@ -1002,15 +1104,12 @@ async function writeAll(
   }
 }
 
-async function prepareEntry(
+async function extractEntry(
   zip: AuditedZipFile,
   value: IValidatedEntry,
+  path: string,
   signal: AbortSignal
 ): Promise<string> {
-  const directory = await mkdtemp(
-    join(tmpdir(), 'desktop-material-actions-subject-')
-  )
-  const path = join(directory, 'subject.bin')
   let handle: Awaited<ReturnType<typeof openFile>> | null = null
   let source: Readable | null = null
   let wrapper: PassThrough | null = null
@@ -1074,24 +1173,71 @@ async function prepareEntry(
   } finally {
     wrapper?.destroy()
     source?.destroy()
-    let cleanupFailed = false
     if (handle !== null) {
       try {
         await handle.close()
       } catch {
-        cleanupFailed = true
+        subjectError(
+          'io',
+          'The temporary artifact subject could not be closed.'
+        )
       }
     }
+  }
+}
+
+async function withSubjectLease<T>(
+  download: ICompletedActionsArtifactDownload,
+  selected: IInventoryEntryRecord,
+  signal: AbortSignal,
+  expectedDigest: string | null,
+  use: (subject: IRevalidatedActionsArtifactSubject) => Promise<T>
+): Promise<T> {
+  const directory = await mkdtemp(
+    join(tmpdir(), 'desktop-material-actions-subject-')
+  )
+  const filePath = join(directory, 'subject.bin')
+  try {
+    const subject = await withValidatedArchive(
+      download,
+      signal,
+      async (zip, validated) => {
+        const matches = validated.filter(
+          value => value.fingerprint === selected.fingerprint
+        )
+        if (matches.length !== 1) {
+          subjectError('changed', 'The selected artifact subject has changed.')
+        }
+        const value = matches[0]
+        const digest = await extractEntry(zip, value, filePath, signal)
+        if (expectedDigest !== null && digest !== expectedDigest) {
+          subjectError('changed', 'The selected artifact subject has changed.')
+        }
+        return {
+          filePath,
+          entryId: selected.entryId,
+          entryPath: selected.path,
+          bytes: selected.bytes,
+          digest,
+          archiveDigest: download.archiveDigest,
+        }
+      }
+    )
+    // The archive and output file are closed before the leased path is used.
+    throwIfAborted(signal)
+    const result = await use(subject)
+    throwIfAborted(signal)
+    return result
+  } finally {
     try {
-      await rm(directory, { recursive: true, force: true })
+      await rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+        retryDelay: 100,
+      })
     } catch {
-      cleanupFailed = true
-    }
-    if (cleanupFailed) {
-      throw new ActionsArtifactSubjectError(
-        'io',
-        'The temporary artifact subject could not be removed.'
-      )
+      subjectError('io', 'The temporary artifact subject could not be removed.')
     }
   }
 }
@@ -1120,6 +1266,37 @@ function requestDownload(
   return value
 }
 
+function requestSelectedEntry(
+  senderId: number,
+  download: ICompletedActionsArtifactDownload,
+  inventoryId: unknown,
+  entryId: unknown
+): IInventoryEntryRecord {
+  if (
+    typeof inventoryId !== 'string' ||
+    !opaqueIdPattern.test(inventoryId) ||
+    typeof entryId !== 'string' ||
+    !opaqueIdPattern.test(entryId)
+  ) {
+    subjectError(
+      'invalid-request',
+      'The artifact subject selection is invalid.'
+    )
+  }
+  const inventory = inventories.get(inventoryId)
+  const selected = inventory?.entries.get(entryId)
+  if (
+    inventory === undefined ||
+    selected === undefined ||
+    inventory.senderId !== senderId ||
+    inventory.downloadId !== download.downloadId ||
+    inventory.archiveDigest !== download.archiveDigest
+  ) {
+    subjectError('not-found', 'The artifact subject selection is stale.')
+  }
+  return selected
+}
+
 export async function inspectActionsArtifactSubjects(
   sender: IActionsArtifactDownloadSender,
   request: IActionsArtifactSubjectInspectRequest
@@ -1128,6 +1305,7 @@ export async function inspectActionsArtifactSubjects(
   try {
     active = beginOperation(sender, request?.operationId)
     const download = requestDownload(sender.id, request?.downloadId)
+    active.downloadId = download.downloadId
     return await withValidatedArchive(
       download,
       active.controller.signal,
@@ -1170,7 +1348,7 @@ export async function inspectActionsArtifactSubjects(
     return mapFailure(error)
   } finally {
     if (active !== null) {
-      endOperation(request.operationId, active)
+      endOperation(active)
     }
   }
 }
@@ -1183,55 +1361,78 @@ export async function prepareActionsArtifactSubject(
   try {
     active = beginOperation(sender, request?.operationId)
     const download = requestDownload(sender.id, request?.downloadId)
-    if (
-      typeof request.inventoryId !== 'string' ||
-      !opaqueIdPattern.test(request.inventoryId) ||
-      typeof request.entryId !== 'string' ||
-      !opaqueIdPattern.test(request.entryId)
-    ) {
-      subjectError(
-        'invalid-request',
-        'The artifact subject selection is invalid.'
-      )
-    }
-    const inventory = inventories.get(request.inventoryId)
-    const selected = inventory?.entries.get(request.entryId)
-    if (
-      inventory === undefined ||
-      selected === undefined ||
-      inventory.senderId !== sender.id ||
-      inventory.downloadId !== download.downloadId ||
-      inventory.archiveDigest !== download.archiveDigest
-    ) {
-      subjectError('not-found', 'The artifact subject selection is stale.')
-    }
-    return await withValidatedArchive(
+    active.downloadId = download.downloadId
+    const selected = requestSelectedEntry(
+      sender.id,
       download,
+      request?.inventoryId,
+      request?.entryId
+    )
+    return await withSubjectLease(
+      download,
+      selected,
       active.controller.signal,
-      async (zip, validated) => {
-        const matches = validated.filter(
-          value => value.fingerprint === selected.fingerprint
-        )
-        if (matches.length !== 1) {
-          subjectError('changed', 'The selected artifact subject has changed.')
-        }
-        const value = matches[0]
-        const digest = await prepareEntry(zip, value, active!.controller.signal)
-        return {
-          ok: true,
-          entryId: selected.entryId,
-          path: selected.path,
-          bytes: selected.bytes,
-          digest,
-          archiveDigest: download.archiveDigest,
-        }
-      }
+      null,
+      async subject => ({
+        ok: true,
+        entryId: subject.entryId,
+        path: subject.entryPath,
+        bytes: subject.bytes,
+        digest: subject.digest,
+        archiveDigest: subject.archiveDigest,
+      })
     )
   } catch (error) {
     return mapFailure(error)
   } finally {
     if (active !== null) {
-      endOperation(request.operationId, active)
+      endOperation(active)
+    }
+  }
+}
+
+/**
+ * Reopen and revalidate a sender-owned subject, then lend its private path to
+ * one awaited main-process callback. The path is never returned over IPC.
+ */
+export async function withRevalidatedActionsArtifactSubject<T>(
+  sender: IActionsArtifactDownloadSender,
+  request: IRevalidatedActionsArtifactSubjectRequest,
+  use: (
+    subject: IRevalidatedActionsArtifactSubject,
+    signal: AbortSignal
+  ) => Promise<T>
+): Promise<T> {
+  let active: IActiveOperation | null = null
+  try {
+    active = beginOperation(sender, request?.operationId)
+    const download = requestDownload(sender.id, request?.downloadId)
+    active.downloadId = download.downloadId
+    const selected = requestSelectedEntry(
+      sender.id,
+      download,
+      request?.inventoryId,
+      request?.entryId
+    )
+    if (
+      typeof request?.expectedDigest !== 'string' ||
+      !/^sha256:[a-f0-9]{64}$/.test(request.expectedDigest)
+    ) {
+      subjectError(
+        'invalid-request',
+        'The expected artifact subject digest is invalid.'
+      )
+    }
+    return await withSubjectLease(
+      download,
+      selected,
+      active.controller.signal,
+      request.expectedDigest,
+      subject => use(subject, active!.controller.signal)
+    )
+  } finally {
+    if (active !== null) {
+      endOperation(active)
     }
   }
 }
@@ -1260,6 +1461,14 @@ export function cancelAllActionsArtifactSubjectOperations(): void {
   }
 }
 
+export async function cancelAllActionsArtifactSubjectOperationsAndWait(): Promise<void> {
+  const active = [...activeOperations.values()]
+  for (const operation of active) {
+    operation.controller.abort()
+  }
+  await Promise.all(active.map(operation => operation.done))
+}
+
 export function releaseActionsArtifactSubjectInventoriesForSender(
   senderId: number
 ): void {
@@ -1271,6 +1480,11 @@ export function releaseActionsArtifactSubjectInventoriesForSender(
 }
 
 onCompletedActionsArtifactDownloadReleased((downloadId, senderId) => {
+  for (const active of activeOperations.values()) {
+    if (active.sender.id === senderId && active.downloadId === downloadId) {
+      active.controller.abort()
+    }
+  }
   for (const [inventoryId, inventory] of inventories) {
     if (
       inventory.senderId === senderId &&

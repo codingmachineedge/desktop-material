@@ -80,6 +80,12 @@ import {
   prepareActionsArtifactSubject,
 } from './actions-artifact-subjects'
 import {
+  cancelActionsArtifactProvenance,
+  killAllActionsArtifactProvenanceVerifications,
+  verifyActionsArtifactProvenance,
+} from './actions-artifact-provenance'
+import { ActionsArtifactProvenanceShutdownBarrier } from './actions-artifact-provenance-shutdown'
+import {
   findWindowForRepositoryPath as findOwningWindow,
   nextWindowScope,
 } from './window-routing'
@@ -162,6 +168,16 @@ app.on('window-all-closed', () => {
   //
   // If we don't subscribe to this and change the default behavior we break
   // the crash process window which is shown after the main window is closed.
+})
+
+const provenanceShutdown = new ActionsArtifactProvenanceShutdownBarrier(
+  killAllActionsArtifactProvenanceVerifications,
+  () => app.quit()
+)
+// Wait until Electron has actually accepted every window close. A before-quit
+// barrier would permanently disable the verifier when update UX cancels close.
+app.on('will-quit', event => {
+  provenanceShutdown.handle(event)
 })
 
 app.on('will-quit', () => {
@@ -510,6 +526,12 @@ app.on('ready', () => {
   )
   ipcMain.on('cancel-actions-transfer', (event, operationId) => {
     cancelActionsTransfer(event.sender.id, operationId)
+  })
+  ipcMain.handle('verify-actions-artifact-provenance', (event, request) =>
+    verifyActionsArtifactProvenance(event.sender, request)
+  )
+  ipcMain.on('cancel-actions-artifact-provenance', (event, operationId) => {
+    cancelActionsArtifactProvenance(event.sender.id, operationId)
   })
   ipcMain.handle('inspect-actions-artifact-subjects', (event, request) =>
     inspectActionsArtifactSubjects(event.sender, request)
