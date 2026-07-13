@@ -67,7 +67,6 @@ interface IChangesSidebarProps {
   readonly gitHubUserStore: GitHubUserStore
   readonly focusCommitMessage: boolean
   readonly askForConfirmationOnDiscardChanges: boolean
-  readonly askForConfirmationOnDiscardStash: boolean
   readonly askForConfirmationOnCommitFilteredChanges: boolean
   readonly accounts: ReadonlyArray<Account>
   readonly isShowingModal: boolean
@@ -475,15 +474,14 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
           onOpenItemInExternalEditor={this.onOpenItemInExternalEditor}
           onChangesListScrolled={this.props.onChangesListScrolled}
           changesListScrollTop={this.props.changesListScrollTop}
-          stashEntries={this.props.changes.stashEntries}
+          allStashEntries={this.props.changes.allStashEntries}
+          foreignStashEntryCount={this.props.changes.foreignStashEntryCount}
+          stashInventoryTruncated={this.props.changes.stashInventoryTruncated}
           isShowingStashEntry={isShowingStashEntry}
           selectedStashEntry={
             selection.kind === ChangesSelectionKind.Stash
               ? selection.selectedStashEntry
               : null
-          }
-          askForConfirmationOnDiscardStash={
-            this.props.askForConfirmationOnDiscardStash
           }
           currentBranchProtected={currentBranchProtected}
           shouldNudgeToCommit={this.props.shouldNudgeToCommit}

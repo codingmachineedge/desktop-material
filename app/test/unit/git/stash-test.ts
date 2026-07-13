@@ -13,6 +13,13 @@ import {
   popStashEntry,
   getStashes,
   getStashedFiles,
+  applyDesktopStashEntry,
+  clearReviewedDesktopStashes,
+  createBranchFromDesktopStash,
+  createNamedDesktopStashEntry,
+  normalizeStashDisplayName,
+  StashManagerError,
+  updateDesktopStashEntry,
 } from '../../../src/lib/git/stash'
 import { getStatusOrThrow } from '../../helpers/status'
 import { AppFileStatusKind } from '../../../src/models/status'
@@ -54,6 +61,9 @@ describe('git/stash', () => {
       assert.equal(entries.length, 1)
       assert.equal(entries[0].branchName, 'master')
       assert.equal(entries[0].name, 'refs/stash@{0}')
+      assert.equal(stash.stashEntryCount, 3)
+      assert.equal(stash.foreignStashEntryCount, 2)
+      assert.equal(stash.isTruncated, false)
     })
   })
 
@@ -84,7 +94,7 @@ describe('git/stash', () => {
     it('stashes untracked files and removes them from the working directory', async t => {
       const repository = await setup(t)
       const untrackedFile = path.join(repository.path, 'not-tracked.txt')
-      writeFile(untrackedFile, 'some untracked file')
+      await writeFile(untrackedFile, 'some untracked file')
 
       let status = await getStatusOrThrow(repository)
       let files = status.workingDirectory.files
@@ -144,6 +154,204 @@ describe('git/stash', () => {
         stashedFiles.map(file => file.path),
         ['first.txt']
       )
+    })
+
+    it('round-trips a bounded name and explicit untracked selection', async t => {
+      const repository = await setup(t)
+      await writeFile(join(repository.path, 'chosen file.txt'), 'selected')
+      await writeFile(join(repository.path, 'left-alone.txt'), 'remaining')
+
+      assert.equal(
+        await createNamedDesktopStashEntry(
+          repository,
+          'master',
+          'Review – selected work',
+          ['chosen file.txt'],
+          true
+        ),
+        true
+      )
+
+      const inventory = await getStashes(repository)
+      assert.equal(inventory.desktopEntries.length, 1)
+      assert.equal(
+        inventory.desktopEntries[0].displayName,
+        'Review – selected work'
+      )
+      assert.match(inventory.desktopEntries[0].createdAt ?? '', /^\d{4}-/)
+      const status = await getStatusOrThrow(repository)
+      assert.deepEqual(
+        status.workingDirectory.files.map(file => file.path),
+        ['left-alone.txt']
+      )
+    })
+
+    it('leaves untracked files alone unless explicitly included', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), 'tracked')
+      await writeFile(join(repository.path, 'untracked.txt'), 'untracked')
+
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'Tracked only',
+        null,
+        false
+      )
+
+      const status = await getStatusOrThrow(repository)
+      assert.deepEqual(
+        status.workingDirectory.files.map(file => file.path),
+        ['untracked.txt']
+      )
+    })
+
+    it('rejects control characters and oversized names before mutation', () => {
+      assert.throws(
+        () => normalizeStashDisplayName('unsafe\nname'),
+        (error: unknown) =>
+          error instanceof StashManagerError && error.kind === 'invalid-input'
+      )
+      assert.throws(() => normalizeStashDisplayName('x'.repeat(121)))
+    })
+  })
+
+  describe('managed operations', () => {
+    const setup = async (t: TestContext) => {
+      const repository = await setupEmptyRepository(t)
+      await writeFile(join(repository.path, 'README.md'), 'initial')
+      await exec(['add', 'README.md'], repository.path)
+      await exec(['commit', '-m', 'initial commit'], repository.path)
+      return repository
+    }
+
+    it('applies while keeping the exact stash', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), ' stashed')
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'Keep after apply',
+        null,
+        false
+      )
+      const entry = (await getStashes(repository)).desktopEntries[0]
+
+      await applyDesktopStashEntry(repository, entry.stashSha)
+
+      assert.equal((await getStashes(repository)).desktopEntries.length, 1)
+      assert.equal(
+        (await getStatusOrThrow(repository)).workingDirectory.files.length,
+        1
+      )
+    })
+
+    it('renames and moves association without changing the stashed tree', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), ' stashed')
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'Before',
+        null,
+        false
+      )
+      const before = (await getStashes(repository)).desktopEntries[0]
+
+      await updateDesktopStashEntry(
+        repository,
+        before.stashSha,
+        'feature/stash-home',
+        'After'
+      )
+
+      const entries = (await getStashes(repository)).desktopEntries
+      assert.equal(entries.length, 1)
+      assert.equal(entries[0].branchName, 'feature/stash-home')
+      assert.equal(entries[0].displayName, 'After')
+      assert.equal(entries[0].tree, before.tree)
+      assert.notEqual(entries[0].stashSha, before.stashSha)
+    })
+
+    it('creates and checks out a validated new branch from a stash', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), ' stashed')
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'Branch seed',
+        null,
+        false
+      )
+      const entry = (await getStashes(repository)).desktopEntries[0]
+
+      await createBranchFromDesktopStash(
+        repository,
+        entry.stashSha,
+        'feature/from-stash'
+      )
+
+      const branch = await exec(
+        ['symbolic-ref', '--short', 'HEAD'],
+        repository.path
+      )
+      assert.equal(branch.stdout.trim(), 'feature/from-stash')
+      assert.equal((await getStashes(repository)).desktopEntries.length, 0)
+      assert.equal(
+        (await getStatusOrThrow(repository)).workingDirectory.files.length,
+        1
+      )
+    })
+
+    it('clears only reviewed Desktop-managed stashes and preserves foreign ones', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), ' first')
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'First',
+        null,
+        false
+      )
+      await appendFile(join(repository.path, 'README.md'), ' second')
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'Second',
+        null,
+        false
+      )
+      await appendFile(join(repository.path, 'README.md'), ' foreign')
+      await stash(repository, 'master', 'created outside Desktop')
+      const reviewed = (await getStashes(repository)).desktopEntries.map(
+        entry => entry.stashSha
+      )
+
+      assert.equal(await clearReviewedDesktopStashes(repository, reviewed), 2)
+
+      const remaining = await getStashes(repository)
+      assert.equal(remaining.desktopEntries.length, 0)
+      assert.equal(remaining.stashEntryCount, 1)
+      assert.equal(remaining.foreignStashEntryCount, 1)
+    })
+
+    it('rejects a stale reviewed identity without dropping another stash', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), ' stashed')
+      await createNamedDesktopStashEntry(
+        repository,
+        'master',
+        'Still here',
+        null,
+        false
+      )
+
+      await assert.rejects(
+        clearReviewedDesktopStashes(repository, ['a'.repeat(40)]),
+        (error: unknown) =>
+          error instanceof StashManagerError && error.kind === 'stale-entry'
+      )
+      assert.equal((await getStashes(repository)).desktopEntries.length, 1)
     })
   })
 
@@ -302,7 +510,7 @@ describe('git/stash', () => {
     })
 
     describe('when there are (resolvable) conflicts', () => {
-      it('restores changes and drops stash', async t => {
+      it('retains the stash for recovery when Git leaves conflicts', async t => {
         const repository = await setup(t)
 
         await generateTestStashEntry(repository, 'master', true)
@@ -319,14 +527,20 @@ describe('git/stash', () => {
         assert.equal(files.length, 0)
 
         const entryToApply = desktopEntries[0]
-        await popStashEntry(repository, entryToApply.stashSha)
+        await assert.rejects(() =>
+          popStashEntry(repository, entryToApply.stashSha)
+        )
 
         status = await getStatusOrThrow(repository)
         files = status.workingDirectory.files
         assert.equal(files.length, 1)
 
         const stashAfter = await getStashes(repository)
-        assert(!stashAfter.desktopEntries.includes(entryToApply))
+        assert.equal(stashAfter.desktopEntries.length, 1)
+        assert.equal(
+          stashAfter.desktopEntries[0].stashSha,
+          entryToApply.stashSha
+        )
       })
     })
 
@@ -346,6 +560,7 @@ describe('git/stash', () => {
         await assert.rejects(() =>
           popStashEntry(repository, entryToApply.stashSha)
         )
+        assert.equal((await getStashes(repository)).desktopEntries.length, 1)
       })
     })
   })
