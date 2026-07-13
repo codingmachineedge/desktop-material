@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { clamp } from '../lib/clamp'
+import * as ReactDOM from 'react-dom'
 import { PullRequest } from '../models/pull-request'
 import { PullRequestBadge } from './branches'
 import { Dispatcher } from './dispatcher'
@@ -9,12 +9,17 @@ import { Octicon } from './octicons'
 import * as octicons from './octicons/octicons.generated'
 import classNames from 'classnames'
 import { Emoji } from '../lib/emoji'
+import {
+  calculatePullRequestQuickViewGeometry,
+  IQuickViewGeometry,
+} from './pull-request-quick-view-geometry'
 
 /**
  * The max height of the visible quick view card is 556 (500 for scrollable
  * body and 56 for header)
  */
 const maxQuickViewHeight = 556
+const maxQuickViewWidth = 416
 /**
  * This is currently statically defined so not bothering to attain it from dom
  * searching.
@@ -40,7 +45,10 @@ interface IPullRequestQuickViewProps {
 }
 
 interface IPullRequestQuickViewState {
+  readonly left: number
   readonly top: number
+  readonly pointerTop: number
+  readonly placement: IQuickViewGeometry['placement']
   readonly visibility: 'visible' | 'hidden'
 }
 
@@ -54,16 +62,30 @@ export class PullRequestQuickView extends React.Component<
     return this.quickViewRef.current?.clientHeight ?? maxQuickViewHeight
   }
 
+  private get quickViewWidth(): number {
+    return this.quickViewRef.current?.clientWidth ?? maxQuickViewWidth
+  }
+
   public constructor(props: IPullRequestQuickViewProps) {
     super(props)
 
     this.state = {
-      top: this.calculatePosition(
+      ...this.calculatePosition(
         props.pullRequestItemTop,
+        this.quickViewWidth,
         this.quickViewHeight
       ),
       visibility: 'hidden',
     }
+  }
+
+  public componentDidMount = () => {
+    window.addEventListener('resize', this.updateQuickViewPosition)
+    this.updateQuickViewPosition()
+  }
+
+  public componentWillUnmount = () => {
+    window.removeEventListener('resize', this.updateQuickViewPosition)
   }
 
   public componentDidUpdate = (prevProps: IPullRequestQuickViewProps) => {
@@ -78,12 +100,13 @@ export class PullRequestQuickView extends React.Component<
   }
 
   private updateQuickViewPosition = () => {
-    this.setState({
-      top: this.calculatePosition(
+    this.setState(
+      this.calculatePosition(
         this.props.pullRequestItemTop,
+        this.quickViewWidth,
         this.quickViewHeight
-      ),
-    })
+      )
+    )
   }
 
   private onMarkdownParsed = () => {
@@ -99,62 +122,22 @@ export class PullRequestQuickView extends React.Component<
     this.props.onMouseLeave()
   }
 
-  /**
-   * Important to retrieve as it changes for maximization on macOS and quick
-   * view is relative to the top of branch container = foldout-container. But if
-   * we can't find it (unlikely) we can atleast compensate for the toolbar being
-   * 50px
-   */
-  private getTopPRList(): number {
-    return (
-      document.getElementById('foldout-container')?.getBoundingClientRect()
-        .top ?? 50
-    )
-  }
-
   private calculatePosition(
     prListItemTop: number,
+    quickViewWidth: number,
     quickViewHeight: number
-  ): number {
-    const topOfPRList = this.getTopPRList()
+  ): IQuickViewGeometry {
+    const sheetRect = document
+      .getElementById('foldout-container')
+      ?.querySelector<HTMLElement>('.foldout')
+      ?.getBoundingClientRect()
 
-    // We want to make sure that the quick view is always visible and highest
-    // being aligned to top of branch/pr dropdown (which is 0 since this is a
-    // child element of the branch dropdown)
-    const minTop = 0
-    const maxTop = window.innerHeight - topOfPRList - quickViewHeight
-
-    // Check if it has room to display aligned to top (likely top half of list)
-    if (window.innerHeight - prListItemTop > quickViewHeight) {
-      const alignedTop = prListItemTop - topOfPRList
-      return clamp(alignedTop, minTop, maxTop)
-    }
-
-    // Can't align to top -> likely bottom half of list check if has room to display aligned to bottom.
-    if (prListItemTop - quickViewHeight > 0) {
-      const alignedTop = prListItemTop - topOfPRList
-      const alignedBottom = alignedTop - quickViewHeight + heightPRListItem
-      return clamp(alignedBottom, minTop, maxTop)
-    }
-
-    // If not enough room to display aligned top or bottom, attempt to center on
-    // list item. For short height screens with max height quick views, this
-    // will likely end up being clamped so will be anchored to top or bottom
-    // depending on position in list.
-    const middlePrListItem = prListItemTop + heightPRListItem / 2
-    const middleQuickView = quickViewHeight / 2
-    const alignedMiddle = middlePrListItem - middleQuickView
-    return clamp(alignedMiddle, minTop, maxTop)
-  }
-
-  private getPointerPosition(top: number): React.CSSProperties {
-    const prListItemTopWRTQuickViewTopZero =
-      this.props.pullRequestItemTop - this.getTopPRList()
-    const prListItemPositionWRToQuickViewTop =
-      prListItemTopWRTQuickViewTopZero - top
-    const centerPointOnListItem =
-      prListItemPositionWRToQuickViewTop + heightPRListItem / 2
-    return { top: centerPointOnListItem }
+    return calculatePullRequestQuickViewGeometry(
+      { top: prListItemTop, height: heightPRListItem },
+      sheetRect ?? { left: 0, right: 0 },
+      { width: quickViewWidth, height: quickViewHeight },
+      { width: window.innerWidth, height: window.innerHeight }
+    )
   }
 
   private onMarkdownLinkClicked = (url: string) => {
@@ -227,13 +210,17 @@ export class PullRequestQuickView extends React.Component<
   }
 
   public render() {
-    const { top, visibility } = this.state
-    return (
+    const { left, top, pointerTop, placement, visibility } = this.state
+    const portalHost =
+      document.getElementById('foldout-container') ?? document.body
+    return ReactDOM.createPortal(
       <div
-        className="pull-request-quick-view"
+        className={`pull-request-quick-view placement-${placement}`}
+        role="dialog"
+        aria-label={`Pull request #${this.props.pullRequest.pullRequestNumber} quick view`}
         onMouseEnter={this.props.onMouseEnter}
         onMouseLeave={this.onMouseLeave}
-        style={{ top, visibility }}
+        style={{ left, top, visibility }}
         ref={this.quickViewRef}
       >
         <div className="pull-request-quick-view-contents">
@@ -242,9 +229,10 @@ export class PullRequestQuickView extends React.Component<
         </div>
         <div
           className="pull-request-pointer"
-          style={this.getPointerPosition(top)}
+          style={{ top: pointerTop }}
         ></div>
-      </div>
+      </div>,
+      portalHost
     )
   }
 }

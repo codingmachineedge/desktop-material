@@ -1,29 +1,51 @@
 .pull-request-quick-view {
-  position: absolute;
-  left: 365px;
+  position: fixed;
+  z-index: calc(var(--foldout-z-index) + 1);
+  width: min(416px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: visible;
 
   .pull-request-quick-view-contents {
+    display: flex;
+    flex-direction: column;
     background-color: var(--background-color);
-    margin: 0 var(--spacing);
-    min-width: 400px;
+    width: 100%;
+    min-width: 0;
+    max-height: calc(100vh - 16px);
     border-radius: var(--border-radius);
+    box-shadow: var(--md-sys-elevation-level3);
+    overflow: hidden;
 
     .header {
       display: flex;
+      flex: none;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--spacing);
       padding: var(--spacing-double);
       padding-bottom: var(--spacing);
       border-bottom: var(--base-border);
 
       .action-needed {
+        min-width: 0;
         flex-grow: 1;
-        padding-left: var(--spacing-double);
+        overflow-wrap: anywhere;
+      }
+
+      .button-with-icon {
+        flex: 0 1 auto;
+        max-width: 100%;
       }
     }
 
     .pull-request {
+      flex: 1;
+      min-height: 0;
       padding: var(--spacing-double);
-      max-height: 500px;
-      overflow: scroll;
+      max-height: calc(100vh - 88px);
+      overflow-x: hidden;
+      overflow-y: auto;
 
       .status {
         background-color: var(--pr-open-icon-color);
@@ -46,6 +68,10 @@
 
       .title {
         margin: var(--spacing) 0;
+
+        h2 {
+          overflow-wrap: anywhere;
+        }
 
         .pr-badge {
           display: inline-flex;
@@ -77,6 +103,39 @@
       border: 7px solid transparent;
       border-right-color: var(--background-color);
       left: 2px;
+    }
+  }
+
+  &.placement-left .pull-request-pointer {
+    right: -6px;
+    left: auto;
+
+    &::before {
+      border-right-color: transparent;
+      border-left-color: var(--box-border-color);
+    }
+
+    &::after {
+      left: -2px;
+      border-right-color: transparent;
+      border-left-color: var(--background-color);
+    }
+  }
+
+  &.placement-overlay .pull-request-pointer {
+    display: none;
+  }
+}
+
+@media (max-width: 520px), (max-height: 420px) {
+  .pull-request-quick-view {
+    .pull-request-quick-view-contents .header {
+      padding: var(--spacing);
+    }
+
+    .pull-request-quick-view-contents .pull-request {
+      padding: var(--spacing);
+      max-height: calc(100vh - 64px);
     }
   }
 }

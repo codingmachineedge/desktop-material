@@ -5,6 +5,7 @@ import * as octicons from '../../octicons/octicons.generated'
 import { IRegexFlags, flagsToString } from './regex-block-model'
 import { RegexCategories, RegexBuilderPalette } from './regex-builder-palette'
 import { RegexTestArea } from './regex-test-area'
+import { clampDialogOffset } from '../../dialog/dialog-geometry'
 
 /** The maximum number of visible items used to seed the tester's sample. */
 const MaxSampleItems = 50
@@ -91,7 +92,9 @@ export class RegexBuilder extends React.Component<
   IRegexBuilderProps,
   IRegexBuilderState
 > {
+  private dialogRef = React.createRef<HTMLDivElement>()
   private dragPointerId: number | null = null
+  private clampFrameId: number | null = null
   private dragStart: {
     readonly x: number
     readonly y: number
@@ -108,6 +111,50 @@ export class RegexBuilder extends React.Component<
       activeCategory: 0,
       sample: this.defaultSample(),
       dragOffset: { x: 0, y: 0 },
+    }
+  }
+
+  public componentDidMount = () => {
+    window.addEventListener('resize', this.scheduleKeepOnScreen)
+    this.scheduleKeepOnScreen()
+  }
+
+  public componentWillUnmount = () => {
+    window.removeEventListener('resize', this.scheduleKeepOnScreen)
+    if (this.clampFrameId !== null) {
+      window.cancelAnimationFrame(this.clampFrameId)
+    }
+  }
+
+  private scheduleKeepOnScreen = () => {
+    if (this.clampFrameId !== null) {
+      window.cancelAnimationFrame(this.clampFrameId)
+    }
+    this.clampFrameId = window.requestAnimationFrame(() => {
+      this.clampFrameId = null
+      this.keepOnScreen()
+    })
+  }
+
+  private keepOnScreen = () => {
+    const dialog = this.dialogRef.current
+    if (dialog === null) {
+      return
+    }
+
+    const nextOffset = clampDialogOffset(
+      dialog.getBoundingClientRect(),
+      { width: window.innerWidth, height: window.innerHeight },
+      this.state.dragOffset,
+      8,
+      8
+    )
+
+    if (
+      nextOffset.x !== this.state.dragOffset.x ||
+      nextOffset.y !== this.state.dragOffset.y
+    ) {
+      this.setState({ dragOffset: nextOffset })
     }
   }
 
@@ -203,6 +250,10 @@ export class RegexBuilder extends React.Component<
     if (this.dragPointerId === event.pointerId) {
       this.dragPointerId = null
       this.dragStart = null
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+      this.scheduleKeepOnScreen()
     }
   }
 
@@ -227,12 +278,17 @@ export class RegexBuilder extends React.Component<
 
     return (
       <div className="regex-builder-overlay">
-        <div className="regex-builder-dialog" style={{ transform }}>
+        <div
+          className="regex-builder-dialog"
+          style={{ transform }}
+          ref={this.dialogRef}
+        >
           <div
             className="regex-builder-header"
             onPointerDown={this.onHeaderPointerDown}
             onPointerMove={this.onHeaderPointerMove}
             onPointerUp={this.onHeaderPointerUp}
+            onPointerCancel={this.onHeaderPointerUp}
           >
             <span className="regex-builder-glyph">.*</span>
             <div className="regex-builder-heading">
@@ -251,62 +307,66 @@ export class RegexBuilder extends React.Component<
             </button>
           </div>
 
-          <div className={classNames('regex-builder-pattern-row', { invalid })}>
-            <div className="regex-builder-pattern-field">
-              <span className="regex-delimiter">/</span>
-              <input
-                type="text"
-                className="regex-pattern-input"
-                spellCheck={false}
-                placeholder="pattern"
-                value={this.state.pattern}
-                onChange={this.onPatternChanged}
-              />
-              <span className="regex-delimiter">/{flagsString}</span>
-              {this.renderValidityIcon()}
+          <div className="regex-builder-scroll-region">
+            <div
+              className={classNames('regex-builder-pattern-row', { invalid })}
+            >
+              <div className="regex-builder-pattern-field">
+                <span className="regex-delimiter">/</span>
+                <input
+                  type="text"
+                  className="regex-pattern-input"
+                  spellCheck={false}
+                  placeholder="pattern"
+                  value={this.state.pattern}
+                  onChange={this.onPatternChanged}
+                />
+                <span className="regex-delimiter">/{flagsString}</span>
+                {this.renderValidityIcon()}
+              </div>
+              <button
+                className="regex-builder-icon-button"
+                aria-label="Delete last character"
+                onClick={this.onBackspace}
+              >
+                &#9003;
+              </button>
+              <button
+                className="regex-builder-icon-button destructive"
+                aria-label="Clear pattern"
+                onClick={this.onClear}
+              >
+                <Octicon symbol={octicons.trash} />
+              </button>
             </div>
-            <button
-              className="regex-builder-icon-button"
-              aria-label="Delete last character"
-              onClick={this.onBackspace}
-            >
-              &#9003;
-            </button>
-            <button
-              className="regex-builder-icon-button destructive"
-              aria-label="Clear pattern"
-              onClick={this.onClear}
-            >
-              <Octicon symbol={octicons.trash} />
-            </button>
+
+            <div className="regex-builder-flags">
+              <span className="regex-builder-flags-label">FLAGS</span>
+              {FlagChips.map(({ key, tooltip }) => (
+                <FlagChip
+                  key={key}
+                  flagKey={key}
+                  tooltip={tooltip}
+                  on={this.state.flags[key]}
+                  onToggleFlag={this.onToggleFlag}
+                />
+              ))}
+            </div>
+
+            <RegexBuilderPalette
+              categories={RegexCategories}
+              activeCategory={this.state.activeCategory}
+              onCategoryChange={this.onCategoryChange}
+              onInsertToken={this.onInsertToken}
+            />
+
+            <RegexTestArea
+              pattern={this.state.pattern}
+              flags={flagsString}
+              sample={this.state.sample}
+              onSampleChanged={this.onSampleChanged}
+            />
           </div>
-
-          <div className="regex-builder-flags">
-            <span className="regex-builder-flags-label">FLAGS</span>
-            {FlagChips.map(({ key, tooltip }) => (
-              <FlagChip
-                key={key}
-                flagKey={key}
-                tooltip={tooltip}
-                on={this.state.flags[key]}
-                onToggleFlag={this.onToggleFlag}
-              />
-            ))}
-          </div>
-
-          <RegexBuilderPalette
-            categories={RegexCategories}
-            activeCategory={this.state.activeCategory}
-            onCategoryChange={this.onCategoryChange}
-            onInsertToken={this.onInsertToken}
-          />
-
-          <RegexTestArea
-            pattern={this.state.pattern}
-            flags={flagsString}
-            sample={this.state.sample}
-            onSampleChanged={this.onSampleChanged}
-          />
 
           <div className="regex-builder-footer">
             <button
