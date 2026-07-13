@@ -24,7 +24,7 @@ non-modal dialog framework.
 
 | Page | What it covers |
 | --- | --- |
-| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, organizations, providers, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
+| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
@@ -79,15 +79,19 @@ non-modal dialog framework.
 - **Multiple stashes** — create and keep multiple entries, select one to inspect its files and diffs,
   then restore or discard that exact stash.
 - **Repository power tools** — pin and group repositories, pull all with a per-repository result,
-  use branch presets and default-branch controls, set a repository-specific editor, and multi-clone
-  in parallel or sequence with URL-only import/export.
+  use branch presets and default-branch controls, set a repository-specific editor, shallow-clone
+  with a commit-depth control, manage cone-mode sparse checkout, and multi-clone in parallel or
+  sequence with URL-only import/export. These are named, validated workflows rather than a raw Git,
+  `gh`, or API-command catalogue.
 - **Multi-window workflows** — open a repository or worktree in a separate window; each window keeps
   its own selected repository and persisted tab state while commands route to the correct window.
-- **Notification centre** — unread state, mark-all/delete controls, and restoreable history backed by
-  a dedicated local git repository.
+- **Notification centre** — a Git-backed Local view plus an account-aware GitHub inbox with
+  All/Unread and participating-only filters, including a complete no-signed-in-account state.
 - **Clipping-safe scaling** — choose 50–200% UI scaling; auto-fit caps the effective scale when a
   small window cannot contain the requested size. At the supported minimum window, 200% safely
   auto-fits to 96% while preserving every title-bar, navigation, Appearance, and footer control.
+- **No page-level sideways scrolling** — task forms wrap text and stack controls when space narrows.
+  Horizontal scrolling is reserved for spatial content such as code, diffs, and logs when needed.
 
 ![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
@@ -96,3 +100,9 @@ non-modal dialog framework.
 ![Open repositories and worktrees in another window](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)
 
 ![Requested 200 percent UI scale auto-fitted without clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
+
+![Guided shallow clone with commit depth](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-shallow-clone.png)
+
+![Guided sparse-checkout directory editor](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
+
+![Account-aware GitHub notifications](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)

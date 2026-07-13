@@ -186,15 +186,17 @@
             <a
               href="https://github.com/codingmachineedge/desktop-material/blob/main/PLAN.md"
               >plan</a
-            >.
+            >. Git and GitHub capabilities appear as named, guided workflows—not
+            a searchable dump of commands or API endpoints.
           </p>
           <div class="feature-grid">
             <article class="card">
               <div class="glyph" aria-hidden="true">🔔</div>
               <h3>Notification centre <span class="tag">Shipped</span></h3>
               <p>
-                A bell and side panel backed by its own local git repo — unread
-                badges, mark read/unread, delete, and recoverable history.
+                A Git-backed Local view plus an account-aware GitHub inbox with
+                All, Unread, and participating-only controls and a complete
+                signed-out state.
               </p>
             </article>
 
@@ -215,6 +217,18 @@
                 Browse complete organization lists, select many repositories,
                 clone in parallel or sequence, import/export URL-only lists, and
                 publish directly into an organization.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">↘</div>
+              <h3>
+                Guided repository functions <span class="tag">Shipped</span>
+              </h3>
+              <p>
+                Shallow-clone with a commit-depth field, then deepen history
+                later from Repository tools; manage cone-mode sparse checkout
+                with validation and an explicit review step.
               </p>
             </article>
 
@@ -286,7 +300,11 @@
         <div class="wrap">
           <span class="eyebrow">Take a look</span>
           <h2 class="section-title">Screenshots</h2>
-          <p class="section-sub">Click any image to open it full size.</p>
+          <p class="section-sub">
+            Click any image to open it full size. Guided task forms wrap text
+            and stack controls as space narrows, avoiding page-level sideways
+            scrolling; spatial code, diff, and log content is the exception.
+          </p>
           <div class="gallery-grid">
             <figure class="shot">
               <a
@@ -408,18 +426,52 @@
 
             <figure class="shot">
               <a
-                href="../docs/assets/screenshots/material-notification-center.png"
+                href="../docs/assets/screenshots/material-github-notifications.png"
                 target="_blank"
                 rel="noopener"
               >
                 <img
-                  src="../docs/assets/screenshots/material-notification-center.png"
-                  alt="Git-backed notification centre with unread and history controls"
+                  src="../docs/assets/screenshots/material-github-notifications.png"
+                  alt="GitHub notifications view with account selection, inbox filters, and the no-signed-in-account state"
                   loading="lazy"
                 />
               </a>
               <figcaption>
-                Notifications <span class="tag">Git-backed</span>
+                GitHub notifications <span class="tag">Account-aware</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-shallow-clone.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-shallow-clone.png"
+                  alt="Clone repository form with shallow clone enabled and a commit-depth field"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Shallow clone <span class="tag">Commit depth</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-sparse-checkout.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-sparse-checkout.png"
+                  alt="Sparse checkout side panel with cone-mode directory validation and review control"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Sparse checkout <span class="tag">Validate · review</span>
               </figcaption>
             </figure>
 

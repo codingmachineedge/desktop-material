@@ -100,8 +100,8 @@ The final pre-documentation integration run at `4da59bd383` recorded:
 - the reproducible build emitted `out/`, and Electron was exercised only on a
   uniquely named off-screen Win32 Headless Desktop with isolated fixture and
   user-data paths;
-- all final promoted captures were visually inspected at original resolution,
-  nonblank, private-data-free, and exactly **1443×992**.
+- all captures in that earlier final set were visually inspected at original
+  resolution, nonblank, private-data-free, and exactly **1443×992**.
 
 ### Final headless capture ledger
 
@@ -120,6 +120,35 @@ Earlier verified captures, including
 `docs/assets/screenshots/settings-history-manager.png`, remain tracked; that M3
 image is also 1443×992 and has SHA-256
 `abbcc34aa02949d2144f008c9ed10b4414f721843890643d65d8e0b9360c3da1`.
+
+### 2026-07-13 guided Git and GitHub evidence
+
+A subsequent exact off-screen run verified three named, task-specific app
+functions at **1000×687**. The app presents focused controls and state for these
+tasks; it does not expose a searchable list of raw Git/`gh` commands or API
+endpoints.
+
+- **GitHub notifications:** the GitHub tab, account selector, inbox filters,
+  refresh guard, and complete no-signed-in-account state fit without clipped
+  labels.
+- **Sparse checkout:** the disabled-state side panel explains cone mode,
+  validates repository-relative directories, and provides an explicit review
+  step before enabling the worktree change.
+- **Shallow clone:** the URL clone form exposes a named toggle and numeric
+  commit-depth field, explains current-branch/submodule scope, and points users
+  to Repository tools for later deepening.
+
+| Screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-github-notifications.png` | 1000×687 | 81,465 | `53f40a94a6ead19b73c6c3302d0eb60b0effd050c7b018b43dd76d4b2072a354` |
+| `docs/assets/screenshots/material-sparse-checkout.png` | 1000×687 | 60,070 | `49a7182f5fd9eb7e0a86d6c20a1ed5b5f388b9063c87d033bfef63d42b7b37e7` |
+| `docs/assets/screenshots/material-shallow-clone.png` | 1000×687 | 67,271 | `337e7a967b538de22bdd560ff9393ff35619fd1ea76e6ff8aea7827793befd59` |
+
+Each promoted PNG was reopened at original resolution and matched the source
+capture's SHA-256. No bundle-import or issue-creation screenshot is included in
+this evidence set. Task forms follow a no-page-level-sideways-scroll policy:
+labels wrap and action groups stack when practical, while horizontal scrolling
+is reserved for spatial code, diff, or log content.
 
 ## Headless verification environment
 
@@ -189,6 +218,9 @@ verification for the documentation merge is pending root finalization**.
   response-redacted.
 - Preserve Material token usage when adapting upstream or Desktop Plus code;
   do not import their branding or SCSS wholesale.
+- Keep named Git and GitHub workflows responsive: prefer wrapping and stacked
+  controls over page-level sideways scrolling, with spatial code/diff/log
+  surfaces as the narrow exception.
 - `build-installers.yml` intentionally publishes a release on qualifying
   non-documentation pushes to `main`; verify whether a docs-only merge is
   correctly skipped before reporting the final release state.

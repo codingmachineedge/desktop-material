@@ -12,6 +12,7 @@ focuses on what Desktop Material adds on top.
 - [Settings history](#settings-history)
 - [Non-modal dialogs](#non-modal-dialogs)
 - [Multi-clone](#multi-clone)
+- [Guided Git and GitHub functions](#guided-git-and-github-functions)
 - [One-click commit & push](#one-click-commit--push)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
@@ -186,6 +187,45 @@ The multi-clone window clones **many repositories in one pass**.
 
 ---
 
+## Guided Git and GitHub functions
+
+Desktop Material turns useful Git, GitHub CLI, and GitHub API capabilities into **named,
+task-specific workflows**. You choose an action, complete a focused form, review any destructive
+or worktree-changing step, and receive the result in the app. The product UI is not a searchable
+catalogue of raw commands or API endpoints.
+
+### Shallow clone
+
+Open **File → Clone repository… → URL** when you need only recent history:
+
+1. Enter the repository URL and local path.
+2. Enable **Shallow clone**.
+3. Set **Commit depth** to the number of commits to fetch.
+4. Review the summary, then choose **Clone**.
+
+The form explains that it fetches the current branch and recursive submodules. If you need older
+history later, use the named deepen-history action in **Repository tools**.
+
+![Shallow clone with a commit-depth control](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-shallow-clone.png)
+
+### Sparse checkout
+
+Open **Repository → Manage sparse checkout…** to keep selected directories in a large worktree.
+The side panel reports whether sparse checkout is enabled, explains cone mode, and accepts one
+repository-relative directory per line. It normalizes slashes and rejects absolute paths,
+traversal, option-like input, control characters, blanks, and duplicates before the review step.
+
+Choose **Review enable** only after the valid-directory count matches your intent. The verified
+disabled state below leaves all working-tree paths eligible to appear locally.
+
+![Sparse-checkout directory editor in its disabled state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
+
+These forms wrap labels and stack actions as space narrows. Page-level sideways scrolling is not
+part of the workflow; only inherently spatial content such as code, diffs, and logs may scroll
+horizontally when preserving columns is necessary.
+
+---
+
 ## One-click commit & push
 
 For quick, low-ceremony commits, use **one-click commit & push**:
@@ -203,17 +243,19 @@ see [Automation](Automation).
 
 ## Notification centre
 
-The **bell** in the app chrome opens the **notification centre** side panel, which is backed by its
-own local git repo.
+The **bell** in the app chrome opens the **notification centre** side panel. Its two named views
+keep local app events separate from GitHub inbox items:
 
-- An **unread badge** on the bell shows how many notifications you haven't seen.
-- **Mark read / unread** individually, or clear the badge in bulk.
-- **Delete** notifications you no longer need.
+- **Local** is backed by its own git repo. An unread badge shows how many notifications you have not
+  seen; you can mark items read/unread or delete them.
+- **GitHub** uses an explicit account selector with **All**, **Unread**, and **Participating only**
+  controls. When no account is signed in, the complete **No signed-in accounts** state remains
+  visible and tells you to sign in before refreshing the inbox.
 
-Because the centre is backed by a git repo, its state is versioned along with the rest of your
-per-account data.
+The account, filters, and empty state are part of the guided inbox workflow rather than a `gh`
+command or GitHub API search screen.
 
-![Git-backed notification centre](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-center.png)
+![GitHub notification view with the no-signed-in-account state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
 
 ---
 
