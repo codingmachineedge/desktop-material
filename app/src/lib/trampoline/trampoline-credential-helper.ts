@@ -19,6 +19,7 @@ import { useExternalCredentialHelper } from './use-external-credential-helper'
 import {
   findGenericTrampolineAccount,
   findGitHubTrampolineAccount,
+  getForcedAccountScope,
 } from './find-account'
 import { IGitAccount } from '../../models/git-account'
 import {
@@ -100,8 +101,12 @@ async function getExternalCredential(input: Credential, token: string) {
 }
 
 /** Implementation of the 'get' git credential helper command */
-async function getCredential(cred: Credential, store: Store, token: string) {
-  const forcedAccountKey = getForcedAccountKey(token)
+async function getCredential(
+  cred: Credential,
+  store: Store,
+  token: string,
+  forcedAccountKey?: string
+) {
   const ghCred = await getGitHubCredential(cred, store, forcedAccountKey)
 
   if (ghCred) {
@@ -254,15 +259,31 @@ export const createCredentialHelperTrampolineHandler: (
   }
 
   try {
+    const forcedAccountKey = getForcedAccountKey(token)
+    const scopedForcedAccountKey =
+      forcedAccountKey === undefined ||
+      (await getForcedAccountScope(
+        store,
+        `${getCredentialUrl(input)}`,
+        forcedAccountKey
+      )) !== 'different-origin'
+        ? forcedAccountKey
+        : undefined
+
     if (firstParameter === 'get') {
-      const cred = await getCredential(input, store, token)
+      const cred = await getCredential(
+        input,
+        store,
+        token,
+        scopedForcedAccountKey
+      )
       if (!cred) {
         const endpoint = `${getCredentialUrl(input)}`
         info(`could not find credential for ${endpoint}`)
         setHasRejectedCredentialsForEndpoint(token, endpoint)
       }
       return cred ? formatCredential(cred) : undefined
-    } else if (getForcedAccountKey(token) !== undefined) {
+    } else if (scopedForcedAccountKey !== undefined) {
       // OAuth credentials selected for a retry are owned by AccountsStore.
       // Never forward their store/erase callbacks to generic helpers.
       return undefined

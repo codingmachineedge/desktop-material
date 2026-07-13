@@ -3,7 +3,10 @@ import assert from 'node:assert'
 import { Account, getAccountKey } from '../../src/models/account'
 import { getDotComAPIEndpoint } from '../../src/lib/api'
 import { AccountsStore } from '../../src/lib/stores'
-import { findGitHubTrampolineAccount } from '../../src/lib/trampoline/find-account'
+import {
+  findGitHubTrampolineAccount,
+  getForcedAccountScope,
+} from '../../src/lib/trampoline/find-account'
 import { createCredentialHelperTrampolineHandler } from '../../src/lib/trampoline/trampoline-credential-helper'
 import { TrampolineCommandIdentifier } from '../../src/lib/trampoline/trampoline-command'
 import {
@@ -33,7 +36,7 @@ const second = new Account(
 )
 const otherOrigin = new Account(
   'other-login',
-  'https://api.example.com',
+  'https://example.com/api',
   'other-token',
   [],
   '',
@@ -63,6 +66,33 @@ describe('trampoline forced account', () => {
         getAccountKey(otherOrigin)
       ),
       undefined
+    )
+  })
+
+  it('scopes a selector to its origin and fails closed when it disappears', async () => {
+    assert.equal(
+      await getForcedAccountScope(
+        store,
+        'https://github.com/owner/repository.git',
+        getAccountKey(second)
+      ),
+      'matching-origin'
+    )
+    assert.equal(
+      await getForcedAccountScope(
+        store,
+        'https://example.com/owner/submodule.git',
+        getAccountKey(second)
+      ),
+      'different-origin'
+    )
+    assert.equal(
+      await getForcedAccountScope(
+        store,
+        'https://github.com/owner/repository.git',
+        'signed-out-account'
+      ),
+      'missing'
     )
   })
 
@@ -101,6 +131,57 @@ describe('trampoline forced account', () => {
       false,
       undefined,
       getAccountKey(second)
+    )
+  })
+
+  it('keeps normal credentials for a cross-origin submodule', async () => {
+    const handler = createCredentialHelperTrampolineHandler(store)
+
+    await withTrampolineEnv(
+      async trampolineEnv => {
+        const token = (trampolineEnv as Record<string, string>)[
+          'DESKTOP_TRAMPOLINE_TOKEN'
+        ]
+        const response = await handler({
+          identifier: TrampolineCommandIdentifier.CredentialHelper,
+          trampolineToken: token,
+          parameters: ['get'],
+          environmentVariables: new Map(),
+          stdin: 'protocol=https\nhost=example.com\npath=owner/submodule.git\n',
+        })
+
+        assert.match(response ?? '', /^username=other-login$/m)
+        assert.match(response ?? '', /^password=other-token$/m)
+      },
+      process.cwd(),
+      false,
+      undefined,
+      getAccountKey(second)
+    )
+  })
+
+  it('keeps a missing same-origin selector authoritative', async () => {
+    const handler = createCredentialHelperTrampolineHandler(store)
+
+    await withTrampolineEnv(
+      async trampolineEnv => {
+        const token = (trampolineEnv as Record<string, string>)[
+          'DESKTOP_TRAMPOLINE_TOKEN'
+        ]
+        const response = await handler({
+          identifier: TrampolineCommandIdentifier.CredentialHelper,
+          trampolineToken: token,
+          parameters: ['get'],
+          environmentVariables: new Map(),
+          stdin: 'protocol=https\nhost=github.com\n',
+        })
+
+        assert.equal(response, undefined)
+      },
+      process.cwd(),
+      false,
+      undefined,
+      'signed-out-account'
     )
   })
 
