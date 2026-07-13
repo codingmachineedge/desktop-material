@@ -791,7 +791,8 @@ class FixtureRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         prefix = f"/{OWNER}/{REPOSITORY}.git"
         if parsed.scheme and (
-            parsed.scheme != "http" or parsed.netloc != "material-provider.invalid"
+            parsed.scheme != "http"
+            or parsed.netloc not in {"material-provider.invalid", "localhost"}
         ):
             return False
         return (

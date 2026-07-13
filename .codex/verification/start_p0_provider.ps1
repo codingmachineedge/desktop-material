@@ -4,7 +4,9 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$PythonExecutable,
   [Parameter(Mandatory = $true)]
-  [string]$SourceRoot
+  [string]$SourceRoot,
+  [ValidateRange(0, 65535)]
+  [int]$Port = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,6 +44,7 @@ $arguments = @(
   '--artifact-file', $artifact,
   '--request-log', $requestLog,
   '--ready-file', $ready,
+  '--port', $Port,
   '--html-url', 'http://material-provider.invalid'
 )
 $startOptions = @{

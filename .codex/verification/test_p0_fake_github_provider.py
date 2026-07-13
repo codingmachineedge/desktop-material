@@ -335,6 +335,13 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                 after = int(run("rev-list", "--count", "HEAD", cwd=clone))
                 self.assertGreater(after, before)
 
+                loopback_identity = (
+                    f"http://localhost/{provider.OWNER}/"
+                    f"{provider.REPOSITORY}.git"
+                )
+                run("remote", "set-url", "origin", loopback_identity, cwd=clone)
+                run("fetch", "--dry-run", "origin", cwd=clone)
+
                 receive_pack_url = (
                     f"http://127.0.0.1:{port}/{provider.OWNER}/"
                     f"{provider.REPOSITORY}.git/info/refs?service=git-receive-pack"
@@ -356,6 +363,15 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                     entry["kind"] == "git"
                     and entry["path"].startswith(
                         f"{provider.FIXTURE_HTML_URL}/{provider.OWNER}/"
+                    )
+                    for entry in logged
+                )
+            )
+            self.assertTrue(
+                any(
+                    entry["kind"] == "git"
+                    and entry["path"].startswith(
+                        f"http://localhost/{provider.OWNER}/"
                     )
                     for entry in logged
                 )
