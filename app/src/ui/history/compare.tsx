@@ -368,7 +368,7 @@ export class CompareSidebar extends React.Component<
           type="search"
           displayClearButton={true}
           prefixedIcon={octicons.search}
-          placeholder="Search title, message, tag or hash"
+          placeholder="Search commits"
           ariaLabel="Search commits by title, message, tag, or hash"
           value={this.state.commitFilterText}
           onValueChanged={this.onCommitFilterTextChanged}

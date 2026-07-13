@@ -1,4 +1,12 @@
 #repository-settings {
+  max-height: calc(100vh - var(--spacing-quad));
+  overflow: hidden;
+
+  .dialog-header,
+  .dialog-footer {
+    flex-shrink: 0;
+  }
+
   .repository-automation-settings {
     padding: var(--spacing-double);
 
@@ -111,10 +119,15 @@
 
   .tab-container {
     display: flex;
+    flex: 1;
+    min-height: 0;
 
     .active-tab {
       border-left: var(--base-border);
       flex: 1;
+      min-width: 0;
+      min-height: 0;
+      overflow-y: auto;
     }
   }
 

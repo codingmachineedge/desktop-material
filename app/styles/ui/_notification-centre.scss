@@ -218,6 +218,18 @@
   list-style: none;
 }
 
+.notification-centre-tabpanel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: -3px;
+  }
+}
+
 .notification-centre-empty {
   display: flex;
   flex: 1;

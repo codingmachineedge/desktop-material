@@ -35,6 +35,9 @@ export class NotificationCentrePanel extends React.Component<
   INotificationCentrePanelProps,
   INotificationCentrePanelState
 > {
+  private allTab: HTMLButtonElement | null = null
+  private unreadTab: HTMLButtonElement | null = null
+
   public constructor(props: INotificationCentrePanelProps) {
     super(props)
     this.state = { filter: 'all', confirmingClear: false }
@@ -64,6 +67,41 @@ export class NotificationCentrePanel extends React.Component<
 
   private onSelectAll = () => this.setState({ filter: 'all' })
   private onSelectUnread = () => this.setState({ filter: 'unread' })
+
+  private onFilterKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    let filter: NotificationFilter | null = null
+
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        filter = this.state.filter === 'all' ? 'unread' : 'all'
+        break
+      case 'Home':
+        filter = 'all'
+        break
+      case 'End':
+        filter = 'unread'
+        break
+    }
+
+    if (filter === null) {
+      return
+    }
+
+    event.preventDefault()
+    this.setState({ filter }, () => {
+      const tab = filter === 'all' ? this.allTab : this.unreadTab
+      tab?.focus()
+    })
+  }
+
+  private onAllTabRef = (element: HTMLButtonElement | null) => {
+    this.allTab = element
+  }
+
+  private onUnreadTabRef = (element: HTMLButtonElement | null) => {
+    this.unreadTab = element
+  }
 
   private onMarkAllRead = () => {
     this.props.dispatcher.markAllNotificationsRead()
@@ -186,22 +224,36 @@ export class NotificationCentrePanel extends React.Component<
   private renderSegmented() {
     const { filter } = this.state
     return (
-      <div className="notification-centre-segmented" role="tablist">
+      <div
+        className="notification-centre-segmented"
+        role="tablist"
+        aria-label="Notification filters"
+      >
         <button
+          id="notification-centre-all-tab"
+          ref={this.onAllTabRef}
           type="button"
           role="tab"
           aria-selected={filter === 'all'}
+          aria-controls="notification-centre-tabpanel"
+          tabIndex={filter === 'all' ? 0 : -1}
           className={classNames({ selected: filter === 'all' })}
           onClick={this.onSelectAll}
+          onKeyDown={this.onFilterKeyDown}
         >
           All
         </button>
         <button
+          id="notification-centre-unread-tab"
+          ref={this.onUnreadTabRef}
           type="button"
           role="tab"
           aria-selected={filter === 'unread'}
+          aria-controls="notification-centre-tabpanel"
+          tabIndex={filter === 'unread' ? 0 : -1}
           className={classNames({ selected: filter === 'unread' })}
           onClick={this.onSelectUnread}
+          onKeyDown={this.onFilterKeyDown}
         >
           Unread
           {this.props.unreadCount > 0 ? ` (${this.props.unreadCount})` : ''}
@@ -247,7 +299,15 @@ export class NotificationCentrePanel extends React.Component<
       >
         {this.renderHeader()}
         {this.renderSegmented()}
-        {this.renderList()}
+        <div
+          id="notification-centre-tabpanel"
+          className="notification-centre-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`notification-centre-${this.state.filter}-tab`}
+          tabIndex={0}
+        >
+          {this.renderList()}
+        </div>
       </section>
     )
   }
