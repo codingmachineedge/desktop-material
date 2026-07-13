@@ -158,6 +158,10 @@ export class GitStore extends BaseStore {
 
   private _stashEntryCount = 0
 
+  private _foreignStashEntryCount = 0
+
+  private _stashInventoryTruncated = false
+
   public constructor(
     private readonly repository: Repository,
     private readonly shell: IAppShell,
@@ -1210,6 +1214,8 @@ export class GitStore extends BaseStore {
 
     this._desktopStashEntries = map
     this._stashEntryCount = stash.stashEntryCount
+    this._foreignStashEntryCount = stash.foreignStashEntryCount
+    this._stashInventoryTruncated = stash.isTruncated
     this.emitUpdate()
 
     this.loadFilesForCurrentStashEntries().catch(error =>
@@ -1231,6 +1237,19 @@ export class GitStore extends BaseStore {
     ReadonlyArray<IStashEntry>
   > {
     return this._desktopStashEntries
+  }
+
+  /** Desktop-managed entries across every branch, grouped in map order. */
+  public get allDesktopStashEntries(): ReadonlyArray<IStashEntry> {
+    return [...this._desktopStashEntries.values()].flat()
+  }
+
+  public get foreignStashEntryCount(): number {
+    return this._foreignStashEntryCount
+  }
+
+  public get stashInventoryTruncated(): boolean {
+    return this._stashInventoryTruncated
   }
 
   /** The total number of stash entries */
@@ -1258,13 +1277,16 @@ export class GitStore extends BaseStore {
     )
   }
 
-  private async loadFilesForStashEntry(stashEntry: IStashEntry): Promise<void> {
+  public async loadFilesForStashEntry(
+    stashEntry: IStashEntry
+  ): Promise<IStashEntry | null> {
     if (stashEntry.files.kind !== StashedChangesLoadStates.NotLoaded) {
-      return
+      return stashEntry
     }
 
     const { branchName } = stashEntry
-    const loadingEntries = this.currentBranchStashEntries.map(entry =>
+    const branchEntries = this._desktopStashEntries.get(branchName) ?? []
+    const loadingEntries = branchEntries.map(entry =>
       entry.stashSha === stashEntry.stashSha
         ? {
             ...entry,
@@ -1285,7 +1307,7 @@ export class GitStore extends BaseStore {
       currentEntries === undefined ||
       !currentEntries.some(entry => entry.stashSha === stashEntry.stashSha)
     ) {
-      return
+      return null
     }
 
     this._desktopStashEntries.set(
@@ -1300,6 +1322,11 @@ export class GitStore extends BaseStore {
       )
     )
     this.emitUpdate()
+    return (
+      this._desktopStashEntries
+        .get(branchName)
+        ?.find(entry => entry.stashSha === stashEntry.stashSha) ?? null
+    )
   }
 
   public async loadRemotes(): Promise<void> {

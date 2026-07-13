@@ -127,7 +127,11 @@ import {
 } from '../../lib/stores/commit-status-store'
 import { MergeTreeResult } from '../../models/merge'
 import { UncommittedChangesStrategy } from '../../models/uncommitted-changes-strategy'
-import { IStashEntry } from '../../models/stash-entry'
+import {
+  ICreateManagedStashRequest,
+  IStashEntry,
+  IUpdateManagedStashRequest,
+} from '../../models/stash-entry'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
 import {
   IBuildRunPreferences,
@@ -3653,14 +3657,79 @@ export class Dispatcher {
     return this.appStore._createStashForCurrentBranch(repository)
   }
 
+  /** Create a named stash from a reviewed all/selected changes scope. */
+  public createManagedStash(
+    repository: Repository,
+    request: ICreateManagedStashRequest,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._createManagedStash(repository, request, signal)
+  }
+
+  /** Apply a stash without consuming its recovery entry. */
+  public applyStashKeepingEntry(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._applyStashKeepingEntry(repository, stashEntry, signal)
+  }
+
+  /** Rename and/or change the branch association of a managed stash. */
+  public updateManagedStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    request: IUpdateManagedStashRequest,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._updateManagedStash(
+      repository,
+      stashEntry,
+      request,
+      signal
+    )
+  }
+
+  /** Create and check out a new local branch from the selected stash. */
+  public createBranchFromManagedStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    branchName: string,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._createBranchFromManagedStash(
+      repository,
+      stashEntry,
+      branchName,
+      signal
+    )
+  }
+
+  /** Clear only the exact Desktop-managed stash identities reviewed by the user. */
+  public clearReviewedManagedStashes(
+    repository: Repository,
+    stashShas: ReadonlyArray<string>,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._clearReviewedManagedStashes(
+      repository,
+      stashShas,
+      signal
+    )
+  }
+
   /** Drops the given stash in the given repository */
   public dropStash(repository: Repository, stashEntry: IStashEntry) {
     return this.appStore._dropStashEntry(repository, stashEntry)
   }
 
   /** Pop the given stash in the given repository */
-  public popStash(repository: Repository, stashEntry: IStashEntry) {
-    return this.appStore._popStashEntry(repository, stashEntry)
+  public popStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._popStashEntry(repository, stashEntry, signal)
   }
 
   /**
