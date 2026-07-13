@@ -22,6 +22,8 @@ describe('IPC channel contract', () => {
   const expectedRequestChannels = [
     'cancel-actions-transfer',
     'actions-transfer-progress',
+    'cancel-github-release-transfer',
+    'github-release-transfer-progress',
     'agent-command',
     'agent-command-result',
     'agent-server-status',
@@ -88,6 +90,8 @@ describe('IPC channel contract', () => {
   const expectedResponseChannels = [
     'download-actions-artifact',
     'fetch-actions-job-log',
+    'download-release-asset',
+    'upload-release-asset',
     'get-agent-server-status',
     'regenerate-agent-server-token',
     'get-path',

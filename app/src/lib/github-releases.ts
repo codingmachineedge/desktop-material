@@ -357,11 +357,14 @@ export function validateGitHubReleaseRepositoryPart(
 }
 
 function normalizeField(
-  value: string,
+  value: unknown,
   label: string,
   maximumLength: number,
   allowEmpty: boolean
 ): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${label} must be text.`)
+  }
   const normalized = value.trim()
   if (
     normalized.length > maximumLength ||
