@@ -18,7 +18,7 @@ async function findTestFilesIn(paths) {
 
     for (const file of await readdir(path, { recursive: true }).then(x =>
       x
-        .filter(f => /-test\.(ts|tsx|js|jsx|mts|mjs)$/.test(f))
+        .filter(f => /(?:-test|\.test)\.(ts|tsx|js|jsx|mts|mjs)$/.test(f))
         .map(f => join(path, f))
     )) {
       files.push(file)
