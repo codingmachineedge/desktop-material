@@ -17,7 +17,7 @@ claiming that its remaining README roadmap items are finished.
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Integration checkpoint `0fb82d988b` contains the
+`codex/guided-final-gate`. Integration checkpoint `36b1ef4bac` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -50,10 +50,16 @@ review, or uncertain post-boundary result fails closed. The merged Issues slice
 passed 47/47 focused API/model/store/UI/style/section-order checks again on the
 integration tree after its production build and branch gates passed.
 
-Provider-neutral triage remains active in its isolated worktree and is merging
-this Issues checkpoint before final handoff. Nothing in this live section
-claims publication on
-`main`: final production build, off-screen
+Provider-neutral triage is now integrated for the exact selected account and
+repository across GitHub, GitLab, and Bitbucket. Its bounded Issues and pull-
+request summaries expose neutral availability, partial-failure, and capped
+states without retaining raw provider payloads, tokens, or repository paths;
+Bitbucket Issues are explicitly reported as unsupported. The final feature
+worktree passed 110 focused API/JSON/store/UI/style/sibling tests, TypeScript,
+full lint and formatting, privacy scans, and an 8 GiB production webpack build.
+Root repeated the combined affected union at 108/108 after merge. Nothing in
+this live section claims publication on `main`: final integration hardening,
+the deterministic account-proof fixture, exhaustive gates, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
 can be closed.
