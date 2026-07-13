@@ -50,6 +50,7 @@ import { IdealSummaryLength } from '../../lib/wrap-rich-text-commit-message'
 import { isEmptyOrWhitespace } from '../../lib/is-empty-or-whitespace'
 import { TooltipDirection } from '../lib/tooltip'
 import { ToggledtippedContent } from '../lib/toggletipped-content'
+import { TooltippedContent } from '../lib/tooltipped-content'
 import { PreferencesTab } from '../../models/preferences'
 import {
   RepoRuleEnforced,
@@ -858,9 +859,14 @@ export class CommitMessage extends React.Component<
         <div className="commit-author-info">
           <span className="commit-author-name">{commitAuthor.name}</span>
           <span className="commit-author-email">{commitAuthor.email}</span>
-          <span className="commit-author-source" title={sourceText}>
+          <TooltippedContent
+            tagName="span"
+            className="commit-author-source"
+            tooltip={sourceText}
+            onlyWhenOverflowed={true}
+          >
             {sourceText}
-          </span>
+          </TooltippedContent>
         </div>
       </div>
     )

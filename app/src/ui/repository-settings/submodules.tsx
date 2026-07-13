@@ -360,81 +360,86 @@ interface ISubmoduleRowProps {
  * A single submodule row. Extracted so the per-row action handlers can be
  * stable instance methods bound to the submodule rather than inline arrows.
  */
-class SubmoduleRow extends React.PureComponent<ISubmoduleRowProps> {
-  private onUpdate = () => this.props.onUpdate(this.props.submodule)
-  private onSyncClicked = () =>
-    this.props.onSyncSubmodule(this.props.submodule)
-  private onRemove = () => this.props.onRemove(this.props.submodule)
+function SubmoduleRow(props: ISubmoduleRowProps) {
+  const { submodule, isBusy, statusPill } = props
+  const onUpdate = React.useCallback(
+    () => props.onUpdate(submodule),
+    [props.onUpdate, submodule]
+  )
+  const onSyncClicked = React.useCallback(
+    () => props.onSyncSubmodule(submodule),
+    [props.onSyncSubmodule, submodule]
+  )
+  const onRemove = React.useCallback(
+    () => props.onRemove(submodule),
+    [props.onRemove, submodule]
+  )
+  const shortSha = submodule.sha ? submodule.sha.slice(0, 8) : '—'
 
-  public render() {
-    const { submodule, isBusy, statusPill } = this.props
-    const shortSha = submodule.sha ? submodule.sha.slice(0, 8) : '—'
-
-    return (
-      <li className="submodule-row">
-        <div className="submodule-row-main">
-          <div className="submodule-row-heading">
-            <Octicon
-              className="submodule-row-icon"
-              symbol={octicons.fileSubmodule}
-            />
-            <span className="submodule-row-path">{submodule.path}</span>
-            {statusPill}
-          </div>
-          <div className="submodule-row-meta">
-            {submodule.url !== null && (
-              <TooltippedContent
-                tagName="span"
-                className="submodule-row-url"
-                tooltip={submodule.url}
-                onlyWhenOverflowed={true}
-              >
-                {submodule.url}
-              </TooltippedContent>
-            )}
-            {submodule.branch !== null && (
-              <span className="submodule-row-branch">
-                <Octicon symbol={octicons.gitBranch} />
-                {submodule.branch}
-              </span>
-            )}
+  return (
+    <li className="submodule-row">
+      <div className="submodule-row-main">
+        <div className="submodule-row-heading">
+          <Octicon
+            className="submodule-row-icon"
+            symbol={octicons.fileSubmodule}
+          />
+          <span className="submodule-row-path">{submodule.path}</span>
+          {statusPill}
+        </div>
+        <div className="submodule-row-meta">
+          {submodule.url !== null && (
             <TooltippedContent
               tagName="span"
-              className="submodule-row-sha"
-              tooltip={submodule.sha ?? ''}
+              className="submodule-row-url"
+              tooltip={submodule.url}
+              onlyWhenOverflowed={true}
             >
-              <Octicon symbol={octicons.gitCommit} />
-              {shortSha}
+              {submodule.url}
             </TooltippedContent>
-          </div>
+          )}
+          {submodule.branch !== null && (
+            <span className="submodule-row-branch">
+              <Octicon symbol={octicons.gitBranch} />
+              {submodule.branch}
+            </span>
+          )}
+          <TooltippedContent
+            tagName="span"
+            className="submodule-row-sha"
+            tooltip={submodule.sha ?? ''}
+          >
+            <Octicon symbol={octicons.gitCommit} />
+            {shortSha}
+          </TooltippedContent>
         </div>
-        <div className="submodule-row-actions">
-          <Button
-            type="button"
-            disabled={isBusy}
-            onClick={this.onUpdate}
-            tooltip="Initialize and update this submodule"
-          >
-            Update
-          </Button>
-          <Button
-            type="button"
-            disabled={isBusy}
-            onClick={this.onSyncClicked}
-            tooltip="Sync the remote URL from .gitmodules"
-          >
-            Sync
-          </Button>
-          <Button
-            type="button"
-            disabled={isBusy}
-            onClick={this.onRemove}
-            tooltip="Deinitialize and remove this submodule"
-          >
-            Remove
-          </Button>
-        </div>
-      </li>
-    )
-  }
+      </div>
+      <div className="submodule-row-actions">
+        <Button
+          type="button"
+          disabled={isBusy}
+          onClick={onUpdate}
+          tooltip="Initialize and update this submodule"
+        >
+          Update
+        </Button>
+        <Button
+          type="button"
+          disabled={isBusy}
+          onClick={onSyncClicked}
+          tooltip="Sync the remote URL from .gitmodules"
+        >
+          Sync
+        </Button>
+        <Button
+          type="button"
+          disabled={isBusy}
+          onClick={onRemove}
+          tooltip="Deinitialize and remove this submodule"
+        >
+          Remove
+        </Button>
+      </div>
+    </li>
+  )
 }

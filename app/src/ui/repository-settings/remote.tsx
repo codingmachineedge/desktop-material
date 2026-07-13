@@ -160,46 +160,44 @@ interface IRemoteRowProps {
  * A single remote row. Extracted so the per-remote URL and remove handlers can
  * be stable instance methods bound to the remote's name.
  */
-class RemoteRow extends React.PureComponent<IRemoteRowProps> {
-  private onUrlChanged = (url: string) => {
-    this.props.onRemoteUrlChanged(this.props.remote.name, url)
-  }
+function RemoteRow(props: IRemoteRowProps) {
+  const { remote, isDefault } = props
+  const onUrlChanged = React.useCallback(
+    (url: string) => props.onRemoteUrlChanged(remote.name, url),
+    [props.onRemoteUrlChanged, remote.name]
+  )
+  const onRemove = React.useCallback(
+    () => props.onRemoveRemote(remote.name),
+    [props.onRemoveRemote, remote.name]
+  )
 
-  private onRemove = () => {
-    this.props.onRemoveRemote(this.props.remote.name)
-  }
-
-  public render() {
-    const { remote, isDefault } = this.props
-
-    return (
-      <div className="remote-row" role="listitem">
-        <div className="remote-name">
-          <Octicon className="remote-icon" symbol={octicons.server} />
-          <span>{remote.name}</span>
-          {isDefault && <span className="remote-badge">origin</span>}
-        </div>
-        <TextBox
-          className="remote-url"
-          placeholder="Remote URL"
-          ariaLabel={`${remote.name} remote URL`}
-          value={remote.url}
-          onValueChanged={this.onUrlChanged}
-        />
-        <Button
-          className="remote-remove"
-          ariaLabel={`Remove ${remote.name} remote`}
-          tooltip={
-            isDefault
-              ? 'The account-bound remote cannot be removed'
-              : `Remove ${remote.name}`
-          }
-          disabled={isDefault}
-          onClick={this.onRemove}
-        >
-          <Octicon symbol={octicons.trash} />
-        </Button>
+  return (
+    <div className="remote-row" role="listitem">
+      <div className="remote-name">
+        <Octicon className="remote-icon" symbol={octicons.server} />
+        <span>{remote.name}</span>
+        {isDefault && <span className="remote-badge">origin</span>}
       </div>
-    )
-  }
+      <TextBox
+        className="remote-url"
+        placeholder="Remote URL"
+        ariaLabel={`${remote.name} remote URL`}
+        value={remote.url}
+        onValueChanged={onUrlChanged}
+      />
+      <Button
+        className="remote-remove"
+        ariaLabel={`Remove ${remote.name} remote`}
+        tooltip={
+          isDefault
+            ? 'The account-bound remote cannot be removed'
+            : `Remove ${remote.name}`
+        }
+        disabled={isDefault}
+        onClick={onRemove}
+      >
+        <Octicon symbol={octicons.trash} />
+      </Button>
+    </div>
+  )
 }
