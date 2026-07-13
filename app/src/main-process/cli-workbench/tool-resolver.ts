@@ -26,6 +26,7 @@ const UnsafeGuidedGitEnvironmentVariables = new Set([
   'GIT_OBJECT_DIRECTORY',
   'GIT_PROXY_COMMAND',
   'GIT_SEQUENCE_EDITOR',
+  'GIT_SHALLOW_FILE',
   'GIT_SSH',
   'GIT_SSH_COMMAND',
   'GIT_SSH_VARIANT',
@@ -35,6 +36,8 @@ const UnsafeGuidedGitEnvironmentVariables = new Set([
   'SSH_ASKPASS',
   'EDITOR',
   'VISUAL',
+  'GIT_TERMINAL_PROMPT',
+  'GCM_INTERACTIVE',
 ])
 
 function sanitizeGuidedGitEnvironment(
@@ -42,11 +45,15 @@ function sanitizeGuidedGitEnvironment(
 ): NodeJS.ProcessEnv {
   const environment = { ...processEnvironment }
   for (const key of Object.keys(environment)) {
+    // Windows environment-variable names are case-insensitive. Normalize every
+    // inherited key before matching so alternate casing cannot preserve an
+    // override that Node later passes to CreateProcess.
+    const normalizedKey = key.toUpperCase()
     if (
-      UnsafeGuidedGitEnvironmentVariables.has(key) ||
-      /^GIT_CONFIG_(?:KEY|VALUE)_\d+$/.test(key) ||
-      /^GIT_TRACE/.test(key) ||
-      /^GIT_REDIRECT_(?:STDIN|STDOUT|STDERR)$/.test(key)
+      UnsafeGuidedGitEnvironmentVariables.has(normalizedKey) ||
+      /^GIT_CONFIG_(?:KEY|VALUE)_\d+$/.test(normalizedKey) ||
+      /^GIT_TRACE/.test(normalizedKey) ||
+      /^GIT_REDIRECT_(?:STDIN|STDOUT|STDERR)$/.test(normalizedKey)
     ) {
       delete environment[key]
     }
@@ -77,6 +84,10 @@ export function resolveCLIWorkbenchTool(
           GIT_EXEC_PATH: undefined,
           // An empty pager disables paging without resolving another binary.
           GIT_PAGER: '',
+          // Guided commands must never stop for hidden terminal or credential
+          // manager prompts. Authentication failures are surfaced in output.
+          GIT_TERMINAL_PROMPT: '0',
+          GCM_INTERACTIVE: 'Never',
         },
         guidedEnvironment
       )

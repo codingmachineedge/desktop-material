@@ -49,6 +49,12 @@ describe('CLI workbench tool resolver', () => {
         GIT_TRACE: 'C:\\private\\trace.log',
         GIT_TRACE2_EVENT: 'C:\\private\\trace2.log',
         GIT_REDIRECT_STDERR: 'C:\\private\\stderr.log',
+        GIT_SHALLOW_FILE: 'C:\\private\\shallow',
+        GIT_TERMINAL_PROMPT: '1',
+        GCM_INTERACTIVE: 'Always',
+        GIT_SSL_CAINFO: 'C:\\trusted\\git-ca.pem',
+        SSL_CERT_FILE: 'C:\\trusted\\ssl-ca.pem',
+        NODE_EXTRA_CA_CERTS: 'C:\\trusted\\node-ca.pem',
       },
       runtimeDirectory
     )
@@ -73,7 +79,41 @@ describe('CLI workbench tool resolver', () => {
     assert.equal(resolved.env.GIT_TRACE, undefined)
     assert.equal(resolved.env.GIT_TRACE2_EVENT, undefined)
     assert.equal(resolved.env.GIT_REDIRECT_STDERR, undefined)
+    assert.equal(resolved.env.GIT_SHALLOW_FILE, undefined)
     assert.equal(resolved.env.GIT_PAGER, '')
+    assert.equal(resolved.env.GIT_TERMINAL_PROMPT, '0')
+    assert.equal(resolved.env.GCM_INTERACTIVE, 'Never')
+    assert.equal(resolved.env.GIT_SSL_CAINFO, 'C:\\trusted\\git-ca.pem')
+    assert.equal(resolved.env.SSL_CERT_FILE, 'C:\\trusted\\ssl-ca.pem')
+    assert.equal(resolved.env.NODE_EXTRA_CA_CERTS, 'C:\\trusted\\node-ca.pem')
+  })
+
+  it('scrubs unsafe Git environment names regardless of casing', () => {
+    const resolved = resolveCLIWorkbenchTool(
+      'git',
+      {
+        git_ssh_command: 'payload --option',
+        Git_Config_Key_7: 'alias.pwn',
+        gIt_CoNfIg_VaLuE_7: '!payload',
+        git_trace2_event: 'C:\\private\\trace.json',
+        GiT_RedirECT_STDERR: 'C:\\private\\stderr.log',
+        gIt_ShAlLoW_FiLe: 'C:\\private\\shallow',
+        git_terminal_prompt: '1',
+        gcm_interactive: 'Always',
+      },
+      resolve('staged-app')
+    )
+
+    assert.equal(resolved.env.git_ssh_command, undefined)
+    assert.equal(resolved.env.Git_Config_Key_7, undefined)
+    assert.equal(resolved.env.gIt_CoNfIg_VaLuE_7, undefined)
+    assert.equal(resolved.env.git_trace2_event, undefined)
+    assert.equal(resolved.env.GiT_RedirECT_STDERR, undefined)
+    assert.equal(resolved.env.gIt_ShAlLoW_FiLe, undefined)
+    assert.equal(resolved.env.git_terminal_prompt, undefined)
+    assert.equal(resolved.env.gcm_interactive, undefined)
+    assert.equal(resolved.env.GIT_TERMINAL_PROMPT, '0')
+    assert.equal(resolved.env.GCM_INTERACTIVE, 'Never')
   })
 
   it('keeps GitHub CLI feature detection on the supplied PATH', () => {
