@@ -28,6 +28,13 @@ import {
 import { HttpStatusCode } from './http-status-code'
 import { CopilotError, parseCopilotPaymentRequiredError } from './copilot-error'
 import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-dialog'
+import {
+  IAPICreatedGitHubIssue,
+  ICreatedGitHubIssue,
+  normalizeGitHubIssueDraft,
+  validateCreatedGitHubIssue,
+  validateGitHubRepositoryPart,
+} from './github-issue'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
 const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
@@ -1425,6 +1432,41 @@ export class API {
       log.warn(`fetchIssues: failed for repository ${owner}/${name}`, e)
       throw e
     }
+  }
+
+  /**
+   * Create one issue using the bounded fields exposed by the guided Desktop
+   * flow. The response URL is validated against this client's provider before
+   * it is returned to a caller that may offer to open it.
+   */
+  public async createIssue(
+    owner: string,
+    name: string,
+    title: string,
+    body: string,
+    signal?: AbortSignal
+  ): Promise<ICreatedGitHubIssue> {
+    signal?.throwIfAborted()
+
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const draft = normalizeGitHubIssueDraft(title, body)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/issues`
+    const response = await this.ghRequest('POST', path, {
+      body: draft,
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const issue = await parsedResponse<IAPICreatedGitHubIssue>(response)
+
+    return validateCreatedGitHubIssue(
+      issue,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
   }
 
   /** Fetch all open pull requests in the given repository. */
