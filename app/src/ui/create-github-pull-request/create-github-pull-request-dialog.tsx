@@ -11,10 +11,14 @@ import {
   IGitHubPullRequestBaseBranch,
   IGitHubPullRequestDraft,
   IGitHubPullRequestHeadRepository,
+  IGitHubPullRequestMetadata,
   IGitHubPullRequestTarget,
   isGitHubPullRequestAbortError,
   normalizeGitHubPullRequestDraft,
+  normalizeGitHubPullRequestMetadata,
+  parseGitHubPullRequestMetadataField,
 } from '../../lib/github-pull-request'
+import { IGitHubPullRequestTemplate } from '../../lib/github-pull-request-templates'
 import { Account, getAccountKey } from '../../models/account'
 import { Branch } from '../../models/branch'
 import { IRemote } from '../../models/remote'
@@ -60,6 +64,12 @@ interface ICreateGitHubPullRequestDialogState {
   readonly title: string
   readonly body: string
   readonly draft: boolean
+  readonly templatePath: string
+  readonly templates: ReadonlyArray<IGitHubPullRequestTemplate>
+  readonly templatesLoading: boolean
+  readonly reviewers: string
+  readonly assignees: string
+  readonly labels: string
   readonly error: string | null
   readonly successReceipt: ICreateGitHubPullRequestSuccessReceipt | null
   readonly openingBrowser: boolean
@@ -81,6 +91,7 @@ interface ICreateGitHubPullRequestSuccessReceipt {
   readonly targetName: string
   readonly accountLogin: string
   readonly reviewed: IGitHubPullRequestDraft
+  readonly metadata: IGitHubPullRequestMetadata
 }
 
 const CancellationResultMessage =
@@ -143,6 +154,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
   public declare context: React.ContextType<typeof DialogStackContext>
 
   private request: AbortController | null = null
+  private templateRequest: AbortController | null = null
   private requestGeneration = 0
   private mounted = false
   private titleInput: HTMLInputElement | null = null
@@ -172,6 +184,12 @@ export class CreateGitHubPullRequestDialog extends React.Component<
       title: props.currentBranch.nameWithoutRemote,
       body: '',
       draft: false,
+      templatePath: '',
+      templates: [],
+      templatesLoading: true,
+      reviewers: '',
+      assignees: '',
+      labels: '',
       error: null,
       successReceipt: null,
       openingBrowser: false,
@@ -220,12 +238,28 @@ export class CreateGitHubPullRequestDialog extends React.Component<
 
   public componentDidMount() {
     this.mounted = true
+    const request = new AbortController()
+    this.templateRequest = request
+    void this.props.dispatcher
+      .loadGitHubPullRequestTemplates(this.props.repository, request.signal)
+      .then(templates => {
+        if (this.mounted && this.templateRequest === request) {
+          this.setState({ templates, templatesLoading: false })
+        }
+      })
+      .catch(() => {
+        if (this.mounted && this.templateRequest === request) {
+          this.setState({ templates: [], templatesLoading: false })
+        }
+      })
   }
 
   public componentWillUnmount() {
     this.mounted = false
     this.requestGeneration++
     this.request?.abort()
+    this.templateRequest?.abort()
+    this.templateRequest = null
   }
 
   public componentDidUpdate(
@@ -454,6 +488,35 @@ export class CreateGitHubPullRequestDialog extends React.Component<
   private onDraftChanged = (event: React.FormEvent<HTMLInputElement>) =>
     this.setState({ draft: event.currentTarget.checked, error: null })
 
+  private onTemplateChanged = (event: React.FormEvent<HTMLSelectElement>) => {
+    const templatePath = event.currentTarget.value
+    const template = this.state.templates.find(
+      candidate => candidate.path === templatePath
+    )
+    this.setState({
+      templatePath,
+      body: template?.body ?? '',
+      error: null,
+    })
+  }
+
+  private onReviewersChanged = (event: React.FormEvent<HTMLInputElement>) =>
+    this.setState({ reviewers: event.currentTarget.value, error: null })
+
+  private onAssigneesChanged = (event: React.FormEvent<HTMLInputElement>) =>
+    this.setState({ assignees: event.currentTarget.value, error: null })
+
+  private onLabelsChanged = (event: React.FormEvent<HTMLInputElement>) =>
+    this.setState({ labels: event.currentTarget.value, error: null })
+
+  private getReviewedMetadata(): IGitHubPullRequestMetadata {
+    return normalizeGitHubPullRequestMetadata(
+      parseGitHubPullRequestMetadataField(this.state.reviewers),
+      parseGitHubPullRequestMetadataField(this.state.assignees),
+      parseGitHubPullRequestMetadataField(this.state.labels)
+    )
+  }
+
   private onSubmit = () => {
     if (!this.canPerformAction()) {
       return
@@ -489,6 +552,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         this.state.draft,
         availability.headRepository
       )
+      this.getReviewedMetadata()
       this.setState({
         step: 'review',
         title: draft.title,
@@ -537,7 +601,8 @@ export class CreateGitHubPullRequestDialog extends React.Component<
       return
     }
 
-    let draft
+    let draft: IGitHubPullRequestDraft
+    let metadata: IGitHubPullRequestMetadata
     try {
       draft = normalizeGitHubPullRequestDraft(
         this.state.title,
@@ -547,6 +612,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         this.state.draft,
         availability.headRepository
       )
+      metadata = this.getReviewedMetadata()
     } catch (error) {
       this.setState({
         step: 'compose',
@@ -576,13 +642,10 @@ export class CreateGitHubPullRequestDialog extends React.Component<
           this.props.providerHTMLURL,
           this.props.contextVersion,
           draft,
+          metadata,
           request.signal
         )
       if (!this.mounted || generation !== this.requestGeneration) {
-        return
-      }
-      if (request.signal.aborted) {
-        this.showCancellationResult()
         return
       }
       this.setState({
@@ -592,6 +655,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
           targetName: availability.target.repository.fullName,
           accountLogin: availability.account.login,
           reviewed: draft,
+          metadata,
         },
         error: null,
         abortRequested: false,
@@ -851,6 +915,30 @@ export class CreateGitHubPullRequestDialog extends React.Component<
             </small>
           </label>
           <label className="create-github-pull-request-field">
+            <span>Template</span>
+            <select
+              aria-label="Pull request template"
+              value={this.state.templatePath}
+              disabled={this.state.templatesLoading}
+              onChange={this.onTemplateChanged}
+            >
+              <option value="">
+                {this.state.templatesLoading
+                  ? 'Loading templates…'
+                  : 'No template'}
+              </option>
+              {this.state.templates.map(template => (
+                <option key={template.path} value={template.path}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+            <small>
+              Selecting a template replaces the description with its reviewed
+              local content.
+            </small>
+          </label>
+          <label className="create-github-pull-request-field">
             <span>Description (optional)</span>
             <textarea
               value={this.state.body}
@@ -870,6 +958,45 @@ export class CreateGitHubPullRequestDialog extends React.Component<
             value={this.state.draft ? CheckboxValue.On : CheckboxValue.Off}
             onChange={this.onDraftChanged}
           />
+          <div
+            className="create-github-pull-request-metadata"
+            role="group"
+            aria-label="Pull request metadata"
+          >
+            <label className="create-github-pull-request-field">
+              <span>Reviewers (optional)</span>
+              <input
+                type="text"
+                value={this.state.reviewers}
+                aria-label="Reviewers (optional)"
+                placeholder="octocat, reviewer-two"
+                onChange={this.onReviewersChanged}
+              />
+            </label>
+            <label className="create-github-pull-request-field">
+              <span>Assignees (optional)</span>
+              <input
+                type="text"
+                value={this.state.assignees}
+                aria-label="Assignees (optional)"
+                placeholder="octocat"
+                onChange={this.onAssigneesChanged}
+              />
+            </label>
+            <label className="create-github-pull-request-field">
+              <span>Labels (optional)</span>
+              <input
+                type="text"
+                value={this.state.labels}
+                aria-label="Labels (optional)"
+                placeholder="ready, documentation"
+                onChange={this.onLabelsChanged}
+              />
+            </label>
+            <small>
+              Separate multiple values with commas. Maximum 15 each.
+            </small>
+          </div>
         </DialogContent>
         <DialogFooter>
           <div className="button-group">
@@ -890,6 +1017,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     const account = availability.account!
     const head = availability.head!
     const headRepository = availability.headRepository!
+    const metadata = this.getReviewedMetadata()
     return (
       <>
         <DialogContent className="create-github-pull-request-content">
@@ -922,6 +1050,12 @@ export class CreateGitHubPullRequestDialog extends React.Component<
               ) : (
                 this.state.body
               )}
+            </div>
+            <span className="create-github-pull-request-eyebrow">Metadata</span>
+            <div className="create-github-pull-request-review-metadata">
+              <span>Reviewers: {metadata.reviewers.join(', ') || 'None'}</span>
+              <span>Assignees: {metadata.assignees.join(', ') || 'None'}</span>
+              <span>Labels: {metadata.labels.join(', ') || 'None'}</span>
             </div>
           </div>
           <p id="create-github-pull-request-confirmation">
@@ -981,7 +1115,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     if (receipt === null) {
       return null
     }
-    const { created, reviewed } = receipt
+    const { created, reviewed, metadata } = receipt
     return (
       <>
         <DialogContent className="create-github-pull-request-content">
@@ -1001,12 +1135,22 @@ export class CreateGitHubPullRequestDialog extends React.Component<
             {reviewed.headRepository.name !== null && (
               <span>Head repository: {reviewed.headRepository.fullName}</span>
             )}
+            <span>
+              Reviewers: {metadata.reviewers.join(', ') || 'None'} · Assignees:{' '}
+              {metadata.assignees.join(', ') || 'None'} · Labels:{' '}
+              {metadata.labels.join(', ') || 'None'}
+            </span>
             <p>{reviewed.title}</p>
             {reviewed.body !== '' && (
               <div className="create-github-pull-request-review-body">
                 {reviewed.body}
               </div>
             )}
+            {(created.metadataWarnings ?? []).map(warning => (
+              <p key={warning} role="alert">
+                {warning}
+              </p>
+            ))}
           </div>
         </DialogContent>
         <DialogFooter>

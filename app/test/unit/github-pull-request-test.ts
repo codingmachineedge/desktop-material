@@ -9,10 +9,17 @@ import {
   getGitHubPullRequestHead,
   getGitHubPullRequestHeadRepository,
   GitHubPullRequestBodyMaximumLength,
+  GitHubPullRequestMetadataMaximumItems,
   GitHubPullRequestTitleMaximumLength,
   normalizeGitHubPullRequestDraft,
+  normalizeGitHubPullRequestMetadata,
+  normalizeGitHubPullRequestReview,
+  normalizeGitHubPullRequestUpdate,
+  parseGitHubPullRequestMetadataField,
   resolveRefreshedGitHubPullRequestBranch,
   validateCreatedGitHubPullRequest,
+  validateGitHubPullRequestLifecycle,
+  validateGitHubPullRequestMergeReceipt,
   validateGitHubPullRequestDraftRouting,
   validateGitHubPullRequestBranch,
 } from '../../src/lib/github-pull-request'
@@ -818,5 +825,156 @@ describe('GitHub pull request validation', () => {
     )
     assert.equal(permission.kind, 'permission')
     assert.doesNotMatch(permission.message, /secret title/i)
+  })
+})
+
+describe('GitHub pull request lifecycle validation', () => {
+  const lifecycle = {
+    number: 42,
+    title: 'Lifecycle PR',
+    body: 'Reviewed body',
+    html_url: 'https://github.com/desktop/material/pull/42',
+    state: 'open' as const,
+    draft: false,
+    merged: false,
+    mergeable: true,
+    mergeable_state: 'clean',
+    head: {
+      ref: 'feature/lifecycle',
+      sha: 'a'.repeat(40),
+      repo: { full_name: 'octocat/material' },
+    },
+    base: { ref: 'main' },
+    requested_reviewers: [{ login: 'reviewer-one' }],
+    assignees: [{ login: 'octocat' }],
+    labels: [{ name: 'ready for review' }],
+  }
+
+  it('normalizes bounded metadata and exact update/review fields', () => {
+    assert.deepEqual(
+      normalizeGitHubPullRequestMetadata(
+        [' Reviewer-One ', 'reviewer-one'],
+        ['octocat'],
+        [' ready for review ']
+      ),
+      {
+        reviewers: ['reviewer-one'],
+        assignees: ['octocat'],
+        labels: ['ready for review'],
+      }
+    )
+    assert.deepEqual(parseGitHubPullRequestMetadataField('a, b ,c'), [
+      'a',
+      'b',
+      'c',
+    ])
+    assert.deepEqual(
+      normalizeGitHubPullRequestUpdate('  Updated  ', 'body', 'release', {
+        reviewers: [],
+        assignees: [],
+        labels: [],
+      }),
+      {
+        title: 'Updated',
+        body: 'body',
+        base: 'release',
+        metadata: { reviewers: [], assignees: [], labels: [] },
+      }
+    )
+    assert.deepEqual(
+      normalizeGitHubPullRequestReview('APPROVE', 'Looks good'),
+      {
+        event: 'APPROVE',
+        body: 'Looks good',
+      }
+    )
+    assert.throws(() => normalizeGitHubPullRequestReview('REQUEST_CHANGES', ''))
+  })
+
+  it('rejects oversized, ambiguous, and malformed metadata', () => {
+    assert.throws(() =>
+      normalizeGitHubPullRequestMetadata(
+        new Array(GitHubPullRequestMetadataMaximumItems + 1).fill('octocat'),
+        [],
+        []
+      )
+    )
+    for (const login of ['', '-leading', 'trailing-', 'space name', '../x']) {
+      assert.throws(() => normalizeGitHubPullRequestMetadata([login], [], []))
+    }
+    for (const label of ['', 'x'.repeat(51), 'line\nbreak']) {
+      assert.throws(() => normalizeGitHubPullRequestMetadata([], [], [label]))
+    }
+  })
+
+  it('validates an exact provider-bound lifecycle snapshot', () => {
+    assert.deepEqual(
+      validateGitHubPullRequestLifecycle(
+        lifecycle,
+        'desktop',
+        'material',
+        42,
+        'https://github.com'
+      ),
+      {
+        number: 42,
+        title: 'Lifecycle PR',
+        body: 'Reviewed body',
+        url: 'https://github.com/desktop/material/pull/42',
+        state: 'open',
+        draft: false,
+        merged: false,
+        mergeable: true,
+        mergeableState: 'clean',
+        headRef: 'feature/lifecycle',
+        headSHA: 'a'.repeat(40),
+        headRepository: 'octocat/material',
+        base: 'main',
+        metadata: {
+          reviewers: ['reviewer-one'],
+          assignees: ['octocat'],
+          labels: ['ready for review'],
+        },
+      }
+    )
+
+    for (const value of [
+      { ...lifecycle, number: 43 },
+      { ...lifecycle, html_url: 'https://evil.test/desktop/material/pull/42' },
+      { ...lifecycle, head: { ...lifecycle.head, sha: 'not-a-sha' } },
+      { ...lifecycle, head: { ...lifecycle.head, repo: null } },
+      { ...lifecycle, mergeable_state: 'bad\nstate' },
+    ]) {
+      assert.throws(() =>
+        validateGitHubPullRequestLifecycle(
+          value,
+          'desktop',
+          'material',
+          42,
+          'https://github.com'
+        )
+      )
+    }
+  })
+
+  it('requires an affirmative, bounded merge response', () => {
+    assert.deepEqual(
+      validateGitHubPullRequestMergeReceipt({
+        merged: true,
+        sha: 'b'.repeat(40),
+        message: 'provider-controlled text',
+      }),
+      {
+        merged: true,
+        sha: 'b'.repeat(40),
+        message: 'Pull request merged.',
+      }
+    )
+    assert.throws(() =>
+      validateGitHubPullRequestMergeReceipt({
+        merged: false,
+        sha: 'b'.repeat(40),
+      })
+    )
   })
 })

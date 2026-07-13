@@ -93,6 +93,7 @@ import { FileHistory } from './file-history'
 import { SparseCheckoutManager } from './sparse-checkout'
 import { CreateGitHubIssueDialog } from './create-github-issue'
 import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
+import { GitHubPullRequestLifecycleDialog } from './github-pull-request-lifecycle'
 import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { MergeAllDialog } from './merge-all'
@@ -1957,6 +1958,18 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       }
+      case PopupType.GitHubPullRequestLifecycle:
+        return (
+          <GitHubPullRequestLifecycleDialog
+            key={`github-pull-request-lifecycle-${popup.repository.id}-${popup.pullRequest.pullRequestNumber}`}
+            repository={popup.repository}
+            pullRequest={popup.pullRequest}
+            baseBranchNames={popup.baseBranchNames}
+            accounts={this.state.accounts}
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       case PopupType.SparseCheckout:
         return (
           <SparseCheckoutManager

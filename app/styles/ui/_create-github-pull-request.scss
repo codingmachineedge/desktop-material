@@ -19,6 +19,8 @@
   .create-github-pull-request-context,
   .create-github-pull-request-review,
   .create-github-pull-request-review-body,
+  .create-github-pull-request-review-metadata,
+  .create-github-pull-request-metadata,
   .create-github-pull-request-success,
   .create-github-pull-request-availability,
   .create-github-pull-request-browser-note {
@@ -52,6 +54,17 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing);
+}
+
+.create-github-pull-request-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing);
+
+  > small {
+    grid-column: 1 / -1;
+    color: var(--text-secondary-color);
+  }
 }
 
 .create-github-pull-request-field {
@@ -158,6 +171,15 @@
   }
 }
 
+.create-github-pull-request-review-metadata {
+  display: grid;
+  gap: var(--spacing-half);
+
+  span {
+    overflow-wrap: anywhere;
+  }
+}
+
 .create-github-pull-request-browser-note,
 #create-github-pull-request-confirmation {
   margin: 0;
@@ -170,8 +192,13 @@
 }
 
 @media (max-width: 620px) {
-  .create-github-pull-request-routing {
+  .create-github-pull-request-routing,
+  .create-github-pull-request-metadata {
     grid-template-columns: minmax(0, 1fr);
+
+    > small {
+      grid-column: auto;
+    }
   }
 }
 

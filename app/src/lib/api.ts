@@ -36,11 +36,30 @@ import {
   validateGitHubRepositoryPart,
 } from './github-issue'
 import {
+  EmptyGitHubPullRequestMetadata,
+  GitHubPullRequestContextChangedError,
   IAPICreatedGitHubPullRequest,
+  IAPIGitHubPullRequestLifecycle,
   ICreatedGitHubPullRequest,
+  IGitHubPullRequestLifecycle,
+  IGitHubPullRequestMergeReceipt,
+  IGitHubPullRequestMetadata,
+  IGitHubPullRequestMutationReceipt,
+  IGitHubPullRequestReview,
+  IGitHubPullRequestReviewReceipt,
+  IGitHubPullRequestUpdate,
   IGitHubPullRequestHeadRepository,
+  GitHubPullRequestMergeMethod,
   normalizeGitHubPullRequestDraft,
+  normalizeGitHubPullRequestMetadata,
+  normalizeGitHubPullRequestReview,
+  normalizeGitHubPullRequestUpdate,
   validateCreatedGitHubPullRequest,
+  validateGitHubPullRequestHeadSHA,
+  validateGitHubPullRequestLifecycle,
+  validateGitHubPullRequestMergeReceipt,
+  validateGitHubPullRequestNumber,
+  validateGitHubPullRequestReviewReceipt,
 } from './github-pull-request'
 import {
   ActionsArtifactMaximumPages,
@@ -1497,7 +1516,8 @@ export class API {
     base: string,
     draft: boolean,
     headRepository: IGitHubPullRequestHeadRepository,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    metadata: IGitHubPullRequestMetadata = EmptyGitHubPullRequestMetadata
   ): Promise<ICreatedGitHubPullRequest> {
     signal?.throwIfAborted()
 
@@ -1510,6 +1530,11 @@ export class API {
       base,
       draft,
       headRepository
+    )
+    const safeMetadata = normalizeGitHubPullRequestMetadata(
+      metadata.reviewers,
+      metadata.assignees,
+      metadata.labels
     )
     const requestBody = {
       title: pullRequest.title,
@@ -1530,13 +1555,341 @@ export class API {
       signal,
     })
     const created = await parsedResponse<IAPICreatedGitHubPullRequest>(response)
-
-    return validateCreatedGitHubPullRequest(
+    const validated = validateCreatedGitHubPullRequest(
       created,
       safeOwner,
       safeName,
       getHTMLURL(this.endpoint),
       pullRequest
+    )
+    const metadataWarnings = await this.applyCreatedPullRequestMetadata(
+      safeOwner,
+      safeName,
+      validated.number,
+      safeMetadata,
+      signal
+    )
+    return metadataWarnings.length === 0
+      ? validated
+      : { ...validated, metadataWarnings }
+  }
+
+  private async applyCreatedPullRequestMetadata(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    metadata: IGitHubPullRequestMetadata,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<string>> {
+    const warnings = new Array<string>()
+    const root = `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      name
+    )}`
+
+    if (metadata.reviewers.length > 0) {
+      try {
+        const response = await this.ghRequest(
+          'POST',
+          `${root}/pulls/${pullRequestNumber}/requested_reviewers`,
+          {
+            body: { reviewers: metadata.reviewers },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await parsedResponse<unknown>(response)
+      } catch {
+        warnings.push(
+          'The pull request was created, but reviewers were not requested.'
+        )
+      }
+    }
+
+    if (metadata.assignees.length > 0 || metadata.labels.length > 0) {
+      try {
+        const response = await this.ghRequest(
+          'PATCH',
+          `${root}/issues/${pullRequestNumber}`,
+          {
+            body: {
+              assignees: metadata.assignees,
+              labels: metadata.labels,
+            },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await parsedResponse<unknown>(response)
+      } catch {
+        warnings.push(
+          'The pull request was created, but assignees or labels were not applied.'
+        )
+      }
+    }
+    return warnings
+  }
+
+  /** Load one exact pull request for the native lifecycle workbench. */
+  public async inspectPullRequest(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestLifecycle> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}`,
+      {
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const value = await parsedResponse<IAPIGitHubPullRequestLifecycle>(response)
+    return validateGitHubPullRequestLifecycle(
+      value,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Update reviewed PR fields and exact metadata lists for one head snapshot. */
+  public async updatePullRequestLifecycle(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    update: IGitHubPullRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    const safeUpdate = normalizeGitHubPullRequestUpdate(
+      update.title,
+      update.body,
+      update.base,
+      update.metadata
+    )
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (current.state !== 'open' || current.merged) {
+      throw new Error('Only an open pull request can be updated.')
+    }
+
+    const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}`
+    const response = await this.ghRequest(
+      'PATCH',
+      `${root}/pulls/${safeNumber}`,
+      {
+        body: {
+          title: safeUpdate.title,
+          body: safeUpdate.body,
+          base: safeUpdate.base,
+        },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const updatedValue = await parsedResponse<IAPIGitHubPullRequestLifecycle>(
+      response
+    )
+    validateGitHubPullRequestLifecycle(
+      updatedValue,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+
+    const warnings = new Array<string>()
+    const currentReviewerKeys = new Set(
+      current.metadata.reviewers.map(login => login.toLowerCase())
+    )
+    const requestedReviewerKeys = new Set(
+      safeUpdate.metadata.reviewers.map(login => login.toLowerCase())
+    )
+    const reviewersToAdd = safeUpdate.metadata.reviewers.filter(
+      login => !currentReviewerKeys.has(login.toLowerCase())
+    )
+    const reviewersToRemove = current.metadata.reviewers.filter(
+      login => !requestedReviewerKeys.has(login.toLowerCase())
+    )
+    try {
+      if (reviewersToAdd.length > 0) {
+        const addResponse = await this.ghRequest(
+          'POST',
+          `${root}/pulls/${safeNumber}/requested_reviewers`,
+          {
+            body: { reviewers: reviewersToAdd },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await parsedResponse<unknown>(addResponse)
+      }
+      if (reviewersToRemove.length > 0) {
+        const removeResponse = await this.ghRequest(
+          'DELETE',
+          `${root}/pulls/${safeNumber}/requested_reviewers`,
+          {
+            body: { reviewers: reviewersToRemove },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await parsedResponse<unknown>(removeResponse)
+      }
+    } catch {
+      warnings.push('Reviewer requests were not fully updated.')
+    }
+
+    try {
+      const issueResponse = await this.ghRequest(
+        'PATCH',
+        `${root}/issues/${safeNumber}`,
+        {
+          body: {
+            assignees: safeUpdate.metadata.assignees,
+            labels: safeUpdate.metadata.labels,
+          },
+          customHeaders: { Accept: 'application/vnd.github+json' },
+          signal,
+        }
+      )
+      await parsedResponse<unknown>(issueResponse)
+    } catch {
+      warnings.push('Assignees or labels were not fully updated.')
+    }
+
+    const pullRequest = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (pullRequest.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    return { pullRequest, warnings }
+  }
+
+  /** Submit one bounded top-level review against an unchanged head. */
+  public async submitPullRequestReview(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    review: IGitHubPullRequestReview,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestReviewReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    const safeReview = normalizeGitHubPullRequestReview(
+      review.event,
+      review.body
+    )
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (current.state !== 'open' || current.merged) {
+      throw new Error('Only an open pull request can be reviewed.')
+    }
+    const response = await this.ghRequest(
+      'POST',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}/reviews`,
+      {
+        body: safeReview,
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const value = await parsedResponse<unknown>(response)
+    return validateGitHubPullRequestReviewReceipt(
+      value,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Merge one unchanged, ready pull request with an allowlisted method. */
+  public async mergePullRequest(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    method: GitHubPullRequestMergeMethod,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMergeReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    if (!['merge', 'squash', 'rebase'].includes(method)) {
+      throw new Error('Choose a supported pull request merge method.')
+    }
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (
+      current.state !== 'open' ||
+      current.merged ||
+      current.draft ||
+      current.mergeable === false
+    ) {
+      throw new Error('This pull request is not ready to merge.')
+    }
+    const response = await this.ghRequest(
+      'PUT',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}/merge`,
+      {
+        body: { sha: safeHeadSHA, merge_method: method },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    return validateGitHubPullRequestMergeReceipt(
+      await parsedResponse<unknown>(response)
     )
   }
 

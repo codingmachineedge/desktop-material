@@ -64,6 +64,7 @@ import type {
 } from '../../lib/stores/copilot-store'
 import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
+import { PullRequestLifecycleStore } from '../../lib/stores/pull-request-lifecycle-store'
 import { getTipSha } from '../../lib/tip'
 import type {
   IAutomationSettingsOverrides,
@@ -182,10 +183,23 @@ import {
 import { ICreatedGitHubIssue } from '../../lib/github-issue'
 import {
   GitHubPullRequestContextChangedError,
+  GitHubPullRequestMergeMethod,
   ICreatedGitHubPullRequest,
   IGitHubPullRequestDraft,
+  IGitHubPullRequestLifecycle,
+  IGitHubPullRequestMergeReceipt,
+  IGitHubPullRequestMetadata,
+  IGitHubPullRequestMutationReceipt,
+  IGitHubPullRequestReview,
+  IGitHubPullRequestReviewReceipt,
+  IGitHubPullRequestUpdate,
   validateGitHubPullRequestDraftRouting,
+  validateGitHubPullRequestNumber,
 } from '../../lib/github-pull-request'
+import {
+  IGitHubPullRequestTemplate,
+  loadGitHubPullRequestTemplates,
+} from '../../lib/github-pull-request-templates'
 
 /**
  * An error handler function.
@@ -233,6 +247,7 @@ function parseOverrideCommand(override: string | undefined): ICommand | null {
  */
 export class Dispatcher {
   private readonly errorHandlers = new Array<ErrorHandler>()
+  private readonly pullRequestLifecycleStore = new PullRequestLifecycleStore()
   public incrementMetric: StatsStore['increment']
 
   public constructor(
@@ -3223,6 +3238,22 @@ export class Dispatcher {
     this.appStore._showCreateGitHubPullRequest(repository, branch, baseBranch)
   }
 
+  /** Open the native inspect/update/review/merge workbench. */
+  public showGitHubPullRequestLifecycle(
+    repository: Repository,
+    pullRequest: PullRequest
+  ): void {
+    this.appStore._showGitHubPullRequestLifecycle(repository, pullRequest)
+  }
+
+  /** Read bounded conventional templates from the exact local worktree. */
+  public loadGitHubPullRequestTemplates(
+    repository: Repository,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<IGitHubPullRequestTemplate>> {
+    return loadGitHubPullRequestTemplates(repository, signal)
+  }
+
   /**
    * Show the current pull request on github.com
    */
@@ -3752,6 +3783,7 @@ export class Dispatcher {
     providerHTMLURL: string,
     contextVersion: string,
     draft: IGitHubPullRequestDraft,
+    metadata: IGitHubPullRequestMetadata,
     signal: AbortSignal
   ): Promise<ICreatedGitHubPullRequest> {
     if (
@@ -3806,8 +3838,132 @@ export class Dispatcher {
       draft.base,
       draft.draft,
       draft.headRepository,
+      signal,
+      metadata
+    )
+  }
+
+  private getGitHubPullRequestLifecycleTarget(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    mutation: boolean
+  ): GitHubRepository {
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new Error('This repository is not connected to GitHub.')
+    }
+    const target = pullRequest.base.gitHubRepository
+    validateGitHubPullRequestNumber(pullRequest.pullRequestNumber)
+    if (getNonForkGitHubRepository(repository).hash !== target.hash) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('No matching authenticated GitHub account is available.')
+    }
+    if (mutation && target.isArchived) {
+      throw new Error('Archived repositories cannot update pull requests.')
+    }
+    return target
+  }
+
+  public inspectGitHubPullRequest(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestLifecycle> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      false
+    )
+    return this.pullRequestLifecycleStore.inspect(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
       signal
     )
+  }
+
+  public async updateGitHubPullRequest(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    update: IGitHubPullRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    const receipt = await this.pullRequestLifecycleStore.update(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      update,
+      signal
+    )
+    void this.appStore._refreshPullRequests(repository)
+    return receipt
+  }
+
+  public submitGitHubPullRequestReview(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    review: IGitHubPullRequestReview,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestReviewReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    return this.pullRequestLifecycleStore.review(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      review,
+      signal
+    )
+  }
+
+  public async mergeGitHubPullRequest(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    method: GitHubPullRequestMergeMethod,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMergeReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    const receipt = await this.pullRequestLifecycleStore.merge(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      method,
+      signal
+    )
+    void this.appStore._refreshPullRequests(repository)
+    return receipt
   }
 
   public setRepositoryIndicatorsEnabled(repositoryIndicatorsEnabled: boolean) {

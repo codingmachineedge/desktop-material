@@ -5,6 +5,7 @@ import * as React from 'react'
 import {
   ICreatedGitHubPullRequest,
   IGitHubPullRequestDraft,
+  IGitHubPullRequestMetadata,
   IGitHubPullRequestTarget,
 } from '../../../src/lib/github-pull-request'
 import { APIError } from '../../../src/lib/http'
@@ -165,6 +166,7 @@ class TestDispatcher {
     providerHTMLURL: string
     contextVersion: string
     draft: IGitHubPullRequestDraft
+    metadata: IGitHubPullRequestMetadata
     signal: AbortSignal
   }>()
   public browserCalls = new Array<{
@@ -173,6 +175,17 @@ class TestDispatcher {
     sourceRemote: IRemote | null
   }>()
   public openedURLs = new Array<string>()
+  public templates = [
+    {
+      name: 'Bug fix',
+      path: '.github/PULL_REQUEST_TEMPLATE/bug_fix.md',
+      body: '## Bug fix template',
+    },
+  ]
+
+  public async loadGitHubPullRequestTemplates() {
+    return this.templates
+  }
 
   public createResult: (
     signal: AbortSignal
@@ -196,6 +209,7 @@ class TestDispatcher {
     providerHTMLURL: string,
     contextVersion: string,
     draft: IGitHubPullRequestDraft,
+    metadata: IGitHubPullRequestMetadata,
     signal: AbortSignal
   ) {
     this.createCalls.push({
@@ -206,6 +220,7 @@ class TestDispatcher {
       providerHTMLURL,
       contextVersion,
       draft,
+      metadata,
       signal,
     })
     return this.createResult(signal)
@@ -334,6 +349,11 @@ describe('CreateGitHubPullRequestDialog', () => {
       base: 'main',
       draft: true,
     })
+    assert.deepEqual(call.metadata, {
+      reviewers: [],
+      assignees: [],
+      labels: [],
+    })
     assert.equal(call.signal.aborted, false)
 
     await waitFor(() =>
@@ -347,6 +367,58 @@ describe('CreateGitHubPullRequestDialog', () => {
         'https://github.com/desktop/material/pull/12',
       ])
     )
+  })
+
+  it('applies a bounded local template and reviews exact metadata', async () => {
+    const fixture = createFixture()
+    const dispatcher = new TestDispatcher()
+    render(dialogElement(fixture, dispatcher, () => {}))
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('option', { name: 'Bug fix' }))
+    )
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Pull request template' }),
+      {
+        target: {
+          value: '.github/PULL_REQUEST_TEMPLATE/bug_fix.md',
+        },
+      }
+    )
+    assert.equal(
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
+        name: 'Description (optional)',
+      }).value,
+      '## Bug fix template'
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+      target: { value: 'Templated PR' },
+    })
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Reviewers (optional)' }),
+      { target: { value: ' reviewer-one, reviewer-two ' } }
+    )
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Assignees (optional)' }),
+      { target: { value: 'octocat' } }
+    )
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Labels (optional)' }),
+      { target: { value: 'ready, documentation' } }
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Review pull request' }))
+    assert.match(
+      screen.getByText(/Reviewers:/).textContent ?? '',
+      /reviewer-one, reviewer-two/
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
+
+    await waitFor(() => assert.equal(dispatcher.createCalls.length, 1))
+    assert.deepEqual(dispatcher.createCalls[0].metadata, {
+      reviewers: ['reviewer-one', 'reviewer-two'],
+      assignees: ['octocat'],
+      labels: ['ready', 'documentation'],
+    })
   })
 
   it('reviews and submits the required same-owner fork head repository', async () => {

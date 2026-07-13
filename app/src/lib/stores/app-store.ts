@@ -9947,6 +9947,48 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
   }
 
+  /** Open the purpose-built lifecycle workbench for a stored pull request. */
+  public _showGitHubPullRequestLifecycle(
+    repository: Repository,
+    pullRequest: PullRequest
+  ): void {
+    if (
+      !isRepositoryWithGitHubRepository(repository) ||
+      this.popupManager.areTherePopupsOfType(
+        PopupType.GitHubPullRequestLifecycle
+      )
+    ) {
+      return
+    }
+    const target = pullRequest.base.gitHubRepository
+    if (getNonForkGitHubRepository(repository).hash !== target.hash) {
+      return
+    }
+    const repositoryState = this.repositoryStateCache.get(repository)
+    const source = repository.gitHubRepository
+    const remoteName =
+      target.hash === source.hash
+        ? repositoryState.remote?.name ?? null
+        : target.hash === source.parent?.hash
+        ? UpstreamRemoteName
+        : null
+    const names = new Set<string>([pullRequest.base.ref])
+    if (remoteName !== null) {
+      for (const branch of repositoryState.branchesState.allBranches) {
+        const name = getGitHubPullRequestBaseBranchName(branch, remoteName)
+        if (name !== null) {
+          names.add(name)
+        }
+      }
+    }
+    this._showPopup({
+      type: PopupType.GitHubPullRequestLifecycle,
+      repository,
+      pullRequest,
+      baseBranchNames: [...names],
+    })
+  }
+
   public async _showPullRequest(repository: Repository): Promise<void> {
     // no pull requests from non github repos
     if (repository.gitHubRepository === null) {

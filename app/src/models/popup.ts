@@ -42,6 +42,7 @@ export enum PopupType {
   FileHistory = 'FileHistory',
   CreateGitHubIssue = 'CreateGitHubIssue',
   CreateGitHubPullRequest = 'CreateGitHubPullRequest',
+  GitHubPullRequestLifecycle = 'GitHubPullRequestLifecycle',
   SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
   AddRepository = 'AddRepository',
@@ -187,6 +188,12 @@ export type PopupDetail =
       initialTargetHash: string
       initialBaseBranchName: string | null
       contextVersion: string
+    }
+  | {
+      type: PopupType.GitHubPullRequestLifecycle
+      repository: RepositoryWithGitHubRepository
+      pullRequest: PullRequest
+      baseBranchNames: ReadonlyArray<string>
     }
   | { type: PopupType.SparseCheckout; repository: Repository }
   | { type: PopupType.MergeAll; repository: Repository; mode: MergeAllMode }
