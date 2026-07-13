@@ -2029,7 +2029,7 @@ export class API {
     path: string,
     options: {
       body?: Object
-      customHeaders?: Object
+      customHeaders?: HeadersInit
       reloadCache?: boolean
       redirect?: RequestRedirect
     } = {}
@@ -2055,7 +2055,7 @@ export class API {
     path: string,
     options: {
       body?: Object
-      customHeaders?: Object
+      customHeaders?: HeadersInit
       reloadCache?: boolean
       redirect?: RequestRedirect
     } = {}
@@ -3040,7 +3040,7 @@ abstract class ThirdPartyAPI extends API {
   protected async providerRequest(
     method: HTTPMethod,
     path: string,
-    headers: Object,
+    headers: HeadersInit,
     reloadCache = false
   ): Promise<Response> {
     return request(
