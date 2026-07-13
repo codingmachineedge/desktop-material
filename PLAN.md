@@ -4,18 +4,20 @@
 
 Milestones **M0 through M18 are shipped on `main`** through historical
 implementation baseline `b2699faccb07728fe9aa2838aa13355d71e172b0`.
-The later guided parity milestone, **M19**, is implementation-complete through
-integration checkpoint `a00e751c575c80dee345b1b51b1d411dcd20e911` on
+The later guided parity milestone, **M19**, is implementation-complete and
+locally accepted at exact app source
+`5e80e678d062b65a82c0991b352e5a861c7469e5` on
 `codex/guided-final-gate`. Every named P0, P1, P2, and Later capability is in
-that source tree with focused regression evidence. M19 is not yet described as
-shipped on `main`: exhaustive final gates, the exact production/off-screen
-acceptance run, accepted screenshots, documentation/wiki synchronization, CI,
-Pages, release verification, and cleanup remain open.
+that source tree with focused regression evidence; the exact MCP production
+build and isolated hidden-desktop interaction completed against that app
+source. M19 is not yet described as shipped on `main`: the final documentation
+and image union, exhaustive revalidation, `main` promotion, CI, Pages,
+canonical wiki, release, artifact purge, and owned-resource cleanup remain open.
 
-That checkpoint also changed the Windows unit launcher to run the full 360-file
-suite in two bounded batches; its interim integration run exited successfully.
-It is not the final post-merge acceptance result and must not replace the open
-closing checklist below.
+The accepted source also carries the bounded Windows full-suite launcher and
+the reviewed exact-origin clone, Pull All, and history-deepening recovery fixes.
+Its local results are app-source evidence, not the later final-tree or remote
+publication result; the open gates below must still be closed at their own SHAs.
 
 The M0–M18 baseline includes the responsive-shell correction prompted by the final
 1450×997 review, its exact-size headless regression capture, the public
@@ -61,7 +63,7 @@ end of this plan and must be filled only after each check actually succeeds.
 | **M16 — Multi-window** | **COMPLETE** | Tab-aware window creation/routing, scoped selected repositories and tabs, safe shared-profile serialization, and multi-window menu/context actions. | `app/src/main-process/window-routing.ts`, `app/src/main-process/app-window.ts`, `app/src/main-process/main.ts`, `app/src/lib/window-scope.ts`, `app/test/unit/window-routing-test.ts` |
 | **M17 — GitLab, Bitbucket, and self-hosted GitLab** | **COMPLETE** | Provider API foundation, GitLab PAT and Bitbucket sign-in, self-hosted endpoint support, provider clone browsing, cross-host PR/status routing, credential isolation, and provider documentation. | `app/src/lib/api.ts`, `app/src/lib/stores/accounts-store.ts`, `app/src/ui/preferences/accounts.tsx`, `app/src/ui/clone-repository/`, `docs/integrations/gitlab.md`, `docs/integrations/bitbucket.md` |
 | **M18 — Final Material alignment** | **COMPLETE** | Full MD3 shell, tokens, motion, navigation rail, floating workspace cards, dialogs/sheets, de-stocked controls, final post-shell polish, accessibility coverage, and clipping/layout fixes across milestone surfaces. | `app/styles/_material.scss`, `app/styles/_material-shell.scss`, `app/styles/ui/`, `app/src/ui/app.tsx`, `app/test/unit/post-shell-style-test.ts`, `app/test/unit/ui/` |
-| **M19 — Guided Git, GitHub, and provider parity** | **IMPLEMENTATION COMPLETE — FINAL ACCEPTANCE PENDING** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
+| **M19 — Guided Git, GitHub, and provider parity** | **LOCAL ACCEPTANCE COMPLETE — PUBLICATION PENDING** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. Exact app source `5e80e678…` is built and accepted off-screen; final `main` and public evidence remain open. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
 
 ## M19 guided parity implementation ledger
 
@@ -72,7 +74,7 @@ end of this plan and must be filled only after each check actually succeeds.
 | **P1** | **IMPLEMENTATION COMPLETE** | Patch-series export/import, structured local-commit rewrite, GitHub Releases/assets, commit/tag signing, Git LFS, and complete worktree lifecycle administration. |
 | **P2** | **IMPLEMENTATION COMPLETE** | Persisted branch pin, hide, solo, and restore controls with clear filtered-state recovery. |
 | **Later** | **IMPLEMENTATION COMPLETE** | Exact merge-tree conflict paths, guided bisect, complete repository-wide Stash Manager, guarded Remote Manager, safe Repository Hooks Manager, richer GitHub Issues, and exact-account GitHub/GitLab/Bitbucket triage. |
-| **Closing acceptance** | **PENDING** | Exhaustive final union, exact production build, isolated off-screen interaction, inspected screenshots, `main` merge, CI/Pages/wiki/release verification, and owned-resource cleanup. |
+| **Closing acceptance** | **LOCAL APP-SOURCE GATE COMPLETE; PUBLICATION PENDING** | Exact source/build and isolated off-screen interaction are accepted with 14 inspected synthetic-only captures. Exhaustive final documentation/image-union gates, `main`, CI/Pages/wiki/release verification, artifact purge, and owned-resource cleanup remain open. |
 
 ## Additional completed product work
 
@@ -142,6 +144,69 @@ end of this plan and must be filled only after each check actually succeeds.
     Account selectors stay internal to the trampoline; the successful stable
     account key is persisted for later repository matching and retries without
     exposing a token, login, selector, or credentials dialog.
+
+## M19 accepted app-source evidence
+
+Exact application source
+`5e80e678d062b65a82c0991b352e5a861c7469e5` was built through the required
+low-level MCP HTTP client with
+`npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`.
+The client reported `client_ok: true`, return code `0`, and no timeout after the
+production bundles, native dependencies, bundled Git, Sass validation, license
+generation, and unpackaged `out` tree completed.
+
+One uniquely named hidden Win32 desktop then exercised that exact bundle with
+an isolated user-data directory and an owned `%TEMP%` root. The fixture used
+only `proof-a`, `proof-b`, neutral repository labels, loopback HTTPS, and random
+synthetic credentials that never entered a command line, child environment,
+error, screenshot, or retained ledger. Its redacted cross-account evidence was:
+
+- **clone:** `proof-a` returned the private-repository-style not-found response;
+  `proof-b` served the smart-Git advertisement and pack; the clean cloned
+  repository opened on `main`, and its persisted affinity named only the
+  synthetic `proof-b` account key. Tokenless candidates and stale tokenless
+  repository bindings were excluded;
+- **Pull All:** built checkpoint `32b7bb6b…` showed the normal unforced attempt
+  rejected, another eligible exact-origin signed-in account succeeding, and the
+  neutral result `Pull completed using another signed-in account.`. Its final
+  hardening and regressions are present in `5e80e678…`; this ledger does not
+  relabel the earlier Pull All pixels as a final-source capture;
+- **history deepening:** a shallow fetch recovered through the Desktop
+  credential trampoline and another exact-origin account, and the app reported
+  `Fetch completed using another signed-in account.`; and
+- **provider UI:** native pull-request creation, Actions log/artifact transfer,
+  Releases, Issues, and provider triage mutated only the in-memory loopback
+  fixture. No public provider object was changed.
+
+The following 14 synthetic-only PNGs were reopened at original resolution and
+accepted as nonblank, unclipped, and identity-safe. Their provenance remains
+explicit: six were captured from built app source `32b7bb6b…`, before the last
+cross-account/lifecycle merges; eight were captured from exact built app source
+`5e80e678…`. A separate redacted ledger proves the final-source clone. The files
+must be promoted unchanged with the final documentation/image union before
+their later merge SHA is published.
+
+| M19 accepted capture candidate | App source/build | Dimensions | Bytes | SHA-256 |
+| --- | --- | ---: | ---: | --- |
+| `material-shallow-clone-safe.png` | `32b7bb6b…` | 1443×992 | 86,305 | `926575457408ea49a1a29617b50a429a75fbc394f48ae8cba0a5a418461acd0a` |
+| `material-clone-account-fallback.png` | `32b7bb6b…` | 1443×992 | 144,728 | `0aa51e9c6254e5f1c25ff366ca4dc71fbf9a245224c6292159309c871a83de8e` |
+| `material-pull-all-account-fallback.png` | `32b7bb6b…` | 1443×992 | 97,762 | `66476a7e1807b1ccc33cb63ef9bca3e57f04ccf9c2bd2fbd720b9dcecce7f8aa` |
+| `material-sparse-checkout-safe.png` | `32b7bb6b…` | 1443×992 | 113,831 | `2ed3530f661466b5794a5eda5501e15e54e6aa4d2e47f35a43156a043004b5e5` |
+| `material-remote-manager.png` | `32b7bb6b…` | 1443×992 | 149,830 | `febd9e405b505eef557f5954f58549556fefa3f5656cdbc2396923fcbd46e483` |
+| `material-stash-manager.png` | `32b7bb6b…` | 1443×992 | 121,038 | `21403cb9a5517d904e467dc70a5f8356fe44ba36f5ca66bb46f707557690837f` |
+| `material-history-deepen.png` | `5e80e678…` | 1452×1001 | 106,548 | `5e6bdfa9d9a935b9f5fd8d6d3e7cad80dab28cca6f425ef0356b684f74cb8089` |
+| `material-repository-tools.png` | `5e80e678…` | 1452×1001 | 117,713 | `b72ba5a362f6d4fef758183cbc84db7795c41884bdc2eea88deb115b3fe59385` |
+| `material-provider-triage.png` | `5e80e678…` | 1452×1001 | 119,639 | `a4acbe0cfa8d7f17deb1e0e36ba7177caf3ff25b5c7c38ae65bc16f0de1f950e` |
+| `material-actions-job-log.png` | `5e80e678…` | 1452×1001 | 93,898 | `45a67b15745f413d80d2d3a3a5a47acdac63e1dda942a4d49131b36b2784a064` |
+| `material-actions-artifact-download.png` | `5e80e678…` | 1452×1001 | 134,585 | `d263bd5885e67ea52f515970e771eaf266901f51b826e9fa3159d3f9a438a1cf` |
+| `material-github-releases.png` | `5e80e678…` | 1452×1001 | 135,021 | `ab6d46d4fe749dd63b34095411562cae82f4ddfc48991474f927e4be9ae5d739` |
+| `material-github-issues.png` | `5e80e678…` | 1452×1001 | 123,243 | `423d201a90346548ca9b36cdc472b11e144cf3aff1f79179939e44fb50e606bc` |
+| `material-native-pull-request.png` | `5e80e678…` | 1452×1001 | 152,440 | `9fd4c407f74639b58607c1c2c3158c2278f71ac3fe4088bb66bc5e3cf24434cb` |
+
+This local proof does not close remote publication or cleanup. The application,
+loopback listener, synthetic credential entries, hidden desktop, owned temporary
+roots, and completed worktrees must still be removed and verified absent after
+the screenshot/documentation work finishes.
 
 ## Prior M0–M18 integrated validation evidence
 
@@ -247,14 +312,18 @@ proof for that newer source tree.
 
 ## M19 closing evidence checklist
 
-- [ ] Replace the integration checkpoint with the exact final accepted source
-  SHA and record exhaustive unit, lint, TypeScript, formatting, diff, privacy,
-  and production-build results.
-- [ ] Record the deterministic synthetic cross-account clone ledger and exact
-  off-screen interaction matrix for representative Foundation/P0/P1/P2/Later
-  surfaces.
-- [ ] Add only inspected, identity-safe screenshots, with dimensions, byte
-  counts, SHA-256 digests, and their exact source/build SHA.
+- [x] Record exact accepted app source
+  `5e80e678d062b65a82c0991b352e5a861c7469e5` and its successful exact MCP
+  production build. Exhaustive gates must be repeated after the final
+  documentation/image union and recorded separately.
+- [x] Record the deterministic synthetic cross-account clone/Pull All/deepen
+  ledger and exact off-screen interaction matrix for representative
+  Foundation/P0/P1/Later surfaces.
+- [x] Record all 14 inspected, identity-safe capture candidates with dimensions,
+  byte counts, SHA-256 digests, and their individual `32b7bb6b…` or
+  `5e80e678…` source/build provenance.
+- [ ] Promote those exact 14 files unchanged and verify their tracked hashes in
+  the final documentation/image union.
 - [ ] Record the merge to `main`, exact-SHA CI, Pages, canonical wiki,
   installer/release, release-asset/digest, and public live-URL evidence.
 - [ ] Record cleanup of every owned process, hidden desktop, credential,
