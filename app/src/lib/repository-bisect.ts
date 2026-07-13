@@ -11,8 +11,7 @@ export interface IRepositoryBisectRangeRequest {
   readonly args: ReadonlyArray<string>
 }
 
-export interface IRepositoryBisectStartRequest
-  extends IRepositoryBisectRangeRequest {}
+export type IRepositoryBisectStartRequest = IRepositoryBisectRangeRequest
 
 export interface IRepositoryBisectMarkRequest {
   readonly verdict: RepositoryBisectVerdict
