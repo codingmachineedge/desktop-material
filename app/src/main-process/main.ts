@@ -58,6 +58,11 @@ import {
 import parseCommandLineArgs from 'minimist'
 import { CLIAction } from '../lib/cli-action'
 import { buildRunner, registerBuildRunIpc } from './build-run'
+import {
+  cliWorkbenchCatalog,
+  cliWorkbenchRunner,
+  registerCLIWorkbenchIpc,
+} from './cli-workbench'
 import { AgentServerController } from './agent-server'
 import {
   findWindowForRepositoryPath as findOwningWindow,
@@ -145,8 +150,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
-  // Ensure no Build & Run child process (or its tree) outlives the app.
+  // Ensure no owned child process (or its tree) outlives the app.
   buildRunner.killAll()
+  cliWorkbenchCatalog.killAll()
+  cliWorkbenchRunner.killAll()
   agentServerController
     ?.stop()
     .catch(error => log.error('Failed to stop agent server cleanly', error))
@@ -504,6 +511,7 @@ app.on('ready', () => {
   )
 
   registerBuildRunIpc()
+  registerCLIWorkbenchIpc()
 
   ipcMain.on('update-accounts', (event, accounts) => {
     updateAccounts(accounts)

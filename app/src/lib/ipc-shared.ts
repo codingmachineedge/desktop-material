@@ -27,6 +27,12 @@ import {
   IAgentCommandEnvelope,
   IAgentServerStatus,
 } from './agent-commands'
+import {
+  ICLICommandOutputEvent,
+  ICLICommandRequest,
+  ICLICommandStateEvent,
+  ICLIWorkbenchCatalog,
+} from './cli-workbench'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -110,6 +116,8 @@ export type RequestChannels = {
   'uninstall-windows-cli': () => void
   'build-run-log': (event: IBuildRunLogEvent) => void
   'build-run-state': (event: IBuildRunStateEvent) => void
+  'cli-command-output': (event: ICLICommandOutputEvent) => void
+  'cli-command-state': (event: ICLICommandStateEvent) => void
 }
 
 /**
@@ -162,4 +170,11 @@ export type RequestResponseChannels = {
   'request-notifications-permission': () => Promise<boolean>
   'start-build-run': (plan: IBuildRunPlan) => Promise<void>
   'cancel-build-run': (runId: string) => Promise<void>
+  'get-cli-workbench-catalog': () => Promise<ICLIWorkbenchCatalog>
+  'start-cli-command': (request: ICLICommandRequest) => Promise<void>
+  'cancel-cli-command': (id: string) => Promise<boolean>
+  'write-cli-command-input': (
+    id: string,
+    data: string | null
+  ) => Promise<boolean>
 }

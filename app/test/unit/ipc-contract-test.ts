@@ -79,6 +79,8 @@ describe('IPC channel contract', () => {
     'uninstall-windows-cli',
     'build-run-log',
     'build-run-state',
+    'cli-command-output',
+    'cli-command-state',
   ] as const
 
   const expectedResponseChannels = [
@@ -112,6 +114,10 @@ describe('IPC channel contract', () => {
     'request-notifications-permission',
     'start-build-run',
     'cancel-build-run',
+    'get-cli-workbench-catalog',
+    'start-cli-command',
+    'cancel-cli-command',
+    'write-cli-command-input',
   ] as const
 
   describe('RequestChannels', () => {

@@ -17,6 +17,9 @@ Main Porcelain Commands
 
 External commands
    lfs
+
+Command aliases
+   deploy                  !gh api -H "token: secret"
 `)
 
     assert.deepEqual(entries, [
@@ -37,6 +40,12 @@ External commands
         command: 'lfs',
         summary: '',
         category: 'External commands',
+      },
+      {
+        tool: 'git',
+        command: 'deploy',
+        summary: '',
+        category: 'Command aliases',
       },
     ])
   })
@@ -86,13 +95,18 @@ View an issue.
 
 GITHUB ACTIONS COMMANDS
   workflow:      View details about Actions workflows
+
+ALIAS COMMANDS
+  deploy:        Alias for "api -H token:secret"
 `)
 
     assert.deepEqual(entries.map(x => [x.command, x.category]), [
       ['auth', 'Core'],
       ['pr', 'Core'],
       ['workflow', 'Github actions'],
+      ['deploy', 'Alias'],
     ])
+    assert.equal(entries.find(x => x.command === 'deploy')?.summary, '')
   })
 
   it('extracts tool versions without retaining extra output', () => {

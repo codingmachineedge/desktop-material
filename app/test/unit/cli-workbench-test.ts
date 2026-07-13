@@ -4,6 +4,7 @@ import {
   assessCLICommand,
   CLIWorkbenchQuickActions,
   formatCLICommand,
+  getCLICommandBlockReason,
   parseCLIArguments,
 } from '../../src/lib/cli-workbench'
 
@@ -79,6 +80,43 @@ describe('CLI workbench command contract', () => {
     assert.equal(
       assessCLICommand('gh', ['api', '-X', 'PATCH', 'repos/o/r']).risk,
       'write'
+    )
+  })
+
+  it('blocks GitHub CLI commands that print stored credentials', () => {
+    assert.match(
+      getCLICommandBlockReason('gh', ['auth', 'token']) ?? '',
+      /cannot display stored authentication tokens/
+    )
+    assert.match(
+      getCLICommandBlockReason('gh', ['auth', 'status', '--show-token']) ?? '',
+      /cannot display stored authentication tokens/
+    )
+    assert.match(
+      getCLICommandBlockReason('gh', ['auth', 'status', '-t']) ?? '',
+      /cannot display stored authentication tokens/
+    )
+    assert.equal(getCLICommandBlockReason('gh', ['auth', 'login']), null)
+    assert.match(
+      getCLICommandBlockReason('git', ['credential', 'fill']) ?? '',
+      /cannot display stored authentication credentials/
+    )
+    assert.match(
+      getCLICommandBlockReason('git', ['credential-manager', 'get']) ?? '',
+      /cannot display stored authentication credentials/
+    )
+    assert.match(
+      getCLICommandBlockReason('git', [
+        '-C',
+        'credential',
+        'credential',
+        'fill',
+      ]) ?? '',
+      /cannot display stored authentication credentials/
+    )
+    assert.equal(
+      getCLICommandBlockReason('git', ['credential', 'approve']),
+      null
     )
   })
 

@@ -56,7 +56,7 @@ export function parseGitHelpCatalog(
     entries.push({
       tool: 'git',
       command: match[1],
-      summary: cleanSummary(match[2]),
+      summary: /alias/i.test(category) ? '' : cleanSummary(match[2]),
       category,
     })
   }
@@ -166,7 +166,7 @@ export function parseGitHubHelpCatalog(
     entries.push({
       tool: 'gh',
       command: command[1],
-      summary: cleanSummary(command[2]),
+      summary: /alias/i.test(category) ? '' : cleanSummary(command[2]),
       category,
     })
   }
