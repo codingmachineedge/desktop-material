@@ -99,7 +99,7 @@ Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is t
 | **Done** | Inventory the installed Git 2.55 and GitHub CLI 2.96 command trees | Complete command catalogs are parsed at runtime rather than maintained as a stale hard-coded list |
 | **Done** | Inventory the official GitHub REST and GraphQL surfaces | REST baseline: 790 paths, 1,196 operations, and 51 categories; GraphQL baseline: 32 query fields and 268 mutation fields |
 | **Done** | Add a bounded CLI execution foundation | `git`/`gh` only, no shell, repository-bound working directory, output/input limits, cancellation, ownership cleanup, credential-command blocking, and bundled-Git environment support |
-| **Done** | Add safe request contracts for a GitHub API workbench | Selected-host relative paths, traversal rejection, body/response limits, mutation confirmation, and credential redaction |
+| **Done** | Add safe request contracts for a GitHub API workbench | Selected-host relative paths, traversal rejection, mutation confirmation, bounded streamed responses, safe-header allowlisting, and deep credential redaction |
 | **Done** | Extend native Actions controls | Run/job reruns, normal and force cancellation, workflow enable/disable, confirmations, and responsive long-metadata containment |
 | **Done** | Remove known compact-layout sideways overflow | Settings, floating surfaces, repository rail, toolbar, Merge All, Pull All, Build & Run, Actions, and screenshot gallery now wrap, stack, clamp, or vertically scroll at compact sizes |
 | **Active** | Expose the CLI foundation through an interactive Workbench | Searchable live catalog, safe previews, risk labels, destructive confirmation, streaming output, input, cancel, keyboard access, and repository refresh |

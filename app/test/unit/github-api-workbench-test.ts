@@ -4,6 +4,8 @@ import {
   assessGitHubAPIWorkbenchRequest,
   formatGitHubAPIWorkbenchPreview,
   normalizeGitHubAPIPath,
+  prepareGitHubAPIWorkbenchExecution,
+  readGitHubAPIWorkbenchResponse,
   redactGitHubAPIWorkbenchValue,
   validateGitHubAPIWorkbenchRequest,
 } from '../../src/lib/github-api-workbench'
@@ -94,6 +96,82 @@ describe('GitHub API workbench contract', () => {
       }).risk,
       'read'
     )
+  })
+
+  it('prepares exact requests and gates every mutation', () => {
+    assert.deepEqual(
+      prepareGitHubAPIWorkbenchExecution({
+        mode: 'rest',
+        method: 'GET',
+        path: '/repos/octo/repo',
+        bodyText: '',
+      }),
+      { method: 'GET', path: 'repos/octo/repo', body: undefined }
+    )
+    assert.throws(() =>
+      prepareGitHubAPIWorkbenchExecution({
+        mode: 'rest',
+        method: 'DELETE',
+        path: 'repos/octo/repo',
+        bodyText: '',
+      })
+    )
+    assert.deepEqual(
+      prepareGitHubAPIWorkbenchExecution(
+        {
+          mode: 'graphql',
+          query:
+            'mutation Rename { updateRepository(input: {}) { clientMutationId } }',
+          variablesText: '{}',
+          operationName: 'Rename',
+        },
+        true
+      ),
+      {
+        method: 'POST',
+        path: 'graphql',
+        body: {
+          query:
+            'mutation Rename { updateRepository(input: {}) { clientMutationId } }',
+          variables: {},
+          operationName: 'Rename',
+        },
+      }
+    )
+  })
+
+  it('bounds and redacts response bodies and exposes safe headers only', async () => {
+    const response = new Response(
+      JSON.stringify({
+        token: 'github_pat_abcdefghijklmnopqrstuvwxyz',
+        ok: true,
+      }),
+      {
+        status: 200,
+        headers: {
+          Authorization: 'Bearer do-not-render',
+          'Content-Type': 'application/json',
+          'X-GitHub-Request-Id': 'request-id',
+          'X-RateLimit-Remaining': '4999',
+        },
+      }
+    )
+    const result = await readGitHubAPIWorkbenchResponse(response)
+    assert.deepEqual(result.body, { token: '[redacted]', ok: true })
+    assert.equal(result.headers.authorization, undefined)
+    assert.equal(result.headers['x-github-request-id'], 'request-id')
+    assert.equal(result.headers['x-ratelimit-remaining'], '4999')
+    assert.equal(result.truncated, false)
+
+    const truncated = await readGitHubAPIWorkbenchResponse(
+      new Response('Bearer secret-value and more text', {
+        headers: { 'Content-Type': 'text/plain' },
+      }),
+      20
+    )
+    assert.equal(truncated.truncated, true)
+    assert.equal(truncated.displayedBytes, 20)
+    assert.doesNotMatch(String(truncated.body), /secret-value/)
   })
 
   it('redacts credential-shaped response data and previews no body values', () => {
