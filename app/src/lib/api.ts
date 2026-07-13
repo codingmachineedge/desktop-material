@@ -1681,8 +1681,9 @@ export class API {
   }
 
   /**
-   * Fetch one job's plaintext log. The API redirect is followed without the
-   * GitHub Authorization header so credentials never reach signed blob hosts.
+   * Fetch one job's plaintext log. Electron follows the API redirect so the
+   * main-process same-origin filter can remove the GitHub Authorization header
+   * before the request reaches the signed blob host.
    */
   public async fetchWorkflowJobLogs(
     owner: string,
@@ -1690,26 +1691,21 @@ export class API {
     jobId: number
   ): Promise<string> {
     const path = `repos/${owner}/${name}/actions/jobs/${jobId}/logs`
-    const response = await this.ghRequest('GET', path, { redirect: 'manual' })
+    const response = await this.ghRequest('GET', path, { redirect: 'follow' })
 
     if (response.status === 410) {
       throw new APIError(response, { message: 'Workflow logs have expired.' })
     }
 
-    let logResponse = response
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('Location')
-      if (location === null) {
-        throw new Error('GitHub did not provide a workflow log download URL.')
-      }
-      logResponse = await fetch(location)
+    if (!response.ok) {
+      // A followed response URL can contain a short-lived signed query. Keep
+      // that credential out of renderer-visible error messages.
+      throw new APIError(response, {
+        message: 'Unable to download workflow logs.',
+      })
     }
 
-    if (!logResponse.ok) {
-      throw new APIError(logResponse, null)
-    }
-
-    const bytes = new Uint8Array(await logResponse.arrayBuffer())
+    const bytes = new Uint8Array(await response.arrayBuffer())
     const truncated = bytes.byteLength > ActionsLogMaximumBytes
     const content = new TextDecoder().decode(
       truncated ? bytes.slice(0, ActionsLogMaximumBytes) : bytes
