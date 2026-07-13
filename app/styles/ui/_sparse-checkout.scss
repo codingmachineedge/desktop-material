@@ -265,7 +265,9 @@
   min-height: 150px;
   max-height: 300px;
   resize: vertical;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   border: 1px solid var(--md-sys-color-outline);
   border-radius: var(--md-sys-shape-corner-medium);
   background: var(--md-sys-color-surface-container-lowest);
@@ -274,7 +276,8 @@
   font-size: 12px;
   line-height: 1.5;
   padding: 10px;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
 
   &:focus-visible {
     border-color: var(--md-sys-color-primary);

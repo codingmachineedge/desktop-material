@@ -94,6 +94,7 @@ export class SparseCheckoutManager extends React.Component<
   private mounted = false
   private loadController: AbortController | null = null
   private mutationController: AbortController | null = null
+  private mutationSequence = 0
   private confirmButton: HTMLButtonElement | null = null
   private cancelButton: HTMLButtonElement | null = null
   private refreshButton: HTMLButtonElement | null = null
@@ -128,8 +129,10 @@ export class SparseCheckoutManager extends React.Component<
 
   public componentDidUpdate(previousProps: ISparseCheckoutProps) {
     if (previousProps.repository.path !== this.props.repository.path) {
+      this.mutationSequence++
       this.loadController?.abort()
       this.mutationController?.abort()
+      this.mutationController = null
       this.setState(
         {
           sparseState: null,
@@ -149,8 +152,10 @@ export class SparseCheckoutManager extends React.Component<
 
   public componentWillUnmount() {
     this.mounted = false
+    this.mutationSequence++
     this.loadController?.abort()
     this.mutationController?.abort()
+    this.mutationController = null
     window.removeEventListener('keydown', this.onWindowKeyDown)
   }
 
@@ -161,7 +166,7 @@ export class SparseCheckoutManager extends React.Component<
     const shortcutKey = __DARWIN__ ? event.metaKey : event.ctrlKey
     if (shortcutKey && event.key === 'w') {
       event.preventDefault()
-      if (this.state.busy) {
+      if (this.state.busy && this.mutationController !== null) {
         this.cancelMutation()
       } else {
         this.props.onDismissed()
@@ -174,7 +179,7 @@ export class SparseCheckoutManager extends React.Component<
     event.preventDefault()
     if (this.state.pending !== null) {
       this.cancelReview()
-    } else if (this.state.busy) {
+    } else if (this.state.busy && this.mutationController !== null) {
       this.cancelMutation()
     } else {
       this.props.onDismissed()
@@ -187,7 +192,7 @@ export class SparseCheckoutManager extends React.Component<
     }
   }
 
-  private async loadState(resetEditor: boolean) {
+  private async loadState(resetEditor: boolean): Promise<string | null> {
     this.loadController?.abort()
     const controller = new AbortController()
     this.loadController = controller
@@ -201,7 +206,7 @@ export class SparseCheckoutManager extends React.Component<
         controller.signal
       )
       if (!this.mounted || controller.signal.aborted) {
-        return
+        return null
       }
       const input =
         resetEditor && sparseState.enabled && sparseState.coneMode
@@ -216,15 +221,18 @@ export class SparseCheckoutManager extends React.Component<
         validation: parseSparseCheckoutDirectories(input),
         showValidation: false,
       })
+      return null
     } catch (error) {
       if (!this.mounted || controller.signal.aborted) {
-        return
+        return null
       }
+      const message = getErrorMessage(error)
       this.setState({
         sparseState: null,
         loading: false,
-        error: getErrorMessage(error),
+        error: message,
       })
+      return message
     } finally {
       if (this.loadController === controller) {
         this.loadController = null
@@ -284,6 +292,14 @@ export class SparseCheckoutManager extends React.Component<
     }
   }
 
+  private isCurrentMutation(sequence: number, repositoryPath: string) {
+    return (
+      this.mounted &&
+      this.mutationSequence === sequence &&
+      this.props.repository.path === repositoryPath
+    )
+  }
+
   private confirmMutation = async () => {
     const pending = this.state.pending
     if (pending === null || this.state.busy) {
@@ -291,6 +307,8 @@ export class SparseCheckoutManager extends React.Component<
     }
 
     const controller = new AbortController()
+    const repositoryPath = this.props.repository.path
+    const sequence = ++this.mutationSequence
     this.mutationController = controller
     this.setState(
       {
@@ -313,16 +331,16 @@ export class SparseCheckoutManager extends React.Component<
     try {
       if (pending.kind === 'set' && pending.input !== null) {
         await this.client.setDirectories(
-          this.props.repository.path,
+          repositoryPath,
           pending.input,
           controller.signal
         )
         status = 'Included directories updated.'
       } else if (pending.kind === 'reapply') {
-        await this.client.reapply(this.props.repository.path, controller.signal)
+        await this.client.reapply(repositoryPath, controller.signal)
         status = 'Sparse checkout reapplied.'
       } else {
-        await this.client.disable(this.props.repository.path, controller.signal)
+        await this.client.disable(repositoryPath, controller.signal)
         status = 'Sparse checkout disabled.'
       }
     } catch (error) {
@@ -337,6 +355,15 @@ export class SparseCheckoutManager extends React.Component<
         this.mutationController = null
       }
 
+      if (!this.isCurrentMutation(sequence, repositoryPath)) {
+        return
+      }
+
+      this.setState({
+        status: 'Refreshing repository and sparse-checkout state…',
+        error: null,
+      })
+
       let refreshError: string | null = null
       try {
         await this.props.onRefreshRepository()
@@ -345,31 +372,29 @@ export class SparseCheckoutManager extends React.Component<
           'The sparse-checkout command finished, but refreshing the repository view failed.'
       }
 
-      if (this.mounted) {
-        this.setState({
-          busy: false,
-          status: 'Refreshing sparse-checkout state…',
-          error: null,
-        })
-        await this.loadState(true)
-        if (this.mounted) {
-          const errors = [
-            operationError,
-            refreshError,
-            this.state.error,
-          ].filter((value): value is string => value !== null)
-          this.setState(
-            {
-              status:
-                cancelled && errors.length === 0
-                  ? 'Operation cancelled. Repository state refreshed.'
-                  : status,
-              error: errors.length === 0 ? null : errors.join(' '),
-            },
-            () => this.refreshButton?.focus()
-          )
-        }
+      if (!this.isCurrentMutation(sequence, repositoryPath)) {
+        return
       }
+
+      const stateError = await this.loadState(true)
+      if (!this.isCurrentMutation(sequence, repositoryPath)) {
+        return
+      }
+
+      const errors = [operationError, refreshError, stateError].filter(
+        (value): value is string => value !== null
+      )
+      this.setState(
+        {
+          busy: false,
+          status:
+            cancelled && errors.length === 0
+              ? 'Operation cancelled. Repository state refreshed.'
+              : status,
+          error: errors.length === 0 ? null : errors.join(' '),
+        },
+        () => this.refreshButton?.focus()
+      )
     }
   }
 
@@ -663,7 +688,7 @@ export class SparseCheckoutManager extends React.Component<
             className="sparse-checkout-icon-button"
             ariaLabel="Close sparse checkout"
             tooltip="Close sparse checkout"
-            disabled={this.state.busy}
+            disabled={this.state.busy && this.mutationController !== null}
             onClick={this.props.onDismissed}
           >
             <Octicon symbol={octicons.x} />
@@ -671,7 +696,7 @@ export class SparseCheckoutManager extends React.Component<
         </header>
         <div className="sparse-checkout-toolbar">
           {this.renderStatus(sparseState)}
-          {this.state.busy ? (
+          {this.state.busy && this.mutationController !== null ? (
             <Button
               onButtonRef={button => (this.cancelButton = button)}
               onClick={this.cancelMutation}
