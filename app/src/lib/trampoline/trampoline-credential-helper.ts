@@ -10,6 +10,7 @@ import {
 } from '../git/credential'
 import {
   getCredentialUrl,
+  getForcedAccountKey,
   getIsBackgroundTaskEnvironment,
   getTrampolineEnvironmentPath,
   setHasRejectedCredentialsForEndpoint,
@@ -47,9 +48,17 @@ const error = (msg: string, e: any) => log.error(`credential-helper: ${msg}`, e)
 const credWithAccount = (c: Credential, a: IGitAccount | undefined) =>
   a && new Map(c).set('username', a.login).set('password', a.token)
 
-async function getGitHubCredential(cred: Credential, store: AccountsStore) {
+async function getGitHubCredential(
+  cred: Credential,
+  store: AccountsStore,
+  forcedAccountKey?: string
+) {
   const endpoint = `${getCredentialUrl(cred)}`
-  const account = await findGitHubTrampolineAccount(store, endpoint)
+  const account = await findGitHubTrampolineAccount(
+    store,
+    endpoint,
+    forcedAccountKey
+  )
   if (account) {
     info(`found GitHub credential for ${endpoint} in store`)
   }
@@ -92,10 +101,17 @@ async function getExternalCredential(input: Credential, token: string) {
 
 /** Implementation of the 'get' git credential helper command */
 async function getCredential(cred: Credential, store: Store, token: string) {
-  const ghCred = await getGitHubCredential(cred, store)
+  const forcedAccountKey = getForcedAccountKey(token)
+  const ghCred = await getGitHubCredential(cred, store, forcedAccountKey)
 
   if (ghCred) {
     return ghCred
+  }
+
+  // A forced selector is authoritative. Falling through could silently use an
+  // external helper, prompt, or a different signed-in identity.
+  if (forcedAccountKey !== undefined) {
+    return undefined
   }
 
   const endpointKind = await getEndpointKind(cred, store)
@@ -246,6 +262,10 @@ export const createCredentialHelperTrampolineHandler: (
         setHasRejectedCredentialsForEndpoint(token, endpoint)
       }
       return cred ? formatCredential(cred) : undefined
+    } else if (getForcedAccountKey(token) !== undefined) {
+      // OAuth credentials selected for a retry are owned by AccountsStore.
+      // Never forward their store/erase callbacks to generic helpers.
+      return undefined
     } else if (firstParameter === 'store') {
       await storeCredential(input, store, token)
     } else if (firstParameter === 'erase') {
