@@ -266,7 +266,7 @@ export class JobLogViewer extends React.Component<
             placeholder="Search logs"
             aria-label="Search logs"
           />
-          <span>
+          <span role="status" aria-live="polite" aria-atomic="true">
             {matches.length === 0
               ? 'No matches'
               : `${Math.min(this.state.match + 1, matches.length)} of ${

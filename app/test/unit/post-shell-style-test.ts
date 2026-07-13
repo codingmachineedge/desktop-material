@@ -32,4 +32,13 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /pull-all-results-container/)
     assert.match(style, /overflow: auto/)
   })
+
+  it('keeps Repository Settings inside the viewport with a scrollable tab', () => {
+    const style = readStyle('dialogs/_repository-settings.scss')
+    assert.match(style, /max-height: calc\(100vh - var\(--spacing-quad\)\);/)
+    assert.match(
+      style,
+      /\.active-tab\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-y: auto;/
+    )
+  })
 })
