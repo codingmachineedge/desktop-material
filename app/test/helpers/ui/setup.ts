@@ -15,6 +15,17 @@ if (globalThis.ResizeObserver === undefined) {
   })
 }
 
+// Node exposes localStorage as a read-only accessor while global-jsdom keeps
+// the usable test storage on window. Align the global once for every UI test;
+// Object.assign cannot replace Node's accessor because its setter rejects.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: window.localStorage,
+    writable: true,
+  })
+}
+
 if (
   typeof window !== 'undefined' &&
   globalThis.CustomEvent !== window.CustomEvent

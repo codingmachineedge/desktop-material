@@ -75,17 +75,6 @@ describe('versioned store history', () => {
   })
 
   it('ignores an old pagination response after undo reloads history', async () => {
-    Object.assign(globalThis, {
-      localStorage: {
-        length: 0,
-        clear: () => {},
-        getItem: () => null,
-        key: () => null,
-        removeItem: () => {},
-        setItem: () => {},
-      } as Storage,
-    })
-
     const initialEntry = historyEntry('11111111', 'Initial snapshot')
     const staleEntry = historyEntry('22222222', 'Stale older snapshot')
     const undoEntry = historyEntry('33333333', 'Undo snapshot')
@@ -142,17 +131,6 @@ describe('versioned store history', () => {
   })
 
   it('loads file metadata only for the selected entry', async () => {
-    Object.assign(globalThis, {
-      localStorage: {
-        length: 0,
-        clear: () => {},
-        getItem: () => null,
-        key: () => null,
-        removeItem: () => {},
-        setItem: () => {},
-      } as Storage,
-    })
-
     const first = historyEntry('11111111', 'First snapshot')
     const second = historyEntry('22222222', 'Second snapshot')
     const third = historyEntry('33333333', 'Third snapshot')
