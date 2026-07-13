@@ -65,9 +65,11 @@ capabilities into named app functions rather than a searchable command or endpoi
   setting per account or repository, run commit-and-push immediately, and merge all branches or
   worktrees with per-target progress and Copilot-assisted conflict handling.
 - **GitHub Actions** — filter runs by workflow, branch, event, or status; load later run pages while
-  preserving them across polling/Refresh; re-run a complete run or failed jobs; inspect jobs and
-  steps; search job logs; dispatch a workflow; and load later artifact pages before a native
-  download with local digest comparison and explicit attestation-presence context.
+  preserving them across polling/Refresh; re-run a complete run or failed jobs; switch current or
+  historical attempts; load bounded job pages; search exact job logs; review pending environments;
+  approve or reject eligible deployments; approve an eligible fork run; dispatch a workflow; and
+  load later artifact pages before a native download with local digest comparison and explicit
+  attestation-presence context.
 - **Agent access** — opt in from Settings to start a token-gated MCP/REST server on a random
   loopback-only port. A stdio proxy and command-line client expose the same bounded commands for
   repositories, tabs, Git operations, automation, and workflow dispatch.
@@ -86,6 +88,10 @@ capabilities into named app functions rather than a searchable command or endpoi
 - **Actions pagination** — use purpose-built **Load more runs** and **Load more artifacts** controls.
   Provider-side filters, exact-account routing, cancellation, retained-page retry, and shifted-page
   de-duplication stay behind the workflow; no command, REST path, or GraphQL editor is exposed.
+- **Actions run inspector** — choose the latest or a historical attempt, load 50-job pages through a
+  named retry, open or re-run the exact loaded job, inspect pending environments and review history,
+  submit a bounded deployment decision, and confirm eligible fork approval. Locked environments
+  explain why they cannot be selected instead of exposing an API mutation editor.
 - **Effective branch rules** — inspect reviews, checks, deployments, merge queue, signatures,
   history, update/delete/force policy, bypass context, and source rulesets. Signed-out and ambiguous
   repository-account states route to the relevant settings screen.
@@ -99,6 +105,10 @@ capabilities into named app functions rather than a searchable command or endpoi
 ![Actions run page two retained after Refresh](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pagination.png)
 
 ![Actions artifact page-two sentinel with wrapped text](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-page-two.png)
+
+![Attempt-aware Actions job pagination with the recovered page-two job selected](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-jobs-pagination.png)
+
+![Pending Actions deployment environments with long reviewer and protection details](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pending-deployments.png)
 
 ![Effective branch rules inspector](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-effective-branch-rules.png)
 
@@ -122,9 +132,9 @@ capabilities into named app functions rather than a searchable command or endpoi
 - **Notification centre** — a Git-backed Local view plus an account-aware GitHub inbox with
   All/Unread and participating-only filters, including a complete no-signed-in-account state.
 - **Clipping-safe scaling** — choose 50–200% UI scaling; auto-fit caps the effective scale when a
-  small window cannot contain the requested size. The latest Actions gate reached a requested 200%
-  through five actual View-menu actions and safely auto-fit to 94% at the supported minimum while
-  preserving every title-bar, navigation, filter, pagination, and artifact control.
+  small window cannot contain the requested size. The latest Actions run-inspector gate reached a
+  requested 200% base through five actual menu actions and safely auto-fit to 96% while preserving
+  every title-bar, navigation, attempt, job, deployment, confirmation, and log control.
 - **No page-level sideways scrolling** — task forms wrap text and stack controls when space narrows.
   Horizontal scrolling is reserved for spatial content such as code, diffs, and logs when needed.
 

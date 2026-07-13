@@ -251,11 +251,11 @@
               <div class="glyph" aria-hidden="true">▷</div>
               <h3>GitHub Actions <span class="tag">Verified branch</span></h3>
               <p>
-                Filter workflow runs, load and retain later run pages, re-run
-                all or failed jobs, inspect jobs and steps, search logs,
-                dispatch workflows, load later artifact pages, and safely
-                download artifacts with local digest comparison and
-                attestation-presence context.
+                Filter and retain workflow-run pages, switch attempts, load and
+                retry bounded job pages, inspect logs, re-run the exact job,
+                review pending deployments and history, and separately confirm
+                eligible fork runs. Artifacts retain bounded paging, native
+                download, and local digest context.
               </p>
             </article>
 
@@ -692,6 +692,42 @@
               <figcaption>
                 Actions artifact pagination
                 <span class="tag">31 loaded · no clipping</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/material-actions-jobs-pagination.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-actions-jobs-pagination.png"
+                  alt="GitHub Actions run detail showing a long page-two Windows packaging job and its wrapped steps"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Actions job pagination
+                <span class="tag">Retry retained</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/material-actions-pending-deployments.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-actions-pending-deployments.png"
+                  alt="GitHub Actions run detail showing an approvable long-name deployment environment and a separate locked environment"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Pending deployment review
+                <span class="tag">Locked stays distinct</span>
               </figcaption>
             </figure>
 

@@ -4,10 +4,10 @@
 - Run id: `dm-actions-run-inspector-20260713-93cb7f41`
 - Branch: `mega-feature-update`
 - Expected remote: `origin` (`codingmachineedge/desktop-material`)
-- Exact built and exercised source: pending
+- Exact built and exercised source: `2f40d8949aaa7ae4ce5418cd949c28c643da0a37`
 - Owned off-screen desktop: `DesktopMaterialRunInspector-20260713-93cb7f41`
 - Disposable fixture root: `%TEMP%\desktop-material-p0-ui-20260713-actions-run-inspector-93cb7f41`
-- Screenshot theme and target: light, original 960×660 PNGs
+- Screenshot theme and target: light; original 960×660 job pagination and 944×808 pending-deployment PNGs
 - Public repository mutations authorized: milestone commits/pushes, separate wiki merge/push, and Pages workflow dispatch; no GitHub API mutation may target a public provider
 
 ## Product contract
@@ -64,7 +64,11 @@ Every accepted state must have equal document/body client and scroll widths, no 
 - Focused result before provider work: TypeScript `--noEmit` passed, targeted ESLint passed with the repository rule directory, Prettier rewrote the touched TypeScript/SCSS files cleanly, and the Actions suite passed 124/124 checks across 22 suites. The regression set now includes bounded single-byte JSON chunks, nonshrinking totals, 101-attempt reachability, retained-list recovery, latest-attempt historical-page reconstruction, shorter-page stopping, eligibility invalidation, and modal focus containment.
 - Deterministic provider checkpoint: 11 tests and a live read-only probe pass for run `84152`/attempt 2, current jobs `85051`→`85101`, historical jobs `85000`→`85050`, a one-shot current page-two 503, exact log redirect/content, two pending environments, review history, stateful exact review/fork/re-run mutations, unchanged artifact integrity, and blocked receive-pack. The probe intentionally leaves the retry fault unconsumed for the UI interaction.
 - The dedicated `verify_actions_run_inspector_cdp.js` verifier passes `node --check` and audits document/body width, named panels, clipping, sibling overlap, oversized headings, modal count, focus containment, and scrim pointer ownership.
-- Remaining: production build, exact-request CDP receipt, original-resolution screenshot inspection, README/wiki/Pages evidence, and cleanup/publication receipt.
+- A first production interaction exposed a real short-window dialog defect: the deployment footer extended 7 pixels below the renderer because the layer was positioned against the tall scrolled Actions view. Fixed viewport positioning was committed and pushed at `2f40d8949a`, then rebuilt with the exact production command in 115 seconds.
+- The rebuilt interaction loaded current and historical 50→51 job pages, recovered the reserved current page-two 503 on retry, opened exact redirected logs, re-ran job `85101`, reviewed two pending environments, approved environment `86101` with the exact bounded comment, and separately approved the eligible fork run.
+- The provider recorded only the expected three POST mutations. Regular-height, supported short-height, true 960×660 capture, and requested 200%-base states had equal document/body client and scroll widths with empty overflow, clipping, outside-control, overlap, and oversized-text arrays. Every modal had one layer, contained focus, and owned pointer input.
+- Promoted and original-resolution-inspected evidence: `material-actions-jobs-pagination.png` (960×660, 111,675 bytes, SHA-256 `0e61eb4e66c20bffbeac76c79eebb9508d44160cb104feb8fc47f2617dc94b90`) and `material-actions-pending-deployments.png` (944×808, 98,249 bytes, SHA-256 `6eea1333755d5edad469c8d0d06b8a3d62e43c991e6bc9de5e98080dee75c1bc`).
+- Remaining: commit/push the documentation evidence, merge/push the separate wiki, verify the Pages artifact and its responsive gallery, then complete exact credential/process/port/desktop/run-root cleanup.
 
 ## Documentation and evidence allowlist
 
@@ -74,9 +78,10 @@ Every accepted state must have equal document/body client and scroll widths, no 
 - `docs/wiki/Home.md`
 - `docs/wiki/User-Guide.md`
 - `site/index.html`
+- `.codex/verification/verify_pages_gallery_cdp.js`
 - `docs/assets/screenshots/material-actions-jobs-pagination.png`
 - `docs/assets/screenshots/material-actions-pending-deployments.png`
 
 ## Publication and cleanup receipt
 
-Implementation, focused checks, and deterministic provider complete. Pending hidden-desktop production verification, screenshot inspection, documentation publication, separate wiki push, Pages artifact verification, credential deletion, process/port shutdown, desktop closure, and containment-checked disposable-root removal.
+Implementation, focused checks, deterministic provider, exact production build, hidden-desktop interaction, request receipt, responsive/modal geometry, screenshot inspection, and in-repository documentation updates are complete. The exact isolated POST receipt was job `85101` re-run (201, bodyless), run `84152` deployment review (204, body SHA-256 `32a6c1c2d4615f352f1d0060b11e688d3cf020146027c4ada23d56e82e460be8`), and run `84152` fork approval (204, bodyless), with current page two returning 503 then 200. The assembled Pages layout rendered 25 nonzero images across 24 gallery cards. At 960×660, document/body client and scroll widths were all 945; at 390×844 they were all 375. Overflow and outside-control arrays were empty, both new images retained their exact natural dimensions, and original desktop/mobile gallery captures were inspected. Pending publication receipt: main-repository documentation push, separate wiki merge/push, remote Pages artifact verification, credential deletion, exact process/port shutdown, desktop closure, and containment-checked disposable-root removal.

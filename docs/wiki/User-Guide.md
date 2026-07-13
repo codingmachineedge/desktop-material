@@ -310,8 +310,16 @@ The **Actions** panel brings CI into the app:
   **Load more runs**; already loaded pages remain visible across background polling and **Refresh**.
 - **Filters** by **workflow**, **status**, **branch**, and **event**.
 - **Re-run** a whole run or **re-run only the failed jobs**.
-- Drill into a run to see its **jobs and steps**, and open the **in-app log viewer** to read output
-  without leaving Desktop Material. Search the loaded log to isolate a command, warning, or error.
+- Drill into a run, choose the **current or a historical attempt**, and use **Load more jobs** to
+  append the next bounded 50-job page. A failed later page keeps the jobs already loaded and offers
+  the same named retry. Every loaded job retains its exact **View logs** and **Re-run job** actions.
+- Open the **in-app log viewer** to read output without leaving Desktop Material. Search the loaded
+  log to isolate a command, warning, or error; only the spatial log body may pan horizontally.
+- Inspect **pending deployment environments** and prior review history. Select only environments
+  for which the signed-in account is eligible, enter a required bounded comment, review the exact
+  approve/reject intent, and confirm. Locked environments keep their explanation visible.
+- When GitHub marks a first-time fork run as eligible, use the separate **Approve fork run**
+  confirmation. It is never inferred from a deployment decision.
 - Trigger manual workflows with the **`workflow_dispatch` dialog** — pick the workflow, ref, and
   inputs, and dispatch.
 - Select a run artifact to review its name, size, creation/expiry, workflow source, and GitHub digest.
@@ -329,10 +337,17 @@ The **Actions** panel brings CI into the app:
 
 ![Actions artifact page two with a deliberately long wrapping sentinel name](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-page-two.png)
 
-The production gate exercised 50→51 filtered runs and 30→31 artifacts at the supported minimum
-window and at a requested 200% scale with auto-fit. Document and body widths matched, and the
-measured Actions surfaces had no clipping, overlap, outside controls, or page-level sideways
-scrolling. These are named app controls; there is no `gh` command, API-path, or GraphQL editor.
+![Attempt-aware Actions job pagination with an exact recovered page-two job](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-jobs-pagination.png)
+
+![Pending Actions deployment environments with long reviewer and protection details](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pending-deployments.png)
+
+The production gates exercised 50→51 filtered runs, 30→31 artifacts, and current/historical 50→51
+job pages, including a deliberate later-page 503→200 retry. Exact job log/re-run, deployment review,
+and fork approval mutations ran only against the isolated provider. At regular and short windows
+plus a requested 200% base with auto-fit, document and body widths matched and the measured Actions
+surfaces had no clipping, overlap, outside controls, oversized text, or page-level sideways
+scrolling. Modal focus and scrim ownership were also contained. These are named app controls; there
+is no `gh` command, API-path, or GraphQL editor.
 
 ---
 

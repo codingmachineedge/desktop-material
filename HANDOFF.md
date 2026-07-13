@@ -13,9 +13,13 @@ guided history deepening, native pull-request creation, Actions artifact
 download/digest context, and effective branch-rules inspection. The typed
 operation registry is also complete. Actions workflow-run and artifact
 pagination then passed its exact production UI gate at
-`0aca4420df88a0865a0223530b956209e131431d`. Job pagination and attempt-aware
-inspection, pending-run approvals, the Pull Request Center, Issue Hub, and
-Release Manager are the next named-function milestones in the README roadmap.
+`0aca4420df88a0865a0223530b956209e131431d`. Attempt-aware job pagination,
+exact job logs/re-runs, pending deployment reviews, and fork-run approval now
+pass their production UI gate at
+`2f40d8949aaa7ae4ce5418cd949c28c643da0a37`. Cryptographic artifact
+attestation verification is the next named-function slice; the smaller Actions
+cache manager follows, then bounded Pull Request Center and Issue Hub read
+waves. Release Manager follows those work centers in the README roadmap.
 
 This handoff does not claim that branch-only Pages assets are already live on
 `main`. Pages remains protected to the normal reviewed `main` promotion path;
@@ -384,20 +388,82 @@ following against the resulting final `main` SHA:
 For the legacy M0-M18 foundation, final public verification still follows that
 gate. The newer function-first parity roadmap is intentionally active: the P0
 four-function slice, typed operation boundary, and Actions run/artifact
-pagination are production-verified. Job pagination/approvals and the
-PR/Issue/Release waves remain next.
+pagination are production-verified. Attempt/job/log/re-run, deployment-review,
+and fork-approval functions have now passed their production UI gate as well.
+Cryptographic artifact attestation verification and Actions cache management
+are next, followed by bounded PR/Issue waves and then Release Manager.
 
-## 2026-07-13 Actions run inspector implementation checkpoint
+## 2026-07-13 Actions run inspector production UI gate
 
-The active roadmap slice now exists as named app functions rather than a command or API catalogue. The run detail pane selects the latest or a historical attempt, loads strict 50-job pages, retains page one through a later-page retry, and sends an exact loaded job to the existing bounded log transfer or throwing re-run mutation. Run-level pending deployments and review history load independently; selected approvable environments use a dedicated required 1–1024-character decision dialog, while an eligible first-time fork run has a separate confirmation.
+The exact unpackaged production build at
+`2f40d8949aaa7ae4ce5418cd949c28c643da0a37` passed on the isolated
+off-screen desktop. The build used the required no-download production command
+and completed in 115 seconds. The visible user desktop was never shown,
+focused, resized, or used for input.
+
+This roadmap slice exists as named app functions rather than a command or API
+catalogue. The run detail pane selects the latest or a historical attempt,
+loads strict 50-job pages, retains page one through a later-page retry, and
+sends an exact loaded job to the bounded log transfer or re-run mutation.
+Run-level pending deployments and review history load independently; selected
+approvable environments use a dedicated required 1–1024-character decision
+dialog, while an eligible first-time fork run has a separate confirmation.
 
 Every new API/store surface stays on the repository-selected same-endpoint account. Current jobs use the fixed latest-attempt path, historical jobs use the fixed attempt path, deployment reviews send only normalized environment ids/state/comment, and fork approval is bodyless. Same-run attempt changes abort and generation-guard stale jobs; repository/account/run changes also cancel child work. Artifacts are now correctly labelled as run-level outputs across all attempts.
 
 Focused implementation evidence is green: TypeScript `--noEmit`, targeted ESLint with the repository rule directory, responsive style contracts, and 124/124 Actions checks across 22 suites. Those checks cover strict bounded parsing (including single-byte response streams), fixed paths and bodies, permission-aware bounded errors, exact-account routing, current→historical stale-request cancellation, latest-attempt page revalidation, shortened-page stopping, 50→51 retained retry, exact recovered-job log/re-run targeting, 101-attempt bounded navigation, locked deployment selection, required bounded comments, approval submission, separate fork confirmation, consuming modal scrims, and contained/restored focus.
 
-The deterministic provider checkpoint is also green. Eleven provider tests plus the live read-only probe cover inspector run `84152` at attempt 2, 51 current and 51 historical jobs, current sentinel `85101`, historical sentinel `85050`, a one-time current page-two 503 reserved for the UI, exact bodyless re-run/fork mutations, exact bounded deployment-review bodies, redirected log content without credentials, two eligibility-distinct environments, stateful history, unchanged artifact integrity, and blocked Git receive-pack. The dedicated run-inspector CDP verifier passes `node --check`; production build, hidden-desktop interaction/geometry, screenshots, request-log receipt, wiki, and Pages remain.
+The deterministic provider checkpoint is also green. Eleven provider tests plus
+the live probe cover inspector run `84152` at attempt 2, 51 current and 51
+historical jobs, current sentinel `85101`, historical sentinel `85050`, a
+one-time current page-two 503, exact bodyless re-run/fork mutations, exact
+bounded deployment-review bodies, redirected log content without credentials,
+two eligibility-distinct environments, stateful history, unchanged artifact
+integrity, and blocked Git receive-pack.
 
-Do not call this production-verified yet. The next continuation must build the exact pushed source and exercise it through the owned off-screen desktop described by `.codex/run-manifests/2026-07-13-actions-run-inspector-ui-gate.md`. Promote screenshots and update README/wiki/Pages only after original-resolution inspection and zero-overflow/clipping/outside-control/overlap geometry receipts at the supported minimum, short-height, and requested 200% scale.
+### Interaction, request, and responsive receipts
+
+- The real app loaded the current 50→51 jobs through a deliberate 503→200
+  retry, selected attempt 1, loaded its 50→51 historical jobs, opened the exact
+  recovered logs, and confirmed the exact loaded job re-run.
+- Exact provider links resolved run `84152`, current job `85101`, historical job
+  `85050`, and environment `86101`. The isolated provider recorded exactly
+  three POSTs: job `85101` re-run (201, bodyless), run `84152` pending-deployment
+  review (204, exact normalized body SHA-256
+  `32a6c1c2d4615f352f1d0060b11e688d3cf020146027c4ada23d56e82e460be8`),
+  and run `84152` fork approval (204, bodyless). No public GitHub state was
+  touched.
+- A first production pass caught a real short-window defect: the deployment
+  dialog footer extended 7 pixels below the renderer because its layer was
+  positioned against the tall scrolled Actions view. The layer now uses fixed
+  viewport positioning; the exact source was rebuilt and the same modal passed.
+- The full interaction passed in a 1000×687 CSS renderer captured at a true
+  960×660. Regular-height, supported short-height, and requested 200%-base
+  states also passed. Auto-fit preserved the user base while applying a 96%
+  effective scale. Document and body client/scroll widths matched in every
+  receipt; overflow, clipped controls, outside controls, sibling overlaps, and
+  oversized text arrays were empty.
+- Job-log, deployment-review, and fork-review dialogs each produced exactly one
+  modal and one interactive scrim; focus stayed contained while open and was
+  restored after close. The spatial log body remains the sole intentional
+  horizontal-pan surface.
+
+| Promoted screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-actions-jobs-pagination.png` | 960×660 | 111,675 | `0e61eb4e66c20bffbeac76c79eebb9508d44160cb104feb8fc47f2617dc94b90` |
+| `docs/assets/screenshots/material-actions-pending-deployments.png` | 944×808 | 98,249 | `6eea1333755d5edad469c8d0d06b8a3d62e43c991e6bc9de5e98080dee75c1bc` |
+
+Both promoted PNGs were reopened at original resolution after copying and
+matched their accepted run captures. README, in-repository wiki, and Pages
+sources now reference them. The assembled local Pages layout loaded 25 nonzero
+images across 24 gallery cards. At 960×660, document/body client and scroll
+widths were all 945; at 390×844 they were all 375. Overflow and outside-control
+arrays were empty, and original desktop/mobile captures showed the two new
+cards with wrapped captions and no sideways scrolling. Separate-wiki
+publication, remote Pages artifact verification, final remote-SHA
+confirmation, credential removal, exact process shutdown, desktop closure, and
+containment-checked run-root deletion remain for the publication/cleanup
+receipt.
 
 ## Maintenance constraints
 
