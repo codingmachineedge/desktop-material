@@ -86,6 +86,12 @@ export interface IGitExecutionOptions
    */
   readonly isBackgroundTask?: boolean
 
+  /**
+   * Stable account identity used only by Desktop's credential trampoline.
+   * This is removed before spawning Git and never enters child environments.
+   */
+  readonly credentialAccountKey?: string
+
   readonly interceptHooks?: string[]
 }
 
@@ -234,7 +240,7 @@ export async function git(
     maxBuffer: options?.encoding === 'buffer' ? Infinity : kStringMaxLength,
   }
 
-  const opts = { ...defaultOptions, ...options }
+  const { credentialAccountKey, ...opts } = { ...defaultOptions, ...options }
 
   // The combined contents of stdout and stderr with some light processing
   // applied to remove redundant lines caused by Git's use of `\r` to "erase"
@@ -379,7 +385,8 @@ export async function git(
         },
         path,
         options?.isBackgroundTask ?? false,
-        hooksEnv
+        hooksEnv,
+        credentialAccountKey
       ),
     path,
     options

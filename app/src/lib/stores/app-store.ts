@@ -339,6 +339,10 @@ import {
   selectWorktreeCandidates,
 } from '../automation/merge-all'
 import { IPullAllResult, runBoundedPullAll } from '../automation/pull-all'
+import {
+  PullAllFallbackSuccessDetail,
+  pullWithAccountFallback,
+} from '../automation/pull-all-account-fallback'
 import { BranchPruner } from './helpers/branch-pruner'
 import {
   enableCopilotConflictResolution,
@@ -6563,15 +6567,27 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
     }
 
+    let usedFallbackAccount = false
     await this.withPushPullFetch(repository, async () => {
-      await pullRepo(repository, remote)
+      const result = await pullWithAccountFallback(
+        remote.url,
+        this.accounts,
+        repository.accountKey,
+        accountKey => pullRepo(repository, remote, { accountKey })
+      )
+      usedFallbackAccount = result.usedFallbackAccount
       await updateRemoteHEAD(repository, remote, false).catch(error =>
         log.error('Failed updating remote HEAD after Pull all', error)
       )
       await this._refreshRepository(repository)
     })
 
-    return { status: 'pulled' as const, detail: 'Pull completed.' }
+    return {
+      status: 'pulled' as const,
+      detail: usedFallbackAccount
+        ? PullAllFallbackSuccessDetail
+        : 'Pull completed.',
+    }
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */

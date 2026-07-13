@@ -36,12 +36,17 @@ export const getHasRejectedCredentialsForEndpoint = (
 }
 const isBackgroundTaskEnvironment = new Map<string, boolean>()
 const trampolineEnvironmentPath = new Map<string, string>()
+const forcedAccountKeyByToken = new Map<string, string>()
 
 export const getTrampolineEnvironmentPath = (trampolineToken: string) =>
   trampolineEnvironmentPath.get(trampolineToken) ?? process.cwd()
 
 export const getIsBackgroundTaskEnvironment = (trampolineToken: string) =>
   isBackgroundTaskEnvironment.get(trampolineToken) ?? false
+
+/** Get the stable account identity forced for this trampoline session. */
+export const getForcedAccountKey = (trampolineToken: string) =>
+  forcedAccountKeyByToken.get(trampolineToken)
 
 export const getCredentialUrl = (cred: Map<string, string>) => {
   const u = cred.get('url')
@@ -94,13 +99,18 @@ export async function withTrampolineEnv<T>(
   fn: (env: object) => Promise<T>,
   path: string,
   isBackgroundTask = false,
-  customEnv?: Record<string, string | undefined>
+  customEnv?: Record<string, string | undefined>,
+  credentialAccountKey?: string
 ): Promise<T> {
   const sshEnv = await getSSHEnvironment()
 
   return withTrampolineToken(async token => {
     isBackgroundTaskEnvironment.set(token, isBackgroundTask)
     trampolineEnvironmentPath.set(token, path)
+
+    if (credentialAccountKey !== undefined) {
+      forcedAccountKeyByToken.set(token, credentialAccountKey)
+    }
 
     const existingGitEnvConfig =
       customEnv?.['GIT_CONFIG_PARAMETERS'] ??
@@ -197,6 +207,7 @@ export async function withTrampolineEnv<T>(
       isBackgroundTaskEnvironment.delete(token)
       hasRejectedCredentialsForEndpoint.delete(token)
       trampolineEnvironmentPath.delete(token)
+      forcedAccountKeyByToken.delete(token)
     }
   })
 }
