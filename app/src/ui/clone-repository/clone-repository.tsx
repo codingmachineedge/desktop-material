@@ -47,6 +47,7 @@ import {
 import { mergeOrganizationRepositories } from './org-filter-chips'
 import { PopupType } from '../../models/popup'
 import { PreferencesTab } from '../../models/preferences'
+import { getPreferredGenericCloneAccountKey } from '../../lib/automation/clone-account-fallback'
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -981,6 +982,8 @@ export class CloneRepository extends React.Component<
     const accountKey =
       selectedAccount !== null && selectedAccount.token.length > 0
         ? getAccountKey(selectedAccount)
+        : tab === CloneRepositoryTab.Generic
+        ? getPreferredGenericCloneAccountKey(url, this.props.accounts, account)
         : undefined
 
     if (url.endsWith('.wiki.git')) {

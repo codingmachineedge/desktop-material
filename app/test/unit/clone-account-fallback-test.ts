@@ -7,6 +7,7 @@ import { GitError, IGitResult } from '../../src/lib/git/core'
 import {
   cloneWithAccountFallback,
   getCloneAccountKeys,
+  getPreferredGenericCloneAccountKey,
 } from '../../src/lib/automation/clone-account-fallback'
 
 const account = (
@@ -59,6 +60,50 @@ describe('clone account fallback', () => {
       assert.deepStrictEqual(
         getCloneAccountKeys(remoteUrl, [first, second]),
         []
+      )
+    }
+  })
+
+  it('prefers the API-matched identity for a generic exact-origin clone', () => {
+    const first = account(1, 'https://127.0.0.1:38443/api/v3')
+    const matched = account(2, 'https://127.0.0.1:38443/api/v3')
+
+    assert.equal(
+      getPreferredGenericCloneAccountKey(
+        'https://127.0.0.1:38443/owner/private-repository.git',
+        [first, matched],
+        matched
+      ),
+      getAccountKey(matched)
+    )
+  })
+
+  it('keeps generic clone selection non-interactive when lookup is inconclusive', () => {
+    const first = account(1, 'https://127.0.0.1:38443/api/v3')
+    const second = account(2, 'https://127.0.0.1:38443/api/v3')
+
+    assert.equal(
+      getPreferredGenericCloneAccountKey(
+        'https://127.0.0.1:38443/owner/private-repository.git',
+        [first, second],
+        null
+      ),
+      getAccountKey(first)
+    )
+  })
+
+  it('never selects a generic clone identity outside the exact HTTPS origin', () => {
+    const signedIn = account(1)
+
+    for (const remoteUrl of [
+      'http://github.com/owner/repository.git',
+      'https://github.com:8443/owner/repository.git',
+      'https://github.com.evil.example/owner/repository.git',
+      'git@github.com:owner/repository.git',
+    ]) {
+      assert.equal(
+        getPreferredGenericCloneAccountKey(remoteUrl, [signedIn], signedIn),
+        undefined
       )
     }
   })

@@ -2540,7 +2540,10 @@ export function getHTMLURL(endpoint: string): string {
     }
 
     const parsed = URL.parse(endpoint)
-    return `${parsed.protocol}//${parsed.hostname}`
+    // `host` includes a non-default port while `hostname` does not. GHES can
+    // legitimately run on a custom port, and dropping it would make the HTML
+    // origin differ from the signed-in account's API origin.
+    return `${parsed.protocol}//${parsed.host}`
   }
 }
 

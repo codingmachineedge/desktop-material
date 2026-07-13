@@ -46,6 +46,32 @@ export function getCloneAccountKeys(
   })
 }
 
+/**
+ * Choose the signed-in identity for the first attempt of a generic URL clone.
+ *
+ * Repository lookup may identify the account which can see a private
+ * repository, so prefer that identity when it is still signed in and belongs
+ * to the remote's exact HTTPS origin. If lookup was inconclusive, use the
+ * first eligible identity. This keeps Git on the non-interactive OAuth path
+ * whenever an exact-origin signed-in account is available.
+ */
+export function getPreferredGenericCloneAccountKey(
+  remoteUrl: string,
+  accounts: ReadonlyArray<Account>,
+  matchedAccount: Account | null
+): string | undefined {
+  const eligibleAccountKeys = getCloneAccountKeys(remoteUrl, accounts)
+
+  if (matchedAccount !== null) {
+    const matchedAccountKey = getAccountKey(matchedAccount)
+    if (eligibleAccountKeys.includes(matchedAccountKey)) {
+      return matchedAccountKey
+    }
+  }
+
+  return eligibleAccountKeys[0]
+}
+
 export interface ICloneAccountFallbackResult {
   /** Stable identity forced for the successful clone, if one was needed. */
   readonly accountKey: string | null
