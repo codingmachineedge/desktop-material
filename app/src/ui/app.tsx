@@ -317,6 +317,11 @@ export class App extends React.Component<IAppProps, IAppState> {
 
   private repositoryViewRef = React.createRef<RepositoryView>()
 
+  private readonly refreshRepositoryHandlers = new WeakMap<
+    Repository,
+    () => Promise<void>
+  >()
+
   /**
    * Gets a value indicating whether or not we're currently showing a
    * modal dialog such as the preferences, or an error dialog.
@@ -1221,6 +1226,17 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
   }
 
+  private getOnRefreshRepositoryFn(repository: Repository) {
+    const existingHandler = this.refreshRepositoryHandlers.get(repository)
+    if (existingHandler !== undefined) {
+      return existingHandler
+    }
+
+    const handler = () => this.props.dispatcher.refreshRepository(repository)
+    this.refreshRepositoryHandlers.set(repository, handler)
+    return handler
+  }
+
   private getWindowTitle(state: IAppState = this.state): string {
     const repository = state.selectedState?.repository
     const repositoryTitle =
@@ -1893,9 +1909,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             key={`file-history-${popup.repository.id}-${popup.path}`}
             repository={popup.repository}
             path={popup.path}
-            onRefreshRepository={() =>
-              this.props.dispatcher.refreshRepository(popup.repository)
-            }
+            onRefreshRepository={this.getOnRefreshRepositoryFn(
+              popup.repository
+            )}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -1946,9 +1962,9 @@ export class App extends React.Component<IAppProps, IAppState> {
           <SparseCheckoutManager
             key={`sparse-checkout-${popup.repository.id}`}
             repository={popup.repository}
-            onRefreshRepository={() =>
-              this.props.dispatcher.refreshRepository(popup.repository)
-            }
+            onRefreshRepository={this.getOnRefreshRepositoryFn(
+              popup.repository
+            )}
             onDismissed={onPopupDismissedFn}
           />
         )

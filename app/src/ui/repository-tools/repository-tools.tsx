@@ -114,6 +114,12 @@ export class RepositoryTools extends React.Component<
   private unsubscribeState: (() => void) | null = null
   private confirmButton: HTMLButtonElement | null = null
   private archiveRunDestination: string | null = null
+  private readonly operationHandlers = new Map(
+    RepositoryToolOperations.map(
+      operation =>
+        [operation.id, () => this.onOperationRequested(operation)] as const
+    )
+  )
 
   public constructor(props: IRepositoryToolsProps) {
     super(props)
@@ -146,8 +152,8 @@ export class RepositoryTools extends React.Component<
     void this.loadAvailability()
   }
 
-  public componentDidUpdate(previousProps: IRepositoryToolsProps) {
-    if (previousProps.repositoryPath !== this.props.repositoryPath) {
+  public componentDidUpdate(prevProps: IRepositoryToolsProps) {
+    if (prevProps.repositoryPath !== this.props.repositoryPath) {
       this.cancelActiveRun()
       this.setState({
         activeOperation: null,
@@ -238,6 +244,42 @@ export class RepositoryTools extends React.Component<
       return
     }
     void this.startOperation(operation, false)
+  }
+
+  private onExportZip = () => {
+    void this.chooseArchiveDestination('zip')
+  }
+
+  private onExportTar = () => {
+    void this.chooseArchiveDestination('tar')
+  }
+
+  private onExportBundle = () => {
+    void this.chooseBundleDestination()
+  }
+
+  private onVerifyBundle = () => {
+    void this.chooseBundleToVerify()
+  }
+
+  private onConfirmButtonRef = (button: HTMLButtonElement | null) => {
+    this.confirmButton = button
+  }
+
+  private onDismissOperationConfirmation = () => {
+    this.setState({ confirmationOperation: null })
+  }
+
+  private onDismissArchiveConfirmation = () => {
+    this.setState({ archiveRequest: null })
+  }
+
+  private onCancelClick = () => {
+    void this.onCancel()
+  }
+
+  private onClearOutput = () => {
+    this.setState({ output: '' })
   }
 
   private async startOperation(
@@ -551,19 +593,13 @@ export class RepositoryTools extends React.Component<
     }
     if (!this.state.gitAvailable) {
       return (
-        <span
-          className="repository-tools-runtime unavailable"
-          title={this.state.availabilityError ?? ''}
-        >
+        <span className="repository-tools-runtime unavailable">
           Git unavailable
         </span>
       )
     }
     return (
-      <span
-        className="repository-tools-runtime available"
-        title={this.state.gitVersion ?? ''}
-      >
+      <span className="repository-tools-runtime available">
         {this.state.gitVersion ?? 'Git available'}
       </span>
     )
@@ -585,7 +621,7 @@ export class RepositoryTools extends React.Component<
           {operations.map(operation => (
             <article className="repository-tool-card" key={operation.id}>
               <div>
-                <h3 title={operation.title}>{operation.title}</h3>
+                <h3>{operation.title}</h3>
                 <p>{operation.description}</p>
                 {operation.supportingDetails !== undefined && (
                   <ul>
@@ -602,7 +638,7 @@ export class RepositoryTools extends React.Component<
                     : undefined
                 }
                 disabled={this.isBusy() || !this.state.gitAvailable}
-                onClick={() => this.onOperationRequested(operation)}
+                onClick={this.operationHandlers.get(operation.id)}
               >
                 {operation.id === 'maintenance-run' ? 'Review and run' : 'Run'}
               </Button>
@@ -630,29 +666,30 @@ export class RepositoryTools extends React.Component<
           </div>
           <div
             className="repository-tool-controls"
+            role="group"
             aria-label="Repository archive formats"
           >
             <Button
               disabled={this.isBusy() || !this.state.gitAvailable}
-              onClick={() => void this.chooseArchiveDestination('zip')}
+              onClick={this.onExportZip}
             >
               Export ZIP
             </Button>
             <Button
               disabled={this.isBusy() || !this.state.gitAvailable}
-              onClick={() => void this.chooseArchiveDestination('tar')}
+              onClick={this.onExportTar}
             >
               Export TAR
             </Button>
             <Button
               disabled={this.isBusy() || !this.state.gitAvailable}
-              onClick={() => void this.chooseBundleDestination()}
+              onClick={this.onExportBundle}
             >
               Export full-history bundle
             </Button>
             <Button
               disabled={this.isBusy() || !this.state.gitAvailable}
-              onClick={() => void this.chooseBundleToVerify()}
+              onClick={this.onVerifyBundle}
             >
               Verify a bundle
             </Button>
@@ -715,16 +752,12 @@ export class RepositoryTools extends React.Component<
         <div className="repository-tool-controls">
           <Button
             className="repository-tool-confirm-button"
-            onButtonRef={button => (this.confirmButton = button)}
+            onButtonRef={this.onConfirmButtonRef}
             onClick={this.onConfirmOperation}
           >
             Confirm maintenance
           </Button>
-          <Button
-            onClick={() => this.setState({ confirmationOperation: null })}
-          >
-            Go back
-          </Button>
+          <Button onClick={this.onDismissOperationConfirmation}>Go back</Button>
         </div>
       </div>
     )
@@ -748,25 +781,22 @@ export class RepositoryTools extends React.Component<
             : `Export ${request.format.toUpperCase()} archive from HEAD?`}
         </strong>
         <p id="repository-archive-confirm-description">
-          Destination:{' '}
-          <span title={request.destination}>{request.destination}</span>
+          Destination: <span>{request.destination}</span>
         </p>
         <p>
           {request.format === 'bundle'
-            ? 'The bundle includes all local refs and their reachable history. Working-tree changes and untracked files are not included.'
-            : 'The native save picker handles replacement confirmation when the file already exists. Uncommitted changes are not included.'}
+            ? 'The bundle includes all local refs and their reachable history. Choose a new destination; existing files are never replaced. Working-tree changes and untracked files are not included.'
+            : 'Choose a new destination; existing files are never replaced. Uncommitted changes are not included.'}
         </p>
         <div className="repository-tool-controls">
           <Button
             className="repository-tool-confirm-button"
-            onButtonRef={button => (this.confirmButton = button)}
+            onButtonRef={this.onConfirmButtonRef}
             onClick={this.onConfirmArchive}
           >
             {request.format === 'bundle' ? 'Export bundle' : 'Export archive'}
           </Button>
-          <Button onClick={() => this.setState({ archiveRequest: null })}>
-            Go back
-          </Button>
+          <Button onClick={this.onDismissArchiveConfirmation}>Go back</Button>
         </div>
       </div>
     )
@@ -802,15 +832,12 @@ export class RepositoryTools extends React.Component<
             </span>
           </div>
           <div className="repository-tool-controls">
-            <Button
-              disabled={this.runId === null}
-              onClick={() => void this.onCancel()}
-            >
+            <Button disabled={this.runId === null} onClick={this.onCancelClick}>
               Cancel
             </Button>
             <Button
               disabled={this.state.output.length === 0}
-              onClick={() => this.setState({ output: '' })}
+              onClick={this.onClearOutput}
             >
               Clear
             </Button>
@@ -833,8 +860,8 @@ export class RepositoryTools extends React.Component<
         )}
         <pre
           className="repository-tools-output"
+          role="log"
           aria-label="Repository tool results"
-          tabIndex={0}
         >
           {this.state.output ||
             'Choose a named repository tool to see its results here.'}
@@ -849,7 +876,7 @@ export class RepositoryTools extends React.Component<
         <header className="repository-tools-header">
           <div>
             <h1>Repository tools</h1>
-            <p title={this.props.repositoryPath}>{this.props.repositoryPath}</p>
+            <p>{this.props.repositoryPath}</p>
           </div>
           {this.renderAvailability()}
         </header>
