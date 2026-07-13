@@ -113,7 +113,8 @@ The 944×1000 Actions and Branch Rules images are intentional original captures 
 - Repository documentation, Pages source, and all four promoted PNGs were committed and pushed to `mega-feature-update` at `949eca9a29f266f9aa21451718c92d71fe0a4701`; local, tracking, and direct remote SHAs matched.
 - The separate wiki was merged with its existing extra guidance rather than overwritten. The four P0 images were copied into its `Images/` directory so publication did not depend on not-yet-main raw URLs.
 - Wiki `master` was committed and pushed at `cf115fec684278f44cceced279651b7f288b2ddd`; local, tracking, and direct remote SHAs matched. Public Home and User Guide renders contained the new named-function content, and all four raw wiki images loaded successfully.
-- Pages source passed the exact desktop/mobile geometry gate above but remains branch-only. Live Pages promotion follows the repository's protected `main` deployment path.
+- Pages source passed the exact desktop/mobile geometry gate above. Workflow run `29260862943` at branch SHA `b7b2d0492782def08f95598e6b0610ef1d57aa3a` completed checkout, configuration, publish-directory assembly, and artifact upload successfully. Deployment was correctly rejected because `mega-feature-update` is not allowed by the `github-pages` environment protection rules; live promotion still follows the reviewed `main` path.
+- The verified clean temporary wiki checkout was containment-checked beneath `%TEMP%`, removed, and confirmed absent after its remote SHA matched.
 
 ## Cleanup ledger
 

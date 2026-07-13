@@ -119,8 +119,13 @@ was removed. No normal Desktop profile or public provider state was changed.
   remote SHAs matched.
 - Public Home and User Guide renders showed the current named-function text and
   all four image links; each raw wiki image returned successfully. Pages source
-  remains branch-only and follows the repository's protected `main` deployment
-  path.
+  remains branch-only. Workflow run `29260862943` checked out the exact branch
+  SHA, configured Pages, assembled the publish directory, and uploaded the
+  artifact successfully. The deploy job was then rejected because
+  `mega-feature-update` is not allowed by the `github-pages` environment's
+  branch protection; live deployment still follows the reviewed `main` path.
+- The verified clean temporary wiki checkout was containment-checked beneath
+  `%TEMP%`, removed, and confirmed absent after its remote SHA matched.
 
 ## Legacy M0-M18 milestone summary
 
