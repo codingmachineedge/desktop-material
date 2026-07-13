@@ -1,0 +1,205 @@
+#create-github-pull-request {
+  width: min(680px, calc(100vw - var(--spacing-double)));
+  max-width: calc(100vw - var(--spacing-double));
+  min-width: min(480px, calc(100vw - var(--spacing-double)));
+  max-height: calc(100vh - var(--spacing-double));
+  overflow-x: hidden;
+
+  &,
+  * {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .dialog-header h1,
+  .dialog-banner div,
+  .create-github-pull-request-content,
+  .create-github-pull-request-routing,
+  .create-github-pull-request-head,
+  .create-github-pull-request-context,
+  .create-github-pull-request-review,
+  .create-github-pull-request-review-body,
+  .create-github-pull-request-success,
+  .create-github-pull-request-availability,
+  .create-github-pull-request-browser-note {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .dialog-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .dialog-footer .button-group {
+    flex-wrap: wrap;
+    gap: var(--spacing-half);
+
+    button {
+      margin: 0;
+      max-width: 100%;
+      white-space: normal;
+    }
+  }
+}
+
+.create-github-pull-request-content {
+  display: grid;
+  gap: var(--spacing-double);
+}
+
+.create-github-pull-request-routing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing);
+}
+
+.create-github-pull-request-field {
+  display: grid;
+  gap: var(--spacing-half);
+
+  > span {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  input,
+  select,
+  textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  textarea {
+    min-height: 112px;
+    max-height: min(300px, 36vh);
+    resize: vertical;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  small {
+    color: var(--text-secondary-color);
+    overflow-wrap: anywhere;
+  }
+}
+
+.create-github-pull-request-head,
+.create-github-pull-request-context,
+.create-github-pull-request-progress,
+.create-github-pull-request-success,
+.create-github-pull-request-availability {
+  display: grid;
+  gap: var(--spacing-half);
+  padding: var(--spacing);
+  border: var(--base-border);
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+
+  strong,
+  span,
+  small,
+  p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  span,
+  small {
+    color: var(--text-secondary-color);
+  }
+}
+
+.create-github-pull-request-draft {
+  align-items: flex-start;
+
+  label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+.create-github-pull-request-review {
+  display: grid;
+  gap: var(--spacing);
+  padding: var(--spacing-double);
+  border: var(--base-border);
+  border-radius: var(--md-sys-shape-corner-medium);
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-md);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+}
+
+.create-github-pull-request-eyebrow {
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.create-github-pull-request-review-body {
+  max-height: min(240px, 30vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+
+  em {
+    color: var(--text-secondary-color);
+  }
+}
+
+.create-github-pull-request-browser-note,
+#create-github-pull-request-confirmation {
+  margin: 0;
+}
+
+.create-github-pull-request-success {
+  border-color: color-mix(in srgb, var(--dm-green) 45%, transparent);
+  background: var(--dm-green-container);
+  color: var(--dm-green);
+}
+
+@media (max-width: 620px) {
+  .create-github-pull-request-routing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  #create-github-pull-request {
+    width: calc(100vw - var(--spacing));
+    max-width: calc(100vw - var(--spacing));
+    min-width: 0;
+
+    .dialog-header,
+    .dialog-content,
+    .dialog-footer {
+      padding-left: var(--spacing);
+      padding-right: var(--spacing);
+    }
+
+    .dialog-footer .button-group {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+
+      button {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+  }
+
+  .create-github-pull-request-review {
+    padding: var(--spacing);
+  }
+}

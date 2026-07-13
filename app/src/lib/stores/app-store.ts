@@ -84,6 +84,11 @@ import {
   isForkedRepositoryContributingToParent,
 } from '../../models/repository'
 import {
+  buildGitHubPullRequestTargets,
+  getGitHubPullRequestCreationURL,
+  getGitHubPullRequestContextVersion,
+} from '../github-pull-request'
+import {
   CommittedFileChange,
   WorkingDirectoryFileChange,
   WorkingDirectoryStatus,
@@ -9697,6 +9702,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
         type: PopupType.PushBranchCommits,
         repository,
         branch: compareBranch,
+        baseBranch,
       })
     } else if (aheadBehind.ahead > 0) {
       this._showPopup({
@@ -9704,14 +9710,78 @@ export class AppStore extends TypedBaseStore<IAppState> {
         repository,
         branch: compareBranch,
         unPushedCommits: aheadBehind.ahead,
+        baseBranch,
       })
     } else {
-      await this._openCreatePullRequestInBrowser(
-        repository,
-        compareBranch,
-        baseBranch
-      )
+      this._showCreateGitHubPullRequest(repository, compareBranch, baseBranch)
     }
+  }
+
+  /**
+   * Open the native pull request composer for an already published branch.
+   * Target repositories and base branches are derived from the exact remotes
+   * Desktop uses for self and parent-fork contribution flows.
+   */
+  public _showCreateGitHubPullRequest(
+    repository: Repository,
+    currentBranch: Branch,
+    initialBaseBranch?: Branch
+  ): void {
+    if (
+      !isRepositoryWithGitHubRepository(repository) ||
+      this.popupManager.areTherePopupsOfType(PopupType.CreateGitHubPullRequest)
+    ) {
+      return
+    }
+
+    const { branchesState } = this.repositoryStateCache.get(repository)
+    const { allBranches, defaultBranch, upstreamDefaultBranch } = branchesState
+    const gitStore = this.gitStoreCache.get(repository)
+    const source = repository.gitHubRepository
+    const targets = buildGitHubPullRequestTargets(
+      source,
+      allBranches,
+      defaultBranch,
+      upstreamDefaultBranch,
+      gitStore.defaultRemote?.name ?? null,
+      UpstreamRemoteName
+    )
+
+    const configuredTarget = getNonForkGitHubRepository(repository)
+    this._showPopup({
+      type: PopupType.CreateGitHubPullRequest,
+      repository,
+      currentBranch,
+      targets,
+      initialTargetHash: configuredTarget.hash,
+      initialBaseBranchName: initialBaseBranch?.nameWithoutRemote ?? null,
+      contextVersion: getGitHubPullRequestContextVersion(
+        repository,
+        currentBranch
+      ),
+    })
+  }
+
+  /** Reject stale non-modal PR composers after repository or tip changes. */
+  public _isGitHubPullRequestContextCurrent(
+    repository: Repository,
+    contextVersion: string
+  ): boolean {
+    const selected = this.selectedRepository
+    if (
+      !(selected instanceof Repository) ||
+      selected.id !== repository.id ||
+      selected.hash !== repository.hash
+    ) {
+      return false
+    }
+
+    const { tip } = this.repositoryStateCache.get(selected).branchesState
+    return (
+      tip.kind === TipState.Valid &&
+      getGitHubPullRequestContextVersion(selected, tip.branch) ===
+        contextVersion
+    )
   }
 
   public async _showPullRequest(repository: Repository): Promise<void> {
@@ -9806,42 +9876,35 @@ export class AppStore extends TypedBaseStore<IAppState> {
   public async _openCreatePullRequestInBrowser(
     repository: Repository,
     compareBranch: Branch,
-    baseBranch?: Branch
-  ): Promise<void> {
-    const gitHubRepository = repository.gitHubRepository
-    if (!gitHubRepository) {
-      return
+    baseBranch?: Branch,
+    targetOverride?: GitHubRepository
+  ): Promise<boolean> {
+    if (
+      !isRepositoryWithGitHubRepository(repository) ||
+      repository.gitHubRepository.htmlURL === null
+    ) {
+      return false
     }
 
-    const { parent, owner, name, htmlURL } = gitHubRepository
-    const isForkContributingToParent =
-      isForkedRepositoryContributingToParent(repository)
-
-    const baseForkPreface =
-      isForkContributingToParent && parent !== null
-        ? `${parent.owner.login}:${parent.name}:`
-        : ''
-    const encodedBaseBranch =
-      baseBranch !== undefined
-        ? baseForkPreface +
-          encodeURIComponent(baseBranch.nameWithoutRemote) +
-          '...'
-        : ''
-
-    const compareForkPreface = isForkContributingToParent
-      ? `${owner.login}:${name}:`
-      : ''
-
-    const encodedCompareBranch =
-      compareForkPreface +
-      encodeURIComponent(
-        compareBranch.upstreamWithoutRemote ?? compareBranch.nameWithoutRemote
-      )
-
-    const compareString = `${encodedBaseBranch}${encodedCompareBranch}`
-    const baseURL = `${htmlURL}/pull/new/${compareString}`
-
-    await this._openInBrowser(baseURL)
+    const gitHubRepository = repository.gitHubRepository
+    const target = targetOverride ?? getNonForkGitHubRepository(repository)
+    const targetIsAllowed =
+      target.hash === gitHubRepository.hash ||
+      target.hash === gitHubRepository.parent?.hash
+    if (
+      !targetIsAllowed ||
+      target.endpoint !== gitHubRepository.endpoint ||
+      target.htmlURL === null
+    ) {
+      return false
+    }
+    const url = getGitHubPullRequestCreationURL(
+      gitHubRepository,
+      target,
+      compareBranch,
+      baseBranch
+    )
+    return url === null ? false : this._openInBrowser(url)
   }
 
   public async _updateExistingUpstreamRemote(

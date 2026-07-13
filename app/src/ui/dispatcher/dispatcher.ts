@@ -174,6 +174,12 @@ import {
 } from '../../lib/copilot-conflict-resolution'
 import { WorktreeEntry } from '../../models/worktree'
 import { ICreatedGitHubIssue } from '../../lib/github-issue'
+import {
+  getGitHubPullRequestHead,
+  GitHubPullRequestContextChangedError,
+  ICreatedGitHubPullRequest,
+  IGitHubPullRequestDraft,
+} from '../../lib/github-pull-request'
 
 /**
  * An error handler function.
@@ -3159,6 +3165,15 @@ export class Dispatcher {
     return this.appStore._createPullRequest(repository, baseBranch)
   }
 
+  /** Continue the publish/push prerequisite flow in the native PR composer. */
+  public showCreateGitHubPullRequest(
+    repository: Repository,
+    branch: Branch,
+    baseBranch?: Branch
+  ): void {
+    this.appStore._showCreateGitHubPullRequest(repository, branch, baseBranch)
+  }
+
   /**
    * Show the current pull request on github.com
    */
@@ -3180,9 +3195,16 @@ export class Dispatcher {
    */
   public openCreatePullRequestInBrowser(
     repository: Repository,
-    branch: Branch
-  ): Promise<void> {
-    return this.appStore._openCreatePullRequestInBrowser(repository, branch)
+    branch: Branch,
+    baseBranch?: Branch,
+    target?: GitHubRepository
+  ): Promise<boolean> {
+    return this.appStore._openCreatePullRequestInBrowser(
+      repository,
+      branch,
+      baseBranch,
+      target
+    )
   }
 
   /**
@@ -3654,6 +3676,75 @@ export class Dispatcher {
       target.name,
       title,
       body,
+      signal
+    )
+  }
+
+  /** Whether the repository and checked-out tip still match a PR review. */
+  public isGitHubPullRequestContextCurrent(
+    repository: Repository,
+    contextVersion: string
+  ): boolean {
+    return this.appStore._isGitHubPullRequestContextCurrent(
+      repository,
+      contextVersion
+    )
+  }
+
+  /** Create one reviewed pull request through the selected GitHub account. */
+  public async createGitHubPullRequest(
+    repository: Repository,
+    target: GitHubRepository,
+    account: Account,
+    currentBranch: Branch,
+    contextVersion: string,
+    draft: IGitHubPullRequestDraft,
+    signal: AbortSignal
+  ): Promise<ICreatedGitHubPullRequest> {
+    if (
+      !this.appStore._isGitHubPullRequestContextCurrent(
+        repository,
+        contextVersion
+      )
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new Error('This repository is not connected to GitHub.')
+    }
+
+    const source = repository.gitHubRepository
+    const targetIsAllowed =
+      target.hash === source.hash || target.hash === source.parent?.hash
+    if (!targetIsAllowed || target.endpoint !== source.endpoint) {
+      throw new Error(
+        'The pull request target is not valid for this repository.'
+      )
+    }
+    if (target.isArchived === true) {
+      throw new Error('Archived repositories cannot accept pull requests.')
+    }
+    if (
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('No matching authenticated GitHub account is available.')
+    }
+
+    const expectedHead = getGitHubPullRequestHead(source, target, currentBranch)
+    if (draft.head !== expectedHead) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+
+    return API.fromAccount(account).createPullRequest(
+      target.owner.login,
+      target.name,
+      draft.title,
+      draft.body,
+      draft.head,
+      draft.base,
+      draft.draft,
       signal
     )
   }

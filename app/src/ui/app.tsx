@@ -92,6 +92,8 @@ import { NotificationHistoryDialog } from './notifications/notification-history-
 import { FileHistory } from './file-history'
 import { SparseCheckoutManager } from './sparse-checkout'
 import { CreateGitHubIssueDialog } from './create-github-issue'
+import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
+import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
@@ -1907,6 +1909,35 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
           />
         )
+      case PopupType.CreateGitHubPullRequest: {
+        const selection = this.state.selectedState
+        const repositoryContextCurrent =
+          selection !== null &&
+          selection.type === SelectionType.Repository &&
+          selection.repository.id === popup.repository.id &&
+          selection.repository.hash === popup.repository.hash &&
+          selection.state.branchesState.tip.kind === TipState.Valid &&
+          getGitHubPullRequestContextVersion(
+            selection.repository,
+            selection.state.branchesState.tip.branch
+          ) === popup.contextVersion
+
+        return (
+          <CreateGitHubPullRequestDialog
+            key={`create-github-pull-request-${popup.repository.id}`}
+            repository={popup.repository}
+            currentBranch={popup.currentBranch}
+            targets={popup.targets}
+            initialTargetHash={popup.initialTargetHash}
+            initialBaseBranchName={popup.initialBaseBranchName}
+            contextVersion={popup.contextVersion}
+            repositoryContextCurrent={repositoryContextCurrent}
+            accounts={this.state.accounts}
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
       case PopupType.SparseCheckout:
         return (
           <SparseCheckoutManager
@@ -2177,8 +2208,9 @@ export class App extends React.Component<IAppProps, IAppState> {
             dispatcher={this.props.dispatcher}
             repository={popup.repository}
             branch={popup.branch}
+            baseBranch={popup.baseBranch}
             unPushedCommits={popup.unPushedCommits}
-            onConfirm={this.openCreatePullRequestInBrowser}
+            onConfirm={this.showCreateGitHubPullRequest}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -3962,11 +3994,16 @@ export class App extends React.Component<IAppProps, IAppState> {
     this.props.dispatcher.startPullRequest(state.repository)
   }
 
-  private openCreatePullRequestInBrowser = (
+  private showCreateGitHubPullRequest = (
     repository: Repository,
-    branch: Branch
+    branch: Branch,
+    baseBranch?: Branch
   ) => {
-    this.props.dispatcher.openCreatePullRequestInBrowser(repository, branch)
+    this.props.dispatcher.showCreateGitHubPullRequest(
+      repository,
+      branch,
+      baseBranch
+    )
   }
 
   private onPushPullDropdownStateChanged = (newState: DropdownState) => {

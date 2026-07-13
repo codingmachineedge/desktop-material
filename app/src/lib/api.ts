@@ -35,6 +35,12 @@ import {
   validateCreatedGitHubIssue,
   validateGitHubRepositoryPart,
 } from './github-issue'
+import {
+  IAPICreatedGitHubPullRequest,
+  ICreatedGitHubPullRequest,
+  normalizeGitHubPullRequestDraft,
+  validateCreatedGitHubPullRequest,
+} from './github-pull-request'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
 const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
@@ -1463,6 +1469,50 @@ export class API {
 
     return validateCreatedGitHubIssue(
       issue,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /**
+   * Create one pull request using only the reviewed fields exposed by the
+   * guided Desktop flow. The returned browser URL is constrained to this
+   * client's provider and the exact target repository and PR number.
+   */
+  public async createPullRequest(
+    owner: string,
+    name: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string,
+    draft: boolean,
+    signal?: AbortSignal
+  ): Promise<ICreatedGitHubPullRequest> {
+    signal?.throwIfAborted()
+
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const pullRequest = normalizeGitHubPullRequestDraft(
+      title,
+      body,
+      head,
+      base,
+      draft
+    )
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/pulls`
+    const response = await this.ghRequest('POST', path, {
+      body: pullRequest,
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const created = await parsedResponse<IAPICreatedGitHubPullRequest>(response)
+
+    return validateCreatedGitHubPullRequest(
+      created,
       safeOwner,
       safeName,
       getHTMLURL(this.endpoint)

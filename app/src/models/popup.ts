@@ -29,6 +29,7 @@ import { TerminalOutput, TerminalOutputListener } from '../lib/git'
 import type { IBYOKModel, IBYOKProvider } from '../lib/copilot/byok'
 import { WorktreeEntry } from './worktree'
 import { MergeAllMode } from '../lib/automation/merge-all'
+import { IGitHubPullRequestTarget } from '../lib/github-pull-request'
 
 export enum PopupType {
   RenameBranch = 'RenameBranch',
@@ -40,6 +41,7 @@ export enum PopupType {
   NotificationHistory = 'NotificationHistory',
   FileHistory = 'FileHistory',
   CreateGitHubIssue = 'CreateGitHubIssue',
+  CreateGitHubPullRequest = 'CreateGitHubPullRequest',
   SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
   AddRepository = 'AddRepository',
@@ -175,6 +177,15 @@ export type PopupDetail =
   | { type: PopupType.NotificationHistory }
   | { type: PopupType.FileHistory; repository: Repository; path: string }
   | { type: PopupType.CreateGitHubIssue; repository: Repository }
+  | {
+      type: PopupType.CreateGitHubPullRequest
+      repository: RepositoryWithGitHubRepository
+      currentBranch: Branch
+      targets: ReadonlyArray<IGitHubPullRequestTarget>
+      initialTargetHash: string
+      initialBaseBranchName: string | null
+      contextVersion: string
+    }
   | { type: PopupType.SparseCheckout; repository: Repository }
   | { type: PopupType.MergeAll; repository: Repository; mode: MergeAllMode }
   | { type: PopupType.PullAllRepositories }
@@ -230,6 +241,7 @@ export type PopupDetail =
       repository: Repository
       branch: Branch
       unPushedCommits?: number
+      baseBranch?: Branch
     }
   | { type: PopupType.CLIInstalled }
   | {
