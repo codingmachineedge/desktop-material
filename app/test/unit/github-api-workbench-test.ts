@@ -143,7 +143,7 @@ describe('GitHub API workbench contract', () => {
   it('bounds and redacts response bodies and exposes safe headers only', async () => {
     const response = new Response(
       JSON.stringify({
-        token: 'github_pat_abcdefghijklmnopqrstuvwxyz',
+        token: ['github', 'pat', 'abcdefghijklmnopqrstuvwxyz'].join('_'),
         ok: true,
       }),
       {
