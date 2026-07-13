@@ -34,6 +34,7 @@ export async function findGitHubTrampolineAccount(
   const parsedUrl = new URL(remoteUrl)
   return accounts.find(
     a =>
+      a.token.length > 0 &&
       getAccountOrigin(a) === parsedUrl.origin &&
       (forcedAccountKey === undefined || getAccountKey(a) === forcedAccountKey)
   )

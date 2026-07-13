@@ -10,6 +10,7 @@ import {
 import { createCredentialHelperTrampolineHandler } from '../../src/lib/trampoline/trampoline-credential-helper'
 import { TrampolineCommandIdentifier } from '../../src/lib/trampoline/trampoline-command'
 import {
+  getHasRejectedCredentialsForEndpoint,
   getForcedAccountKey,
   withTrampolineEnv,
 } from '../../src/lib/trampoline/trampoline-environment'
@@ -44,6 +45,16 @@ const otherOrigin = new Account(
   '',
   'free'
 )
+const tokenless = new Account(
+  'tokenless-login',
+  getDotComAPIEndpoint(),
+  '',
+  [],
+  '',
+  4,
+  '',
+  'free'
+)
 
 const store = {
   getAll: async () => [first, second, otherOrigin],
@@ -66,6 +77,50 @@ describe('trampoline forced account', () => {
         getAccountKey(otherOrigin)
       ),
       undefined
+    )
+  })
+
+  it('skips tokenless accounts without weakening a forced selector', async () => {
+    const tokenAwareStore = {
+      getAll: async () => [tokenless, second],
+    } as unknown as AccountsStore
+
+    assert.equal(
+      await findGitHubTrampolineAccount(
+        tokenAwareStore,
+        'https://github.com/owner/repository.git'
+      ),
+      second
+    )
+    assert.equal(
+      await findGitHubTrampolineAccount(
+        tokenAwareStore,
+        'https://github.com/owner/repository.git',
+        getAccountKey(tokenless)
+      ),
+      undefined
+    )
+
+    const handler = createCredentialHelperTrampolineHandler(tokenAwareStore)
+    await withTrampolineEnv(
+      async trampolineEnv => {
+        const trampolineToken = (trampolineEnv as Record<string, string>)[
+          'DESKTOP_TRAMPOLINE_TOKEN'
+        ]
+        const response = await handler({
+          identifier: TrampolineCommandIdentifier.CredentialHelper,
+          trampolineToken,
+          parameters: ['get'],
+          environmentVariables: new Map(),
+          stdin: 'protocol=https\nhost=github.com\n',
+        })
+
+        assert.equal(response, undefined)
+      },
+      process.cwd(),
+      false,
+      undefined,
+      getAccountKey(tokenless)
     )
   })
 
@@ -232,6 +287,39 @@ describe('trampoline forced account', () => {
       false,
       undefined,
       'signed-out-account'
+    )
+  })
+
+  it('records rejected endpoint provenance for forced credential erasure', async () => {
+    const handler = createCredentialHelperTrampolineHandler(store)
+
+    await withTrampolineEnv(
+      async trampolineEnv => {
+        const trampolineToken = (trampolineEnv as Record<string, string>)[
+          'DESKTOP_TRAMPOLINE_TOKEN'
+        ]
+        const response = await handler({
+          identifier: TrampolineCommandIdentifier.CredentialHelper,
+          trampolineToken,
+          parameters: ['erase'],
+          environmentVariables: new Map(),
+          stdin:
+            'protocol=https\nhost=github.com\nusername=second-login\npassword=second-token\n',
+        })
+
+        assert.equal(response, undefined)
+        assert.equal(
+          getHasRejectedCredentialsForEndpoint(
+            trampolineToken,
+            'https://second-login@github.com/'
+          ),
+          true
+        )
+      },
+      process.cwd(),
+      false,
+      undefined,
+      getAccountKey(second)
     )
   })
 

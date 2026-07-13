@@ -10,6 +10,7 @@ import { GitError as DugiteError, exec } from 'dugite'
 import memoizeOne from 'memoize-one'
 import { GitError, getDescriptionForError } from '../git/core'
 import { getDesktopAskpassTrampolineFilename } from 'desktop-trampoline'
+import { setAuthenticationFailureOrigins } from '../git/authentication-failure-origin'
 
 const hasRejectedCredentialsForEndpoint = new Map<string, Set<string>>()
 
@@ -82,7 +83,54 @@ export const GitUserAgent = memoizeOne(() =>
 )
 
 const fatalPromptsDisabledRe =
-  /^fatal: could not read .*?: terminal prompts disabled\n$/
+  /^fatal: could not read (?:Username|Password) for '([^'\r\n]+)': terminal prompts disabled\r?$/gm
+
+const getHTTPSOrigin = (value: string): string | null => {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' ? parsed.origin.toLowerCase() : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Find the exact HTTPS origin for a prompts-disabled fatal line only when the
+ * credential trampoline recorded a rejection for that same origin. Clone and
+ * submodule progress may precede the fatal line, so matching is multiline but
+ * deliberately line-bounded.
+ */
+export function getRejectedCredentialPromptOrigin(
+  trampolineToken: string,
+  message: string
+): string | null {
+  const rejectedOrigins = getRejectedCredentialOrigins(trampolineToken)
+
+  for (const match of message.matchAll(fatalPromptsDisabledRe)) {
+    const origin = getHTTPSOrigin(match[1])
+    if (origin !== null && rejectedOrigins.has(origin)) {
+      return origin
+    }
+  }
+
+  return null
+}
+
+const getRejectedCredentialOrigins = (
+  trampolineToken: string
+): ReadonlySet<string> => {
+  const rejectedEndpoints =
+    hasRejectedCredentialsForEndpoint.get(trampolineToken)
+  return new Set(
+    [...(rejectedEndpoints ?? [])]
+      .map(getHTTPSOrigin)
+      .filter((origin): origin is string => origin !== null)
+  )
+}
+
+const isNativeHTTPSAuthenticationAmbiguity = (error: GitError): boolean =>
+  error.result.gitError === DugiteError.HTTPSAuthenticationFailed ||
+  error.result.gitError === DugiteError.HTTPSRepositoryNotFound
 
 /**
  * Allows invoking a function with a set of environment variables to use when
@@ -181,23 +229,39 @@ export async function withTrampolineEnv<T>(
       //
       // We catch that specific error here and throw the user-friendly
       // authentication failed error that we've always done in the past.
+      const rejectedCredentialOrigins = getRejectedCredentialOrigins(token)
       if (
-        hasRejectedCredentialsForEndpoint.has(token) &&
         e instanceof GitError &&
-        fatalPromptsDisabledRe.test(e.message)
+        rejectedCredentialOrigins.size > 0 &&
+        isNativeHTTPSAuthenticationAmbiguity(e)
       ) {
+        setAuthenticationFailureOrigins(e, rejectedCredentialOrigins)
+      }
+
+      const rejectedCredentialOrigin =
+        e instanceof GitError
+          ? getRejectedCredentialPromptOrigin(token, e.message)
+          : null
+      if (e instanceof GitError && rejectedCredentialOrigin !== null) {
         const msg = 'Authentication failed: user cancelled authentication'
         const gitErrorDescription =
           getDescriptionForError(DugiteError.HTTPSAuthenticationFailed, '') ??
           msg
 
         const fakeAuthError = new GitError(
-          { ...e.result, gitErrorDescription },
+          {
+            ...e.result,
+            gitError: DugiteError.HTTPSAuthenticationFailed,
+            gitErrorDescription,
+          },
           e.args,
           msg
         )
 
         fakeAuthError.cause = e
+        setAuthenticationFailureOrigins(fakeAuthError, [
+          rejectedCredentialOrigin,
+        ])
         throw fakeAuthError
       }
 

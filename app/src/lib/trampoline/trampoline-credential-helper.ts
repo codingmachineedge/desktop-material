@@ -283,14 +283,20 @@ export const createCredentialHelperTrampolineHandler: (
         setHasRejectedCredentialsForEndpoint(token, endpoint)
       }
       return cred ? formatCredential(cred) : undefined
+    } else if (firstParameter === 'erase') {
+      // Git invokes erase after a server rejects a credential. Preserve the
+      // endpoint as authentication provenance even when a forced OAuth
+      // identity owns the request and generic helpers must remain untouched.
+      setHasRejectedCredentialsForEndpoint(token, `${getCredentialUrl(input)}`)
+      if (scopedForcedAccountKey === undefined) {
+        await eraseCredential(input, store, token)
+      }
     } else if (scopedForcedAccountKey !== undefined) {
       // OAuth credentials selected for a retry are owned by AccountsStore.
       // Never forward their store/erase callbacks to generic helpers.
       return undefined
     } else if (firstParameter === 'store') {
       await storeCredential(input, store, token)
-    } else if (firstParameter === 'erase') {
-      await eraseCredential(input, store, token)
     }
     return undefined
   } catch (e) {

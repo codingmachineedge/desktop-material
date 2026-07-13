@@ -2,6 +2,7 @@ import { GitError as DugiteError } from 'dugite'
 import { Account, getAccountKey } from '../../models/account'
 import { getHTMLURL } from '../api'
 import { GitError } from '../git/core'
+import { getAuthenticationFailureOrigins } from '../git/authentication-failure-origin'
 
 const HTTPSAuthenticationErrors: ReadonlySet<DugiteError> = new Set([
   DugiteError.HTTPSAuthenticationFailed,
@@ -75,13 +76,21 @@ export function isPullAllHTTPSAuthenticationFailure(
   remoteUrl: string
 ): error is GitError {
   const origin = getOrigin(remoteUrl)
-  return (
+  if (
     origin !== null &&
     origin.startsWith('https://') &&
     error instanceof GitError &&
     error.result.gitError !== null &&
     HTTPSAuthenticationErrors.has(error.result.gitError)
-  )
+  ) {
+    const failureOrigins = getAuthenticationFailureOrigins(error)
+    return (
+      failureOrigins === undefined ||
+      (failureOrigins.size === 1 && failureOrigins.has(origin))
+    )
+  }
+
+  return false
 }
 
 export interface IPullAllAccountFallbackResult {
