@@ -33,6 +33,13 @@ import {
   ICLICommandStateEvent,
   ICLIWorkbenchCatalog,
 } from './cli-workbench'
+import {
+  ActionsArtifactTransferResult,
+  ActionsJobLogTransferResult,
+  IActionsArtifactTransferRequest,
+  IActionsJobLogTransferRequest,
+  IActionsTransferProgressEvent,
+} from './actions-transfer'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -41,6 +48,8 @@ import {
  * the two over the untyped IPC framework.
  */
 export type RequestChannels = {
+  'cancel-actions-transfer': (operationId: string) => void
+  'actions-transfer-progress': (event: IActionsTransferProgressEvent) => void
   'agent-command': (command: IAgentCommandEnvelope) => void
   'agent-command-result': (id: string, result: AgentCommandResult) => void
   'agent-server-status': (status: IAgentServerStatus) => void
@@ -129,6 +138,12 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  'download-actions-artifact': (
+    request: IActionsArtifactTransferRequest
+  ) => Promise<ActionsArtifactTransferResult>
+  'fetch-actions-job-log': (
+    request: IActionsJobLogTransferRequest
+  ) => Promise<ActionsJobLogTransferResult>
   'get-agent-server-status': () => Promise<IAgentServerStatus>
   'regenerate-agent-server-token': () => Promise<IAgentServerStatus>
   'get-path': (path: PathType) => Promise<string>

@@ -49,6 +49,18 @@ import {
   parseActionsArtifactList,
   validateActionsArtifactIdentifier,
 } from './actions-artifacts'
+import {
+  ActionsArtifactJSONError,
+  parseBoundedActionsArtifactAPIError,
+  readBoundedActionsArtifactJSON,
+} from './actions-artifact-json'
+import { createGitHubAPIRequestHeaders } from './github-rest-api-version'
+export {
+  createGitHubAPIRequestHeaders,
+  getGitHubRESTAPIVersion,
+  GitHubDotComRESTAPIVersion,
+  GitHubRESTAPIVersionHeader,
+} from './github-rest-api-version'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
 const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
@@ -163,45 +175,6 @@ export type GitHubAccountType = 'User' | 'Organization'
 
 /** The OAuth scopes we want to request */
 const oauthScopes = ['repo', 'user', 'workflow']
-
-/** The current stable REST API version used for GitHub.com requests. */
-export const GitHubDotComRESTAPIVersion = '2026-03-10'
-
-export const GitHubRESTAPIVersionHeader = 'X-GitHub-Api-Version'
-
-function isGraphQLRequestPath(path: string): boolean {
-  return path.split(/[?#]/, 1)[0].replace(/^\/+/, '') === 'graphql'
-}
-
-/**
- * Return the REST API version to use for a request, if one is known to be
- * supported by the endpoint. This is deliberately GitHub.com-only until GHES
- * reports supported API versions through a capability probe.
- */
-export function getGitHubRESTAPIVersion(
-  endpoint: string,
-  path: string
-): string | null {
-  return isDotCom(endpoint) && !isGraphQLRequestPath(path)
-    ? GitHubDotComRESTAPIVersion
-    : null
-}
-
-/** Add the stable REST version to GitHub.com API request headers. */
-export function createGitHubAPIRequestHeaders(
-  endpoint: string,
-  path: string,
-  customHeaders?: HeadersInit
-): Headers {
-  const headers = new Headers(customHeaders)
-  const version = getGitHubRESTAPIVersion(endpoint, path)
-
-  if (version !== null) {
-    headers.set(GitHubRESTAPIVersionHeader, version)
-  }
-
-  return headers
-}
 
 /**
  * Information about a repository as returned by the GitHub API.
@@ -625,10 +598,6 @@ export interface IAPIWorkflowJobStep {
   readonly log: string
 }
 
-export const ActionsLogMaximumBytes = 5 * 1024 * 1024
-export const ActionsLogTruncationMarker =
-  '\n\n--- Log truncated after 5 MB by Desktop Material ---\n'
-
 /** Protected branch information returned by the GitHub API */
 export interface IAPIPushControl {
   /**
@@ -974,6 +943,25 @@ export interface IAPICreatePushProtectionBypassResponse {
   reason: BypassReasonType
   expire_at: string
   token_type: string
+}
+
+async function boundedActionsArtifactResponse(
+  response: Response,
+  signal?: AbortSignal
+): Promise<unknown> {
+  let value: unknown
+  try {
+    value = await readBoundedActionsArtifactJSON(response, signal)
+  } catch (error) {
+    if (!response.ok && error instanceof ActionsArtifactJSONError) {
+      throw new APIError(response, null)
+    }
+    throw error
+  }
+  if (!response.ok) {
+    throw new APIError(response, parseBoundedActionsArtifactAPIError(value))
+  }
+  return value
 }
 
 /**
@@ -1920,7 +1908,7 @@ export class API {
     const path = `repos/${owner}/${name}/actions/runs/${runId}/artifacts?per_page=${ActionsArtifactPageSize}`
     const response = await this.ghRequest('GET', path, { signal })
     return parseActionsArtifactList(
-      await parsedResponse<unknown>(response),
+      await boundedActionsArtifactResponse(response, signal),
       runId
     )
   }
@@ -1942,66 +1930,8 @@ export class API {
       { signal }
     )
     return parseActionsArtifactAttestationPresence(
-      await parsedResponse<unknown>(response)
+      await boundedActionsArtifactResponse(response, signal)
     )
-  }
-
-  /**
-   * Obtain an artifact's signed archive response. The authenticated API
-   * redirect is followed by a new anonymous request so the account token can
-   * never be forwarded to GitHub's blob-storage host.
-   */
-  public async fetchWorkflowArtifactArchive(
-    owner: string,
-    name: string,
-    artifactId: number,
-    signal?: AbortSignal
-  ): Promise<Response> {
-    const id = validateActionsArtifactIdentifier(artifactId, 'artifact id')
-    const path = `repos/${owner}/${name}/actions/artifacts/${id}/zip`
-    const response = await this.ghRequest('GET', path, {
-      redirect: 'manual',
-      signal,
-    })
-
-    if (response.status === 410) {
-      throw new APIError(response, {
-        message: 'This artifact has expired and can no longer be downloaded.',
-      })
-    }
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('Location')
-      if (location === null) {
-        throw new Error('GitHub did not provide an artifact download URL.')
-      }
-      let archiveURL: URL.URL
-      try {
-        archiveURL = new URL.URL(location)
-      } catch {
-        throw new Error('GitHub provided an invalid artifact download URL.')
-      }
-      if (archiveURL.protocol !== 'https:' && archiveURL.protocol !== 'http:') {
-        throw new Error('GitHub provided an unsafe artifact download URL.')
-      }
-      const accountProtocol = new URL.URL(this.endpoint).protocol
-      if (archiveURL.protocol === 'http:' && accountProtocol !== 'http:') {
-        throw new Error(
-          'GitHub provided an insecure artifact download URL for this HTTPS account.'
-        )
-      }
-
-      const archive = await fetch(archiveURL.toString(), { signal })
-      if (!archive.ok) {
-        throw new APIError(archive, null)
-      }
-      return archive
-    }
-
-    if (!response.ok) {
-      await parsedResponse<unknown>(response)
-    }
-    return response
   }
 
   /** Re-run every job in a workflow run. */
@@ -2081,39 +2011,6 @@ export class API {
       await parsedResponse<unknown>(response)
     }
     return await response.text()
-  }
-
-  /**
-   * Fetch one job's plaintext log. Electron follows the API redirect so the
-   * main-process same-origin filter can remove the GitHub Authorization header
-   * before the request reaches the signed blob host.
-   */
-  public async fetchWorkflowJobLogs(
-    owner: string,
-    name: string,
-    jobId: number
-  ): Promise<string> {
-    const path = `repos/${owner}/${name}/actions/jobs/${jobId}/logs`
-    const response = await this.ghRequest('GET', path, { redirect: 'follow' })
-
-    if (response.status === 410) {
-      throw new APIError(response, { message: 'Workflow logs have expired.' })
-    }
-
-    if (!response.ok) {
-      // A followed response URL can contain a short-lived signed query. Keep
-      // that credential out of renderer-visible error messages.
-      throw new APIError(response, {
-        message: 'Unable to download workflow logs.',
-      })
-    }
-
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    const truncated = bytes.byteLength > ActionsLogMaximumBytes
-    const content = new TextDecoder().decode(
-      truncated ? bytes.slice(0, ActionsLogMaximumBytes) : bytes
-    )
-    return truncated ? content + ActionsLogTruncationMarker : content
   }
 
   /**

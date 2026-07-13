@@ -7,12 +7,12 @@ import {
 } from '../../lib/api'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
-import { GitHubRepository } from '../../models/github-repository'
+import { Repository } from '../../models/repository'
 import { ActionsStore } from '../../lib/stores/actions-store'
 import { RunArtifacts } from './run-artifacts'
 
 interface IRunDetailsProps {
-  readonly repository: GitHubRepository
+  readonly repository: Repository
   readonly actionsStore: ActionsStore
   readonly run: IAPIWorkflowRun
   readonly jobs: ReadonlyArray<IAPIWorkflowJob>

@@ -1,22 +1,22 @@
 import { Disposable } from 'event-kit'
-import { Account } from '../../models/account'
+import { Account, getAccountKey } from '../../models/account'
 import { GitHubRepository } from '../../models/github-repository'
-import {
-  API,
-  IAPIWorkflow,
-  IAPIWorkflowJob,
-  IAPIWorkflowRun,
-  getAccountForEndpoint,
-} from '../api'
+import { API, IAPIWorkflow, IAPIWorkflowJob, IAPIWorkflowRun } from '../api'
 import { supportsActions } from '../endpoint-capabilities'
 import { APIError } from '../http'
 import { IActionsArtifact, IActionsArtifactList } from '../actions-artifacts'
 import {
-  downloadActionsArtifactArchive,
   IActionsArtifactDownloadProgress,
   IActionsArtifactDownloadResult,
 } from '../actions-artifact-download'
+import {
+  downloadActionsArtifactThroughMainProcess,
+  fetchActionsJobLogThroughMainProcess,
+} from '../actions-transfer-client'
+import { ActionsTransferError } from '../actions-transfer'
 import { AccountsStore } from './accounts-store'
+import { Repository } from '../../models/repository'
+import { getAccountForRepository } from '../get-account-for-repository'
 
 export type ActionsMutation =
   | 'rerun-job'
@@ -84,41 +84,49 @@ export function actionsArtifactError(
   if ((error as Error)?.name === 'AbortError') {
     return error as Error
   }
-  if (!(error instanceof APIError)) {
+  if (
+    !(error instanceof APIError) &&
+    !(error instanceof ActionsTransferError)
+  ) {
     return error instanceof Error ? error : new Error(String(error))
   }
 
   const action = artifactOperationLabels[operation]
-  if (error.responseStatus === 401) {
+  const responseStatus = error.responseStatus
+  const rateLimitReset = error instanceof APIError ? error.rateLimitReset : null
+  if (responseStatus === 401) {
     return new Error(`GitHub could not ${action}. Sign in again and retry.`)
   }
-  if (error.responseStatus === 403) {
-    if (error.rateLimitReset !== null) {
+  if (responseStatus === 403) {
+    if (rateLimitReset !== null) {
       return new Error(
-        `GitHub cannot ${action} until the API rate limit resets at ${error.rateLimitReset.toLocaleTimeString()}.`
+        `GitHub cannot ${action} until the API rate limit resets at ${rateLimitReset.toLocaleTimeString()}.`
       )
     }
     return new Error(
       `GitHub denied permission to ${action}. Check that the selected account has Actions read access to this repository.`
     )
   }
-  if (error.responseStatus === 404) {
+  if (responseStatus === 404) {
     return new Error(
       `GitHub could not ${action}. The artifact may no longer exist, the account may not have access, or this GitHub Enterprise version may not support the operation.`
     )
   }
-  if (error.responseStatus === 410) {
+  if (responseStatus === 410) {
     return new Error(
       'This artifact has expired and can no longer be downloaded.'
     )
   }
-  if (error.responseStatus >= 500) {
+  if (responseStatus !== null && responseStatus >= 500) {
     return new Error(
-      `GitHub could not ${action} because the service returned an error (${error.responseStatus}). Retry in a moment.`
+      `GitHub could not ${action} because the service returned an error (${responseStatus}). Retry in a moment.`
     )
   }
+  if (responseStatus === null) {
+    return error
+  }
   return new Error(
-    `GitHub could not ${action} (HTTP ${error.responseStatus}). Refresh and retry.`
+    `GitHub could not ${action} (HTTP ${responseStatus}). Refresh and retry.`
   )
 }
 
@@ -135,7 +143,7 @@ export interface IActionsState {
 export type ActionsStateCallback = (state: IActionsState) => void
 
 interface IActionsSubscription {
-  readonly repository: GitHubRepository
+  readonly repository: Repository
   readonly callbacks: Set<ActionsStateCallback>
 }
 
@@ -151,17 +159,55 @@ const emptyState = (supported: boolean): IActionsState => ({
   supported,
 })
 
-export function getActionsRepositoryKey(repository: GitHubRepository): string {
-  return `${repository.endpoint}/${repository.owner.login}/${repository.name}`
+export function getActionsRepositoryKey(repository: Repository): string {
+  const gitHubRepository = repository.gitHubRepository
+  const remote =
+    gitHubRepository === null
+      ? `local:${repository.path}`
+      : `${gitHubRepository.endpoint}/${gitHubRepository.owner.login}/${gitHubRepository.name}`
+  return `${remote}#account:${repository.accountKey ?? 'legacy-endpoint'}`
 }
 
 /** GitHub Actions is available only for GitHub-backed authenticated accounts. */
 export function accountSupportsActions(
-  repository: GitHubRepository,
+  repository: Repository,
   accounts: ReadonlyArray<Account>
 ): boolean {
-  const account = getAccountForEndpoint(accounts, repository.endpoint)
-  return account?.provider === 'github' && supportsActions(repository.endpoint)
+  const gitHubRepository = repository.gitHubRepository
+  if (gitHubRepository === null) {
+    return false
+  }
+  const account = getActionsAccount(repository, accounts)
+  return account !== null && supportsActions(gitHubRepository.endpoint)
+}
+
+/** Resolve the exact per-repository account without endpoint fallback drift. */
+export function getActionsAccount(
+  repository: Repository,
+  accounts: ReadonlyArray<Account>
+): Account | null {
+  const gitHubRepository = repository.gitHubRepository
+  const account = getAccountForRepository(accounts, repository)
+  return gitHubRepository !== null &&
+    account?.provider === 'github' &&
+    account.endpoint === gitHubRepository.endpoint
+    ? account
+    : null
+}
+
+function actionsAccountsEqual(
+  left: ReadonlyArray<Account>,
+  right: ReadonlyArray<Account>
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (account, index) =>
+        getAccountKey(account) === getAccountKey(right[index]) &&
+        account.provider === right[index].provider &&
+        account.token === right[index].token
+    )
+  )
 }
 
 /** Compare the API fields used by the run list before notifying subscribers. */
@@ -185,6 +231,7 @@ export function workflowRunsEqual(
  */
 export class ActionsStore {
   private accounts: ReadonlyArray<Account> = []
+  private accountsGeneration = 0
   private readonly states = new Map<string, IActionsState>()
   private readonly subscriptions = new Map<string, IActionsSubscription>()
   private readonly inFlight = new Map<string, Promise<void>>()
@@ -201,11 +248,27 @@ export class ActionsStore {
   }
 
   private readonly onAccountsUpdated = (accounts: ReadonlyArray<Account>) => {
+    if (actionsAccountsEqual(this.accounts, accounts)) {
+      return
+    }
     this.accounts = accounts
+    this.accountsGeneration++
+    this.states.clear()
+    this.inFlight.clear()
+
+    for (const { repository } of this.subscriptions.values()) {
+      const state = emptyState(accountSupportsActions(repository, accounts))
+      this.notify(repository, state)
+      if (state.supported) {
+        this.refresh(repository, true).catch(error =>
+          log.error('Failed refreshing Actions after an account update', error)
+        )
+      }
+    }
   }
 
   public subscribe(
-    repository: GitHubRepository,
+    repository: Repository,
     callback: ActionsStateCallback
   ): Disposable {
     const key = getActionsRepositoryKey(repository)
@@ -265,22 +328,40 @@ export class ActionsStore {
     }
   }
 
-  private notify(repository: GitHubRepository, state: IActionsState) {
+  private notify(repository: Repository, state: IActionsState) {
     const key = getActionsRepositoryKey(repository)
     this.states.set(key, state)
     this.subscriptions.get(key)?.callbacks.forEach(callback => callback(state))
   }
 
-  private apiFor(repository: GitHubRepository): API {
-    const account = getAccountForEndpoint(this.accounts, repository.endpoint)
-    if (account === null || account.provider !== 'github') {
-      throw new Error(`Sign in to ${repository.endpoint} to use Actions.`)
+  private gitHubFor(repository: Repository): GitHubRepository {
+    const gitHubRepository = repository.gitHubRepository
+    if (gitHubRepository === null) {
+      throw new Error('This repository is not connected to GitHub Actions.')
     }
-    if (!supportsActions(repository.endpoint)) {
+    return gitHubRepository
+  }
+
+  private accountFor(repository: Repository): Account {
+    const gitHubRepository = this.gitHubFor(repository)
+    const account = getActionsAccount(repository, this.accounts)
+    if (account === null) {
+      throw new Error(
+        repository.accountKey === null
+          ? `Sign in to ${gitHubRepository.endpoint} to use Actions.`
+          : 'Sign in with the account selected for this repository to use Actions.'
+      )
+    }
+    if (!supportsActions(gitHubRepository.endpoint)) {
       throw new Error(
         'GitHub Actions is not available on this GitHub Enterprise version.'
       )
     }
+    return account
+  }
+
+  private apiFor(repository: Repository): API {
+    const account = this.accountFor(repository)
     return API.fromAccount(account)
   }
 
@@ -296,7 +377,7 @@ export class ActionsStore {
   }
 
   public async refresh(
-    repository: GitHubRepository,
+    repository: Repository,
     force: boolean = false
   ): Promise<void> {
     const key = getActionsRepositoryKey(repository)
@@ -321,25 +402,37 @@ export class ActionsStore {
       return pending
     }
 
-    const refresh = this.performRefresh(repository, existing).finally(() =>
-      this.inFlight.delete(key)
-    )
+    const generation = this.accountsGeneration
+    const refresh = this.performRefresh(
+      repository,
+      existing,
+      generation
+    ).finally(() => {
+      if (this.inFlight.get(key) === refresh) {
+        this.inFlight.delete(key)
+      }
+    })
     this.inFlight.set(key, refresh)
     return refresh
   }
 
   private async performRefresh(
-    repository: GitHubRepository,
-    existing: IActionsState
+    repository: Repository,
+    existing: IActionsState,
+    accountsGeneration: number
   ) {
     this.notify(repository, { ...existing, loading: true, error: null })
     try {
       const api = this.apiFor(repository)
-      const owner = repository.owner.login
+      const gitHubRepository = this.gitHubFor(repository)
+      const owner = gitHubRepository.owner.login
       const [workflows, runs] = await Promise.all([
-        api.fetchWorkflows(owner, repository.name),
-        api.fetchWorkflowRuns(owner, repository.name),
+        api.fetchWorkflows(owner, gitHubRepository.name),
+        api.fetchWorkflowRuns(owner, gitHubRepository.name),
       ])
+      if (accountsGeneration !== this.accountsGeneration) {
+        return
+      }
       const nextRuns = workflowRunsEqual(existing.runs, runs.workflow_runs)
         ? existing.runs
         : runs.workflow_runs
@@ -353,9 +446,18 @@ export class ActionsStore {
         supported: true,
       })
     } catch (error) {
+      if (accountsGeneration !== this.accountsGeneration) {
+        return
+      }
       const failure = error instanceof Error ? error : new Error(String(error))
+      const clearCachedData =
+        error instanceof APIError &&
+        (error.responseStatus === 401 || error.responseStatus === 403)
+      const safeExisting = clearCachedData
+        ? emptyState(existing.supported)
+        : existing
       this.notify(repository, {
-        ...existing,
+        ...safeExisting,
         loading: false,
         error: failure,
         rateLimitReset:
@@ -367,19 +469,21 @@ export class ActionsStore {
     }
   }
 
-  public async rerun(repository: GitHubRepository, runId: number) {
+  public async rerun(repository: Repository, runId: number) {
+    const gitHubRepository = this.gitHubFor(repository)
     await this.apiFor(repository).rerunWorkflowRun(
-      repository.owner.login,
-      repository.name,
+      gitHubRepository.owner.login,
+      gitHubRepository.name,
       runId
     )
     await this.refresh(repository, true)
   }
 
-  public async rerunFailed(repository: GitHubRepository, runId: number) {
+  public async rerunFailed(repository: Repository, runId: number) {
+    const gitHubRepository = this.gitHubFor(repository)
     const succeeded = await this.apiFor(repository).rerunFailedJobs(
-      repository.owner.login,
-      repository.name,
+      gitHubRepository.owner.login,
+      gitHubRepository.name,
       runId
     )
     if (!succeeded) {
@@ -388,11 +492,12 @@ export class ActionsStore {
     await this.refresh(repository, true)
   }
 
-  public async rerunJob(repository: GitHubRepository, jobId: number) {
+  public async rerunJob(repository: Repository, jobId: number) {
+    const gitHubRepository = this.gitHubFor(repository)
     await this.mutate('rerun-job', async () => {
       const succeeded = await this.apiFor(repository).rerunJob(
-        repository.owner.login,
-        repository.name,
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
         jobId
       )
       if (!succeeded) {
@@ -403,14 +508,15 @@ export class ActionsStore {
   }
 
   public async cancelRun(
-    repository: GitHubRepository,
+    repository: Repository,
     runId: number,
     force: boolean
   ) {
+    const gitHubRepository = this.gitHubFor(repository)
     await this.mutate(force ? 'force-cancel-run' : 'cancel-run', () =>
       this.apiFor(repository).cancelWorkflowRun(
-        repository.owner.login,
-        repository.name,
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
         runId,
         force
       )
@@ -419,14 +525,15 @@ export class ActionsStore {
   }
 
   public async setWorkflowEnabled(
-    repository: GitHubRepository,
+    repository: Repository,
     workflowId: number,
     enabled: boolean
   ) {
+    const gitHubRepository = this.gitHubFor(repository)
     await this.mutate(enabled ? 'enable-workflow' : 'disable-workflow', () =>
       this.apiFor(repository).setWorkflowEnabled(
-        repository.owner.login,
-        repository.name,
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
         workflowId,
         enabled
       )
@@ -435,34 +542,42 @@ export class ActionsStore {
   }
 
   public async fetchJobs(
-    repository: GitHubRepository,
+    repository: Repository,
     runId: number
   ): Promise<ReadonlyArray<IAPIWorkflowJob>> {
+    const gitHubRepository = this.gitHubFor(repository)
     const result = await this.apiFor(repository).fetchWorkflowRunJobs(
-      repository.owner.login,
-      repository.name,
+      gitHubRepository.owner.login,
+      gitHubRepository.name,
       runId
     )
     return result?.jobs ?? []
   }
 
-  public fetchJobLogs(repository: GitHubRepository, jobId: number) {
-    return this.apiFor(repository).fetchWorkflowJobLogs(
-      repository.owner.login,
-      repository.name,
-      jobId
+  public fetchJobLogs(
+    repository: Repository,
+    jobId: number,
+    signal?: AbortSignal
+  ) {
+    const gitHubRepository = this.gitHubFor(repository)
+    return fetchActionsJobLogThroughMainProcess(
+      this.accountFor(repository),
+      gitHubRepository,
+      jobId,
+      signal
     )
   }
 
   public async fetchArtifacts(
-    repository: GitHubRepository,
+    repository: Repository,
     runId: number,
     signal?: AbortSignal
   ): Promise<IActionsArtifactList> {
     try {
+      const gitHubRepository = this.gitHubFor(repository)
       return await this.apiFor(repository).fetchWorkflowRunArtifacts(
-        repository.owner.login,
-        repository.name,
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
         runId,
         signal
       )
@@ -472,14 +587,15 @@ export class ActionsStore {
   }
 
   public async fetchArtifactAttestationPresence(
-    repository: GitHubRepository,
+    repository: Repository,
     digest: string,
     signal?: AbortSignal
   ): Promise<boolean> {
     try {
+      const gitHubRepository = this.gitHubFor(repository)
       return await this.apiFor(repository).fetchArtifactAttestationPresence(
-        repository.owner.login,
-        repository.name,
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
         digest,
         signal
       )
@@ -489,55 +605,51 @@ export class ActionsStore {
   }
 
   public async downloadArtifact(
-    repository: GitHubRepository,
+    repository: Repository,
     artifact: IActionsArtifact,
     destination: string,
     signal: AbortSignal,
     onProgress?: (progress: IActionsArtifactDownloadProgress) => void
   ): Promise<IActionsArtifactDownloadResult> {
     try {
-      const response = await this.apiFor(
-        repository
-      ).fetchWorkflowArtifactArchive(
-        repository.owner.login,
-        repository.name,
-        artifact.id,
-        signal
-      )
-      return await downloadActionsArtifactArchive({
+      const gitHubRepository = this.gitHubFor(repository)
+      return await downloadActionsArtifactThroughMainProcess(
+        this.accountFor(repository),
+        gitHubRepository,
         artifact,
-        response,
         destination,
         signal,
-        onProgress,
-      })
+        onProgress
+      )
     } catch (error) {
       throw actionsArtifactError(error, 'download')
     }
   }
 
   public fetchWorkflowSource(
-    repository: GitHubRepository,
+    repository: Repository,
     workflow: IAPIWorkflow,
     ref?: string
   ) {
+    const gitHubRepository = this.gitHubFor(repository)
     return this.apiFor(repository).fetchWorkflowFileContent(
-      repository.owner.login,
-      repository.name,
+      gitHubRepository.owner.login,
+      gitHubRepository.name,
       workflow.path,
       ref
     )
   }
 
   public async dispatch(
-    repository: GitHubRepository,
+    repository: Repository,
     workflowId: number,
     ref: string,
     inputs: Readonly<Record<string, string>>
   ) {
+    const gitHubRepository = this.gitHubFor(repository)
     await this.apiFor(repository).dispatchWorkflow(
-      repository.owner.login,
-      repository.name,
+      gitHubRepository.owner.login,
+      gitHubRepository.name,
       workflowId,
       ref,
       inputs

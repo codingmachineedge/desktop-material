@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { GitHubRepository } from '../../models/github-repository'
+import { Repository } from '../../models/repository'
 import { IAPIWorkflow } from '../../lib/api'
 import {
   IWorkflowDispatchDefinition,
@@ -12,7 +12,7 @@ import { Button } from '../lib/button'
 import { Select } from '../lib/select'
 
 interface IWorkflowDispatchDialogProps {
-  readonly repository: GitHubRepository
+  readonly repository: Repository
   readonly workflows: ReadonlyArray<IAPIWorkflow>
   readonly initialWorkflowId: number | null
   readonly branchNames: ReadonlyArray<string>

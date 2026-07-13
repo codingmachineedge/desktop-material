@@ -11,6 +11,7 @@ import { IActionsArtifactDownloadResult } from '../../../src/lib/actions-artifac
 import { ActionsStore } from '../../../src/lib/stores/actions-store'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
+import { Repository } from '../../../src/models/repository'
 import { RunArtifacts } from '../../../src/ui/actions/run-artifacts'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 
@@ -18,10 +19,16 @@ const longName =
   'Windows-package-with-a-deliberately-very-long-name-that-must-wrap-without-overlapping-or-requiring-sideways-scrolling'
 const digest = `sha256:${'a'.repeat(64)}`
 
-const repository = new GitHubRepository(
+const gitHubRepository = new GitHubRepository(
   'desktop-material',
   new Owner('owner', 'https://api.github.com', 1),
   1
+)
+const repository = new Repository(
+  'C:/desktop-material',
+  1,
+  gitHubRepository,
+  false
 )
 
 const run = (id: number = 7): IAPIWorkflowRun => ({
@@ -71,12 +78,12 @@ const list = (
 
 interface IStoreOverrides {
   readonly fetchArtifacts?: (
-    repository: GitHubRepository,
+    repository: Repository,
     runId: number,
     signal?: AbortSignal
   ) => Promise<IActionsArtifactList>
   readonly fetchArtifactAttestationPresence?: (
-    repository: GitHubRepository,
+    repository: Repository,
     digest: string,
     signal?: AbortSignal
   ) => Promise<boolean>
@@ -308,15 +315,21 @@ describe('Actions run artifacts', () => {
   it('aborts and ignores a stale provider/run listing', async () => {
     let firstSignal: AbortSignal | undefined
     let resolveFirst: ((value: IActionsArtifactList) => void) | undefined
-    const nextRepository = new GitHubRepository(
+    const nextGitHubRepository = new GitHubRepository(
       'desktop-material',
       new Owner('owner', 'https://github.enterprise.test/api/v3', 2),
       2
     )
+    const nextRepository = new Repository(
+      'C:/desktop-material',
+      2,
+      nextGitHubRepository,
+      false
+    )
     let latestEndpoint = ''
     const actionsStore = store({
       fetchArtifacts: async (value, runId, signal) => {
-        latestEndpoint = value.endpoint
+        latestEndpoint = value.gitHubRepository?.endpoint ?? ''
         if (runId === 7) {
           firstSignal = signal
           return await new Promise(resolve => (resolveFirst = resolve))
@@ -343,7 +356,7 @@ describe('Actions run artifacts', () => {
     )
     assert.ok(await screen.findByText('new run package'))
     assert.equal(firstSignal?.aborted, true)
-    assert.equal(latestEndpoint, nextRepository.endpoint)
+    assert.equal(latestEndpoint, nextGitHubRepository.endpoint)
     resolveFirst?.(list([artifact({ name: 'stale package' })]))
     await new Promise(resolve => setTimeout(resolve, 0))
     assert.equal(screen.queryByText('stale package'), null)

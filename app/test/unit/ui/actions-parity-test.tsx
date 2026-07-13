@@ -19,12 +19,14 @@ import { fireEvent, render, screen } from '../../helpers/ui/render'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
 import { ActionsStore } from '../../../src/lib/stores/actions-store'
+import { Repository } from '../../../src/models/repository'
 
-const repository = new GitHubRepository(
+const gitHubRepository = new GitHubRepository(
   'repo',
   new Owner('owner', 'https://api.github.com', 1),
   1
 )
+const repository = new Repository('C:/repo', 1, gitHubRepository, false)
 const actionsStore = {
   fetchArtifacts: async () => ({
     totalCount: 0,

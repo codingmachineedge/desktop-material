@@ -65,6 +65,12 @@ import {
 } from './cli-workbench'
 import { AgentServerController } from './agent-server'
 import {
+  cancelActionsTransfer,
+  handleActionsArtifactTransfer,
+  handleActionsJobLogTransfer,
+  updateActionsTransferAccounts,
+} from './actions-transfer'
+import {
   findWindowForRepositoryPath as findOwningWindow,
   nextWindowScope,
 } from './window-routing'
@@ -485,6 +491,15 @@ app.on('ready', () => {
   ipcMain.handle('regenerate-agent-server-token', async () =>
     agentServerController!.regenerateToken()
   )
+  ipcMain.handle('download-actions-artifact', (event, request) =>
+    handleActionsArtifactTransfer(event.sender, request)
+  )
+  ipcMain.handle('fetch-actions-job-log', (event, request) =>
+    handleActionsJobLogTransfer(event.sender, request)
+  )
+  ipcMain.on('cancel-actions-transfer', (event, operationId) => {
+    cancelActionsTransfer(event.sender.id, operationId)
+  })
 
   const orderedWebRequest = new OrderedWebRequest(
     session.defaultSession.webRequest
@@ -515,6 +530,7 @@ app.on('ready', () => {
 
   ipcMain.on('update-accounts', (event, accounts) => {
     updateAccounts(accounts)
+    updateActionsTransferAccounts(accounts)
     const fingerprint = JSON.stringify(accounts)
     if (fingerprint === accountsFingerprint) {
       return

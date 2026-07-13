@@ -190,12 +190,14 @@ export class RepositoryView extends React.Component<
   }
 
   private supportsGitHubActions() {
-    const repository = this.props.repository.gitHubRepository
     return (
-      repository !== null &&
-      accountSupportsActions(repository, this.props.accounts)
+      this.props.repository.gitHubRepository !== null &&
+      accountSupportsActions(this.props.repository, this.props.accounts)
     )
   }
+
+  private readonly refreshRepository = () =>
+    this.props.dispatcher.refreshRepository(this.props.repository)
 
   private getSelectedSection() {
     return this.props.state.selectedSection === RepositorySectionTab.Actions &&
@@ -274,11 +276,7 @@ export class RepositoryView extends React.Component<
             <span className="rail-label">Actions</span>
           </span>
         )}
-        <span
-          className="rail-item"
-          id="repository-tools-tab"
-          title="Repository tools"
-        >
+        <span className="rail-item" id="repository-tools-tab">
           <span className="rail-pill">
             <Octicon symbol={octicons.tools} className="rail-icon" />
           </span>
@@ -807,9 +805,7 @@ export class RepositoryView extends React.Component<
       return (
         <RepositoryTools
           repositoryPath={this.props.repository.path}
-          onRefreshRepository={() =>
-            this.props.dispatcher.refreshRepository(this.props.repository)
-          }
+          onRefreshRepository={this.refreshRepository}
         />
       )
     } else {

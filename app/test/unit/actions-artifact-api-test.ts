@@ -1,6 +1,10 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { API } from '../../src/lib/api'
+import {
+  ActionsArtifactJSONError,
+  ActionsArtifactJSONMaximumBytes,
+} from '../../src/lib/actions-artifact-json'
 import { APIError } from '../../src/lib/http'
 
 const responseArtifact = {
@@ -81,76 +85,8 @@ describe('GitHub Actions artifact API', () => {
     )
   })
 
-  it('follows the short-lived archive redirect without credentials', async () => {
+  it('preserves bounded permission failures as API errors', async () => {
     const api = new API('https://api.github.com', 'secret-token')
-    const controller = new AbortController()
-    let requestOptions:
-      | { redirect?: RequestRedirect; signal?: AbortSignal }
-      | undefined
-    Reflect.set(
-      api,
-      'ghRequest',
-      async (
-        _method: string,
-        _path: string,
-        options?: { redirect?: RequestRedirect; signal?: AbortSignal }
-      ) => {
-        requestOptions = options
-        return new Response(null, {
-          status: 302,
-          headers: { Location: 'https://blob.example.test/artifact.zip' },
-        })
-      }
-    )
-
-    const originalFetch = globalThis.fetch
-    let signedRequest:
-      | { input: string; options?: RequestInit; headers: Headers }
-      | undefined
-    globalThis.fetch = async (input, options) => {
-      signedRequest = {
-        input: String(input),
-        options,
-        headers: new Headers(options?.headers),
-      }
-      return new Response('archive')
-    }
-
-    try {
-      const response = await api.fetchWorkflowArtifactArchive(
-        'owner',
-        'repo',
-        19,
-        controller.signal
-      )
-      assert.equal(await response.text(), 'archive')
-      assert.deepEqual(requestOptions, {
-        redirect: 'manual',
-        signal: controller.signal,
-      })
-      assert.equal(
-        signedRequest?.input,
-        'https://blob.example.test/artifact.zip'
-      )
-      assert.equal(signedRequest?.options?.signal, controller.signal)
-      assert.equal(signedRequest?.headers.has('Authorization'), false)
-    } finally {
-      globalThis.fetch = originalFetch
-    }
-  })
-
-  it('preserves expired and permission failures as API errors', async () => {
-    const api = new API('https://api.github.com', 'secret-token')
-    Reflect.set(
-      api,
-      'ghRequest',
-      async () => new Response(null, { status: 410 })
-    )
-    await assert.rejects(
-      api.fetchWorkflowArtifactArchive('owner', 'repo', 19),
-      error => error instanceof APIError && error.responseStatus === 410
-    )
-
     Reflect.set(
       api,
       'ghRequest',
@@ -165,65 +101,48 @@ describe('GitHub Actions artifact API', () => {
     )
   })
 
-  it('rejects HTTPS-to-HTTP archive redirects without issuing the request', async () => {
+  it('rejects oversized successful metadata before parsing it', async () => {
     const api = new API('https://api.github.com', 'secret-token')
     Reflect.set(
       api,
       'ghRequest',
       async () =>
-        new Response(null, {
-          status: 302,
-          headers: { Location: 'http://blob.example.test/artifact.zip' },
+        new Response('{}', {
+          headers: {
+            'Content-Length': String(ActionsArtifactJSONMaximumBytes + 1),
+          },
         })
     )
-    const originalFetch = globalThis.fetch
-    let fetches = 0
-    globalThis.fetch = async () => {
-      fetches++
-      return new Response('unexpected')
-    }
-    try {
-      await assert.rejects(
-        api.fetchWorkflowArtifactArchive('owner', 'repo', 19),
-        /insecure artifact download URL/
-      )
-      assert.equal(fetches, 0)
-    } finally {
-      globalThis.fetch = originalFetch
-    }
+
+    await assert.rejects(
+      api.fetchWorkflowRunArtifacts('owner', 'repo', 7),
+      error =>
+        error instanceof ActionsArtifactJSONError && error.kind === 'too-large'
+    )
   })
 
-  it('allows HTTP archives only for an explicitly HTTP custom endpoint', async () => {
-    const api = new API('http://localhost:3210/api/v3', 'test-token')
+  it('bounds oversized API error bodies without copying provider text', async () => {
+    const api = new API('https://api.github.com', 'secret-token')
     Reflect.set(
       api,
       'ghRequest',
       async () =>
-        new Response(null, {
-          status: 302,
-          headers: { Location: 'http://localhost:3211/artifact.zip' },
-        })
+        new Response(
+          new Uint8Array(ActionsArtifactJSONMaximumBytes + 1).fill(65),
+          { status: 403 }
+        )
     )
-    const originalFetch = globalThis.fetch
-    let requested = ''
-    globalThis.fetch = async input => {
-      requested = String(input)
-      return new Response('archive')
-    }
-    try {
-      const response = await api.fetchWorkflowArtifactArchive(
-        'owner',
-        'repo',
-        19
-      )
-      assert.equal(await response.text(), 'archive')
-      assert.equal(requested, 'http://localhost:3211/artifact.zip')
-    } finally {
-      globalThis.fetch = originalFetch
-    }
+
+    await assert.rejects(
+      api.fetchWorkflowRunArtifacts('owner', 'repo', 7),
+      error =>
+        error instanceof APIError &&
+        error.responseStatus === 403 &&
+        !error.message.includes('AAAA')
+    )
   })
 
-  it('rejects invalid identifiers before any artifact request', async () => {
+  it('rejects invalid run identifiers before any artifact request', async () => {
     const api = new API('https://api.github.com', 'secret-token')
     let requests = 0
     Reflect.set(api, 'ghRequest', async () => {
@@ -233,9 +152,6 @@ describe('GitHub Actions artifact API', () => {
 
     await assert.rejects(() =>
       api.fetchWorkflowRunArtifacts('owner', 'repo', 0)
-    )
-    await assert.rejects(() =>
-      api.fetchWorkflowArtifactArchive('owner', 'repo', Number.NaN)
     )
     assert.equal(requests, 0)
   })

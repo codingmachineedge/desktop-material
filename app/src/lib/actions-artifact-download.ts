@@ -136,7 +136,10 @@ async function createPartialFile(destination: string): Promise<{
       return { path: partialPath, handle: await open(partialPath, 'wx') }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-        throw error
+        throw new ActionsArtifactDownloadError(
+          'The artifact temporary file could not be created at the selected destination.',
+          'destination'
+        )
       }
     }
   }
@@ -149,37 +152,92 @@ async function createPartialFile(destination: string): Promise<{
 async function writeAll(handle: FileHandle, bytes: Uint8Array): Promise<void> {
   let offset = 0
   while (offset < bytes.byteLength) {
-    const result = await handle.write(
-      bytes,
-      offset,
-      bytes.byteLength - offset,
-      null
-    )
+    let result: { readonly bytesWritten: number }
+    try {
+      result = await handle.write(
+        bytes,
+        offset,
+        bytes.byteLength - offset,
+        null
+      )
+    } catch {
+      throw new ActionsArtifactDownloadError(
+        'The artifact archive could not be written at the selected destination.',
+        'destination'
+      )
+    }
     if (result.bytesWritten <= 0) {
-      throw new Error('The artifact archive could not be written.')
+      throw new ActionsArtifactDownloadError(
+        'The artifact archive could not be written at the selected destination.',
+        'destination'
+      )
     }
     offset += result.bytesWritten
   }
 }
 
-async function publishWithoutOverwrite(partial: string, destination: string) {
-  for (let index = 1; index <= 1000; index++) {
-    const candidate = getActionsArtifactDestinationCandidate(destination, index)
-    try {
-      // A same-directory hard link is atomic and fails when the candidate
-      // already exists. Existing user files are therefore never replaced.
-      await link(partial, candidate)
-      return candidate
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-        throw error
+export async function publishActionsArtifactWithoutOverwrite(
+  partial: string,
+  destination: string,
+  signal: AbortSignal
+): Promise<string> {
+  let published: string | null = null
+  try {
+    for (let index = 1; index <= 1000; index++) {
+      const candidate = getActionsArtifactDestinationCandidate(
+        destination,
+        index
+      )
+      try {
+        // A same-directory hard link is atomic and fails when the candidate
+        // already exists. Existing user files are therefore never replaced.
+        await link(partial, candidate)
+        published = candidate
+        break
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw new ActionsArtifactDownloadError(
+            'The artifact archive could not be published at the selected destination.',
+            'destination'
+          )
+        }
       }
     }
+    if (published === null) {
+      throw new ActionsArtifactDownloadError(
+        'Too many files already use this artifact archive name. Choose another destination.',
+        'destination'
+      )
+    }
+
+    // Cancellation and partial-file cleanup are part of the publish boundary.
+    // A candidate is not handed to the caller until both checks have passed.
+    throwIfAborted(signal)
+    try {
+      await unlink(partial)
+    } catch {
+      throw new ActionsArtifactDownloadError(
+        'The completed artifact archive could not be finalized at the selected destination.',
+        'destination'
+      )
+    }
+    throwIfAborted(signal)
+    const completed = published
+    published = null
+    return completed
+  } catch (error) {
+    if (published !== null) {
+      try {
+        await unlink(published)
+      } catch {
+        throw new ActionsArtifactDownloadError(
+          'The incomplete artifact archive could not be removed from the selected destination.',
+          'destination'
+        )
+      }
+    }
+    throw error
   }
-  throw new ActionsArtifactDownloadError(
-    'Too many files already use this artifact archive name. Choose another destination.',
-    'destination'
-  )
 }
 
 /**
@@ -193,48 +251,73 @@ export async function downloadActionsArtifactArchive({
   signal,
   onProgress,
 }: IActionsArtifactDownloadOptions): Promise<IActionsArtifactDownloadResult> {
-  throwIfAborted(signal)
-  if (artifact.expired) {
-    throw new ActionsArtifactDownloadError(
-      'This artifact has expired and can no longer be downloaded.',
-      'destination'
-    )
-  }
-  if (artifact.sizeInBytes > ActionsArtifactMaximumDownloadBytes) {
-    throw new ActionsArtifactDownloadError(
-      'This artifact is larger than the app’s 5 GiB download safety limit.',
-      'too-large'
-    )
+  let target: string
+  try {
+    throwIfAborted(signal)
+    if (artifact.expired) {
+      throw new ActionsArtifactDownloadError(
+        'This artifact has expired and can no longer be downloaded.',
+        'destination'
+      )
+    }
+    if (artifact.sizeInBytes > ActionsArtifactMaximumDownloadBytes) {
+      throw new ActionsArtifactDownloadError(
+        'This artifact is larger than the app’s 5 GiB download safety limit.',
+        'too-large'
+      )
+    }
+
+    const contentLength = advertisedContentLength(response)
+    if (
+      contentLength !== null &&
+      contentLength > ActionsArtifactMaximumDownloadBytes
+    ) {
+      throw new ActionsArtifactDownloadError(
+        'The artifact response is larger than the app’s 5 GiB download safety limit.',
+        'too-large'
+      )
+    }
+    if (contentLength !== null && contentLength !== artifact.sizeInBytes) {
+      throw new ActionsArtifactDownloadError(
+        'GitHub’s artifact size does not match the archive response size.',
+        'size-mismatch'
+      )
+    }
+    if (response.body === null && artifact.sizeInBytes !== 0) {
+      throw new ActionsArtifactDownloadError(
+        'GitHub returned an artifact archive without a response body.',
+        'missing-body'
+      )
+    }
+
+    target = normalizeActionsArtifactDestination(destination)
+  } catch (error) {
+    await response.body?.cancel().catch(() => undefined)
+    throw error
   }
 
-  const contentLength = advertisedContentLength(response)
-  if (
-    contentLength !== null &&
-    contentLength > ActionsArtifactMaximumDownloadBytes
-  ) {
-    throw new ActionsArtifactDownloadError(
-      'The artifact response is larger than the app’s 5 GiB download safety limit.',
-      'too-large'
-    )
-  }
-  if (contentLength !== null && contentLength !== artifact.sizeInBytes) {
-    throw new ActionsArtifactDownloadError(
-      'GitHub’s artifact size does not match the archive response size.',
-      'size-mismatch'
-    )
-  }
-  if (response.body === null && artifact.sizeInBytes !== 0) {
-    throw new ActionsArtifactDownloadError(
-      'GitHub returned an artifact archive without a response body.',
-      'missing-body'
-    )
-  }
-
-  const target = normalizeActionsArtifactDestination(destination)
-  const { path: partialPath, handle } = await createPartialFile(target)
-  let openHandle: FileHandle | null = handle
-  const reader = response.body?.getReader() ?? null
   const hash = createHash('sha256')
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null
+  try {
+    reader = response.body?.getReader() ?? null
+  } catch (error) {
+    await response.body?.cancel().catch(() => undefined)
+    throw error
+  }
+
+  let partial: Awaited<ReturnType<typeof createPartialFile>>
+  try {
+    partial = await createPartialFile(target)
+  } catch (error) {
+    try {
+      await reader?.cancel().catch(() => undefined)
+    } finally {
+      reader?.releaseLock()
+    }
+    throw error
+  }
+  const { path: partialPath, handle } = partial
+  let openHandle: FileHandle | null = handle
   let receivedBytes = 0
   const cancelReader = () => {
     reader?.cancel(abortError()).catch(() => undefined)
@@ -288,12 +371,22 @@ export async function downloadActionsArtifactArchive({
       )
     }
 
-    await handle.sync()
-    await handle.close()
+    try {
+      await handle.sync()
+      await handle.close()
+    } catch {
+      throw new ActionsArtifactDownloadError(
+        'The artifact archive could not be finalized at the selected destination.',
+        'destination'
+      )
+    }
     openHandle = null
     throwIfAborted(signal)
-    const publishedPath = await publishWithoutOverwrite(partialPath, target)
-    await unlink(partialPath)
+    const publishedPath = await publishActionsArtifactWithoutOverwrite(
+      partialPath,
+      target,
+      signal
+    )
     return {
       path: publishedPath,
       bytes: receivedBytes,
@@ -312,5 +405,6 @@ export async function downloadActionsArtifactArchive({
     throw error
   } finally {
     signal.removeEventListener('abort', cancelReader)
+    reader?.releaseLock()
   }
 }

@@ -7,8 +7,11 @@ import {
   IActionsArtifactList,
 } from '../../lib/actions-artifacts'
 import { IActionsArtifactDownloadProgress } from '../../lib/actions-artifact-download'
-import { ActionsStore } from '../../lib/stores/actions-store'
-import { GitHubRepository } from '../../models/github-repository'
+import {
+  ActionsStore,
+  getActionsRepositoryKey,
+} from '../../lib/stores/actions-store'
+import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
 import { formatBytes } from '../lib/bytes'
 import { showItemInFolder, showSaveDialog } from '../main-process-proxy'
@@ -27,7 +30,7 @@ interface ICompletedArtifactDownload {
 }
 
 interface IRunArtifactsProps {
-  readonly repository: GitHubRepository
+  readonly repository: Repository
   readonly run: IAPIWorkflowRun
   readonly actionsStore: ActionsStore
   readonly chooseDestination?: (
@@ -106,7 +109,8 @@ export class RunArtifacts extends React.Component<
   public componentDidUpdate(prevProps: IRunArtifactsProps) {
     if (
       prevProps.run.id !== this.props.run.id ||
-      prevProps.repository.hash !== this.props.repository.hash
+      getActionsRepositoryKey(prevProps.repository) !==
+        getActionsRepositoryKey(this.props.repository)
     ) {
       this.cancelOperations()
       this.setState(initialState(), this.loadArtifacts)
