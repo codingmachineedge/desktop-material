@@ -18,6 +18,15 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(readStyle('_agent-access.scss'), /max-width: 430px/)
   })
 
+  it('keeps the History commit search input flush inside its pill', () => {
+    const style = readStyle('history/_history.scss')
+    assert.match(
+      style,
+      /\.history-commit-filter-field\s*\{[\s\S]*?flex-direction: row;/
+    )
+    assert.match(style, /#history & input\s*\{[\s\S]*?min-height: 0;/)
+  })
+
   it('makes Pull all results horizontally scrollable on narrow windows', () => {
     const style = readStyle('_pull-all.scss')
     assert.match(style, /pull-all-results-container/)

@@ -217,6 +217,7 @@
     flex: 1 1 auto;
     min-width: 160px;
     display: flex;
+    flex-direction: row;
     align-items: center;
     height: 46px;
     box-sizing: border-box;
@@ -241,7 +242,10 @@
       fill: var(--md-sys-color-on-surface-variant);
     }
 
-    input {
+    // The global Material shell input rule is loaded after this stylesheet and
+    // has two attribute selectors, so the extra #history scope is intentional:
+    // keep the native input flush inside this component-owned pill.
+    #history & input {
       flex: 1;
       min-width: 0;
       height: 100%;
