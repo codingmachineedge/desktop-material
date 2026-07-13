@@ -306,7 +306,8 @@ command or GitHub API search screen.
 
 The **Actions** panel brings CI into the app:
 
-- **Workflow runs** for the current repository, newest first.
+- **Workflow runs** for the current repository, newest first. When more are available, choose
+  **Load more runs**; already loaded pages remain visible across background polling and **Refresh**.
 - **Filters** by **workflow**, **status**, **branch**, and **event**.
 - **Re-run** a whole run or **re-run only the failed jobs**.
 - Drill into a run to see its **jobs and steps**, and open the **in-app log viewer** to read output
@@ -314,6 +315,8 @@ The **Actions** panel brings CI into the app:
 - Trigger manual workflows with the **`workflow_dispatch` dialog** — pick the workflow, ref, and
   inputs, and dispatch.
 - Select a run artifact to review its name, size, creation/expiry, workflow source, and GitHub digest.
+  Choose **Load more artifacts** to append the next bounded page. A failed later page keeps the
+  cards you already loaded and lets you retry that same page.
   **Download archive** opens the native save picker; after transfer, Desktop computes SHA-256 locally,
   reports whether it matches, and offers **Show in folder**.
 - **Check attestations** reports whether an attestation record is present. Presence is not presented as
@@ -321,6 +324,15 @@ The **Actions** panel brings CI into the app:
   future verification function.
 
 ![Actions artifact with digest match and attestation-presence context](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifacts.png)
+
+![Actions workflow-run pagination with 51 filtered runs retained after Refresh](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pagination.png)
+
+![Actions artifact page two with a deliberately long wrapping sentinel name](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-page-two.png)
+
+The production gate exercised 50→51 filtered runs and 30→31 artifacts at the supported minimum
+window and at a requested 200% scale with auto-fit. Document and body widths matched, and the
+measured Actions surfaces had no clipping, overlap, outside controls, or page-level sideways
+scrolling. These are named app controls; there is no `gh` command, API-path, or GraphQL editor.
 
 ---
 

@@ -10,10 +10,12 @@ interactive app functions instead of exposing a searchable command/API list.
 The first four-function P0 wave is implemented, pushed, and production-UI
 verified at exact source SHA `9e946fd527e5843b2fdba5de675a5476b0c80445`:
 guided history deepening, native pull-request creation, Actions artifact
-download/digest context, and effective branch-rules inspection. The next
-checkpoint is a typed operation registry that removes arbitrary
-renderer-supplied Git argv, followed by the Pull Request Center, Actions
-completion, Issue Hub, and Release Manager listed in the README roadmap.
+download/digest context, and effective branch-rules inspection. The typed
+operation registry is also complete. Actions workflow-run and artifact
+pagination then passed its exact production UI gate at
+`0aca4420df88a0865a0223530b956209e131431d`. Job pagination and attempt-aware
+inspection, pending-run approvals, the Pull Request Center, Issue Hub, and
+Release Manager are the next named-function milestones in the README roadmap.
 
 This handoff does not claim that branch-only Pages assets are already live on
 `main`. Pages remains protected to the normal reviewed `main` promotion path;
@@ -126,6 +128,51 @@ was removed. No normal Desktop profile or public provider state was changed.
   branch protection; live deployment still follows the reviewed `main` path.
 - The verified clean temporary wiki checkout was containment-checked beneath
   `%TEMP%`, removed, and confirmed absent after its remote SHA matched.
+
+## 2026-07-13 Actions pagination production UI gate
+
+The exact unpackaged production build at
+`0aca4420df88a0865a0223530b956209e131431d` passed on the isolated desktop
+`DesktopMaterialActions-20260713-29de6ec7`. The build used the same exact
+production command and completed in 112.3 seconds.
+
+### Pagination and responsive receipts
+
+- The **Success** filter loaded 50→51 workflow runs through the named **Load
+  more runs** control. The deliberately long page-two sentinel appeared, and
+  all 51 runs plus the sentinel remained after **Refresh**.
+- The selected run loaded 30→31 artifacts through **Load more artifacts**. The
+  long page-two artifact name wrapped, and both load-more controls disappeared
+  when their bounded collections were complete.
+- Provider requests contained exact `per_page=50&page=1|2&status=success` run
+  paths and `per_page=30&page=1|2` artifact paths. No GitHub API mutation was
+  made; POST traffic was limited to the fixture's smart-HTTP `git-upload-pack`
+  fetches.
+- At the supported 960×660 minimum/short window, the renderer was 1000×690 CSS
+  pixels. Document and body client/scroll widths matched, and measured
+  overflow, clipped controls, outside controls, and overlaps were all empty.
+- Five actual **View → Zoom in** actions moved the requested base through
+  100→110→125→150→175→200%. Auto-fit held the effective scale at 94%; the same
+  geometry gate remained clean.
+- The first pass caught a real flex-shrink defect in the run-detail **Close**
+  button. The header button now keeps its intrinsic width, the exact source was
+  rebuilt, and the full 51-run/31-artifact interaction passed.
+
+| Promoted screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-actions-pagination.png` | 960×660 | 95,213 | `3250eaee8b6fc69b06dceb6439f04ee45e68351229ac87db003d04c27c4dd7a2` |
+| `docs/assets/screenshots/material-actions-artifact-page-two.png` | 960×660 | 83,960 | `5310197657763fc1269639d5b3c8c3998393ae36e6077e71e274877e51dbdb8b` |
+
+The Pages layout was also assembled under the owned run root with all 33
+tracked PNGs. Its 23 referenced images and 22 gallery cards loaded at nonzero
+natural dimensions. At 960×660 and 390×844, document/body widths matched the
+viewport and measured overflow/outside arrays were empty; original desktop and
+mobile captures showed both new cards and wrapped captions.
+
+The first documentation commit, separate wiki SHA, hosted Pages artifact
+receipt, and final cleanup evidence remain to be appended after those actions succeed. See
+`.codex/run-manifests/2026-07-13-actions-pagination-ui-gate.md` for the complete
+fixture, request, interaction, and geometry record.
 
 ## Legacy M0-M18 milestone summary
 
@@ -315,8 +362,9 @@ following against the resulting final `main` SHA:
 
 For the legacy M0-M18 foundation, final public verification still follows that
 gate. The newer function-first parity roadmap is intentionally active: the P0
-four-function slice is production-verified, its documentation publication is in
-progress, and the typed-operation/PR/Actions/Issue/Release waves remain next.
+four-function slice, typed operation boundary, and Actions run/artifact
+pagination are production-verified. Job pagination/approvals and the
+PR/Issue/Release waves remain next.
 
 ## Maintenance constraints
 

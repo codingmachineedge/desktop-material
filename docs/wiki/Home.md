@@ -64,9 +64,10 @@ capabilities into named app functions rather than a searchable command or endpoi
 - **Automation** — schedule guarded commit-and-push and pull at the global level, override either
   setting per account or repository, run commit-and-push immediately, and merge all branches or
   worktrees with per-target progress and Copilot-assisted conflict handling.
-- **GitHub Actions** — filter runs by workflow, branch, event, or status; re-run a complete run or
-  failed jobs; inspect jobs and steps; search job logs; dispatch a workflow; and browse/download a
-  bounded artifact page with a local digest comparison and explicit attestation-presence context.
+- **GitHub Actions** — filter runs by workflow, branch, event, or status; load later run pages while
+  preserving them across polling/Refresh; re-run a complete run or failed jobs; inspect jobs and
+  steps; search job logs; dispatch a workflow; and load later artifact pages before a native
+  download with local digest comparison and explicit attestation-presence context.
 - **Agent access** — opt in from Settings to start a token-gated MCP/REST server on a random
   loopback-only port. A stdio proxy and command-line client expose the same bounded commands for
   repositories, tabs, Git operations, automation, and workflow dispatch.
@@ -82,6 +83,9 @@ capabilities into named app functions rather than a searchable command or endpoi
 - **Actions artifacts** — select a workflow run and artifact, review size/expiry/source context,
   save through the native file picker, compare the downloaded SHA-256 with GitHub's digest, reveal
   the file, and distinguish attestation presence from cryptographic verification.
+- **Actions pagination** — use purpose-built **Load more runs** and **Load more artifacts** controls.
+  Provider-side filters, exact-account routing, cancellation, retained-page retry, and shifted-page
+  de-duplication stay behind the workflow; no command, REST path, or GraphQL editor is exposed.
 - **Effective branch rules** — inspect reviews, checks, deployments, merge queue, signatures,
   history, update/delete/force policy, bypass context, and source rulesets. Signed-out and ambiguous
   repository-account states route to the relevant settings screen.
@@ -91,6 +95,10 @@ capabilities into named app functions rather than a searchable command or endpoi
 ![Native pull-request creation success](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-create-pull-request.png)
 
 ![Actions artifact download and digest evidence](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifacts.png)
+
+![Actions run page two retained after Refresh](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pagination.png)
+
+![Actions artifact page-two sentinel with wrapped text](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-page-two.png)
 
 ![Effective branch rules inspector](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-effective-branch-rules.png)
 
@@ -114,8 +122,9 @@ capabilities into named app functions rather than a searchable command or endpoi
 - **Notification centre** — a Git-backed Local view plus an account-aware GitHub inbox with
   All/Unread and participating-only filters, including a complete no-signed-in-account state.
 - **Clipping-safe scaling** — choose 50–200% UI scaling; auto-fit caps the effective scale when a
-  small window cannot contain the requested size. At the supported minimum window, 200% safely
-  auto-fits to 96% while preserving every title-bar, navigation, Appearance, and footer control.
+  small window cannot contain the requested size. The latest Actions gate reached a requested 200%
+  through five actual View-menu actions and safely auto-fit to 94% at the supported minimum while
+  preserving every title-bar, navigation, filter, pagination, and artifact control.
 - **No page-level sideways scrolling** — task forms wrap text and stack controls when space narrows.
   Horizontal scrolling is reserved for spatial content such as code, diffs, and logs when needed.
 
