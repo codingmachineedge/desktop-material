@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import {
   FileBlameLineLimit,
@@ -55,17 +55,17 @@ describe('git/file-history-parser', () => {
   })
   it('contains repository-relative paths before invoking Git', () => {
     const repositoryPath = resolve('file-history-fixtures', 'repository')
-    assert.equal(
-      normalizeFileHistoryPath(
-        repositoryPath,
-        join('src', 'feature', 'file.ts')
-      ),
-      'src/feature/file.ts'
-    )
+    for (const path of ['src\\feature/file.ts', 'src/feature/file.ts']) {
+      assert.equal(
+        normalizeFileHistoryPath(repositoryPath, path),
+        'src/feature/file.ts'
+      )
+    }
 
     for (const path of [
       '',
-      join('..', 'secret'),
+      '..\\secret',
+      '../secret',
       resolve(repositoryPath, '..', 'secret.txt'),
       'src/../../x',
     ]) {
