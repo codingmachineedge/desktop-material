@@ -422,9 +422,6 @@ export class RepositoryView extends React.Component<
         askForConfirmationOnDiscardChanges={
           this.props.askForConfirmationOnDiscardChanges
         }
-        askForConfirmationOnDiscardStash={
-          this.props.askForConfirmationOnDiscardStash
-        }
         askForConfirmationOnCommitFilteredChanges={
           this.props.askForConfirmationOnCommitFilteredChanges
         }
