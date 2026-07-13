@@ -41,6 +41,7 @@ import {
   getRepositoryType,
   listWorktrees,
   IManagedSubmodule,
+  IRemoteManagementApplyOptions,
 } from '../../lib/git'
 import { isGitOnPath } from '../../lib/is-git-on-path'
 import {
@@ -88,7 +89,11 @@ import { ICommitMessage } from '../../models/commit-message'
 import { DiffSelection, ImageDiffType, ITextDiff } from '../../models/diff'
 import { FetchType } from '../../models/fetch'
 import { GitHubRepository } from '../../models/github-repository'
-import { IRemote } from '../../models/remote'
+import {
+  IRemote,
+  IRemoteManagementPlan,
+  IRemoteManagementSnapshot,
+} from '../../models/remote'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { Popup, PopupType } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
@@ -2028,6 +2033,15 @@ export class Dispatcher {
   /** Removes the remote that matches the given name. */
   public removeRemote(repository: Repository, name: string): Promise<void> {
     return this.appStore._removeRemote(repository, name)
+  }
+
+  /** Apply one explicitly confirmed, bounded Remote Manager plan. */
+  public applyRemoteManagementPlan(
+    repository: Repository,
+    plan: IRemoteManagementPlan,
+    options: IRemoteManagementApplyOptions
+  ): Promise<IRemoteManagementSnapshot> {
+    return this.appStore._applyRemoteManagementPlan(repository, plan, options)
   }
 
   /** Open the URL in a browser */

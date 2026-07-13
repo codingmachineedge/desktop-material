@@ -20,7 +20,9 @@
 .repository-commit-rewrite,
 .repository-commit-rewrite *,
 .repository-bisect-session,
-.repository-bisect-session * {
+.repository-bisect-session *,
+.repository-hooks-manager,
+.repository-hooks-manager * {
   box-sizing: border-box;
   min-width: 0;
 }
@@ -362,6 +364,225 @@
 
 .repository-bisect-reset {
   justify-self: start;
+}
+
+.repository-hooks-manager,
+.repository-hooks-card,
+.repository-hooks-inventory {
+  display: grid;
+  gap: 12px;
+}
+
+.repository-hooks-card {
+  gap: 14px;
+}
+
+.repository-hooks-location {
+  align-items: center;
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 11px;
+
+  strong,
+  span {
+    margin: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  span {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+    border-radius: 999px;
+    color: var(--md-sys-color-primary);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 9px;
+    white-space: normal;
+  }
+}
+
+.repository-hooks-status {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.repository-hooks-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  span {
+    background: var(--md-sys-color-surface-container-highest);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    padding: 4px 8px;
+  }
+}
+
+.repository-hooks-inventory > ul {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 0;
+  max-height: 560px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 3px 0 0;
+}
+
+.repository-hook-row {
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px;
+
+  dl {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    min-width: 0;
+  }
+}
+
+.repository-hook-row-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+
+  code,
+  span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  code {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  span {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+  }
+}
+
+.repository-hook-slot {
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+
+  dt {
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  dd {
+    display: grid;
+    gap: 5px;
+    margin: 0;
+    min-width: 0;
+  }
+
+  dd > span {
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    justify-self: start;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    padding: 3px 7px;
+    text-transform: capitalize;
+  }
+
+  small {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+    line-height: 1.45;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  &.present dd > span {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+    color: var(--md-sys-color-primary);
+  }
+
+  &.missing dd > span {
+    background: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  &.unsafe dd > span,
+  &.ambiguous dd > span {
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+  }
+}
+
+.repository-hooks-confirmation {
+  background: var(--md-sys-color-tertiary-container);
+  border-radius: 10px;
+  color: var(--md-sys-color-on-tertiary-container);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 12px;
+
+  strong,
+  p,
+  dt,
+  dd,
+  code {
+    margin: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  p,
+  dd {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  dl {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+  }
+
+  dl > div {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: minmax(110px, 0.3fr) minmax(0, 1fr);
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 600;
+  }
 }
 
 .repository-patch-series {
@@ -1214,7 +1435,14 @@
 
   .repository-commit-rewrite-row-controls,
   .repository-commit-rewrite-confirmation dl > div,
-  .repository-bisect-progress ol {
+  .repository-bisect-progress ol,
+  .repository-hook-row dl,
+  .repository-hooks-confirmation dl > div {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .repository-hooks-location {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

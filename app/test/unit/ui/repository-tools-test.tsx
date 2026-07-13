@@ -222,6 +222,7 @@ describe('Repository tools', () => {
     assert.ok(screen.getByText('Export repository artifacts'))
     assert.ok(screen.getByText('Import a branch from a Git bundle'))
     assert.ok(screen.getByText('Guided bisect'))
+    assert.ok(screen.getByText('Safe hook manager'))
     assert.equal(screen.queryByRole('searchbox'), null)
     assert.equal(screen.queryByRole('textbox'), null)
     assert.equal(screen.queryByText(/command arguments/i), null)

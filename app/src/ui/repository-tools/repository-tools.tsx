@@ -33,6 +33,7 @@ import {
 import { RepositoryBundleImport } from './bundle-import'
 import { RepositoryBisectSession } from './bisect-session'
 import { RepositoryLFSAdministration } from './lfs-administration'
+import { IRepositoryHooksClient, RepositoryHooks } from './repository-hooks'
 import { RepositoryShallowHistory } from './shallow-history'
 import { RepositoryPatchSeries } from './patch-series'
 import { RepositorySigning } from './signing'
@@ -89,6 +90,7 @@ export interface IRepositoryToolsProps {
   readonly choosePatchFiles?: () => Promise<ReadonlyArray<string>>
   readonly revealArchive?: (path: string) => Promise<void>
   readonly commitRewriteClient?: IRepositoryCommitRewriteClient
+  readonly hooksClient?: IRepositoryHooksClient
 }
 
 type OperationStatus =
@@ -120,6 +122,7 @@ interface IRepositoryToolsState {
   readonly lfsBusy: boolean
   readonly commitRewriteBusy: boolean
   readonly bisectBusy: boolean
+  readonly hooksBusy: boolean
 }
 
 let nextOperationSequence = 0
@@ -163,6 +166,7 @@ export class RepositoryTools extends React.Component<
       lfsBusy: false,
       commitRewriteBusy: false,
       bisectBusy: false,
+      hooksBusy: false,
     }
   }
 
@@ -196,6 +200,7 @@ export class RepositoryTools extends React.Component<
         lfsBusy: false,
         commitRewriteBusy: false,
         bisectBusy: false,
+        hooksBusy: false,
       })
     }
   }
@@ -252,7 +257,8 @@ export class RepositoryTools extends React.Component<
       this.state.signingBusy ||
       this.state.lfsBusy ||
       this.state.commitRewriteBusy ||
-      this.state.bisectBusy
+      this.state.bisectBusy ||
+      this.state.hooksBusy
     )
   }
 
@@ -295,6 +301,12 @@ export class RepositoryTools extends React.Component<
   private onBisectBusyChanged = (bisectBusy: boolean) => {
     if (this.state.bisectBusy !== bisectBusy) {
       this.setState({ bisectBusy })
+    }
+  }
+
+  private onHooksBusyChanged = (hooksBusy: boolean) => {
+    if (this.state.hooksBusy !== hooksBusy) {
+      this.setState({ hooksBusy })
     }
   }
 
@@ -776,6 +788,7 @@ export class RepositoryTools extends React.Component<
           this.state.lfsBusy ||
           this.state.commitRewriteBusy ||
           this.state.bisectBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -799,6 +812,7 @@ export class RepositoryTools extends React.Component<
           this.state.lfsBusy ||
           this.state.commitRewriteBusy ||
           this.state.bisectBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -822,6 +836,7 @@ export class RepositoryTools extends React.Component<
           this.state.lfsBusy ||
           this.state.commitRewriteBusy ||
           this.state.bisectBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -843,6 +858,7 @@ export class RepositoryTools extends React.Component<
           this.state.lfsBusy ||
           this.state.commitRewriteBusy ||
           this.state.bisectBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -864,6 +880,7 @@ export class RepositoryTools extends React.Component<
           this.state.signingBusy ||
           this.state.commitRewriteBusy ||
           this.state.bisectBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -885,6 +902,7 @@ export class RepositoryTools extends React.Component<
           this.state.signingBusy ||
           this.state.lfsBusy ||
           this.state.bisectBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.props.commitRewriteClient}
@@ -906,11 +924,34 @@ export class RepositoryTools extends React.Component<
           this.state.signingBusy ||
           this.state.lfsBusy ||
           this.state.commitRewriteBusy ||
+          this.state.hooksBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
         onRefreshRepository={this.props.onRefreshRepository}
         onBusyChanged={this.onBisectBusyChanged}
+      />
+    )
+  }
+
+  private renderRepositoryHooks() {
+    return (
+      <RepositoryHooks
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
+          this.state.commitRewriteBusy ||
+          this.state.bisectBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.props.hooksClient}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onHooksBusyChanged}
       />
     )
   }
@@ -1078,6 +1119,7 @@ export class RepositoryTools extends React.Component<
             {this.renderBisectSession()}
             {this.renderSigning()}
             {this.renderLFSAdministration()}
+            {this.renderRepositoryHooks()}
             {this.renderCategory('Diagnostics')}
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}

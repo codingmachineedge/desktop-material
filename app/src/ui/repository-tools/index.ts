@@ -6,6 +6,7 @@ export { RepositoryPatchSeries } from './patch-series'
 export { RepositorySigning } from './signing'
 export { RepositoryLFSAdministration } from './lfs-administration'
 export { RepositoryCommitRewrite } from './commit-rewrite'
+export { RepositoryHooks } from './repository-hooks'
 export type { IRepositoryBundleImportProps } from './bundle-import'
 export type { IRepositoryBisectSessionProps } from './bisect-session'
 export type { IRepositoryShallowHistoryProps } from './shallow-history'
@@ -16,6 +17,27 @@ export type {
   IRepositoryCommitRewriteClient,
   IRepositoryCommitRewriteProps,
 } from './commit-rewrite'
+export type {
+  IRepositoryHooksClient,
+  IRepositoryHooksProps,
+} from './repository-hooks'
+export {
+  applyReviewedRepositoryHookAction,
+  inspectRepositoryHooks,
+  KnownRepositoryClientHooks,
+  RepositoryHooksManagerError,
+  revealRepositoryHooks,
+} from '../../lib/hooks/repository-hooks-manager'
+export type {
+  IRepositoryClientHookState,
+  IRepositoryHookFileMetadata,
+  IRepositoryHookMutationRequest,
+  IRepositoryHookReviewAction,
+  IRepositoryHooksSnapshot,
+  RepositoryClientHookName,
+  RepositoryHookAction,
+  RepositoryHooksManagerErrorKind,
+} from '../../lib/hooks/repository-hooks-manager'
 export type {
   IRepositoryToolsClient,
   IRepositoryToolsProps,
