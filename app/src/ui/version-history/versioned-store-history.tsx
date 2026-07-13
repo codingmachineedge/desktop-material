@@ -8,6 +8,7 @@ import { RelativeTime } from '../relative-time'
 import { TextBox } from '../lib/text-box'
 import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { FilterModeControl } from '../lib/filter-mode-control'
+import { DialogStackContext } from '../dialog'
 
 const VersionHistoryPageSize = 50
 
@@ -132,6 +133,9 @@ export class VersionedStoreHistory extends React.Component<
   IVersionedStoreHistoryProps,
   IVersionedStoreHistoryState
 > {
+  public static contextType = DialogStackContext
+  public declare context: React.ContextType<typeof DialogStackContext>
+
   private isMountedFlag = false
   private selectionRequest = 0
   private historyRequestGeneration = 0
@@ -175,7 +179,7 @@ export class VersionedStoreHistory extends React.Component<
   }
 
   private onWindowKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented) {
+    if (!this.context.isTopMost || event.defaultPrevented) {
       return
     }
 

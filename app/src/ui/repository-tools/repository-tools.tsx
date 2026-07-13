@@ -1,6 +1,7 @@
 import * as React from 'react'
 import * as Path from 'path'
 import {
+  CLICommandRecipe,
   ICLICommandOutputEvent,
   ICLICommandRequest,
   ICLICommandStateEvent,
@@ -23,7 +24,7 @@ import {
   IRepositoryToolOperation,
   prepareRepositoryArchive,
   prepareRepositoryBundle,
-  prepareRepositoryBundleVerification,
+  prepareRepositoryBundleInspection,
   RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
@@ -243,12 +244,16 @@ export class RepositoryTools extends React.Component<
     operation: IRepositoryToolOperation,
     confirmed: boolean
   ) {
-    return this.startCommand(operation.id, operation.args, confirmed)
+    return this.startCommand(
+      operation.id,
+      { kind: 'repository-tool', operation: operation.id },
+      confirmed
+    )
   }
 
   private async startCommand(
     operation: RepositoryToolResultID,
-    args: ReadonlyArray<string>,
+    recipe: CLICommandRecipe,
     confirmed: boolean
   ) {
     if (this.isBusy()) {
@@ -269,9 +274,8 @@ export class RepositoryTools extends React.Component<
     try {
       await this.client.start({
         id,
-        tool: 'git',
-        args,
-        cwd: this.props.repositoryPath,
+        repositoryPath: this.props.repositoryPath,
+        recipe,
         confirmed,
       })
     } catch (error) {
@@ -344,7 +348,16 @@ export class RepositoryTools extends React.Component<
     this.archiveRunDestination = request.destination
     void this.startCommand(
       request.format === 'bundle' ? 'bundle-export' : 'archive-export',
-      request.args,
+      request.format === 'bundle'
+        ? {
+            kind: 'repository-bundle-export',
+            destination: request.destination,
+          }
+        : {
+            kind: 'repository-archive',
+            format: request.format,
+            destination: request.destination,
+          },
       true
     )
   }
@@ -402,9 +415,14 @@ export class RepositoryTools extends React.Component<
       if (bundlePath === null || !this.mounted) {
         return
       }
+      const inspection = prepareRepositoryBundleInspection(bundlePath)
       await this.startCommand(
         'bundle-verify',
-        prepareRepositoryBundleVerification(bundlePath),
+        {
+          kind: 'repository-bundle-inspection',
+          operation: 'verify',
+          bundlePath: inspection.bundlePath,
+        },
         false
       )
     } catch (error) {

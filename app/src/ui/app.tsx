@@ -3568,6 +3568,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         unreadCount={this.state.unreadNotificationCount}
         repositories={this.state.repositories}
         accounts={this.state.accounts}
+        isTopMost={this.state.currentPopup === null}
       />
     )
   }

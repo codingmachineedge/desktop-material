@@ -2,7 +2,6 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import { WebContents } from 'electron'
 import {
   ICLICommandOutputEvent,
-  ICLICommandRequest,
   ICLICommandStateEvent,
 } from '../../lib/cli-workbench'
 import * as ipcWebContents from '../ipc-webcontents'
@@ -11,12 +10,15 @@ import {
   CLICommandConcurrencyCap,
   CLICommandInputChunkCap,
   CLICommandOutputLimiter,
+  createCLICommandValidationDependencies,
+  IValidatedCLICommandRequest,
+  revalidateCLICommandBeforeSpawn,
   validateCLICommandRequest,
 } from './runner-helpers'
 import { resolveCLIWorkbenchTool } from './tool-resolver'
 
 interface IActiveCLICommand {
-  readonly request: ICLICommandRequest
+  readonly request: IValidatedCLICommandRequest
   readonly sender: WebContents
   readonly child: ChildProcessWithoutNullStreams
   readonly pid: number | null
@@ -29,7 +31,7 @@ interface IActiveCLICommand {
 const OutputTruncatedMessage =
   '\n[CLI workbench output truncated at the 4 MiB safety limit.]\n'
 
-/** Bounded main-process runner for explicit Git and GitHub CLI argv. */
+/** Bounded main-process runner for exact guided Git recipes. */
 export class CLIWorkbenchRunner {
   private readonly runs = new Map<string, IActiveCLICommand>()
 
@@ -38,32 +40,38 @@ export class CLIWorkbenchRunner {
       throw new Error('Too many CLI commands are already running.')
     }
 
-    const request = await validateCLICommandRequest(value)
+    let resolved: ReturnType<typeof resolveCLIWorkbenchTool>
+    try {
+      resolved = resolveCLIWorkbenchTool('git')
+    } catch {
+      throw new Error('Unable to start Git.')
+    }
+    const validationDependencies =
+      createCLICommandValidationDependencies(resolved)
+    const request = await validateCLICommandRequest(
+      value,
+      validationDependencies
+    )
     if (this.runs.has(request.id)) {
       throw new Error('A CLI command with this id is already running.')
     }
 
-    let executable: string
-    let toolEnv: Record<string, string | undefined>
-    try {
-      const resolved = resolveCLIWorkbenchTool(request.tool)
-      executable = resolved.executable
-      toolEnv = resolved.env
-    } catch {
-      throw new Error(`Unable to start ${request.tool}.`)
-    }
+    // Re-run repository and output-path checks after all async validation and
+    // immediately before spawn to catch worktree or reparse-point changes.
+    await revalidateCLICommandBeforeSpawn(request, validationDependencies)
+
     let child: ChildProcessWithoutNullStreams
     try {
-      child = spawn(executable, [...request.args], {
+      child = spawn(resolved.executable, [...request.args], {
         cwd: request.cwd,
-        env: toolEnv,
+        env: resolved.env,
         shell: false,
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
       })
     } catch {
-      throw new Error(`Unable to start ${request.tool}.`)
+      throw new Error('Unable to start Git.')
     }
 
     const run: IActiveCLICommand = {
@@ -110,7 +118,7 @@ export class CLIWorkbenchRunner {
         state: 'failed',
         exitCode: null,
         signal: null,
-        error: `Unable to run ${request.tool}.`,
+        error: 'Unable to run Git.',
       })
     })
     child.once('close', (code, signal) => {

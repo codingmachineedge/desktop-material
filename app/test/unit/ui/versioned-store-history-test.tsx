@@ -9,6 +9,7 @@ import {
   IVersionedStoreHistorySource,
   VersionedStoreHistory,
 } from '../../../src/ui/version-history'
+import { DialogStackContext } from '../../../src/ui/dialog'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 
 function createDeferred<T>(): {
@@ -72,6 +73,39 @@ describe('versioned store history', () => {
       'addition'
     )
     assert.equal(classifyVersionHistoryDiffLine(' unchanged'), 'context')
+  })
+
+  it('lets only the topmost stacked history consume Escape', () => {
+    const dismissed = { background: 0, foreground: 0 }
+    const source: IVersionedStoreHistorySource = {
+      getHistory: () => Promise.resolve(historyPage([], false, false)),
+      getFiles: () => Promise.resolve([]),
+      getDiff: () => Promise.resolve(''),
+      undoLastChange: () => Promise.resolve(),
+      redoLastChange: () => Promise.resolve(),
+      restoreTo: () => Promise.resolve(),
+    }
+    const history = (isTopMost: boolean, layer: keyof typeof dismissed) => (
+      <DialogStackContext.Provider value={{ isTopMost }}>
+        <VersionedStoreHistory
+          title={`${layer} history`}
+          timelineLabel={`${layer} timeline`}
+          description={`${layer} layer`}
+          source={source}
+          onDismissed={() => dismissed[layer]++}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    render(
+      <>
+        {history(false, 'background')}
+        {history(true, 'foreground')}
+      </>
+    )
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    assert.deepStrictEqual(dismissed, { background: 0, foreground: 1 })
   })
 
   it('ignores an old pagination response after undo reloads history', async () => {

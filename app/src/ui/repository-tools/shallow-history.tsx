@@ -1,5 +1,6 @@
 import * as React from 'react'
 import {
+  CLICommandRecipe,
   ICLICommandOutputEvent,
   ICLICommandRequest,
   ICLICommandStateEvent,
@@ -10,10 +11,8 @@ import {
   normalizeRepositoryDeepenCommitCount,
   parseRepositoryFetchRemotes,
   parseRepositoryShallowStatus,
-  prepareRepositoryFetchRemoteInspection,
   prepareRepositoryHistoryDeepen,
   prepareRepositoryHistoryUnshallow,
-  prepareRepositoryShallowStatusInspection,
 } from './operations'
 
 const MaximumVisibleOutput = 1024 * 1024
@@ -219,7 +218,7 @@ export class RepositoryShallowHistory extends React.Component<
 
   private async startCommand(
     phase: ShallowHistoryPhase,
-    args: ReadonlyArray<string>,
+    recipe: CLICommandRecipe,
     confirmed: boolean
   ) {
     if (this.runId !== null || !this.mounted) {
@@ -240,9 +239,8 @@ export class RepositoryShallowHistory extends React.Component<
     try {
       await this.props.client.start({
         id,
-        tool: 'git',
-        args,
-        cwd: this.props.repositoryPath,
+        repositoryPath: this.props.repositoryPath,
+        recipe,
         confirmed,
       })
     } catch (error) {
@@ -375,7 +373,16 @@ export class RepositoryShallowHistory extends React.Component<
             )
           }
           this.mutationStarted = true
-          void this.startCommand('fetching', request.args, true)
+          void this.startCommand(
+            'fetching',
+            {
+              kind: 'repository-shallow-fetch',
+              action: request.action,
+              remote: request.remote,
+              deepenBy: request.deepenBy,
+            },
+            true
+          )
           return
         }
         case 'fetching': {
@@ -438,13 +445,13 @@ export class RepositoryShallowHistory extends React.Component<
     if (recheck) {
       void this.startCommand(
         'rechecking-remotes',
-        prepareRepositoryFetchRemoteInspection(),
+        { kind: 'repository-shallow-inspection', operation: 'remotes' },
         false
       )
     } else {
       void this.startCommand(
         'checking-remotes',
-        prepareRepositoryFetchRemoteInspection(),
+        { kind: 'repository-shallow-inspection', operation: 'remotes' },
         false
       )
     }
@@ -473,7 +480,7 @@ export class RepositoryShallowHistory extends React.Component<
     }
     void this.startCommand(
       'postchecking',
-      prepareRepositoryShallowStatusInspection(),
+      { kind: 'repository-shallow-inspection', operation: 'status' },
       false
     )
   }
@@ -562,7 +569,7 @@ export class RepositoryShallowHistory extends React.Component<
         if (this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
           void this.startCommand(
             'checking-shallow',
-            prepareRepositoryShallowStatusInspection(),
+            { kind: 'repository-shallow-inspection', operation: 'status' },
             false
           )
         }
@@ -645,7 +652,7 @@ export class RepositoryShallowHistory extends React.Component<
     this.setBusy(true)
     void this.startCommand(
       'rechecking-shallow',
-      prepareRepositoryShallowStatusInspection(),
+      { kind: 'repository-shallow-inspection', operation: 'status' },
       false
     )
   }

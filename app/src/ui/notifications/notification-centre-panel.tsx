@@ -29,6 +29,8 @@ export interface INotificationCentrePanelProps {
   readonly unreadCount: number
   readonly repositories: ReadonlyArray<Repository | CloningRepository>
   readonly accounts: ReadonlyArray<Account>
+  /** False while any application popup is in front of this side sheet. */
+  readonly isTopMost: boolean
   /** Injectable for focused UI tests; production creates an on-demand store. */
   readonly githubNotificationsStore?: GitHubNotificationsStore
 }
@@ -110,7 +112,11 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private onWindowKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || event.key !== 'Escape') {
+    if (
+      !this.props.isTopMost ||
+      event.defaultPrevented ||
+      event.key !== 'Escape'
+    ) {
       return
     }
     event.preventDefault()

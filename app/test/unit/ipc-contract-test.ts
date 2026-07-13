@@ -178,5 +178,29 @@ describe('IPC channel contract', () => {
         )
       }
     })
+
+    it('binds start-cli-command to a structured recipe with no raw execution fields', () => {
+      const request: Parameters<
+        RequestResponseChannels['start-cli-command']
+      >[0] = {
+        id: 'ipc-guided-recipe',
+        repositoryPath: 'C:\\work\\repository',
+        recipe: {
+          kind: 'repository-tool',
+          operation: 'status-summary',
+        },
+        confirmed: false,
+      }
+
+      assert.deepStrictEqual(Object.keys(request).sort(), [
+        'confirmed',
+        'id',
+        'recipe',
+        'repositoryPath',
+      ])
+      assert.equal('args' in request, false)
+      assert.equal('cwd' in request, false)
+      assert.equal('tool' in request, false)
+    })
   })
 })
