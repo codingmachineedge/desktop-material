@@ -83,7 +83,7 @@ export class PullAllDialog extends React.Component<
               <p className="pull-all-summary" role="status">
                 {pulled} pulled, {skipped} skipped, {failed} failed.
               </p>
-              {/* Keyboard focus makes the two-axis scroll region operable. */}
+              {/* Keyboard focus keeps long result lists operable. */}
               <div
                 className="pull-all-results-container"
                 role="region"
@@ -101,13 +101,13 @@ export class PullAllDialog extends React.Component<
                   <tbody>
                     {results.map(result => (
                       <tr key={result.id}>
-                        <td>{result.name}</td>
-                        <td>
+                        <td data-label="Repository">{result.name}</td>
+                        <td data-label="Result">
                           <span className={`pull-all-status ${result.status}`}>
                             {result.status}
                           </span>
                         </td>
-                        <td>{result.detail}</td>
+                        <td data-label="Details">{result.detail}</td>
                       </tr>
                     ))}
                   </tbody>

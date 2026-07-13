@@ -82,13 +82,13 @@ export class MergeAllDialog extends React.Component<IMergeAllDialogProps> {
               <tbody>
                 {(state?.results ?? []).map((result, index) => (
                   <tr key={`${result.branch}-${index}`}>
-                    <td>{result.branch}</td>
-                    <td>
+                    <td data-label="Branch">{result.branch}</td>
+                    <td data-label="Result">
                       <span className={`merge-result ${result.status}`}>
                         {result.status}
                       </span>
                     </td>
-                    <td>{result.detail}</td>
+                    <td data-label="Details">{result.detail}</td>
                   </tr>
                 ))}
               </tbody>

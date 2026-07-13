@@ -6,6 +6,7 @@ import { getTitleBarHeight } from '../window/title-bar'
 import { isTopMostDialog } from './is-top-most'
 import { isMacOSSonomaOrLater, isMacOSVentura } from '../../lib/get-os'
 import { sendDialogDidOpen } from '../main-process-proxy'
+import { clampDialogOffset } from './dialog-geometry'
 
 /**
  * Class name used for elements that should be focused initially when a dialog
@@ -347,11 +348,7 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
     this.keepOnScreen()
   }
 
-  /**
-   * Clamp the committed drag offset so the dialog remains within the viewport
-   * (leaving room for the title bar at the top). No-op when the dialog is
-   * larger than the viewport since there's nothing sensible to clamp to.
-   */
+  /** Keep the dialog reachable after dragging, content changes, or resizing. */
   private keepOnScreen() {
     const dialog = this.dialogElement
     if (dialog === null) {
@@ -362,27 +359,13 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
     const margin = 8
     const minTop = titleBarHeight + margin
 
-    // Nothing we can do if the dialog is bigger than the window
-    if (
-      rect.height > window.innerHeight - minTop ||
-      rect.width > window.innerWidth - margin * 2
-    ) {
-      return
-    }
-
-    let { x, y } = this.dragOffset
-
-    if (rect.left < margin) {
-      x += margin - rect.left
-    } else if (rect.right > window.innerWidth - margin) {
-      x -= rect.right - (window.innerWidth - margin)
-    }
-
-    if (rect.top < minTop) {
-      y += minTop - rect.top
-    } else if (rect.bottom > window.innerHeight - margin) {
-      y -= rect.bottom - (window.innerHeight - margin)
-    }
+    const { x, y } = clampDialogOffset(
+      rect,
+      { width: window.innerWidth, height: window.innerHeight },
+      this.dragOffset,
+      minTop,
+      margin
+    )
 
     if (x !== this.dragOffset.x || y !== this.dragOffset.y) {
       this.dragOffset = { x, y }

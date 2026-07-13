@@ -36,10 +36,11 @@ describe('post-shell MD3 style contracts', () => {
     )
   })
 
-  it('makes Pull all results horizontally scrollable on narrow windows', () => {
+  it('reflows Pull all results without horizontal scrolling', () => {
     const style = readStyle('_pull-all.scss')
     assert.match(style, /pull-all-results-container/)
-    assert.match(style, /overflow: auto/)
+    assert.match(style, /overflow-x: hidden/)
+    assert.match(style, /grid-template-columns: minmax\(82px, 32%\) minmax\(0, 1fr\)/)
   })
 
   it('keeps Merge all content inside its dialog with reachable results', () => {
@@ -48,9 +49,13 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /max-width: calc\(100vw - var\(--spacing-quad\)\);/)
     assert.match(
       style,
-      /\.merge-all-results-scroll\s*\{[\s\S]*?max-width: 100%;[\s\S]*?overflow: auto;/
+      /\.merge-all-results-scroll\s*\{[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: hidden;/
     )
     assert.match(style, /overflow-wrap: anywhere;/)
+    assert.match(
+      style,
+      /grid-template-columns: minmax\(72px, 30%\) minmax\(0, 1fr\)/
+    )
   })
 
   it('keeps every Pages gallery card within a narrow mobile viewport', () => {
@@ -88,6 +93,19 @@ describe('post-shell MD3 style contracts', () => {
       /\.build-run-panel-header\s*\{[\s\S]*?flex-wrap: wrap;/
     )
     assert.match(style, /@media \(max-width: 640px\), \(max-height: 420px\)/)
+  })
+
+  it('bounds shared dialogs and keeps footer actions reachable', () => {
+    const style = readStyle('_dialog-layer.scss')
+    assert.match(style, /max-height: calc\(100vh - 54px\);/)
+    assert.match(
+      style,
+      /\.dialog-content\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-x: hidden;/
+    )
+    assert.match(
+      style,
+      /\.dialog-footer \.button-group\s*\{[\s\S]*?flex-wrap: wrap;/
+    )
   })
 
   it('keeps Repository Settings inside the viewport with a scrollable tab', () => {

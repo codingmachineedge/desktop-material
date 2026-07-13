@@ -14,7 +14,7 @@
 
   .pull-all-results {
     border-collapse: collapse;
-    min-width: 560px;
+    min-width: 0;
     width: 100%;
 
     th,
@@ -33,7 +33,8 @@
 
   .pull-all-results-container {
     max-height: min(55vh, 420px);
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: var(--md-sys-shape-corner-medium);
 
@@ -70,6 +71,53 @@
 
     .dialog-content {
       padding-inline: var(--spacing);
+    }
+
+    .pull-all-results {
+      display: block;
+
+      thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      tbody {
+        display: grid;
+      }
+
+      tr {
+        display: grid;
+        gap: 6px;
+        padding: var(--spacing);
+        border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      }
+
+      td,
+      td:first-child,
+      td:last-child {
+        display: grid;
+        max-width: none;
+        grid-template-columns: minmax(82px, 32%) minmax(0, 1fr);
+        gap: var(--spacing);
+        padding: 0;
+        border: 0;
+        overflow-wrap: anywhere;
+
+        &::before {
+          content: attr(data-label);
+          color: var(--md-sys-color-on-surface-variant);
+          font-weight: var(--font-weight-semibold);
+        }
+      }
+
+      .pull-all-status {
+        justify-self: start;
+      }
     }
   }
 }

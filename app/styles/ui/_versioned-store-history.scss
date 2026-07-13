@@ -533,12 +533,14 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--md-sys-color-surface-container-lowest);
 }
 
 .versioned-store-history-diff {
-  min-width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 100%;
   margin: 0;
   padding: 14px 0;
@@ -546,11 +548,16 @@
   font-family: var(--font-family-monospace);
   font-size: 12px;
   line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 
   > span {
     display: block;
-    min-width: max-content;
+    min-width: 0;
+    max-width: 100%;
     padding: 0 16px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 }
 

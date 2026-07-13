@@ -31,7 +31,8 @@
     width: 100%;
     max-width: 100%;
     margin-top: var(--spacing-double);
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     border-radius: 12px;
 
     &:focus-visible {
@@ -43,7 +44,7 @@
 
   .merge-all-results {
     width: 100%;
-    min-width: 520px;
+    min-width: 0;
     margin: 0;
     border-collapse: collapse;
 
@@ -60,10 +61,6 @@
       max-width: 220px;
     }
 
-    th:last-child,
-    td:last-child {
-      min-width: 180px;
-    }
   }
 
   .merge-result {
@@ -82,6 +79,57 @@
     &.failed {
       color: var(--md-sys-color-on-error-container);
       background: var(--md-sys-color-error-container);
+    }
+  }
+}
+
+@media (max-width: 620px) {
+  #merge-all {
+    .merge-all-results {
+      display: block;
+
+      thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      tbody {
+        display: grid;
+      }
+
+      tr {
+        display: grid;
+        gap: 6px;
+        padding: var(--spacing);
+        border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      }
+
+      td,
+      td:first-child,
+      td:last-child {
+        display: grid;
+        max-width: none;
+        grid-template-columns: minmax(72px, 30%) minmax(0, 1fr);
+        gap: var(--spacing);
+        padding: 0;
+        border: 0;
+        overflow-wrap: anywhere;
+
+        &::before {
+          content: attr(data-label);
+          color: var(--md-sys-color-on-surface-variant);
+          font-weight: var(--font-weight-semibold);
+        }
+      }
+
+      .merge-result {
+        justify-self: start;
+      }
     }
   }
 }

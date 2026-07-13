@@ -40,6 +40,10 @@
       // Drag uses `transform`, kept independent of this `translate`.
       position: fixed;
       inset: 0;
+      max-width: calc(100vw - 16px);
+      max-height: calc(100vh - 54px);
+      min-width: min(400px, calc(100vw - 16px));
+      min-height: 0;
       margin: auto;
       translate: var(--dialog-cascade-offset, 0 0);
 
@@ -47,6 +51,41 @@
       box-shadow: var(--md-sys-elevation-level1);
 
       animation: dmDialog calc(520ms * var(--mdur, 1)) var(--spring);
+
+      > form,
+      > form > fieldset {
+        min-width: 0;
+        min-height: 0;
+        max-height: 100%;
+        overflow: hidden;
+      }
+
+      .dialog-header,
+      .dialog-footer {
+        min-width: 0;
+        flex: none;
+      }
+
+      .dialog-content {
+        min-width: 0;
+        min-height: 0;
+        max-width: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .dialog-footer .button-group {
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: var(--spacing-half);
+
+        button {
+          min-width: min(120px, 100%);
+          max-width: 100%;
+          flex: 0 1 auto;
+          margin-right: 0;
+        }
+      }
     }
 
     // The frontmost dialog is elevated above the rest.
