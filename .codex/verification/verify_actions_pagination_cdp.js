@@ -363,6 +363,19 @@ async function interact(client, options) {
   }
   await waitFor(
     client,
+    `document.querySelector('#actions-tab') !== null || [...document.querySelectorAll('button')].some(value => value.textContent.trim() === 'Add repository' && !value.disabled)`,
+    'app shell or Add local repository confirmation'
+  )
+  if (
+    await evaluate(
+      client,
+      `[...document.querySelectorAll('button')].some(value => value.textContent.trim() === 'Add repository' && !value.disabled)`
+    )
+  ) {
+    await clickButton(client, 'Add repository')
+  }
+  await waitFor(
+    client,
     `document.querySelector('#actions-tab') !== null`,
     'Actions tab'
   )
