@@ -96,6 +96,28 @@ describe('trampoline forced account', () => {
     )
   })
 
+  it('does not extend a selector to a lookalike host, another scheme, or a non-default port', async () => {
+    for (const remoteUrl of [
+      'https://github.com.evil.example/owner/repository.git',
+      'http://github.com/owner/repository.git',
+      'https://github.com:8443/owner/repository.git',
+    ]) {
+      assert.equal(
+        await getForcedAccountScope(store, remoteUrl, getAccountKey(second)),
+        'different-origin'
+      )
+    }
+
+    assert.equal(
+      await getForcedAccountScope(
+        store,
+        'https://github.com:443/owner/repository.git',
+        getAccountKey(second)
+      ),
+      'matching-origin'
+    )
+  })
+
   it('routes the stable selector without putting a token in the environment', async () => {
     const handler = createCredentialHelperTrampolineHandler(store)
 
@@ -126,6 +148,34 @@ describe('trampoline forced account', () => {
 
         assert.match(response ?? '', /^username=second-login$/m)
         assert.match(response ?? '', /^password=second-token$/m)
+      },
+      process.cwd(),
+      false,
+      undefined,
+      getAccountKey(second)
+    )
+  })
+
+  it('keeps the selected identity authoritative over a username-bearing clone URL', async () => {
+    const handler = createCredentialHelperTrampolineHandler(store)
+
+    await withTrampolineEnv(
+      async trampolineEnv => {
+        const token = (trampolineEnv as Record<string, string>)[
+          'DESKTOP_TRAMPOLINE_TOKEN'
+        ]
+        const response = await handler({
+          identifier: TrampolineCommandIdentifier.CredentialHelper,
+          trampolineToken: token,
+          parameters: ['get'],
+          environmentVariables: new Map(),
+          stdin:
+            'protocol=https\nhost=github.com\nusername=wrong-login\npath=owner/repository.git\n',
+        })
+
+        assert.match(response ?? '', /^username=second-login$/m)
+        assert.match(response ?? '', /^password=second-token$/m)
+        assert.doesNotMatch(response ?? '', /wrong-login/)
       },
       process.cwd(),
       false,
