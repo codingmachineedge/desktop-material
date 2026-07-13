@@ -49,9 +49,20 @@ export interface IRepositoryShallowHistoryRequest {
   readonly args: ReadonlyArray<string>
 }
 
+export interface IRepositoryPatchExportRequest {
+  readonly destination: string
+  readonly args: ReadonlyArray<string>
+}
+
+export interface IRepositoryPatchImportRequest {
+  readonly patchPaths: ReadonlyArray<string>
+  readonly args: ReadonlyArray<string>
+}
+
 const MaximumBundleRefs = 5_000
 const MaximumFetchRemotes = 128
 const MaximumDeepenCommitCount = 1_000_000
+const MaximumPatchFiles = 256
 
 /** The bounded, read-only check used before review and again before mutation. */
 export function prepareRepositoryShallowStatusInspection(): ReadonlyArray<string> {
@@ -395,6 +406,58 @@ function normalizeRepositoryExportDestination(
   }
 
   return resolvedDestination
+}
+
+/** Export every commit ahead of the configured upstream into one new folder. */
+export function prepareRepositoryPatchExport(
+  repositoryPath: string,
+  destination: string
+): IRepositoryPatchExportRequest {
+  const resolvedDestination = normalizeRepositoryExportDestination(
+    repositoryPath,
+    destination,
+    '.patches'
+  )
+  return {
+    destination: resolvedDestination,
+    args: [
+      'format-patch',
+      '--no-signature',
+      '--numbered',
+      `--output-directory=${resolvedDestination}`,
+      '@{upstream}..HEAD',
+    ],
+  }
+}
+
+/** Normalize a bounded native-picker selection for `git am`. */
+export function prepareRepositoryPatchImport(
+  patchPaths: ReadonlyArray<string>
+): IRepositoryPatchImportRequest {
+  if (patchPaths.length === 0 || patchPaths.length > MaximumPatchFiles) {
+    throw new Error(`Choose between 1 and ${MaximumPatchFiles} patch files.`)
+  }
+  const normalized = patchPaths.map(path => {
+    if (
+      path.length === 0 ||
+      path.includes('\0') ||
+      !Path.isAbsolute(path) ||
+      !path.toLowerCase().endsWith('.patch')
+    ) {
+      throw new Error('Choose only absolute .patch files.')
+    }
+    return Path.resolve(path)
+  })
+  if (
+    new Set(normalized.map(path => path.toLowerCase())).size !==
+    normalized.length
+  ) {
+    throw new Error('Choose each patch file only once.')
+  }
+  return {
+    patchPaths: normalized,
+    args: ['am', '--3way', '--keep-cr', '--no-gpg-sign', '--', ...normalized],
+  }
 }
 
 export type RepositoryToolID = GuidedRepositoryToolID

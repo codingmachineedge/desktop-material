@@ -587,6 +587,17 @@ export class AppWindow {
     return filePaths.length > 0 ? filePaths[0] : null
   }
 
+  /** Show an open dialog and return every path selected by the user. */
+  public async showOpenDialogMultiple(options: Electron.OpenDialogOptions) {
+    const { filePaths } = await dialog.showOpenDialog(this.window, {
+      ...options,
+      properties: Array.from(
+        new Set([...(options.properties ?? []), 'multiSelections' as const])
+      ),
+    })
+    return filePaths
+  }
+
   public markWillQuit() {
     this.quitting = true
   }

@@ -10,9 +10,47 @@
 .repository-shallow-history,
 .repository-shallow-history *,
 .repository-bundle-import,
-.repository-bundle-import * {
+.repository-bundle-import *,
+.repository-patch-series,
+.repository-patch-series * {
   box-sizing: border-box;
   min-width: 0;
+}
+
+.repository-patch-series {
+  display: grid;
+  gap: 12px;
+}
+
+.repository-patch-card,
+.repository-patch-recovery {
+  gap: 12px;
+}
+
+.repository-patch-recovery {
+  background: var(--md-sys-color-tertiary-container);
+  border-radius: 10px;
+  color: var(--md-sys-color-on-tertiary-container);
+  display: grid;
+  overflow-x: hidden;
+  padding: 12px;
+
+  p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.repository-patch-file-list {
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-left: 24px;
+
+  li {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
 .repository-shallow-history-card {

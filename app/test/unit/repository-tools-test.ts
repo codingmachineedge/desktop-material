@@ -10,6 +10,8 @@ import {
   prepareRepositoryBundleImport,
   prepareRepositoryBundleInspection,
   prepareRepositoryBundleVerification,
+  prepareRepositoryPatchExport,
+  prepareRepositoryPatchImport,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -125,6 +127,53 @@ describe('repository tool recipes', () => {
         'C:\\work\\repo',
         'C:\\work\\repo\\.git\\backup.bundle'
       )
+    )
+  })
+
+  it('prepares create-new upstream patch export and bounded patch import', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryPatchExport(
+        'C:\\work\\repo',
+        'C:\\exports\\review-series'
+      ),
+      {
+        destination: 'C:\\exports\\review-series.patches',
+        args: [
+          'format-patch',
+          '--no-signature',
+          '--numbered',
+          '--output-directory=C:\\exports\\review-series.patches',
+          '@{upstream}..HEAD',
+        ],
+      }
+    )
+    assert.deepStrictEqual(
+      prepareRepositoryPatchImport([
+        'C:\\patches\\0001.patch',
+        'C:\\patches\\0002.patch',
+      ]),
+      {
+        patchPaths: ['C:\\patches\\0001.patch', 'C:\\patches\\0002.patch'],
+        args: [
+          'am',
+          '--3way',
+          '--keep-cr',
+          '--no-gpg-sign',
+          '--',
+          'C:\\patches\\0001.patch',
+          'C:\\patches\\0002.patch',
+        ],
+      }
+    )
+    assert.throws(() => prepareRepositoryPatchImport([]))
+    assert.throws(() =>
+      prepareRepositoryPatchImport(['C:\\patches\\not-a-patch.txt'])
+    )
+    assert.throws(() =>
+      prepareRepositoryPatchImport([
+        'C:\\patches\\same.patch',
+        'C:\\patches\\same.patch',
+      ])
     )
   })
 

@@ -131,6 +131,25 @@ function argsForRecipe(request: ICLICommandRequest): ReadonlyArray<string> {
         '--',
         recipe.remote,
       ]
+    case 'repository-patch-export':
+      return [
+        'format-patch',
+        '--no-signature',
+        '--numbered',
+        `--output-directory=${recipe.destination}`,
+        '@{upstream}..HEAD',
+      ]
+    case 'repository-patch-import':
+      return [
+        'am',
+        '--3way',
+        '--keep-cr',
+        '--no-gpg-sign',
+        '--',
+        ...recipe.patchPaths,
+      ]
+    case 'repository-patch-session':
+      return ['am', `--${recipe.operation}`]
   }
 }
 

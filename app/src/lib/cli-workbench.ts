@@ -20,6 +20,8 @@ export type GuidedBundleImportOperation =
 
 export type GuidedShallowInspectionOperation = 'status' | 'remotes'
 
+export type GuidedPatchSessionOperation = 'continue' | 'skip' | 'abort'
+
 /**
  * Closed, structured command families exposed by the guided Repository Tools
  * UI. The main process reconstructs argv from this union and never accepts an
@@ -64,6 +66,18 @@ export type CLICommandRecipe =
       readonly action: 'deepen' | 'unshallow'
       readonly remote: string
       readonly deepenBy: number | null
+    }
+  | {
+      readonly kind: 'repository-patch-export'
+      readonly destination: string
+    }
+  | {
+      readonly kind: 'repository-patch-import'
+      readonly patchPaths: ReadonlyArray<string>
+    }
+  | {
+      readonly kind: 'repository-patch-session'
+      readonly operation: GuidedPatchSessionOperation
     }
 
 export interface ICLICommandRequest {

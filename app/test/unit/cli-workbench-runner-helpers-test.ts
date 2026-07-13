@@ -100,9 +100,11 @@ describe('CLI workbench runner helpers', () => {
     const root = await mkdtemp(join(tmpdir(), 'desktop-cli-recipes-'))
     const destination = join(tmpdir(), 'desktop-cli-export')
     const bundlePath = join(tmpdir(), 'desktop-cli-input.bundle')
+    const patchPath = join(root, '0001-feature.patch')
     const source = { oid: 'a'.repeat(40), ref: 'refs/heads/main' }
     const dependencies = fakeDependencies(root)
     try {
+      await writeFile(patchPath, 'synthetic patch\n')
       const allowed = [
         {
           recipe: { kind: 'repository-tool', operation: 'status-summary' },
@@ -313,6 +315,30 @@ describe('CLI workbench runner helpers', () => {
             'upstream',
           ],
         },
+        {
+          recipe: { kind: 'repository-patch-export', destination },
+          confirmed: true,
+          args: [
+            'format-patch',
+            '--no-signature',
+            '--numbered',
+            `--output-directory=${destination}.patches`,
+            '@{upstream}..HEAD',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-patch-import',
+            patchPaths: [patchPath],
+          },
+          confirmed: true,
+          args: ['am', '--3way', '--keep-cr', '--no-gpg-sign', '--', patchPath],
+        },
+        ...(['continue', 'skip', 'abort'] as const).map(operation => ({
+          recipe: { kind: 'repository-patch-session' as const, operation },
+          confirmed: true,
+          args: ['am', `--${operation}`],
+        })),
       ] as const
 
       for (const [index, candidate] of allowed.entries()) {
@@ -497,6 +523,86 @@ describe('CLI workbench runner helpers', () => {
       )
     } finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('revalidates patch inputs and rejects Git-storage or missing files', async () => {
+    const fixture = await createRepositoryFixture()
+    const patchPath = join(fixture.exportsDirectory, '0001-feature.patch')
+    const movedPatchPath = join(
+      fixture.exportsDirectory,
+      '0001-feature-moved.patch'
+    )
+    const gitStoragePatch = join(fixture.repository, '.git', 'private.patch')
+    const gitStorageAliasPatch = join(
+      fixture.exportsDirectory,
+      'private-hard-link.patch'
+    )
+    await writeFile(patchPath, 'synthetic patch\n')
+    await writeFile(gitStoragePatch, 'private patch\n')
+    try {
+      const validated = await validateCLICommandRequest(
+        request(
+          fixture.repository,
+          { kind: 'repository-patch-import', patchPaths: [patchPath] },
+          true
+        ),
+        fixture.dependencies
+      )
+      assert.deepEqual(validated.inputPaths, [await realpath(patchPath)])
+      await revalidateCLICommandBeforeSpawn(validated, fixture.dependencies)
+
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.repository,
+            {
+              kind: 'repository-patch-import',
+              patchPaths: [gitStoragePatch],
+            },
+            true
+          ),
+          fixture.dependencies
+        ),
+        /Git storage/
+      )
+      await link(gitStoragePatch, gitStorageAliasPatch)
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.repository,
+            {
+              kind: 'repository-patch-import',
+              patchPaths: [gitStorageAliasPatch],
+            },
+            true
+          ),
+          fixture.dependencies
+        ),
+        /existing regular file/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.repository,
+            {
+              kind: 'repository-patch-import',
+              patchPaths: [join(fixture.exportsDirectory, 'missing.patch')],
+            },
+            true
+          ),
+          fixture.dependencies
+        ),
+        /existing regular file/
+      )
+
+      await rename(patchPath, movedPatchPath)
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(validated, fixture.dependencies),
+        /existing regular file/
+      )
+    } finally {
+      await rm(fixture.fixture, { recursive: true, force: true })
     }
   })
 

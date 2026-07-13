@@ -16,6 +16,8 @@ const RunIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 const MaximumPathBytes = 32 * 1024
 const MaximumDeepenCommitCount = 1_000_000
 const MaximumProbeOutputBytes = 64 * 1024
+const MaximumPatchFiles = 256
+const MaximumPatchPathBytes = 256 * 1024
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -58,7 +60,7 @@ function normalizeBundlePath(value: unknown): string {
 
 function normalizeExportDestination(
   value: unknown,
-  extension: '.zip' | '.tar' | '.bundle'
+  extension: '.zip' | '.tar' | '.bundle' | '.patches'
 ): string {
   const destination = normalizeAbsolutePath(
     value,
@@ -67,6 +69,34 @@ function normalizeExportDestination(
   return destination.toLowerCase().endsWith(extension)
     ? destination
     : `${destination}${extension}`
+}
+
+function normalizePatchPaths(value: unknown): ReadonlyArray<string> {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MaximumPatchFiles
+  ) {
+    throw new Error(`Choose between 1 and ${MaximumPatchFiles} patch files.`)
+  }
+  const paths = value.map(path => {
+    const normalized = normalizeAbsolutePath(
+      path,
+      'Choose only absolute .patch files.'
+    )
+    if (!normalized.toLowerCase().endsWith('.patch')) {
+      throw new Error('Choose only absolute .patch files.')
+    }
+    return normalized
+  })
+  if (
+    paths.reduce((total, path) => total + Buffer.byteLength(path, 'utf8'), 0) >
+      MaximumPatchPathBytes ||
+    new Set(paths.map(path => comparablePath(path))).size !== paths.length
+  ) {
+    throw new Error('The selected patch-file list is invalid.')
+  }
+  return paths
 }
 
 function isValidFullRefName(ref: string): boolean {
@@ -135,6 +165,7 @@ interface IBoundCLICommand {
   readonly requiresConfirmation: boolean
   readonly outputDestination: string | null
   readonly remote: string | null
+  readonly inputPaths?: ReadonlyArray<string>
 }
 
 const RepositoryToolArgs = {
@@ -346,6 +377,63 @@ function bindCLICommandRecipe(value: unknown): IBoundCLICommand {
         remote,
       }
     }
+    case 'repository-patch-export': {
+      if (!hasOnlyKeys(value, ['kind', 'destination'])) {
+        throw new Error('Repository patch export recipe is invalid.')
+      }
+      const destination = normalizeExportDestination(
+        value.destination,
+        '.patches'
+      )
+      return {
+        args: [
+          'format-patch',
+          '--no-signature',
+          '--numbered',
+          `--output-directory=${destination}`,
+          '@{upstream}..HEAD',
+        ],
+        requiresConfirmation: true,
+        outputDestination: destination,
+        remote: null,
+      }
+    }
+    case 'repository-patch-import': {
+      if (!hasOnlyKeys(value, ['kind', 'patchPaths'])) {
+        throw new Error('Repository patch import recipe is invalid.')
+      }
+      const inputPaths = normalizePatchPaths(value.patchPaths)
+      return {
+        args: [
+          'am',
+          '--3way',
+          '--keep-cr',
+          '--no-gpg-sign',
+          '--',
+          ...inputPaths,
+        ],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+        inputPaths,
+      }
+    }
+    case 'repository-patch-session': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'operation']) ||
+        (value.operation !== 'continue' &&
+          value.operation !== 'skip' &&
+          value.operation !== 'abort')
+      ) {
+        throw new Error('Repository patch-session recipe is invalid.')
+      }
+      return {
+        args: ['am', `--${value.operation}`],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
     default:
       throw new Error('Unknown guided CLI command recipe.')
   }
@@ -376,6 +464,7 @@ export interface IValidatedCLICommandRequest {
   readonly confirmed: boolean
   readonly outputDestination: string | null
   readonly remote: string | null
+  readonly inputPaths: ReadonlyArray<string>
 }
 
 function runGitProbe(
@@ -581,6 +670,46 @@ async function validateOutputDestination(
   return canonicalDestination
 }
 
+async function validatePatchInputPaths(
+  paths: ReadonlyArray<string>,
+  context: IRepositoryGitContext,
+  dependencies: ICLICommandValidationDependencies
+): Promise<ReadonlyArray<string>> {
+  const canonicalGitDirectory = await dependencies.canonicalizePath(
+    context.gitDirectory
+  )
+  const canonicalGitCommonDirectory = await dependencies.canonicalizePath(
+    context.gitCommonDirectory
+  )
+  const canonicalPaths = new Array<string>()
+  for (const path of paths) {
+    const pathStat = await lstat(path).catch(() => null)
+    if (
+      pathStat === null ||
+      !pathStat.isFile() ||
+      pathStat.isSymbolicLink() ||
+      pathStat.nlink !== 1
+    ) {
+      throw new Error('Every selected patch must be an existing regular file.')
+    }
+    const canonicalPath = await dependencies.canonicalizePath(path)
+    if (
+      isPathInside(canonicalPath, canonicalGitDirectory) ||
+      isPathInside(canonicalPath, canonicalGitCommonDirectory)
+    ) {
+      throw new Error('Patch files cannot be read from Git storage.')
+    }
+    canonicalPaths.push(canonicalPath)
+  }
+  if (
+    new Set(canonicalPaths.map(path => comparablePath(path))).size !==
+    canonicalPaths.length
+  ) {
+    throw new Error('Choose each patch file only once.')
+  }
+  return canonicalPaths
+}
+
 async function assertOutputDestinationDoesNotExist(
   destination: string
 ): Promise<void> {
@@ -652,7 +781,16 @@ export async function validateCLICommandRequest(
     await validateRemote(bound.remote, repositoryPath, dependencies)
   }
   let outputDestination: string | null = null
+  let inputPaths = bound.inputPaths ?? []
   let args = bound.args
+  if (inputPaths.length > 0) {
+    inputPaths = await validatePatchInputPaths(
+      inputPaths,
+      context,
+      dependencies
+    )
+    args = ['am', '--3way', '--keep-cr', '--no-gpg-sign', '--', ...inputPaths]
+  }
   if (bound.outputDestination !== null) {
     outputDestination = await validateOutputDestination(
       bound.outputDestination,
@@ -667,8 +805,18 @@ export async function validateCLICommandRequest(
         `--output=${outputDestination}`,
         'HEAD',
       ]
-    } else {
+    } else if (isRecord(recipe) && recipe.kind === 'repository-bundle-export') {
       args = ['bundle', 'create', outputDestination, '--all']
+    } else if (isRecord(recipe) && recipe.kind === 'repository-patch-export') {
+      args = [
+        'format-patch',
+        '--no-signature',
+        '--numbered',
+        `--output-directory=${outputDestination}`,
+        '@{upstream}..HEAD',
+      ]
+    } else {
+      throw new Error('Repository export recipe is invalid.')
     }
   }
 
@@ -681,6 +829,7 @@ export async function validateCLICommandRequest(
     confirmed,
     outputDestination,
     remote: bound.remote,
+    inputPaths,
   }
 }
 
@@ -703,6 +852,20 @@ export async function revalidateCLICommandBeforeSpawn(
       throw new Error(
         'The selected destination path changed after it was reviewed.'
       )
+    }
+  }
+  if (request.inputPaths.length > 0) {
+    const canonicalPaths = await validatePatchInputPaths(
+      request.inputPaths,
+      context,
+      dependencies
+    )
+    if (
+      canonicalPaths.some(
+        (path, index) => !pathsEqual(path, request.inputPaths[index])
+      )
+    ) {
+      throw new Error('A selected patch path changed after it was reviewed.')
     }
   }
 }

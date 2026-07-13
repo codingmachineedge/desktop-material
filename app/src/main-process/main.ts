@@ -925,6 +925,15 @@ app.on('ready', () => {
       getAppWindowFromWebContents(event.sender)?.showOpenDialog(options) ?? null
   )
 
+  /** An event sent by the renderer asking for a bounded multi-file selection. */
+  ipcMain.handle(
+    'show-open-dialog-multiple',
+    async (event, options) =>
+      getAppWindowFromWebContents(event.sender)?.showOpenDialogMultiple(
+        options
+      ) ?? []
+  )
+
   /**
    * An event sent by the renderer asking obtain whether the window is focused
    */

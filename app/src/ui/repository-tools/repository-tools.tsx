@@ -32,6 +32,7 @@ import {
 } from './operations'
 import { RepositoryBundleImport } from './bundle-import'
 import { RepositoryShallowHistory } from './shallow-history'
+import { RepositoryPatchSeries } from './patch-series'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -73,6 +74,10 @@ export interface IRepositoryToolsProps {
   ) => Promise<string | null>
   readonly chooseBundleToVerify?: () => Promise<string | null>
   readonly chooseBundleToImport?: () => Promise<string | null>
+  readonly choosePatchExportDestination?: (
+    defaultPath: string
+  ) => Promise<string | null>
+  readonly choosePatchFiles?: () => Promise<ReadonlyArray<string>>
   readonly revealArchive?: (path: string) => Promise<void>
 }
 
@@ -100,6 +105,7 @@ interface IRepositoryToolsState {
   readonly error: string | null
   readonly bundleImportBusy: boolean
   readonly shallowHistoryBusy: boolean
+  readonly patchSeriesBusy: boolean
 }
 
 let nextOperationSequence = 0
@@ -138,6 +144,7 @@ export class RepositoryTools extends React.Component<
       error: null,
       bundleImportBusy: false,
       shallowHistoryBusy: false,
+      patchSeriesBusy: false,
     }
   }
 
@@ -166,6 +173,7 @@ export class RepositoryTools extends React.Component<
         error: null,
         bundleImportBusy: false,
         shallowHistoryBusy: false,
+        patchSeriesBusy: false,
       })
     }
   }
@@ -217,7 +225,8 @@ export class RepositoryTools extends React.Component<
     return (
       this.runId !== null ||
       this.state.bundleImportBusy ||
-      this.state.shallowHistoryBusy
+      this.state.shallowHistoryBusy ||
+      this.state.patchSeriesBusy
     )
   }
 
@@ -230,6 +239,12 @@ export class RepositoryTools extends React.Component<
   private onShallowHistoryBusyChanged = (shallowHistoryBusy: boolean) => {
     if (this.state.shallowHistoryBusy !== shallowHistoryBusy) {
       this.setState({ shallowHistoryBusy })
+    }
+  }
+
+  private onPatchSeriesBusyChanged = (patchSeriesBusy: boolean) => {
+    if (this.state.patchSeriesBusy !== patchSeriesBusy) {
+      this.setState({ patchSeriesBusy })
     }
   }
 
@@ -706,12 +721,33 @@ export class RepositoryTools extends React.Component<
         disabled={
           this.runId !== null ||
           this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
         onRefreshRepository={this.props.onRefreshRepository}
         onBusyChanged={this.onBundleImportBusyChanged}
         chooseBundleToImport={this.props.chooseBundleToImport}
+      />
+    )
+  }
+
+  private renderPatchSeries() {
+    return (
+      <RepositoryPatchSeries
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onPatchSeriesBusyChanged}
+        chooseExportDestination={this.props.choosePatchExportDestination}
+        choosePatchFiles={this.props.choosePatchFiles}
       />
     )
   }
@@ -723,6 +759,7 @@ export class RepositoryTools extends React.Component<
         disabled={
           this.runId !== null ||
           this.state.bundleImportBusy ||
+          this.state.patchSeriesBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -896,6 +933,7 @@ export class RepositoryTools extends React.Component<
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}
             {this.renderExport()}
+            {this.renderPatchSeries()}
             {this.renderImport()}
           </div>
           <aside className="repository-tools-results-column">
