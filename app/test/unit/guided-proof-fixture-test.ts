@@ -1,5 +1,6 @@
 import assert from 'node:assert'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   createServer,
   IncomingMessage,
@@ -296,16 +297,39 @@ describe('guided hidden-desktop proof fixture', () => {
           ?.jobs[0].name,
         'Windows x64'
       )
+      const artifact = (
+        await api.fetchWorkflowRunArtifacts(
+          'material-proof',
+          'guided-proof',
+          7001
+        )
+      ).artifacts[0]
+      assert.equal(artifact.name, 'guided-proof-artifact')
       assert.equal(
-        (
-          await api.fetchWorkflowRunArtifacts(
-            'material-proof',
-            'guided-proof',
-            7001
-          )
-        ).artifacts[0].name,
-        'guided-proof-artifact'
+        await api.fetchArtifactAttestationPresence(
+          'material-proof',
+          'guided-proof',
+          artifact.digest!
+        ),
+        true
       )
+      const artifactDownload = await fetch(
+        `${harness.endpoint}/repos/material-proof/guided-proof/actions/artifacts/7301/zip`,
+        { headers: { Authorization: `Bearer ${tokenB}` } }
+      )
+      assert.equal(artifactDownload.status, 200)
+      const artifactBytes = Buffer.from(await artifactDownload.arrayBuffer())
+      assert.equal(artifactBytes.length, artifact.sizeInBytes)
+      assert.equal(
+        `sha256:${createHash('sha256').update(artifactBytes).digest('hex')}`,
+        artifact.digest
+      )
+      const jobLog = await fetch(
+        `${harness.endpoint}/repos/material-proof/guided-proof/actions/jobs/7101/logs`,
+        { headers: { Authorization: `Bearer ${tokenB}` } }
+      )
+      assert.equal(jobLog.status, 200)
+      assert.match(await jobLog.text(), /Guided proof build completed/)
       assert.equal(
         (
           await api.fetchEffectiveBranchRules(

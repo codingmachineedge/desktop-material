@@ -2846,7 +2846,7 @@ async function handleActionsAPI(
       response,
       200,
       [
-        '2026-07-13T12:00:00Z Build deterministic proof',
+        '2026-07-13T12:00:00Z Guided proof build completed',
         '2026-07-13T12:00:01Z All bounded checks passed',
         '',
       ].join('\n'),
