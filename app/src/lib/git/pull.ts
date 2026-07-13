@@ -38,10 +38,13 @@ export async function pull(
     ) => Promise<'abort' | 'ignore'>
     onTerminalOutputAvailable?: TerminalOutputCallback
     noVerify?: boolean
+    /** Stable account identity to force for this pull. Never a token. */
+    accountKey?: string
   }
 ): Promise<void> {
   let opts: IGitStringExecutionOptions = {
     env: await envForRemoteOperation(remote.url),
+    credentialAccountKey: options?.accountKey,
     // git pull triggers merge or rebase hooks depending on config, instead of
     // trying to check pull.rebase and friends we'll just intercept all possible
     // hooks that could be run as part of a pull operation.
