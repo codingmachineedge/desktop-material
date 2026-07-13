@@ -25,8 +25,12 @@
   5. Actions shows a synthetic run, jobs, readable job log, artifact digest and
      attestation-presence context, a successful authenticated same-endpoint
      artifact download, local SHA-256 result, and reveal-ready destination.
-  6. Regular and compact window checks have no clipping, overlap, oversized
-     text, black compositor tiles, or document-level horizontal overflow.
+  6. Regular and compact window checks cover light and dark themes; requested
+     50%, 100%, and 200% UI scaling with auto-fit; long synthetic repository,
+     branch, and host labels; destructive-confirmation focus; keyboard paths;
+     and screen-reader names and roles. They have no clipping, overlap,
+     oversized text, black compositor tiles, or document-level horizontal
+     overflow.
 - Ordered background interactions: verify the exact low-level MCP server,
   scheduled-task command, and MCP checkout SHA; run the required unpackaged
   production build through MCP; create one owned Temp run root, deterministic
@@ -50,20 +54,21 @@
   `docs/assets/screenshots/material-history-deepen.png`,
   `docs/assets/screenshots/material-sparse-checkout-safe.png`,
   `docs/assets/screenshots/material-native-pull-request.png`, and
-  `docs/assets/screenshots/material-actions-artifact-download.png`; take an
-  additional compact geometry capture under the owned Temp root for layout
-  validation without necessarily publishing it.
+  `docs/assets/screenshots/material-actions-artifact-download.png`; retain
+  compact, dark-theme, and scaling-matrix captures under the owned Temp root for
+  validation without necessarily publishing them.
 - Documentation allowlist: this manifest; the five accepted screenshots;
   `README.md`; `PLAN.md`; `HANDOFF.md`; `site/index.html`; and the relevant
   actual image references in `docs/wiki/Home.md` and
   `docs/wiki/User-Guide.md`. The separate GitHub wiki receives the same
   canonical privacy-safe content and images only after `main` is final.
-- Tests: focused clone/Pull All/PR/Actions/runner/file-history/sparse/shallow/UI
-  suites; full unit corpus; `yarn lint:src`; repository-wide `yarn prettier`;
-  `yarn tsc --noEmit --skipLibCheck`; `git diff --check`; conflict-marker,
-  secret, signed-URL, email, personal-name, and local-path scans; reproducible
-  MCP production build; deterministic off-screen interactions; original-image
-  inspection and hashes; final remote/CI/Pages/release/wiki verification.
+- Tests: focused clone/Pull All/PR/Actions/runner/file-history/sparse/shallow/UI,
+  accessibility, focus, scaling, theme, and responsive suites; full unit corpus;
+  `yarn lint:src`; repository-wide `yarn prettier`; `yarn tsc --noEmit
+  --skipLibCheck`; `git diff --check`; conflict-marker, secret, signed-URL,
+  email, personal-name, and local-path scans; reproducible MCP production build;
+  deterministic off-screen interactions; original-image inspection and hashes;
+  final remote/CI/Pages/release/wiki verification.
 - Publish gate: reject remote divergence; commit and push coherent checkpoints
   without force; land only reviewed privacy-safe ancestry on `main`; require
   all applicable workflow jobs to finish successfully; require the public
