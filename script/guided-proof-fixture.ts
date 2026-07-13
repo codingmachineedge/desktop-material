@@ -1,4 +1,8 @@
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
+import {
+  ChildProcess,
+  ChildProcessWithoutNullStreams,
+  spawn,
+} from 'child_process'
 import { createHash } from 'crypto'
 import { IncomingMessage, ServerResponse } from 'http'
 import { createServer as createHTTPSServer, Server as HTTPSServer } from 'https'
@@ -26,11 +30,39 @@ const ProofChildMaximumRuntimeMilliseconds = 30_000
 const ProofChildShutdownGraceMilliseconds = 2_000
 const ProofDate = '2026-07-13T12:00:00Z'
 const ProofEarlierDate = '2026-06-01T09:00:00Z'
+const ProofGitName = 'Guided Proof'
+const ProofGitEmail = 'guided-proof@example.invalid'
+const ProofExpectedHeadSha = 'e602b6bae7af1dbcd62a4434b6bf4d24bc46c234'
+const ProofIssueBodyMaximumLength = 65_536
+const ProofPullRequestMaximumCount = 5
+const ProofPullRequestReviewMaximumCount = 10
 const ProofArtifactBytes = Buffer.from(
   'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==',
   'base64'
 )
 const ProofReleaseBytes = Buffer.from('Desktop Material guided proof asset\n')
+const ProofWorkflowYAML = [
+  'name: Guided proof CI',
+  'on:',
+  '  workflow_dispatch:',
+  '    inputs:',
+  '      proof_scope:',
+  '        description: Bounded proof scope',
+  '        required: true',
+  '        type: choice',
+  '        default: guided',
+  '        options:',
+  '          - guided',
+  '          - complete',
+  'jobs:',
+  '  proof:',
+  '    runs-on: windows-latest',
+  '    steps:',
+  '      - run: echo guided-proof',
+  '',
+].join('\n')
+
+const activeGuidedProofGitChildren = new Set<ChildProcess>()
 
 type ProofAccountClass = 'proof-a' | 'proof-b' | 'anonymous' | 'unknown'
 
@@ -129,6 +161,31 @@ interface IProofComment {
   readonly html_url: string
 }
 
+interface IProofPullRequest {
+  readonly id: number
+  readonly number: number
+  title: string
+  body: string
+  headRef: string
+  headLabel: string
+  headRepository: string
+  base: string
+  draft: boolean
+  state: 'open' | 'closed'
+  merged: boolean
+  mergeable: boolean
+  reviewers: string[]
+  assignees: string[]
+  labels: string[]
+}
+
+interface IProofPullRequestReview {
+  readonly id: number
+  readonly pullRequestNumber: number
+  readonly state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED'
+  readonly body: string
+}
+
 interface IProofReleaseAsset {
   readonly id: number
   readonly name: string
@@ -197,30 +254,59 @@ function validateToken(value: string, label: string): string {
   return value
 }
 
-const proofTokenEnvironmentNames = new Set([
-  'guided_proof_token_a',
-  'guided_proof_token_b',
+const guidedProofChildEnvironmentAllowlist = new Set([
+  'lang',
+  'lc_all',
+  'lc_ctype',
+  'path',
+  'pathext',
+  'systemroot',
+  'temp',
+  'tmp',
+  'tmpdir',
+  'windir',
 ])
 
-/** Keep fixture credentials out of every Git/upload-pack child environment. */
+const guidedProofChildOverrideAllowlist = new Set([
+  'git_author_date',
+  'git_committer_date',
+  'git_protocol',
+])
+
+function validateGuidedProofChildOverride(name: string, value: string): void {
+  const normalizedName = name.toLowerCase()
+  if (!guidedProofChildOverrideAllowlist.has(normalizedName)) {
+    throw new Error(
+      'Only fixed guided proof Git metadata may enter a child environment.'
+    )
+  }
+  if (
+    normalizedName === 'git_protocol'
+      ? value !== 'version=2'
+      : !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)
+  ) {
+    throw new Error('The guided proof child environment override is invalid.')
+  }
+}
+
+/** Keep all caller credentials out of every Git/upload-pack child environment. */
 export function createGuidedProofChildEnvironment(
   base: NodeJS.ProcessEnv = process.env,
   overrides: Readonly<Record<string, string>> = {}
 ): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {}
   for (const [name, value] of Object.entries(base)) {
-    if (!proofTokenEnvironmentNames.has(name.toLowerCase())) {
+    if (guidedProofChildEnvironmentAllowlist.has(name.toLowerCase())) {
       result[name] = value
     }
   }
   for (const [name, value] of Object.entries(overrides)) {
-    if (proofTokenEnvironmentNames.has(name.toLowerCase())) {
-      throw new Error('Guided proof tokens cannot enter a child environment.')
-    }
+    validateGuidedProofChildOverride(name, value)
     result[name] = value
   }
   result.GIT_CONFIG_NOSYSTEM = '1'
   result.GIT_CONFIG_GLOBAL = process.platform === 'win32' ? 'NUL' : '/dev/null'
+  result.GIT_TERMINAL_PROMPT = '0'
   return result
 }
 
@@ -254,13 +340,26 @@ async function runGit(
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    activeGuidedProofGitChildren.add(child)
     const stdout = new Array<Buffer>()
     let stdoutBytes = 0
     let stderrBytes = 0
     let settled = false
-    const timeout = setTimeout(() => {
+    let terminationReason: string | null = null
+    let escalation: NodeJS.Timeout | null = null
+    const terminate = (message: string) => {
+      if (settled || terminationReason !== null) {
+        return
+      }
+      terminationReason = message
       child.kill()
-      fail('A deterministic guided proof Git command timed out.')
+      escalation = setTimeout(
+        () => child.kill('SIGKILL'),
+        ProofChildShutdownGraceMilliseconds
+      )
+    }
+    const timeout = setTimeout(() => {
+      terminate('A deterministic guided proof Git command timed out.')
     }, ProofChildMaximumRuntimeMilliseconds)
     const fail = (message: string) => {
       if (settled) {
@@ -268,12 +367,17 @@ async function runGit(
       }
       settled = true
       clearTimeout(timeout)
+      if (escalation !== null) {
+        clearTimeout(escalation)
+      }
       reject(new Error(message))
     }
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBytes += chunk.length
       if (stdoutBytes > ProofChildOutputMaximumBytes) {
-        child.kill()
+        terminate(
+          'A deterministic guided proof Git command returned too much output.'
+        )
         return
       }
       stdout.push(chunk)
@@ -281,12 +385,23 @@ async function runGit(
     child.stderr.on('data', (chunk: Buffer) => {
       stderrBytes += chunk.length
       if (stderrBytes > ProofChildOutputMaximumBytes) {
-        child.kill()
+        terminate(
+          'A deterministic guided proof Git command returned too much output.'
+        )
       }
     })
-    child.once('error', () => fail('Unable to start Git.'))
+    child.once('error', () => {
+      if (terminationReason === null) {
+        terminationReason = 'Unable to start Git.'
+      }
+    })
     child.once('close', code => {
+      activeGuidedProofGitChildren.delete(child)
       if (settled) {
+        return
+      }
+      if (terminationReason !== null) {
+        fail(terminationReason)
         return
       }
       if (
@@ -356,11 +471,8 @@ export async function createGuidedProofRepository(
   )
   await mkdir(seedPath)
   await runGit(['init', '-b', ProofBranch, '.'], seedPath)
-  await runGit(['config', 'user.name', 'Guided Proof'], seedPath)
-  await runGit(
-    ['config', 'user.email', 'guided-proof@example.invalid'],
-    seedPath
-  )
+  await runGit(['config', 'user.name', ProofGitName], seedPath)
+  await runGit(['config', 'user.email', ProofGitEmail], seedPath)
   await runGit(['config', 'core.autocrlf', 'false'], seedPath)
   await runGit(['config', 'commit.gpgsign', 'false'], seedPath)
 
@@ -419,7 +531,7 @@ export async function createGuidedProofRepository(
       .trim(),
     10
   )
-  if (!/^[a-f0-9]{40}$/.test(headSha) || commitCount !== commits.length) {
+  if (headSha !== ProofExpectedHeadSha || commitCount !== commits.length) {
     throw new Error(
       'The guided proof repository did not verify after creation.'
     )
@@ -445,8 +557,12 @@ class GuidedProofContext {
   public readonly issues: IProofIssue[]
   public readonly comments = new Map<number, IProofComment[]>()
   public readonly releases: IProofRelease[]
+  public readonly pullRequests: IProofPullRequest[]
+  public readonly pullRequestReviews: IProofPullRequestReview[] = []
+  public workflowEnabled = true
   private sequence = 0
   private ledgerWrites: Promise<void> = Promise.resolve()
+  private readonly activeRequests = new Set<Promise<void>>()
 
   public constructor(public readonly options: IGuidedProofContextOptions) {
     const origin = new URL(options.origin)
@@ -482,12 +598,12 @@ class GuidedProofContext {
         owner: ProofOwner,
         name: ProofRepository,
         defaultBranch: ProofBranch,
-        path: options.repository.bareRepositoryPath,
+        path: `${ProofRepository}.git`,
         headSha: options.repository.headSha,
         commitCount: options.repository.commitCount,
       },
       ledger: {
-        path: options.repository.ledgerPath,
+        path: 'events.ndjson',
         redaction: 'account-class-only',
       },
       accountHints: ['proof-a', 'proof-b'],
@@ -545,6 +661,25 @@ class GuidedProofContext {
         html_url: `${this.ready.origin}/${ProofOwner}/${ProofRepository}/issues/7#issuecomment-7701`,
       },
     ])
+    this.pullRequests = [
+      {
+        id: 8008,
+        number: 8,
+        title: 'Finish the guided proof review',
+        body: 'A bounded synthetic pull request.',
+        headRef: 'proof-work',
+        headLabel: `${ProofOwner}:proof-work`,
+        headRepository: `${ProofOwner}/${ProofRepository}`,
+        base: ProofBranch,
+        draft: false,
+        state: 'open',
+        merged: false,
+        mergeable: true,
+        reviewers: ['guided-proof-reviewer'],
+        assignees: ['proof-b'],
+        labels: ['guided-proof'],
+      },
+    ]
     const releaseAsset: IProofReleaseAsset = {
       id: 1901,
       name: 'guided-proof.txt',
@@ -657,6 +792,20 @@ class GuidedProofContext {
 
   public async flushLedger(): Promise<void> {
     await this.ledgerWrites
+  }
+
+  public trackRequest(request: Promise<void>): void {
+    this.activeRequests.add(request)
+    void request.then(
+      () => this.activeRequests.delete(request),
+      () => this.activeRequests.delete(request)
+    )
+  }
+
+  public async waitForRequests(): Promise<void> {
+    while (this.activeRequests.size > 0) {
+      await Promise.allSettled([...this.activeRequests])
+    }
   }
 
   public async stopUploadPacks(): Promise<void> {
@@ -902,6 +1051,23 @@ function boundedString(
   return value
 }
 
+function boundedGitReference(value: unknown): string {
+  const reference = boundedString(value, 255)
+  if (
+    reference.trim() !== reference ||
+    reference.startsWith('/') ||
+    reference.endsWith('/') ||
+    reference.endsWith('.') ||
+    reference.includes('..') ||
+    reference.includes('//') ||
+    reference.includes('@{') ||
+    /[\u0000-\u0020\u007f~^:?*\\[]/.test(reference)
+  ) {
+    throw new ProofRequestError(422, 'invalid-git-reference')
+  }
+  return reference
+}
+
 function safeDecodeURIComponent(value: string): string {
   try {
     return decodeURIComponent(value)
@@ -923,7 +1089,7 @@ function validateRequestBodyEnvelope(request: IncomingMessage): void {
     }
   }
   if (
-    ['GET', 'HEAD', 'DELETE'].includes(request.method ?? '') &&
+    ['GET', 'HEAD'].includes(request.method ?? '') &&
     (parsedLength > 0 || request.headers['transfer-encoding'] !== undefined)
   ) {
     throw new ProofRequestError(400, 'unexpected-request-body')
@@ -985,7 +1151,7 @@ function workflowPayload(context: GuidedProofContext): unknown {
     id: 700,
     name: 'Guided proof CI',
     path: '.github/workflows/guided-proof.yml',
-    state: 'active',
+    state: context.workflowEnabled ? 'active' : 'disabled_manually',
     html_url: `${context.ready.origin}/${ProofOwner}/${ProofRepository}/actions/workflows/guided-proof.yml`,
     created_at: ProofEarlierDate,
     updated_at: ProofDate,
@@ -1039,20 +1205,34 @@ function workflowJobPayload(context: GuidedProofContext): unknown {
   }
 }
 
-function pullRequestPayload(context: GuidedProofContext): unknown {
+function pullRequestPayload(
+  context: GuidedProofContext,
+  pullRequest: IProofPullRequest
+): unknown {
   return {
-    id: 8008,
-    number: 8,
-    title: 'Finish the guided proof review',
-    body: 'A bounded synthetic pull request.',
-    state: 'open',
+    id: pullRequest.id,
+    number: pullRequest.number,
+    title: pullRequest.title,
+    body: pullRequest.body,
+    state: pullRequest.state,
     created_at: ProofEarlierDate,
     updated_at: ProofDate,
-    html_url: `${context.ready.origin}/${ProofOwner}/${ProofRepository}/pull/8`,
+    html_url: `${context.ready.origin}/${ProofOwner}/${ProofRepository}/pull/${pullRequest.number}`,
     user: { login: 'proof-a' },
-    assignees: [{ login: 'proof-b' }],
-    requested_reviewers: [{ login: 'guided-proof-reviewer' }],
-    draft: false,
+    assignees: pullRequest.assignees.map(login => ({ login })),
+    requested_reviewers: pullRequest.reviewers.map(login => ({ login })),
+    labels: pullRequest.labels.map(name => ({ name })),
+    draft: pullRequest.draft,
+    merged: pullRequest.merged,
+    mergeable: pullRequest.mergeable,
+    mergeable_state: pullRequest.mergeable ? 'clean' : 'blocked',
+    head: {
+      ref: pullRequest.headRef,
+      label: pullRequest.headLabel,
+      sha: context.options.repository.headSha,
+      repo: { full_name: pullRequest.headRepository },
+    },
+    base: { ref: pullRequest.base },
   }
 }
 
@@ -1077,23 +1257,26 @@ async function runUploadPack(
     let stdoutBytes = 0
     let stderrBytes = 0
     let settled = false
-    const timeout = setTimeout(() => {
-      child.kill()
-      fail()
-    }, ProofChildMaximumRuntimeMilliseconds)
-    const fail = () => {
-      if (settled) {
+    let terminationReason: string | null = null
+    let escalation: NodeJS.Timeout | null = null
+    const terminate = () => {
+      if (settled || terminationReason !== null) {
         return
       }
-      settled = true
-      clearTimeout(timeout)
+      terminationReason = 'The guided proof upload-pack process failed.'
       child.kill()
-      reject(new Error('The guided proof upload-pack process failed.'))
+      escalation = setTimeout(
+        () => child.kill('SIGKILL'),
+        ProofChildShutdownGraceMilliseconds
+      )
     }
+    const timeout = setTimeout(() => {
+      terminate()
+    }, ProofChildMaximumRuntimeMilliseconds)
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBytes += chunk.length
       if (stdoutBytes > ProofChildOutputMaximumBytes) {
-        child.kill()
+        terminate()
         return
       }
       stdout.push(chunk)
@@ -1101,28 +1284,32 @@ async function runUploadPack(
     child.stderr.on('data', (chunk: Buffer) => {
       stderrBytes += chunk.length
       if (stderrBytes > ProofChildOutputMaximumBytes) {
-        child.kill()
+        terminate()
       }
     })
-    child.once('error', fail)
+    child.once('error', terminate)
     child.once('close', code => {
       context.activeUploadPacks.delete(child)
       if (settled) {
         return
       }
+      settled = true
+      clearTimeout(timeout)
+      if (escalation !== null) {
+        clearTimeout(escalation)
+      }
       if (
+        terminationReason !== null ||
         code !== 0 ||
         stdoutBytes > ProofChildOutputMaximumBytes ||
         stderrBytes > ProofChildOutputMaximumBytes
       ) {
-        fail()
+        reject(new Error('The guided proof upload-pack process failed.'))
         return
       }
-      settled = true
-      clearTimeout(timeout)
       resolvePromise(Buffer.concat(stdout))
     })
-    child.stdin.once('error', fail)
+    child.stdin.once('error', terminate)
     child.stdin.end(requestBody ?? undefined)
   })
 }
@@ -1460,6 +1647,170 @@ async function updateIssue(
   return issue
 }
 
+function pullRequestByNumber(
+  context: GuidedProofContext,
+  pullRequestNumber: number
+): IProofPullRequest {
+  const pullRequest = context.pullRequests.find(
+    candidate => candidate.number === pullRequestNumber
+  )
+  if (pullRequest === undefined) {
+    throw new ProofRequestError(404, 'pull-request-not-found')
+  }
+  return pullRequest
+}
+
+function parsePullRequestLogins(
+  context: GuidedProofContext,
+  value: unknown
+): string[] {
+  const allowed = new Set(['proof-a', ...context.assignees])
+  const values = parseStringArray(value, 15, 100)
+  if (values.some(login => !allowed.has(login))) {
+    throw new ProofRequestError(422, 'unknown-pull-request-login')
+  }
+  return [...values]
+}
+
+function parsePullRequestLabels(
+  context: GuidedProofContext,
+  value: unknown
+): string[] {
+  const allowed = new Set(context.labels.map(label => label.name))
+  const values = parseStringArray(value, 15, 50)
+  if (values.some(label => !allowed.has(label))) {
+    throw new ProofRequestError(422, 'unknown-pull-request-label')
+  }
+  return [...values]
+}
+
+async function createPullRequest(
+  context: GuidedProofContext,
+  request: IncomingMessage
+): Promise<IProofPullRequest> {
+  if (context.pullRequests.length >= ProofPullRequestMaximumCount) {
+    throw new ProofRequestError(409, 'pull-request-cap-reached')
+  }
+  const body = await readJSONObject(request)
+  requireOnlyFields(body, [
+    'title',
+    'body',
+    'head',
+    'head_repo',
+    'base',
+    'draft',
+  ])
+  const title = boundedString(body.title, 256)
+  const pullRequestBody = boundedString(
+    body.body,
+    ProofIssueBodyMaximumLength,
+    true
+  )
+  const head = boundedGitReference(body.head)
+  const headSeparator = head.indexOf(':')
+  if (headSeparator !== -1 && head.indexOf(':', headSeparator + 1) !== -1) {
+    throw new ProofRequestError(422, 'invalid-pull-request-head')
+  }
+  const headOwner =
+    headSeparator === -1 ? ProofOwner : head.slice(0, headSeparator)
+  const headRef = headSeparator === -1 ? head : head.slice(headSeparator + 1)
+  if (!['proof-a', ProofOwner].includes(headOwner)) {
+    throw new ProofRequestError(422, 'unknown-pull-request-head-owner')
+  }
+  boundedGitReference(headRef)
+  const base = boundedGitReference(body.base)
+  if (headSeparator === -1 && headRef === base) {
+    throw new ProofRequestError(422, 'matching-pull-request-branches')
+  }
+  const headRepositoryName =
+    body.head_repo === undefined
+      ? ProofRepository
+      : boundedString(body.head_repo, 100)
+  if (headRepositoryName !== ProofRepository) {
+    throw new ProofRequestError(422, 'unknown-pull-request-head-repository')
+  }
+  const draft = booleanField(body.draft)
+  const nextNumber =
+    Math.max(...context.pullRequests.map(item => item.number)) + 1
+  const pullRequest: IProofPullRequest = {
+    id: 8000 + nextNumber,
+    number: nextNumber,
+    title,
+    body: pullRequestBody,
+    headRef,
+    headLabel: `${headOwner}:${headRef}`,
+    headRepository: `${headOwner}/${headRepositoryName}`,
+    base,
+    draft,
+    state: 'open',
+    merged: false,
+    mergeable: true,
+    reviewers: [],
+    assignees: [],
+    labels: [],
+  }
+  context.pullRequests.push(pullRequest)
+  return pullRequest
+}
+
+async function updatePullRequest(
+  request: IncomingMessage,
+  pullRequest: IProofPullRequest
+): Promise<IProofPullRequest> {
+  if (pullRequest.merged) {
+    throw new ProofRequestError(409, 'pull-request-already-merged')
+  }
+  const body = await readJSONObject(request)
+  requireOnlyFields(body, ['title', 'body', 'base', 'state'])
+  const fields = Object.keys(body)
+  if (
+    fields.length === 0 ||
+    (body.state !== undefined &&
+      (fields.length !== 1 ||
+        !['open', 'closed'].includes(body.state as string)))
+  ) {
+    throw new ProofRequestError(422, 'invalid-pull-request-update')
+  }
+  const candidate = { ...pullRequest }
+  if (body.title !== undefined) {
+    candidate.title = boundedString(body.title, 256)
+  }
+  if (body.body !== undefined) {
+    candidate.body = boundedString(body.body, ProofIssueBodyMaximumLength, true)
+  }
+  if (body.base !== undefined) {
+    candidate.base = boundedGitReference(body.base)
+    if (
+      candidate.headLabel.startsWith(`${ProofOwner}:`) &&
+      candidate.base === candidate.headRef
+    ) {
+      throw new ProofRequestError(422, 'matching-pull-request-branches')
+    }
+  }
+  if (body.state !== undefined) {
+    candidate.state = body.state as 'open' | 'closed'
+  }
+  Object.assign(pullRequest, candidate)
+  return pullRequest
+}
+
+async function updatePullRequestMetadata(
+  context: GuidedProofContext,
+  request: IncomingMessage,
+  pullRequest: IProofPullRequest
+): Promise<void> {
+  if (pullRequest.merged) {
+    throw new ProofRequestError(409, 'pull-request-already-merged')
+  }
+  const body = await readJSONObject(request)
+  requireOnlyFields(body, ['assignees', 'labels'])
+  if (body.assignees === undefined || body.labels === undefined) {
+    throw new ProofRequestError(422, 'missing-pull-request-metadata')
+  }
+  pullRequest.assignees = parsePullRequestLogins(context, body.assignees)
+  pullRequest.labels = parsePullRequestLabels(context, body.labels)
+}
+
 async function handleIssuesAPI(
   context: GuidedProofContext,
   request: IncomingMessage,
@@ -1523,28 +1874,198 @@ async function handleIssuesAPI(
   }
   if (path === `${repositoryPath}/pulls`) {
     audit.route = 'api-pull-requests'
-    if (!requireMethod(request, response, ['GET'])) {
+    if (!requireMethod(request, response, ['GET', 'POST'])) {
+      return true
+    }
+    if (request.method === 'POST') {
+      requireOnlyQuery(url, [])
+      const pullRequest = await createPullRequest(context, request)
+      sendJSON(response, 201, pullRequestPayload(context, pullRequest))
       return true
     }
     requireOnlyQuery(url, ['state', 'sort', 'direction', 'page', 'per_page'])
-    boundedIntegerQuery(url, 'per_page', 1, 100, 50)
+    const perPage = boundedIntegerQuery(url, 'per_page', 1, 100, 50)
     const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
-    if ((url.searchParams.get('state') ?? 'open') !== 'open') {
+    const state = url.searchParams.get('state') ?? 'open'
+    if (!['open', 'closed', 'all'].includes(state)) {
       throw new ProofRequestError(400, 'invalid-state')
     }
-    sendJSON(response, 200, page === 1 ? [pullRequestPayload(context)] : [])
+    const matching = context.pullRequests.filter(
+      pullRequest => state === 'all' || pullRequest.state === state
+    )
+    const offset = (page - 1) * perPage
+    sendJSON(
+      response,
+      200,
+      matching
+        .slice(offset, offset + perPage)
+        .map(pullRequest => pullRequestPayload(context, pullRequest))
+    )
+    return true
+  }
+  const pullRequestMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)$`
+  ).exec(path)
+  if (pullRequestMatch !== null) {
+    audit.route = 'api-pull-request-lifecycle'
+    if (!requireMethod(request, response, ['GET', 'PATCH'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    const pullRequest = pullRequestByNumber(
+      context,
+      Number.parseInt(pullRequestMatch[1], 10)
+    )
+    if (request.method === 'PATCH') {
+      await updatePullRequest(request, pullRequest)
+    }
+    sendJSON(response, 200, pullRequestPayload(context, pullRequest))
+    return true
+  }
+  const requestedReviewersMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/requested_reviewers$`
+  ).exec(path)
+  if (requestedReviewersMatch !== null) {
+    audit.route = 'api-pull-request-reviewers'
+    if (!requireMethod(request, response, ['POST', 'DELETE'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    const pullRequest = pullRequestByNumber(
+      context,
+      Number.parseInt(requestedReviewersMatch[1], 10)
+    )
+    if (pullRequest.merged) {
+      throw new ProofRequestError(409, 'pull-request-already-merged')
+    }
+    const body = await readJSONObject(request)
+    requireOnlyFields(body, ['reviewers'])
+    const reviewers = parsePullRequestLogins(context, body.reviewers)
+    const current = new Map(
+      pullRequest.reviewers.map(login => [login.toLowerCase(), login])
+    )
+    if (request.method === 'POST') {
+      reviewers.forEach(login => current.set(login.toLowerCase(), login))
+    } else {
+      reviewers.forEach(login => current.delete(login.toLowerCase()))
+    }
+    pullRequest.reviewers = [...current.values()]
+    sendJSON(response, 200, pullRequestPayload(context, pullRequest))
+    return true
+  }
+  const pullRequestReviewsMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/reviews$`
+  ).exec(path)
+  if (pullRequestReviewsMatch !== null) {
+    audit.route = 'api-pull-request-review'
+    if (!requireMethod(request, response, ['POST'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    const pullRequest = pullRequestByNumber(
+      context,
+      Number.parseInt(pullRequestReviewsMatch[1], 10)
+    )
+    if (
+      pullRequest.state !== 'open' ||
+      pullRequest.merged ||
+      context.pullRequestReviews.length >= ProofPullRequestReviewMaximumCount
+    ) {
+      throw new ProofRequestError(409, 'pull-request-review-unavailable')
+    }
+    const body = await readJSONObject(request)
+    requireOnlyFields(body, ['event', 'body'])
+    const event = boundedString(body.event, 32)
+    if (!['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event)) {
+      throw new ProofRequestError(422, 'invalid-pull-request-review-event')
+    }
+    const reviewBody = boundedString(
+      body.body,
+      ProofIssueBodyMaximumLength,
+      true
+    )
+    if (event === 'REQUEST_CHANGES' && reviewBody.trim() === '') {
+      throw new ProofRequestError(422, 'missing-pull-request-review-body')
+    }
+    const state =
+      event === 'APPROVE'
+        ? 'APPROVED'
+        : event === 'REQUEST_CHANGES'
+        ? 'CHANGES_REQUESTED'
+        : 'COMMENTED'
+    const review: IProofPullRequestReview = {
+      id: 8801 + context.pullRequestReviews.length,
+      pullRequestNumber: pullRequest.number,
+      state,
+      body: reviewBody,
+    }
+    context.pullRequestReviews.push(review)
+    sendJSON(response, 200, { id: review.id, state: review.state })
+    return true
+  }
+  const pullRequestMergeMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/merge$`
+  ).exec(path)
+  if (pullRequestMergeMatch !== null) {
+    audit.route = 'api-pull-request-merge'
+    if (!requireMethod(request, response, ['PUT'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    const pullRequest = pullRequestByNumber(
+      context,
+      Number.parseInt(pullRequestMergeMatch[1], 10)
+    )
+    if (
+      pullRequest.state !== 'open' ||
+      pullRequest.merged ||
+      pullRequest.draft ||
+      !pullRequest.mergeable
+    ) {
+      throw new ProofRequestError(409, 'pull-request-merge-unavailable')
+    }
+    const body = await readJSONObject(request)
+    requireOnlyFields(body, ['sha', 'merge_method'])
+    if (body.sha !== context.options.repository.headSha) {
+      throw new ProofRequestError(409, 'pull-request-head-changed')
+    }
+    if (!['merge', 'squash', 'rebase'].includes(body.merge_method as string)) {
+      throw new ProofRequestError(422, 'invalid-pull-request-merge-method')
+    }
+    pullRequest.merged = true
+    pullRequest.mergeable = false
+    pullRequest.state = 'closed'
+    sendJSON(response, 200, {
+      merged: true,
+      sha: context.options.repository.headSha,
+      message: 'Pull request merged.',
+    })
     return true
   }
   const issueMatch = new RegExp(
     `^${repositoryPath}/issues/([1-9][0-9]*)$`
   ).exec(path)
   if (issueMatch !== null) {
+    const issueNumber = Number.parseInt(issueMatch[1], 10)
+    const pullRequest = context.pullRequests.find(
+      candidate => candidate.number === issueNumber
+    )
+    if (pullRequest !== undefined) {
+      audit.route = 'api-pull-request-metadata'
+      if (!requireMethod(request, response, ['PATCH'])) {
+        return true
+      }
+      requireOnlyQuery(url, [])
+      await updatePullRequestMetadata(context, request, pullRequest)
+      sendJSON(response, 200, pullRequestPayload(context, pullRequest))
+      return true
+    }
     audit.route = 'api-issue-detail'
     if (!requireMethod(request, response, ['GET', 'PATCH'])) {
       return true
     }
     requireOnlyQuery(url, [])
-    const issue = issueByNumber(context, Number.parseInt(issueMatch[1], 10))
+    const issue = issueByNumber(context, issueNumber)
     if (request.method === 'PATCH') {
       await updateIssue(context, request, issue)
     }
@@ -1772,6 +2293,9 @@ async function handleReleasesAPI(
     const releaseId = Number.parseInt(exactRelease[1], 10)
     const release = releaseById(context, releaseId)
     if (request.method === 'DELETE') {
+      if ((await readBody(request)).length !== 0) {
+        throw new ProofRequestError(400, 'unexpected-request-body')
+      }
       context.releases.splice(context.releases.indexOf(release), 1)
       sendNoContent(response)
       return true
@@ -1817,6 +2341,9 @@ async function handleReleasesAPI(
       Number.parseInt(exactAsset[1], 10)
     )
     if (request.method === 'DELETE') {
+      if ((await readBody(request)).length !== 0) {
+        throw new ProofRequestError(400, 'unexpected-request-body')
+      }
       release.assets.splice(release.assets.indexOf(asset), 1)
       sendNoContent(response)
       return true
@@ -1916,6 +2443,21 @@ async function handleActionsAPI(
   audit: IProofAudit
 ): Promise<boolean> {
   const repositoryPath = `/repos/${ProofOwner}/${ProofRepository}`
+  if (
+    path === `${repositoryPath}/contents/.github/workflows/guided-proof.yml`
+  ) {
+    audit.route = 'api-actions-workflow-source'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    requireOnlyQuery(url, ['ref'])
+    const reference = url.searchParams.get('ref')
+    if (reference !== null && reference !== ProofBranch) {
+      throw new ProofRequestError(404, 'workflow-reference-not-found')
+    }
+    sendText(response, 200, ProofWorkflowYAML)
+    return true
+  }
   if (path === `${repositoryPath}/actions/workflows`) {
     audit.route = 'api-actions-workflows'
     if (!requireMethod(request, response, ['GET'])) {
@@ -2164,8 +2706,55 @@ async function handleActionsAPI(
     })
     return true
   }
+  const workflowStateMutation = new RegExp(
+    `^${repositoryPath}/actions/workflows/700/(enable|disable)$`
+  ).exec(path)
+  if (workflowStateMutation !== null) {
+    audit.route = 'api-actions-local-mutation'
+    if (!requireMethod(request, response, ['PUT'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    if ((await readBody(request)).length !== 0) {
+      throw new ProofRequestError(400, 'unexpected-request-body')
+    }
+    context.workflowEnabled = workflowStateMutation[1] === 'enable'
+    sendNoContent(response)
+    return true
+  }
+  if (path === `${repositoryPath}/actions/workflows/700/dispatches`) {
+    audit.route = 'api-actions-workflow-dispatch'
+    if (!requireMethod(request, response, ['POST'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    const body = await readJSONObject(request)
+    requireOnlyFields(body, ['ref', 'inputs'])
+    if (body.ref !== ProofBranch) {
+      throw new ProofRequestError(422, 'unknown-workflow-reference')
+    }
+    if (
+      typeof body.inputs !== 'object' ||
+      body.inputs === null ||
+      Array.isArray(body.inputs)
+    ) {
+      throw new ProofRequestError(422, 'invalid-workflow-inputs')
+    }
+    const inputs = body.inputs as Record<string, unknown>
+    if (Object.keys(inputs).length > 10) {
+      throw new ProofRequestError(422, 'too-many-workflow-inputs')
+    }
+    for (const [name, value] of Object.entries(inputs)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_-]{0,63}$/.test(name)) {
+        throw new ProofRequestError(422, 'invalid-workflow-input-name')
+      }
+      boundedString(value, 1024, true)
+    }
+    sendNoContent(response)
+    return true
+  }
   const actionMutation = new RegExp(
-    `^${repositoryPath}/actions/(?:runs/7001/(?:rerun|rerun-failed-jobs|cancel|force-cancel)|jobs/7101/rerun|workflows/700/(?:enable|disable|dispatches))$`
+    `^${repositoryPath}/actions/(?:runs/7001/(?:rerun|rerun-failed-jobs|cancel|force-cancel)|jobs/7101/rerun)$`
   ).exec(path)
   if (actionMutation !== null) {
     audit.route = 'api-actions-local-mutation'
@@ -2173,7 +2762,9 @@ async function handleActionsAPI(
       return true
     }
     requireOnlyQuery(url, [])
-    await readBody(request)
+    if ((await readBody(request)).length !== 0) {
+      throw new ProofRequestError(400, 'unexpected-request-body')
+    }
     sendNoContent(response)
     return true
   }
@@ -2289,6 +2880,7 @@ export interface IGuidedProofHandlerFixture {
   readonly ready: IGuidedProofReady
   readonly handler: GuidedProofRequestHandler
   flushLedger(): Promise<void>
+  waitForRequests(): Promise<void>
   stopUploadPacks(): Promise<void>
 }
 
@@ -2298,7 +2890,7 @@ export function createGuidedProofHandler(
 ): IGuidedProofHandlerFixture {
   const context = new GuidedProofContext(options)
   const handler: GuidedProofRequestHandler = (request, response) => {
-    void (async () => {
+    const work = (async () => {
       const audit: IProofAudit = {
         route: 'rejected-request',
         account: 'anonymous',
@@ -2335,11 +2927,13 @@ export function createGuidedProofHandler(
         )
       }
     })()
+    context.trackRequest(work)
   }
   return {
     ready: context.ready,
     handler,
     flushLedger: async () => await context.flushLedger(),
+    waitForRequests: async () => await context.waitForRequests(),
     stopUploadPacks: async () => await context.stopUploadPacks(),
   }
 }
@@ -2477,6 +3071,8 @@ export async function startGuidedProofFixture(
         const serverClosed = closeServer()
         await fixture.stopUploadPacks()
         await serverClosed
+        await fixture.waitForRequests()
+        await fixture.stopUploadPacks()
         await fixture.flushLedger()
       })()
       await closePromise
