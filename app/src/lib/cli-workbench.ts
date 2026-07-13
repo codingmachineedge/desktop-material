@@ -21,6 +21,36 @@ export type GuidedBundleImportOperation =
 export type GuidedShallowInspectionOperation = 'status' | 'remotes'
 
 export type GuidedPatchSessionOperation = 'continue' | 'skip' | 'abort'
+export type RepositorySigningScope = 'local' | 'global'
+export type RepositorySigningFormat = 'openpgp' | 'ssh' | 'x509'
+
+export type RepositorySigningUpdate =
+  | {
+      readonly operation: 'set-format'
+      readonly format: RepositorySigningFormat
+    }
+  | {
+      readonly operation: 'set-key'
+      readonly format: RepositorySigningFormat
+      readonly key: string
+    }
+  | {
+      readonly operation: 'set-commit-signing' | 'set-tag-signing'
+      readonly enabled: boolean
+    }
+
+export type RepositoryLFSInspectionOperation =
+  | 'version'
+  | 'patterns'
+  | 'status'
+  | 'prune-preview'
+
+export type RepositoryLFSOperation =
+  | 'install'
+  | 'uninstall'
+  | 'fetch'
+  | 'pull'
+  | 'prune'
 
 /**
  * Closed, structured command families exposed by the guided Repository Tools
@@ -78,6 +108,37 @@ export type CLICommandRecipe =
   | {
       readonly kind: 'repository-patch-session'
       readonly operation: GuidedPatchSessionOperation
+    }
+  | {
+      readonly kind: 'repository-signing-inspection'
+      readonly scope: RepositorySigningScope
+      readonly operation: 'settings' | 'key-presence'
+    }
+  | ({
+      readonly kind: 'repository-signing-update'
+      readonly scope: RepositorySigningScope
+    } & RepositorySigningUpdate)
+  | {
+      readonly kind: 'repository-signing-list-tags'
+    }
+  | {
+      readonly kind: 'repository-signing-verify'
+      readonly target: 'head' | 'tag'
+      readonly tagName: string | null
+      readonly expectedObject: string | null
+    }
+  | {
+      readonly kind: 'repository-lfs-inspection'
+      readonly operation: RepositoryLFSInspectionOperation
+    }
+  | {
+      readonly kind: 'repository-lfs-pattern'
+      readonly operation: 'track' | 'untrack'
+      readonly pattern: string
+    }
+  | {
+      readonly kind: 'repository-lfs-operation'
+      readonly operation: RepositoryLFSOperation
     }
 
 export interface ICLICommandRequest {

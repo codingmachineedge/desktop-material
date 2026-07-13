@@ -31,8 +31,10 @@ import {
   RepositoryToolOperations,
 } from './operations'
 import { RepositoryBundleImport } from './bundle-import'
+import { RepositoryLFSAdministration } from './lfs-administration'
 import { RepositoryShallowHistory } from './shallow-history'
 import { RepositoryPatchSeries } from './patch-series'
+import { RepositorySigning } from './signing'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -106,6 +108,8 @@ interface IRepositoryToolsState {
   readonly bundleImportBusy: boolean
   readonly shallowHistoryBusy: boolean
   readonly patchSeriesBusy: boolean
+  readonly signingBusy: boolean
+  readonly lfsBusy: boolean
 }
 
 let nextOperationSequence = 0
@@ -145,6 +149,8 @@ export class RepositoryTools extends React.Component<
       bundleImportBusy: false,
       shallowHistoryBusy: false,
       patchSeriesBusy: false,
+      signingBusy: false,
+      lfsBusy: false,
     }
   }
 
@@ -174,6 +180,8 @@ export class RepositoryTools extends React.Component<
         bundleImportBusy: false,
         shallowHistoryBusy: false,
         patchSeriesBusy: false,
+        signingBusy: false,
+        lfsBusy: false,
       })
     }
   }
@@ -226,7 +234,9 @@ export class RepositoryTools extends React.Component<
       this.runId !== null ||
       this.state.bundleImportBusy ||
       this.state.shallowHistoryBusy ||
-      this.state.patchSeriesBusy
+      this.state.patchSeriesBusy ||
+      this.state.signingBusy ||
+      this.state.lfsBusy
     )
   }
 
@@ -245,6 +255,18 @@ export class RepositoryTools extends React.Component<
   private onPatchSeriesBusyChanged = (patchSeriesBusy: boolean) => {
     if (this.state.patchSeriesBusy !== patchSeriesBusy) {
       this.setState({ patchSeriesBusy })
+    }
+  }
+
+  private onSigningBusyChanged = (signingBusy: boolean) => {
+    if (this.state.signingBusy !== signingBusy) {
+      this.setState({ signingBusy })
+    }
+  }
+
+  private onLFSBusyChanged = (lfsBusy: boolean) => {
+    if (this.state.lfsBusy !== lfsBusy) {
+      this.setState({ lfsBusy })
     }
   }
 
@@ -722,6 +744,8 @@ export class RepositoryTools extends React.Component<
           this.runId !== null ||
           this.state.shallowHistoryBusy ||
           this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -741,6 +765,8 @@ export class RepositoryTools extends React.Component<
           this.state.bundleImportBusy ||
           this.state.shallowHistoryBusy ||
           this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -760,11 +786,51 @@ export class RepositoryTools extends React.Component<
           this.runId !== null ||
           this.state.bundleImportBusy ||
           this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
         onRefreshRepository={this.props.onRefreshRepository}
         onBusyChanged={this.onShallowHistoryBusyChanged}
+      />
+    )
+  }
+
+  private renderSigning() {
+    return (
+      <RepositorySigning
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.lfsBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onSigningBusyChanged}
+      />
+    )
+  }
+
+  private renderLFSAdministration() {
+    return (
+      <RepositoryLFSAdministration
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onLFSBusyChanged}
       />
     )
   }
@@ -929,6 +995,8 @@ export class RepositoryTools extends React.Component<
         <div className="repository-tools-layout">
           <div className="repository-tools-functions">
             {this.renderShallowHistory()}
+            {this.renderSigning()}
+            {this.renderLFSAdministration()}
             {this.renderCategory('Diagnostics')}
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}

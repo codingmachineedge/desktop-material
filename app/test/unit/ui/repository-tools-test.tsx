@@ -150,6 +150,20 @@ function argsForRecipe(request: ICLICommandRequest): ReadonlyArray<string> {
       ]
     case 'repository-patch-session':
       return ['am', `--${recipe.operation}`]
+    case 'repository-signing-inspection':
+      return ['config', recipe.scope, recipe.operation]
+    case 'repository-signing-update':
+      return ['config', recipe.scope, recipe.operation]
+    case 'repository-signing-list-tags':
+      return ['for-each-ref', 'refs/tags']
+    case 'repository-signing-verify':
+      return ['verify', recipe.target]
+    case 'repository-lfs-inspection':
+      return ['lfs', recipe.operation]
+    case 'repository-lfs-pattern':
+      return ['lfs', recipe.operation, recipe.pattern]
+    case 'repository-lfs-operation':
+      return ['lfs', recipe.operation]
   }
 }
 

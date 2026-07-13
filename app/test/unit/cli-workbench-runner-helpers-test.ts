@@ -328,6 +328,21 @@ describe('CLI workbench runner helpers', () => {
         },
         {
           recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'local',
+            operation: 'settings',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--local',
+            '--null',
+            '--get-regexp',
+            '^(gpg\\.format|commit\\.gpgsign|tag\\.gpgsign)$',
+          ],
+        },
+        {
+          recipe: {
             kind: 'repository-patch-import',
             patchPaths: [patchPath],
           },
@@ -338,6 +353,199 @@ describe('CLI workbench runner helpers', () => {
           recipe: { kind: 'repository-patch-session' as const, operation },
           confirmed: true,
           args: ['am', `--${operation}`],
+        })),
+        {
+          recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'global',
+            operation: 'settings',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--global',
+            '--null',
+            '--get-regexp',
+            '^(gpg\\.format|commit\\.gpgsign|tag\\.gpgsign)$',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'local',
+            operation: 'key-presence',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--local',
+            '--null',
+            '--name-only',
+            '--get-regexp',
+            '^user\\.signingkey$',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'global',
+            operation: 'key-presence',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--global',
+            '--null',
+            '--name-only',
+            '--get-regexp',
+            '^user\\.signingkey$',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'local',
+            operation: 'set-format',
+            format: 'ssh',
+          },
+          confirmed: true,
+          args: ['config', '--local', '--replace-all', 'gpg.format', 'ssh'],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'global',
+            operation: 'set-key',
+            format: 'openpgp',
+            key: '0x0123456789abcdef',
+          },
+          confirmed: true,
+          args: [
+            'config',
+            '--global',
+            '--replace-all',
+            'user.signingkey',
+            '0123456789ABCDEF',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'local',
+            operation: 'set-commit-signing',
+            enabled: true,
+          },
+          confirmed: true,
+          args: [
+            'config',
+            '--local',
+            '--type=bool',
+            '--replace-all',
+            'commit.gpgsign',
+            'true',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'local',
+            operation: 'set-tag-signing',
+            enabled: false,
+          },
+          confirmed: true,
+          args: [
+            'config',
+            '--local',
+            '--type=bool',
+            '--replace-all',
+            'tag.gpgsign',
+            'false',
+          ],
+        },
+        {
+          recipe: { kind: 'repository-signing-list-tags' },
+          confirmed: false,
+          args: [
+            'for-each-ref',
+            '--count=100',
+            '--sort=-creatordate',
+            '--format=%(refname:strip=2)%00%(objecttype)%00%(objectname)',
+            'refs/tags',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-verify',
+            target: 'head',
+            tagName: null,
+            expectedObject: null,
+          },
+          confirmed: false,
+          args: [
+            'log',
+            '-1',
+            '--no-show-signature',
+            '--format=%H%x00%G?%x00%GF%x00%GK',
+            'HEAD',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-verify',
+            target: 'tag',
+            tagName: 'v2.0.0',
+            expectedObject: 'b'.repeat(40),
+          },
+          confirmed: false,
+          args: [
+            'for-each-ref',
+            '--count=1',
+            '--format=%(objectname)%00%(signature:grade)%00%(signature:fingerprint)%00%(signature:key)',
+            'refs/tags/v2.0.0',
+          ],
+        },
+        ...(
+          [
+            ['version', ['lfs', 'version']],
+            ['patterns', ['lfs', 'track', '--json']],
+            ['status', ['lfs', 'status', '--json']],
+            ['prune-preview', ['lfs', 'prune', '--dry-run', '--verify-remote']],
+          ] as const
+        ).map(([operation, args]) => ({
+          recipe: { kind: 'repository-lfs-inspection' as const, operation },
+          confirmed: false,
+          args,
+        })),
+        {
+          recipe: {
+            kind: 'repository-lfs-pattern',
+            operation: 'track',
+            pattern: 'assets/**/*.psd',
+          },
+          confirmed: true,
+          args: ['lfs', 'track', '--', 'assets/**/*.psd'],
+        },
+        {
+          recipe: {
+            kind: 'repository-lfs-pattern',
+            operation: 'untrack',
+            pattern: '*.zip',
+          },
+          confirmed: true,
+          args: ['lfs', 'untrack', '--', '*.zip'],
+        },
+        ...(
+          [
+            ['install', ['lfs', 'install', '--local']],
+            ['uninstall', ['lfs', 'uninstall', '--local']],
+            ['fetch', ['lfs', 'fetch']],
+            ['pull', ['lfs', 'pull']],
+            ['prune', ['lfs', 'prune', '--verify-remote']],
+          ] as const
+        ).map(([operation, args]) => ({
+          recipe: { kind: 'repository-lfs-operation' as const, operation },
+          confirmed: true,
+          args,
         })),
       ] as const
 
@@ -354,7 +562,128 @@ describe('CLI workbench runner helpers', () => {
         assert.deepStrictEqual(validated.args, candidate.args)
         assert.equal(validated.tool, 'git')
         assert.equal(validated.cwd, root)
+        assert.deepStrictEqual(
+          validated.environment,
+          candidate.recipe.kind.startsWith('repository-lfs-')
+            ? { GIT_LFS_TRACK_NO_INSTALL_HOOKS: '1' }
+            : {}
+        )
       }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed for malformed signing and Git LFS recipes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-admin-deny-'))
+    const dependencies = fakeDependencies(root)
+    const invalidRecipes: ReadonlyArray<unknown> = [
+      {
+        kind: 'repository-signing-inspection',
+        scope: 'system',
+        operation: 'settings',
+      },
+      {
+        kind: 'repository-signing-inspection',
+        scope: 'local',
+        operation: 'settings',
+        argv: ['config', '--global', '--list'],
+      },
+      {
+        kind: 'repository-signing-inspection',
+        scope: 'local',
+        operation: 'raw-key',
+      },
+      {
+        kind: 'repository-signing-update',
+        scope: 'local',
+        operation: 'set-format',
+        format: 'custom',
+      },
+      {
+        kind: 'repository-signing-update',
+        scope: 'local',
+        operation: 'set-key',
+        format: 'ssh',
+        key: 'C:/private/id_ed25519',
+      },
+      {
+        kind: 'repository-signing-update',
+        scope: 'local',
+        operation: 'set-commit-signing',
+        enabled: 'true',
+      },
+      {
+        kind: 'repository-signing-verify',
+        target: 'tag',
+        tagName: '--upload-pack=payload',
+        expectedObject: 'a'.repeat(40),
+      },
+      {
+        kind: 'repository-signing-verify',
+        target: 'tag',
+        tagName: 'v1.0.0',
+        expectedObject: '../HEAD',
+      },
+      {
+        kind: 'repository-signing-verify',
+        target: 'head',
+        tagName: 'v1.0.0',
+        expectedObject: null,
+      },
+      { kind: 'repository-lfs-inspection', operation: 'env' },
+      {
+        kind: 'repository-lfs-pattern',
+        operation: 'track',
+        pattern: '../outside.bin',
+      },
+      {
+        kind: 'repository-lfs-pattern',
+        operation: 'track',
+        pattern: '*.bin',
+        environment: { GIT_EXEC_PATH: 'C:/payload' },
+      },
+      { kind: 'repository-lfs-operation', operation: 'push' },
+    ]
+    try {
+      for (const [index, recipe] of invalidRecipes.entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            request(root, recipe, true, `invalid-admin-${index}`),
+            dependencies
+          )
+        )
+      }
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            {
+              kind: 'repository-lfs-operation',
+              operation: 'prune',
+            },
+            false,
+            'unconfirmed-lfs-prune'
+          ),
+          dependencies
+        ),
+        /confirmation/i
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          {
+            ...request(
+              root,
+              { kind: 'repository-lfs-inspection', operation: 'version' },
+              false,
+              'forged-environment'
+            ),
+            environment: { GIT_EXEC_PATH: 'C:/payload' },
+          },
+          dependencies
+        ),
+        /Invalid CLI command request/
+      )
     } finally {
       await rm(root, { recursive: true, force: true })
     }
