@@ -3571,6 +3571,7 @@ export class API {
 
     if (response.status < 300 || response.status >= 400) {
       if (response.status === 410) {
+        await response.body?.cancel().catch(() => undefined)
         throw new APIError(response, {
           message: 'This artifact has expired and can no longer be downloaded.',
         })
@@ -3582,6 +3583,7 @@ export class API {
     }
 
     const location = response.headers.get('Location')
+    await response.body?.cancel().catch(() => undefined)
     if (location === null) {
       throw new Error('GitHub did not provide an artifact download URL.')
     }
@@ -3593,6 +3595,7 @@ export class API {
       dependencies: redirectDependencies,
     })
     if (!archive.ok) {
+      await archive.body?.cancel().catch(() => undefined)
       throw new APIError(archive, null)
     }
     return archive

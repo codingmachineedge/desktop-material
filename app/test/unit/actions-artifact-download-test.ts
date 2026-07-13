@@ -10,7 +10,10 @@ import {
   normalizeActionsArtifactDestination,
   publishActionsArtifactWithoutOverwrite,
 } from '../../src/lib/actions-artifact-download'
-import { IActionsArtifact } from '../../src/lib/actions-artifacts'
+import {
+  ActionsArtifactMaximumDownloadBytes,
+  IActionsArtifact,
+} from '../../src/lib/actions-artifacts'
 
 const archive = Buffer.from('bounded artifact archive')
 const sha256 = (bytes: Uint8Array) =>
@@ -37,6 +40,22 @@ async function withDirectory(run: (directory: string) => Promise<void>) {
     await run(directory)
   } finally {
     await rm(directory, { recursive: true, force: true })
+  }
+}
+
+function cancellationTrackedResponse(headers?: HeadersInit) {
+  let canceled = false
+  return {
+    response: new Response(
+      new ReadableStream<Uint8Array>({
+        cancel() {
+          canceled = true
+          throw new Error('response body cancellation failed')
+        },
+      }),
+      { headers }
+    ),
+    wasCanceled: () => canceled,
   }
 }
 
@@ -77,6 +96,106 @@ describe('Actions artifact archive download', () => {
     )
     assert.throws(() => normalizeActionsArtifactDestination('package.zip'), {
       name: 'ActionsArtifactDownloadError',
+    })
+  })
+
+  it('cancels the response while preserving pre-stream validation errors', async () => {
+    await withDirectory(async directory => {
+      const controller = new AbortController()
+      controller.abort()
+      const aborted = cancellationTrackedResponse({
+        'Content-Length': String(archive.byteLength),
+      })
+      await assert.rejects(
+        downloadActionsArtifactArchive({
+          artifact: artifact(),
+          response: aborted.response,
+          destination: join(directory, 'aborted.zip'),
+          signal: controller.signal,
+        }),
+        { name: 'AbortError' }
+      )
+      assert.equal(aborted.wasCanceled(), true)
+
+      const cases: ReadonlyArray<{
+        readonly artifact: IActionsArtifact
+        readonly headers?: HeadersInit
+        readonly destination: string
+        readonly expected: RegExp
+      }> = [
+        {
+          artifact: artifact({ expired: true }),
+          destination: join(directory, 'expired.zip'),
+          expected: /expired/,
+        },
+        {
+          artifact: artifact({
+            sizeInBytes: ActionsArtifactMaximumDownloadBytes + 1,
+          }),
+          destination: join(directory, 'metadata-too-large.zip'),
+          expected: /larger than the app’s 5 GiB/,
+        },
+        {
+          artifact: artifact(),
+          headers: { 'Content-Length': 'invalid' },
+          destination: join(directory, 'invalid-header.zip'),
+          expected: /invalid artifact archive size/,
+        },
+        {
+          artifact: artifact(),
+          headers: {
+            'Content-Length': String(ActionsArtifactMaximumDownloadBytes + 1),
+          },
+          destination: join(directory, 'response-too-large.zip'),
+          expected: /larger than the app’s 5 GiB/,
+        },
+        {
+          artifact: artifact(),
+          headers: { 'Content-Length': String(archive.byteLength + 1) },
+          destination: join(directory, 'size-mismatch.zip'),
+          expected: /does not match/,
+        },
+        {
+          artifact: artifact(),
+          headers: { 'Content-Length': String(archive.byteLength) },
+          destination: 'relative.zip',
+          expected: /absolute destination/,
+        },
+      ]
+
+      for (const testCase of cases) {
+        const tracked = cancellationTrackedResponse(testCase.headers)
+        await assert.rejects(
+          downloadActionsArtifactArchive({
+            artifact: testCase.artifact,
+            response: tracked.response,
+            destination: testCase.destination,
+            signal: new AbortController().signal,
+          }),
+          testCase.expected
+        )
+        assert.equal(tracked.wasCanceled(), true)
+      }
+      assert.deepEqual(await readdir(directory), [])
+    })
+  })
+
+  it('cancels the response when partial-file setup fails', async () => {
+    await withDirectory(async directory => {
+      const tracked = cancellationTrackedResponse({
+        'Content-Length': String(archive.byteLength),
+      })
+      await assert.rejects(
+        downloadActionsArtifactArchive({
+          artifact: artifact(),
+          response: tracked.response,
+          destination: join(directory, 'missing', 'package.zip'),
+          signal: new AbortController().signal,
+        }),
+        (error: NodeJS.ErrnoException) => error.code === 'ENOENT'
+      )
+      assert.equal(tracked.wasCanceled(), true)
+      assert.deepEqual(await readdir(directory), [])
     })
   })
 

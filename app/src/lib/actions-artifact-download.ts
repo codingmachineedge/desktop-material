@@ -227,48 +227,69 @@ export async function downloadActionsArtifactArchive({
   signal,
   onProgress,
 }: IActionsArtifactDownloadOptions): Promise<IActionsArtifactDownloadResult> {
-  throwIfAborted(signal)
-  if (artifact.expired) {
-    throw new ActionsArtifactDownloadError(
-      'This artifact has expired and can no longer be downloaded.',
-      'destination'
-    )
-  }
-  if (artifact.sizeInBytes > ActionsArtifactMaximumDownloadBytes) {
-    throw new ActionsArtifactDownloadError(
-      'This artifact is larger than the app’s 5 GiB download safety limit.',
-      'too-large'
-    )
+  let target: string
+  try {
+    throwIfAborted(signal)
+    if (artifact.expired) {
+      throw new ActionsArtifactDownloadError(
+        'This artifact has expired and can no longer be downloaded.',
+        'destination'
+      )
+    }
+    if (artifact.sizeInBytes > ActionsArtifactMaximumDownloadBytes) {
+      throw new ActionsArtifactDownloadError(
+        'This artifact is larger than the app’s 5 GiB download safety limit.',
+        'too-large'
+      )
+    }
+
+    const contentLength = advertisedContentLength(response)
+    if (
+      contentLength !== null &&
+      contentLength > ActionsArtifactMaximumDownloadBytes
+    ) {
+      throw new ActionsArtifactDownloadError(
+        'The artifact response is larger than the app’s 5 GiB download safety limit.',
+        'too-large'
+      )
+    }
+    if (contentLength !== null && contentLength !== artifact.sizeInBytes) {
+      throw new ActionsArtifactDownloadError(
+        'GitHub’s artifact size does not match the archive response size.',
+        'size-mismatch'
+      )
+    }
+    if (response.body === null && artifact.sizeInBytes !== 0) {
+      throw new ActionsArtifactDownloadError(
+        'GitHub returned an artifact archive without a response body.',
+        'missing-body'
+      )
+    }
+
+    target = normalizeActionsArtifactDestination(destination)
+  } catch (error) {
+    await response.body?.cancel().catch(() => undefined)
+    throw error
   }
 
-  const contentLength = advertisedContentLength(response)
-  if (
-    contentLength !== null &&
-    contentLength > ActionsArtifactMaximumDownloadBytes
-  ) {
-    throw new ActionsArtifactDownloadError(
-      'The artifact response is larger than the app’s 5 GiB download safety limit.',
-      'too-large'
-    )
-  }
-  if (contentLength !== null && contentLength !== artifact.sizeInBytes) {
-    throw new ActionsArtifactDownloadError(
-      'GitHub’s artifact size does not match the archive response size.',
-      'size-mismatch'
-    )
-  }
-  if (response.body === null && artifact.sizeInBytes !== 0) {
-    throw new ActionsArtifactDownloadError(
-      'GitHub returned an artifact archive without a response body.',
-      'missing-body'
-    )
-  }
-
-  const target = normalizeActionsArtifactDestination(destination)
-  const { path: partialPath, handle } = await createPartialFile(target)
-  let openHandle: FileHandle | null = handle
-  const reader = response.body?.getReader() ?? null
   const hash = createHash('sha256')
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null
+  try {
+    reader = response.body?.getReader() ?? null
+  } catch (error) {
+    await response.body?.cancel().catch(() => undefined)
+    throw error
+  }
+
+  let partial: Awaited<ReturnType<typeof createPartialFile>>
+  try {
+    partial = await createPartialFile(target)
+  } catch (error) {
+    await reader?.cancel().catch(() => undefined)
+    throw error
+  }
+  const { path: partialPath, handle } = partial
+  let openHandle: FileHandle | null = handle
   let receivedBytes = 0
   const cancelReader = () => {
     reader?.cancel(abortError()).catch(() => undefined)
