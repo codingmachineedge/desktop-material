@@ -1,23 +1,25 @@
-# Desktop Material — Final Handoff
+# Desktop Material — Living Final Handoff
 
 ## Outcome
 
-The original requested roadmap is implemented: **M0 through M18 are complete and
-shipped on `main`** through final implementation baseline
-`b2699faccb07728fe9aa2838aa13355d71e172b0`. The implementation, integration
-fixes, exhaustive local validation, production build, hidden-desktop review,
-responsive regression correction, public documentation, and canonical wiki
-publication are complete. There is no remaining queued or in-flight feature
-work in [`PLAN.md`](PLAN.md).
+The original requested roadmap, **M0 through M18**, is complete and shipped on
+`main` through historical implementation baseline
+`b2699faccb07728fe9aa2838aa13355d71e172b0`; its production, hidden-desktop,
+responsive, public documentation, and canonical wiki evidence remains recorded
+below as historical proof for that exact tree.
 
-The later guided Git and GitHub expansion is a separate living roadmap. This
-handoff records the completed functions integrated from that work without
-claiming that its remaining README roadmap items are finished.
+The later guided Git, GitHub, and provider expansion is now **implementation-
+complete** as M19: all named README P0, P1, P2, and Later functions are in the
+integration tree with focused regression evidence. It is not yet a final
+publication result. Exhaustive post-merge gates, exact production/off-screen
+proof, accepted screenshots, `main` promotion, CI/Pages/wiki/release checks,
+and cleanup must still close before M19 can be called shipped.
 
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Integration checkpoint `36b1ef4bac` contains the
+`codex/guided-final-gate`. Documentation checkpoint
+`ac794db8f094b609f661bfa63bad34a321b84090` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -63,6 +65,23 @@ the deterministic account-proof fixture, exhaustive gates, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
 can be closed.
+
+### Closing evidence placeholders — fill only after success
+
+- [ ] **Final source:** exact accepted feature SHA and exact merged `main` SHA.
+- [ ] **Repository gates:** exhaustive unit total, lint, TypeScript, formatting,
+  diff/conflict/privacy scans, and exact production build.
+- [ ] **Off-screen acceptance:** deterministic cross-account clone ledger,
+  representative Foundation/P0/P1/P2/Later interaction matrix, exact MCP/source
+  SHAs, and owned-resource cleanup result.
+- [ ] **Screenshots:** accepted filenames, dimensions, byte counts, SHA-256
+  digests, source/build SHA, original-resolution inspection, and synthetic-only
+  identity statement.
+- [ ] **GitHub/publication:** exact-SHA CI, Pages, canonical wiki, installer and
+  public release, asset count/size/digests, zero workflow artifacts, and live
+  URLs.
+- [ ] **Repository cleanup:** all completed worktrees removed; local `main`
+  clean and equal to `origin/main`; CI left enabled.
 
 The final 1450×997 review found real horizontal clipping in the shell toolbar
 and Changes card. The responsive flex/containment correction is now shipped,
@@ -116,8 +135,8 @@ application was not restarted or controlled during diagnosis.
 
 ## Guided-function integration
 
-The privacy-safe squash integration adds the completed guided-function work
-without importing the feature branch's original commit ancestry. The integrated
+The privacy-safe integration adds the complete guided-function implementation
+without importing the privacy-tainted feature branch ancestry. The integrated
 product behavior includes:
 
 - bounded shallow clone plus later history deepening;
@@ -125,18 +144,38 @@ product behavior includes:
 - native file history/blame and guarded repository bundle/archive/signature
   tools;
 - an account-aware GitHub notification inbox;
-- guided GitHub issue and pull-request creation;
-- confirmed Actions mutations; and
+- guided GitHub Issue and pull-request creation;
+- complete pull-request templates/metadata/review/update/close/reopen/merge;
+- confirmed Actions mutations, paginated artifacts with bounded transfer and
+  digest handling, and effective current-branch rules;
+- patch-series exchange and structured local-commit rewrite;
+- commit/tag signing, Git LFS, and complete worktree administration;
+- persisted branch pin/hide/solo/restore and exact merge-tree conflict paths;
+- guided bisect, the repository-wide Stash Manager, guarded Remote Manager, and
+  safe Repository Hooks Manager;
+- bounded GitHub Releases/assets and richer GitHub Issues workspaces;
+- exact-account GitHub/GitLab/Bitbucket provider-neutral triage with explicit
+  unsupported, partial, capped, and error states; and
 - responsive task forms whose controls wrap or stack instead of causing
   page-level sideways scrolling.
 
-The pull-request slice's exact-remote binding and the first Actions artifact
-browse/download/digest slice are present in this sanitized source snapshot but
-are not yet shipped capabilities. Independent review still requires userinfo,
-alternate-SSH, and cross-repository REST corrections for pull requests, plus
-chained-redirect hardening and focused security regressions for artifact
-downloads, before either slice can join `main`. This snapshot therefore remains
-an integration base, not a final publication candidate.
+The earlier pull-request routing/REST and Actions artifact redirect gaps are
+closed in this implementation tree, including userinfo/alternate-SSH/cross-
+repository head binding, bounded provider responses, chained-redirect
+credential stripping, pagination, and stale-request rejection. These source
+results do not substitute for the final exact-tree production/off-screen and
+public `main` gates listed above.
+
+### Guided parity wave summary
+
+| Wave | State | Integrated capability |
+| --- | --- | --- |
+| **Foundation** | **IMPLEMENTATION COMPLETE** | Repository Tools foundation, file history/blame/restore, shallow clone/deepening, sparse checkout, archives, bundles, Notifications, and guided Issue creation. |
+| **P0** | **IMPLEMENTATION COMPLETE** | Complete pull-request lifecycle; Actions artifact hardening/pagination/download/digest context; effective branch-rule inspection. |
+| **P1** | **IMPLEMENTATION COMPLETE** | Patch series, structured commit rewrite, Releases/assets, signing, LFS, and complete worktree administration. |
+| **P2** | **IMPLEMENTATION COMPLETE** | Persisted branch pin/hide/solo/restore visibility controls. |
+| **Later** | **IMPLEMENTATION COMPLETE** | Merge-tree conflict preview, bisect, complete stash/remote/hooks managers, richer GitHub Issues, and provider-neutral triage. |
+| **Final acceptance** | **PENDING** | Exact final union, off-screen proof/screenshots, `main`, CI/Pages/wiki/release publication, and cleanup. |
 
 ### Sanitized squash verification
 
@@ -158,8 +197,9 @@ not part of this branch's ancestry. The integration gate recorded:
   token-shaped value retained by the scan is a deliberate synthetic response-
   redaction fixture.
 
-The README remains the authority for guided functions that are still planned or
-in progress. No unimplemented item is promoted to shipped status here.
+The README and PLAN now agree that every named guided wave is implementation-
+complete while final acceptance remains pending. Reference-only proprietary
+cloud/team/AI services remain explicitly outside this roadmap.
 
 ## Completed milestone summary
 
@@ -222,6 +262,23 @@ These are the first paths to inspect when maintaining each subsystem:
   `app/src/main-process/agent-server/`,
   `app/src/lib/agent-command-executor.ts`, `script/agent/`, and
   `docs/agent-api.md`.
+- **Guided Git administration:** `app/src/ui/repository-tools/`,
+  `app/src/lib/git/format-patch.ts`,
+  `app/src/lib/git/structured-commit-rewrite.ts`,
+  `app/src/lib/repository-signing.ts`, `app/src/lib/repository-lfs.ts`,
+  `app/src/lib/repository-bisect.ts`, `app/src/lib/git/merge-tree.ts`,
+  `app/src/lib/hooks/repository-hooks-manager.ts`, and
+  `app/src/ui/worktrees/worktree-administration.tsx`.
+- **Guided GitHub workspaces:** `app/src/lib/github-pull-request.ts`,
+  `app/src/lib/stores/pull-request-lifecycle-store.ts`,
+  `app/src/ui/github-pull-request-lifecycle/`,
+  `app/src/lib/actions-artifacts.ts`, `app/src/lib/actions-branch-rules.ts`,
+  `app/src/ui/github-releases/`, `app/src/lib/github-releases.ts`,
+  `app/src/ui/github-issues/`, and `app/src/lib/github-issues.ts`.
+- **Provider-neutral triage:** `app/src/lib/provider-triage.ts`,
+  `app/src/lib/provider-triage-json.ts`,
+  `app/src/lib/stores/provider-triage-store.ts`, and
+  `app/src/ui/repository-tools/provider-triage.tsx`.
 - **Repository parity:** `app/src/lib/databases/repositories-database.ts`,
   `app/src/ui/repository-settings/`, `app/src/ui/pull-all/`,
   `app/src/lib/automation/pull-all.ts`,
