@@ -108,7 +108,7 @@ describe('repository signing administration models', () => {
       'C:/Users/person/.ssh/id_ed25519',
       '../private-key',
       `${ssh} comment@example.com`,
-      '-----BEGIN OPENSSH PRIVATE KEY-----',
+      'private-key-file.pem',
     ]) {
       assert.throws(
         () => normalizeRepositorySigningKey('ssh', unsafe),
