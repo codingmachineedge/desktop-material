@@ -35,6 +35,34 @@ import {
   validateCreatedGitHubIssue,
   validateGitHubRepositoryPart,
 } from './github-issue'
+import { boundedGitHubIssueResponse } from './github-issue-json'
+import {
+  GitHubIssueCommentMaximumPages,
+  GitHubIssueCommentPageSize,
+  GitHubIssueMetadataMaximumPages,
+  GitHubIssueMetadataPageSize,
+  GitHubIssuePageSize,
+  GitHubIssueState,
+  IGitHubIssue,
+  IGitHubIssueComment,
+  IGitHubIssueCommentList,
+  IGitHubIssueList,
+  IGitHubIssueMetadata,
+  IGitHubIssueQuery,
+  IGitHubIssueUpdate,
+  normalizeGitHubIssueComment,
+  normalizeGitHubIssueQuery,
+  normalizeGitHubIssueUpdate,
+  parseGitHubIssue,
+  parseGitHubIssueAssigneePage,
+  parseGitHubIssueComment,
+  parseGitHubIssueCommentList,
+  parseGitHubIssueLabelPage,
+  parseGitHubIssueList,
+  parseGitHubIssueMilestonePage,
+  validateGitHubIssueNumber,
+  validateGitHubIssueRepositoryPart,
+} from './github-issues'
 import {
   EmptyGitHubPullRequestMetadata,
   GitHubPullRequestContextChangedError,
@@ -1481,7 +1509,9 @@ export class API {
       const issues = await this.fetchAll<IAPIIssue>(url)
 
       // PRs are issues! But we only want Really Seriously Issues.
-      return issues.filter((i: any) => !i.pullRequest)
+      return issues.filter(
+        (i: any) => i.pull_request === undefined && i.pullRequest === undefined
+      )
     } catch (e) {
       log.warn(`fetchIssues: failed for repository ${owner}/${name}`, e)
       throw e
@@ -1519,6 +1549,330 @@ export class API {
       issue,
       safeOwner,
       safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /**
+   * Browse one locally generated, bounded page of repository issues. Search
+   * text is quoted inside the repository-scoped query so it cannot introduce
+   * provider qualifiers or escape the selected repository.
+   */
+  public async fetchIssuePage(
+    owner: string,
+    name: string,
+    query: IGitHubIssueQuery,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueList> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeQuery = normalizeGitHubIssueQuery(query)
+    const parameters = new URL.URLSearchParams()
+    parameters.set('per_page', `${GitHubIssuePageSize}`)
+    parameters.set('page', `${safeQuery.page}`)
+    parameters.set('sort', safeQuery.sort)
+    parameters.set('direction', safeQuery.direction)
+
+    let path: string
+    if (safeQuery.search.length > 0) {
+      const quote = (value: string) => `"${value.replace(/["\\]/g, '\\$&')}"`
+      const qualifiers = [
+        `repo:${safeOwner}/${safeName}`,
+        'is:issue',
+        safeQuery.state === 'all' ? null : `is:${safeQuery.state}`,
+        ...safeQuery.labels.map(label => `label:${quote(label)}`),
+        safeQuery.assignee === null
+          ? null
+          : `assignee:${quote(safeQuery.assignee)}`,
+        safeQuery.milestone === null
+          ? null
+          : `milestone:${safeQuery.milestone}`,
+        `in:title,body ${quote(safeQuery.search)}`,
+      ].filter((item): item is string => item !== null)
+      parameters.set('q', qualifiers.join(' '))
+      parameters.set('order', safeQuery.direction)
+      parameters.delete('direction')
+      path = `search/issues?${parameters.toString()}`
+    } else {
+      parameters.set('state', safeQuery.state)
+      if (safeQuery.labels.length > 0) {
+        parameters.set('labels', safeQuery.labels.join(','))
+      }
+      if (safeQuery.assignee !== null) {
+        parameters.set('assignee', safeQuery.assignee)
+      }
+      if (safeQuery.milestone !== null) {
+        parameters.set('milestone', `${safeQuery.milestone}`)
+      }
+      path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues?${parameters.toString()}`
+    }
+
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubIssueList(
+      await boundedGitHubIssueResponse(response, signal),
+      safeQuery,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Re-fetch one exact issue through the bounded parser before mutation. */
+  public async fetchIssue(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssue> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}`,
+      { signal }
+    )
+    return parseGitHubIssue(
+      await boundedGitHubIssueResponse(response, signal),
+      safeNumber,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Browse one bounded page of comments for an exact issue. */
+  public async fetchIssueCommentPage(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueCommentList> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > GitHubIssueCommentMaximumPages
+    ) {
+      throw new Error(
+        'The requested issue comment page exceeds the app safety limit.'
+      )
+    }
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}/comments?per_page=${GitHubIssueCommentPageSize}&page=${page}`,
+      { signal }
+    )
+    return parseGitHubIssueCommentList(
+      await boundedGitHubIssueResponse(response, signal),
+      page,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /**
+   * Load repository metadata through locally generated pages. Older GHES
+   * versions may omit one endpoint; only explicit 404/410 responses are
+   * reported neutrally as unavailable because it may indicate provider version
+   * or repository access changes.
+   */
+  public async fetchIssueMetadata(
+    owner: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueMetadata> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}`
+    const unavailable = new Array<'labels' | 'assignees' | 'milestones'>()
+
+    const fetchPages = async <T>(
+      kind: 'labels' | 'assignees' | 'milestones',
+      parser: (value: unknown) => ReadonlyArray<T>
+    ): Promise<{
+      readonly items: ReadonlyArray<T>
+      readonly capped: boolean
+    }> => {
+      const items = new Array<T>()
+      try {
+        for (let page = 1; page <= GitHubIssueMetadataMaximumPages; page++) {
+          const state = kind === 'milestones' ? 'state=all&' : ''
+          const response = await this.ghRequest(
+            'GET',
+            `${root}/${kind}?${state}per_page=${GitHubIssueMetadataPageSize}&page=${page}`,
+            { signal }
+          )
+          const parsed = parser(
+            await boundedGitHubIssueResponse(response, signal)
+          )
+          items.push(...parsed)
+          if (parsed.length < GitHubIssueMetadataPageSize) {
+            return { items, capped: false }
+          }
+          if (page === GitHubIssueMetadataMaximumPages) {
+            return { items, capped: true }
+          }
+        }
+      } catch (error) {
+        if (
+          error instanceof APIError &&
+          (error.responseStatus === 404 || error.responseStatus === 410)
+        ) {
+          unavailable.push(kind)
+          return { items: [], capped: false }
+        }
+        throw error
+      }
+      return { items, capped: false }
+    }
+
+    const labels = await fetchPages('labels', parseGitHubIssueLabelPage)
+    const assignees = await fetchPages(
+      'assignees',
+      parseGitHubIssueAssigneePage
+    )
+    const milestones = await fetchPages(
+      'milestones',
+      parseGitHubIssueMilestonePage
+    )
+    if (
+      new Set(labels.items.map(label => label.id)).size !==
+        labels.items.length ||
+      new Set(assignees.items).size !== assignees.items.length ||
+      new Set(milestones.items.map(milestone => milestone.number)).size !==
+        milestones.items.length
+    ) {
+      throw new Error('GitHub returned duplicate issue metadata pages.')
+    }
+    return {
+      labels: labels.items,
+      assignees: assignees.items,
+      milestones: milestones.items,
+      labelsCapped: labels.capped,
+      assigneesCapped: assignees.capped,
+      milestonesCapped: milestones.capped,
+      unavailable,
+    }
+  }
+
+  /** Update the reviewed issue's title, body, and supported metadata. */
+  public async updateIssue(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    update: IGitHubIssueUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssue> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    const safeUpdate = normalizeGitHubIssueUpdate(update)
+    const response = await this.ghRequest(
+      'PATCH',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}`,
+      {
+        body: {
+          title: safeUpdate.title,
+          body: safeUpdate.body,
+          labels: safeUpdate.labels,
+          assignees: safeUpdate.assignees,
+          milestone: safeUpdate.milestone,
+        },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    return parseGitHubIssue(
+      await boundedGitHubIssueResponse(response, signal),
+      safeNumber,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Close or reopen one reviewed issue. */
+  public async setIssueState(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    state: GitHubIssueState,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssue> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    if (state !== 'open' && state !== 'closed') {
+      throw new Error('Choose a supported issue state.')
+    }
+    const response = await this.ghRequest(
+      'PATCH',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}`,
+      {
+        body: { state },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const issue = parseGitHubIssue(
+      await boundedGitHubIssueResponse(response, signal),
+      safeNumber,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+    if (issue.state !== state) {
+      throw new Error('GitHub did not apply the reviewed issue state.')
+    }
+    return issue
+  }
+
+  /** Append one reviewed comment and validate its provider link. */
+  public async addIssueComment(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    body: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueComment> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    const safeBody = normalizeGitHubIssueComment(body)
+    const response = await this.ghRequest(
+      'POST',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}/comments`,
+      {
+        body: { body: safeBody },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    return parseGitHubIssueComment(
+      await boundedGitHubIssueResponse(response, signal),
+      safeOwner,
+      safeName,
+      safeNumber,
       getHTMLURL(this.endpoint)
     )
   }
