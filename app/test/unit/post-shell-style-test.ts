@@ -63,6 +63,33 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /\.shot figcaption\s*\{[\s\S]*?flex-wrap: wrap;/)
   })
 
+  it('fits Settings History at compact width and height without auto-fit', () => {
+    const style = readStyle('_versioned-store-history.scss')
+    assert.match(style, /max-height: calc\(100vh - 20px\);/)
+    assert.match(
+      style,
+      /min-height: min\(480px, calc\(100vh - 20px\)\);/
+    )
+    assert.match(style, /@media \(max-height: 520px\)/)
+    assert.match(
+      style,
+      /grid-template-rows: minmax\(80px, 40%\) minmax\(0, 1fr\);/
+    )
+  })
+
+  it('shrinks and wraps the Build & Run header controls', () => {
+    const style = readStyle('_material-build-run.scss')
+    assert.match(
+      style,
+      /\.header-title\s*\{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;/
+    )
+    assert.match(
+      style,
+      /\.build-run-panel-header\s*\{[\s\S]*?flex-wrap: wrap;/
+    )
+    assert.match(style, /@media \(max-width: 640px\), \(max-height: 420px\)/)
+  })
+
   it('keeps Repository Settings inside the viewport with a scrollable tab', () => {
     const style = readStyle('dialogs/_repository-settings.scss')
     assert.match(style, /max-height: calc\(100vh - var\(--spacing-quad\)\);/)
