@@ -2,13 +2,11 @@ import { randomBytes } from 'crypto'
 import { Account } from '../models/account'
 import { GitHubRepository } from '../models/github-repository'
 import { IActionsArtifact } from './actions-artifacts'
-import {
-  IActionsArtifactDownloadProgress,
-  IActionsArtifactDownloadResult,
-} from './actions-artifact-download'
+import { IActionsArtifactDownloadProgress } from './actions-artifact-download'
 import {
   actionsTransferFailureMessage,
   ActionsTransferError,
+  IActionsArtifactTransferSuccess,
   IActionsArtifactTransferRequest,
   IActionsJobLogTransferRequest,
   IActionsTransferProgressEvent,
@@ -52,7 +50,7 @@ export async function downloadActionsArtifactThroughMainProcess(
   destination: string,
   signal: AbortSignal,
   onProgress?: (progress: IActionsArtifactDownloadProgress) => void
-): Promise<IActionsArtifactDownloadResult> {
+): Promise<IActionsArtifactTransferSuccess> {
   throwIfAborted(signal)
   const id = operationId()
   const request: IActionsArtifactTransferRequest = {
@@ -66,6 +64,7 @@ export async function downloadActionsArtifactThroughMainProcess(
       sizeInBytes: artifact.sizeInBytes,
       expired: artifact.expired,
       digest: artifact.digest,
+      workflowRun: artifact.workflowRun,
     },
     destination,
   }
@@ -96,6 +95,8 @@ export async function downloadActionsArtifactThroughMainProcess(
       throw transferError(result, 'artifact')
     }
     return {
+      ok: true,
+      downloadId: result.downloadId,
       path: result.path,
       bytes: result.bytes,
       localDigest: result.localDigest,

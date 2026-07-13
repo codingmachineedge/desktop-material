@@ -14,6 +14,10 @@ import {
   IActionsTransferSender,
 } from '../../../src/main-process/actions-transfer'
 import {
+  getCompletedActionsArtifactDownload,
+  releaseCompletedActionsArtifactDownload,
+} from '../../../src/main-process/actions-artifact-download-registry'
+import {
   ActionsJobLogMaximumBytes,
   ActionsJobLogTruncationMarker,
   IActionsArtifactTransferRequest,
@@ -98,6 +102,7 @@ const artifactRequest = (
     sizeInBytes: archive.byteLength,
     expired: false,
     digest,
+    workflowRun: null,
   },
   destination,
   ...overrides,
@@ -302,6 +307,27 @@ describe('main-process Actions transfer', () => {
       )
 
       assert.equal(result.ok, true)
+      if (result.ok) {
+        assert.match(result.downloadId, /^[a-f0-9]{32}$/)
+        assert.deepEqual(
+          getCompletedActionsArtifactDownload(sender.id, result.downloadId),
+          {
+            downloadId: result.downloadId,
+            senderId: sender.id,
+            path: destination,
+            bytes: archive.length,
+            archiveDigest: digest,
+            owner: 'owner',
+            repository: 'repo',
+            artifactId: 19,
+            workflowRun: null,
+          }
+        )
+        assert.equal(
+          releaseCompletedActionsArtifactDownload(sender.id, result.downloadId),
+          true
+        )
+      }
       assert.deepEqual(
         requests.map(request => request.authorization),
         ['Bearer selected-account-token', null, null]

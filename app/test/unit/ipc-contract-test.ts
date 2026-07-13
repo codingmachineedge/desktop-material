@@ -20,6 +20,8 @@ describe('IPC channel contract', () => {
     : never
 
   const expectedRequestChannels = [
+    'cancel-actions-artifact-subject-operation',
+    'release-actions-artifact-download',
     'cancel-actions-transfer',
     'actions-transfer-progress',
     'agent-command',
@@ -86,6 +88,8 @@ describe('IPC channel contract', () => {
   ] as const
 
   const expectedResponseChannels = [
+    'inspect-actions-artifact-subjects',
+    'prepare-actions-artifact-subject',
     'download-actions-artifact',
     'fetch-actions-job-log',
     'get-agent-server-status',

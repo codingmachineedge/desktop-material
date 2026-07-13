@@ -70,6 +70,16 @@ import {
   handleActionsJobLogTransfer,
 } from './actions-transfer'
 import {
+  releaseAllCompletedActionsArtifactDownloads,
+  releaseCompletedActionsArtifactDownload,
+} from './actions-artifact-download-registry'
+import {
+  cancelAllActionsArtifactSubjectOperations,
+  cancelActionsArtifactSubjectOperation,
+  inspectActionsArtifactSubjects,
+  prepareActionsArtifactSubject,
+} from './actions-artifact-subjects'
+import {
   findWindowForRepositoryPath as findOwningWindow,
   nextWindowScope,
 } from './window-routing'
@@ -159,6 +169,8 @@ app.on('will-quit', () => {
   buildRunner.killAll()
   cliWorkbenchCatalog.killAll()
   cliWorkbenchRunner.killAll()
+  cancelAllActionsArtifactSubjectOperations()
+  releaseAllCompletedActionsArtifactDownloads()
   agentServerController
     ?.stop()
     .catch(error => log.error('Failed to stop agent server cleanly', error))
@@ -498,6 +510,21 @@ app.on('ready', () => {
   )
   ipcMain.on('cancel-actions-transfer', (event, operationId) => {
     cancelActionsTransfer(event.sender.id, operationId)
+  })
+  ipcMain.handle('inspect-actions-artifact-subjects', (event, request) =>
+    inspectActionsArtifactSubjects(event.sender, request)
+  )
+  ipcMain.handle('prepare-actions-artifact-subject', (event, request) =>
+    prepareActionsArtifactSubject(event.sender, request)
+  )
+  ipcMain.on(
+    'cancel-actions-artifact-subject-operation',
+    (event, operationId) => {
+      cancelActionsArtifactSubjectOperation(event.sender.id, operationId)
+    }
+  )
+  ipcMain.on('release-actions-artifact-download', (event, downloadId) => {
+    releaseCompletedActionsArtifactDownload(event.sender.id, downloadId)
   })
 
   const orderedWebRequest = new OrderedWebRequest(

@@ -34,6 +34,7 @@ mock.module('../../src/lib/ipc-renderer', {
         ? { ok: true, log: 'selected account log', truncated: false }
         : {
             ok: true,
+            downloadId: 'd'.repeat(32),
             path: 'C:\\Downloads\\package.zip',
             bytes: 0,
             localDigest: `sha256:${'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}`,
@@ -218,12 +219,13 @@ describe('ActionsStore exact account routing', () => {
         workflowRun: null,
       }
       const controller = new AbortController()
-      await store.downloadArtifact(
+      const download = await store.downloadArtifact(
         repository,
         artifact,
         'C:\\Downloads\\package.zip',
         controller.signal
       )
+      assert.equal(download.downloadId, 'd'.repeat(32))
 
       assert.equal(selectedAccounts.length, 17)
       assert.ok(selectedAccounts.every(account => account === second))

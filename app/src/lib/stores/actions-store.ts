@@ -12,15 +12,15 @@ import {
 import { supportsActions } from '../endpoint-capabilities'
 import { APIError } from '../http'
 import { IActionsArtifact, IActionsArtifactList } from '../actions-artifacts'
-import {
-  IActionsArtifactDownloadProgress,
-  IActionsArtifactDownloadResult,
-} from '../actions-artifact-download'
+import { IActionsArtifactDownloadProgress } from '../actions-artifact-download'
 import {
   downloadActionsArtifactThroughMainProcess,
   fetchActionsJobLogThroughMainProcess,
 } from '../actions-transfer-client'
-import { ActionsTransferError } from '../actions-transfer'
+import {
+  ActionsTransferError,
+  IActionsArtifactTransferSuccess,
+} from '../actions-transfer'
 import { IActionsArtifactAttestationBundleSet } from '../actions-artifact-provenance'
 import { IActionsJobList } from '../actions-jobs'
 import {
@@ -1075,7 +1075,7 @@ export class ActionsStore {
     destination: string,
     signal: AbortSignal,
     onProgress?: (progress: IActionsArtifactDownloadProgress) => void
-  ): Promise<IActionsArtifactDownloadResult> {
+  ): Promise<IActionsArtifactTransferSuccess> {
     try {
       const gitHubRepository = this.gitHubFor(repository)
       return await downloadActionsArtifactThroughMainProcess(

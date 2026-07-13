@@ -22,6 +22,10 @@ import {
   IActionsTransferProgressEvent,
 } from '../lib/actions-transfer'
 import { createGitHubAPIRequestHeaders } from '../lib/github-rest-api-version'
+import {
+  IActionsArtifactDownloadSender,
+  retainCompletedActionsArtifactDownload,
+} from './actions-artifact-download-registry'
 
 type ActionsFetcher = (input: string, init: RequestInit) => Promise<Response>
 type ActionsRequestFactory = (
@@ -29,15 +33,12 @@ type ActionsRequestFactory = (
 ) => Electron.ClientRequest
 type ActionsSessionFactory = () => Electron.Session
 
-export interface IActionsTransferSender {
+export interface IActionsTransferSender extends IActionsArtifactDownloadSender {
   readonly id: number
   send(
     channel: 'actions-transfer-progress',
     event: IActionsTransferProgressEvent
   ): void
-  once(event: 'destroyed', listener: () => void): unknown
-  removeListener(event: 'destroyed', listener: () => void): unknown
-  isDestroyed(): boolean
 }
 
 class TransferFailure extends Error {
@@ -145,11 +146,15 @@ function artifactPath(request: IActionsArtifactTransferRequest): {
   readonly endpoint: URL
   readonly token: string
   readonly path: string
+  readonly owner: string
+  readonly repository: string
+  readonly artifactId: number
+  readonly workflowRun: IActionsArtifactTransferRequest['artifact']['workflowRun']
 } {
   const endpoint = validateEndpoint(request.endpoint)
   const token = validateToken(request.token)
-  const owner = encodeURIComponent(validatePart(request.owner))
-  const repository = encodeURIComponent(validatePart(request.repository))
+  const owner = validatePart(request.owner)
+  const repository = validatePart(request.repository)
   const id = validateIdentifier(request.artifact?.id)
   if (
     typeof request.artifact?.sizeInBytes !== 'number' ||
@@ -170,10 +175,32 @@ function artifactPath(request: IActionsArtifactTransferRequest): {
     throw new TransferFailure('invalid-request')
   }
   normalizeActionsArtifactDestination(request.destination)
+  const workflowRun = request.artifact.workflowRun
+  if (workflowRun !== null) {
+    if (
+      typeof workflowRun !== 'object' ||
+      validateIdentifier(workflowRun.id) !== workflowRun.id ||
+      (workflowRun.headBranch !== null &&
+        (typeof workflowRun.headBranch !== 'string' ||
+          workflowRun.headBranch.length === 0 ||
+          workflowRun.headBranch.length > 1024 ||
+          /[\u0000-\u001f\u007f]/.test(workflowRun.headBranch))) ||
+      typeof workflowRun.headSha !== 'string' ||
+      !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/i.test(workflowRun.headSha)
+    ) {
+      throw new TransferFailure('invalid-request')
+    }
+  }
   return {
     endpoint,
     token,
-    path: `repos/${owner}/${repository}/actions/artifacts/${id}/zip`,
+    path: `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      repository
+    )}/actions/artifacts/${id}/zip`,
+    owner,
+    repository,
+    artifactId: id,
+    workflowRun,
   }
 }
 
@@ -557,7 +584,7 @@ export async function handleActionsArtifactTransfer(
           expiresAt: null,
           updatedAt: new Date(0),
           digest: request.artifact.digest,
-          workflowRun: null,
+          workflowRun: validated.workflowRun,
         },
         response,
         destination: request.destination,
@@ -583,7 +610,16 @@ export async function handleActionsArtifactTransfer(
           }
         },
       })
-      return { ok: true, ...result }
+      const downloadId = retainCompletedActionsArtifactDownload(sender, {
+        path: result.path,
+        bytes: result.bytes,
+        archiveDigest: result.localDigest,
+        owner: validated.owner,
+        repository: validated.repository,
+        artifactId: validated.artifactId,
+        workflowRun: validated.workflowRun,
+      })
+      return { ok: true, downloadId, ...result }
     } catch (error) {
       // Preflight failures can occur before the download helper owns a reader.
       // Always tear down the final network stream before ending the operation.

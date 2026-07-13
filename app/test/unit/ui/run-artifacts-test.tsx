@@ -8,7 +8,7 @@ import {
   IActionsArtifact,
   IActionsArtifactList,
 } from '../../../src/lib/actions-artifacts'
-import { IActionsArtifactDownloadResult } from '../../../src/lib/actions-artifact-download'
+import { IActionsArtifactTransferSuccess } from '../../../src/lib/actions-transfer'
 import { ActionsStore } from '../../../src/lib/stores/actions-store'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
@@ -114,7 +114,9 @@ function store(overrides: IStoreOverrides = {}): ActionsStore {
 const downloadResult = (
   path: string,
   matchesGitHubDigest: boolean | null = true
-): IActionsArtifactDownloadResult => ({
+): IActionsArtifactTransferSuccess => ({
+  ok: true,
+  downloadId: 'd'.repeat(32),
   path,
   bytes: 1024,
   localDigest: digest,
@@ -344,7 +346,7 @@ describe('Actions run artifacts', () => {
             signal
           ) => {
             downloadSignal = signal
-            return await new Promise<IActionsArtifactDownloadResult>(
+            return await new Promise<IActionsArtifactTransferSuccess>(
               (_resolve, reject) =>
                 signal.addEventListener(
                   'abort',

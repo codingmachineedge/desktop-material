@@ -2,6 +2,7 @@ import {
   IActionsArtifactDownloadProgress,
   IActionsArtifactDownloadResult,
 } from './actions-artifact-download'
+import { IActionsArtifactWorkflowRun } from './actions-artifacts'
 
 export const ActionsTransferMaximumRedirects = 5
 export const ActionsJobLogMaximumBytes = 5 * 1024 * 1024
@@ -23,6 +24,7 @@ export interface IActionsArtifactTransferRequest
     readonly sizeInBytes: number
     readonly expired: boolean
     readonly digest: string | null
+    readonly workflowRun: IActionsArtifactWorkflowRun | null
   }
   readonly destination: string
 }
@@ -61,6 +63,7 @@ export interface IActionsTransferFailure {
 export interface IActionsArtifactTransferSuccess
   extends IActionsArtifactDownloadResult {
   readonly ok: true
+  readonly downloadId: string
 }
 
 export type ActionsArtifactTransferResult =

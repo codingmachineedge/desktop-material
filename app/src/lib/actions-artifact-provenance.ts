@@ -11,11 +11,12 @@ export const ActionsArtifactAttestationProbePageSize = 31
 export const ActionsArtifactAttestationMaximumBundles = 30
 export const ActionsArtifactAttestationMaximumBytes = 8 * 1024 * 1024
 
-export const ActionsArtifactArchiveMaximumEntries = 2_000
-export const ActionsArtifactArchiveMaximumUncompressedBytes =
-  8 * 1024 * 1024 * 1024
-export const ActionsArtifactSubjectMaximumBytes = 1024 * 1024 * 1024
-export const ActionsArtifactSubjectMaximumCompressionRatio = 200
+export {
+  ActionsArtifactSubjectMaximumAggregateBytes as ActionsArtifactArchiveMaximumUncompressedBytes,
+  ActionsArtifactSubjectMaximumBytes,
+  ActionsArtifactSubjectMaximumCompressionRatio,
+  ActionsArtifactSubjectMaximumEntries as ActionsArtifactArchiveMaximumEntries,
+} from './actions-artifact-subjects'
 export const ActionsArtifactProvenanceMaximumTimestamps = 8
 
 const operationIdPattern = /^[a-f0-9]{32}$/

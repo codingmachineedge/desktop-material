@@ -40,6 +40,12 @@ import {
   IActionsJobLogTransferRequest,
   IActionsTransferProgressEvent,
 } from './actions-transfer'
+import {
+  ActionsArtifactSubjectInventoryResult,
+  ActionsArtifactSubjectPrepareResult,
+  IActionsArtifactSubjectInspectRequest,
+  IActionsArtifactSubjectPrepareRequest,
+} from './actions-artifact-subjects'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -48,6 +54,8 @@ import {
  * the two over the untyped IPC framework.
  */
 export type RequestChannels = {
+  'cancel-actions-artifact-subject-operation': (operationId: string) => void
+  'release-actions-artifact-download': (downloadId: string) => void
   'cancel-actions-transfer': (operationId: string) => void
   'actions-transfer-progress': (event: IActionsTransferProgressEvent) => void
   'agent-command': (command: IAgentCommandEnvelope) => void
@@ -138,6 +146,12 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  'inspect-actions-artifact-subjects': (
+    request: IActionsArtifactSubjectInspectRequest
+  ) => Promise<ActionsArtifactSubjectInventoryResult>
+  'prepare-actions-artifact-subject': (
+    request: IActionsArtifactSubjectPrepareRequest
+  ) => Promise<ActionsArtifactSubjectPrepareResult>
   'download-actions-artifact': (
     request: IActionsArtifactTransferRequest
   ) => Promise<ActionsArtifactTransferResult>

@@ -18,16 +18,15 @@
 
 ## Current checkpoint
 
-The provider contract and signer-metadata checkpoint is implemented. The app now distinguishes a 31st probe record from its 30-bundle verification ceiling, strips provider wrapper fields into canonical one-line Sigstore bundle JSON, enforces the 8 MiB aggregate ceiling, keeps ordinary artifact/error bodies at their existing 1 MiB cap, and routes bundle lookup through the repository-selected same-endpoint account. It also records exact workflow-run/reusable-workflow metadata, builds only complete signer identities, and fails verifier capability closed on ordinary GHES.
+The safe inventory and digest IPC checkpoint is complete from clean source `1718c9e15266eb4c9161fffd578fdd7da324d9e3`. Its bounded implementation allowlist is the Actions artifact transfer/client/IPC contracts, one main-process completed-download registry and ZIP subject service, direct pinned ZIP/CRC dependencies, focused unit tests, this manifest, and the README roadmap.
 
-Focused results for this checkpoint:
+Completed downloads receive opaque sender-scoped identities bound to their canonical path, size, archive digest, owner/repository, artifact, and workflow-run metadata. Explicit release, navigation, renderer destruction, and app shutdown release the records and dependent inventories. Inspection and preparation use opaque operation/download/inventory/entry identities; raw provenance paths, tokens, commands, and provider envelopes do not cross the new renderer contract.
 
-- provenance/API/account/capability tests: 24 passed, 0 failed
-- full TypeScript `--noEmit`: passed
-- focused ESLint with the repository rules directory: passed
-- focused Prettier and `git diff --check`: passed
+The strict service hashes and parses one open descriptor, validates classic/ZIP64 directory boundaries plus exact central/local headers and signed or unsigned data descriptors, admits only safe NFC regular-file paths and stored/deflate methods, checks CRC and declared/actual sizes, rejects overlapping ranges, and enforces 2,000 entries, 8 GiB aggregate expansion, 1 GiB per subject, and a 200:1 ratio. Preparation reopens and fully revalidates the retained archive, extracts only the selected fingerprint into a unique directory with fixed `subject.bin`, hashes while streaming, and removes the owned directory on success, failure, or cancellation; cleanup failure is a typed failure.
 
-Safe ZIP inventory, selected-subject digesting, cryptographic verification, UI, production interaction, screenshots, wiki publication, and Pages verification remain pending.
+The focused checkpoint regression passes 47 tests across provenance contracts, raw ZIP inventory/preparation, completed-download lifecycle, renderer cancellation/races, transfer publication, account routing, exhaustive IPC channel registration, and the existing artifact UI. It covers stored/deflate members, signed/unsigned descriptors, traversal, malformed UTF-8, symbolic links, ratio bombs, local/central mismatch, CRC forgery, changed bytes, cross-sender denial, immediate cancellation, release invalidation, and Temp cleanup. Full TypeScript also passes. Formatting, focused lint, diff/secret checks, commit/push, and local/tracking/direct-remote SHA alignment are the final publication gates for this same checkpoint.
+
+Cryptographic verifier execution, verification policy/result normalization, UI, production interaction, screenshots, wiki publication, and Pages verification remain out of scope and pending.
 
 ## App-native product contract
 
@@ -102,10 +101,10 @@ No public repository, workflow, artifact, attestation, or release mutation is pa
 ## Delivery checkpoints
 
 - **Done — provider contract and signer metadata:** bounded canonical bundle parsing, exact subject/predicate request construction, selected-account routing, GitHub.com/GHE.com capability gating, workflow-run reusable-signer metadata, and exact signer-candidate validation are implemented and focused-tested.
-- **Active — safe inventory and digest IPC:** implement the opaque sender-scoped completed-download registry, strict ZIP inventory/parser, selected-entry digest preparation, typed IPC, cancellation, and exact cleanup.
-- **Queued — verifier and IPC:** implement the fixed offline verifier policy, re-extraction/digest boundary, normalized output, time/output ceilings, cancellation, and exact process/Temp cleanup.
+- **Done — safe inventory and digest IPC:** opaque sender-scoped completed-download retention, strict same-descriptor ZIP inventory, selected-entry digest preparation, typed opaque IPC, changed-byte/CRC checks, cancellation, lifecycle release, and exact Temp cleanup are implemented and focused-tested.
+- **Active — verifier contract and runtime:** implement the fixed bundle-based/API-offline verifier policy, re-extraction/digest boundary, normalized output, time/output ceilings, cancellation, and exact process/Temp cleanup. Bundle mode avoids attestation API fetching, but Sigstore trusted-root initialization may still contact configured TUF mirrors; capability and trust availability must therefore remain explicit inputs to **Unavailable** rather than being described as fully offline.
 - **Queued — modal and result UI:** implement explicit subject selection, policy review, progress/cancel/retry, evidence/result views, focus restoration, and responsive containment.
-- **Queued — focused and adversarial tests:** parser, ZIP safety, provider/API, store, IPC, process, React, accessibility, style-contract, deterministic-provider, and negative-policy gates.
+- **Active — remaining verifier and UI tests:** the raw parser, ZIP safety, registry, transfer/client, account-routing, and IPC checkpoint is complete; process, negative-policy, React, accessibility, style-contract, and deterministic-provider gates remain with their implementation slices.
 - **Queued — production headless verification:** exact production build, isolated interaction matrix, provider/process/cleanup receipts, inspected screenshots, and source-SHA binding.
 - **Queued — wiki, Pages, and screenshots:** update README, `HANDOFF.md`, in-repository wiki sources, live wiki assets, Pages gallery, and this manifest; push and verify all public artifacts.
 
@@ -134,13 +133,13 @@ No implementation checkpoint may move to **Done** on documentation or mocked UI 
 
 ## Verification and evidence placeholders
 
-- Implementation commits and exact production source: **Pending**
-- Focused parser/API/store/IPC/React/style checks: **Provider contract subset passed (24 tests + TypeScript + focused ESLint); remaining layers pending**
+- Implementation commits and exact production source: **Safe inventory/digest IPC checkpoint completed from `1718c9e15266eb4c9161fffd578fdd7da324d9e3`; final pushed commit is this manifest's Git revision. Verifier/UI production source remains pending**
+- Focused parser/API/store/IPC/React/style checks: **Safe inventory slice passed 47 focused provenance/parser/registry/client/transfer/routing/IPC/artifact-UI tests plus full TypeScript; verifier/process/full-React/style layers remain pending**
 - Deterministic provider request and policy receipt: **Pending**
 - Exact production build receipt: **Pending**
 - Hidden-desktop interaction and geometry receipt: **Pending**
 - Screenshot dimensions, byte sizes, and SHA-256: **Pending**
-- Cleanup ledger: **Pending**
+- Cleanup ledger: **Selected-subject Temp removal and download/inventory lifecycle release are focused-tested; production process/desktop/fixture cleanup remains pending**
 - Primary repository documentation commit: **Pending**
 - Separate wiki commit and public image/source checks: **Pending**
 - Pages run, artifact inspection, and protected-deployment result: **Pending**
