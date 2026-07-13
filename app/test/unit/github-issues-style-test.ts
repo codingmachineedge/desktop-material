@@ -7,6 +7,10 @@ const styles = readFileSync(
   join(process.cwd(), 'app', 'styles', 'ui', '_github-issues.scss'),
   'utf8'
 )
+const mediumViewportStyles = styles.slice(
+  styles.indexOf('@media (max-width: 1100px)'),
+  styles.indexOf('@media (max-width: 720px)')
+)
 
 describe('GitHub Issues responsive Material styles', () => {
   it('contains every issue surface and prevents horizontal overflow', () => {
@@ -30,6 +34,17 @@ describe('GitHub Issues responsive Material styles', () => {
     assert.match(
       styles,
       /\.github-issues-controls \.button-component[\s\S]*?width: 100%;/
+    )
+  })
+
+  it('keeps the issue list and detail reachable when medium-width filters grow', () => {
+    assert.match(
+      mediumViewportStyles,
+      /\.github-issues-view \{[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      mediumViewportStyles,
+      /\.github-issues-layout \{[\s\S]*?min-height: 280px;[\s\S]*?flex: 0 0 auto;[\s\S]*?overflow: visible;/
     )
   })
 
