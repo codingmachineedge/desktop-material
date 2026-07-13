@@ -1,5 +1,29 @@
 import { OrderedWebRequest } from './ordered-webrequest'
 
+const unsafeHeaders = new Set(['authentication', 'authorization', 'cookie'])
+
+export function sanitizeCrossOriginRequestHeaders(
+  initialOrigin: string | undefined,
+  requestUrl: string,
+  requestHeaders: Readonly<Record<string, string>>
+): Record<string, string> {
+  const { origin } = new URL(requestUrl)
+
+  if (initialOrigin === undefined || initialOrigin === origin) {
+    return { ...requestHeaders }
+  }
+
+  const sanitizedHeaders: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(requestHeaders)) {
+    if (!unsafeHeaders.has(key.toLowerCase())) {
+      sanitizedHeaders[key] = value
+    }
+  }
+
+  return sanitizedHeaders
+}
+
 /**
  * Installs a web request filter to prevent cross domain leaks of auth headers
  *
@@ -35,7 +59,6 @@ export function installSameOriginFilter(orderedWebRequest: OrderedWebRequest) {
   // A map between the request ID and the _initial_ request origin
   const requestOrigin = new Map<number, string>()
   const safeProtocols = new Set(['devtools:', 'file:', 'chrome-extension:'])
-  const unsafeHeaders = new Set(['authentication', 'authorization', 'cookie'])
 
   orderedWebRequest.onBeforeRequest.addEventListener(async details => {
     const { protocol, origin } = new URL(details.url)
@@ -55,20 +78,17 @@ export function installSameOriginFilter(orderedWebRequest: OrderedWebRequest) {
     const initialOrigin = requestOrigin.get(details.id)
     const { origin } = new URL(details.url)
 
-    if (initialOrigin === undefined || initialOrigin === origin) {
-      return { requestHeaders: details.requestHeaders }
+    const requestHeaders = sanitizeCrossOriginRequestHeaders(
+      initialOrigin,
+      details.url,
+      details.requestHeaders
+    )
+
+    if (initialOrigin !== undefined && initialOrigin !== origin) {
+      log.debug(`Sanitizing cross-origin redirect to ${origin}`)
     }
 
-    const sanitizedHeaders: Record<string, string> = {}
-
-    for (const [k, v] of Object.entries(details.requestHeaders)) {
-      if (!unsafeHeaders.has(k.toLowerCase())) {
-        sanitizedHeaders[k] = v
-      }
-    }
-
-    log.debug(`Sanitizing cross-origin redirect to ${origin}`)
-    return { requestHeaders: sanitizedHeaders }
+    return { requestHeaders }
   })
 
   orderedWebRequest.onCompleted.addEventListener(details =>

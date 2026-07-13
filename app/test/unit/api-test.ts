@@ -142,22 +142,29 @@ describe('API', () => {
       })
     })
 
-    it('follows job log redirects without forwarding request options', async () => {
+    it('lets Electron follow job log redirects through its header filter', async () => {
       const api = new API('https://api.github.com', 'secret')
+      let receivedRedirect: RequestRedirect | undefined
       Reflect.set(
         api,
         'ghRequest',
-        async () =>
-          new Response(null, {
-            status: 302,
-            headers: { Location: 'https://blob.example.test/job.txt' },
-          })
+        async (
+          _method: string,
+          _path: string,
+          options?: { redirect?: RequestRedirect }
+        ) => {
+          receivedRedirect = options?.redirect
+
+          // Electron exposes manual cross-origin redirects as opaque status-0
+          // responses. Following the redirect returns the signed-host body.
+          return receivedRedirect === 'manual'
+            ? Response.error()
+            : new Response('hello from the job')
+        }
       )
       const originalFetch = globalThis.fetch
-      let receivedOptions: RequestInit | undefined
-      globalThis.fetch = async (_input, options) => {
-        receivedOptions = options
-        return new Response('hello from the job')
+      globalThis.fetch = async () => {
+        throw new Error('job log redirects must remain in Electron fetch')
       }
 
       try {
@@ -165,7 +172,7 @@ describe('API', () => {
           await api.fetchWorkflowJobLogs('owner', 'repo', 7),
           'hello from the job'
         )
-        assert.equal(receivedOptions, undefined)
+        assert.equal(receivedRedirect, 'follow')
       } finally {
         globalThis.fetch = originalFetch
       }
@@ -190,6 +197,28 @@ describe('API', () => {
       await assert.rejects(
         api.fetchWorkflowJobLogs('owner', 'repo', 7),
         error => error instanceof APIError && error.responseStatus === 410
+      )
+    })
+
+    it('does not expose signed job log URLs in download errors', async () => {
+      const api = new API('https://api.github.com', 'secret')
+      const response = new Response(null, {
+        status: 403,
+        statusText: 'Forbidden',
+      })
+      Object.defineProperty(response, 'url', {
+        value:
+          'https://signed-results.example.test/job.txt?sig=private-signature',
+      })
+      Reflect.set(api, 'ghRequest', async () => response)
+
+      await assert.rejects(
+        api.fetchWorkflowJobLogs('owner', 'repo', 7),
+        error =>
+          error instanceof APIError &&
+          error.responseStatus === 403 &&
+          error.message === 'Unable to download workflow logs.' &&
+          !error.message.includes('private-signature')
       )
     })
   })
