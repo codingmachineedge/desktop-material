@@ -100,6 +100,10 @@ import {
   validateActionsArtifactPage,
 } from './actions-artifacts'
 import {
+  fetchActionsArtifactRedirect,
+  IActionsArtifactRedirectDependencies,
+} from './actions-artifact-redirect'
+import {
   ActionsArtifactJSONError,
   parseBoundedActionsArtifactAPIError,
   readBoundedActionsArtifactJSON,
@@ -3543,6 +3547,55 @@ export class API {
     }
 
     return { branch: safeBranch, rules, capped: false }
+  }
+
+  /**
+   * Fetch an artifact archive without forwarding the account token to the
+   * short-lived storage redirect.
+   */
+  public async fetchWorkflowArtifactArchive(
+    owner: string,
+    name: string,
+    artifactId: number,
+    signal?: AbortSignal,
+    redirectDependencies?: IActionsArtifactRedirectDependencies
+  ): Promise<Response> {
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const id = validateActionsArtifactIdentifier(artifactId, 'artifact id')
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${safeOwner}/${safeName}/actions/artifacts/${id}/zip`,
+      { redirect: 'manual', signal }
+    )
+
+    if (response.status < 300 || response.status >= 400) {
+      if (response.status === 410) {
+        throw new APIError(response, {
+          message: 'This artifact has expired and can no longer be downloaded.',
+        })
+      }
+      if (!response.ok) {
+        await parsedResponse<unknown>(response)
+      }
+      return response
+    }
+
+    const location = response.headers.get('Location')
+    if (location === null) {
+      throw new Error('GitHub did not provide an artifact download URL.')
+    }
+    const accountEndpoint = new URL.URL(this.endpoint)
+    const archive = await fetchActionsArtifactRedirect({
+      location,
+      githubDotCom: accountEndpoint.hostname === 'api.github.com',
+      signal,
+      dependencies: redirectDependencies,
+    })
+    if (!archive.ok) {
+      throw new APIError(archive, null)
+    }
+    return archive
   }
 
   /** Check for a matching attestation record without claiming verification. */
