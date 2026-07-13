@@ -10,6 +10,7 @@ import {
 } from '../../lib/api'
 import {
   ActionsStore,
+  ActionsRunFilter,
   getActionsRepositoryKey,
   IActionsState,
 } from '../../lib/stores/actions-store'
@@ -64,6 +65,9 @@ interface IActionsViewState {
 const InitialActionsState: IActionsState = {
   workflows: [],
   runs: [],
+  runsTotalCount: 0,
+  runsNextPage: null,
+  runsLoadingMore: false,
   loading: false,
   error: null,
   rateLimitReset: null,
@@ -203,6 +207,9 @@ export class ActionsView extends React.Component<
       this.setState({
         actions,
         workflow: 'all',
+        branch: 'all',
+        event: 'all',
+        status: 'all',
         selectedRun: null,
         jobs: [],
         jobsLoading: false,
@@ -234,15 +241,66 @@ export class ActionsView extends React.Component<
 
   private onFilterChange = (event: React.FormEvent<HTMLSelectElement>) => {
     const element = event.currentTarget
-    this.setState({ [element.name]: element.value } as Pick<
-      IActionsViewState,
-      'workflow' | 'branch' | 'event' | 'status'
-    >)
+    const field = element.name as 'workflow' | 'branch' | 'event' | 'status'
+    const value = element.value
+    this.operationGeneration++
+    this.logController?.abort()
+    this.logController = null
+    this.setState(
+      state => ({
+        workflow: field === 'workflow' ? value : state.workflow,
+        branch: field === 'branch' ? value : state.branch,
+        event: field === 'event' ? value : state.event,
+        status: field === 'status' ? value : state.status,
+        selectedRun: null,
+        jobs: [],
+        jobsLoading: false,
+        jobsError: null,
+        logJob: null,
+        log: '',
+        logLoading: false,
+        logError: null,
+        actionError: null,
+      }),
+      this.applyRunFilter
+    )
+  }
+
+  private applyRunFilter = () => {
+    const repository = this.props.repository
+    if (repository.gitHubRepository === null) {
+      return
+    }
+    const filter: ActionsRunFilter = {
+      ...(this.state.workflow === 'all'
+        ? {}
+        : { workflowId: Number(this.state.workflow) }),
+      ...(this.state.branch === 'all' ? {} : { branch: this.state.branch }),
+      ...(this.state.event === 'all' ? {} : { event: this.state.event }),
+      ...(this.state.status === 'all' ? {} : { status: this.state.status }),
+    }
+    const repositoryGeneration = this.repositoryGeneration
+    void this.props.actionsStore
+      .setRunFilter(repository, filter)
+      .catch(error => {
+        if (this.isCurrentRepository(repository, repositoryGeneration)) {
+          this.setState({
+            actionError:
+              error instanceof Error ? error : new Error(String(error)),
+          })
+        }
+      })
   }
 
   private refresh = () => {
     if (this.props.repository.gitHubRepository !== null) {
       this.props.actionsStore.refresh(this.props.repository, true)
+    }
+  }
+
+  private loadMoreRuns = () => {
+    if (this.props.repository.gitHubRepository !== null) {
+      void this.props.actionsStore.loadMoreRuns(this.props.repository)
     }
   }
 
@@ -634,7 +692,13 @@ export class ActionsView extends React.Component<
       if (event !== 'all' && run.event !== event) {
         return false
       }
-      if (status === 'running' && run.status === APICheckStatus.Completed) {
+      if (status === 'queued' && run.status !== APICheckStatus.Queued) {
+        return false
+      }
+      if (
+        status === 'in_progress' &&
+        run.status !== APICheckStatus.InProgress
+      ) {
         return false
       }
       if (
@@ -668,7 +732,13 @@ export class ActionsView extends React.Component<
 
   public render() {
     const { actions, selectedRun } = this.state
-    const events = [...new Set(actions.runs.map(x => x.event))].sort()
+    const filteredRuns = this.getFilteredRuns()
+    const events = [
+      ...new Set([
+        ...(this.state.event === 'all' ? [] : [this.state.event]),
+        ...actions.runs.map(x => x.event),
+      ]),
+    ].sort()
     const branches = [
       ...new Set([
         ...this.props.branchNames,
@@ -707,7 +777,10 @@ export class ActionsView extends React.Component<
             >
               Run workflow
             </Button>
-            <Button onClick={this.refresh} disabled={actions.loading}>
+            <Button
+              onClick={this.refresh}
+              disabled={actions.loading || actions.runsLoadingMore}
+            >
               Refresh
             </Button>
           </div>
@@ -780,7 +853,8 @@ export class ActionsView extends React.Component<
             onChange={this.onFilterChange}
           >
             <option value="all">Any status</option>
-            <option value="running">Running</option>
+            <option value="queued">Queued</option>
+            <option value="in_progress">In progress</option>
             <option value="success">Success</option>
             <option value="failure">Failure</option>
           </Select>
@@ -794,15 +868,41 @@ export class ActionsView extends React.Component<
           <div className="actions-loading">Loading workflows…</div>
         )}
         <div className="actions-content">
-          <RunList
-            runs={this.getFilteredRuns()}
-            selectedRunId={selectedRun?.id ?? null}
-            busyRunId={this.state.busyRunId}
-            onSelect={this.selectRun}
-            onRerun={this.rerun}
-            onRerunFailed={this.rerunFailed}
-            onRequestCancel={this.requestCancelRun}
-          />
+          <div className="actions-run-column">
+            <RunList
+              runs={filteredRuns}
+              selectedRunId={selectedRun?.id ?? null}
+              busyRunId={this.state.busyRunId}
+              onSelect={this.selectRun}
+              onRerun={this.rerun}
+              onRerunFailed={this.rerunFailed}
+              onRequestCancel={this.requestCancelRun}
+            />
+            {(actions.runs.length > 0 || actions.runsNextPage !== null) && (
+              <div
+                className="actions-run-pagination"
+                role="status"
+                aria-live="polite"
+              >
+                <span>
+                  Showing {filteredRuns.length} matching from{' '}
+                  {actions.runs.length} loaded of {actions.runsTotalCount}{' '}
+                  workflow runs.
+                </span>
+                {actions.runsNextPage !== null && (
+                  <Button
+                    size="small"
+                    onClick={this.loadMoreRuns}
+                    disabled={actions.runsLoadingMore || actions.loading}
+                  >
+                    {actions.runsLoadingMore
+                      ? 'Loading more…'
+                      : 'Load more runs'}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
           {selectedRun && this.props.repository.gitHubRepository && (
             <RunDetails
               repository={this.props.repository}

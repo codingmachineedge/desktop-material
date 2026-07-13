@@ -344,12 +344,23 @@ describe('API', () => {
         method: string
         path: string
         body?: Object
+        signal?: AbortSignal
       }>()
+      const controller = new AbortController()
       Reflect.set(
         api,
         'ghRequest',
-        async (method: string, path: string, options?: { body?: Object }) => {
-          requests.push({ method, path, body: options?.body })
+        async (
+          method: string,
+          path: string,
+          options?: { body?: Object; signal?: AbortSignal }
+        ) => {
+          requests.push({
+            method,
+            path,
+            body: options?.body,
+            signal: options?.signal,
+          })
           return path.endsWith('/dispatches')
             ? new Response(null, { status: 204 })
             : new Response(
@@ -361,24 +372,35 @@ describe('API', () => {
         }
       )
 
-      await api.fetchWorkflowRuns('owner', 'repo', {
-        workflowId: 42,
-        branch: 'feature/a',
-        event: 'push',
-        status: 'success',
-      })
+      await api.fetchWorkflowRuns(
+        'owner',
+        'repo',
+        {
+          workflowId: 42,
+          branch: 'feature/a',
+          event: 'push',
+          status: 'success',
+          page: 3,
+        },
+        controller.signal
+      )
       await api.dispatchWorkflow('owner', 'repo', 42, 'main', {
         target: 'prod',
       })
 
       assert.equal(
         requests[0].path,
-        'repos/owner/repo/actions/workflows/42/runs?per_page=50&branch=feature%2Fa&event=push&status=success'
+        'repos/owner/repo/actions/workflows/42/runs?per_page=50&page=3&branch=feature%2Fa&event=push&status=success'
       )
+      assert.equal(requests[0].signal, controller.signal)
       assert.deepEqual(requests[1].body, {
         ref: 'main',
         inputs: { target: 'prod' },
       })
+
+      await assert.rejects(() =>
+        api.fetchWorkflowRuns('owner', 'repo', { page: 0 })
+      )
     })
 
     it('uses the exact Actions mutation methods and paths', async () => {

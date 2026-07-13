@@ -9,6 +9,8 @@ import {
   actionsMutationError,
   getActionsAccount,
   getActionsRepositoryKey,
+  mergeRefreshedWorkflowRuns,
+  mergeWorkflowRunPage,
   workflowRunsEqual,
 } from '../../src/lib/stores/actions-store'
 import { Account, getAccountKey } from '../../src/models/account'
@@ -58,6 +60,9 @@ const actionsRepository = (accountKey: string | null, path = 'C:/project') => {
 const cachedActionsState = (): IActionsState => ({
   workflows: [{ id: 3, name: 'Old workflow' } as IAPIWorkflow],
   runs: [run(7, 'old-account')],
+  runsTotalCount: 1,
+  runsNextPage: null,
+  runsLoadingMore: false,
   loading: false,
   error: null,
   rateLimitReset: null,
@@ -75,6 +80,24 @@ describe('ActionsStore helpers', () => {
     assert.equal(
       workflowRunsEqual([run(1, 'a'), run(2, 'b')], [run(2, 'b'), run(1, 'a')]),
       false
+    )
+  })
+
+  it('deduplicates later pages and keeps refreshed page one first', () => {
+    assert.deepEqual(
+      mergeWorkflowRunPage(
+        [run(1, 'old'), run(2, 'old')],
+        [run(2, 'new'), run(3, 'new')]
+      ),
+      [run(1, 'old'), run(2, 'new'), run(3, 'new')]
+    )
+    assert.deepEqual(
+      mergeRefreshedWorkflowRuns(
+        [run(4, 'fresh'), run(1, 'fresh')],
+        [run(1, 'old'), run(2, 'old'), run(3, 'old')],
+        4
+      ),
+      [run(4, 'fresh'), run(1, 'fresh'), run(2, 'old'), run(3, 'old')]
     )
   })
 
@@ -255,6 +278,149 @@ describe('ActionsStore helpers', () => {
     assert.deepEqual(states.at(-1)?.runs, [])
 
     subscription.dispose()
+  })
+
+  it('loads, deduplicates, and completes bounded workflow run pages', async () => {
+    const endpoint = 'https://api.github.com'
+    const account = new Account(
+      'selected',
+      endpoint,
+      'token',
+      [],
+      '',
+      1,
+      'Selected'
+    )
+    const repository = actionsRepository(getAccountKey(account))
+    const accounts = new TestAccountsStore([account])
+    const store = new ActionsStore(accounts as unknown as AccountsStore)
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    Reflect.set(store, 'refresh', async () => {})
+    await store.setRunFilter(repository, { status: 'success' })
+    const states = new Array<IActionsState>()
+    const subscription = store.subscribe(repository, state =>
+      states.push(state)
+    )
+    const notify = Reflect.get(store, 'notify') as (
+      repository: Repository,
+      state: IActionsState
+    ) => void
+    notify.call(store, repository, {
+      ...cachedActionsState(),
+      runs: [run(1, 'first-page')],
+      runsTotalCount: 3,
+      runsNextPage: 2,
+    })
+
+    const filters = new Array<{
+      readonly page: number
+      readonly perPage: number
+      readonly status?: string
+    }>()
+    Reflect.set(store, 'apiFor', () => ({
+      fetchWorkflowRuns: (
+        _owner: string,
+        _name: string,
+        filter: { page: number; perPage: number; status?: string }
+      ) => {
+        filters.push(filter)
+        return Promise.resolve(
+          filter.page === 2
+            ? {
+                total_count: 3,
+                workflow_runs: [run(1, 'updated'), run(2, 'second-page')],
+              }
+            : {
+                total_count: 3,
+                workflow_runs: [run(3, 'third-page')],
+              }
+        )
+      },
+    }))
+
+    await store.loadMoreRuns(repository)
+    assert.deepEqual(filters, [{ page: 2, perPage: 50, status: 'success' }])
+    assert.deepEqual(
+      states.at(-1)?.runs.map(value => [value.id, value.updated_at]),
+      [
+        [1, 'updated'],
+        [2, 'second-page'],
+      ]
+    )
+    assert.equal(states.at(-1)?.runsNextPage, 3)
+
+    await store.loadMoreRuns(repository)
+    assert.deepEqual(filters, [
+      { page: 2, perPage: 50, status: 'success' },
+      { page: 3, perPage: 50, status: 'success' },
+    ])
+    assert.deepEqual(
+      states.at(-1)?.runs.map(value => value.id),
+      [1, 2, 3]
+    )
+    assert.equal(states.at(-1)?.runsNextPage, null)
+    assert.equal(states.at(-1)?.runsLoadingMore, false)
+
+    subscription.dispose()
+  })
+
+  it('cancels an in-flight run page when its last repository view leaves', async () => {
+    const endpoint = 'https://api.github.com'
+    const account = new Account(
+      'selected',
+      endpoint,
+      'token',
+      [],
+      '',
+      1,
+      'Selected'
+    )
+    const repository = actionsRepository(getAccountKey(account))
+    const accounts = new TestAccountsStore([account])
+    const store = new ActionsStore(accounts as unknown as AccountsStore)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    Reflect.set(store, 'refresh', async () => {})
+
+    const subscription = store.subscribe(repository, () => {})
+    const notify = Reflect.get(store, 'notify') as (
+      repository: Repository,
+      state: IActionsState
+    ) => void
+    notify.call(store, repository, {
+      ...cachedActionsState(),
+      runsTotalCount: 2,
+      runsNextPage: 2,
+    })
+
+    let pageSignal: AbortSignal | undefined
+    Reflect.set(store, 'apiFor', () => ({
+      fetchWorkflowRuns: (
+        _owner: string,
+        _name: string,
+        _filter: unknown,
+        signal?: AbortSignal
+      ) => {
+        pageSignal = signal
+        return new Promise((_resolve, reject) =>
+          signal?.addEventListener(
+            'abort',
+            () => {
+              const error = new Error('canceled')
+              error.name = 'AbortError'
+              reject(error)
+            },
+            { once: true }
+          )
+        )
+      },
+    }))
+
+    const pending = store.loadMoreRuns(repository)
+    assert.equal(pageSignal?.aborted, false)
+    subscription.dispose()
+    await pending
+    assert.equal(pageSignal?.aborted, true)
   })
 
   it('explains permission and Enterprise capability failures', () => {

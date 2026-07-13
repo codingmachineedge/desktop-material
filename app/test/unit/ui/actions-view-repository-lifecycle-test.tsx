@@ -9,6 +9,7 @@ import {
   IAPIWorkflowRun,
 } from '../../../src/lib/api'
 import {
+  ActionsRunFilter,
   ActionsStateCallback,
   ActionsStore,
   IActionsState,
@@ -69,6 +70,9 @@ const job: IAPIWorkflowJob = {
 const state = (run: IAPIWorkflowRun): IActionsState => ({
   workflows: [],
   runs: [run],
+  runsTotalCount: 1,
+  runsNextPage: null,
+  runsLoadingMore: false,
   loading: false,
   error: null,
   rateLimitReset: null,
@@ -79,6 +83,9 @@ const state = (run: IAPIWorkflowRun): IActionsState => ({
 const invalidatedState: IActionsState = {
   workflows: [],
   runs: [],
+  runsTotalCount: 0,
+  runsNextPage: null,
+  runsLoadingMore: false,
   loading: false,
   error: null,
   rateLimitReset: null,
@@ -105,7 +112,9 @@ class TestActionsStore {
   public readonly disposed = new Array<string>()
   public readonly artifactSignals = new Array<AbortSignal | undefined>()
   public readonly logSignals = new Array<AbortSignal | undefined>()
+  public readonly runFilters = new Array<ActionsRunFilter>()
   public refreshStates: ReadonlyArray<IActionsState> = [invalidatedState]
+  public loadMoreStates: ReadonlyArray<IActionsState> = []
 
   public constructor(
     private readonly states: ReadonlyMap<string, IActionsState>
@@ -128,6 +137,16 @@ class TestActionsStore {
     for (const next of this.refreshStates) {
       this.callbacks.get(repository.hash)?.(next)
     }
+  }
+
+  public async loadMoreRuns(repository: Repository) {
+    for (const next of this.loadMoreStates) {
+      this.callbacks.get(repository.hash)?.(next)
+    }
+  }
+
+  public async setRunFilter(_repository: Repository, filter: ActionsRunFilter) {
+    this.runFilters.push(filter)
   }
 
   public fetchJobs(repository: Repository) {
@@ -154,6 +173,76 @@ class TestActionsStore {
 }
 
 describe('ActionsView repository lifecycle', () => {
+  it('restarts server paging with the exact selected run filters', async () => {
+    const selected = repository('filtered-actions', 8)
+    const selectedRun = workflowRun('Filtered run')
+    const store = new TestActionsStore(
+      new Map([[selected.hash, state(selectedRun)]])
+    )
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main', 'release']}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('Branch'), {
+      target: { name: 'branch', value: 'release' },
+    })
+    await waitFor(() =>
+      assert.deepEqual(store.runFilters.at(-1), { branch: 'release' })
+    )
+    fireEvent.change(screen.getByLabelText('Status'), {
+      target: { name: 'status', value: 'in_progress' },
+    })
+    await waitFor(() =>
+      assert.deepEqual(store.runFilters.at(-1), {
+        branch: 'release',
+        status: 'in_progress',
+      })
+    )
+  })
+
+  it('loads additional run pages through an explicit responsive control', async () => {
+    const selected = repository('paginated-actions', 7)
+    const first = workflowRun('First page run')
+    const second = {
+      ...workflowRun('Second page run'),
+      id: 8,
+      run_number: 43,
+    }
+    const firstPage: IActionsState = {
+      ...state(first),
+      runsTotalCount: 2,
+      runsNextPage: 2,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, firstPage]]))
+    store.loadMoreStates = [
+      { ...firstPage, runsLoadingMore: true },
+      {
+        ...firstPage,
+        runs: [first, second],
+        runsNextPage: null,
+        runsLoadingMore: false,
+      },
+    ]
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={[]}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    assert.ok(screen.getByText(/1 loaded of 2 workflow runs/))
+    fireEvent.click(screen.getByRole('button', { name: 'Load more runs' }))
+
+    assert.ok(await screen.findByText('Second page run'))
+    assert.ok(screen.getByText(/2 loaded of 2 workflow runs/))
+    assert.equal(screen.queryByRole('button', { name: 'Load more runs' }), null)
+  })
+
   it('drops stale jobs when repositories with colliding run ids switch', async () => {
     const first = repository('first', 1)
     const second = repository('second', 2)

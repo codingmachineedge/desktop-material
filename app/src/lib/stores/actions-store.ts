@@ -1,7 +1,14 @@
 import { Disposable } from 'event-kit'
 import { Account, getAccountKey } from '../../models/account'
 import { GitHubRepository } from '../../models/github-repository'
-import { API, IAPIWorkflow, IAPIWorkflowJob, IAPIWorkflowRun } from '../api'
+import {
+  ActionsWorkflowRunPageSize,
+  API,
+  IAPIWorkflow,
+  IAPIWorkflowJob,
+  IAPIWorkflowRun,
+  IAPIWorkflowRunsFilter,
+} from '../api'
 import { supportsActions } from '../endpoint-capabilities'
 import { APIError } from '../http'
 import { IActionsArtifact, IActionsArtifactList } from '../actions-artifacts'
@@ -133,6 +140,9 @@ export function actionsArtifactError(
 export interface IActionsState {
   readonly workflows: ReadonlyArray<IAPIWorkflow>
   readonly runs: ReadonlyArray<IAPIWorkflowRun>
+  readonly runsTotalCount: number
+  readonly runsNextPage: number | null
+  readonly runsLoadingMore: boolean
   readonly loading: boolean
   readonly error: Error | null
   readonly rateLimitReset: Date | null
@@ -141,6 +151,8 @@ export interface IActionsState {
 }
 
 export type ActionsStateCallback = (state: IActionsState) => void
+
+export type ActionsRunFilter = Omit<IAPIWorkflowRunsFilter, 'page' | 'perPage'>
 
 interface IActionsSubscription {
   readonly repository: Repository
@@ -152,6 +164,9 @@ const RefreshInterval = 60 * 1000
 const emptyState = (supported: boolean): IActionsState => ({
   workflows: [],
   runs: [],
+  runsTotalCount: 0,
+  runsNextPage: null,
+  runsLoadingMore: false,
   loading: false,
   error: null,
   rateLimitReset: null,
@@ -224,6 +239,39 @@ export function workflowRunsEqual(
   )
 }
 
+/** Merge one later Actions page without duplicating runs shifted by refreshes. */
+export function mergeWorkflowRunPage(
+  existing: ReadonlyArray<IAPIWorkflowRun>,
+  page: ReadonlyArray<IAPIWorkflowRun>
+): ReadonlyArray<IAPIWorkflowRun> {
+  const merged = [...existing]
+  const indexes = new Map(merged.map((run, index) => [run.id, index]))
+  for (const run of page) {
+    const index = indexes.get(run.id)
+    if (index === undefined) {
+      indexes.set(run.id, merged.length)
+      merged.push(run)
+    } else {
+      merged[index] = run
+    }
+  }
+  return merged
+}
+
+/** Refresh page one while retaining already loaded older pages in order. */
+export function mergeRefreshedWorkflowRuns(
+  refreshed: ReadonlyArray<IAPIWorkflowRun>,
+  existing: ReadonlyArray<IAPIWorkflowRun>,
+  totalCount: number
+): ReadonlyArray<IAPIWorkflowRun> {
+  const refreshedIds = new Set(refreshed.map(run => run.id))
+  const merged = [
+    ...refreshed,
+    ...existing.filter(run => !refreshedIds.has(run.id)),
+  ]
+  return merged.slice(0, Math.max(refreshed.length, totalCount))
+}
+
 /**
  * Repository Actions cache with focus/visibility-gated polling and in-flight
  * request suppression. UI components subscribe only while the Actions tab is
@@ -235,6 +283,10 @@ export class ActionsStore {
   private readonly states = new Map<string, IActionsState>()
   private readonly subscriptions = new Map<string, IActionsSubscription>()
   private readonly inFlight = new Map<string, Promise<void>>()
+  private readonly runPageInFlight = new Map<string, Promise<void>>()
+  private readonly runPageControllers = new Map<string, AbortController>()
+  private readonly refreshGenerations = new Map<string, number>()
+  private readonly runFilters = new Map<string, ActionsRunFilter>()
   private refreshHandle: number | null = null
 
   public constructor(accountsStore: AccountsStore) {
@@ -253,8 +305,15 @@ export class ActionsStore {
     }
     this.accounts = accounts
     this.accountsGeneration++
+    for (const controller of this.runPageControllers.values()) {
+      controller.abort()
+    }
     this.states.clear()
     this.inFlight.clear()
+    this.runPageInFlight.clear()
+    this.runPageControllers.clear()
+    this.refreshGenerations.clear()
+    this.runFilters.clear()
 
     for (const { repository } of this.subscriptions.values()) {
       const state = emptyState(accountSupportsActions(repository, accounts))
@@ -294,6 +353,17 @@ export class ActionsStore {
       current?.callbacks.delete(callback)
       if (current?.callbacks.size === 0) {
         this.subscriptions.delete(key)
+        this.refreshGenerations.set(
+          key,
+          (this.refreshGenerations.get(key) ?? 0) + 1
+        )
+        this.runPageControllers.get(key)?.abort()
+        this.runPageControllers.delete(key)
+        this.runFilters.delete(key)
+        const state = this.states.get(key)
+        if (state?.runsLoadingMore) {
+          this.states.set(key, { ...state, runsLoadingMore: false })
+        }
       }
       if (this.subscriptions.size === 0) {
         this.stopPolling()
@@ -332,6 +402,47 @@ export class ActionsStore {
     const key = getActionsRepositoryKey(repository)
     this.states.set(key, state)
     this.subscriptions.get(key)?.callbacks.forEach(callback => callback(state))
+  }
+
+  /** Apply one exact server-side run filter and restart at page one. */
+  public setRunFilter(
+    repository: Repository,
+    filter: ActionsRunFilter
+  ): Promise<void> {
+    const key = getActionsRepositoryKey(repository)
+    let normalized: ActionsRunFilter = {}
+    if (filter.workflowId !== undefined) {
+      if (!Number.isSafeInteger(filter.workflowId) || filter.workflowId < 1) {
+        return Promise.reject(new Error('Workflow filter is invalid.'))
+      }
+      normalized = { ...normalized, workflowId: filter.workflowId }
+    }
+    for (const field of ['branch', 'event', 'status'] as const) {
+      const value = filter[field]
+      if (value === undefined) {
+        continue
+      }
+      const maximumLength = field === 'branch' ? 1_024 : 64
+      if (
+        value.length === 0 ||
+        value.length > maximumLength ||
+        /[\u0000-\u001f\u007f]/.test(value)
+      ) {
+        return Promise.reject(
+          new Error(`Workflow run ${field} filter is invalid.`)
+        )
+      }
+      normalized = { ...normalized, [field]: value }
+    }
+
+    if (
+      JSON.stringify(this.runFilters.get(key) ?? {}) ===
+      JSON.stringify(normalized)
+    ) {
+      return Promise.resolve()
+    }
+    this.runFilters.set(key, normalized)
+    return this.refresh(repository, true)
   }
 
   private gitHubFor(repository: Repository): GitHubRepository {
@@ -403,10 +514,16 @@ export class ActionsStore {
     }
 
     const generation = this.accountsGeneration
+    const refreshGeneration = (this.refreshGenerations.get(key) ?? 0) + 1
+    this.refreshGenerations.set(key, refreshGeneration)
+    this.runPageControllers.get(key)?.abort()
+    this.runPageControllers.delete(key)
     const refresh = this.performRefresh(
       repository,
       existing,
-      generation
+      generation,
+      refreshGeneration,
+      this.runFilters.get(key) ?? {}
     ).finally(() => {
       if (this.inFlight.get(key) === refresh) {
         this.inFlight.delete(key)
@@ -419,26 +536,56 @@ export class ActionsStore {
   private async performRefresh(
     repository: Repository,
     existing: IActionsState,
-    accountsGeneration: number
+    accountsGeneration: number,
+    refreshGeneration: number,
+    filter: ActionsRunFilter
   ) {
-    this.notify(repository, { ...existing, loading: true, error: null })
+    const key = getActionsRepositoryKey(repository)
+    this.notify(repository, {
+      ...existing,
+      loading: true,
+      runsLoadingMore: false,
+      error: null,
+    })
     try {
       const api = this.apiFor(repository)
       const gitHubRepository = this.gitHubFor(repository)
       const owner = gitHubRepository.owner.login
       const [workflows, runs] = await Promise.all([
         api.fetchWorkflows(owner, gitHubRepository.name),
-        api.fetchWorkflowRuns(owner, gitHubRepository.name),
+        api.fetchWorkflowRuns(owner, gitHubRepository.name, {
+          ...filter,
+          page: 1,
+          perPage: ActionsWorkflowRunPageSize,
+        }),
       ])
-      if (accountsGeneration !== this.accountsGeneration) {
+      if (
+        accountsGeneration !== this.accountsGeneration ||
+        (this.refreshGenerations.get(key) ?? 0) !== refreshGeneration
+      ) {
         return
       }
-      const nextRuns = workflowRunsEqual(existing.runs, runs.workflow_runs)
-        ? existing.runs
-        : runs.workflow_runs
+      const nextRuns =
+        existing.runs.length <= runs.workflow_runs.length
+          ? workflowRunsEqual(existing.runs, runs.workflow_runs)
+            ? existing.runs
+            : runs.workflow_runs
+          : mergeRefreshedWorkflowRuns(
+              runs.workflow_runs,
+              existing.runs,
+              runs.total_count
+            )
+      const runsTotalCount = Math.max(runs.total_count, nextRuns.length)
       this.notify(repository, {
         workflows: workflows.workflows,
         runs: nextRuns,
+        runsTotalCount,
+        runsNextPage:
+          nextRuns.length < runsTotalCount
+            ? existing.runsNextPage ??
+              Math.floor(nextRuns.length / ActionsWorkflowRunPageSize) + 1
+            : null,
+        runsLoadingMore: false,
         loading: false,
         error: null,
         rateLimitReset: null,
@@ -446,7 +593,10 @@ export class ActionsStore {
         supported: true,
       })
     } catch (error) {
-      if (accountsGeneration !== this.accountsGeneration) {
+      if (
+        accountsGeneration !== this.accountsGeneration ||
+        (this.refreshGenerations.get(key) ?? 0) !== refreshGeneration
+      ) {
         return
       }
       const failure = error instanceof Error ? error : new Error(String(error))
@@ -458,6 +608,7 @@ export class ActionsStore {
         : existing
       this.notify(repository, {
         ...safeExisting,
+        runsLoadingMore: false,
         loading: false,
         error: failure,
         rateLimitReset:
@@ -465,6 +616,126 @@ export class ActionsStore {
             ? error.rateLimitReset
             : null,
         lastUpdated: new Date(),
+      })
+    }
+  }
+
+  /** Append the next bounded run page for the currently selected account. */
+  public async loadMoreRuns(repository: Repository): Promise<void> {
+    const key = getActionsRepositoryKey(repository)
+    const existing =
+      this.states.get(key) ??
+      emptyState(accountSupportsActions(repository, this.accounts))
+    const page = existing.runsNextPage
+    if (
+      !existing.supported ||
+      existing.loading ||
+      existing.runsLoadingMore ||
+      page === null
+    ) {
+      return
+    }
+
+    const pending = this.runPageInFlight.get(key)
+    if (pending !== undefined) {
+      return pending
+    }
+
+    const accountsGeneration = this.accountsGeneration
+    const refreshGeneration = this.refreshGenerations.get(key) ?? 0
+    const controller = new AbortController()
+    this.runPageControllers.set(key, controller)
+    const request = this.performLoadMoreRuns(
+      repository,
+      existing,
+      page,
+      accountsGeneration,
+      refreshGeneration,
+      controller.signal,
+      this.runFilters.get(key) ?? {}
+    ).finally(() => {
+      if (this.runPageInFlight.get(key) === request) {
+        this.runPageInFlight.delete(key)
+      }
+      if (this.runPageControllers.get(key) === controller) {
+        this.runPageControllers.delete(key)
+      }
+    })
+    this.runPageInFlight.set(key, request)
+    return request
+  }
+
+  private async performLoadMoreRuns(
+    repository: Repository,
+    existing: IActionsState,
+    page: number,
+    accountsGeneration: number,
+    refreshGeneration: number,
+    signal: AbortSignal,
+    filter: ActionsRunFilter
+  ): Promise<void> {
+    const key = getActionsRepositoryKey(repository)
+    this.notify(repository, {
+      ...existing,
+      runsLoadingMore: true,
+      error: null,
+    })
+    try {
+      const gitHubRepository = this.gitHubFor(repository)
+      const response = await this.apiFor(repository).fetchWorkflowRuns(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        { ...filter, page, perPage: ActionsWorkflowRunPageSize },
+        signal
+      )
+      if (
+        accountsGeneration !== this.accountsGeneration ||
+        (this.refreshGenerations.get(key) ?? 0) !== refreshGeneration
+      ) {
+        return
+      }
+
+      const current = this.states.get(key)
+      if (current === undefined || current.runsNextPage !== page) {
+        return
+      }
+      const runs = mergeWorkflowRunPage(current.runs, response.workflow_runs)
+      const runsTotalCount = Math.max(response.total_count, runs.length)
+      this.notify(repository, {
+        ...current,
+        runs,
+        runsTotalCount,
+        runsNextPage:
+          response.workflow_runs.length > 0 && runs.length < runsTotalCount
+            ? page + 1
+            : null,
+        runsLoadingMore: false,
+        error: null,
+      })
+    } catch (error) {
+      if (
+        accountsGeneration !== this.accountsGeneration ||
+        (this.refreshGenerations.get(key) ?? 0) !== refreshGeneration
+      ) {
+        return
+      }
+      const current = this.states.get(key) ?? existing
+      if ((error as Error)?.name === 'AbortError') {
+        this.notify(repository, { ...current, runsLoadingMore: false })
+        return
+      }
+      const failure = error instanceof Error ? error : new Error(String(error))
+      const clearCachedData =
+        error instanceof APIError &&
+        (error.responseStatus === 401 || error.responseStatus === 403)
+      this.notify(repository, {
+        ...(clearCachedData ? emptyState(current.supported) : current),
+        runsLoadingMore: false,
+        error: failure,
+        rateLimitReset:
+          error instanceof APIError && error.responseStatus === 403
+            ? error.rateLimitReset
+            : null,
       })
     }
   }

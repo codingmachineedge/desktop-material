@@ -560,7 +560,11 @@ export interface IAPIWorkflowRunsFilter {
   readonly event?: string
   readonly status?: string
   readonly perPage?: number
+  readonly page?: number
 }
+
+/** GitHub's bounded page size used by the interactive Actions run browser. */
+export const ActionsWorkflowRunPageSize = 50
 
 // NB. Only partially mapped
 export interface IAPIWorkflowRun {
@@ -2147,13 +2151,24 @@ export class API {
   public async fetchWorkflowRuns(
     owner: string,
     name: string,
-    filter: IAPIWorkflowRunsFilter = {}
+    filter: IAPIWorkflowRunsFilter = {},
+    signal?: AbortSignal
   ): Promise<IAPIWorkflowRuns> {
     const path = filter.workflowId
       ? `repos/${owner}/${name}/actions/workflows/${filter.workflowId}/runs`
       : `repos/${owner}/${name}/actions/runs`
+    const perPage = filter.perPage ?? ActionsWorkflowRunPageSize
+    const page = filter.page ?? 1
+    if (!Number.isSafeInteger(perPage) || perPage < 1 || perPage > 100) {
+      throw new Error('Workflow run page size is invalid.')
+    }
+    if (!Number.isSafeInteger(page) || page < 1 || page > 1_000_000) {
+      throw new Error('Workflow run page is invalid.')
+    }
+
     const query = new URLSearchParams()
-    query.set('per_page', String(filter.perPage ?? 50))
+    query.set('per_page', String(perPage))
+    query.set('page', String(page))
     if (filter.branch) {
       query.set('branch', filter.branch)
     }
@@ -2164,7 +2179,9 @@ export class API {
       query.set('status', filter.status)
     }
 
-    const response = await this.ghRequest('GET', `${path}?${query}`)
+    const response = await this.ghRequest('GET', `${path}?${query}`, {
+      signal,
+    })
     return await parsedResponse<IAPIWorkflowRuns>(response)
   }
 

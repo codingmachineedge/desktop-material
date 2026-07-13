@@ -9,6 +9,21 @@ const source = readFileSync(
 )
 
 describe('Actions artifact responsive styles', () => {
+  it('keeps the run pager inside a vertically scrolling, zero-min-width column', () => {
+    assert.match(
+      source,
+      /\.actions-run-column\s*\{[\s\S]*?display: flex;[\s\S]*?flex-direction: column;[\s\S]*?min-width: min\(360px, 100%\);[\s\S]*?min-height: 0;/
+    )
+    assert.match(
+      source,
+      /\.actions-run-pagination\s*\{[\s\S]*?min-width: 0;[\s\S]*?flex-wrap: wrap;[\s\S]*?> span\s*\{[\s\S]*?overflow-wrap: anywhere;/
+    )
+    assert.match(
+      source,
+      /@media \(max-width: 620px\)[\s\S]*?\.actions-run-pagination\s*\{[\s\S]*?flex-direction: column;[\s\S]*?width: 100%;/
+    )
+  })
+
   it('constrains nested panels and artifact cards without horizontal scrolling', () => {
     assert.match(
       source,
