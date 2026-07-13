@@ -3,7 +3,8 @@ import { RepositorySectionTab } from '../lib/app-state'
 /** Repository rail order, kept independent from the enum's stable values. */
 export function getRepositorySections(
   supportsGitHubActions: boolean,
-  supportsGitHubReleases: boolean = false
+  supportsGitHubReleases: boolean = false,
+  supportsGitHubIssues: boolean = false
 ): ReadonlyArray<RepositorySectionTab> {
   const sections = [RepositorySectionTab.Changes, RepositorySectionTab.History]
   if (supportsGitHubActions) {
@@ -12,6 +13,9 @@ export function getRepositorySections(
   if (supportsGitHubReleases) {
     sections.push(RepositorySectionTab.Releases)
   }
+  if (supportsGitHubIssues) {
+    sections.push(RepositorySectionTab.Issues)
+  }
   sections.push(RepositorySectionTab.RepositoryTools)
   return sections
 }
@@ -19,10 +23,12 @@ export function getRepositorySections(
 export function getRepositorySectionVisualIndex(
   section: RepositorySectionTab,
   supportsGitHubActions: boolean,
-  supportsGitHubReleases: boolean = false
+  supportsGitHubReleases: boolean = false,
+  supportsGitHubIssues: boolean = false
 ): number {
   return getRepositorySections(
     supportsGitHubActions,
-    supportsGitHubReleases
+    supportsGitHubReleases,
+    supportsGitHubIssues
   ).indexOf(section)
 }

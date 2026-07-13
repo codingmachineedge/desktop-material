@@ -17,7 +17,7 @@ claiming that its remaining README roadmap items are finished.
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Integration checkpoint `36eb02992b` contains the
+`codex/guided-final-gate`. Integration checkpoint `0fb82d988b` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -41,10 +41,18 @@ review. Repository Hooks passed all 349 test files in Windows-safe batches on
 its final worktree, then passed 35/35 focused manager, style, Repository Tools,
 and compact-settings checks again after integration. Its reviewed mutations
 revalidate the hooks directory, source and destination identity, configuration,
-and cancellation boundary before changing an exact known client hook.
+and cancellation boundary before changing an exact known client hook. Richer
+GitHub Issues workflows add bounded browsing, search, filtering, exact detail
+and comments, metadata editing, comments, and close/reopen operations. Every
+write is bound to the exact repository, account generation, issue snapshot,
+operation, and normalized payload; an account rotation, stale issue, reused
+review, or uncertain post-boundary result fails closed. The merged Issues slice
+passed 47/47 focused API/model/store/UI/style/section-order checks again on the
+integration tree after its production build and branch gates passed.
 
-Richer Issue workflows and provider-neutral triage remain active in isolated
-worktrees. Nothing in this live section claims publication on
+Provider-neutral triage remains active in its isolated worktree and is merging
+this Issues checkpoint before final handoff. Nothing in this live section
+claims publication on
 `main`: final production build, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
