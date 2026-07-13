@@ -106,4 +106,45 @@ describe('Branches grouping', () => {
       ['zulu', 'alpha']
     )
   })
+
+  it('groups pinned branches first and hides only nonessential branches', () => {
+    const groups = groupBranches(
+      defaultBranch,
+      currentBranch,
+      allBranches,
+      recentBranches,
+      BranchSortOrder.Alphabetical,
+      {
+        pinned: ['other-branch'],
+        hidden: ['some-recent-branch', 'master'],
+        solo: null,
+      }
+    )
+
+    assert.deepEqual(
+      groups.map(group => group.identifier),
+      ['default', 'pinned', 'other']
+    )
+    assert.equal(groups[0].items[0].branch.name, 'master')
+    assert.equal(groups[1].items[0].branch.name, 'other-branch')
+    assert.equal(groups[1].items[0].isPinned, true)
+    assert.equal(groups[2].items.length, 0)
+  })
+
+  it('keeps the default and current branches available in solo view', () => {
+    const feature = new Branch('feature', null, branchTip, BranchType.Local, '')
+    const groups = groupBranches(
+      defaultBranch,
+      feature,
+      [...allBranches, feature],
+      recentBranches,
+      BranchSortOrder.Alphabetical,
+      { pinned: [], hidden: [], solo: 'other-branch' }
+    )
+
+    assert.deepEqual(
+      groups.flatMap(group => group.items.map(item => item.branch.name)),
+      ['master', 'feature', 'other-branch']
+    )
+  })
 })

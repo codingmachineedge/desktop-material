@@ -24,6 +24,7 @@ export function renderDefaultBranch(
   return (
     <BranchListItem
       name={branch.name}
+      isPinned={item.isPinned}
       isCurrentBranch={branch.name === currentBranchName}
       isLocalOnly={isLocalOnly}
       authorDate={authorDate}
@@ -44,9 +45,10 @@ export function getDefaultAriaLabelForBranch(
     (branch.upstream === null || branch.isGone)
       ? ', not published'
       : ''
+  const pinnedSuffix = item.isPinned ? ', pinned' : ''
 
   if (!authorDate) {
-    return `${branch.name}${localOnlySuffix}`
+    return `${branch.name}${localOnlySuffix}${pinnedSuffix}`
   }
 
   const { relativeText, absoluteText } = getRelativeTimeInfoFromDate(
@@ -54,7 +56,7 @@ export function getDefaultAriaLabelForBranch(
     true
   )
 
-  return `${item.branch.name}${localOnlySuffix} ${
+  return `${item.branch.name}${localOnlySuffix}${pinnedSuffix} ${
     getPreferAbsoluteDates() ? absoluteText : relativeText
   }`
 }

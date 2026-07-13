@@ -21,6 +21,9 @@ interface IBranchListItemProps {
   /** Specifies whether this item is currently selected */
   readonly isCurrentBranch: boolean
 
+  /** Whether this branch has been pinned to the top of the list. */
+  readonly isPinned?: boolean
+
   /** Whether the local branch has no live upstream branch. */
   readonly isLocalOnly?: boolean
 
@@ -99,6 +102,7 @@ export class BranchListItem extends React.Component<
     const {
       authorDate,
       isCurrentBranch,
+      isPinned = false,
       isLocalOnly = false,
       name,
     } = this.props
@@ -149,6 +153,13 @@ export class BranchListItem extends React.Component<
               tooltip={!enableAccessibleListToolTips()}
             />
           ))}
+        {isPinned && (
+          <Octicon
+            className="pinned-branch-indicator"
+            symbol={octicons.pin}
+            title="Pinned branch"
+          />
+        )}
         {isCurrentBranch && (
           <Octicon
             className="current-branch-indicator"

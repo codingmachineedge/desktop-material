@@ -181,6 +181,26 @@
 }
 
 .branches-list {
+  .branch-visibility-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-half);
+    padding: var(--spacing-half) var(--spacing);
+    color: var(--md-sys-color-on-surface-variant);
+    background: var(--md-sys-color-surface-container);
+    border-radius: 12px;
+
+    span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    button {
+      flex-shrink: 0;
+    }
+  }
+
   &-item {
     padding: 0 var(--spacing);
   }
@@ -220,6 +240,12 @@
       flex-grow: 1;
       text-align: right;
       white-space: nowrap;
+    }
+
+    .pinned-branch-indicator {
+      color: var(--md-sys-color-primary);
+      flex-shrink: 0;
+      margin-right: var(--spacing-half);
     }
   }
 }
