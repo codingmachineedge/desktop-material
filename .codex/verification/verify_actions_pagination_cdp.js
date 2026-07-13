@@ -34,9 +34,46 @@ function parseArguments(argv) {
   if (mode !== 'interact' && mode !== 'inspect') {
     fail('Mode must be interact or inspect.')
   }
+  let fixtureAccount = null
+  if (mode === 'interact') {
+    const providerEndpoint = values.get('provider-endpoint')
+    const accountLogin = values.get('account-login')
+    const accountId = Number(values.get('account-id'))
+    let parsedEndpoint
+    try {
+      parsedEndpoint = new URL(providerEndpoint)
+    } catch {
+      fail('A valid fixture provider endpoint is required.')
+    }
+    if (
+      parsedEndpoint.protocol !== 'http:' ||
+      !['127.0.0.1', 'localhost', '::1'].includes(
+        parsedEndpoint.hostname.toLowerCase()
+      ) ||
+      parsedEndpoint.pathname.replace(/\/$/, '') !== '/api/v3' ||
+      parsedEndpoint.username !== '' ||
+      parsedEndpoint.password !== ''
+    ) {
+      fail(
+        'The fixture provider must be an uncredentialed loopback /api/v3 URL.'
+      )
+    }
+    if (!/^[A-Za-z0-9-]{1,39}$/.test(accountLogin ?? '')) {
+      fail('A valid fixture account login is required.')
+    }
+    if (!Number.isSafeInteger(accountId) || accountId < 1) {
+      fail('A valid fixture account id is required.')
+    }
+    fixtureAccount = {
+      endpoint: parsedEndpoint.toString().replace(/\/$/, ''),
+      login: accountLogin,
+      id: accountId,
+    }
+  }
   return {
     port,
     mode,
+    fixtureAccount,
     runCapture: values.get('run-capture'),
     artifactCapture: values.get('artifact-capture'),
     sentinelCapture: values.get('sentinel-capture'),
@@ -185,7 +222,27 @@ async function waitFor(client, expression, label, timeout = 20_000) {
   fail(`Timed out waiting for ${label}: ${JSON.stringify(diagnostic)}`)
 }
 
-async function seedIsolatedProfile(client) {
+async function seedIsolatedProfile(client, fixtureAccount) {
+  const users = JSON.stringify([
+    {
+      token: '',
+      login: fixtureAccount.login,
+      endpoint: fixtureAccount.endpoint,
+      emails: [
+        {
+          email: 'material-verifier@example.invalid',
+          verified: true,
+          primary: true,
+          visibility: 'private',
+        },
+      ],
+      avatarURL: '',
+      id: fixtureAccount.id,
+      name: 'Material Verification Account With Wrapped Identity',
+      plan: 'enterprise',
+      provider: 'github',
+    },
+  ])
   return evaluate(
     client,
     `(() => {
@@ -194,7 +251,8 @@ async function seedIsolatedProfile(client) {
         'theme': 'light',
         'zoom-auto-fit-enabled': '1',
         'stats-opt-out': '1',
-        'has-sent-stats-opt-in-ping': '1'
+        'has-sent-stats-opt-in-ping': '1',
+        'users': ${JSON.stringify(users)}
       }
       let changed = false
       for (const [key, value] of Object.entries(expected)) {
@@ -376,7 +434,7 @@ async function interact(client, options) {
     'sentinel-capture'
   )
 
-  if (await seedIsolatedProfile(client)) {
+  if (await seedIsolatedProfile(client, options.fixtureAccount)) {
     fail(
       'Initialized the isolated verification profile; restart the exact app with the same profile before retrying.'
     )
