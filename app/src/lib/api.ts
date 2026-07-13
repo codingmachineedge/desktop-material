@@ -1523,7 +1523,8 @@ export class API {
       created,
       safeOwner,
       safeName,
-      getHTMLURL(this.endpoint)
+      getHTMLURL(this.endpoint),
+      pullRequest
     )
   }
 

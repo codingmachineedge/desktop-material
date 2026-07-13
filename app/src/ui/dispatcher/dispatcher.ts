@@ -8,6 +8,7 @@ import {
   IAPICheckSuite,
   IAPIRepoRuleset,
   getDotComAPIEndpoint,
+  getHTMLURL,
   IAPICreatePushProtectionBypassResponse,
 } from '../../lib/api'
 import { getAccountForRepository } from '../../lib/get-account-for-repository'
@@ -86,6 +87,7 @@ import { ICommitMessage } from '../../models/commit-message'
 import { DiffSelection, ImageDiffType, ITextDiff } from '../../models/diff'
 import { FetchType } from '../../models/fetch'
 import { GitHubRepository } from '../../models/github-repository'
+import { IRemote } from '../../models/remote'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { Popup, PopupType } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
@@ -3196,13 +3198,15 @@ export class Dispatcher {
   public openCreatePullRequestInBrowser(
     repository: Repository,
     branch: Branch,
-    baseBranch?: Branch,
+    sourceRemote: IRemote | null,
+    baseBranchName?: string,
     target?: GitHubRepository
   ): Promise<boolean> {
     return this.appStore._openCreatePullRequestInBrowser(
       repository,
       branch,
-      baseBranch,
+      sourceRemote,
+      baseBranchName,
       target
     )
   }
@@ -3697,6 +3701,8 @@ export class Dispatcher {
     target: GitHubRepository,
     account: Account,
     currentBranch: Branch,
+    sourceRemote: IRemote | null,
+    providerHTMLURL: string,
     contextVersion: string,
     draft: IGitHubPullRequestDraft,
     signal: AbortSignal
@@ -3714,6 +3720,9 @@ export class Dispatcher {
     }
 
     const source = repository.gitHubRepository
+    if (providerHTMLURL !== getHTMLURL(source.endpoint)) {
+      throw new GitHubPullRequestContextChangedError()
+    }
     const targetIsAllowed =
       target.hash === source.hash || target.hash === source.parent?.hash
     if (!targetIsAllowed || target.endpoint !== source.endpoint) {
@@ -3732,7 +3741,13 @@ export class Dispatcher {
       throw new Error('No matching authenticated GitHub account is available.')
     }
 
-    const expectedHead = getGitHubPullRequestHead(source, target, currentBranch)
+    const expectedHead = getGitHubPullRequestHead(
+      source,
+      target,
+      currentBranch,
+      sourceRemote,
+      providerHTMLURL
+    )
     if (draft.head !== expectedHead) {
       throw new GitHubPullRequestContextChangedError()
     }

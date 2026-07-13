@@ -1,8 +1,10 @@
-import { Branch } from '../models/branch'
+import { Branch, BranchType } from '../models/branch'
 import { GitHubRepository } from '../models/github-repository'
+import { IRemote } from '../models/remote'
 import { Repository } from '../models/repository'
 import { APIError } from './http'
 import { validateGitHubRepositoryPart } from './github-issue'
+import { parseRepositoryIdentifier } from './remote-parsing'
 
 export const GitHubPullRequestTitleMaximumLength = 256
 export const GitHubPullRequestBodyMaximumLength = 65536
@@ -23,6 +25,13 @@ export interface IAPICreatedGitHubPullRequest {
   readonly html_url: string
   readonly state: string
   readonly draft?: boolean
+  readonly head?: {
+    readonly ref?: string
+    readonly label?: string
+  }
+  readonly base?: {
+    readonly ref?: string
+  }
 }
 
 export interface ICreatedGitHubPullRequest {
@@ -34,8 +43,77 @@ export interface ICreatedGitHubPullRequest {
 
 export interface IGitHubPullRequestTarget {
   readonly repository: GitHubRepository
-  readonly baseBranches: ReadonlyArray<Branch>
-  readonly defaultBranch: Branch | null
+  readonly baseBranches: ReadonlyArray<IGitHubPullRequestBaseBranch>
+  readonly defaultBranchName: string | null
+}
+
+export interface IGitHubPullRequestBaseBranch {
+  /** Canonical provider-side ref name, independent of any local alias. */
+  readonly name: string
+  /** Local branch evidence or exact remote ref that established this mapping. */
+  readonly branch: Branch
+}
+
+/** Map one local or remote branch to its canonical ref on an exact remote. */
+export function getGitHubPullRequestBaseBranchName(
+  branch: Branch,
+  remoteName: string
+): string | null {
+  if (branch.type === BranchType.Remote && branch.remoteName === remoteName) {
+    return branch.nameWithoutRemote
+  }
+  if (branch.upstreamRemoteName === remoteName) {
+    return branch.upstreamWithoutRemote
+  }
+  return null
+}
+
+function getCanonicalBaseBranches(
+  allBranches: ReadonlyArray<Branch>,
+  remoteName: string | null,
+  defaultBranch: Branch | null
+): {
+  readonly branches: ReadonlyArray<IGitHubPullRequestBaseBranch>
+  readonly defaultName: string | null
+} {
+  if (remoteName === null) {
+    return { branches: [], defaultName: null }
+  }
+
+  const byName = new Map<string, IGitHubPullRequestBaseBranch>()
+  for (const branch of allBranches) {
+    const name = getGitHubPullRequestBaseBranchName(branch, remoteName)
+    if (name === null) {
+      continue
+    }
+
+    const existing = byName.get(name)
+    // Prefer the exact remote ref when a local tracking alias maps to the same
+    // provider branch. This makes collisions deterministic and reviewable.
+    if (
+      existing === undefined ||
+      (existing.branch.type !== BranchType.Remote &&
+        branch.type === BranchType.Remote)
+    ) {
+      byName.set(name, { name, branch })
+    }
+  }
+
+  const candidateDefault =
+    defaultBranch === null
+      ? null
+      : getGitHubPullRequestBaseBranchName(defaultBranch, remoteName)
+  const defaultName =
+    candidateDefault !== null && byName.has(candidateDefault)
+      ? candidateDefault
+      : null
+  if (defaultName === null) {
+    return { branches: [...byName.values()], defaultName }
+  }
+
+  const preferred = byName.get(defaultName)!
+  byName.delete(defaultName)
+  return { branches: [preferred, ...byName.values()], defaultName }
 }
 
 /** Map self and fork-parent targets to only the branches on their exact remote. */
@@ -56,17 +134,15 @@ export function buildGitHubPullRequestTargets(
     if (targets.some(target => target.repository.hash === repository.hash)) {
       return
     }
+    const canonical = getCanonicalBaseBranches(
+      allBranches,
+      remoteName,
+      targetDefaultBranch
+    )
     targets.push({
       repository,
-      baseBranches:
-        remoteName === null
-          ? []
-          : allBranches.filter(
-              branch =>
-                branch.upstreamRemoteName === remoteName ||
-                branch.remoteName === remoteName
-            ),
-      defaultBranch: targetDefaultBranch,
+      baseBranches: canonical.branches,
+      defaultBranchName: canonical.defaultName,
     })
   }
 
@@ -75,6 +151,14 @@ export function buildGitHubPullRequestTargets(
     addTarget(source.parent, upstreamRemoteName, upstreamDefaultBranch)
   }
   return targets
+}
+
+/** Use refreshed branch metadata only when it still represents the same ref. */
+export function resolveRefreshedGitHubPullRequestBranch(
+  requestedBranch: Branch,
+  refreshedBranch: Branch | null
+): Branch | null {
+  return refreshedBranch?.ref === requestedBranch.ref ? refreshedBranch : null
 }
 
 export type GitHubPullRequestCreationErrorKind =
@@ -183,12 +267,113 @@ export function normalizeGitHubPullRequestDraft(
   }
 }
 
+function getExactGitHubRepositoryHTMLURL(
+  repository: GitHubRepository,
+  providerHTMLURL: string
+): URL | null {
+  if (repository.htmlURL === null) {
+    return null
+  }
+
+  let providerURL: URL
+  let repositoryURL: URL
+  try {
+    providerURL = new URL(providerHTMLURL)
+    repositoryURL = new URL(repository.htmlURL)
+  } catch {
+    return null
+  }
+
+  if (
+    !['http:', 'https:'].includes(providerURL.protocol) ||
+    providerURL.username !== '' ||
+    providerURL.password !== '' ||
+    providerURL.search !== '' ||
+    providerURL.hash !== '' ||
+    repositoryURL.origin !== providerURL.origin ||
+    repositoryURL.username !== '' ||
+    repositoryURL.password !== '' ||
+    repositoryURL.search !== '' ||
+    repositoryURL.hash !== ''
+  ) {
+    return null
+  }
+
+  const providerPath = providerURL.pathname.replace(/\/+$/, '')
+  const expectedPath = `${providerPath}/${encodeURIComponent(
+    repository.owner.login
+  )}/${encodeURIComponent(repository.name)}`.replace(/^\/\//, '/')
+  return repositoryURL.pathname.replace(/\/$/, '') === expectedPath
+    ? repositoryURL
+    : null
+}
+
+function getRepositoryURLHostname(
+  value: string,
+  parsed: ReturnType<typeof parseRepositoryIdentifier>
+): string | null {
+  try {
+    const url = new URL(value)
+    if (['http:', 'https:'].includes(url.protocol)) {
+      return url.hostname
+    }
+  } catch {
+    // SSH/scp-style Git remotes are handled by parseRepositoryIdentifier.
+  }
+  return parsed?.hostname ?? null
+}
+
 /** Build the exact head value expected by GitHub for same-repo and fork PRs. */
 export function getGitHubPullRequestHead(
   source: GitHubRepository,
   target: GitHubRepository,
-  branch: Branch
+  branch: Branch,
+  sourceRemote: IRemote | null,
+  providerHTMLURL: string
 ): string {
+  if (
+    sourceRemote === null ||
+    branch.upstreamRemoteName !== sourceRemote.name
+  ) {
+    throw new Error(
+      'The current branch is not published to the source repository remote.'
+    )
+  }
+
+  const remoteRepository = parseRepositoryIdentifier(sourceRemote.url)
+  const providerSourceURL = getExactGitHubRepositoryHTMLURL(
+    source,
+    providerHTMLURL
+  )
+  const sourceRepositoryURL =
+    source.cloneURL === null ? source.htmlURL : source.cloneURL
+  const sourceRepository =
+    sourceRepositoryURL === null
+      ? null
+      : parseRepositoryIdentifier(sourceRepositoryURL)
+  const remoteHostname = getRepositoryURLHostname(
+    sourceRemote.url,
+    remoteRepository
+  )
+  const sourceHostname =
+    sourceRepositoryURL === null
+      ? null
+      : getRepositoryURLHostname(sourceRepositoryURL, sourceRepository)
+  if (
+    remoteRepository === null ||
+    providerSourceURL === null ||
+    sourceRepository === null ||
+    remoteRepository.owner.toLowerCase() !== source.owner.login.toLowerCase() ||
+    remoteRepository.name.toLowerCase() !== source.name.toLowerCase() ||
+    (sourceHostname !== null &&
+      remoteHostname?.toLowerCase() !== sourceHostname.toLowerCase()) ||
+    remoteHostname?.toLowerCase() !== providerSourceURL.hostname.toLowerCase()
+  ) {
+    throw new Error(
+      'The current branch upstream does not belong to the source repository.'
+    )
+  }
+
   const publishedBranch = branch.upstreamWithoutRemote
   if (publishedBranch === null) {
     throw new Error(
@@ -210,40 +395,36 @@ export function getGitHubPullRequestCreationURL(
   source: GitHubRepository,
   target: GitHubRepository,
   branch: Branch,
-  baseBranch?: Branch
+  sourceRemote: IRemote | null,
+  providerHTMLURL: string,
+  baseBranchName?: string
 ): string | null {
-  if (target.htmlURL === null) {
+  const targetURL = getExactGitHubRepositoryHTMLURL(target, providerHTMLURL)
+  if (targetURL === null) {
     return null
   }
 
-  let targetURL: URL
+  let apiHead: string
   try {
-    targetURL = new URL(target.htmlURL)
+    apiHead = getGitHubPullRequestHead(
+      source,
+      target,
+      branch,
+      sourceRemote,
+      providerHTMLURL
+    )
   } catch {
     return null
   }
-
-  if (
-    !['http:', 'https:'].includes(targetURL.protocol) ||
-    targetURL.username !== '' ||
-    targetURL.password !== '' ||
-    targetURL.search !== '' ||
-    targetURL.hash !== '' ||
-    !targetURL.pathname.endsWith(`/${target.owner.login}/${target.name}`)
-  ) {
-    return null
-  }
-
-  const publishedBranch = branch.upstreamWithoutRemote
-  if (publishedBranch === null) {
-    return null
-  }
-  const safeHead = validateGitHubPullRequestBranch(publishedBranch, 'head')
+  const safeHead = validateGitHubPullRequestBranch(
+    apiHead.slice(apiHead.indexOf(':') + 1),
+    'head'
+  )
   const encodedBase =
-    baseBranch === undefined
+    baseBranchName === undefined
       ? ''
       : `${encodeURIComponent(
-          validateGitHubPullRequestBranch(baseBranch.nameWithoutRemote, 'base')
+          validateGitHubPullRequestBranch(baseBranchName, 'base')
         )}...`
   const encodedHead = encodeURIComponent(safeHead)
   const head =
@@ -265,7 +446,8 @@ export function getGitHubPullRequestCreationURL(
 /** A stable snapshot used to reject repository or current-branch changes. */
 export function getGitHubPullRequestContextVersion(
   repository: Repository,
-  branch: Branch
+  branch: Branch,
+  sourceRemote: IRemote | null
 ): string {
   return JSON.stringify([
     repository.id,
@@ -273,6 +455,9 @@ export function getGitHubPullRequestContextVersion(
     repository.hash,
     branch.ref,
     branch.tip.sha,
+    branch.upstream,
+    sourceRemote?.name ?? null,
+    sourceRemote?.url ?? null,
   ])
 }
 
@@ -281,16 +466,31 @@ export function getGitHubPullRequestContextVersion(
  * URL must point to the exact PR number on the selected provider origin.
  */
 export function validateCreatedGitHubPullRequest(
-  pullRequest: IAPICreatedGitHubPullRequest,
+  value: unknown,
   owner: string,
   repository: string,
-  providerHTMLURL: string
+  providerHTMLURL: string,
+  reviewedDraft?: IGitHubPullRequestDraft
 ): ICreatedGitHubPullRequest {
   validateGitHubRepositoryPart(owner, 'owner')
   validateGitHubRepositoryPart(repository, 'repository')
 
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('GitHub returned an invalid pull request result.')
+  }
+  const pullRequest = value as IAPICreatedGitHubPullRequest
+
   if (!Number.isSafeInteger(pullRequest.number) || pullRequest.number <= 0) {
     throw new Error('GitHub returned an invalid pull request number.')
+  }
+  if (
+    typeof pullRequest.title !== 'string' ||
+    pullRequest.title.length === 0 ||
+    pullRequest.title.length > GitHubPullRequestTitleMaximumLength ||
+    pullRequest.state !== 'open' ||
+    typeof pullRequest.draft !== 'boolean'
+  ) {
+    throw new Error('GitHub returned an invalid pull request result.')
   }
 
   let provider: URL
@@ -323,11 +523,35 @@ export function validateCreatedGitHubPullRequest(
     throw new Error('GitHub returned an unexpected pull request URL.')
   }
 
+  if (reviewedDraft !== undefined) {
+    const reviewedHeadRef = reviewedDraft.head.includes(':')
+      ? reviewedDraft.head.slice(reviewedDraft.head.indexOf(':') + 1)
+      : reviewedDraft.head
+    const expectedHeadLabel = reviewedDraft.head.includes(':')
+      ? reviewedDraft.head
+      : `${owner}:${reviewedDraft.head}`
+    const bodyMatches =
+      pullRequest.body === reviewedDraft.body ||
+      (reviewedDraft.body === '' && pullRequest.body === null)
+    if (
+      pullRequest.title !== reviewedDraft.title ||
+      !bodyMatches ||
+      pullRequest.draft !== reviewedDraft.draft ||
+      pullRequest.head?.ref !== reviewedHeadRef ||
+      pullRequest.head?.label !== expectedHeadLabel ||
+      pullRequest.base?.ref !== reviewedDraft.base
+    ) {
+      throw new Error(
+        'GitHub returned pull request fields that do not match the reviewed request.'
+      )
+    }
+  }
+
   return {
     number: pullRequest.number,
     title: pullRequest.title,
     url: expected.toString(),
-    draft: pullRequest.draft === true,
+    draft: pullRequest.draft,
   }
 }
 

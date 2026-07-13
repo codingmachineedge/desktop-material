@@ -181,6 +181,8 @@ export type PopupDetail =
       type: PopupType.CreateGitHubPullRequest
       repository: RepositoryWithGitHubRepository
       currentBranch: Branch
+      sourceRemote: IRemote | null
+      providerHTMLURL: string
       targets: ReadonlyArray<IGitHubPullRequestTarget>
       initialTargetHash: string
       initialBaseBranchName: string | null

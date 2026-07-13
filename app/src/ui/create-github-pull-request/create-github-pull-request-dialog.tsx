@@ -7,12 +7,15 @@ import {
   GitHubPullRequestBodyMaximumLength,
   GitHubPullRequestTitleMaximumLength,
   ICreatedGitHubPullRequest,
+  IGitHubPullRequestBaseBranch,
+  IGitHubPullRequestDraft,
   IGitHubPullRequestTarget,
   isGitHubPullRequestAbortError,
   normalizeGitHubPullRequestDraft,
 } from '../../lib/github-pull-request'
 import { Account, getAccountKey } from '../../models/account'
 import { Branch } from '../../models/branch'
+import { IRemote } from '../../models/remote'
 import { RepositoryWithGitHubRepository } from '../../models/repository'
 import {
   Dialog,
@@ -35,6 +38,8 @@ type CreateGitHubPullRequestStep =
 interface ICreateGitHubPullRequestDialogProps {
   readonly repository: RepositoryWithGitHubRepository
   readonly currentBranch: Branch
+  readonly sourceRemote: IRemote | null
+  readonly providerHTMLURL: string
   readonly targets: ReadonlyArray<IGitHubPullRequestTarget>
   readonly initialTargetHash: string
   readonly initialBaseBranchName: string | null
@@ -54,7 +59,7 @@ interface ICreateGitHubPullRequestDialogState {
   readonly body: string
   readonly draft: boolean
   readonly error: string | null
-  readonly createdPullRequest: ICreatedGitHubPullRequest | null
+  readonly successReceipt: ICreateGitHubPullRequestSuccessReceipt | null
   readonly openingBrowser: boolean
   readonly abortRequested: boolean
 }
@@ -62,29 +67,21 @@ interface ICreateGitHubPullRequestDialogState {
 interface IPullRequestCreationAvailability {
   readonly target: IGitHubPullRequestTarget | null
   readonly account: Account | null
-  readonly baseBranch: Branch | null
+  readonly baseBranch: IGitHubPullRequestBaseBranch | null
   readonly head: string | null
   readonly reason: string | null
   readonly browserFallbackAllowed: boolean
 }
 
-function getTargetBaseBranches(
-  target: IGitHubPullRequestTarget
-): ReadonlyArray<Branch> {
-  const byName = new Map<string, Branch>()
-  for (const branch of target.baseBranches) {
-    byName.set(branch.nameWithoutRemote, branch)
-  }
-
-  const defaultName = target.defaultBranch?.nameWithoutRemote
-  if (defaultName !== undefined && byName.has(defaultName)) {
-    const defaultBranch = byName.get(defaultName)!
-    byName.delete(defaultName)
-    return [defaultBranch, ...byName.values()]
-  }
-
-  return [...byName.values()]
+interface ICreateGitHubPullRequestSuccessReceipt {
+  readonly created: ICreatedGitHubPullRequest
+  readonly targetName: string
+  readonly accountLogin: string
+  readonly reviewed: IGitHubPullRequestDraft
 }
+
+const CancellationResultMessage =
+  'The request ended before Desktop received a result. Check GitHub before retrying to avoid a duplicate pull request.'
 
 function getEligibleAccounts(
   accounts: ReadonlyArray<Account>,
@@ -124,15 +121,15 @@ function getInitialBaseBranchName(
     return ''
   }
 
-  const branches = getTargetBaseBranches(target)
+  const branches = target.baseBranches
   if (
     requestedName !== null &&
-    branches.some(branch => branch.nameWithoutRemote === requestedName)
+    branches.some(branch => branch.name === requestedName)
   ) {
     return requestedName
   }
 
-  return branches[0]?.nameWithoutRemote ?? ''
+  return target.defaultBranchName ?? branches[0]?.name ?? ''
 }
 
 export class CreateGitHubPullRequestDialog extends React.Component<
@@ -173,7 +170,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
       body: '',
       draft: false,
       error: null,
-      createdPullRequest: null,
+      successReceipt: null,
       openingBrowser: false,
       abortRequested: false,
     }
@@ -237,12 +234,11 @@ export class CreateGitHubPullRequestDialog extends React.Component<
       !this.props.repositoryContextCurrent &&
       this.state.step !== 'success'
     ) {
-      this.requestGeneration++
-      this.request?.abort()
       if (this.state.step === 'submitting') {
+        this.request?.abort()
         this.setState({
           step: 'review',
-          error: null,
+          error: CancellationResultMessage,
           abortRequested: false,
         })
         return
@@ -270,6 +266,15 @@ export class CreateGitHubPullRequestDialog extends React.Component<
   }
 
   private onDismissed = () => {
+    if (this.state.step === 'submitting') {
+      this.request?.abort()
+      this.setState({
+        step: 'review',
+        error: CancellationResultMessage,
+        abortRequested: false,
+      })
+      return
+    }
     this.requestGeneration++
     this.request?.abort()
     this.props.onDismissed()
@@ -342,8 +347,8 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     }
 
     const baseBranch =
-      getTargetBaseBranches(target).find(
-        branch => branch.nameWithoutRemote === this.state.baseBranchName
+      target.baseBranches.find(
+        branch => branch.name === this.state.baseBranchName
       ) ?? null
     if (baseBranch === null) {
       return {
@@ -381,7 +386,9 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         head: getGitHubPullRequestHead(
           this.props.repository.gitHubRepository,
           target.repository,
-          this.props.currentBranch
+          this.props.currentBranch,
+          this.props.sourceRemote,
+          this.props.providerHTMLURL
         ),
         reason: null,
         browserFallbackAllowed: false,
@@ -463,7 +470,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         this.state.title,
         this.state.body,
         availability.head,
-        availability.baseBranch.nameWithoutRemote,
+        availability.baseBranch.name,
         this.state.draft
       )
       this.setState({
@@ -519,7 +526,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         this.state.title,
         this.state.body,
         availability.head,
-        availability.baseBranch.nameWithoutRemote,
+        availability.baseBranch.name,
         this.state.draft
       )
     } catch (error) {
@@ -547,6 +554,8 @@ export class CreateGitHubPullRequestDialog extends React.Component<
           availability.target.repository,
           availability.account,
           this.props.currentBranch,
+          this.props.sourceRemote,
+          this.props.providerHTMLURL,
           this.props.contextVersion,
           draft,
           request.signal
@@ -560,7 +569,12 @@ export class CreateGitHubPullRequestDialog extends React.Component<
       }
       this.setState({
         step: 'success',
-        createdPullRequest,
+        successReceipt: {
+          created: createdPullRequest,
+          targetName: availability.target.repository.fullName,
+          accountLogin: availability.account.login,
+          reviewed: draft,
+        },
         error: null,
         abortRequested: false,
       })
@@ -587,8 +601,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
   private showCancellationResult = () => {
     this.setState({
       step: 'review',
-      error:
-        'The request was canceled before Desktop received a result. Check GitHub before retrying to avoid a duplicate pull request.',
+      error: CancellationResultMessage,
       abortRequested: false,
     })
   }
@@ -617,7 +630,8 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     const opened = await this.props.dispatcher.openCreatePullRequestInBrowser(
       this.props.repository,
       this.props.currentBranch,
-      availability.baseBranch ?? undefined,
+      this.props.sourceRemote,
+      availability.baseBranch?.name,
       availability.target.repository
     )
     if (!this.mounted) {
@@ -641,11 +655,13 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     if (!this.context.isTopMost) {
       return
     }
-    const pullRequest = this.state.createdPullRequest
-    if (pullRequest === null) {
+    const receipt = this.state.successReceipt
+    if (receipt === null) {
       return
     }
-    const opened = await this.props.dispatcher.openInBrowser(pullRequest.url)
+    const opened = await this.props.dispatcher.openInBrowser(
+      receipt.created.url
+    )
     if (this.mounted && !opened) {
       this.setState({
         error:
@@ -725,7 +741,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     const target = availability.target!
     const account = availability.account!
     const head = availability.head!
-    const baseBranches = getTargetBaseBranches(target)
+    const baseBranches = target.baseBranches
     const eligibleAccounts = getEligibleAccounts(this.props.accounts, target)
     const titleRemaining =
       GitHubPullRequestTitleMaximumLength - this.state.title.length
@@ -778,11 +794,8 @@ export class CreateGitHubPullRequestDialog extends React.Component<
                 onChange={this.onBaseBranchChanged}
               >
                 {baseBranches.map(branch => (
-                  <option
-                    key={branch.nameWithoutRemote}
-                    value={branch.nameWithoutRemote}
-                  >
-                    {branch.nameWithoutRemote}
+                  <option key={branch.name} value={branch.name}>
+                    {branch.name}
                   </option>
                 ))}
               </select>
@@ -937,21 +950,34 @@ export class CreateGitHubPullRequestDialog extends React.Component<
     )
   }
 
-  private renderSuccess(targetName: string) {
-    const pullRequest = this.state.createdPullRequest
-    if (pullRequest === null) {
+  private renderSuccess() {
+    const receipt = this.state.successReceipt
+    if (receipt === null) {
       return null
     }
+    const { created, reviewed } = receipt
     return (
       <>
         <DialogContent className="create-github-pull-request-content">
           <div className="create-github-pull-request-success" role="status">
             <strong>
-              {pullRequest.draft ? 'Draft pull request' : 'Pull request'} #
-              {pullRequest.number} created
+              {reviewed.draft ? 'Draft pull request' : 'Pull request'} #
+              {created.number} created
             </strong>
-            <span>{targetName}</span>
-            <p>{pullRequest.title}</p>
+            <span>{receipt.targetName}</span>
+            <span>
+              {reviewed.head} → {reviewed.base}
+            </span>
+            <span>
+              {receipt.accountLogin} ·{' '}
+              {reviewed.draft ? 'Draft' : 'Ready for review'}
+            </span>
+            <p>{reviewed.title}</p>
+            {reviewed.body !== '' && (
+              <div className="create-github-pull-request-review-body">
+                {reviewed.body}
+              </div>
+            )}
           </div>
         </DialogContent>
         <DialogFooter>
@@ -983,14 +1009,8 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         : 'Create GitHub pull request'
 
     let content: JSX.Element | null
-    if (
-      this.state.step === 'success' &&
-      this.state.createdPullRequest !== null
-    ) {
-      content = this.renderSuccess(
-        this.getSelectedTarget()?.repository.fullName ??
-          this.props.repository.gitHubRepository.fullName
-      )
+    if (this.state.step === 'success' && this.state.successReceipt !== null) {
+      content = this.renderSuccess()
     } else if (
       availability.target === null ||
       availability.account === null ||
@@ -1030,6 +1050,7 @@ export class CreateGitHubPullRequestDialog extends React.Component<
         onSubmit={this.onSubmit}
         onDismissed={this.onDismissed}
         loading={this.state.step === 'submitting'}
+        dismissDisabled={this.state.step === 'submitting'}
       >
         {this.state.error !== null && (
           <DialogError>{this.state.error}</DialogError>

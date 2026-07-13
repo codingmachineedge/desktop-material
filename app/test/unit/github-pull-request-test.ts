@@ -10,6 +10,7 @@ import {
   GitHubPullRequestBodyMaximumLength,
   GitHubPullRequestTitleMaximumLength,
   normalizeGitHubPullRequestDraft,
+  resolveRefreshedGitHubPullRequestBranch,
   validateCreatedGitHubPullRequest,
   validateGitHubPullRequestBranch,
 } from '../../src/lib/github-pull-request'
@@ -18,8 +19,16 @@ import { Branch, BranchType } from '../../src/models/branch'
 import { GitHubRepository } from '../../src/models/github-repository'
 import { Owner } from '../../src/models/owner'
 import { Repository } from '../../src/models/repository'
+import { IRemote } from '../../src/models/remote'
 
 const endpoint = 'https://api.github.com'
+
+function createRemote(
+  name: string = 'origin',
+  url: string = 'https://github.com/octocat/material.git'
+): IRemote {
+  return { name, url }
+}
 
 function createGitHubRepository(
   owner: string,
@@ -128,14 +137,75 @@ describe('GitHub pull request validation', () => {
       parent
     )
     const branch = createBranch('local-name', 'origin/published-name')
+    const sourceRemote = createRemote()
 
-    assert.equal(getGitHubPullRequestHead(fork, fork, branch), 'published-name')
     assert.equal(
-      getGitHubPullRequestHead(fork, parent, branch),
+      getGitHubPullRequestHead(
+        fork,
+        fork,
+        branch,
+        sourceRemote,
+        'https://github.com'
+      ),
+      'published-name'
+    )
+    assert.equal(
+      getGitHubPullRequestHead(
+        fork,
+        parent,
+        branch,
+        sourceRemote,
+        'https://github.com'
+      ),
       'octocat:published-name'
     )
     assert.throws(() =>
-      getGitHubPullRequestHead(fork, parent, createBranch('local', null))
+      getGitHubPullRequestHead(
+        fork,
+        parent,
+        createBranch('local', null),
+        sourceRemote,
+        'https://github.com'
+      )
+    )
+    assert.throws(() =>
+      getGitHubPullRequestHead(
+        fork,
+        parent,
+        branch,
+        createRemote('origin', 'https://github.com/attacker/material.git'),
+        'https://github.com'
+      )
+    )
+    assert.throws(() =>
+      getGitHubPullRequestHead(
+        fork,
+        parent,
+        branch,
+        {
+          name: 'mirror',
+          url: sourceRemote.url,
+        },
+        'https://github.com'
+      )
+    )
+    const attackerMetadata = createGitHubRepository(
+      'octocat',
+      'material',
+      'https://evil.example.test/octocat/material',
+      parent
+    )
+    assert.throws(() =>
+      getGitHubPullRequestHead(
+        attackerMetadata,
+        parent,
+        branch,
+        createRemote(
+          'origin',
+          'https://evil.example.test/octocat/material.git'
+        ),
+        'https://github.com'
+      )
     )
   })
 
@@ -168,21 +238,65 @@ describe('GitHub pull request validation', () => {
       targets.map(target => ({
         name: target.repository.fullName,
         bases: target.baseBranches.map(branch => branch.name),
-        default: target.defaultBranch?.name,
+        default: target.defaultBranchName,
       })),
       [
         {
           name: 'octocat/material',
-          bases: ['company-fork/main'],
-          default: 'company-fork/main',
+          bases: ['main'],
+          default: 'main',
         },
         {
           name: 'desktop/material',
-          bases: ['contribution-target/main'],
-          default: 'contribution-target/main',
+          bases: ['main'],
+          default: 'main',
         },
       ]
     )
+  })
+
+  it('uses canonical provider refs for aliases, collisions, and defaults', () => {
+    const source = createGitHubRepository(
+      'octocat',
+      'material',
+      'https://github.com/octocat/material'
+    )
+    const aliasForMain = createBranch('release', 'origin/main')
+    const originMain = createRemoteBranch('origin', 'main')
+    const originRelease = createRemoteBranch('origin', 'release')
+
+    const [target] = buildGitHubPullRequestTargets(
+      source,
+      [aliasForMain, originRelease, originMain],
+      aliasForMain,
+      null,
+      'origin',
+      'upstream'
+    )
+
+    assert.deepEqual(
+      target.baseBranches.map(base => base.name),
+      ['main', 'release']
+    )
+    assert.equal(target.defaultBranchName, 'main')
+    assert.equal(target.baseBranches[0].branch, originMain)
+    assert.equal(target.baseBranches[1].branch, originRelease)
+  })
+
+  it('re-resolves a newly published branch only for the same checked-out ref', () => {
+    const requested = createBranch('feature', null)
+    const published = createBranch('feature', 'origin/published-feature')
+    const other = createBranch('other', 'origin/other')
+
+    assert.equal(
+      resolveRefreshedGitHubPullRequestBranch(requested, published),
+      published
+    )
+    assert.equal(
+      resolveRefreshedGitHubPullRequestBranch(requested, other),
+      null
+    )
+    assert.equal(resolveRefreshedGitHubPullRequestBranch(requested, null), null)
   })
 
   it('builds browser fallback URLs on the exact self or parent target', () => {
@@ -199,14 +313,106 @@ describe('GitHub pull request validation', () => {
     )
     const head = createBranch('local-name', 'origin/feature/native')
     const base = createBranch('main', 'upstream/main')
+    const sourceRemote = createRemote()
 
     assert.equal(
-      getGitHubPullRequestCreationURL(fork, fork, head, base),
+      getGitHubPullRequestCreationURL(
+        fork,
+        fork,
+        head,
+        sourceRemote,
+        'https://github.com',
+        base.nameWithoutRemote
+      ),
       'https://github.com/octocat/material/pull/new/main...feature%2Fnative'
     )
     assert.equal(
-      getGitHubPullRequestCreationURL(fork, parent, head, base),
+      getGitHubPullRequestCreationURL(
+        fork,
+        parent,
+        head,
+        sourceRemote,
+        'https://github.com',
+        base.nameWithoutRemote
+      ),
       'https://github.com/desktop/material/pull/new/main...octocat:material:feature%2Fnative'
+    )
+  })
+
+  it('constrains browser fallbacks to the endpoint HTML origin and base path', () => {
+    const enterpriseParent = createGitHubRepository(
+      'desktop',
+      'material',
+      'https://github.example.test/code/desktop/material'
+    )
+    const enterpriseFork = createGitHubRepository(
+      'octocat',
+      'material',
+      'https://github.example.test/code/octocat/material',
+      enterpriseParent
+    )
+    const enterpriseRemote = createRemote(
+      'origin',
+      'https://github.example.test/code/octocat/material.git'
+    )
+    const head = createBranch('feature', 'origin/feature')
+
+    assert.equal(
+      getGitHubPullRequestCreationURL(
+        enterpriseFork,
+        enterpriseParent,
+        head,
+        enterpriseRemote,
+        'https://github.example.test/code'
+      ),
+      'https://github.example.test/code/desktop/material/pull/new/octocat:material:feature'
+    )
+
+    const httpSource = createGitHubRepository(
+      'octocat',
+      'material',
+      'http://github.internal/octocat/material'
+    )
+    assert.equal(
+      getGitHubPullRequestCreationURL(
+        httpSource,
+        httpSource,
+        head,
+        createRemote('origin', 'http://github.internal/octocat/material.git'),
+        'http://github.internal'
+      ),
+      'http://github.internal/octocat/material/pull/new/feature'
+    )
+
+    const attackerTarget = createGitHubRepository(
+      'desktop',
+      'material',
+      'https://evil.example.test/code/desktop/material'
+    )
+    assert.equal(
+      getGitHubPullRequestCreationURL(
+        enterpriseFork,
+        attackerTarget,
+        head,
+        enterpriseRemote,
+        'https://github.example.test/code'
+      ),
+      null
+    )
+    const downgradedTarget = createGitHubRepository(
+      'desktop',
+      'material',
+      'http://github.example.test/code/desktop/material'
+    )
+    assert.equal(
+      getGitHubPullRequestCreationURL(
+        enterpriseFork,
+        downgradedTarget,
+        head,
+        enterpriseRemote,
+        'https://github.example.test/code'
+      ),
+      null
     )
   })
 
@@ -256,6 +462,63 @@ describe('GitHub pull request validation', () => {
     }
   })
 
+  it('rejects malformed or mismatched success fields against the review', () => {
+    const reviewed = normalizeGitHubPullRequestDraft(
+      'Reviewed title',
+      'Reviewed body',
+      'octocat:feature',
+      'main',
+      true
+    )
+    const valid = {
+      number: 12,
+      title: reviewed.title,
+      body: reviewed.body,
+      html_url: 'https://github.com/desktop/material/pull/12',
+      state: 'open',
+      draft: reviewed.draft,
+      head: { ref: 'feature', label: reviewed.head },
+      base: { ref: reviewed.base },
+    }
+
+    assert.deepEqual(
+      validateCreatedGitHubPullRequest(
+        valid,
+        'desktop',
+        'material',
+        'https://github.com',
+        reviewed
+      ),
+      {
+        number: 12,
+        title: reviewed.title,
+        url: valid.html_url,
+        draft: true,
+      }
+    )
+
+    for (const response of [
+      null,
+      [],
+      { ...valid, number: Number.NaN },
+      { ...valid, title: 'Changed by response' },
+      { ...valid, state: 'closed' },
+      { ...valid, draft: false },
+      { ...valid, head: { ...valid.head, ref: 'other' } },
+      { ...valid, base: { ref: 'release' } },
+    ]) {
+      assert.throws(() =>
+        validateCreatedGitHubPullRequest(
+          response,
+          'desktop',
+          'material',
+          'https://github.com',
+          reviewed
+        )
+      )
+    }
+  })
+
   it('changes the repository context version for branch and tip changes', () => {
     const gitHubRepository = createGitHubRepository(
       'desktop',
@@ -273,12 +536,20 @@ describe('GitHub pull request validation', () => {
     const other = createBranch('other', 'origin/other', 'a'.repeat(40))
 
     assert.notEqual(
-      getGitHubPullRequestContextVersion(repository, first),
-      getGitHubPullRequestContextVersion(repository, second)
+      getGitHubPullRequestContextVersion(repository, first, createRemote()),
+      getGitHubPullRequestContextVersion(repository, second, createRemote())
     )
     assert.notEqual(
-      getGitHubPullRequestContextVersion(repository, first),
-      getGitHubPullRequestContextVersion(repository, other)
+      getGitHubPullRequestContextVersion(repository, first, createRemote()),
+      getGitHubPullRequestContextVersion(repository, other, createRemote())
+    )
+    assert.notEqual(
+      getGitHubPullRequestContextVersion(repository, first, createRemote()),
+      getGitHubPullRequestContextVersion(
+        repository,
+        first,
+        createRemote('mirror')
+      )
     )
   })
 

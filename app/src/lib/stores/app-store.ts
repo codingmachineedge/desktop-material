@@ -85,8 +85,10 @@ import {
 } from '../../models/repository'
 import {
   buildGitHubPullRequestTargets,
+  getGitHubPullRequestBaseBranchName,
   getGitHubPullRequestCreationURL,
   getGitHubPullRequestContextVersion,
+  resolveRefreshedGitHubPullRequestBranch,
 } from '../github-pull-request'
 import {
   CommittedFileChange,
@@ -132,6 +134,7 @@ import {
 import {
   API,
   getAccountForEndpoint,
+  getHTMLURL,
   IAPIOrganization,
   IAPIFullRepository,
   IAPIComment,
@@ -9724,7 +9727,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
    */
   public _showCreateGitHubPullRequest(
     repository: Repository,
-    currentBranch: Branch,
+    requestedBranch: Branch,
     initialBaseBranch?: Branch
   ): void {
     if (
@@ -9734,30 +9737,56 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return
     }
 
-    const { branchesState } = this.repositoryStateCache.get(repository)
+    const repositoryState = this.repositoryStateCache.get(repository)
+    const { branchesState } = repositoryState
+    const refreshedBranch = resolveRefreshedGitHubPullRequestBranch(
+      requestedBranch,
+      branchesState.tip.kind === TipState.Valid
+        ? branchesState.tip.branch
+        : null
+    )
+    if (refreshedBranch === null) {
+      return
+    }
+
     const { allBranches, defaultBranch, upstreamDefaultBranch } = branchesState
-    const gitStore = this.gitStoreCache.get(repository)
+    const sourceRemote = repositoryState.remote
     const source = repository.gitHubRepository
     const targets = buildGitHubPullRequestTargets(
       source,
       allBranches,
       defaultBranch,
       upstreamDefaultBranch,
-      gitStore.defaultRemote?.name ?? null,
+      sourceRemote?.name ?? null,
       UpstreamRemoteName
     )
 
     const configuredTarget = getNonForkGitHubRepository(repository)
+    const configuredTargetRemoteName =
+      configuredTarget.hash === source.hash
+        ? sourceRemote?.name ?? null
+        : configuredTarget.hash === source.parent?.hash
+        ? UpstreamRemoteName
+        : null
     this._showPopup({
       type: PopupType.CreateGitHubPullRequest,
       repository,
-      currentBranch,
+      currentBranch: refreshedBranch,
+      sourceRemote,
+      providerHTMLURL: getHTMLURL(source.endpoint),
       targets,
       initialTargetHash: configuredTarget.hash,
-      initialBaseBranchName: initialBaseBranch?.nameWithoutRemote ?? null,
+      initialBaseBranchName:
+        initialBaseBranch === undefined || configuredTargetRemoteName === null
+          ? null
+          : getGitHubPullRequestBaseBranchName(
+              initialBaseBranch,
+              configuredTargetRemoteName
+            ),
       contextVersion: getGitHubPullRequestContextVersion(
         repository,
-        currentBranch
+        refreshedBranch,
+        sourceRemote
       ),
     })
   }
@@ -9776,10 +9805,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return false
     }
 
-    const { tip } = this.repositoryStateCache.get(selected).branchesState
+    const { branchesState, remote: sourceRemote } =
+      this.repositoryStateCache.get(selected)
+    const { tip } = branchesState
     return (
       tip.kind === TipState.Valid &&
-      getGitHubPullRequestContextVersion(selected, tip.branch) ===
+      getGitHubPullRequestContextVersion(selected, tip.branch, sourceRemote) ===
         contextVersion
     )
   }
@@ -9876,7 +9907,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
   public async _openCreatePullRequestInBrowser(
     repository: Repository,
     compareBranch: Branch,
-    baseBranch?: Branch,
+    sourceRemote: IRemote | null,
+    baseBranchName?: string,
     targetOverride?: GitHubRepository
   ): Promise<boolean> {
     if (
@@ -9894,7 +9926,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
     if (
       !targetIsAllowed ||
       target.endpoint !== gitHubRepository.endpoint ||
-      target.htmlURL === null
+      target.htmlURL === null ||
+      !remoteEquals(
+        this.repositoryStateCache.get(repository).remote,
+        sourceRemote
+      )
     ) {
       return false
     }
@@ -9902,7 +9938,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
       gitHubRepository,
       target,
       compareBranch,
-      baseBranch
+      sourceRemote,
+      getHTMLURL(target.endpoint),
+      baseBranchName
     )
     return url === null ? false : this._openInBrowser(url)
   }

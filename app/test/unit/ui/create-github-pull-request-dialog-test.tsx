@@ -12,6 +12,7 @@ import { Account } from '../../../src/models/account'
 import { Branch, BranchType } from '../../../src/models/branch'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
+import { IRemote } from '../../../src/models/remote'
 import { Repository } from '../../../src/models/repository'
 import { CreateGitHubPullRequestDialog } from '../../../src/ui/create-github-pull-request'
 import { DialogStackContext } from '../../../src/ui/dialog'
@@ -114,21 +115,38 @@ function createFixture(options: { parentArchived?: boolean } = {}) {
     false
   ) as Repository & { readonly gitHubRepository: GitHubRepository }
   const currentBranch = createLocalBranch()
+  const sourceRemote: IRemote = {
+    name: 'origin',
+    url: 'https://github.com/octocat/material.git',
+  }
   const parentMain = createRemoteBranch('upstream', 'main')
   const sourceMain = createRemoteBranch('origin', 'main')
   const targets: ReadonlyArray<IGitHubPullRequestTarget> = [
     {
       repository: parent,
-      baseBranches: [parentMain, createRemoteBranch('upstream', 'release')],
-      defaultBranch: parentMain,
+      baseBranches: [
+        { name: 'main', branch: parentMain },
+        {
+          name: 'release',
+          branch: createRemoteBranch('upstream', 'release'),
+        },
+      ],
+      defaultBranchName: 'main',
     },
     {
       repository: source,
-      baseBranches: [sourceMain],
-      defaultBranch: sourceMain,
+      baseBranches: [{ name: 'main', branch: sourceMain }],
+      defaultBranchName: 'main',
     },
   ]
-  return { parent, source, repository, currentBranch, targets }
+  return {
+    parent,
+    source,
+    repository,
+    currentBranch,
+    sourceRemote,
+    targets,
+  }
 }
 
 class TestDispatcher {
@@ -137,13 +155,16 @@ class TestDispatcher {
     target: GitHubRepository
     account: Account
     branch: Branch
+    sourceRemote: IRemote | null
+    providerHTMLURL: string
     contextVersion: string
     draft: IGitHubPullRequestDraft
     signal: AbortSignal
   }>()
   public browserCalls = new Array<{
     target?: GitHubRepository
-    baseBranch?: Branch
+    baseBranchName?: string
+    sourceRemote: IRemote | null
   }>()
   public openedURLs = new Array<string>()
 
@@ -165,6 +186,8 @@ class TestDispatcher {
     target: GitHubRepository,
     account: Account,
     branch: Branch,
+    sourceRemote: IRemote | null,
+    providerHTMLURL: string,
     contextVersion: string,
     draft: IGitHubPullRequestDraft,
     signal: AbortSignal
@@ -173,6 +196,8 @@ class TestDispatcher {
       target,
       account,
       branch,
+      sourceRemote,
+      providerHTMLURL,
       contextVersion,
       draft,
       signal,
@@ -183,10 +208,11 @@ class TestDispatcher {
   public async openCreatePullRequestInBrowser(
     _repository: Repository,
     _branch: Branch,
-    baseBranch?: Branch,
+    sourceRemote: IRemote | null,
+    baseBranchName?: string,
     target?: GitHubRepository
   ) {
-    this.browserCalls.push({ target, baseBranch })
+    this.browserCalls.push({ target, baseBranchName, sourceRemote })
     return true
   }
 
@@ -218,6 +244,8 @@ function dialogElement(
       <CreateGitHubPullRequestDialog
         repository={fixture.repository}
         currentBranch={fixture.currentBranch}
+        sourceRemote={fixture.sourceRemote}
+        providerHTMLURL="https://github.com"
         targets={fixture.targets}
         initialTargetHash={options.initialTargetHash ?? fixture.parent.hash}
         initialBaseBranchName={null}
@@ -289,6 +317,8 @@ describe('CreateGitHubPullRequestDialog', () => {
     assert.equal(call.target, fixture.parent)
     assert.equal(call.account.login, 'octocat')
     assert.equal(call.branch, fixture.currentBranch)
+    assert.equal(call.sourceRemote, fixture.sourceRemote)
+    assert.equal(call.providerHTMLURL, 'https://github.com')
     assert.equal(call.contextVersion, 'repository-generation-1')
     assert.deepEqual(call.draft, {
       title: 'Native pull request',
@@ -302,6 +332,8 @@ describe('CreateGitHubPullRequestDialog', () => {
     await waitFor(() =>
       assert.ok(screen.getByText('Draft pull request #12 created'))
     )
+    assert.ok(screen.getByText('Native pull request'))
+    assert.equal(screen.queryByText('Created title'), null)
     fireEvent.click(screen.getByRole('button', { name: 'Open on GitHub' }))
     await waitFor(() =>
       assert.deepEqual(dispatcher.openedURLs, [
@@ -324,6 +356,9 @@ describe('CreateGitHubPullRequestDialog', () => {
     composeAndReview('Cancel native PR', '')
     fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
     await waitFor(() => assert.equal(dispatcher.createCalls.length, 1))
+    assert.equal(screen.queryByRole('button', { name: 'Close' }), null)
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    assert.equal(dispatcher.createCalls[0].signal.aborted, false)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel request' }))
 
     assert.equal(dispatcher.createCalls[0].signal.aborted, true)
@@ -382,10 +417,8 @@ describe('CreateGitHubPullRequestDialog', () => {
 
     await waitFor(() => assert.equal(dispatcher.browserCalls.length, 1))
     assert.equal(dispatcher.browserCalls[0].target, fixture.parent)
-    assert.equal(
-      dispatcher.browserCalls[0].baseBranch?.nameWithoutRemote,
-      'main'
-    )
+    assert.equal(dispatcher.browserCalls[0].sourceRemote, fixture.sourceRemote)
+    assert.equal(dispatcher.browserCalls[0].baseBranchName, 'main')
     await waitFor(() => assert.equal(dismissed, 1))
   })
 
@@ -442,11 +475,7 @@ describe('CreateGitHubPullRequestDialog', () => {
     await waitFor(() =>
       assert.equal(dispatcher.createCalls[0].signal.aborted, true)
     )
-    assert.match(
-      screen.getByText(/repository or current branch changed/).textContent ??
-        '',
-      /start again/
-    )
+    assert.match(screen.getByRole('alert').textContent ?? '', /duplicate/i)
     assert.equal(
       screen.queryByRole('button', { name: 'Open browser fallback' }),
       null
@@ -458,11 +487,9 @@ describe('CreateGitHubPullRequestDialog', () => {
     const dispatcher = new TestDispatcher()
     const rendered = render(dialogElement(fixture, dispatcher, () => {}))
 
-    composeAndReview('Durable success', '')
+    composeAndReview('Durable success', 'Immutable description')
     fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
-    await waitFor(() =>
-      assert.ok(screen.getByText('Draft pull request #12 created'))
-    )
+    await waitFor(() => assert.ok(screen.getByText('Pull request #12 created')))
 
     rendered.rerender(
       dialogElement(fixture, dispatcher, () => {}, {
@@ -470,7 +497,10 @@ describe('CreateGitHubPullRequestDialog', () => {
         contextCurrent: false,
       })
     )
-    assert.ok(screen.getByText('Draft pull request #12 created'))
+    assert.ok(screen.getByText('Pull request #12 created'))
+    assert.ok(screen.getByText('Durable success'))
+    assert.ok(screen.getByText('Immutable description'))
+    assert.equal(screen.queryByText('Created title'), null)
     assert.ok(screen.getByRole('button', { name: 'Open on GitHub' }))
   })
 })

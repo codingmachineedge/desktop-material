@@ -44,6 +44,8 @@ describe('GitHub pull request API', () => {
             html_url: 'https://github.com/desktop/material/pull/42',
             state: 'open',
             draft: true,
+            head: { ref: 'feature/native', label: 'octocat:feature/native' },
+            base: { ref: 'main' },
           }),
           { status: 201 }
         )
@@ -145,6 +147,9 @@ describe('GitHub pull request API', () => {
             body: '',
             html_url: 'https://evil.example.test/desktop/material/pull/42',
             state: 'open',
+            draft: false,
+            head: { ref: 'feature', label: 'desktop:feature' },
+            base: { ref: 'main' },
           }),
           { status: 201 }
         )
@@ -162,6 +167,42 @@ describe('GitHub pull request API', () => {
           false
         ),
       /unexpected pull request URL/i
+    )
+  })
+
+  it('rejects a success response that differs from the reviewed request', async () => {
+    const api = new API('https://api.github.com', 'secret-token')
+    Reflect.set(
+      api,
+      'ghRequest',
+      async () =>
+        new Response(
+          JSON.stringify({
+            number: 42,
+            title: 'Different title',
+            body: 'Reviewed body',
+            html_url: 'https://github.com/desktop/material/pull/42',
+            state: 'open',
+            draft: false,
+            head: { ref: 'feature', label: 'desktop:feature' },
+            base: { ref: 'main' },
+          }),
+          { status: 201 }
+        )
+    )
+
+    await assert.rejects(
+      () =>
+        api.createPullRequest(
+          'desktop',
+          'material',
+          'Reviewed title',
+          'Reviewed body',
+          'feature',
+          'main',
+          false
+        ),
+      /do not match the reviewed request/i
     )
   })
 })

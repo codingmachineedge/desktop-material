@@ -1919,7 +1919,8 @@ export class App extends React.Component<IAppProps, IAppState> {
           selection.state.branchesState.tip.kind === TipState.Valid &&
           getGitHubPullRequestContextVersion(
             selection.repository,
-            selection.state.branchesState.tip.branch
+            selection.state.branchesState.tip.branch,
+            selection.state.remote
           ) === popup.contextVersion
 
         return (
@@ -1927,6 +1928,8 @@ export class App extends React.Component<IAppProps, IAppState> {
             key={`create-github-pull-request-${popup.repository.id}`}
             repository={popup.repository}
             currentBranch={popup.currentBranch}
+            sourceRemote={popup.sourceRemote}
+            providerHTMLURL={popup.providerHTMLURL}
             targets={popup.targets}
             initialTargetHash={popup.initialTargetHash}
             initialBaseBranchName={popup.initialBaseBranchName}
