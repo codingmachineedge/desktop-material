@@ -58,6 +58,13 @@ interface IRawRemoteSnapshot {
 interface IRemoteMutation {
   readonly args: ReadonlyArray<string>
   readonly successExitCodes?: ReadonlySet<number>
+  readonly requiredRemoteTrackingRef?: string
+}
+
+export interface IRemoteManagementApplyOptions {
+  readonly signal?: AbortSignal
+  /** Bounded progress; no command, URL, ref, or path data is exposed. */
+  readonly onMutationApplied?: (completed: number, total: number) => void
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -494,6 +501,7 @@ function buildMutations(
                 symbolicRef,
                 `refs/remotes/${update.name}/${update.defaultBranch}`,
               ],
+              requiredRemoteTrackingRef: `refs/remotes/${update.name}/${update.defaultBranch}`,
             }
       )
     }
@@ -515,8 +523,9 @@ function buildMutations(
 export async function applyRemoteManagementPlan(
   repository: Repository,
   plan: IRemoteManagementPlan,
-  signal?: AbortSignal
+  options: IRemoteManagementApplyOptions = {}
 ): Promise<IRemoteManagementSnapshot> {
+  const { signal } = options
   let mutationStarted = false
   let mutationIndex = -1
   try {
@@ -544,6 +553,31 @@ export async function applyRemoteManagementPlan(
         )
       }
       throwIfAborted(signal)
+      if (mutation.requiredRemoteTrackingRef !== undefined) {
+        const refCheck = await git(
+          [
+            'show-ref',
+            '--verify',
+            '--quiet',
+            mutation.requiredRemoteTrackingRef,
+          ],
+          repository.path,
+          'revalidateRemoteManagerTrackingRef',
+          {
+            maxBuffer: 8192,
+            successExitCodes: new Set([0, 1]),
+            processCallback: getAbortableProcessCallback(signal),
+          }
+        )
+        throwIfAborted(signal)
+        if (refCheck.exitCode !== 0) {
+          throw new RemoteManagementError(
+            'changed',
+            'The reviewed default branch is not available as an exact remote-tracking ref. Fetch it and review again.'
+          )
+        }
+      }
+      throwIfAborted(signal)
       mutationStarted = true
       await git(
         [...mutation.args],
@@ -555,6 +589,7 @@ export async function applyRemoteManagementPlan(
           processCallback: getAbortableProcessCallback(signal),
         }
       )
+      options.onMutationApplied?.(index + 1, mutations.length)
       throwIfAborted(signal)
       expected = await inspectRawRemoteSnapshot(repository, signal)
     }
@@ -563,9 +598,11 @@ export async function applyRemoteManagementPlan(
       remotes: expected.remotes.map(displayConfiguration),
     }
   } catch (error) {
-    throwIfAborted(signal)
-    const safe = safeInspectionError(error)
-    if (mutationStarted && safe.kind !== 'aborted') {
+    const safe =
+      signal?.aborted === true
+        ? new RemoteManagementError('aborted', 'Remote management cancelled.')
+        : safeInspectionError(error)
+    if (mutationStarted) {
       throw new RemoteManagementError(
         'partial',
         `The reviewed remote plan stopped at bounded step ${
