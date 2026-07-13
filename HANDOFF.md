@@ -4,7 +4,7 @@
 
 The requested roadmap is implemented: **M0 through M18 are complete and
 shipped on `main`** through final implementation baseline
-`aeaba02818c3a7c13a6ba78554b2917188b7a9ba`. The implementation, integration
+`a346d0a569642e1c1b1180994cac4144890bf037`. The implementation, integration
 fixes, exhaustive local validation, production build, hidden-desktop review,
 responsive regression correction, public documentation, and canonical wiki
 publication are complete. There is no remaining queued or in-flight feature
@@ -16,6 +16,16 @@ covered by style regressions, and demonstrated by the tracked exact-size image
 `material-responsive-overflow-fixed.png`. A separate final test run also found
 and fixed Node's read-only `globalThis.localStorage` accessor colliding with
 jsdom; that was a test-harness defect, not a product regression.
+
+The final Actions review also reproduced the renderer's status-0 failure when
+job-log downloads used a manual cross-origin redirect. The shipped correction
+lets Electron follow the redirect automatically, while the installed
+main-process same-origin filter tracks the request's initial origin and removes
+`authentication`, `authorization`, and `cookie` headers before a cross-origin
+hop. Renderer-visible download errors use a safe message that omits the
+short-lived signed URL and query. The accepted 2048×1228 hidden-desktop proof
+shows the real **Windows x64** job log loaded in the searchable, collapsible
+viewer with no API error.
 
 ## Completed milestone summary
 
@@ -69,7 +79,8 @@ These are the first paths to inspect when maintaining each subsystem:
   `app/src/ui/repository-settings/automation-overrides.tsx`, and
   `app/src/ui/merge-all/`.
 - **Actions and agent access:** `app/src/lib/stores/actions-store.ts`,
-  `app/src/ui/actions/`, `app/src/lib/agent-commands.ts`,
+  `app/src/ui/actions/`, `app/src/main-process/same-origin-filter.ts`,
+  `app/src/lib/agent-commands.ts`,
   `app/src/main-process/agent-server/`,
   `app/src/lib/agent-command-executor.ts`, `script/agent/`, and
   `docs/agent-api.md`.
@@ -89,10 +100,10 @@ These are the first paths to inspect when maintaining each subsystem:
 ## Final integrated validation evidence
 
 The exhaustive final run on the same application/test tree shipped by
-`aeaba02818c3` recorded:
+`a346d0a56964` recorded:
 
-- **241 files and 617 suites** in the validation scope;
-- **1,858 unit tests: 1,857 passed, 0 failed, 1 intentional skip**;
+- **242 files and 618 suites** in the validation scope;
+- **1,861 unit tests: 1,860 passed, 0 failed, 1 intentional skip**;
 - `yarn lint`: **passed**;
 - `yarn tsc --noEmit --skipLibCheck`: **passed**;
 - focused version-history tests: **4 of 4 passed**;
@@ -105,7 +116,9 @@ The exhaustive final run on the same application/test tree shipped by
   user-data paths;
 - all final promoted captures were visually inspected at original resolution,
   nonblank, and private-data-free. The standard captures are **1443×992** and
-  the user-size responsive proof is **1450×997**.
+  the user-size responsive proof is **1450×997**. The live Actions job-log
+  proof is **2048×1228** and contains no token value, signed URL, account name,
+  local path, email address, or personal identifier.
 
 ### Final headless capture ledger
 
@@ -121,6 +134,7 @@ The exhaustive final run on the same application/test tree shipped by
 | `docs/assets/screenshots/material-scale-200-autofit.png` | 1443×992 | 104,599 | `6fc094a466cef3a540d3bef08db7468e6d9312c9d2242c5abf0df6f9b4fafe05` |
 | `docs/assets/screenshots/material-workspace-changes.png` | 1443×992 | 123,162 | `3155b321f9aabb73ee6a40000c69f8931f1915920216818a362ec974cc3a4621` |
 | `docs/assets/screenshots/material-responsive-overflow-fixed.png` | 1450×997 | 132,049 | `160c622c6630d96eda26b5ff3be6705c31dbe55d6ffa6d1376575425770278bf` |
+| `docs/assets/screenshots/material-actions-job-log.png` | 2048×1228 | 155,579 | `6f8a96a9bff8a9c76f89b44aaf3c84a71574aed11ef994db93d12d2749ca0409` |
 
 Earlier verified captures, including
 `docs/assets/screenshots/settings-history-manager.png`, remain tracked; that M3
@@ -155,6 +169,26 @@ pattern scanning all pass on the published source-only set.
 - Existing queued/in-progress runs were canceled when requested. After the
   subsequent enable instruction, no new runs were canceled and all ten
   repository Actions workflows report `active`.
+
+## Secure Actions job-log downloads
+
+- `API.fetchWorkflowJobLogs` uses Electron's automatic redirect path, avoiding
+  Chromium's opaque status-0 response for manual cross-origin redirects.
+- The already-installed `same-origin-filter` records each request's initial
+  origin by request ID and strips authentication, authorization, and cookie
+  headers from every cross-origin continuation. Same-origin requests preserve
+  their required headers.
+- Unit regressions cover redirect following, cross-origin credential removal,
+  same-origin header preservation, expired logs, the 5 MB display cap, and
+  signed-query-safe failure messages.
+- A sanitized live API check confirmed an authenticated 302 to an HTTPS signed
+  blob, followed by an unauthenticated `text/plain` 200 response with the CORS
+  policy required by the renderer. No token, signed URL, or log body was
+  printed during that metadata check.
+- The exact `a346d0a569642e1c1b1180994cac4144890bf037` production build loaded the
+  real Windows x64 log on the off-screen desktop. The accepted original-size
+  capture is `material-actions-job-log.png`; its dimensions and digest are in
+  the final capture ledger above.
 
 ## Headless verification environment
 
@@ -203,13 +237,15 @@ The closing gate is complete:
   [Pages 29219686071](https://github.com/codingmachineedge/desktop-material/actions/runs/29219686071).
   The [repository](https://github.com/codingmachineedge/desktop-material) and
   [Pages site](https://codingmachineedge.github.io/desktop-material/) return
-  HTTP 200, reference the responsive proof, and serve all 15 distinct
-  README/site screenshot assets byte-for-byte with their tracked SHA-256.
+  HTTP 200, reference the responsive and Actions log proofs, and serve all 16
+  distinct README/site screenshot assets byte-for-byte with their tracked
+  SHA-256.
 - **Wiki:** the canonical six-file mirror is pushed at
   `72b8eac8bb2f76f3499bedd3f96bc7ea6c295202`. The live
   [Home](https://github.com/codingmachineedge/desktop-material/wiki) and
   [User Guide](https://github.com/codingmachineedge/desktop-material/wiki/User-Guide)
-  return HTTP 200 and render the 1450×997 raw-main proof.
+  return HTTP 200 and render the 1450×997 responsive proof; the final User
+  Guide source also embeds the 2048×1228 Actions job-log proof from raw `main`.
 - **Accessibility and clipping:** the exact-size hidden-desktop review shows
   every repository/worktree/branch/sync/one-click/build toolbar control, all
   Changes filter/composer controls, and no horizontal scrollbar. The supported

@@ -229,6 +229,13 @@ The **Actions** panel brings CI into the app:
 - Trigger manual workflows with the **`workflow_dispatch` dialog** — pick the workflow, ref, and
   inputs, and dispatch.
 
+Job-log downloads follow GitHub's signed redirect automatically. Desktop Material's main-process
+request filter tracks the original request and removes authentication, authorization, and cookie
+headers before any cross-origin hop. Download errors also omit signed URLs and query strings. The
+live Windows x64 proof below shows the resulting searchable, collapsible log viewer.
+
+![Windows x64 GitHub Actions job log loaded securely in the searchable in-app viewer](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-job-log.png)
+
 ---
 
 ## UI scaling
