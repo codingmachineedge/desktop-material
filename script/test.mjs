@@ -24,7 +24,57 @@ async function findTestFilesIn(paths) {
       files.push(file)
     }
   }
-  return files
+  return files.sort((a, b) => a.localeCompare(b))
+}
+
+// Leave room for Windows' CreateProcess command-line limit as well as quoting
+// added by Node. A full Desktop Material unit run contains hundreds of paths,
+// so passing every file to one child process can fail with ENAMETOOLONG before
+// the test runner starts.
+const maximumCommandLength = process.platform === 'win32' ? 24_000 : 96_000
+
+function estimateCommandLength(args) {
+  return (
+    'node'.length + args.reduce((length, arg) => length + arg.length + 3, 0)
+  )
+}
+
+function partitionFiles(baseArgs, files) {
+  const batches = []
+  let batch = []
+
+  for (const file of files) {
+    if (
+      batch.length > 0 &&
+      estimateCommandLength([...baseArgs, ...batch, file]) >
+        maximumCommandLength
+    ) {
+      batches.push(batch)
+      batch = []
+    }
+
+    batch.push(file)
+  }
+
+  if (batch.length > 0 || files.length === 0) {
+    batches.push(batch)
+  }
+
+  return batches
+}
+
+function runNode(args) {
+  return new Promise((resolveExit, reject) => {
+    const child = spawn('node', args, {
+      stdio: 'inherit',
+      cwd: resolve(import.meta.dirname, '..'),
+    })
+
+    child.on('error', reject)
+    child.on('exit', (code, signal) => {
+      resolveExit(code ?? (signal === null ? 1 : 128))
+    })
+  })
 }
 
 const fileArgs = process.argv.slice(2).filter(a => !a.startsWith('--'))
@@ -41,7 +91,7 @@ const files =
 const testEnv = parseEnv(await readFile(join(projectRoot, '.test.env'), 'utf8'))
 Object.entries(testEnv).forEach(([k, v]) => (process.env[k] = v))
 
-const args = [
+const baseArgs = [
   '--disable-warning=ExperimentalWarning',
   '--experimental-test-module-mocks',
   // Allow CJS resolution to find ESM-only packages (e.g. @github/copilot-sdk)
@@ -53,10 +103,17 @@ const args = [
   '--test',
   ...reporter('spec'),
   ...(process.env.GITHUB_ACTIONS ? reporter('node-test-github-reporter') : []),
-  ...files,
 ]
 
-spawn('node', args, {
-  stdio: 'inherit',
-  cwd: resolve(import.meta.dirname, '..'),
-}).on('exit', process.exit)
+const batches = partitionFiles(baseArgs, files)
+if (batches.length > 1) {
+  console.log(`Running ${files.length} test files in ${batches.length} batches`)
+}
+
+for (const batch of batches) {
+  const exitCode = await runNode([...baseArgs, ...batch])
+  if (exitCode !== 0) {
+    process.exitCode = exitCode
+    break
+  }
+}
