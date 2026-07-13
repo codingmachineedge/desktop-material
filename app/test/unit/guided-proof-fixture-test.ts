@@ -1,0 +1,371 @@
+import assert from 'node:assert'
+import { execFile } from 'node:child_process'
+import {
+  createServer,
+  IncomingMessage,
+  request as httpRequest,
+  ServerResponse,
+} from 'node:http'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { promisify } from 'node:util'
+import { describe, it } from 'node:test'
+import { API } from '../../src/lib/api'
+import {
+  createGuidedProofChildEnvironment,
+  createGuidedProofHandler,
+  createGuidedProofRepository,
+  GuidedProofRequestHandler,
+  IGuidedProofHandlerFixture,
+} from '../../../script/guided-proof-fixture'
+
+const execFileAsync = promisify(execFile)
+const tokenA = 'synthetic-guided-proof-token-a'
+const tokenB = 'synthetic-guided-proof-token-b'
+
+interface IProofHarness {
+  readonly fixture: IGuidedProofHandlerFixture
+  readonly root: string
+  readonly fixtureRoot: string
+  readonly origin: string
+  readonly endpoint: string
+  close(): Promise<void>
+}
+
+function basicAuthorization(token: string): string {
+  return `Basic ${Buffer.from(`x-access-token:${token}`, 'utf8').toString(
+    'base64'
+  )}`
+}
+
+async function listen(
+  handler: (request: IncomingMessage, response: ServerResponse) => void
+): Promise<{
+  readonly server: ReturnType<typeof createServer>
+  readonly origin: string
+}> {
+  const server = createServer(handler)
+  await new Promise<void>((resolvePromise, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => resolvePromise())
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') {
+    throw new Error('The proof test server did not expose a loopback port.')
+  }
+  return { server, origin: `http://127.0.0.1:${address.port}` }
+}
+
+async function createHarness(): Promise<IProofHarness> {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-material-proof-test-'))
+  const fixtureRoot = join(root, 'owned-fixture')
+  const repository = await createGuidedProofRepository(fixtureRoot)
+  let handler: GuidedProofRequestHandler | null = null
+  const running = await listen((request, response) => {
+    if (handler === null) {
+      response.destroy()
+      return
+    }
+    handler(request, response)
+  })
+  const originURL = new URL(`${running.origin}/`)
+  const fixture = createGuidedProofHandler({
+    repository,
+    origin: originURL.toString(),
+    expectedHost: originURL.host,
+    tokenA,
+    tokenB,
+  })
+  handler = fixture.handler
+  return {
+    fixture,
+    root,
+    fixtureRoot,
+    origin: running.origin,
+    endpoint: `${running.origin}/api/v3`,
+    close: async () => {
+      await fixture.stopUploadPacks()
+      await new Promise<void>(resolvePromise =>
+        running.server.close(() => resolvePromise())
+      )
+      await fixture.flushLedger()
+      const safeRoot = resolve(root)
+      assert.ok(safeRoot.startsWith(resolve(tmpdir())))
+      await rm(safeRoot, { recursive: true })
+    },
+  }
+}
+
+async function runGitClone(
+  cloneURL: string,
+  destination: string,
+  token: string
+): Promise<void> {
+  const environment = createGuidedProofChildEnvironment(process.env, {
+    GIT_CONFIG_COUNT: '2',
+    GIT_CONFIG_KEY_0: 'credential.helper',
+    GIT_CONFIG_VALUE_0: '',
+    GIT_CONFIG_KEY_1: 'http.extraHeader',
+    GIT_CONFIG_VALUE_1: `Authorization: ${basicAuthorization(token)}`,
+    GIT_TERMINAL_PROMPT: '0',
+  })
+  await execFileAsync('git', ['clone', '--quiet', cloneURL, destination], {
+    env: environment,
+    windowsHide: true,
+  })
+}
+
+async function requestWithDeclaredLength(
+  url: string,
+  length: number
+): Promise<number> {
+  return await new Promise<number>((resolvePromise, reject) => {
+    const parsed = new URL(url)
+    const request = httpRequest(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port,
+        path: parsed.pathname,
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenB}`,
+          'Content-Length': String(length),
+          'Content-Type': 'application/json',
+        },
+      },
+      response => {
+        response.resume()
+        response.once('end', () => resolvePromise(response.statusCode ?? 0))
+      }
+    )
+    request.once('error', reject)
+    request.end()
+  })
+}
+
+describe('guided hidden-desktop proof fixture', () => {
+  it('creates the same verified three-commit bare repository in empty owned roots', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-material-proof-repo-'))
+    try {
+      const first = await createGuidedProofRepository(join(root, 'first'))
+      const second = await createGuidedProofRepository(join(root, 'second'))
+      assert.equal(first.commitCount, 3)
+      assert.equal(second.commitCount, 3)
+      assert.equal(first.headSha, second.headSha)
+      const { stdout: isBare } = await execFileAsync(
+        'git',
+        [
+          '--git-dir',
+          first.bareRepositoryPath,
+          'config',
+          '--bool',
+          'core.bare',
+        ],
+        { windowsHide: true }
+      )
+      assert.equal(isBare.trim(), 'true')
+
+      const occupied = join(root, 'occupied')
+      await mkdir(occupied)
+      await writeFile(join(occupied, 'caller-data.txt'), 'preserve\n')
+      await assert.rejects(
+        createGuidedProofRepository(occupied),
+        /must be empty/
+      )
+      assert.equal(
+        await readFile(join(occupied, 'caller-data.txt'), 'utf8'),
+        'preserve\n'
+      )
+    } finally {
+      const safeRoot = resolve(root)
+      assert.ok(safeRoot.startsWith(resolve(tmpdir())))
+      await rm(safeRoot, { recursive: true })
+    }
+  })
+
+  it('serves production parser contracts and a real account-B smart-Git clone', async () => {
+    const harness = await createHarness()
+    try {
+      const accountAResponse = await fetch(`${harness.endpoint}/user`, {
+        headers: { Authorization: `Bearer ${tokenA}` },
+      })
+      assert.equal(accountAResponse.status, 200)
+      assert.equal((await accountAResponse.json()).login, 'proof-a')
+
+      const api = new API(harness.endpoint, tokenB)
+      assert.equal((await api.fetchAccount()).login, 'proof-b')
+      const repository = await api.fetchRepository(
+        'material-proof',
+        'guided-proof'
+      )
+      assert.equal(repository?.clone_url, harness.fixture.ready.cloneUrl)
+
+      const issues = await api.fetchIssuePage(
+        'material-proof',
+        'guided-proof',
+        {
+          state: 'open',
+          search: '',
+          labels: [],
+          assignee: null,
+          milestone: null,
+          sort: 'updated',
+          direction: 'desc',
+          page: 1,
+        }
+      )
+      assert.equal(issues.issues[0].number, 7)
+      assert.equal(
+        (await api.fetchIssueMetadata('material-proof', 'guided-proof')).labels
+          .length,
+        2
+      )
+      assert.equal(
+        (await api.fetchIssueCommentPage('material-proof', 'guided-proof', 7))
+          .comments.length,
+        1
+      )
+
+      const releases = await api.fetchReleases('material-proof', 'guided-proof')
+      assert.equal(releases.releases[0].name, 'Guided proof release')
+      assert.equal(
+        (await api.fetchReleaseAssets('material-proof', 'guided-proof', 4201))
+          .assets[0].name,
+        'guided-proof.txt'
+      )
+
+      assert.equal(
+        (await api.fetchWorkflows('material-proof', 'guided-proof'))
+          .workflows[0].name,
+        'Guided proof CI'
+      )
+      assert.equal(
+        (await api.fetchWorkflowRuns('material-proof', 'guided-proof'))
+          .workflow_runs[0].conclusion,
+        'success'
+      )
+      assert.equal(
+        (await api.fetchWorkflowRunJobs('material-proof', 'guided-proof', 7001))
+          ?.jobs[0].name,
+        'Windows x64'
+      )
+      assert.equal(
+        (
+          await api.fetchWorkflowRunArtifacts(
+            'material-proof',
+            'guided-proof',
+            7001
+          )
+        ).artifacts[0].name,
+        'guided-proof-artifact'
+      )
+      assert.equal(
+        (
+          await api.fetchEffectiveBranchRules(
+            'material-proof',
+            'guided-proof',
+            'main'
+          )
+        ).rules.length,
+        2
+      )
+
+      const triage = await fetch(
+        `${harness.endpoint}/repos/material-proof/guided-proof/pulls?state=open&sort=updated&direction=desc&page=1&per_page=50`,
+        { headers: { Authorization: `Bearer ${tokenB}` } }
+      )
+      assert.equal(triage.status, 200)
+      assert.equal((await triage.json())[0].number, 8)
+
+      const accountAClone = await fetch(
+        `${harness.fixture.ready.cloneUrl}/info/refs?service=git-upload-pack`,
+        { headers: { Authorization: basicAuthorization(tokenA) } }
+      )
+      assert.equal(accountAClone.status, 401)
+      const cloneDestination = join(harness.root, 'clone')
+      await runGitClone(
+        harness.fixture.ready.cloneUrl,
+        cloneDestination,
+        tokenB
+      )
+      const { stdout: cloneCount } = await execFileAsync(
+        'git',
+        ['rev-list', '--count', 'HEAD'],
+        { cwd: cloneDestination, windowsHide: true }
+      )
+      assert.equal(cloneCount.trim(), '3')
+
+      await harness.fixture.flushLedger()
+      const ledger = await readFile(harness.fixture.ready.ledger.path, 'utf8')
+      assert.match(ledger, /"account":"proof-a"/)
+      assert.match(ledger, /"account":"proof-b"/)
+      assert.doesNotMatch(ledger, new RegExp(tokenA))
+      assert.doesNotMatch(ledger, new RegExp(tokenB))
+      const readyJSON = JSON.stringify(harness.fixture.ready)
+      assert.doesNotMatch(readyJSON, new RegExp(tokenA))
+      assert.doesNotMatch(readyJSON, new RegExp(tokenB))
+      assert.doesNotMatch(readyJSON, /"pid"/i)
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('fails closed on unknown auth, routes, methods, queries, and oversized bodies', async () => {
+    const harness = await createHarness()
+    try {
+      const unknownAccount = await fetch(`${harness.endpoint}/user`, {
+        headers: { Authorization: 'Bearer unknown-proof-token' },
+      })
+      assert.equal(unknownAccount.status, 401)
+
+      const unknownRoute = await fetch(`${harness.endpoint}/unexpected`, {
+        headers: { Authorization: `Bearer ${tokenB}` },
+      })
+      assert.equal(unknownRoute.status, 404)
+
+      const wrongMethod = await fetch(
+        `${harness.endpoint}/repos/material-proof/guided-proof`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${tokenB}` },
+        }
+      )
+      assert.equal(wrongMethod.status, 405)
+
+      const injectedQuery = await fetch(
+        `${harness.endpoint}/repos/material-proof/guided-proof/releases?per_page=30&page=1&next=https://example.invalid`,
+        { headers: { Authorization: `Bearer ${tokenB}` } }
+      )
+      assert.equal(injectedQuery.status, 400)
+
+      assert.equal(
+        await requestWithDeclaredLength(
+          `${harness.endpoint}/repos/material-proof/guided-proof/issues`,
+          2 * 1024 * 1024 + 1
+        ),
+        413
+      )
+
+      await harness.fixture.flushLedger()
+      const ledgerLines = (
+        await readFile(harness.fixture.ready.ledger.path, 'utf8')
+      )
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line) as Record<string, unknown>)
+      assert.ok(ledgerLines.length >= 5)
+      for (const entry of ledgerLines) {
+        assert.deepEqual(Object.keys(entry), [
+          'sequence',
+          'method',
+          'route',
+          'account',
+          'status',
+        ])
+      }
+    } finally {
+      await harness.close()
+    }
+  })
+})
