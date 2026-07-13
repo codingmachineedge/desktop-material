@@ -1,0 +1,469 @@
+.branch-rules-panel,
+.branch-rules-panel *,
+.branch-rules-content,
+.branch-rules-grid,
+.branch-rules-card,
+.branch-rules-row,
+.branch-rules-row dd,
+.branch-rules-sources li {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.branch-rules-panel {
+  position: fixed;
+  z-index: var(--popup-z-index);
+  top: calc(10px + var(--non-modal-sheet-cascade-offset, 0px));
+  right: calc(10px + var(--non-modal-sheet-cascade-offset, 0px));
+  bottom: 10px;
+  display: flex;
+  width: min(860px, max(1px, calc(100vw - 20px - var(--non-modal-sheet-cascade-offset, 0px))));
+  max-width: max(1px, calc(100vw - 20px - var(--non-modal-sheet-cascade-offset, 0px)));
+  max-height: max(1px, calc(100vh - 20px - var(--non-modal-sheet-cascade-offset, 0px)));
+  min-width: min(680px, max(1px, calc(100vw - 20px - var(--non-modal-sheet-cascade-offset, 0px))));
+  min-height: min(440px, max(1px, calc(100vh - 20px - var(--non-modal-sheet-cascade-offset, 0px))));
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-sys-elevation-level3);
+  color: var(--md-sys-color-on-surface);
+  container-name: branch-rules-panel;
+  container-type: inline-size;
+  pointer-events: auto;
+  animation: dmSheetR calc(480ms * var(--mdur, 1)) var(--spring);
+}
+
+.branch-rules-header {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 8px 20px;
+}
+
+.branch-rules-header-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.branch-rules-heading-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+
+  h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  small {
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+
+.branch-rules-progress,
+.branch-rules-icon-button {
+  flex: none;
+}
+
+.branch-rules-icon-button.button-component {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+
+  &:not([aria-disabled='true']):hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
+}
+
+.branch-rules-toolbar {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 5px 16px 11px 20px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+
+  p {
+    min-width: 0;
+    margin: 0;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .button-component {
+    height: auto;
+    min-height: 32px;
+    white-space: normal;
+  }
+}
+
+.branch-rules-content {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.branch-rules-state-card,
+.branch-rules-empty,
+.branch-rules-warning-list,
+.branch-rules-card {
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container);
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  p,
+  li,
+  span,
+  strong,
+  small,
+  a {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+.branch-rules-state-card {
+  margin-bottom: 14px;
+
+  p {
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+
+  &.warning {
+    background: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+  }
+
+  &.error {
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+  }
+}
+
+.branch-rules-state-actions {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--spacing-half);
+}
+
+.branch-rules-state-card .button-component,
+.branch-rules-state-actions .button-component {
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 32px;
+  flex: 0 1 auto;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.branch-rules-result-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+
+  h2,
+  p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  p {
+    margin-top: 3px;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-sm);
+  }
+}
+
+.branch-rules-empty,
+.branch-rules-warning-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+
+  ul {
+    margin: 4px 0 0;
+    padding-left: 20px;
+  }
+}
+
+.branch-rules-empty {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.branch-rules-warning-list {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.branch-rules-grid {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.branch-rules-card {
+  margin-bottom: 14px;
+
+  dl {
+    min-width: 0;
+    margin: 0;
+  }
+}
+
+.branch-rules-row {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  gap: 8px 12px;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.2fr);
+  padding: 9px 0;
+
+  & + & {
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+  }
+
+  dt {
+    min-width: 0;
+    font-weight: var(--font-weight-semibold);
+    overflow-wrap: anywhere;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.branch-rules-badge {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 26px;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+  white-space: normal;
+
+  &.required,
+  &.operation-blocked {
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+  }
+
+  &.not-required,
+  &.operation-allowed {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  &.unknown,
+  &.operation-constrained {
+    background: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+  }
+
+  &.operation-bypass {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+}
+
+.branch-rules-detail,
+.branch-rules-details-list {
+  margin: 8px 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.branch-rules-details-list {
+  padding-left: 18px;
+}
+
+.branch-rules-values {
+  max-width: 100%;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--md-sys-color-surface-container-high);
+
+    & + li {
+      margin-top: 5px;
+    }
+  }
+
+  code {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.branch-rules-sources {
+  > ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  > ul > li {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: start;
+    justify-content: space-between;
+    gap: 10px 16px;
+    padding: 11px 0;
+
+    & + li {
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+    }
+
+    > div {
+      display: flex;
+      min-width: 0;
+      flex: 1 1 300px;
+      flex-direction: column;
+    }
+  }
+
+  strong,
+  small {
+    display: block;
+  }
+
+  small,
+  p {
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  p {
+    margin: 5px 0 0;
+  }
+
+  .link-button-component {
+    flex: 0 1 auto;
+  }
+}
+
+.branch-rules-source-types {
+  font-size: var(--font-size-sm);
+}
+
+@container branch-rules-panel (max-width: 720px) {
+  .branch-rules-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container branch-rules-panel (max-width: 500px) {
+  .branch-rules-header {
+    flex-wrap: wrap;
+  }
+
+  .branch-rules-heading-copy {
+    flex-basis: calc(100% - 152px);
+  }
+
+  .branch-rules-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+
+    .button-component {
+      width: 100%;
+    }
+  }
+
+  .branch-rules-content {
+    padding: 10px;
+  }
+
+  .branch-rules-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 560px) {
+  .branch-rules-panel {
+    top: calc(4px + var(--non-modal-sheet-cascade-offset, 0px));
+    right: calc(4px + var(--non-modal-sheet-cascade-offset, 0px));
+    bottom: 4px;
+    width: min(860px, max(1px, calc(100vw - 8px - var(--non-modal-sheet-cascade-offset, 0px))));
+    max-width: max(1px, calc(100vw - 8px - var(--non-modal-sheet-cascade-offset, 0px)));
+    max-height: max(1px, calc(100vh - 8px - var(--non-modal-sheet-cascade-offset, 0px)));
+    min-height: max(1px, calc(100vh - 8px - var(--non-modal-sheet-cascade-offset, 0px)));
+    border-radius: 18px;
+  }
+
+  .branch-rules-header {
+    padding-top: 8px;
+  }
+}

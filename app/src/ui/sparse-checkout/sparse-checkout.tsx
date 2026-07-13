@@ -14,6 +14,7 @@ import {
 } from '../../lib/git/sparse-checkout'
 import { Repository } from '../../models/repository'
 import { DialogStackContext } from '../dialog'
+import { getNonModalSheetCascadeStyle } from '../dialog/non-modal-sheet-cascade'
 import { Button } from '../lib/button'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
@@ -101,6 +102,7 @@ export class SparseCheckoutManager extends React.Component<
   private refreshButton: HTMLButtonElement | null = null
   private reviewButton: HTMLButtonElement | null = null
   private panel: HTMLElement | null = null
+  private wasTopMost = false
 
   public constructor(props: ISparseCheckoutProps) {
     super(props)
@@ -123,12 +125,19 @@ export class SparseCheckoutManager extends React.Component<
 
   public componentDidMount() {
     this.mounted = true
+    this.wasTopMost = this.context.isTopMost
     window.addEventListener('keydown', this.onWindowKeyDown)
-    this.panel?.focus()
+    this.focusPanelIfTopMost()
     void this.loadState(true)
   }
 
   public componentDidUpdate(prevProps: ISparseCheckoutProps) {
+    const becameTopMost = this.context.isTopMost && !this.wasTopMost
+    this.wasTopMost = this.context.isTopMost
+    if (becameTopMost) {
+      this.focusPanelIfTopMost()
+    }
+
     if (prevProps.repository.path !== this.props.repository.path) {
       this.mutationSequence++
       this.loadController?.abort()
@@ -209,6 +218,16 @@ export class SparseCheckoutManager extends React.Component<
 
   private onPanelRef = (panel: HTMLElement | null) => {
     this.panel = panel
+  }
+
+  private focusPanelIfTopMost() {
+    if (
+      this.context.isTopMost &&
+      this.panel !== null &&
+      !this.panel.contains(document.activeElement)
+    ) {
+      this.panel.focus()
+    }
   }
 
   private onConfirmButtonRef = (button: HTMLButtonElement | null) => {
@@ -720,6 +739,7 @@ export class SparseCheckoutManager extends React.Component<
       // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
       <section
         className="sparse-checkout-panel"
+        style={getNonModalSheetCascadeStyle(this.context.stackOrder)}
         role="dialog"
         tabIndex={-1}
         ref={this.onPanelRef}

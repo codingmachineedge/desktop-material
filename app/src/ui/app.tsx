@@ -91,6 +91,16 @@ import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
 import { FileHistory } from './file-history'
 import { SparseCheckoutManager } from './sparse-checkout'
+import { BranchRulesInspector } from './branch-rules'
+import { EffectiveBranchRulesAPIDataSource } from '../lib/effective-branch-rules-api'
+import {
+  EffectiveBranchRulesLoader,
+  EffectiveBranchRulesetCache,
+} from '../lib/effective-branch-rules-loader'
+import {
+  resolveEffectiveBranchRulesAccount,
+  resolveEffectiveBranchRulesContext,
+} from '../lib/effective-branch-rules-context'
 import { CreateGitHubIssueDialog } from './create-github-issue'
 import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
 import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
@@ -305,6 +315,15 @@ export const bannerTransitionTimeout = { enter: 500, exit: 400 }
 const ReadyDelay = 100
 export class App extends React.Component<IAppProps, IAppState> {
   private loading = true
+  private readonly effectiveBranchRulesetCache =
+    new EffectiveBranchRulesetCache()
+  private readonly getEffectiveBranchRulesClient = memoizeOne(
+    (account: Account, repository: GitHubRepository, _contextVersion: string) =>
+      new EffectiveBranchRulesLoader(
+        new EffectiveBranchRulesAPIDataSource(account, repository),
+        { rulesetCache: this.effectiveBranchRulesetCache }
+      )
+  )
 
   /**
    * Used on non-macOS platforms to support the Alt key behavior for
@@ -577,6 +596,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.buildAndRun()
       case 'view-repository-on-github':
         return this.viewRepositoryOnGitHub()
+      case 'inspect-branch-rules':
+        return this.showBranchRules()
       case 'compare-on-github':
         return this.openBranchOnGitHub('compare')
       case 'branch-on-github':
@@ -1472,6 +1493,17 @@ export class App extends React.Component<IAppProps, IAppState> {
     })
   }
 
+  private showRepositoryAccountSettings = () => {
+    this.showRepositorySettings(RepositorySettingsTab.Remote)
+  }
+
+  private showAccountSettings = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.Preferences,
+      initialSelectedTab: PreferencesTab.Accounts,
+    })
+  }
+
   private showSparseCheckout() {
     const repository = this.getRepository()
 
@@ -1481,6 +1513,33 @@ export class App extends React.Component<IAppProps, IAppState> {
     this.props.dispatcher.showPopup({
       type: PopupType.SparseCheckout,
       repository,
+    })
+  }
+
+  private showBranchRules() {
+    const selectedState = this.state.selectedState
+    if (
+      selectedState === null ||
+      selectedState.type !== SelectionType.Repository ||
+      !(selectedState.repository instanceof Repository) ||
+      selectedState.state.branchesState.tip.kind !== TipState.Valid
+    ) {
+      return
+    }
+
+    const branch = selectedState.state.branchesState.tip.branch
+    const context = resolveEffectiveBranchRulesContext(
+      selectedState.repository,
+      branch,
+      selectedState.state.remote
+    )
+    this.props.dispatcher.showPopup({
+      type: PopupType.BranchRules,
+      repository: selectedState.repository,
+      initialBranch:
+        context.branch ??
+        branch.upstreamWithoutRemote ??
+        branch.nameWithoutRemote,
     })
   }
 
@@ -1937,6 +1996,98 @@ export class App extends React.Component<IAppProps, IAppState> {
             repositoryContextCurrent={repositoryContextCurrent}
             accounts={this.state.accounts}
             dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
+      case PopupType.BranchRules: {
+        const selection = this.state.selectedState
+        const isSelectedRepository =
+          selection !== null &&
+          selection.type === SelectionType.Repository &&
+          selection.repository.id === popup.repository.id
+        const repository = isSelectedRepository
+          ? selection.repository
+          : popup.repository
+        const tip = isSelectedRepository
+          ? selection.state.branchesState.tip
+          : null
+        const branch = tip?.kind === TipState.Valid ? tip.branch : null
+        const rulesContext = resolveEffectiveBranchRulesContext(
+          repository,
+          branch,
+          isSelectedRepository ? selection.state.remote : null
+        )
+        const currentBranch = rulesContext.branch
+        const gitHubRepository =
+          rulesContext.kind === 'ready'
+            ? rulesContext.gitHubRepository
+            : repository.gitHubRepository
+        const accountResolution =
+          rulesContext.kind === 'ready' && gitHubRepository !== null
+            ? resolveEffectiveBranchRulesAccount(
+                this.state.accounts,
+                repository,
+                gitHubRepository.endpoint
+              )
+            : { kind: 'incompatible' as const }
+
+        let availability: React.ComponentProps<
+          typeof BranchRulesInspector
+        >['availability'] = 'unsupported'
+        let requestContext: unknown = rulesContext.contextVersion
+        let unavailableMessage =
+          rulesContext.kind === 'unsupported'
+            ? rulesContext.message
+            : 'Branch rules are unavailable for this repository.'
+        let client: EffectiveBranchRulesLoader | undefined
+
+        if (
+          rulesContext.kind === 'ready' &&
+          gitHubRepository !== null &&
+          accountResolution.kind === 'signed-out'
+        ) {
+          availability = 'signed-out'
+          requestContext = `signed-out:${rulesContext.contextVersion}`
+        } else if (
+          rulesContext.kind === 'ready' &&
+          gitHubRepository !== null &&
+          accountResolution.kind === 'ready'
+        ) {
+          availability = 'ready'
+          client = this.getEffectiveBranchRulesClient(
+            accountResolution.account,
+            gitHubRepository,
+            rulesContext.contextVersion
+          )
+          requestContext = client
+        } else if (
+          rulesContext.kind === 'ready' &&
+          (accountResolution.kind === 'ambiguous' ||
+            accountResolution.kind === 'incompatible')
+        ) {
+          availability = 'account-selection-required'
+          requestContext = `account-selection-required:${rulesContext.contextVersion}`
+          unavailableMessage =
+            accountResolution.kind === 'ambiguous'
+              ? 'Choose an account for this repository in Repository settings before inspecting account-specific permissions and bypasses.'
+              : 'The selected account does not match this GitHub repository. Choose the Repository account in Repository settings.'
+        }
+
+        return (
+          <BranchRulesInspector
+            key={`branch-rules-${popup.repository.id}-${popup.initialBranch}`}
+            repositoryLabel={gitHubRepository?.fullName ?? repository.name}
+            repositoryPath={repository.path}
+            initialBranch={popup.initialBranch}
+            currentBranch={currentBranch}
+            isSelectedRepository={isSelectedRepository}
+            availability={availability}
+            requestContext={requestContext}
+            unavailableMessage={unavailableMessage}
+            client={client}
+            onSignIn={this.showAccountSettings}
+            onChooseRepositoryAccount={this.showRepositoryAccountSettings}
             onDismissed={onPopupDismissedFn}
           />
         )

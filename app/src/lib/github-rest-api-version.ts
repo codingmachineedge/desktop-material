@@ -18,7 +18,13 @@ function isDotComRESTEndpoint(endpoint: string): boolean {
 
   try {
     const hostname = new URL(endpoint).hostname
-    return hostname === 'api.github.com' || hostname === 'github.com'
+    return (
+      hostname === 'api.github.com' ||
+      hostname === 'github.com' ||
+      (hostname.startsWith('api.') &&
+        hostname.endsWith('.ghe.com') &&
+        hostname.split('.').length >= 4)
+    )
   } catch {
     return false
   }

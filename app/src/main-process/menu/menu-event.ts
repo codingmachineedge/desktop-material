@@ -36,6 +36,7 @@ export type MenuEvent =
   | 'compare-on-github'
   | 'branch-on-github'
   | 'view-repository-on-github'
+  | 'inspect-branch-rules'
   | 'clone-repository'
   | 'export-repository-list'
   | 'import-repository-list'

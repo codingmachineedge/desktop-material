@@ -12,15 +12,15 @@
 .sparse-checkout-panel {
   position: fixed;
   z-index: var(--popup-z-index);
-  top: 10px;
-  right: 10px;
+  top: calc(10px + var(--non-modal-sheet-cascade-offset, 0px));
+  right: calc(10px + var(--non-modal-sheet-cascade-offset, 0px));
   bottom: 10px;
   display: flex;
-  width: min(820px, calc(100vw - 20px));
-  max-width: calc(100vw - 20px);
-  max-height: calc(100vh - 20px);
-  min-width: min(620px, calc(100vw - 20px));
-  min-height: min(420px, calc(100vh - 20px));
+  width: min(820px, max(1px, calc(100vw - 20px - var(--non-modal-sheet-cascade-offset, 0px))));
+  max-width: max(1px, calc(100vw - 20px - var(--non-modal-sheet-cascade-offset, 0px)));
+  max-height: max(1px, calc(100vh - 20px - var(--non-modal-sheet-cascade-offset, 0px)));
+  min-width: min(620px, max(1px, calc(100vw - 20px - var(--non-modal-sheet-cascade-offset, 0px))));
+  min-height: min(420px, max(1px, calc(100vh - 20px - var(--non-modal-sheet-cascade-offset, 0px))));
   flex-direction: column;
   overflow: hidden;
   border-radius: 28px;
@@ -381,13 +381,13 @@
 
 @media (max-height: 560px) {
   .sparse-checkout-panel {
-    top: 4px;
-    right: 4px;
+    top: calc(4px + var(--non-modal-sheet-cascade-offset, 0px));
+    right: calc(4px + var(--non-modal-sheet-cascade-offset, 0px));
     bottom: 4px;
-    width: min(820px, calc(100vw - 8px));
-    max-width: calc(100vw - 8px);
-    max-height: calc(100vh - 8px);
-    min-height: calc(100vh - 8px);
+    width: min(820px, max(1px, calc(100vw - 8px - var(--non-modal-sheet-cascade-offset, 0px))));
+    max-width: max(1px, calc(100vw - 8px - var(--non-modal-sheet-cascade-offset, 0px)));
+    max-height: max(1px, calc(100vh - 8px - var(--non-modal-sheet-cascade-offset, 0px)));
+    min-height: max(1px, calc(100vh - 8px - var(--non-modal-sheet-cascade-offset, 0px)));
     border-radius: 18px;
   }
 

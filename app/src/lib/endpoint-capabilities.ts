@@ -164,4 +164,16 @@ export const supportsActions = endpointSatisfies({
 
 export const supportsAliveSessions = endpointSatisfies({ dotcom: true })
 
-export const supportsRepoRules = endpointSatisfies({ dotcom: true })
+/**
+ * Repository rules are available on GitHub.com/GHE.com and GHES 3.11 or
+ * newer. An unknown GHES version must be attempted: treating a missing
+ * version header as an old server would turn an unknown ruleset response into
+ * a falsely authoritative negative answer.
+ */
+export const supportsRepoRules = (
+  endpoint: string,
+  getVersion = getEndpointVersion
+) =>
+  isGHES(endpoint) && getVersion(endpoint) === null
+    ? true
+    : endpointSatisfies({ dotcom: true, es: '>= 3.11.0' }, getVersion)(endpoint)

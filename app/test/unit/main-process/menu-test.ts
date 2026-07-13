@@ -213,6 +213,21 @@ describe('main-process menu', () => {
       assert.equal(sparseCheckout.click instanceof Function, true)
     })
 
+    it('exposes the effective branch-rules inspector in Repository', () => {
+      const template = buildDefaultMenuTemplate(baseParams)
+      const repositoryMenu = template.find(item => item.id === 'repository')
+      assert.ok(repositoryMenu && Array.isArray(repositoryMenu.submenu))
+      const branchRules = repositoryMenu.submenu.find(
+        item => item.id === 'inspect-branch-rules'
+      )
+      assert.ok(branchRules)
+      assert.match(
+        (branchRules.label ?? '').replaceAll('&', ''),
+        /Inspect .*branch rules/i
+      )
+      assert.equal(branchRules.click instanceof Function, true)
+    })
+
     it('exposes native pull request creation from the Branch menu', () => {
       const template = buildDefaultMenuTemplate(baseParams)
       const branchMenu = template.find(item => item.id === 'branch')

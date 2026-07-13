@@ -373,6 +373,11 @@ export function buildDefaultMenuTemplate({
         click: emit('view-repository-on-github'),
       },
       {
+        id: 'inspect-branch-rules',
+        label: __DARWIN__ ? 'Inspect Branch Rules…' : 'I&nspect branch rules…',
+        click: emit('inspect-branch-rules'),
+      },
+      {
         label: __DARWIN__
           ? `Open in ${selectedShell ?? 'Shell'}`
           : `O&pen in ${selectedShell ?? 'shell'}`,

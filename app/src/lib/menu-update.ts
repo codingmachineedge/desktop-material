@@ -12,6 +12,7 @@ import { AppMenu, MenuItem } from '../models/app-menu'
 import { hasConflictedFiles } from './status'
 import { findContributionTargetDefaultBranch } from './branch'
 import { enableWorktreeSupport } from './feature-flag'
+import { hasModalPopup } from '../models/popup'
 
 export interface IMenuItemState {
   readonly enabled?: boolean
@@ -115,6 +116,7 @@ const allMenuIds: ReadonlyArray<MenuIDs> = [
   'merge-branch',
   'rebase-branch',
   'view-repository-on-github',
+  'inspect-branch-rules',
   'compare-on-github',
   'branch-on-github',
   'open-in-shell',
@@ -246,6 +248,7 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
     'open-in-shell',
     'open-working-directory',
     'show-repository-settings',
+    'inspect-branch-rules',
     'manage-gitignore',
     'manage-sparse-checkout',
     'build-and-run',
@@ -308,6 +311,10 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
     )
 
     menuStateBuilder.setEnabled('view-repository-on-github', isHostedOnGitHub)
+    menuStateBuilder.setEnabled(
+      'inspect-branch-rules',
+      isHostedOnGitHub && onBranch && !branchIsUnborn
+    )
     menuStateBuilder.setEnabled(
       'create-issue-in-repository-on-github',
       repoIssuesEnabled
@@ -402,7 +409,7 @@ function getRepositoryMenuBuilder(state: IAppState): MenuStateBuilder {
 }
 
 function getMenuState(state: IAppState): Map<MenuIDs, IMenuItemState> {
-  if (state.currentPopup) {
+  if (hasModalPopup(state.allPopups)) {
     return getAllMenusDisabledBuilder().state
   }
 

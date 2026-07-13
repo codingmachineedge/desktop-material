@@ -141,6 +141,41 @@ describe('API', () => {
         assert.equal(headers.get(GitHubRESTAPIVersionHeader), null)
       }
     })
+
+    it('versions GHEC data-residency REST hosts without widening to GHES or impostors', () => {
+      for (const endpoint of [
+        'https://api.acme.ghe.com',
+        'https://API.ENTERPRISE.GHE.COM/',
+      ]) {
+        const headers = createGitHubAPIRequestHeaders(endpoint, '/user', {
+          'x-GITHUB-api-VERSION': '2022-11-28',
+        })
+        assert.equal(
+          headers.get(GitHubRESTAPIVersionHeader),
+          GitHubDotComRESTAPIVersion
+        )
+        assert.equal(
+          createGitHubAPIRequestHeaders(endpoint, '/graphql').get(
+            GitHubRESTAPIVersionHeader
+          ),
+          null
+        )
+      }
+
+      for (const endpoint of [
+        'https://ghe.com',
+        'https://api.ghe.com',
+        'https://api.acme.ghe.com.example.test',
+        'https://github.example.test/api/v3',
+      ]) {
+        assert.equal(
+          createGitHubAPIRequestHeaders(endpoint, '/user').get(
+            GitHubRESTAPIVersionHeader
+          ),
+          null
+        )
+      }
+    })
   })
 
   describe('fetchOrgRepositories', () => {

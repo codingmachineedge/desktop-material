@@ -142,6 +142,9 @@ interface IFetchAllOptions<T> {
    */
   onPage?: (page: ReadonlyArray<T>) => void
 
+  /** Invoked for every HTTP response, before its payload is interpreted. */
+  onResponse?: (response: Response) => void
+
   /**
    * Calculate the next page path given the response.
    *
@@ -160,6 +163,15 @@ interface IFetchAllOptions<T> {
    * on any page.
    */
   suppressErrors?: boolean
+
+  /** Reject a successful response unless its JSON payload is an array. */
+  requireArrayPage?: boolean
+
+  /** Cancels every page request in this pagination sequence. */
+  signal?: AbortSignal
+
+  /** Bypass the HTTP cache for every page in this pagination sequence. */
+  reloadCache?: boolean
 }
 
 const ClientID = process.env.TEST_ENV ? '' : __OAUTH_CLIENT_ID__
@@ -175,6 +187,14 @@ export type GitHubAccountType = 'User' | 'Organization'
 
 /** The OAuth scopes we want to request */
 const oauthScopes = ['repo', 'user', 'workflow']
+
+/**
+ * Bound the effective-rules response even if a server supplies an unending
+ * pagination chain. Reaching this limit is reported as incomplete rather than
+ * silently treating the partial result as authoritative.
+ */
+const MaximumEffectiveBranchRules = 1000
+const MaximumEffectiveBranchRulePages = 20
 
 /**
  * Information about a repository as returned by the GitHub API.
@@ -631,6 +651,46 @@ export interface IAPIPushControl {
   allow_force_pushes: boolean
 }
 
+export interface IBranchRulesAPIRequestOptions {
+  readonly signal?: AbortSignal
+  /** Reject instead of returning the legacy permissive fallback. */
+  readonly strict?: boolean
+  /** Bypass the HTTP cache for an explicit user refresh. */
+  readonly reloadCache?: boolean
+}
+
+export interface IStrictBranchRulesAPIRequestOptions
+  extends IBranchRulesAPIRequestOptions {
+  readonly strict: true
+}
+
+/** Detailed classic branch-protection payload, validated by its consumer. */
+export interface IAPIBranchProtection {
+  readonly required_status_checks?: {
+    readonly strict?: unknown
+    readonly contexts?: unknown
+    readonly checks?: unknown
+  } | null
+  readonly required_pull_request_reviews?: {
+    readonly dismiss_stale_reviews?: unknown
+    readonly require_code_owner_reviews?: unknown
+    readonly required_approving_review_count?: unknown
+    readonly require_last_push_approval?: unknown
+    readonly dismissal_restrictions?: unknown
+    readonly bypass_pull_request_allowances?: unknown
+  } | null
+  readonly required_signatures?: { readonly enabled?: unknown } | null
+  readonly required_linear_history?: { readonly enabled?: unknown } | null
+  readonly allow_force_pushes?: { readonly enabled?: unknown } | null
+  readonly allow_deletions?: { readonly enabled?: unknown } | null
+  readonly required_conversation_resolution?: {
+    readonly enabled?: unknown
+  } | null
+  readonly lock_branch?: { readonly enabled?: unknown } | null
+  readonly allow_fork_syncing?: { readonly enabled?: unknown } | null
+  readonly enforce_admins?: { readonly enabled?: unknown } | null
+}
+
 /** Branch information returned by the GitHub API */
 export interface IAPIBranch {
   /**
@@ -660,13 +720,14 @@ export interface IAPIRepoRule {
    */
   readonly type: APIRepoRuleType
 
+  readonly ruleset_source_type?: string
+  readonly ruleset_source?: string
+
   /**
-   * The parameters that apply to the rule if it is a metadata rule.
-   * Other rule types may have parameters, but they are not used in
-   * this app so they are ignored. Do not attempt to use this field
-   * unless you know `type` matches a metadata rule type.
+   * Rule-specific parameters. Consumers must narrow and validate the shape
+   * appropriate for `type` before reading it.
    */
-  readonly parameters?: IAPIRepoRuleMetadataParameters
+  readonly parameters?: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -676,10 +737,14 @@ export interface IAPIRepoRule {
 export enum APIRepoRuleType {
   Creation = 'creation',
   Update = 'update',
+  Deletion = 'deletion',
   RequiredDeployments = 'required_deployments',
+  RequiredLinearHistory = 'required_linear_history',
   RequiredSignatures = 'required_signatures',
   RequiredStatusChecks = 'required_status_checks',
   PullRequest = 'pull_request',
+  MergeQueue = 'merge_queue',
+  NonFastForward = 'non_fast_forward',
   CommitMessagePattern = 'commit_message_pattern',
   CommitAuthorEmailPattern = 'commit_author_email_pattern',
   CommitterEmailPattern = 'committer_email_pattern',
@@ -702,7 +767,24 @@ export interface IAPIRepoRuleset extends IAPISlimRepoRuleset {
   /**
    * Whether the user making the API request can bypass the ruleset.
    */
-  readonly current_user_can_bypass: 'always' | 'pull_requests_only' | 'never'
+  readonly current_user_can_bypass?:
+    | 'always'
+    | 'exempt'
+    | 'pull_requests_only'
+    | 'pull_request'
+    | 'never'
+  readonly name?: string
+  readonly source_type?: string
+  readonly source?: string
+  readonly _links?: {
+    readonly html?: { readonly href?: string }
+  }
+}
+
+export interface IAPIRepoRulesForBranchResult {
+  readonly rules: ReadonlyArray<IAPIRepoRule>
+  /** False when a safety cap or malformed pagination boundary was reached. */
+  readonly complete: boolean
 }
 
 /**
@@ -810,24 +892,219 @@ interface IAPIMentionablesResponse {
  *
  * If no link rel next header is found this method returns null.
  */
-function getNextPagePathFromLink(response: Response): string | null {
+interface ISplitLinkHeaderValues {
+  readonly values: ReadonlyArray<string>
+  readonly structurallyValid: boolean
+}
+
+function splitLinkHeaderValues(linkHeader: string): ISplitLinkHeaderValues {
+  const values = new Array<string>()
+  let start = 0
+  let inTarget = false
+  let inQuote = false
+  let escaped = false
+  let targetsInValue = 0
+  let structurallyValid = true
+
+  const finishValue = (end: number) => {
+    const value = linkHeader.slice(start, end)
+    if (value.trim().length === 0 || targetsInValue !== 1) {
+      structurallyValid = false
+    }
+    values.push(value)
+    targetsInValue = 0
+  }
+
+  for (let index = 0; index < linkHeader.length; index++) {
+    const character = linkHeader[index]
+    if (inQuote) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === '"') {
+        inQuote = false
+      }
+      continue
+    }
+    if (character === '<') {
+      if (
+        inTarget ||
+        targetsInValue > 0 ||
+        linkHeader.slice(start, index).trim().length > 0
+      ) {
+        structurallyValid = false
+      }
+      inTarget = true
+      targetsInValue++
+    } else if (character === '>' && inTarget) {
+      inTarget = false
+    } else if (character === '>') {
+      structurallyValid = false
+    } else if (character === '"' && !inTarget) {
+      inQuote = true
+    } else if (character === '"') {
+      structurallyValid = false
+    } else if (character === ',' && !inTarget) {
+      finishValue(index)
+      start = index + 1
+    }
+  }
+  finishValue(linkHeader.length)
+  return {
+    values,
+    structurallyValid: structurallyValid && !inTarget && !inQuote && !escaped,
+  }
+}
+
+function splitLinkParameters(part: string): ReadonlyArray<string> {
+  const targetEnd = part.indexOf('>')
+  if (targetEnd < 0) {
+    return []
+  }
+
+  const suffix = part.slice(targetEnd + 1)
+  const segments = new Array<string>()
+  let start = 0
+  let inQuote = false
+  let escaped = false
+  for (let index = 0; index < suffix.length; index++) {
+    const character = suffix[index]
+    if (inQuote) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === '"') {
+        inQuote = false
+      }
+    } else if (character === '"') {
+      inQuote = true
+    } else if (character === ';') {
+      segments.push(suffix.slice(start, index))
+      start = index + 1
+    }
+  }
+  segments.push(suffix.slice(start))
+  return segments.slice(1)
+}
+
+function getNextPagePathFromLink(
+  response: Response,
+  expectedEndpoint?: string
+): string | null {
   const linkHeader = response.headers.get('Link')
 
   if (!linkHeader) {
     return null
   }
 
-  for (const part of linkHeader.split(',')) {
-    // https://github.com/philschatz/octokat.js/blob/5658abe442e8bf405cfda1c72629526a37554613/src/plugins/pagination.js#L17
-    const match = part.match(/<([^>]+)>; rel="([^"]+)"/)
+  const parsedHeader = splitLinkHeaderValues(linkHeader)
+  if (!parsedHeader.structurallyValid) {
+    return null
+  }
 
-    if (match && match[2] === 'next') {
-      const nextURL = URL.parse(match[1])
-      return nextURL.path || null
+  for (const part of parsedHeader.values) {
+    const target = part.match(/^\s*<([^>]+)>/)
+    if (target !== null && linkPartHasRelation(part, 'next')) {
+      const candidate = target[1]
+      if (candidate.startsWith('//') || /[\u0000-\u0020\\]/.test(candidate)) {
+        return null
+      }
+      try {
+        const nextURL = candidate.startsWith('/')
+          ? expectedEndpoint === undefined
+            ? null
+            : new globalThis.URL(candidate, expectedEndpoint)
+          : new globalThis.URL(candidate)
+        if (nextURL === null) {
+          return candidate
+        }
+        if (
+          !['http:', 'https:'].includes(nextURL.protocol) ||
+          (expectedEndpoint !== undefined &&
+            nextURL.origin !== new globalThis.URL(expectedEndpoint).origin)
+        ) {
+          return null
+        }
+        return `${nextURL.pathname}${nextURL.search}` || null
+      } catch {
+        return null
+      }
     }
   }
 
   return null
+}
+
+function linkPartHasRelation(part: string, relation: string): boolean {
+  const parsed = parseLinkPartRelation(part)
+  return (
+    parsed.kind === 'valid' &&
+    parsed.tokens.some(token => token.toLowerCase() === relation.toLowerCase())
+  )
+}
+
+function linkPartHasMalformedRelation(part: string): boolean {
+  return parseLinkPartRelation(part).kind !== 'valid'
+}
+
+type ParsedLinkRelation =
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'invalid' }
+  | { readonly kind: 'valid'; readonly tokens: ReadonlyArray<string> }
+
+/** Parse only the first rel parameter, as required for duplicate parameters. */
+function parseLinkPartRelation(part: string): ParsedLinkRelation {
+  const relationParameter = splitLinkParameters(part).find(parameter =>
+    /^\s*rel(?:\s*=|\s*$)/i.test(parameter)
+  )
+  if (relationParameter === undefined) {
+    return { kind: 'absent' }
+  }
+  const parameter = relationParameter.trimStart()
+  const assignment = /^rel\s*=\s*/i.exec(parameter)
+  if (assignment === null) {
+    return { kind: 'invalid' }
+  }
+
+  const remainder = parameter.slice(assignment[0].length)
+  if (remainder.startsWith('"')) {
+    const closingQuote = remainder.indexOf('"', 1)
+    if (closingQuote < 0) {
+      return { kind: 'invalid' }
+    }
+    const trailing = remainder.slice(closingQuote + 1).trim()
+    const value = remainder.slice(1, closingQuote)
+    const tokens = /^[^ \t\r\n]+(?: +[^ \t\r\n]+)*$/.test(value)
+      ? value.split(/ +/)
+      : []
+    return tokens.length > 0 &&
+      tokens.every(isValidLinkRelationToken) &&
+      trailing.length === 0
+      ? { kind: 'valid', tokens }
+      : { kind: 'invalid' }
+  }
+
+  const value = /^([^\s;,"=]+)/.exec(remainder)?.[1]
+  if (value === undefined) {
+    return { kind: 'invalid' }
+  }
+  const trailing = remainder.slice(value.length).trim()
+  return isValidLinkRelationToken(value) && trailing.length === 0
+    ? { kind: 'valid', tokens: [value] }
+    : { kind: 'invalid' }
+}
+
+function isValidLinkRelationToken(value: string): boolean {
+  if (/^[a-z][a-z0-9.-]*$/.test(value)) {
+    return true
+  }
+  try {
+    return new globalThis.URL(value).protocol.length > 1
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -2114,6 +2391,51 @@ export class API {
     return null
   }
 
+  /** Fetch live metadata for one exact repository without legacy fallbacks. */
+  public async fetchBranchRulesRepository(
+    owner: string,
+    name: string,
+    options: IStrictBranchRulesAPIRequestOptions
+  ): Promise<IAPIFullRepository> {
+    const response = await this.ghRequest('GET', `repos/${owner}/${name}`, {
+      signal: options.signal,
+      reloadCache: options.reloadCache,
+    })
+    return await parsedResponse<IAPIFullRepository>(response)
+  }
+
+  /** Fetch the repository's summary for one exact branch. */
+  public async fetchBranch(
+    owner: string,
+    name: string,
+    branch: string,
+    options: IBranchRulesAPIRequestOptions = {}
+  ): Promise<IAPIBranch> {
+    const path = `repos/${owner}/${name}/branches/${encodeURIComponent(branch)}`
+    const response = await this.ghRequest('GET', path, {
+      signal: options.signal,
+      reloadCache: options.reloadCache,
+    })
+    return await parsedResponse<IAPIBranch>(response)
+  }
+
+  /** Fetch the detailed classic protection configured for an exact branch. */
+  public async fetchBranchProtection(
+    owner: string,
+    name: string,
+    branch: string,
+    options: IBranchRulesAPIRequestOptions = {}
+  ): Promise<IAPIBranchProtection> {
+    const path = `repos/${owner}/${name}/branches/${encodeURIComponent(
+      branch
+    )}/protection`
+    const response = await this.ghRequest('GET', path, {
+      signal: options.signal,
+      reloadCache: options.reloadCache,
+    })
+    return await parsedResponse<IAPIBranchProtection>(response)
+  }
+
   /**
    * Get branch protection info to determine if a user can push to a given branch.
    *
@@ -2122,7 +2444,8 @@ export class API {
   public async fetchPushControl(
     owner: string,
     name: string,
-    branch: string
+    branch: string,
+    options: IBranchRulesAPIRequestOptions = {}
   ): Promise<IAPIPushControl> {
     const path = `repos/${owner}/${name}/branches/${encodeURIComponent(
       branch
@@ -2135,9 +2458,15 @@ export class API {
     try {
       const response = await this.ghRequest('GET', path, {
         customHeaders: headers,
+        signal: options.signal,
+        reloadCache: options.reloadCache,
       })
       return await parsedResponse<IAPIPushControl>(response)
     } catch (err) {
+      if (options.strict) {
+        throw err
+      }
+
       log.info(
         `[fetchPushControl] unable to check if branch is potentially pushable`,
         err
@@ -2178,13 +2507,81 @@ export class API {
   public async fetchRepoRulesForBranch(
     owner: string,
     name: string,
+    branch: string,
+    options: IStrictBranchRulesAPIRequestOptions
+  ): Promise<IAPIRepoRulesForBranchResult>
+  public async fetchRepoRulesForBranch(
+    owner: string,
+    name: string,
+    branch: string,
+    options: IBranchRulesAPIRequestOptions & { readonly strict?: false }
+  ): Promise<ReadonlyArray<IAPIRepoRule>>
+  public async fetchRepoRulesForBranch(
+    owner: string,
+    name: string,
     branch: string
-  ): Promise<ReadonlyArray<IAPIRepoRule>> {
+  ): Promise<ReadonlyArray<IAPIRepoRule>>
+  public async fetchRepoRulesForBranch(
+    owner: string,
+    name: string,
+    branch: string,
+    options?: IBranchRulesAPIRequestOptions
+  ): Promise<ReadonlyArray<IAPIRepoRule> | IAPIRepoRulesForBranchResult> {
     const path = `repos/${owner}/${name}/rules/branches/${encodeURIComponent(
       branch
     )}`
+
+    if (options?.strict) {
+      let lastResponseHadNextPage = false
+      let ambiguousPagination = false
+      let pagesFetched = 0
+      const fetchedRules = await this.fetchAll<IAPIRepoRule>(path, {
+        perPage: 100,
+        suppressErrors: false,
+        requireArrayPage: true,
+        signal: options.signal,
+        reloadCache: options.reloadCache,
+        continue: results =>
+          results.length < MaximumEffectiveBranchRules &&
+          pagesFetched < MaximumEffectiveBranchRulePages,
+        onResponse: () => pagesFetched++,
+        getNextPagePath: response => {
+          const nextPath = getNextPagePathFromLink(response, this.endpoint)
+          const link = response.headers.get('Link')
+          const parsedLink = link === null ? null : splitLinkHeaderValues(link)
+          const claimsNextPage =
+            parsedLink !== null &&
+            parsedLink.values.some(part => linkPartHasRelation(part, 'next'))
+          const malformedRelations =
+            parsedLink !== null &&
+            (!parsedLink.structurallyValid ||
+              parsedLink.values.some(linkPartHasMalformedRelation))
+
+          lastResponseHadNextPage = nextPath !== null
+          if (malformedRelations || (claimsNextPage && nextPath === null)) {
+            ambiguousPagination = true
+          }
+
+          return nextPath
+        },
+      })
+      const exceededSafetyCap =
+        fetchedRules.length > MaximumEffectiveBranchRules
+
+      return {
+        rules: fetchedRules.slice(0, MaximumEffectiveBranchRules),
+        complete:
+          !exceededSafetyCap &&
+          !lastResponseHadNextPage &&
+          !ambiguousPagination,
+      }
+    }
+
     try {
-      const response = await this.ghRequest('GET', path)
+      const response = await this.ghRequest('GET', path, {
+        signal: options?.signal,
+        reloadCache: options?.reloadCache,
+      })
       return await parsedResponse<IAPIRepoRule[]>(response)
     } catch (err) {
       // If the repository isn't owned by the current user there's no way for us
@@ -2235,13 +2632,21 @@ export class API {
   public async fetchRepoRuleset(
     owner: string,
     name: string,
-    id: number
+    id: number,
+    options: IBranchRulesAPIRequestOptions = {}
   ): Promise<IAPIRepoRuleset | null> {
     const path = `repos/${owner}/${name}/rulesets/${id}`
     try {
-      const response = await this.ghRequest('GET', path)
+      const response = await this.ghRequest('GET', path, {
+        signal: options.signal,
+        reloadCache: options.reloadCache,
+      })
       return await parsedResponse<IAPIRepoRuleset>(response)
     } catch (err) {
+      if (options.strict) {
+        throw err
+      }
+
       log.info(
         `[fetchRepoRuleset] unable to fetch repo ruleset for ID: ${id} | ${path}`,
         err
@@ -2265,13 +2670,21 @@ export class API {
     let nextPath: string | null = urlWithQueryString(path, params)
     let page: ReadonlyArray<T> = []
     do {
-      const response: Response = await this.ghRequest('GET', nextPath)
+      const response: Response = await this.ghRequest('GET', nextPath, {
+        signal: opts.signal,
+        reloadCache: opts.reloadCache,
+      })
+      opts.onResponse?.(response)
       if (opts.suppressErrors !== false && !response.ok) {
         log.warn(`fetchAll: '${path}' returned a ${response.status}`)
         return buf
       }
 
-      page = await parsedResponse<ReadonlyArray<T>>(response)
+      const parsedPage: unknown = await parsedResponse<unknown>(response)
+      if (opts.requireArrayPage && !Array.isArray(parsedPage)) {
+        throw new Error('Expected a paginated API response to be an array.')
+      }
+      page = parsedPage as ReadonlyArray<T>
       if (page) {
         buf.push(...page)
         opts.onPage?.(page)

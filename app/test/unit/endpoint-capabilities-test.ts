@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   endpointSatisfies,
+  supportsRepoRules,
   VersionConstraint,
 } from '../../src/lib/endpoint-capabilities'
 import { SemVer, parse } from 'semver'
@@ -60,6 +61,31 @@ describe('endpoint-capabilities', () => {
           },
           '3.1.0'
         ),
+        true
+      )
+    })
+  })
+
+  describe('supportsRepoRules', () => {
+    it('supports dotcom, GHES 3.11+, and unknown-version GHES fail closed', () => {
+      assert.equal(
+        supportsRepoRules(getDotComAPIEndpoint(), () => null),
+        true
+      )
+      assert.equal(
+        supportsRepoRules('https://old.example.test/api/v3', () =>
+          forceUnwrap(`Couldn't parse endpoint version`, parse('3.10.9'))
+        ),
+        false
+      )
+      assert.equal(
+        supportsRepoRules('https://new.example.test/api/v3', () =>
+          forceUnwrap(`Couldn't parse endpoint version`, parse('3.11.0'))
+        ),
+        true
+      )
+      assert.equal(
+        supportsRepoRules('https://unknown.example.test/api/v3', () => null),
         true
       )
     })

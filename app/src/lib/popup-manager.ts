@@ -95,15 +95,25 @@ export class PopupManager {
 
     const existingPopup = this.getPopupsOfType(popupToAdd.type)
 
-    const popup = { id: ++this.popupCounter, ...popupToAdd }
-
     if (existingPopup.length > 0) {
+      if (
+        popupToAdd.type === PopupType.BranchRules ||
+        popupToAdd.type === PopupType.SparseCheckout
+      ) {
+        const popup = { ...popupToAdd, id: existingPopup[0].id }
+        this.popupStack = this.popupStack.filter(
+          candidate => candidate.type !== popupToAdd.type
+        )
+        this.insertBeforeErrorPopups(popup)
+        return popup
+      }
       log.warn(
         `Attempted to add a popup of already existing type - ${popupToAdd.type}.`
       )
       return popupToAdd
     }
 
+    const popup = { id: ++this.popupCounter, ...popupToAdd }
     this.insertBeforeErrorPopups(popup)
     this.checkStackLength()
     return popup

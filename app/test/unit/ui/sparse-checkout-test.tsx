@@ -224,6 +224,107 @@ describe('SparseCheckoutManager', () => {
     assert.equal(dismissals, 1)
   })
 
+  it('reclaims focus and shortcut ownership when reordered ahead of branch rules', async () => {
+    let sparseDismissals = 0
+    let branchDismissals = 0
+    const client = {
+      getState: async () => disabledState,
+      setDirectories: async () => ['src'],
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+    const renderStack = (
+      topMost: 'sparse' | 'branch-rules',
+      showBranchRules: boolean
+    ) => (
+      <>
+        <DialogStackContext.Provider
+          value={{ isTopMost: topMost === 'sparse' }}
+        >
+          <SparseCheckoutManager
+            repository={repository}
+            client={client}
+            onRefreshRepository={async () => {}}
+            onDismissed={() => {
+              sparseDismissals++
+            }}
+          />
+        </DialogStackContext.Provider>
+        {showBranchRules ? (
+          <DialogStackContext.Provider
+            value={{ isTopMost: topMost === 'branch-rules' }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                branchDismissals++
+              }}
+            >
+              Close effective branch rules
+            </button>
+          </DialogStackContext.Provider>
+        ) : null}
+      </>
+    )
+    const view = render(renderStack('sparse', false))
+
+    await screen.findByRole('textbox', { name: 'Included directories' })
+    const sparsePanel = screen.getByRole('dialog', {
+      name: 'Sparse checkout',
+    })
+    assert.equal(document.activeElement, sparsePanel)
+
+    view.rerender(renderStack('branch-rules', true))
+    const branchRulesClose = screen.getByRole('button', {
+      name: 'Close effective branch rules',
+    })
+    branchRulesClose.focus()
+    assert.equal(document.activeElement, branchRulesClose)
+
+    view.rerender(renderStack('sparse', true))
+    await waitFor(() => assert.ok(sparsePanel.contains(document.activeElement)))
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.equal(sparseDismissals, 1)
+    assert.equal(branchDismissals, 0)
+  })
+
+  it('does not take focus when mounted behind another sheet', async () => {
+    const origin = document.createElement('button')
+    document.body.appendChild(origin)
+    origin.focus()
+    const client = {
+      getState: async () => disabledState,
+      setDirectories: async () => ['src'],
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+
+    const view = render(
+      <DialogStackContext.Provider value={{ isTopMost: false }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={async () => {}}
+          onDismissed={() => {}}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    await screen.findByRole('textbox', { name: 'Included directories' })
+    assert.equal(document.activeElement, origin)
+    view.unmount()
+    origin.remove()
+  })
+
   it('reports cancellation before refresh and does not claim a failed refresh succeeded', async () => {
     const signals = new Array<AbortSignal | undefined>()
     let rejectMutation: ((error: Error) => void) | undefined

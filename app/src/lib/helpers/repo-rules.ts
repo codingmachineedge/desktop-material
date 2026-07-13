@@ -60,6 +60,15 @@ export function useRepoRulesLogic(
   return true
 }
 
+export function canAlwaysBypassRuleset(
+  ruleset: IAPIRepoRuleset | undefined
+): boolean {
+  return (
+    ruleset?.current_user_can_bypass === 'always' ||
+    ruleset?.current_user_can_bypass === 'exempt'
+  )
+}
+
 /**
  * Parses the GitHub API response for a branch's repo rules into a more useable
  * format.
@@ -84,8 +93,7 @@ export async function parseRepoRules(
     // since the rule will not exist in the API response if it's not enforced, we know
     // we're always assigning either 'bypass' or true below. therefore, we only need
     // to check if the existing value is true, otherwise it can always be overridden.
-    const enforced =
-      ruleset.current_user_can_bypass === 'always' ? 'bypass' : true
+    const enforced = canAlwaysBypassRuleset(ruleset) ? 'bypass' : true
 
     switch (rule.type) {
       case APIRepoRuleType.Update:
@@ -142,7 +150,7 @@ function toMetadataRule(
   rule: IAPIRepoRule | undefined,
   enforced: RepoRuleEnforced
 ): IRepoRulesMetadataRule | undefined {
-  if (!rule?.parameters) {
+  if (!rule?.parameters || !isMetadataRuleParameters(rule.parameters)) {
     return undefined
   }
 
@@ -152,6 +160,20 @@ function toMetadataRule(
     humanDescription: toHumanDescription(rule.parameters),
     rulesetId: rule.ruleset_id,
   }
+}
+
+function isMetadataRuleParameters(
+  parameters: Readonly<Record<string, unknown>>
+): parameters is IAPIRepoRuleMetadataParameters &
+  Readonly<Record<string, unknown>> {
+  return (
+    typeof parameters.name === 'string' &&
+    typeof parameters.negate === 'boolean' &&
+    typeof parameters.pattern === 'string' &&
+    Object.values(APIRepoRuleMetadataOperator).includes(
+      parameters.operator as APIRepoRuleMetadataOperator
+    )
+  )
 }
 
 function toHumanDescription(apiParams: IAPIRepoRuleMetadataParameters): string {

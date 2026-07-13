@@ -27,6 +27,15 @@ describe('hasModalPopup', () => {
     }
     assert.equal(hasModalPopup([sparseCheckout]), false)
   })
+
+  it('keeps the branch-rules inspector non-modal while context changes', () => {
+    const branchRules: Popup = {
+      type: PopupType.BranchRules,
+      repository: null as never,
+      initialBranch: 'main',
+    }
+    assert.equal(hasModalPopup([branchRules]), false)
+  })
 })
 
 describe('PopupManager', () => {
@@ -129,6 +138,70 @@ describe('PopupManager', () => {
 
       const popupsOfType = popupManager.getPopupsOfType(PopupType.About)
       assert.equal(popupsOfType.length, 1)
+    })
+
+    it('replaces branch-rules context and keeps trailing errors foremost', () => {
+      const popupManager = new PopupManager()
+      const firstRepository = { id: 1 } as never
+      const secondRepository = { id: 2 } as never
+      const first = popupManager.addPopup({
+        type: PopupType.BranchRules,
+        repository: firstRepository,
+        initialBranch: 'main',
+      })
+      popupManager.addPopup({
+        type: PopupType.SparseCheckout,
+        repository: firstRepository,
+      })
+      popupManager.addErrorPopup(new Error('visible error'))
+      const replacement = popupManager.addPopup({
+        type: PopupType.BranchRules,
+        repository: secondRepository,
+        initialBranch: 'release',
+      })
+
+      assert.equal(replacement.id, first.id)
+      const branchRules = popupManager.getPopupsOfType(PopupType.BranchRules)
+      assert.equal(branchRules.length, 1)
+      assert.equal(branchRules[0].type, PopupType.BranchRules)
+      if (branchRules[0].type === PopupType.BranchRules) {
+        assert.equal(branchRules[0].repository, secondRepository)
+        assert.equal(branchRules[0].initialBranch, 'release')
+      }
+      assert.deepEqual(
+        popupManager.allPopups.map(popup => popup.type),
+        [PopupType.SparseCheckout, PopupType.BranchRules, PopupType.Error]
+      )
+      assert.equal(popupManager.currentPopup?.type, PopupType.Error)
+      popupManager.removePopupByType(PopupType.Error)
+      assert.equal(popupManager.currentPopup?.type, PopupType.BranchRules)
+    })
+
+    it('retargets repeated sparse-checkout sheets for the same or a different repository', () => {
+      const popupManager = new PopupManager()
+      const firstRepository = { id: 1 } as never
+      const secondRepository = { id: 2 } as never
+      const first = popupManager.addPopup({
+        type: PopupType.SparseCheckout,
+        repository: firstRepository,
+      })
+      const sameRepository = popupManager.addPopup({
+        type: PopupType.SparseCheckout,
+        repository: firstRepository,
+      })
+      const differentRepository = popupManager.addPopup({
+        type: PopupType.SparseCheckout,
+        repository: secondRepository,
+      })
+
+      assert.equal(first.id, sameRepository.id)
+      assert.equal(sameRepository.id, differentRepository.id)
+      const sparse = popupManager.getPopupsOfType(PopupType.SparseCheckout)
+      assert.equal(sparse.length, 1)
+      assert.equal(sparse[0].type, PopupType.SparseCheckout)
+      if (sparse[0].type === PopupType.SparseCheckout) {
+        assert.equal(sparse[0].repository, secondRepository)
+      }
     })
 
     it('adds multiple popups of different types', () => {
