@@ -1,5 +1,8 @@
 #repository-settings {
+  container-name: repository-settings-dialog;
+  container-type: inline-size;
   max-height: calc(100vh - var(--spacing-quad));
+  max-width: calc(100vw - var(--spacing-double));
   overflow: hidden;
 
   .dialog-header,
@@ -31,10 +34,12 @@
       }
     }
   }
-  width: 600px;
+  width: min(600px, calc(100vw - var(--spacing-double)));
 
   .dialog-content {
-    min-height: 305px;
+    min-width: 0;
+    min-height: min(305px, calc(100vh - 150px));
+    overflow-x: hidden;
   }
 
   .no-remote {
@@ -123,10 +128,13 @@
     min-height: 0;
 
     .active-tab {
+      container-name: repository-settings-pane;
+      container-type: inline-size;
       border-left: var(--base-border);
       flex: 1;
       min-width: 0;
       min-height: 0;
+      overflow-x: hidden;
       overflow-y: auto;
     }
   }
@@ -628,6 +636,189 @@
         align-items: center;
         gap: 6px;
       }
+    }
+  }
+
+  // Collapse the vertical label rail into one row of accessible icon buttons.
+  // The text remains in the DOM as each button's accessible name.
+  @container repository-settings-dialog (max-width: 520px) {
+    .tab-container {
+      flex-direction: column;
+
+      > .tab-bar.vertical {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+        width: 100%;
+        padding: 4px 8px;
+        overflow: visible;
+
+        .tab-bar-item {
+          min-width: 40px;
+          min-height: 40px;
+          margin: 0;
+          padding: 8px;
+          justify-content: center;
+          font-size: 0;
+
+          .icon {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+          }
+        }
+      }
+
+      .active-tab {
+        border-top: var(--base-border);
+        border-left: 0;
+      }
+    }
+
+    .dialog-footer {
+      padding: var(--spacing);
+
+      .button-group {
+        width: 100%;
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: var(--spacing-half);
+      }
+
+      button {
+        max-width: 100%;
+        min-width: min(120px, 100%);
+        flex: 1 1 120px;
+        margin: 0;
+      }
+    }
+  }
+
+  // Stack field groups based on the active pane, which is often much narrower
+  // than either the dialog or the application viewport.
+  @container repository-settings-pane (max-width: 500px) {
+    .repository-automation-settings .automation-override-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .repository-account-setting {
+      align-items: stretch;
+      flex-direction: column;
+      margin: var(--spacing);
+      padding: var(--spacing-double);
+
+      p {
+        max-width: none;
+        overflow-wrap: anywhere;
+      }
+
+      .account-picker {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .no-remote {
+      align-items: stretch;
+      flex-direction: column;
+
+      button {
+        width: 100%;
+        align-self: stretch;
+      }
+    }
+
+    .remotes-manager {
+      .remote-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 40px;
+        align-items: end;
+
+        .remote-name {
+          grid-column: 1 / -1;
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
+        }
+
+        .remote-url {
+          grid-column: 1;
+          width: 100%;
+        }
+
+        .remote-remove {
+          grid-column: 2;
+          width: 40px;
+          min-width: 40px;
+          height: 40px;
+          margin: 0;
+        }
+      }
+
+      .add-remote-fields {
+        flex-direction: column;
+
+        .add-remote-name,
+        .add-remote-url {
+          width: 100%;
+          flex: 1 1 auto;
+        }
+      }
+
+      .add-remote-actions .add-remote-button {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .submodules-settings {
+      .submodules-section-header {
+        align-items: stretch;
+        flex-direction: column;
+
+        .button-component {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+
+      .submodule-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .submodule-row-heading {
+        flex-wrap: wrap;
+      }
+
+      .submodule-row-path {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .submodule-row-url {
+        max-width: 100%;
+      }
+
+      .submodule-row-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+
+        .button-component {
+          flex: 1 1 88px;
+          min-width: min(88px, 100%);
+        }
+      }
+
+      .submodules-add-actions .button-component {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .build-run-section-description code,
+    .submodules-error,
+    .add-remote-error {
+      overflow-wrap: anywhere;
     }
   }
 }

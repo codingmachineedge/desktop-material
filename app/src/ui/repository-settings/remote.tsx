@@ -175,7 +175,7 @@ function RemoteRow(props: IRemoteRowProps) {
     <div className="remote-row" role="listitem">
       <div className="remote-name">
         <Octicon className="remote-icon" symbol={octicons.server} />
-        <span>{remote.name}</span>
+        <span title={remote.name}>{remote.name}</span>
         {isDefault && <span className="remote-badge">origin</span>}
       </div>
       <TextBox
