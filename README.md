@@ -27,6 +27,8 @@ These features are implemented and live on `main`.
 
 **Multi-account**
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
+- Browse complete GitHub organization repository lists, filter cloning by organization, and choose an organization when publishing
+- Add GitLab accounts, including self-hosted endpoints, with a personal access token; add Bitbucket accounts with an app password, then browse and clone their repositories from the provider tab
 - The repository list can hide its automatically maintained Recent group from **Settings → Appearance**
 - Repositories can be pinned from their context menu into a dedicated top group
 
@@ -63,34 +65,38 @@ These features are implemented and live on `main`.
 - Auto-ignores build outputs (applies the matching `.gitignore` template + an artifacts section) before building
 - Bounded auto-fix on failure, a per-repo Build & Run settings tab, and optional single-prompt UAC pre-elevation
 
+**Automation and GitHub Actions**
+- Configure scheduled commit-and-push and pull globally, override them per account or repository, and rely on safety guards that skip unsafe repositories and preserve draft commit messages
+- Run commit-and-push immediately, or merge all branches/worktrees with per-target progress and Copilot-assisted conflict handling
+- Browse GitHub Actions runs in the repository rail, filter by workflow/branch/event/status, re-run all or failed jobs, inspect jobs and steps, read searchable logs, and dispatch workflows with inputs
+
+**Agent access and command line**
+- Enable an opt-in, token-gated local agent server from **Settings → Agent access**; it exposes MCP and REST on a random loopback-only port and never returns account credentials
+- Use the bundled stdio proxy or command-line client to list accounts/repos/tabs, inspect status, clone, commit, fetch/pull/push, manage branches/tabs, run automation, and dispatch workflows
+
+**Power-user history, stashes, and windows**
+- Search History by title, message, tag, or hash and toggle a lane graph that visualizes commit ancestry
+- Keep multiple named stashes visible in Changes, inspect each stash's files and diffs, then restore or discard the selected entry
+- Pull every repository from the repositories sheet with per-repository results; use repository pinning/grouping, branch presets/default-branch controls, and per-repository editor overrides
+- Open repositories and worktrees in separate windows with isolated per-window selection and persisted tabs
+
 **Fully Material, everywhere**
 - The remaining stock surfaces — tooltips, menus, banners, autocomplete popups, segmented controls, split-buttons, dialog internals, History/CI surfaces — are re-tinted through the Material token system in both light and dark themes
 
-## On the roadmap
-
-These are planned milestones — **not yet implemented**. They are tracked in [`PLAN.md`](PLAN.md).
-
-- **Multi-clone** — select many repos with checkboxes, org filter chips, parallel or one-by-one cloning, plus export/import of repo lists (URLs only)
-- **Automation** — one-click commit & push with a Copilot-written message; scheduled auto commit & push and auto pull (global default plus per-repo override); merge-all branches/worktrees with Copilot conflict resolution
-- **GitHub Actions panel** — workflow runs, status/branch/event filters, re-run / re-run-failed, job steps, an in-app log viewer, and a `workflow_dispatch` dialog
-- **Built-in agent server** — an MCP server plus a local HTTP/CLI fallback for AI-agent control
-- **GitHub organization support** — browse and clone full org repo lists, and publish into an org
-- **Self-updating** — the app checks the project's own GitHub releases and updates itself
-- **Self-hosted GitLab sign-in** (endpoint plus personal access token) and GitLab/Bitbucket integration
-- **Desktop-plus parity** — commit search, commit graph, multiple stashes, repo pinning/grouping, pull-all, and more
+**Also shipped:** multi-clone with organization chips, parallel/sequential modes and URL-only import/export; one-click commit and push with a generated message; self-update checks against Desktop Material releases; SVG diff hardening and display controls; safer undo/reset/tag deletion confirmations; and responsive, keyboard-accessible MD3 surfaces throughout the app.
 
 ## Screenshots
 
 | | |
 |---|---|
-| ![Changes view with the MD3 shell](docs/assets/screenshots/material-workspace-changes.png) | ![History view with commit rows and detail](docs/assets/screenshots/material-history.png) |
-| **Changes** — icon rail, pill toolbar, floating card, tri-state checkboxes | **History** — MD3 commit rows and commit detail |
-| ![Preferences as an MD3 940×660 dialog](docs/assets/screenshots/material-settings.png) | ![Live Settings history side sheet](docs/assets/screenshots/settings-history-manager.png) |
-| **Preferences** — MD3 dialog with a left rail, Active chip, and pill footer | **Settings history** — Git-backed timeline, diff, Undo, Redo, restore-to-point |
-| ![Repositories side sheet](docs/assets/screenshots/material-repositories-sheet.png) | ![Branches side sheet](docs/assets/screenshots/material-branches-sheet.png) |
-| **Repositories** — MD3 side sheet | **Branches** — MD3 side sheet |
-| ![Redesigned welcome flow](docs/assets/screenshots/material-welcome.png) | ![Per-tab text styling popover](docs/assets/screenshots/tab-text-style.png) |
-| **Welcome** — redesigned first-run flow | **Per-tab title styling** — bold, italic, size, color, and font per tab |
+| ![Automation preferences with global and account-level schedules](docs/assets/screenshots/material-automation.png) | ![Git-backed notification centre](docs/assets/screenshots/material-notification-center.png) |
+| **Automation** — guarded commit/push and pull schedules with layered overrides | **Notifications** — unread state, history, restore, and cleanup |
+| ![History search and commit graph](docs/assets/screenshots/material-history-power-tools.png) | ![Merge all branches dialog](docs/assets/screenshots/material-branch-merge-all.png) |
+| **History power tools** — commit search, filters, and ancestry graph | **Merge all** — branches/worktrees with per-target progress |
+| ![Agent access preferences](docs/assets/screenshots/material-agent-access.png) | ![GitLab and Bitbucket provider accounts](docs/assets/screenshots/material-provider-accounts.png) |
+| **Agent access** — opt-in loopback MCP/REST with bearer-token controls | **Provider accounts** — GitHub, GitLab, Bitbucket, and self-hosted endpoints |
+| ![Open repository and worktree in a new window](docs/assets/screenshots/material-multi-window-menu.png) | ![Live Settings history side sheet](docs/assets/screenshots/settings-history-manager.png) |
+| **Multi-window** — isolated repository/worktree windows and persisted tabs | **Settings history** — Git-backed timeline, diff, Undo, Redo, restore-to-point |
 
 ## Building
 

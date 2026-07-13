@@ -178,12 +178,11 @@
             </article>
           </div>
 
-          <span class="eyebrow" style="margin-top: 3rem">On the roadmap</span>
-          <h2 class="section-title">Planned next</h2>
+          <span class="eyebrow" style="margin-top: 3rem">Power features</span>
+          <h2 class="section-title">Shipped for real-world Git work</h2>
           <p class="section-sub">
-            These are the queued milestones —
-            <strong>not yet implemented</strong>. Progress is tracked in the
-            project's
+            These features are implemented on <code>main</code>. Their design
+            and verification history is tracked in the project's
             <a
               href="https://github.com/codingmachineedge/desktop-material/blob/main/PLAN.md"
               >plan</a
@@ -192,78 +191,90 @@
           <div class="feature-grid">
             <article class="card">
               <div class="glyph" aria-hidden="true">🔔</div>
-              <h3>Notification centre <span class="tag">Roadmap</span></h3>
+              <h3>Notification centre <span class="tag">Shipped</span></h3>
               <p>
                 A bell and side panel backed by its own local git repo — unread
-                badges, mark read/unread, and delete.
+                badges, mark read/unread, delete, and recoverable history.
               </p>
             </article>
 
             <article class="card">
               <div class="glyph" aria-hidden="true">🔍</div>
-              <h3>Regex-powered search <span class="tag">Roadmap</span></h3>
+              <h3>Search everywhere <span class="tag">Shipped</span></h3>
               <p>
-                Every search bar gets filter chips, a regex toggle, and a full
-                builder — anchors, classes, quantifiers, groups, lookaround,
-                live tester.
+                Filter chips, substring/regex modes, and a full regex builder,
+                plus History search by title, message, tag, or hash and an
+                optional commit ancestry graph.
               </p>
             </article>
 
             <article class="card">
               <div class="glyph" aria-hidden="true">⧉</div>
-              <h3>Multi-clone <span class="tag">Roadmap</span></h3>
+              <h3>Multi-clone &amp; orgs <span class="tag">Shipped</span></h3>
               <p>
-                Checkbox-select many repos, filter by org chips, clone in
-                parallel or one-by-one, and export/import repo lists as URLs.
+                Browse complete organization lists, select many repositories,
+                clone in parallel or sequence, import/export URL-only lists, and
+                publish directly into an organization.
               </p>
             </article>
 
             <article class="card">
               <div class="glyph" aria-hidden="true">⚡</div>
-              <h3>Automation <span class="tag">Roadmap</span></h3>
+              <h3>Automation <span class="tag">Shipped</span></h3>
               <p>
-                One-click commit &amp; push with a Copilot-written message,
-                scheduled auto commit/push and auto pull, and merge-all with
-                Copilot conflict resolution.
+                Guarded commit/push and pull schedules with global, account, and
+                repository overrides, plus merge-all branches/worktrees with
+                per-target progress and Copilot conflict assistance.
               </p>
             </article>
 
             <article class="card">
               <div class="glyph" aria-hidden="true">▷</div>
-              <h3>GitHub Actions panel <span class="tag">Roadmap</span></h3>
+              <h3>GitHub Actions <span class="tag">Shipped</span></h3>
               <p>
-                Browse workflow runs, filter by status/branch/event, re-run or
-                re-run-failed, inspect job steps, and read logs in-app.
+                Filter workflow runs, re-run all or failed jobs, inspect jobs
+                and steps, search in-app logs, and dispatch workflows with refs
+                and inputs.
               </p>
             </article>
 
             <article class="card">
               <div class="glyph" aria-hidden="true">🤖</div>
-              <h3>Built-in MCP server <span class="tag">Roadmap</span></h3>
+              <h3>Agent access &amp; CLI <span class="tag">Shipped</span></h3>
               <p>
-                Drive the app from AI agents over a bundled MCP server, with a
-                local HTTP/CLI fallback.
+                Opt-in, token-gated MCP and REST on loopback only, backed by a
+                stdio proxy and command-line client for repositories, Git, tabs,
+                automation, and workflow dispatch.
               </p>
             </article>
 
             <article class="card">
               <div class="glyph" aria-hidden="true">🏢</div>
-              <h3>
-                Organizations &amp; scaling <span class="tag">Roadmap</span>
-              </h3>
+              <h3>Provider accounts <span class="tag">Shipped</span></h3>
               <p>
-                Browse and clone full org repo lists, publish into an org, and
-                scale the whole UI from 50–200% with auto-fit.
+                Use multiple GitHub identities, self-hosted GitLab endpoints
+                with PATs, and Bitbucket app passwords; browse and clone each
+                provider's repositories without exposing credentials.
               </p>
             </article>
 
             <article class="card">
-              <div class="glyph" aria-hidden="true">🦊</div>
-              <h3>GitLab &amp; parity <span class="tag">Roadmap</span></h3>
+              <div class="glyph" aria-hidden="true">🧰</div>
+              <h3>Desktop-plus parity <span class="tag">Shipped</span></h3>
               <p>
-                Self-hosted GitLab (endpoint + PAT) and Bitbucket sign-in, plus
-                desktop-plus parity: commit search, commit graph, stashes,
-                pinning, pull-all.
+                Multiple inspectable stashes, repository pinning and grouping,
+                pull-all with per-repo results, branch presets, default-branch
+                controls, and repository editor overrides.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">🪟</div>
+              <h3>Multi-window workflows <span class="tag">Shipped</span></h3>
+              <p>
+                Open repositories and worktrees in separate windows with
+                isolated selection, correct command routing, and persisted
+                per-window repository tabs.
               </p>
             </article>
           </div>
@@ -375,6 +386,125 @@
               </a>
               <figcaption>
                 Branches <span class="tag">Side sheet</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-automation.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-automation.png"
+                  alt="Automation preferences with guarded commit and pull schedules and account overrides"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Automation <span class="tag">Schedules</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-notification-center.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-notification-center.png"
+                  alt="Git-backed notification centre with unread and history controls"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Notifications <span class="tag">Git-backed</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-history-power-tools.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-history-power-tools.png"
+                  alt="History view with commit search and ancestry graph controls"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                History <span class="tag">Search · graph</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-branch-merge-all.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-branch-merge-all.png"
+                  alt="Merge all branches dialog with per-branch progress"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Merge all <span class="tag">Branches · worktrees</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-agent-access.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-agent-access.png"
+                  alt="Agent access preferences with loopback address and bearer token controls"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Agent access <span class="tag">MCP · REST · CLI</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-provider-accounts.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-provider-accounts.png"
+                  alt="Accounts preferences for GitHub, GitLab, and Bitbucket providers"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Provider accounts <span class="tag">GitLab · Bitbucket</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-multi-window-menu.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-multi-window-menu.png"
+                  alt="Repository context menu with the open in new window action"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Multi-window <span class="tag">Repos · worktrees</span>
               </figcaption>
             </figure>
           </div>
