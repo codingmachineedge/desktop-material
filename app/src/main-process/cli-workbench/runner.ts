@@ -64,7 +64,7 @@ export class CLIWorkbenchRunner {
     try {
       child = spawn(resolved.executable, [...request.args], {
         cwd: request.cwd,
-        env: resolved.env,
+        env: { ...resolved.env, ...request.environment },
         shell: false,
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],

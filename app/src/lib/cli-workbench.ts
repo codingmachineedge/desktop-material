@@ -20,6 +20,37 @@ export type GuidedBundleImportOperation =
 
 export type GuidedShallowInspectionOperation = 'status' | 'remotes'
 
+export type RepositorySigningScope = 'local' | 'global'
+export type RepositorySigningFormat = 'openpgp' | 'ssh' | 'x509'
+
+export type RepositorySigningUpdate =
+  | {
+      readonly operation: 'set-format'
+      readonly format: RepositorySigningFormat
+    }
+  | {
+      readonly operation: 'set-key'
+      readonly format: RepositorySigningFormat
+      readonly key: string
+    }
+  | {
+      readonly operation: 'set-commit-signing' | 'set-tag-signing'
+      readonly enabled: boolean
+    }
+
+export type RepositoryLFSInspectionOperation =
+  | 'version'
+  | 'patterns'
+  | 'status'
+  | 'prune-preview'
+
+export type RepositoryLFSOperation =
+  | 'install'
+  | 'uninstall'
+  | 'fetch'
+  | 'pull'
+  | 'prune'
+
 /**
  * Closed, structured command families exposed by the guided Repository Tools
  * UI. The main process reconstructs argv from this union and never accepts an
@@ -64,6 +95,36 @@ export type CLICommandRecipe =
       readonly action: 'deepen' | 'unshallow'
       readonly remote: string
       readonly deepenBy: number | null
+    }
+  | {
+      readonly kind: 'repository-signing-inspection'
+      readonly scope: RepositorySigningScope
+    }
+  | ({
+      readonly kind: 'repository-signing-update'
+      readonly scope: RepositorySigningScope
+    } & RepositorySigningUpdate)
+  | {
+      readonly kind: 'repository-signing-list-tags'
+    }
+  | {
+      readonly kind: 'repository-signing-verify'
+      readonly target: 'head' | 'tag'
+      readonly tagName: string | null
+      readonly expectedObject: string | null
+    }
+  | {
+      readonly kind: 'repository-lfs-inspection'
+      readonly operation: RepositoryLFSInspectionOperation
+    }
+  | {
+      readonly kind: 'repository-lfs-pattern'
+      readonly operation: 'track' | 'untrack'
+      readonly pattern: string
+    }
+  | {
+      readonly kind: 'repository-lfs-operation'
+      readonly operation: RepositoryLFSOperation
     }
 
 export interface ICLICommandRequest {

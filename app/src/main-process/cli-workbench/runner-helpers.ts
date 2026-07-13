@@ -3,6 +3,8 @@ import { lstat, realpath, stat } from 'fs/promises'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { StringDecoder } from 'string_decoder'
 import { CLICommandRecipe } from '../../lib/cli-workbench'
+import { normalizeRepositoryLFSPattern } from '../../lib/repository-lfs'
+import { normalizeRepositorySigningKey } from '../../lib/repository-signing'
 import {
   IResolvedCLIWorkbenchTool,
   resolveCLIWorkbenchTool,
@@ -135,6 +137,186 @@ interface IBoundCLICommand {
   readonly requiresConfirmation: boolean
   readonly outputDestination: string | null
   readonly remote: string | null
+  readonly environment?: Readonly<Record<string, string>>
+}
+
+const SigningConfigPattern =
+  '^(user\\.signingkey|gpg\\.format|commit\\.gpgsign|tag\\.gpgsign)$'
+const LFSInspectionEnvironment = {
+  GIT_LFS_TRACK_NO_INSTALL_HOOKS: '1',
+} as const
+
+function signingScopeFlag(value: unknown): '--local' | '--global' {
+  if (value === 'local') {
+    return '--local'
+  }
+  if (value === 'global') {
+    return '--global'
+  }
+  throw new Error('Choose a valid signing configuration scope.')
+}
+
+function normalizeSigningFormat(value: unknown): 'openpgp' | 'ssh' | 'x509' {
+  if (value === 'openpgp' || value === 'ssh' || value === 'x509') {
+    return value
+  }
+  throw new Error('Choose a supported signing format.')
+}
+
+function normalizeTagName(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('Choose a valid annotated tag.')
+  }
+  const tagName = value.trim()
+  if (
+    tagName.length === 0 ||
+    tagName.length > 1000 ||
+    tagName === '@' ||
+    tagName.startsWith('-') ||
+    !isValidFullRefName(`refs/tags/${tagName}`)
+  ) {
+    throw new Error('Choose a valid annotated tag.')
+  }
+  return tagName
+}
+
+function normalizeExpectedObject(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value)
+  ) {
+    throw new Error('The reviewed tag object is invalid.')
+  }
+  return value
+}
+
+function bindSigningUpdateRecipe(
+  recipe: Record<string, unknown>
+): IBoundCLICommand {
+  const scope = signingScopeFlag(recipe.scope)
+  switch (recipe.operation) {
+    case 'set-format': {
+      if (!hasOnlyKeys(recipe, ['kind', 'scope', 'operation', 'format'])) {
+        throw new Error('Signing-format update is invalid.')
+      }
+      const format = normalizeSigningFormat(recipe.format)
+      return {
+        args: ['config', scope, '--replace-all', 'gpg.format', format],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'set-key': {
+      if (
+        !hasOnlyKeys(recipe, ['kind', 'scope', 'operation', 'format', 'key']) ||
+        typeof recipe.key !== 'string'
+      ) {
+        throw new Error('Signing-key update is invalid.')
+      }
+      const format = normalizeSigningFormat(recipe.format)
+      const key = normalizeRepositorySigningKey(format, recipe.key)
+      return {
+        args: ['config', scope, '--replace-all', 'user.signingkey', key],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'set-commit-signing':
+    case 'set-tag-signing': {
+      if (
+        !hasOnlyKeys(recipe, ['kind', 'scope', 'operation', 'enabled']) ||
+        typeof recipe.enabled !== 'boolean'
+      ) {
+        throw new Error('Signing-toggle update is invalid.')
+      }
+      return {
+        args: [
+          'config',
+          scope,
+          '--type=bool',
+          '--replace-all',
+          recipe.operation === 'set-commit-signing'
+            ? 'commit.gpgsign'
+            : 'tag.gpgsign',
+          String(recipe.enabled),
+        ],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    default:
+      throw new Error('Unknown signing configuration update.')
+  }
+}
+
+function bindLFSInspectionRecipe(
+  recipe: Record<string, unknown>
+): IBoundCLICommand {
+  if (!hasOnlyKeys(recipe, ['kind', 'operation'])) {
+    throw new Error('Git LFS inspection is invalid.')
+  }
+  let args: ReadonlyArray<string>
+  switch (recipe.operation) {
+    case 'version':
+      args = ['lfs', 'version']
+      break
+    case 'patterns':
+      args = ['lfs', 'track', '--json']
+      break
+    case 'status':
+      args = ['lfs', 'status', '--json']
+      break
+    case 'prune-preview':
+      args = ['lfs', 'prune', '--dry-run', '--verify-remote']
+      break
+    default:
+      throw new Error('Unknown Git LFS inspection.')
+  }
+  return {
+    args,
+    requiresConfirmation: false,
+    outputDestination: null,
+    remote: null,
+    environment: LFSInspectionEnvironment,
+  }
+}
+
+function bindLFSOperationRecipe(
+  recipe: Record<string, unknown>
+): IBoundCLICommand {
+  if (!hasOnlyKeys(recipe, ['kind', 'operation'])) {
+    throw new Error('Git LFS operation is invalid.')
+  }
+  let args: ReadonlyArray<string>
+  switch (recipe.operation) {
+    case 'install':
+      args = ['lfs', 'install', '--local']
+      break
+    case 'uninstall':
+      args = ['lfs', 'uninstall', '--local']
+      break
+    case 'fetch':
+      args = ['lfs', 'fetch']
+      break
+    case 'pull':
+      args = ['lfs', 'pull']
+      break
+    case 'prune':
+      args = ['lfs', 'prune', '--verify-remote']
+      break
+    default:
+      throw new Error('Unknown Git LFS operation.')
+  }
+  return {
+    args,
+    requiresConfirmation: true,
+    outputDestination: null,
+    remote: null,
+    environment: LFSInspectionEnvironment,
+  }
 }
 
 const RepositoryToolArgs = {
@@ -346,6 +528,95 @@ function bindCLICommandRecipe(value: unknown): IBoundCLICommand {
         remote,
       }
     }
+    case 'repository-signing-inspection': {
+      if (!hasOnlyKeys(value, ['kind', 'scope'])) {
+        throw new Error('Signing configuration inspection is invalid.')
+      }
+      const scope = signingScopeFlag(value.scope)
+      return {
+        args: ['config', scope, '--null', '--get-regexp', SigningConfigPattern],
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-signing-update':
+      return bindSigningUpdateRecipe(value)
+    case 'repository-signing-list-tags':
+      if (!hasOnlyKeys(value, ['kind'])) {
+        throw new Error('Signing tag inspection is invalid.')
+      }
+      return {
+        args: [
+          'for-each-ref',
+          '--count=100',
+          '--sort=-creatordate',
+          '--format=%(refname:strip=2)%00%(objecttype)%00%(objectname)',
+          'refs/tags',
+        ],
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    case 'repository-signing-verify': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'target', 'tagName', 'expectedObject']) ||
+        (value.target !== 'head' && value.target !== 'tag')
+      ) {
+        throw new Error('Signature-verification request is invalid.')
+      }
+      if (value.target === 'head') {
+        if (value.tagName !== null || value.expectedObject !== null) {
+          throw new Error('HEAD signature verification is invalid.')
+        }
+        return {
+          args: [
+            'log',
+            '-1',
+            '--no-show-signature',
+            '--format=%H%x00%G?%x00%GF%x00%GK',
+            'HEAD',
+          ],
+          requiresConfirmation: false,
+          outputDestination: null,
+          remote: null,
+        }
+      }
+      const tagName = normalizeTagName(value.tagName)
+      normalizeExpectedObject(value.expectedObject)
+      return {
+        args: [
+          'for-each-ref',
+          '--count=1',
+          '--format=%(objectname)%00%(signature:grade)%00%(signature:fingerprint)%00%(signature:key)',
+          `refs/tags/${tagName}`,
+        ],
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-lfs-inspection':
+      return bindLFSInspectionRecipe(value)
+    case 'repository-lfs-pattern': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'operation', 'pattern']) ||
+        (value.operation !== 'track' && value.operation !== 'untrack') ||
+        typeof value.pattern !== 'string'
+      ) {
+        throw new Error('Git LFS pattern update is invalid.')
+      }
+      const pattern = normalizeRepositoryLFSPattern(value.pattern)
+      return {
+        args: ['lfs', value.operation, '--', pattern],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+        environment: LFSInspectionEnvironment,
+      }
+    }
+    case 'repository-lfs-operation':
+      return bindLFSOperationRecipe(value)
     default:
       throw new Error('Unknown guided CLI command recipe.')
   }
@@ -376,6 +647,7 @@ export interface IValidatedCLICommandRequest {
   readonly confirmed: boolean
   readonly outputDestination: string | null
   readonly remote: string | null
+  readonly environment: Readonly<Record<string, string>>
 }
 
 function runGitProbe(
@@ -681,6 +953,7 @@ export async function validateCLICommandRequest(
     confirmed,
     outputDestination,
     remote: bound.remote,
+    environment: bound.environment ?? {},
   }
 }
 
