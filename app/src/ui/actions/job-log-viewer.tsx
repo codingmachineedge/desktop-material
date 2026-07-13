@@ -61,6 +61,7 @@ export class JobLogViewer extends React.Component<
   IJobLogViewerState
 > {
   private list: List | null = null
+  private viewer: HTMLElement | null = null
   private readonly groupToggleHandlers = new Map<number, () => void>()
   private parseLog = memoizeOne((log: string, prefix: string) =>
     new ActionsLogParser(log, prefix).getParsedLogLinesTemplateData()
@@ -83,6 +84,21 @@ export class JobLogViewer extends React.Component<
   public constructor(props: IJobLogViewerProps) {
     super(props)
     this.state = { search: '', match: 0, collapsedGroups: new Set() }
+  }
+
+  public componentDidMount() {
+    this.viewer?.focus()
+  }
+
+  private setViewerRef = (viewer: HTMLElement | null) => {
+    this.viewer = viewer
+  }
+
+  private onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      this.props.onClose()
+    }
   }
 
   private getLines() {
@@ -157,17 +173,8 @@ export class JobLogViewer extends React.Component<
   }
 
   private renderParsedContent(content: IParsedContent, index: number) {
-    const style: React.CSSProperties = {}
-    for (const declaration of content.styles) {
-      if (declaration.startsWith('color:')) {
-        style.color = declaration.slice(6)
-      }
-      if (declaration.startsWith('background-color:')) {
-        style.backgroundColor = declaration.slice('background-color:'.length)
-      }
-    }
     return (
-      <span key={index} className={content.classes.join(' ')} style={style}>
+      <span key={index} className={content.classes.join(' ')}>
         {content.output.map((item, outputIndex) => (
           <React.Fragment key={outputIndex}>
             {item.entry}
@@ -203,6 +210,11 @@ export class JobLogViewer extends React.Component<
               ? `Toggle log group at line ${line.lineNumber}`
               : undefined
           }
+          aria-expanded={
+            line.isGroup
+              ? !this.state.collapsedGroups.has(line.lineNumber)
+              : undefined
+          }
         >
           {line.isGroup
             ? this.state.collapsedGroups.has(line.lineNumber)
@@ -227,9 +239,17 @@ export class JobLogViewer extends React.Component<
       this.props.error.responseStatus === 410
 
     return (
+      // The log overlay intentionally handles Escape while focus is anywhere
+      // inside the labelled dialog region.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
       <section
         className="actions-log-viewer"
+        role="dialog"
+        aria-modal="false"
         aria-label={`${this.props.job.name} logs`}
+        tabIndex={-1}
+        ref={this.setViewerRef}
+        onKeyDown={this.onKeyDown}
       >
         <header>
           <div>

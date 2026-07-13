@@ -41,6 +41,8 @@ export class WorkflowDispatchDialog extends React.Component<
   IWorkflowDispatchDialogProps,
   IWorkflowDispatchDialogState
 > {
+  private dialog: HTMLFormElement | null = null
+
   public constructor(props: IWorkflowDispatchDialogProps) {
     super(props)
     const workflowId =
@@ -61,6 +63,18 @@ export class WorkflowDispatchDialog extends React.Component<
 
   public componentDidMount() {
     this.loadDefinition()
+    this.dialog?.focus()
+  }
+
+  private setDialogRef = (dialog: HTMLFormElement | null) => {
+    this.dialog = dialog
+  }
+
+  private onKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (event.key === 'Escape' && !this.state.submitting) {
+      event.preventDefault()
+      this.props.onDismissed()
+    }
   }
 
   private async loadDefinition() {
@@ -188,11 +202,16 @@ export class WorkflowDispatchDialog extends React.Component<
         : [this.state.ref]
     return (
       <div className="actions-dialog-layer">
+        {/* The form dialog handles Escape from any descendant control. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
         <form
           className="workflow-dispatch-dialog"
           role="dialog"
           aria-modal="false"
           aria-labelledby="workflow-dispatch-title"
+          tabIndex={-1}
+          ref={this.setDialogRef}
+          onKeyDown={this.onKeyDown}
           onSubmit={this.submit}
         >
           <header>

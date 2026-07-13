@@ -418,14 +418,17 @@ export function reconcileSubmodules(
   for (const path of paths) {
     const config = configByPath.get(path)
     const status = statusByPath.get(path)
+    const isInitialized = status?.status !== 'uninitialized'
 
     submodules.push({
       name: config?.name ?? path,
       path,
       url: config?.url && config.url.length > 0 ? config.url : null,
       branch: config?.branch ?? null,
-      sha: status?.sha ?? null,
-      describe: status?.describe ?? null,
+      // `git submodule status` prints the expected commit even for a leading
+      // `-` entry. Do not present that commit as checked out until initialized.
+      sha: isInitialized ? status?.sha ?? null : null,
+      describe: isInitialized ? status?.describe ?? null : null,
       // A submodule that is declared but never reported by status is, by
       // definition, not yet initialized.
       status: status?.status ?? 'uninitialized',

@@ -109,11 +109,6 @@
     transform: scale(0.99);
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--md-sys-color-primary);
-    outline-offset: 2px;
-  }
-
   &.selected {
     border-color: var(--md-sys-color-primary);
     background: var(--md-sys-color-primary-container);
@@ -133,6 +128,12 @@
   text-align: left;
   background: transparent;
   cursor: pointer;
+
+  &:focus-visible {
+    border-radius: 12px;
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 45%, transparent);
+    outline-offset: 4px;
+  }
 }
 
 .actions-status-chip,
@@ -245,6 +246,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+
+  > div:first-child {
+    min-width: 0;
+  }
 }
 
 .actions-details-header {
@@ -253,6 +258,7 @@
   h2 {
     margin: 2px 0 0;
     font-size: 17px;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -269,6 +275,11 @@
     display: flex;
     gap: 8px;
     align-items: center;
+
+    strong {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
   }
 }
 
@@ -290,6 +301,11 @@
     color: var(--md-sys-color-on-surface-variant);
     font-size: 12px;
 
+    > span:nth-child(2) {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
     small {
       text-transform: capitalize;
     }
@@ -303,7 +319,7 @@
   }
 
   .success .step-state {
-    background: var(--md-sys-color-tertiary);
+    background: var(--md-sys-color-on-tertiary-container);
   }
 
   .failure .step-state {
@@ -348,8 +364,59 @@
 
   .actions-run-details {
     position: absolute;
-    inset: 90px 20px 20px 100px;
+    inset: 76px 14px 14px;
     z-index: 2;
     box-shadow: var(--shadow-dialog);
+  }
+}
+
+@media (max-width: 620px) {
+  .actions-view {
+    padding: var(--spacing-double);
+  }
+
+  .actions-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--spacing);
+  }
+
+  .actions-header-buttons {
+    flex-wrap: wrap;
+
+    .button-component {
+      flex: 1 1 auto;
+    }
+  }
+
+  .actions-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions-run-list {
+    min-width: 0;
+  }
+
+  .actions-run-card,
+  .actions-run-select {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .actions-run-select {
+    grid-column: 1 / 3;
+
+    .actions-status-chip {
+      grid-column: 1 / 3;
+      justify-self: start;
+    }
+  }
+
+  .actions-run-buttons {
+    grid-column: 1 / 3;
+    flex-wrap: wrap;
+  }
+
+  .actions-run-details {
+    inset: var(--spacing);
   }
 }

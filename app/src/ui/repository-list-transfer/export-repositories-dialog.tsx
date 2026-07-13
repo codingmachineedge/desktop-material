@@ -59,6 +59,7 @@ export class ExportRepositoriesDialog extends React.Component<
   IExportRepositoriesDialogProps,
   IExportRepositoriesDialogState
 > {
+  private readonly toggleHandlers = new Map<number, () => void>()
   public constructor(props: IExportRepositoriesDialogProps) {
     super(props)
     this.state = {
@@ -93,6 +94,15 @@ export class ExportRepositoriesDialog extends React.Component<
       checkedIds.add(id)
     }
     this.setState({ checkedIds })
+  }
+
+  private getToggleHandler(id: number) {
+    let handler = this.toggleHandlers.get(id)
+    if (handler === undefined) {
+      handler = () => this.onToggle(id)
+      this.toggleHandlers.set(id, handler)
+    }
+    return handler
   }
 
   private getSelectedUrls(): ReadonlyArray<string> {
@@ -143,7 +153,7 @@ export class ExportRepositoriesDialog extends React.Component<
               ? CheckboxValue.On
               : CheckboxValue.Off
           }
-          onChange={() => this.onToggle(repository.id)}
+          onChange={this.getToggleHandler(repository.id)}
           disabled={disabled}
         />
         <div className="details">

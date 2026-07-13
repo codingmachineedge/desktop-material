@@ -19,12 +19,51 @@
     }
 
     .automation-account-row {
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      padding: var(--spacing-double);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+      background: var(--md-sys-color-surface-container-low);
+
+      > strong {
+        grid-column: 1 / -1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
 
       label {
         display: flex;
-        align-items: center;
+        min-width: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-half);
+
+        select {
+          width: 100%;
+          min-width: 0;
+        }
+      }
+    }
+
+    .automation-account-row + .automation-account-row {
+      margin-top: var(--spacing);
+    }
+
+    @media (max-width: 620px) {
+      .automation-toggle-row {
+        align-items: stretch;
+        flex-direction: column;
         gap: var(--spacing);
+
+        select {
+          width: 100%;
+        }
+      }
+
+      .automation-account-row {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   }
@@ -488,6 +527,11 @@
       .password-text-box {
         min-width: 0;
       }
+
+      .button-component {
+        min-height: 40px;
+        white-space: nowrap;
+      }
     }
 
     .provider-sign-in-error {
@@ -543,8 +587,8 @@
         height: 26px;
         padding: 0 10px;
         border-radius: 999px;
-        background: var(--dm-green-container);
-        color: var(--dm-green);
+        background: var(--md-sys-color-tertiary-container);
+        color: var(--md-sys-color-on-tertiary-container);
         font-size: 11.5px;
         font-weight: var(--font-weight-bold);
         white-space: nowrap;
@@ -573,6 +617,7 @@
       }
 
       .user-info {
+        min-width: 0;
         flex-grow: 1;
         align-self: flex-start;
 
@@ -584,10 +629,36 @@
           margin-top: -2px;
           margin-bottom: -2px;
         }
+
+        .account-title,
+        .endpoint,
+        .name,
+        .login {
+          overflow-wrap: anywhere;
+        }
+      }
+    }
+
+    @media (max-width: 760px) {
+      .provider-sign-in-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+
+        .button-component {
+          grid-column: 1 / -1;
+          justify-self: end;
+        }
       }
     }
 
     @media (max-width: 600px) {
+      .provider-sign-in-card {
+        grid-template-columns: minmax(0, 1fr);
+
+        .button-component {
+          width: 100%;
+        }
+      }
+
       .account-info {
         flex-direction: column;
 
@@ -634,7 +705,7 @@
   .settings-description {
     margin-top: var(--spacing);
     font-size: var(--font-size-sm);
-    color: var(--text-secondary-color);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .example-link {

@@ -133,7 +133,8 @@
     }
   }
 
-  label {
+  label,
+  .agent-field-label {
     display: block;
     margin: 12px 0 6px;
     color: var(--md-sys-color-on-surface-variant);
@@ -194,6 +195,11 @@
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
       box-shadow: none;
+
+      &:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+        outline-offset: 2px;
+      }
     }
   }
 
@@ -222,6 +228,11 @@
     &:disabled {
       opacity: 0.45;
     }
+
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline-offset: 2px;
+    }
   }
 
   .agent-connect-card {
@@ -239,5 +250,40 @@
     border-radius: 12px;
     background: var(--md-sys-color-error-container);
     color: var(--md-sys-color-on-error-container);
+  }
+
+  @media (max-width: 620px) {
+    .agent-access-heading,
+    .agent-toggle-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .agent-status-chip {
+      align-self: flex-start;
+    }
+
+    .agent-token-row {
+      grid-template-columns: minmax(0, 1fr) 40px 40px;
+    }
+
+    .agent-access-card {
+      padding: var(--spacing-double);
+    }
+  }
+
+  @media (max-width: 430px) {
+    .agent-token-row {
+      grid-template-columns: 1fr 1fr;
+
+      input {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .agent-tonal-button {
+      justify-content: center;
+      width: 100%;
+    }
   }
 }

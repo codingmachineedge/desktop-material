@@ -14,6 +14,7 @@
 
   .pull-all-results {
     border-collapse: collapse;
+    min-width: 560px;
     width: 100%;
 
     th,
@@ -21,6 +22,24 @@
       border-bottom: 1px solid var(--md-sys-color-outline-variant);
       padding: var(--spacing);
       text-align: left;
+
+      &:first-child,
+      &:last-child {
+        max-width: 260px;
+        overflow-wrap: anywhere;
+      }
+    }
+  }
+
+  .pull-all-results-container {
+    max-height: min(55vh, 420px);
+    overflow: auto;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline-offset: 2px;
     }
   }
 
@@ -43,6 +62,14 @@
     &.failed {
       background: var(--md-sys-color-error-container);
       color: var(--md-sys-color-on-error-container);
+    }
+  }
+
+  @media (max-width: 620px) {
+    width: calc(100vw - var(--spacing-double));
+
+    .dialog-content {
+      padding-inline: var(--spacing);
     }
   }
 }

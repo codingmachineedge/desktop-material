@@ -140,6 +140,16 @@ dialog.clone-repository {
   .tab-bar {
     background: transparent;
     padding: 4px 18px 6px;
+
+    .tab-bar-item {
+      min-width: 0;
+
+      span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
   }
 
   [role='tabpanel'] {
@@ -292,6 +302,46 @@ dialog.clone-repository {
     .button-component[type='submit'] {
       &:hover {
         border-radius: 16px;
+      }
+    }
+  }
+
+  @media (max-width: 640px) {
+    max-width: calc(100vw - var(--spacing-double));
+
+    .dialog-header {
+      padding-inline: var(--spacing-double);
+    }
+
+    .tab-bar {
+      height: auto;
+      overflow-x: auto;
+      padding-inline: var(--spacing);
+      scrollbar-width: thin;
+
+      .tab-bar-item {
+        flex: 0 0 auto;
+        min-height: 42px;
+        padding-inline: var(--spacing);
+      }
+    }
+
+    .clone-github-repo {
+      height: calc(100vh - 380px);
+      min-height: 180px;
+    }
+
+    .filter-list.filter-list.clone-github-repo .filter-field-row {
+      margin-inline: var(--spacing);
+    }
+
+    .local-path-field {
+      align-items: stretch;
+      flex-direction: column;
+      gap: var(--spacing);
+
+      .button-component {
+        align-self: flex-end;
       }
     }
   }

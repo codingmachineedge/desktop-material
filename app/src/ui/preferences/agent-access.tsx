@@ -53,8 +53,12 @@ export class AgentAccess extends React.Component<{}, IAgentAccessState> {
               REST compatibility API.
             </p>
           </div>
-          <span className={`agent-status-chip ${running ? 'running' : ''}`}>
-            <span className="agent-status-dot" />
+          <span
+            className={`agent-status-chip ${running ? 'running' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="agent-status-dot" aria-hidden="true" />
             {running ? 'Listening' : enabled ? 'Starting' : 'Off'}
           </span>
         </div>
@@ -83,9 +87,16 @@ export class AgentAccess extends React.Component<{}, IAgentAccessState> {
             <Octicon symbol={octicons.server} />
             <h3>Connection</h3>
           </div>
-          <label htmlFor="agent-server-address">Local address</label>
-          <div className="agent-readonly-field">
-            <code id="agent-server-address">{address}</code>
+          <span className="agent-field-label" id="agent-server-address-label">
+            Local address
+          </span>
+          <div
+            className="agent-readonly-field"
+            role="textbox"
+            aria-readonly="true"
+            aria-labelledby="agent-server-address-label"
+          >
+            <code>{address}</code>
           </div>
 
           <label htmlFor="agent-server-token">Bearer token</label>
@@ -95,6 +106,7 @@ export class AgentAccess extends React.Component<{}, IAgentAccessState> {
               type={this.state.revealToken ? 'text' : 'password'}
               value={token}
               readOnly={true}
+              autoComplete="off"
               aria-describedby="agent-token-help"
             />
             <button
@@ -102,6 +114,7 @@ export class AgentAccess extends React.Component<{}, IAgentAccessState> {
               className="agent-icon-button"
               onClick={this.toggleTokenVisibility}
               disabled={!running}
+              aria-pressed={this.state.revealToken}
               aria-label={
                 this.state.revealToken ? 'Hide token' : 'Reveal token'
               }

@@ -40,7 +40,19 @@ dialog.clone-repository {
 
       .batch-mode-radio {
         display: flex;
+        flex-wrap: wrap;
         gap: var(--spacing);
+      }
+    }
+
+    @media (max-width: 520px) {
+      .batch-mode-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .batch-action-row .button-component {
+        width: 100%;
       }
     }
 

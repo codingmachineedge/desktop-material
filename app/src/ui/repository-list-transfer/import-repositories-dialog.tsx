@@ -273,27 +273,24 @@ interface IImportUrlRowProps {
  * A single import row. Extracted so the checkbox toggle handler can be a stable
  * instance method bound to the row's URL.
  */
-class ImportUrlRow extends React.PureComponent<IImportUrlRowProps> {
-  private onChange = () => {
-    this.props.onToggle(this.props.url)
-  }
+function ImportUrlRow(props: IImportUrlRowProps) {
+  const onChange = React.useCallback(
+    () => props.onToggle(props.url),
+    [props.onToggle, props.url]
+  )
 
-  public render() {
-    const { url, checked, alreadyCloned } = this.props
-
-    return (
-      <li className="transfer-item">
-        <Checkbox
-          value={checked ? CheckboxValue.On : CheckboxValue.Off}
-          onChange={this.onChange}
-        />
-        <div className="details">
-          <div className="url">{url}</div>
-          {alreadyCloned && (
-            <div className="already-cloned">Already cloned</div>
-          )}
-        </div>
-      </li>
-    )
-  }
+  return (
+    <li className="transfer-item">
+      <Checkbox
+        value={props.checked ? CheckboxValue.On : CheckboxValue.Off}
+        onChange={onChange}
+      />
+      <div className="details">
+        <div className="url">{props.url}</div>
+        {props.alreadyCloned && (
+          <div className="already-cloned">Already cloned</div>
+        )}
+      </div>
+    </li>
+  )
 }
