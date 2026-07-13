@@ -152,6 +152,22 @@ async function requestWithDeclaredLength(
   })
 }
 
+async function proofMutation(
+  url: string,
+  value: unknown,
+  contentType: string = 'application/json'
+): Promise<Response> {
+  return await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${tokenB}`,
+      'Content-Type': contentType,
+    },
+    body:
+      contentType === 'application/json' ? JSON.stringify(value) : `${value}`,
+  })
+}
+
 describe('guided hidden-desktop proof fixture', () => {
   it('creates the same verified three-commit bare repository in empty owned roots', async () => {
     const root = await mkdtemp(join(tmpdir(), 'desktop-material-proof-repo-'))
@@ -479,6 +495,153 @@ describe('guided hidden-desktop proof fixture', () => {
       assert.doesNotMatch(readyJSON, new RegExp(tokenB))
       assert.doesNotMatch(readyJSON, /"pid"/i)
       assert.doesNotMatch(readyJSON, /"[A-Za-z]:[\\/]|\\Users\\/i)
+    } finally {
+      await harness.close()
+    }
+  })
+
+  it('filters and paginates search while bounding every mutable collection', async () => {
+    const harness = await createHarness()
+    const repositoryPath = `${harness.endpoint}/repos/material-proof/guided-proof`
+    try {
+      const oversizedIssue = await proofMutation(`${repositoryPath}/issues`, {
+        title: 'Rejected oversized issue',
+        body: 'x'.repeat(65_537),
+      })
+      assert.equal(oversizedIssue.status, 400)
+
+      for (let index = 0; index < 19; index++) {
+        const response = await proofMutation(`${repositoryPath}/issues`, {
+          title: `Synthetic bounded issue ${index}`,
+          body: `Deterministic filler ${index}`,
+        })
+        assert.equal(response.status, 201)
+      }
+      assert.equal(
+        (
+          await proofMutation(`${repositoryPath}/issues`, {
+            title: 'Beyond issue limit',
+            body: '',
+          })
+        ).status,
+        409
+      )
+
+      const api = new API(harness.endpoint, tokenB)
+      const filtered = await api.fetchIssuePage(
+        'material-proof',
+        'guided-proof',
+        {
+          state: 'open',
+          search: 'hidden desktop',
+          labels: ['guided-proof'],
+          assignee: null,
+          milestone: null,
+          sort: 'updated',
+          direction: 'desc',
+          page: 1,
+        }
+      )
+      assert.deepEqual(
+        filtered.issues.map(issue => issue.number),
+        [7]
+      )
+
+      const searchParameters = new URLSearchParams({
+        q: 'repo:material-proof/guided-proof is:issue state:open in:title,body "Synthetic bounded"',
+        per_page: '3',
+        page: '2',
+        sort: 'updated',
+        order: 'asc',
+      })
+      const secondPage = await fetch(
+        `${harness.endpoint}/search/issues?${searchParameters.toString()}`,
+        { headers: { Authorization: `Bearer ${tokenB}` } }
+      )
+      assert.equal(secondPage.status, 200)
+      assert.ok(
+        Number(secondPage.headers.get('content-length')) < 2 * 1024 * 1024
+      )
+      const searchPage = (await secondPage.json()) as {
+        readonly total_count: number
+        readonly items: ReadonlyArray<{ readonly number: number }>
+      }
+      assert.equal(searchPage.total_count, 19)
+      assert.equal(searchPage.items.length, 3)
+      assert.ok(searchPage.items.every(issue => issue.number !== 7))
+
+      const unsupportedSearch = new URLSearchParams({
+        q: 'repo:material-proof/guided-proof is:issue author:proof-b',
+      })
+      assert.equal(
+        (
+          await fetch(
+            `${harness.endpoint}/search/issues?${unsupportedSearch.toString()}`,
+            { headers: { Authorization: `Bearer ${tokenB}` } }
+          )
+        ).status,
+        400
+      )
+
+      for (let index = 0; index < 19; index++) {
+        const response = await proofMutation(
+          `${repositoryPath}/issues/7/comments`,
+          { body: `Bounded comment ${index}` }
+        )
+        assert.equal(response.status, 201)
+      }
+      assert.equal(
+        (
+          await proofMutation(`${repositoryPath}/issues/7/comments`, {
+            body: 'Beyond comment limit',
+          })
+        ).status,
+        409
+      )
+
+      for (let index = 0; index < 9; index++) {
+        const response = await proofMutation(`${repositoryPath}/releases`, {
+          tag_name: `bounded-release-${index}`,
+          target_commitish: 'main',
+          name: `Bounded release ${index}`,
+          body: '',
+          draft: true,
+          prerelease: false,
+        })
+        assert.equal(response.status, 201)
+      }
+      assert.equal(
+        (
+          await proofMutation(`${repositoryPath}/releases`, {
+            tag_name: 'beyond-release-limit',
+            target_commitish: 'main',
+            name: 'Beyond release limit',
+            body: '',
+            draft: true,
+            prerelease: false,
+          })
+        ).status,
+        409
+      )
+
+      for (let index = 0; index < 19; index++) {
+        const response = await proofMutation(
+          `${harness.origin}/api/uploads/repos/material-proof/guided-proof/releases/4201/assets?name=bounded-${index}.txt`,
+          'x',
+          'text/plain'
+        )
+        assert.equal(response.status, 201)
+      }
+      assert.equal(
+        (
+          await proofMutation(
+            `${harness.origin}/api/uploads/repos/material-proof/guided-proof/releases/4201/assets?name=beyond-limit.txt`,
+            'x',
+            'text/plain'
+          )
+        ).status,
+        409
+      )
     } finally {
       await harness.close()
     }

@@ -7,8 +7,10 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -344,6 +346,20 @@ describe('guided proof fixture script', () => {
         await readFile(join(occupied, 'caller.txt'), 'utf8'),
         'preserve\n'
       )
+
+      const symlinkTarget = join(root, 'symlink-target')
+      const symlinkRoot = join(root, 'symlink-root')
+      await mkdir(symlinkTarget)
+      await symlink(
+        symlinkTarget,
+        symlinkRoot,
+        process.platform === 'win32' ? 'junction' : 'dir'
+      )
+      await assert.rejects(
+        createGuidedProofRepository(symlinkRoot),
+        /must be a real directory/
+      )
+      assert.deepEqual(await readdir(symlinkTarget), [])
     } finally {
       const safeRoot = resolve(root)
       assert.ok(safeRoot.startsWith(resolve(tmpdir())))

@@ -24,8 +24,10 @@ const ProofBindAddress = '127.0.0.1'
 const ProofAPIPrefix = '/api/v3'
 const ProofGitPath = `/${ProofOwner}/${ProofRepository}.git`
 const ProofRequestBodyMaximumBytes = 2 * 1024 * 1024
+const ProofResponseBodyMaximumBytes = 2 * 1024 * 1024
 const ProofTLSFileMaximumBytes = 1024 * 1024
 const ProofChildOutputMaximumBytes = 16 * 1024 * 1024
+const ProofGitResponseMaximumBytes = ProofChildOutputMaximumBytes + 1024
 const ProofChildMaximumRuntimeMilliseconds = 30_000
 const ProofChildShutdownGraceMilliseconds = 2_000
 const ProofDate = '2026-07-13T12:00:00Z'
@@ -34,8 +36,13 @@ const ProofGitName = 'Guided Proof'
 const ProofGitEmail = 'guided-proof@example.invalid'
 const ProofExpectedHeadSha = 'e602b6bae7af1dbcd62a4434b6bf4d24bc46c234'
 const ProofIssueBodyMaximumLength = 65_536
+const ProofIssueMaximumCount = 20
+const ProofIssueCommentMaximumCount = 20
 const ProofPullRequestMaximumCount = 5
 const ProofPullRequestReviewMaximumCount = 10
+const ProofReleaseMaximumCount = 10
+const ProofReleaseAssetMaximumCount = 20
+const ProofReleaseAssetStoredMaximumBytes = 16 * 1024 * 1024
 const ProofArtifactBytes = Buffer.from(
   'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==',
   'base64'
@@ -862,8 +869,16 @@ function sendBytes(
   status: number,
   contentType: string,
   body: Uint8Array,
-  headers: Readonly<Record<string, string>> = {}
+  headers: Readonly<Record<string, string>> = {},
+  maximumBytes: number = ProofResponseBodyMaximumBytes
 ): void {
+  if (
+    !Number.isSafeInteger(maximumBytes) ||
+    maximumBytes < 1 ||
+    body.byteLength > maximumBytes
+  ) {
+    throw new Error('The guided proof response exceeded its fixed body limit.')
+  }
   response.writeHead(status, {
     'Cache-Control': 'no-store',
     'Content-Length': String(body.byteLength),
@@ -1363,7 +1378,14 @@ async function handleGitRequest(
       response,
       200,
       'application/x-git-upload-pack-advertisement',
-      Buffer.concat([packetLength, service, Buffer.from('0000'), advertisement])
+      Buffer.concat([
+        packetLength,
+        service,
+        Buffer.from('0000'),
+        advertisement,
+      ]),
+      {},
+      ProofGitResponseMaximumBytes
     )
     return
   }
@@ -1392,7 +1414,14 @@ async function handleGitRequest(
       requestBody,
       gitProtocol
     )
-    sendBytes(response, 200, 'application/x-git-upload-pack-result', result)
+    sendBytes(
+      response,
+      200,
+      'application/x-git-upload-pack-result',
+      result,
+      {},
+      ProofGitResponseMaximumBytes
+    )
     return
   }
   audit.route = 'rejected-git-route'
@@ -1569,8 +1598,11 @@ async function createIssue(
 ): Promise<IProofIssue> {
   const body = await readJSONObject(request)
   requireOnlyFields(body, ['title', 'body'])
+  if (context.issues.length >= ProofIssueMaximumCount) {
+    throw new ProofRequestError(409, 'issue-limit-reached')
+  }
   const title = boundedString(body.title, 256)
-  const issueBody = boundedString(body.body, 125_000, true)
+  const issueBody = boundedString(body.body, ProofIssueBodyMaximumLength, true)
   const nextNumber = Math.max(...context.issues.map(issue => issue.number)) + 1
   const issue: IProofIssue = {
     id: 7000 + nextNumber,
@@ -1613,7 +1645,7 @@ async function updateIssue(
     issue.title = boundedString(body.title, 256)
   }
   if (body.body !== undefined) {
-    issue.body = boundedString(body.body, 125_000, true)
+    issue.body = boundedString(body.body, ProofIssueBodyMaximumLength, true)
   }
   if (body.labels !== undefined) {
     const names = parseStringArray(body.labels, 50, 255)
@@ -1817,6 +1849,201 @@ async function updatePullRequestMetadata(
   pullRequest.labels = parsePullRequestLabels(context, body.labels)
 }
 
+interface IProofSearchToken {
+  readonly value: string
+  readonly entirelyQuoted: boolean
+}
+
+interface IProofIssueSearch {
+  readonly state: 'open' | 'closed' | 'all'
+  readonly labels: ReadonlyArray<string>
+  readonly assignee: string | null
+  readonly milestone: number | null
+  readonly terms: ReadonlyArray<string>
+}
+
+function tokenizeProofIssueSearch(
+  query: string
+): ReadonlyArray<IProofSearchToken> {
+  const tokens = new Array<IProofSearchToken>()
+  let value = ''
+  let inQuote = false
+  let escaped = false
+  let quoteStartedAt = -1
+  let entirelyQuoted = false
+  let quoteClosed = false
+
+  const push = () => {
+    if (value.length === 0) {
+      throw new ProofRequestError(400, 'invalid-search-query')
+    }
+    tokens.push({ value, entirelyQuoted })
+    value = ''
+    quoteStartedAt = -1
+    entirelyQuoted = false
+    quoteClosed = false
+  }
+
+  for (const character of query) {
+    if (escaped) {
+      if (character !== '"' && character !== '\\') {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      value += character
+      escaped = false
+      continue
+    }
+    if (inQuote) {
+      if (character === '\\') {
+        escaped = true
+      } else if (character === '"') {
+        inQuote = false
+        quoteClosed = true
+      } else {
+        value += character
+      }
+      continue
+    }
+    if (/\s/.test(character)) {
+      if (value.length > 0 || quoteClosed) {
+        push()
+      }
+      continue
+    }
+    if (quoteClosed) {
+      throw new ProofRequestError(400, 'invalid-search-query')
+    }
+    if (character === '"') {
+      if (value.length > 0 && !value.endsWith(':')) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      quoteStartedAt = value.length
+      entirelyQuoted = quoteStartedAt === 0
+      inQuote = true
+      continue
+    }
+    value += character
+  }
+  if (inQuote || escaped) {
+    throw new ProofRequestError(400, 'invalid-search-query')
+  }
+  if (value.length > 0 || quoteClosed) {
+    push()
+  }
+  if (tokens.length === 0 || tokens.length > 32) {
+    throw new ProofRequestError(400, 'invalid-search-query')
+  }
+  return tokens
+}
+
+function parseProofIssueSearch(query: string): IProofIssueSearch {
+  let hasRepository = false
+  let hasIssueKind = false
+  let hasLocation = false
+  let state: IProofIssueSearch['state'] = 'all'
+  let hasState = false
+  let assignee: string | null = null
+  let hasAssignee = false
+  let milestone: number | null = null
+  let hasMilestone = false
+  const labels = new Array<string>()
+  const terms = new Array<string>()
+
+  for (const token of tokenizeProofIssueSearch(query)) {
+    if (token.value === `repo:${ProofOwner}/${ProofRepository}`) {
+      if (hasRepository) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      hasRepository = true
+      continue
+    }
+    if (token.value === 'is:issue') {
+      if (hasIssueKind) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      hasIssueKind = true
+      continue
+    }
+    const stateMatch = /^(?:is|state):(open|closed|all)$/.exec(token.value)
+    if (stateMatch !== null) {
+      if (hasState) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      state = stateMatch[1] as IProofIssueSearch['state']
+      hasState = true
+      continue
+    }
+    if (token.value.startsWith('label:')) {
+      const label = boundedString(token.value.slice('label:'.length), 100)
+      if (labels.length >= 20 || labels.includes(label.toLowerCase())) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      labels.push(label.toLowerCase())
+      continue
+    }
+    if (token.value.startsWith('assignee:')) {
+      if (hasAssignee) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      assignee = boundedString(token.value.slice('assignee:'.length), 255)
+      hasAssignee = true
+      continue
+    }
+    if (token.value.startsWith('milestone:')) {
+      if (hasMilestone || !/^milestone:[1-9][0-9]*$/.test(token.value)) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      milestone = Number.parseInt(token.value.slice('milestone:'.length), 10)
+      if (!Number.isSafeInteger(milestone)) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      hasMilestone = true
+      continue
+    }
+    if (token.value === 'in:title,body') {
+      if (hasLocation) {
+        throw new ProofRequestError(400, 'invalid-search-query')
+      }
+      hasLocation = true
+      continue
+    }
+    if (!token.entirelyQuoted && token.value.includes(':')) {
+      throw new ProofRequestError(400, 'unsupported-search-qualifier')
+    }
+    if (terms.length >= 8) {
+      throw new ProofRequestError(400, 'invalid-search-query')
+    }
+    terms.push(boundedString(token.value, 256).toLowerCase())
+  }
+  if (!hasRepository || !hasIssueKind) {
+    throw new ProofRequestError(400, 'unscoped-search')
+  }
+  return { state, labels, assignee, milestone, terms }
+}
+
+function filterProofIssuesForSearch(
+  context: GuidedProofContext,
+  search: IProofIssueSearch
+): ReadonlyArray<IProofIssue> {
+  return context.issues.filter(issue => {
+    const searchableText = `${issue.title}\n${issue.body}`.toLowerCase()
+    return (
+      (search.state === 'all' || issue.state === search.state) &&
+      search.labels.every(label =>
+        issue.labels.some(candidate => candidate.name.toLowerCase() === label)
+      ) &&
+      (search.assignee === null ||
+        issue.assignees.some(
+          candidate =>
+            candidate.login.toLowerCase() === search.assignee?.toLowerCase()
+        )) &&
+      (search.milestone === null ||
+        issue.milestone?.number === search.milestone) &&
+      search.terms.every(term => searchableText.includes(term))
+    )
+  })
+}
+
 async function handleIssuesAPI(
   context: GuidedProofContext,
   request: IncomingMessage,
@@ -1832,16 +2059,40 @@ async function handleIssuesAPI(
       return true
     }
     requireOnlyQuery(url, ['q', 'per_page', 'page', 'sort', 'order'])
-    boundedIntegerQuery(url, 'per_page', 1, 30, 30)
+    const perPage = boundedIntegerQuery(url, 'per_page', 1, 30, 30)
     const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
     const query = boundedString(url.searchParams.get('q'), 4096)
-    if (!query.includes(`repo:${ProofOwner}/${ProofRepository}`)) {
-      throw new ProofRequestError(400, 'unscoped-search')
+    const sort = url.searchParams.get('sort') ?? 'updated'
+    const order = url.searchParams.get('order') ?? 'desc'
+    if (!['created', 'updated', 'comments'].includes(sort)) {
+      throw new ProofRequestError(400, 'invalid-search-sort')
     }
+    if (order !== 'asc' && order !== 'desc') {
+      throw new ProofRequestError(400, 'invalid-search-order')
+    }
+    const search = parseProofIssueSearch(query)
+    const matchingIssues = [...filterProofIssuesForSearch(context, search)]
+    const direction = order === 'asc' ? 1 : -1
+    matchingIssues.sort((left, right) => {
+      const leftValue =
+        sort === 'created'
+          ? Date.parse(left.created_at)
+          : sort === 'comments'
+          ? left.comments
+          : Date.parse(left.updated_at)
+      const rightValue =
+        sort === 'created'
+          ? Date.parse(right.created_at)
+          : sort === 'comments'
+          ? right.comments
+          : Date.parse(right.updated_at)
+      return (leftValue - rightValue || left.number - right.number) * direction
+    })
+    const start = (page - 1) * perPage
     sendJSON(response, 200, {
-      total_count: context.issues.length,
+      total_count: matchingIssues.length,
       incomplete_results: false,
-      items: page === 1 ? context.issues : [],
+      items: matchingIssues.slice(start, start + perPage),
     })
     return true
   }
@@ -2099,6 +2350,9 @@ async function handleIssuesAPI(
     requireOnlyQuery(url, [])
     const body = await readJSONObject(request)
     requireOnlyFields(body, ['body'])
+    if (comments.length >= ProofIssueCommentMaximumCount) {
+      throw new ProofRequestError(409, 'issue-comment-limit-reached')
+    }
     const commentBody = boundedString(body.body, 65_536)
     const comment: IProofComment = {
       id: 7701 + comments.length,
@@ -2199,6 +2453,9 @@ async function createRelease(
     'draft',
     'prerelease',
   ])
+  if (context.releases.length >= ProofReleaseMaximumCount) {
+    throw new ProofRequestError(409, 'release-limit-reached')
+  }
   const release: IProofRelease = {
     id: Math.max(...context.releases.map(item => item.id)) + 1,
     tag_name: boundedString(body.tag_name, 255),
@@ -2401,6 +2658,17 @@ async function handleReleaseUpload(
     throw new ProofRequestError(400, 'empty-asset')
   }
   const release = releaseById(context, Number.parseInt(upload[1], 10))
+  const storedAssetBytes = context.releases.reduce(
+    (total, item) =>
+      total + item.assets.reduce((sum, asset) => sum + asset.bytes.length, 0),
+    0
+  )
+  if (
+    release.assets.length >= ProofReleaseAssetMaximumCount ||
+    storedAssetBytes + bytes.length > ProofReleaseAssetStoredMaximumBytes
+  ) {
+    throw new ProofRequestError(409, 'release-asset-limit-reached')
+  }
   const allIds = context.releases.flatMap(item =>
     item.assets.map(asset => asset.id)
   )
