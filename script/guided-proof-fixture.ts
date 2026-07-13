@@ -1436,6 +1436,26 @@ async function handleAccountAndRepositoryAPI(
   path: string,
   audit: IProofAudit
 ): Promise<boolean> {
+  const avatar = /^\/enterprise\/avatars\/(proof-a|proof-b)$/.exec(path)
+  if (avatar !== null) {
+    audit.route = 'api-avatar'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    requireOnlyQuery(url, [])
+    sendBytes(
+      response,
+      200,
+      'image/svg+xml; charset=utf-8',
+      Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#0969da"/><text x="32" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" fill="white">${
+          avatar[1] === 'proof-a' ? 'A' : 'B'
+        }</text></svg>`,
+        'utf8'
+      )
+    )
+    return true
+  }
   const account =
     audit.account === 'proof-a' || audit.account === 'proof-b'
       ? audit.account
@@ -1505,26 +1525,6 @@ async function handleAccountAndRepositoryAPI(
     }
     requireOnlyQuery(url, [])
     sendJSON(response, 200, { features: [] })
-    return true
-  }
-  const avatar = /^\/enterprise\/avatars\/(proof-a|proof-b)$/.exec(path)
-  if (avatar !== null) {
-    audit.route = 'api-avatar'
-    if (!requireMethod(request, response, ['GET'])) {
-      return true
-    }
-    requireOnlyQuery(url, [])
-    sendBytes(
-      response,
-      200,
-      'image/svg+xml; charset=utf-8',
-      Buffer.from(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#0969da"/><text x="32" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" fill="white">${
-          avatar[1] === 'proof-a' ? 'A' : 'B'
-        }</text></svg>`,
-        'utf8'
-      )
-    )
     return true
   }
   const user = /^\/users\/(proof-a|proof-b)$/.exec(path)
@@ -3100,7 +3100,15 @@ async function dispatchGuidedProofRequest(
     return
   }
 
-  if (audit.account !== 'proof-a' && audit.account !== 'proof-b') {
+  const isPublicSyntheticAvatar = [
+    `${ProofAPIPrefix}/enterprise/avatars/proof-a`,
+    `${ProofAPIPrefix}/enterprise/avatars/proof-b`,
+  ].includes(url.pathname)
+  if (
+    audit.account !== 'proof-a' &&
+    audit.account !== 'proof-b' &&
+    !isPublicSyntheticAvatar
+  ) {
     audit.route = 'api-authentication'
     sendAuthenticationRequired(response)
     return

@@ -241,6 +241,12 @@ describe('guided hidden-desktop proof fixture', () => {
       const signedIn = await fetchUser(harness.endpoint, tokenB)
       assert.equal(signedIn.login, 'proof-b')
       assert.equal(signedIn.id, 102)
+      const publicAvatar = await fetch(
+        `${harness.endpoint}/enterprise/avatars/proof-b`
+      )
+      assert.equal(publicAvatar.status, 200)
+      assert.match(publicAvatar.headers.get('content-type') ?? '', /image\/svg/)
+      assert.match(await publicAvatar.text(), />B<\/text>/)
       assert.deepEqual(await api.fetchFeatureFlags(), [])
       const repository = await api.fetchRepository(
         'material-proof',
