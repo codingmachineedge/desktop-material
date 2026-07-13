@@ -14,3 +14,11 @@
 - Initial dirty-state baseline: clean at `74b30ce17ce04c040042623f9e2bea7b89368889`
 - Publication authorization: explicit user request to have the primary agent and all subagents commit and push continuously
 - Cleanup ledger: record run id, owned paths, headless desktop name, creation state, launch PID, and resolved HWND before each GUI phase; remove only resolved paths beneath the owned run root
+
+## Verification ledger
+
+- `2026-07-12`, root `302208c45e26e771532261df1541d33dc5695077`: full TypeScript check passed; guided Repository tools and CLI safety suites passed 32/32; GitHub transport and safe-response suites passed 35/35.
+- Exact production build command: `node vendor/yarn-1.21.1.js build:prod`.
+- Current build result: JavaScript/TypeScript compilation starts successfully, but renderer/main linking stops because the reusable lockfile-matched dependency tree was installed with lifecycle scripts disabled and therefore has no `desktop-notifications.node`, `registry.node`, `fs_admin.node`, or `keytar.node`. The local `desktop-trampoline` and `windows-argv-parser` packages also have not run their normal compile/install steps.
+- The pinned Electron 42.0.1 archive was present in the local Electron cache and its ignored runtime was extracted without a network fetch. This does not replace the four missing native addons.
+- Per the no-download gate, no partial build was launched, no screenshot was captured, and no UI verification is claimed for this state.
