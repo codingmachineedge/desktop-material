@@ -16,6 +16,7 @@ export type RepositoryToolID =
   | 'maintenance-preview'
   | 'maintenance-run'
   | 'reflog-view'
+  | 'signature-audit'
 
 export interface IRepositoryToolOperation {
   readonly id: RepositoryToolID
@@ -55,6 +56,26 @@ export const RepositoryToolOperations: ReadonlyArray<IRepositoryToolOperation> =
       args: ['fsck', '--full'],
       mutatesRepository: false,
       requiresConfirmation: false,
+    },
+    {
+      id: 'signature-audit',
+      title: 'Audit recent commit signatures',
+      description:
+        'Inspect signature status, signer identity, and subject for the latest 50 commits.',
+      category: 'Diagnostics',
+      args: [
+        'log',
+        '--format=%h%x09%G?%x09%GS%x09%s',
+        '--show-signature',
+        '-50',
+      ],
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'G = good, U = good with unknown trust, B = bad, N = unsigned.',
+        'Also reports expired, revoked, and missing-key signature states.',
+        'Does not change signing keys, trust, commits, or Git configuration.',
+      ],
     },
     {
       id: 'maintenance-preview',

@@ -95,6 +95,7 @@ describe('Repository tools', () => {
 
     assert.ok(screen.getByText('Status summary'))
     assert.ok(screen.getByText('Repository health check'))
+    assert.ok(screen.getByText('Audit recent commit signatures'))
     assert.ok(screen.getByText('Preview maintenance needs'))
     assert.ok(screen.getByText('Run repository maintenance'))
     assert.ok(screen.getByText('View recent ref movements'))

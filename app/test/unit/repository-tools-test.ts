@@ -18,6 +18,7 @@ describe('repository tool recipes', () => {
       [
         'status-summary',
         'repository-health',
+        'signature-audit',
         'maintenance-preview',
         'maintenance-run',
         'reflog-view',
@@ -40,6 +41,7 @@ describe('repository tool recipes', () => {
     for (const id of [
       'status-summary',
       'repository-health',
+      'signature-audit',
       'maintenance-preview',
       'reflog-view',
     ] as const) {
@@ -51,6 +53,12 @@ describe('repository tool recipes', () => {
       'reflog',
       'show',
       '--date=local',
+      '-50',
+    ])
+    assert.deepStrictEqual(getRepositoryToolOperation('signature-audit').args, [
+      'log',
+      '--format=%h%x09%G?%x09%GS%x09%s',
+      '--show-signature',
       '-50',
     ])
   })
