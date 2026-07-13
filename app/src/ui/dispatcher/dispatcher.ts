@@ -173,6 +173,7 @@ import {
   ICopilotResolutionSummary,
 } from '../../lib/copilot-conflict-resolution'
 import { WorktreeEntry } from '../../models/worktree'
+import { ICreatedGitHubIssue } from '../../lib/github-issue'
 
 /**
  * An error handler function.
@@ -3619,6 +3620,42 @@ export class Dispatcher {
     } else {
       return false
     }
+  }
+
+  /** Create one issue through the selected repository-scoped GitHub account. */
+  public async createGitHubIssue(
+    repository: Repository,
+    account: Account,
+    title: string,
+    body: string,
+    signal: AbortSignal
+  ): Promise<ICreatedGitHubIssue> {
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new Error('This repository is not connected to GitHub.')
+    }
+
+    const target = getNonForkGitHubRepository(repository)
+    if (
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('No matching authenticated GitHub account is available.')
+    }
+    if (target.isArchived === true) {
+      throw new Error('Archived repositories cannot accept new issues.')
+    }
+    if (target.issuesEnabled === false) {
+      throw new Error('Issues are disabled for this repository.')
+    }
+
+    return API.fromAccount(account).createIssue(
+      target.owner.login,
+      target.name,
+      title,
+      body,
+      signal
+    )
   }
 
   public setRepositoryIndicatorsEnabled(repositoryIndicatorsEnabled: boolean) {

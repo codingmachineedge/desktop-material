@@ -39,6 +39,7 @@ export enum PopupType {
   SettingsHistory = 'SettingsHistory',
   NotificationHistory = 'NotificationHistory',
   FileHistory = 'FileHistory',
+  CreateGitHubIssue = 'CreateGitHubIssue',
   SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
   AddRepository = 'AddRepository',
@@ -173,6 +174,7 @@ export type PopupDetail =
   | { type: PopupType.SettingsHistory }
   | { type: PopupType.NotificationHistory }
   | { type: PopupType.FileHistory; repository: Repository; path: string }
+  | { type: PopupType.CreateGitHubIssue; repository: Repository }
   | { type: PopupType.SparseCheckout; repository: Repository }
   | { type: PopupType.MergeAll; repository: Repository; mode: MergeAllMode }
   | { type: PopupType.PullAllRepositories }

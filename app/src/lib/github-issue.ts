@@ -1,3 +1,5 @@
+import { APIError } from './http'
+
 export const GitHubIssueTitleMaximumLength = 256
 export const GitHubIssueBodyMaximumLength = 65536
 
@@ -20,6 +22,21 @@ export interface ICreatedGitHubIssue {
   readonly number: number
   readonly title: string
   readonly url: string
+}
+
+export type GitHubIssueCreationErrorKind =
+  | 'authentication'
+  | 'permission'
+  | 'not-found'
+  | 'unavailable'
+  | 'validation'
+  | 'rate-limit'
+  | 'network'
+  | 'unknown'
+
+export interface IGitHubIssueCreationError {
+  readonly kind: GitHubIssueCreationErrorKind
+  readonly message: string
 }
 
 /**
@@ -120,4 +137,78 @@ export function validateCreatedGitHubIssue(
     title: issue.title,
     url: expected.toString(),
   }
+}
+
+/** Convert API failures to bounded, actionable copy without echoing payloads. */
+export function getGitHubIssueCreationError(
+  error: unknown
+): IGitHubIssueCreationError {
+  if (error instanceof APIError) {
+    if (error.responseStatus === 401) {
+      return {
+        kind: 'authentication',
+        message:
+          'GitHub could not authenticate this account. Sign in again, then retry.',
+      }
+    }
+    if (
+      error.responseStatus === 429 ||
+      (error.responseStatus === 403 && error.rateLimitReset !== null)
+    ) {
+      return {
+        kind: 'rate-limit',
+        message:
+          error.rateLimitReset === null
+            ? 'GitHub is temporarily limiting issue requests. Try again later.'
+            : `GitHub is limiting issue requests until ${error.rateLimitReset.toLocaleTimeString()}.`,
+      }
+    }
+    if (error.responseStatus === 403) {
+      return {
+        kind: 'permission',
+        message:
+          'GitHub denied issue creation. Verify that issues are enabled and this account is allowed to create them.',
+      }
+    }
+    if (error.responseStatus === 404) {
+      return {
+        kind: 'not-found',
+        message:
+          'GitHub could not find this repository for the selected account. Check the account and its organization access.',
+      }
+    }
+    if (error.responseStatus === 410) {
+      return {
+        kind: 'unavailable',
+        message:
+          'Issue creation is unavailable for this repository. It may be archived or have issues disabled.',
+      }
+    }
+    if (error.responseStatus === 422) {
+      return {
+        kind: 'validation',
+        message:
+          'GitHub did not accept this issue. Review the title and description, then try again.',
+      }
+    }
+  }
+
+  if (error instanceof TypeError) {
+    return {
+      kind: 'network',
+      message:
+        'Desktop could not reach GitHub. Check your connection and try again.',
+    }
+  }
+
+  return {
+    kind: 'unknown',
+    message: 'Desktop could not create the issue. Try again.',
+  }
+}
+
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError'
 }

@@ -91,6 +91,7 @@ import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
 import { FileHistory } from './file-history'
 import { SparseCheckoutManager } from './sparse-checkout'
+import { CreateGitHubIssueDialog } from './create-github-issue'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
@@ -1494,16 +1495,16 @@ export class App extends React.Component<IAppProps, IAppState> {
       .catch(err => log.error('Failed to start build & run', err))
   }
 
-  /**
-   * Opens a browser to the issue creation page
-   * of the current GitHub repository.
-   */
+  /** Open the guided issue creator for the current GitHub repository. */
   private openIssueCreationOnGitHub() {
     const repository = this.getRepository()
     // this will likely never be null since we disable the
     // issue creation menu item for non-GitHub repositories
     if (repository instanceof Repository) {
-      this.props.dispatcher.openIssueCreationPage(repository)
+      this.props.dispatcher.showPopup({
+        type: PopupType.CreateGitHubIssue,
+        repository,
+      })
     }
   }
 
@@ -1893,6 +1894,16 @@ export class App extends React.Component<IAppProps, IAppState> {
             onRefreshRepository={() =>
               this.props.dispatcher.refreshRepository(popup.repository)
             }
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.CreateGitHubIssue:
+        return (
+          <CreateGitHubIssueDialog
+            key={`create-github-issue-${popup.repository.id}`}
+            repository={popup.repository}
+            accounts={this.state.accounts}
+            dispatcher={this.props.dispatcher}
             onDismissed={onPopupDismissedFn}
           />
         )

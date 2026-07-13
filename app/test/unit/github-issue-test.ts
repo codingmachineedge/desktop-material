@@ -2,12 +2,14 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 
 import {
+  getGitHubIssueCreationError,
   GitHubIssueBodyMaximumLength,
   GitHubIssueTitleMaximumLength,
   normalizeGitHubIssueDraft,
   validateCreatedGitHubIssue,
   validateGitHubRepositoryPart,
 } from '../../src/lib/github-issue'
+import { APIError } from '../../src/lib/http'
 
 describe('GitHub issue validation', () => {
   it('normalizes title whitespace while preserving the exact body', () => {
@@ -106,5 +108,29 @@ describe('GitHub issue validation', () => {
         )
       )
     }
+  })
+
+  it('maps provider failures without echoing server or draft text', () => {
+    const permission = getGitHubIssueCreationError(
+      new APIError(new Response(null, { status: 403 }), {
+        message: 'server echoed private issue text',
+      })
+    )
+    assert.equal(permission.kind, 'permission')
+    assert.match(permission.message, /denied issue creation/i)
+    assert.doesNotMatch(permission.message, /private issue text/i)
+
+    const validation = getGitHubIssueCreationError(
+      new APIError(new Response(null, { status: 422 }), {
+        message: 'sensitive title',
+      })
+    )
+    assert.equal(validation.kind, 'validation')
+    assert.doesNotMatch(validation.message, /sensitive title/i)
+
+    assert.equal(
+      getGitHubIssueCreationError(new TypeError('offline')).kind,
+      'network'
+    )
   })
 })
