@@ -161,6 +161,7 @@ import { UnreachableCommitsTab } from '../history/unreachable-commits-dialog'
 import { sendNonFatalException } from '../../lib/helpers/non-fatal-exception'
 import { SignInResult } from '../../lib/stores/sign-in-store'
 import { ICustomIntegration } from '../../lib/custom-integration'
+import { IBranchNamePreset } from '../../models/branch-preset'
 import { isAbsolute, join } from 'path'
 import { randomUUID } from 'crypto'
 import { CLIAction } from '../../lib/cli-action'
@@ -513,7 +514,7 @@ export class Dispatcher {
   }
 
   /** Load the next batch of history for the repository. */
-  public loadNextCommitBatch(repository: Repository): Promise<void> {
+  public loadNextCommitBatch(repository: Repository): Promise<number> {
     return this.appStore._loadNextCommitBatch(repository)
   }
 
@@ -1954,6 +1955,12 @@ export class Dispatcher {
   /** Open the URL in a browser */
   public openInBrowser(url: string): Promise<boolean> {
     return this.appStore._openInBrowser(url)
+  }
+
+  public getBranchNamePresets(
+    repositoryPath: string
+  ): Promise<ReadonlyArray<IBranchNamePreset>> {
+    return this.appStore._getBranchNamePresets(repositoryPath)
   }
 
   /** Add the pattern to the repository's gitignore. */
@@ -4148,6 +4155,10 @@ export class Dispatcher {
   /** Set the custom shell info */
   public setCustomShell(customShell: ICustomIntegration) {
     this.appStore._setCustomShell(customShell)
+  }
+
+  public setBranchPresetScript(branchPresetScript: ICustomIntegration) {
+    this.appStore._setBranchPresetScript(branchPresetScript)
   }
 
   public async reorderCommits(

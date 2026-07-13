@@ -100,6 +100,7 @@ const imageFileExtensions = new Set([
   '.webp',
   '.bmp',
   '.avif',
+  '.svg',
 ])
 
 if (enableImagePreviewsForDDSFiles()) {
@@ -661,6 +662,28 @@ export async function convertDiff(
 ): Promise<IDiff> {
   const extension = Path.extname(file.path).toLowerCase()
 
+  if (extension === '.svg') {
+    const imageDiff = await getImageDiff(
+      repository,
+      file,
+      newestCommitish,
+      oldestCommitish
+    )
+
+    return diff.isBinary
+      ? imageDiff
+      : {
+          ...imageDiff,
+          textDiff: {
+            text: diff.contents,
+            hunks: diff.hunks,
+            lineEndingsChange,
+            maxLineNumber: diff.maxLineNumber,
+            hasHiddenBidiChars: diff.hasHiddenBidiChars,
+          },
+        }
+  }
+
   if (diff.isBinary) {
     // some extension we don't know how to parse, never mind
     if (!imageFileExtensions.has(extension)) {
@@ -706,6 +729,9 @@ function getMediaType(extension: string) {
   }
   if (extension === '.avif') {
     return 'image/avif'
+  }
+  if (extension === '.svg') {
+    return 'image/svg+xml'
   }
   if (extension === '.dds') {
     return 'image/vnd-ms.dds'

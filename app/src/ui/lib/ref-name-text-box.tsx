@@ -15,6 +15,9 @@ interface IRefNameProps {
    */
   readonly initialValue?: string
 
+  /** Called when a key is pressed in the underlying input. */
+  readonly onKeyDown?: (event: React.KeyboardEvent) => void
+
   /**
    * The label of the text box.
    */
@@ -118,6 +121,12 @@ export class RefNameTextBox extends React.Component<
     )
   }
 
+  public setValue(value: string) {
+    const sanitizedValue = sanitizedRefName(value)
+    this.setState({ proposedValue: value, sanitizedValue })
+    this.props.onValueChange?.(sanitizedValue)
+  }
+
   private renderTextInput() {
     const ariaDescribedBy =
       (this.props.ariaDescribedBy ?? '') +
@@ -136,6 +145,7 @@ export class RefNameTextBox extends React.Component<
           autocompletionProviders={[this.props.autocompletionProvider]}
           alwaysAutocomplete={this.state.proposedValue.length === 0}
           onValueChanged={this.onValueChange}
+          onKeyDown={this.props.onKeyDown}
           onBlur={this.onBlur}
           completionSuffix=""
           anchorToCaret={false}
@@ -153,6 +163,7 @@ export class RefNameTextBox extends React.Component<
         ariaLabelledBy={this.props.ariaLabelledBy}
         ariaDescribedBy={ariaDescribedBy}
         onValueChanged={this.onValueChange}
+        onKeyDown={this.props.onKeyDown}
         onBlur={this.onBlur}
       />
     )

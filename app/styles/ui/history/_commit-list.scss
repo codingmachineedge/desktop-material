@@ -109,6 +109,24 @@
   padding-right: calc(var(--spacing) + var(--spacing-half));
   padding-left: var(--spacing);
 
+  .commit-graph {
+    flex: 0 0 auto;
+    align-self: stretch;
+    min-width: 16px;
+    overflow: visible;
+
+    path {
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    circle {
+      stroke: var(--md-sys-color-surface);
+      stroke-width: 2;
+    }
+  }
+
   &.merge-commit .summary span {
     color: var(--md-sys-color-on-surface-variant);
     font-style: italic;

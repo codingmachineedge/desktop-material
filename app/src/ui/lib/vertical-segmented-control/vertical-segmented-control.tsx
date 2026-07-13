@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { SegmentedItem } from './segmented-item'
 import { RadioGroup } from '../radio-group'
+import classNames from 'classnames'
 
 /**
  * An item which is rendered as a choice in the segmented control.
@@ -16,6 +17,8 @@ export interface ISegmentedItem<T extends React.Key> {
    * selecting this item.
    */
   readonly description?: string | JSX.Element
+
+  readonly expandText?: boolean
 
   /**
    * The key to use for that item. This key will be passed as
@@ -45,6 +48,10 @@ interface IVerticalSegmentedControlProps<T extends React.Key> {
    * The currently selected item, denoted by its key.
    */
   readonly selectedKey: T
+
+  readonly showRadioButtons?: boolean
+
+  readonly scrollableHeight?: number
 
   /**
    * A function that's called whenever the selected item changes, either
@@ -80,6 +87,7 @@ export class VerticalSegmentedControl<
         key={item.key}
         title={item.title}
         description={item.description}
+        expandText={item.expandText}
       />
     )
   }
@@ -97,16 +105,33 @@ export class VerticalSegmentedControl<
       <fieldset className="vertical-segmented-control" ref={this.onFieldsetRef}>
         <legend id="vertical-segment-control-label">{this.props.label}</legend>
 
-        <RadioGroup<T>
-          ariaLabelledBy="vertical-segment-control-label"
-          className="vertical-segmented-control"
-          selectedKey={this.props.selectedKey}
-          radioButtonKeys={this.props.items.map(item => item.key)}
-          onSelectionChanged={this.onSelectionChanged}
-          renderRadioButtonLabelContents={this.renderItem}
-          onRadioButtonDoubleClick={this.onRadioButtonDoubleClick}
-        />
+        {this.props.scrollableHeight === undefined ? (
+          this.renderRadioGroup()
+        ) : (
+          <div
+            className="vertical-segmented-control-scrollable"
+            style={{ maxHeight: this.props.scrollableHeight }}
+          >
+            {this.renderRadioGroup()}
+          </div>
+        )}
       </fieldset>
+    )
+  }
+
+  private renderRadioGroup() {
+    return (
+      <RadioGroup<T>
+        ariaLabelledBy="vertical-segment-control-label"
+        className={classNames('vertical-segmented-control', {
+          'hide-radio-buttons': this.props.showRadioButtons === false,
+        })}
+        selectedKey={this.props.selectedKey}
+        radioButtonKeys={this.props.items.map(item => item.key)}
+        onSelectionChanged={this.onSelectionChanged}
+        renderRadioButtonLabelContents={this.renderItem}
+        onRadioButtonDoubleClick={this.onRadioButtonDoubleClick}
+      />
     )
   }
 }

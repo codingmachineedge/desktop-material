@@ -122,6 +122,7 @@ interface IPreferencesProps {
   readonly customEditor: ICustomIntegration | null
   readonly useCustomShell: boolean
   readonly customShell: ICustomIntegration | null
+  readonly branchPresetScript: ICustomIntegration | null
   readonly showRecentRepositories: boolean
   readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
   readonly branchSortOrder: BranchSortOrder
@@ -166,6 +167,7 @@ interface IPreferencesState {
   readonly customEditor: ICustomIntegration
   readonly useCustomShell: boolean
   readonly customShell: ICustomIntegration
+  readonly branchPresetScript: ICustomIntegration
   readonly selectedExternalEditor: string | null
   readonly availableShells: ReadonlyArray<Shell>
   readonly selectedShell: Shell
@@ -250,6 +252,8 @@ export class Preferences extends React.Component<
       customEditor: this.props.customEditor ?? DefaultCustomIntegration,
       useCustomShell: this.props.useCustomShell,
       customShell: this.props.customShell ?? DefaultCustomIntegration,
+      branchPresetScript:
+        this.props.branchPresetScript ?? DefaultCustomIntegration,
       useWindowsOpenSSH: false,
       showCommitLengthWarning: false,
       notificationsEnabled: true,
@@ -364,6 +368,8 @@ export class Preferences extends React.Component<
       customEditor: this.props.customEditor ?? DefaultCustomIntegration,
       useCustomShell: this.props.useCustomShell,
       customShell: this.props.customShell ?? DefaultCustomIntegration,
+      branchPresetScript:
+        this.props.branchPresetScript ?? DefaultCustomIntegration,
       isLoadingGitConfig: false,
     })
   }
@@ -606,11 +612,13 @@ export class Preferences extends React.Component<
             customEditor={this.state.customEditor}
             useCustomShell={this.state.useCustomShell}
             customShell={this.state.customShell}
+            branchPresetScript={this.state.branchPresetScript}
             onSelectedShellChanged={this.onSelectedShellChanged}
             onUseCustomEditorChanged={this.onUseCustomEditorChanged}
             onCustomEditorChanged={this.onCustomEditorChanged}
             onUseCustomShellChanged={this.onUseCustomShellChanged}
             onCustomShellChanged={this.onCustomShellChanged}
+            onBranchPresetScriptChanged={this.onBranchPresetScriptChanged}
           />
         )
         break
@@ -1007,6 +1015,12 @@ export class Preferences extends React.Component<
     this.setState({ customShell })
   }
 
+  private onBranchPresetScriptChanged = (
+    branchPresetScript: ICustomIntegration
+  ) => {
+    this.setState({ branchPresetScript })
+  }
+
   private onSelectedThemeChanged = (theme: ApplicationTheme) => {
     this.props.dispatcher.setSelectedTheme(theme)
   }
@@ -1189,8 +1203,13 @@ export class Preferences extends React.Component<
 
     await dispatcher.setStatsOptOut(this.state.optOutOfUsageTracking, false)
 
-    const { useCustomEditor, customEditor, useCustomShell, customShell } =
-      this.state
+    const {
+      useCustomEditor,
+      customEditor,
+      useCustomShell,
+      customShell,
+      branchPresetScript,
+    } = this.state
 
     const isValidCustomEditor =
       customEditor && (await isValidCustomIntegration(customEditor))
@@ -1204,6 +1223,12 @@ export class Preferences extends React.Component<
     dispatcher.setUseCustomShell(useCustomShell && isValidCustomShell)
     if (isValidCustomShell) {
       dispatcher.setCustomShell(customShell)
+    }
+
+    if (branchPresetScript.path.trim() === '') {
+      dispatcher.setBranchPresetScript(branchPresetScript)
+    } else if (await isValidCustomIntegration(branchPresetScript, false)) {
+      dispatcher.setBranchPresetScript(branchPresetScript)
     }
 
     if (

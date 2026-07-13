@@ -1,4 +1,5 @@
 import * as React from 'react'
+import classNames from 'classnames'
 
 interface ISegmentedItemProps {
   /**
@@ -11,6 +12,8 @@ interface ISegmentedItemProps {
    * selecting this item.
    */
   readonly description?: string | JSX.Element
+
+  readonly expandText?: boolean
 }
 
 export class SegmentedItem extends React.Component<ISegmentedItemProps> {
@@ -23,9 +26,12 @@ export class SegmentedItem extends React.Component<ISegmentedItemProps> {
   }
 
   public render() {
+    const titleClassName = classNames('title', {
+      'expand-text': this.props.expandText === true,
+    })
     return (
       <>
-        <div className="title">{this.props.title}</div>
+        <div className={titleClassName}>{this.props.title}</div>
         {this.renderDescription()}
       </>
     )

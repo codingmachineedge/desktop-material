@@ -52,6 +52,66 @@ async function launchEditor(
   })
 }
 
+const MaxIntegrationOutput = 1024 * 1024
+const IntegrationTimeoutMs = 15_000
+
+async function launchExecutableAndReturnStdout(
+  executablePath: string,
+  args: readonly string[]
+) {
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn(executablePath, args, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    })
+    let output = ''
+    let settled = false
+
+    const finish = (error?: Error) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      if (error === undefined) {
+        resolve(output)
+      } else {
+        reject(error)
+      }
+    }
+
+    const timeout = setTimeout(() => {
+      child.kill()
+      finish(new Error('The branch preset script timed out.'))
+    }, IntegrationTimeoutMs)
+
+    child.stdout?.on('data', data => {
+      output += data.toString()
+      if (output.length > MaxIntegrationOutput) {
+        child.kill()
+        finish(new Error('The branch preset script returned too much data.'))
+      }
+    })
+    child.on('error', error => finish(error))
+    child.on('close', code => {
+      finish(
+        code === 0
+          ? undefined
+          : new Error(`The branch preset script exited with code ${code}.`)
+      )
+    })
+  }).catch((error: unknown) => {
+    log.error(
+      `Error while launching branch preset script at ${executablePath}`,
+      error instanceof Error ? error : undefined
+    )
+    throw new ExternalEditorError(
+      'The branch preset script could not be run. Check its path and arguments in Settings.',
+      { openPreferences: true }
+    )
+  })
+}
+
 /**
  * Open a given file or folder in the desired external editor.
  *
@@ -83,4 +143,13 @@ export const launchCustomExternalEditor = (
   const editorName = `custom editor at path '${customEditor.path}'`
 
   return launchEditor(customEditor.path, args, editorName, spawnAsDarwinApp)
+}
+
+export function launchAndReturnStdout(
+  fullPath: string,
+  executable: ICustomIntegration
+): Promise<string> {
+  const argv = parseCustomIntegrationArguments(executable.arguments)
+  const args = expandTargetPathArgument(argv, fullPath)
+  return launchExecutableAndReturnStdout(executable.path, args)
 }

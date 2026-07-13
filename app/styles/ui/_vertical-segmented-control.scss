@@ -38,6 +38,10 @@ fieldset.vertical-segmented-control {
       @include ellipsis;
     }
 
+    .title.expand-text {
+      white-space: normal;
+    }
+
     p {
       color: var(--md-sys-color-on-surface-variant);
     }
@@ -72,5 +76,16 @@ fieldset.vertical-segmented-control {
       min-width: 100%;
       padding: var(--spacing);
     }
+  }
+
+  .hide-radio-buttons input[type='radio'] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .vertical-segmented-control-scrollable {
+    overflow-y: auto;
+    border-radius: var(--md-sys-shape-corner-medium);
   }
 }

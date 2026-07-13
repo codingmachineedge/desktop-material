@@ -168,8 +168,13 @@ import {
   getAvailableEditors,
   launchCustomExternalEditor,
   launchExternalEditor,
+  launchAndReturnStdout,
 } from '../editors'
 import { assertNever, fatalError, forceUnwrap } from '../fatal-error'
+import {
+  IBranchNamePreset,
+  parseBranchNamePresets,
+} from '../../models/branch-preset'
 
 import { formatCommitMessage } from '../format-commit-message'
 import {
@@ -591,6 +596,7 @@ const customEditorKey = 'custom-editor'
 
 export const useCustomShellKey = 'use-custom-shell'
 const customShellKey = 'custom-shell'
+const branchPresetScriptKey = 'branch-preset-script'
 
 export const underlineLinksKey = 'underline-links'
 export const underlineLinksDefault = true
@@ -773,6 +779,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   private useCustomShell: boolean = false
   private customShell: ICustomIntegration | null = null
+  private branchPresetScript: ICustomIntegration | null = null
 
   private showCIStatusPopover: boolean = false
 
@@ -1504,6 +1511,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       customEditor: this.customEditor,
       useCustomShell: this.useCustomShell,
       customShell: this.customShell,
+      branchPresetScript: this.branchPresetScript,
       showCIStatusPopover: this.showCIStatusPopover,
       notificationsEnabled: getNotificationsEnabled(),
       pullRequestSuggestedNextAction: this.pullRequestSuggestedNextAction,
@@ -2137,7 +2145,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
-  public async _loadNextCommitBatch(repository: Repository): Promise<void> {
+  public async _loadNextCommitBatch(repository: Repository): Promise<number> {
     const gitStore = this.gitStoreCache.get(repository)
 
     const state = this.repositoryStateCache.get(repository)
@@ -2163,14 +2171,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       if (!newCommits) {
-        return
+        return 0
       }
 
       this.repositoryStateCache.updateCompareState(repository, () => ({
         commitSHAs: commits.concat(newCommits),
       }))
       this.emitUpdate()
+      return newCommits.length
     }
+    return 0
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
@@ -2952,6 +2962,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.useCustomShell =
       enableCustomIntegration() && getBoolean(useCustomShellKey, false)
     this.customShell = getObject<ICustomIntegration>(customShellKey) ?? null
+    this.branchPresetScript =
+      getObject<ICustomIntegration>(branchPresetScriptKey) ?? null
 
     // Migrate custom editor and shell to the new format if needed. This
     // will persist the new format to local storage.
@@ -6986,9 +6998,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<void> {
     const gitStore = this.gitStoreCache.get(repository)
     const repositoryState = this.repositoryStateCache.get(repository)
-    const { changesState } = repositoryState
+    const { changesState, localCommitSHAs } = repositoryState
     const isWorkingDirectoryClean =
       changesState.workingDirectory.files.length === 0
+
+    if (showConfirmationDialog && !localCommitSHAs.includes(commit.sha)) {
+      return this._showPopup({
+        type: PopupType.WarnUndoPushedCommit,
+        repository,
+        commit,
+      })
+    }
 
     // Warn the user if there are changes in the working directory
     // This warning can be disabled, except when the user tries to undo
@@ -7027,9 +7047,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<void> {
     const gitStore = this.gitStoreCache.get(repository)
     const repositoryState = this.repositoryStateCache.get(repository)
-    const { changesState } = repositoryState
+    const { changesState, localCommitSHAs } = repositoryState
     const isWorkingDirectoryClean =
       changesState.workingDirectory.files.length === 0
+
+    if (showConfirmationDialog && !localCommitSHAs.includes(commit.sha)) {
+      return this._showPopup({
+        type: PopupType.WarnResetToPushedCommit,
+        repository,
+        commit,
+      })
+    }
 
     // Warn the user if there are changes in the working directory
     if (showConfirmationDialog && !isWorkingDirectoryClean) {
@@ -8722,6 +8750,23 @@ export class AppStore extends TypedBaseStore<IAppState> {
     await getGlobalConfigPath()
       .then(p => this._openInExternalEditor(p))
       .catch(e => log.error('Could not open global Git config for editing', e))
+  }
+
+  public async _getBranchNamePresets(
+    repositoryPath: string
+  ): Promise<ReadonlyArray<IBranchNamePreset>> {
+    if (this.branchPresetScript?.path.trim() === '') {
+      return []
+    }
+    if (this.branchPresetScript === null) {
+      return []
+    }
+
+    const stdout = await launchAndReturnStdout(
+      repositoryPath,
+      this.branchPresetScript
+    )
+    return parseBranchNamePresets(stdout)
   }
 
   /** Open a path to a repository or file using the user's configured editor */
@@ -10778,6 +10823,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
   public _setCustomShell(customShell: ICustomIntegration) {
     setObject(customShellKey, customShell)
     this.customShell = customShell
+    this.emitUpdate()
+  }
+
+  public _setBranchPresetScript(branchPresetScript: ICustomIntegration) {
+    setObject(branchPresetScriptKey, branchPresetScript)
+    this.branchPresetScript = branchPresetScript
     this.emitUpdate()
   }
 

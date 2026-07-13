@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 import { Repository } from '../../models/repository'
-import { Dispatcher } from '../dispatcher'
+import { defaultErrorHandler, Dispatcher } from '../dispatcher'
 import { Branch, StartPoint } from '../../models/branch'
 import { Row } from '../lib/row'
 import { Ref } from '../lib/ref'
@@ -35,6 +35,10 @@ import {
   checkBranchNameRules,
   renderBranchNameRuleError,
 } from '../lib/branch-name-rule-validation'
+import {
+  getBranchNamePresetForShortcut,
+  IBranchNamePreset,
+} from '../../models/branch-preset'
 
 interface ICreateBranchProps {
   readonly repository: Repository
@@ -103,6 +107,8 @@ interface ICreateBranchState {
    * start of the create branch operation.
    */
   readonly defaultBranchAtCreateStart: Branch | null
+
+  readonly branchNamePresets: ReadonlyArray<IBranchNamePreset>
 }
 
 /** The Create Branch component. */
@@ -111,6 +117,8 @@ export class CreateBranch extends React.Component<
   ICreateBranchState
 > {
   private branchRulesDebounceId: number | null = null
+  private branchNameInputRef = React.createRef<RefNameTextBox>()
+  private isUnmounted = false
 
   private readonly ERRORS_ID = 'branch-name-errors'
 
@@ -126,6 +134,7 @@ export class CreateBranch extends React.Component<
       isCreatingBranch: false,
       tipAtCreateStart: props.tip,
       defaultBranchAtCreateStart: getBranchForStartPoint(startPoint, props),
+      branchNamePresets: [],
     }
   }
 
@@ -154,10 +163,53 @@ export class CreateBranch extends React.Component<
     }
   }
 
+  public componentDidMount() {
+    this.props.dispatcher
+      .getBranchNamePresets(this.props.repository.path)
+      .then(branchNamePresets => {
+        if (!this.isUnmounted) {
+          this.setState({ branchNamePresets })
+        }
+      })
+      .catch(error => defaultErrorHandler(error, this.props.dispatcher))
+  }
+
   public componentWillUnmount() {
+    this.isUnmounted = true
     if (this.branchRulesDebounceId !== null) {
       window.clearTimeout(this.branchRulesDebounceId)
     }
+  }
+
+  private renderBranchNamePresets() {
+    if (this.state.branchNamePresets.length === 0) {
+      return null
+    }
+
+    const items: ReadonlyArray<ISegmentedItem<string>> =
+      this.state.branchNamePresets.map(preset => ({
+        title: preset.description,
+        key: preset.name,
+        expandText: true,
+      }))
+
+    return (
+      <Row>
+        <VerticalSegmentedControl
+          label={`Pick a name preset (${getQuickSelectKeys()}):`}
+          items={items}
+          selectedKey=""
+          onSelectionChanged={this.onBranchNamePresetChanged}
+          showRadioButtons={false}
+          scrollableHeight={250}
+        />
+      </Row>
+    )
+  }
+
+  private onBranchNamePresetChanged = (branchName: string) => {
+    this.branchNameInputRef.current?.setValue(branchName)
+    this.branchNameInputRef.current?.focus()
   }
 
   private renderBranchSelection() {
@@ -237,10 +289,12 @@ export class CreateBranch extends React.Component<
       >
         <DialogContent>
           <RefNameTextBox
+            ref={this.branchNameInputRef}
             label="Name"
             ariaDescribedBy={hasError ? this.ERRORS_ID : undefined}
             initialValue={this.props.initialName}
             onValueChange={this.onBranchNameChange}
+            onKeyDown={this.onKeyDown}
           />
 
           {renderBranchNameRuleError(
@@ -248,6 +302,8 @@ export class CreateBranch extends React.Component<
             this.ERRORS_ID,
             this.state.branchName
           )}
+
+          {this.renderBranchNamePresets()}
 
           {renderBranchNameExistsOnRemoteWarning(
             this.state.branchName,
@@ -285,6 +341,22 @@ export class CreateBranch extends React.Component<
 
   private onBranchNameChange = (name: string) => {
     this.updateBranchName(name)
+  }
+
+  private onKeyDown = (event: React.KeyboardEvent) => {
+    if (!(event.ctrlKey || event.metaKey)) {
+      return
+    }
+
+    const preset = getBranchNamePresetForShortcut(
+      event.key,
+      this.state.branchNamePresets
+    )
+    if (preset !== undefined) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.onBranchNamePresetChanged(preset.name)
+    }
   }
 
   private async updateBranchName(branchName: string) {
@@ -574,6 +646,10 @@ export class CreateBranch extends React.Component<
       initialSelectedTab: RepositorySettingsTab.ForkSettings,
     })
   }
+}
+
+function getQuickSelectKeys() {
+  return __DARWIN__ ? '⌘1, ⌘2, …' : 'Ctrl+1, Ctrl+2, …'
 }
 
 /** Reusable snippet */

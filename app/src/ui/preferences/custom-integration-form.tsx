@@ -16,6 +16,9 @@ interface ICustomIntegrationFormProps {
   readonly id: string
   readonly path: string
   readonly arguments: string
+  readonly hideArgumentsWhenPathEmpty?: boolean
+  readonly allowEmptyPath?: boolean
+  readonly requireTargetPathArgument?: boolean
   readonly onPathChanged: (path: string, bundleID?: string) => void
   readonly onArgumentsChanged: (args: string) => void
 }
@@ -65,6 +68,8 @@ export class CustomIntegrationForm extends React.Component<
   }
 
   public render() {
+    const hideArguments =
+      this.props.hideArgumentsWhenPathEmpty === true && this.state.path === ''
     return (
       <div className="custom-integration-form-container">
         <div className="custom-integration-form-path-container">
@@ -79,14 +84,18 @@ export class CustomIntegrationForm extends React.Component<
           <Button onClick={this.onChoosePath}>Choose…</Button>
         </div>
         {this.renderPathErrors()}
-        <TextBox
-          label="Arguments"
-          value={this.state.arguments}
-          onValueChanged={this.onParamsChanged}
-          placeholder="Command line arguments"
-          ariaDescribedBy={`${this.props.id}-custom-integration-args-error`}
-        />
-        {this.renderArgsErrors()}
+        {hideArguments ? null : (
+          <>
+            <TextBox
+              label="Arguments"
+              value={this.state.arguments}
+              onValueChanged={this.onParamsChanged}
+              placeholder="Command line arguments"
+              ariaDescribedBy={`${this.props.id}-custom-integration-args-error`}
+            />
+            {this.renderArgsErrors()}
+          </>
+        )}
       </div>
     )
   }
@@ -165,6 +174,12 @@ export class CustomIntegrationForm extends React.Component<
   private async updatePath(path: string) {
     this.setState({ path, isValidPath: false })
 
+    if (this.props.allowEmptyPath === true && path.trim() === '') {
+      this.setState({ isValidPath: true, showNonValidPathWarning: false })
+      this.props.onPathChanged('')
+      return
+    }
+
     const result = await validateCustomIntegrationPath(path)
 
     this.setState({
@@ -185,7 +200,10 @@ export class CustomIntegrationForm extends React.Component<
     try {
       const argv = parseCustomIntegrationArguments(args)
 
-      if (!checkTargetPathArgument(argv)) {
+      if (
+        this.props.requireTargetPathArgument !== false &&
+        !checkTargetPathArgument(argv)
+      ) {
         this.setState({
           arguments: args,
           isValidArgs: false,

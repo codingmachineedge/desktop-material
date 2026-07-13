@@ -69,6 +69,7 @@ export enum PopupType {
   StashAndSwitchBranch = 'StashAndSwitchBranch',
   ConfirmDiscardStash = 'ConfirmDiscardStash',
   ConfirmCheckoutCommit = 'ConfirmCheckoutCommit',
+  ConfirmDeletePushedTag = 'ConfirmDeletePushedTag',
   CreateTutorialRepository = 'CreateTutorialRepository',
   ConfirmExitTutorial = 'ConfirmExitTutorial',
   PushRejectedDueToMissingWorkflowScope = 'PushRejectedDueToMissingWorkflowScope',
@@ -86,7 +87,9 @@ export enum PopupType {
   CommitMessage = 'CommitMessage',
   MultiCommitOperation = 'MultiCommitOperation',
   WarnLocalChangesBeforeUndo = 'WarnLocalChangesBeforeUndo',
+  WarnUndoPushedCommit = 'WarnUndoPushedCommit',
   WarningBeforeReset = 'WarningBeforeReset',
+  WarnResetToPushedCommit = 'WarnResetToPushedCommit',
   InvalidatedToken = 'InvalidatedToken',
   AddSSHHost = 'AddSSHHost',
   SSHKeyPassphrase = 'SSHKeyPassphrase',
@@ -374,6 +377,21 @@ export type PopupDetail =
       type: PopupType.WarningBeforeReset
       repository: Repository
       commit: Commit
+    }
+  | {
+      type: PopupType.WarnUndoPushedCommit
+      repository: Repository
+      commit: Commit
+    }
+  | {
+      type: PopupType.WarnResetToPushedCommit
+      repository: Repository
+      commit: Commit
+    }
+  | {
+      type: PopupType.ConfirmDeletePushedTag
+      repository: Repository
+      tagName: string
     }
   | {
       type: PopupType.InvalidatedToken

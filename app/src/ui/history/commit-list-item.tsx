@@ -27,6 +27,8 @@ import { Emoji } from '../../lib/emoji'
 import { enableAccessibleListToolTips } from '../../lib/feature-flag'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { formatDate } from '../../lib/format-date'
+import { CommitGraph } from './commit-graph'
+import { ICommitGraphRow } from './commit-graph-model'
 
 interface ICommitProps {
   readonly gitHubRepository: GitHubRepository | null
@@ -50,6 +52,7 @@ interface ICommitProps {
   readonly unpushedIndicatorTitle?: string
   readonly accounts: ReadonlyArray<Account>
   readonly preferAbsoluteDates: boolean
+  readonly graphRow?: ICommitGraphRow
 }
 
 interface ICommitListItemState {
@@ -156,6 +159,9 @@ export class CommitListItem extends React.PureComponent<
           onMouseLeave={this.onMouseLeave}
           onMouseUp={this.onMouseUp}
         >
+          {this.props.graphRow === undefined ? null : (
+            <CommitGraph row={this.props.graphRow} />
+          )}
           <div className="info">
             <RichText
               className={summaryClassNames}

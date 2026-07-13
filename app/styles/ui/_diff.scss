@@ -452,6 +452,31 @@
   padding: 0;
 }
 // ***************************************************************************************************************************
+.panel.svg-diff-container {
+  flex-direction: column;
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel.svg-diff-container,
+.panel.image.svg-image {
+  .tab-bar {
+    width: min(460px, calc(100% - 32px));
+    margin: var(--spacing) auto;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-high);
+  }
+}
+
+.panel.svg-diff-container.svg-2tab,
+.panel.image.svg-image.svg-2tab {
+  .tab-bar {
+    width: min(220px, calc(100% - 32px));
+  }
+}
+
 .panel.image {
   display: flex;
   flex: 1;

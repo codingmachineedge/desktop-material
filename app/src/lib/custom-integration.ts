@@ -165,14 +165,16 @@ export async function validateCustomIntegrationPath(
  * @param customIntegration The custom integration to validate
  */
 export async function isValidCustomIntegration(
-  customIntegration: ICustomIntegration
+  customIntegration: ICustomIntegration,
+  requireTargetPathArgument: boolean = true
 ): Promise<boolean> {
   try {
     const pathResult = await validateCustomIntegrationPath(
       customIntegration.path
     )
     const argv = parseCustomIntegrationArguments(customIntegration.arguments)
-    const targetPathPresent = checkTargetPathArgument(argv)
+    const targetPathPresent =
+      !requireTargetPathArgument || checkTargetPathArgument(argv)
     return pathResult.isValid && targetPathPresent
   } catch (e) {
     log.error('Failed to validate custom integration:', e)

@@ -139,6 +139,7 @@ import { Banner, BannerType } from '../models/banner'
 import { StashAndSwitchBranch } from './stash-changes/stash-and-switch-branch-dialog'
 import { ConfirmDiscardStashDialog } from './stashing/confirm-discard-stash'
 import { ConfirmCheckoutCommitDialog } from './checkout/confirm-checkout-commit'
+import { ConfirmDeletePushedTagDialog } from './tag/confirm-delete-pushed-tag'
 import { CreateTutorialRepositoryDialog } from './no-repositories/create-tutorial-repository-dialog'
 import { ConfirmExitTutorial } from './tutorial'
 import { TutorialStep, isValidTutorialStep } from '../models/tutorial-step'
@@ -180,7 +181,9 @@ import { DragType, DropTargetSelector } from '../models/drag-drop'
 import { dragAndDropManager } from '../lib/drag-and-drop-manager'
 import { MultiCommitOperation } from './multi-commit-operation/multi-commit-operation'
 import { WarnLocalChangesBeforeUndo } from './undo/warn-local-changes-before-undo'
+import { WarnUndoPushedCommit } from './undo/warn-undo-pushed-commit'
 import { WarningBeforeReset } from './reset/warning-before-reset'
+import { WarnResetToPushedCommit } from './reset/warn-reset-to-pushed-commit'
 import { InvalidatedToken } from './invalidated-token/invalidated-token'
 import { MultiCommitOperationKind } from '../models/multi-commit-operation'
 import { AddSSHHost } from './ssh/add-ssh-host'
@@ -1789,6 +1792,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             customEditor={this.state.customEditor}
             useCustomShell={this.state.useCustomShell}
             customShell={this.state.customShell}
+            branchPresetScript={this.state.branchPresetScript}
             showRecentRepositories={this.state.showRecentRepositories}
             showBranchNameInRepoList={this.state.showBranchNameInRepoList}
             branchSortOrder={this.state.branchSortOrder}
@@ -2540,6 +2544,42 @@ export class App extends React.Component<IAppProps, IAppState> {
             dispatcher={this.props.dispatcher}
             repository={repository}
             commit={commit}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
+      case PopupType.WarnUndoPushedCommit: {
+        const { repository, commit } = popup
+        return (
+          <WarnUndoPushedCommit
+            key="warn-undo-pushed-commit"
+            dispatcher={this.props.dispatcher}
+            repository={repository}
+            commit={commit}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
+      case PopupType.WarnResetToPushedCommit: {
+        const { repository, commit } = popup
+        return (
+          <WarnResetToPushedCommit
+            key="warn-reset-to-pushed-commit"
+            dispatcher={this.props.dispatcher}
+            repository={repository}
+            commit={commit}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
+      case PopupType.ConfirmDeletePushedTag: {
+        const { repository, tagName } = popup
+        return (
+          <ConfirmDeletePushedTagDialog
+            key="confirm-delete-pushed-tag"
+            dispatcher={this.props.dispatcher}
+            repository={repository}
+            tagName={tagName}
             onDismissed={onPopupDismissedFn}
           />
         )

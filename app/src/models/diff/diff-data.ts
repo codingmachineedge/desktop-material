@@ -47,7 +47,7 @@ export function parseLineEndingText(text: string): LineEnding | null {
 /**
  * Data returned as part of a textual diff from Desktop
  */
-interface ITextDiffData {
+export interface ITextDiffData {
   /** The unified text diff - including headers and context */
   readonly text: string
   /** The diff contents organized by hunk - how the git CLI outputs to the caller */
@@ -82,6 +82,9 @@ export interface IImageDiff {
    * Will be undefined for a deleted image
    */
   readonly current?: Image
+
+  /** Text diff data for SVG files, which can be viewed as code or an image. */
+  readonly textDiff?: ITextDiffData
 }
 
 export interface IBinaryDiff {

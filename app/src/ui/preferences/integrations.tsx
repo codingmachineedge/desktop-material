@@ -10,6 +10,8 @@ import { ICustomIntegration } from '../../lib/custom-integration'
 import { enableCustomIntegration } from '../../lib/feature-flag'
 
 const CustomIntegrationValue = 'other'
+const BranchPresetScriptDocumentationUrl =
+  'https://github.com/desktop-plus/desktop-plus/blob/66327944558d5c5c24260ce79a20e4c7ed925e7e/docs/branch-name-presets.md'
 
 interface IIntegrationsPreferencesProps {
   readonly availableEditors: ReadonlyArray<string>
@@ -20,12 +22,16 @@ interface IIntegrationsPreferencesProps {
   readonly customEditor: ICustomIntegration
   readonly useCustomShell: boolean
   readonly customShell: ICustomIntegration
+  readonly branchPresetScript: ICustomIntegration
   readonly onSelectedEditorChanged: (editor: string) => void
   readonly onSelectedShellChanged: (shell: Shell) => void
   readonly onUseCustomEditorChanged: (useCustomEditor: boolean) => void
   readonly onCustomEditorChanged: (customEditor: ICustomIntegration) => void
   readonly onUseCustomShellChanged: (useCustomShell: boolean) => void
   readonly onCustomShellChanged: (customShell: ICustomIntegration) => void
+  readonly onBranchPresetScriptChanged: (
+    branchPresetScript: ICustomIntegration
+  ) => void
 }
 
 interface IIntegrationsPreferencesState {
@@ -35,6 +41,7 @@ interface IIntegrationsPreferencesState {
   readonly customEditor: ICustomIntegration
   readonly useCustomShell: boolean
   readonly customShell: ICustomIntegration
+  readonly branchPresetScript: ICustomIntegration
 }
 
 export class Integrations extends React.Component<
@@ -54,6 +61,7 @@ export class Integrations extends React.Component<
       customEditor: this.props.customEditor,
       useCustomShell: this.props.useCustomShell,
       customShell: this.props.customShell,
+      branchPresetScript: this.props.branchPresetScript,
     }
   }
 
@@ -88,6 +96,7 @@ export class Integrations extends React.Component<
       useCustomShell: nextProps.useCustomShell,
       customShell: nextProps.customShell,
       customEditor: nextProps.customEditor,
+      branchPresetScript: nextProps.branchPresetScript,
     })
   }
 
@@ -351,6 +360,41 @@ export class Integrations extends React.Component<
     this.props.onCustomShellChanged(customShell)
   }
 
+  private onBranchPresetPathChanged = (path: string) => {
+    const branchPresetScript = {
+      path,
+      arguments: this.state.branchPresetScript.arguments,
+    }
+    this.setState({ branchPresetScript })
+    this.props.onBranchPresetScriptChanged(branchPresetScript)
+  }
+
+  private onBranchPresetArgumentsChanged = (args: string) => {
+    const branchPresetScript = {
+      path: this.state.branchPresetScript.path,
+      arguments: args,
+    }
+    this.setState({ branchPresetScript })
+    this.props.onBranchPresetScriptChanged(branchPresetScript)
+  }
+
+  private renderBranchPresetScript() {
+    return (
+      <Row>
+        <CustomIntegrationForm
+          id="branch-preset-script"
+          path={this.state.branchPresetScript.path}
+          arguments={this.state.branchPresetScript.arguments}
+          hideArgumentsWhenPathEmpty={true}
+          allowEmptyPath={true}
+          requireTargetPathArgument={false}
+          onPathChanged={this.onBranchPresetPathChanged}
+          onArgumentsChanged={this.onBranchPresetArgumentsChanged}
+        />
+      </Row>
+    )
+  }
+
   public render() {
     if (!enableCustomIntegration()) {
       return (
@@ -378,6 +422,20 @@ export class Integrations extends React.Component<
           </legend>
           <Row>{this.renderSelectedShell()}</Row>
           {this.state.useCustomShell && this.renderCustomShell()}
+        </fieldset>
+        <fieldset>
+          <legend>
+            <h2>Branch name presets</h2>
+          </legend>
+          {this.renderBranchPresetScript()}
+          <p>
+            Run a script to suggest editable branch names. Use{' '}
+            <code>%TARGET_PATH%</code> in its arguments when the output depends
+            on the current repository.{' '}
+            <LinkButton uri={BranchPresetScriptDocumentationUrl}>
+              View script format and examples.
+            </LinkButton>
+          </p>
         </fieldset>
       </DialogContent>
     )

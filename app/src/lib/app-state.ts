@@ -398,6 +398,9 @@ export interface IAppState {
   /** Info needed to launch a custom shell chosen by the user. */
   readonly customShell: ICustomIntegration | null
 
+  /** Script used to generate branch-name presets in the create dialog. */
+  readonly branchPresetScript: ICustomIntegration | null
+
   /**
    * Whether or not the CI status popover is visible.
    */

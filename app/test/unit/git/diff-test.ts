@@ -139,6 +139,26 @@ describe('git/diff', () => {
   })
 
   describe('imageDiff', () => {
+    it('returns sanitized-preview data and a code diff for SVG files', async t => {
+      const repository = await setupEmptyRepository(t)
+      await writeFile(
+        join(repository.path, 'diagram.svg'),
+        '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4" /></svg>'
+      )
+      const file = new WorkingDirectoryFileChange(
+        'diagram.svg',
+        { kind: AppFileStatusKind.Untracked },
+        DiffSelection.fromInitialSelection(DiffSelectionType.All)
+      )
+
+      const diff = await getWorkingDirectoryDiff(repository, file)
+      assert.equal(diff.kind, DiffType.Image)
+      const imageDiff = diff as IImageDiff
+      assert.equal(imageDiff.current?.mediaType, 'image/svg+xml')
+      assert.notEqual(imageDiff.textDiff, undefined)
+      assert.ok((imageDiff.textDiff?.hunks.length ?? 0) > 0)
+    })
+
     it('changes for images are set', async t => {
       const testRepoPath = await setupFixtureRepository(
         t,
