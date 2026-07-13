@@ -2,6 +2,10 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 
 import { API } from '../../src/lib/api'
+import {
+  GitHubPullRequestJSONError,
+  GitHubPullRequestJSONMaximumBytes,
+} from '../../src/lib/github-pull-request-json'
 
 const desktopHeadRepository = {
   name: null,
@@ -349,6 +353,35 @@ describe('GitHub pull request lifecycle API', () => {
     })
     assert.equal(result.headSHA, 'a'.repeat(40))
     assert.equal(result.url, 'https://github.com/desktop/material/pull/42')
+  })
+
+  it('rejects oversized lifecycle responses before validation', async () => {
+    const api = new API('https://api.github.com', 'secret-token')
+    let canceled = false
+    Reflect.set(
+      api,
+      'ghRequest',
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(
+                new Uint8Array(GitHubPullRequestJSONMaximumBytes)
+              )
+              controller.enqueue(new Uint8Array(1))
+            },
+            cancel() {
+              canceled = true
+            },
+          })
+        )
+    )
+
+    await assert.rejects(
+      api.inspectPullRequest('desktop', 'material', 42),
+      (error: GitHubPullRequestJSONError) => error.kind === 'too-large'
+    )
+    assert.equal(canceled, true)
   })
 
   it('updates reviewed fields and replaces exact metadata lists', async () => {

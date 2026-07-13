@@ -61,6 +61,7 @@ import {
   validateGitHubPullRequestNumber,
   validateGitHubPullRequestReviewReceipt,
 } from './github-pull-request'
+import { boundedGitHubPullRequestResponse } from './github-pull-request-json'
 import {
   ActionsArtifactMaximumPages,
   ActionsArtifactPageSize,
@@ -1575,7 +1576,10 @@ export class API {
       customHeaders: { Accept: 'application/vnd.github+json' },
       signal,
     })
-    const created = await parsedResponse<IAPICreatedGitHubPullRequest>(response)
+    const created = (await boundedGitHubPullRequestResponse(
+      response,
+      signal
+    )) as IAPICreatedGitHubPullRequest
     const validated = validateCreatedGitHubPullRequest(
       created,
       safeOwner,
@@ -1618,7 +1622,7 @@ export class API {
             signal,
           }
         )
-        await parsedResponse<unknown>(response)
+        await boundedGitHubPullRequestResponse(response, signal)
       } catch {
         warnings.push(
           'The pull request was created, but reviewers were not requested.'
@@ -1640,7 +1644,7 @@ export class API {
             signal,
           }
         )
-        await parsedResponse<unknown>(response)
+        await boundedGitHubPullRequestResponse(response, signal)
       } catch {
         warnings.push(
           'The pull request was created, but assignees or labels were not applied.'
@@ -1671,7 +1675,10 @@ export class API {
         signal,
       }
     )
-    const value = await parsedResponse<IAPIGitHubPullRequestLifecycle>(response)
+    const value = (await boundedGitHubPullRequestResponse(
+      response,
+      signal
+    )) as IAPIGitHubPullRequestLifecycle
     return validateGitHubPullRequestLifecycle(
       value,
       safeOwner,
@@ -1730,9 +1737,10 @@ export class API {
         signal,
       }
     )
-    const updatedValue = await parsedResponse<IAPIGitHubPullRequestLifecycle>(
-      response
-    )
+    const updatedValue = (await boundedGitHubPullRequestResponse(
+      response,
+      signal
+    )) as IAPIGitHubPullRequestLifecycle
     validateGitHubPullRequestLifecycle(
       updatedValue,
       safeOwner,
@@ -1765,7 +1773,7 @@ export class API {
             signal,
           }
         )
-        await parsedResponse<unknown>(addResponse)
+        await boundedGitHubPullRequestResponse(addResponse, signal)
       }
       if (reviewersToRemove.length > 0) {
         const removeResponse = await this.ghRequest(
@@ -1777,7 +1785,7 @@ export class API {
             signal,
           }
         )
-        await parsedResponse<unknown>(removeResponse)
+        await boundedGitHubPullRequestResponse(removeResponse, signal)
       }
     } catch {
       warnings.push('Reviewer requests were not fully updated.')
@@ -1796,7 +1804,7 @@ export class API {
           signal,
         }
       )
-      await parsedResponse<unknown>(issueResponse)
+      await boundedGitHubPullRequestResponse(issueResponse, signal)
     } catch {
       warnings.push('Assignees or labels were not fully updated.')
     }
@@ -1854,7 +1862,7 @@ export class API {
         signal,
       }
     )
-    const value = await parsedResponse<unknown>(response)
+    const value = await boundedGitHubPullRequestResponse(response, signal)
     return validateGitHubPullRequestReviewReceipt(
       value,
       safeOwner,
@@ -1910,7 +1918,7 @@ export class API {
       }
     )
     return validateGitHubPullRequestMergeReceipt(
-      await parsedResponse<unknown>(response)
+      await boundedGitHubPullRequestResponse(response, signal)
     )
   }
 
