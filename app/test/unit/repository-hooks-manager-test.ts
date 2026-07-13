@@ -6,6 +6,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  rename,
   symlink,
   writeFile,
 } from 'node:fs/promises'
@@ -221,6 +222,33 @@ describe('repository hooks manager', () => {
         error.kind === 'stale-review'
     )
     assert.equal(existsSync(disabled), true)
+  })
+
+  it('rejects a same-content file identity swap before the unlink boundary', async t => {
+    const { repository, hooksPath } = await setupHooks(t)
+    const active = join(hooksPath, 'pre-commit')
+    const displaced = join(hooksPath, 'displaced-hook')
+    await writeFile(active, hookBody)
+    const review = findAction(
+      findHook(await inspectRepositoryHooks(repository.path), 'pre-commit'),
+      'disable-active'
+    )
+    await rename(active, displaced)
+    await writeFile(active, hookBody)
+
+    await assert.rejects(
+      applyReviewedRepositoryHookAction(repository.path, {
+        hookName: 'pre-commit',
+        action: review.action,
+        token: review.token,
+      }),
+      (error: unknown) =>
+        error instanceof RepositoryHooksManagerError &&
+        error.kind === 'stale-review'
+    )
+    assert.equal(await readFile(active, 'utf8'), hookBody)
+    assert.equal(await readFile(displaced, 'utf8'), hookBody)
+    assert.equal(existsSync(join(hooksPath, 'pre-commit.disabled')), false)
   })
 
   it('rolls back a newly published destination when cancellation wins before source removal', async t => {

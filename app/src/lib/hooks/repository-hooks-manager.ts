@@ -92,6 +92,7 @@ export type RepositoryHooksManagerErrorKind =
   | 'unsafe-location'
   | 'unsafe-file'
   | 'stale-review'
+  | 'changed-reinspect'
   | 'unavailable'
   | 'operation-failed'
 
@@ -275,6 +276,14 @@ function sameDirectoryIdentity(
   )
 }
 
+function sameFileObject(left: IFileIdentity, right: IFileIdentity): boolean {
+  return (
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.birthtimeMs === right.birthtimeMs
+  )
+}
+
 function directoryIdentityKey(identity: IFileIdentity): string {
   return [identity.dev, identity.ino, identity.mode, identity.birthtimeMs].join(
     ':'
@@ -302,9 +311,28 @@ function isExistingFileError(error: unknown): boolean {
 async function runGit(
   args: ReadonlyArray<string>,
   repositoryPath: string,
-  allowMissingValue = false
+  allowMissingValue = false,
+  signal?: AbortSignal
 ): Promise<string | null> {
-  const result = await exec([...args], repositoryPath)
+  throwIfAborted(signal)
+  const processSignal =
+    signal !== undefined && typeof signal.addEventListener === 'function'
+      ? signal
+      : undefined
+  const result = await exec([...args], repositoryPath, {
+    maxBuffer: MaximumGitOutputBytes,
+    signal: processSignal,
+    killSignal: 'SIGTERM',
+  }).catch(error => {
+    if (signal?.aborted === true) {
+      throw new RepositoryHooksManagerError(
+        'aborted',
+        'The operation was cancelled.'
+      )
+    }
+    throw error
+  })
+  throwIfAborted(signal)
   if (result.exitCode === 0) {
     if (Buffer.byteLength(result.stdout, 'utf8') > MaximumGitOutputBytes) {
       throw new RepositoryHooksManagerError(
@@ -385,7 +413,8 @@ async function resolveHooksLocation(
   const configuredOutput = await runGit(
     ['config', '--get', 'core.hooksPath'],
     resolvedRepositoryPath,
-    true
+    true,
+    signal
   )
   throwIfAborted(signal)
   const configured = configuredOutput !== null
@@ -394,7 +423,9 @@ async function resolveHooksLocation(
     : parseSingleGitPath(
         (await runGit(
           ['rev-parse', '--git-path', 'hooks'],
-          resolvedRepositoryPath
+          resolvedRepositoryPath,
+          false,
+          signal
         )) ?? ''
       )
   if (/(^|[\\/])\.\.([\\/]|$)/.test(rawPath)) {
@@ -780,6 +811,34 @@ async function lstatIdentity(path: string): Promise<IFileIdentity | null> {
   }
 }
 
+async function lstatRegularFileObject(
+  path: string
+): Promise<IFileIdentity | null> {
+  try {
+    const stats = await lstat(path)
+    return stats.isSymbolicLink() || !stats.isFile()
+      ? null
+      : identityFromStats(stats)
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return null
+    }
+    throw error
+  }
+}
+
+async function pathEntryExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path)
+    return true
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return false
+    }
+    throw error
+  }
+}
+
 async function requireSameFile(file: IManagedHookFile): Promise<void> {
   const identity = await lstatIdentity(file.path)
   if (identity === null || !sameIdentity(identity, file.identity)) {
@@ -888,6 +947,70 @@ async function unlinkExact(
     )
   }
   await unlink(path)
+  if (await pathEntryExists(path)) {
+    throw new RepositoryHooksManagerError(
+      'changed-reinspect',
+      'A hook changed during removal. Inspect the hooks again.'
+    )
+  }
+}
+
+async function rollbackLinkedPublication(
+  temporaryPath: string,
+  destinationPath: string,
+  expected: IFileIdentity
+): Promise<boolean> {
+  try {
+    const [temporary, destination] = await Promise.all([
+      lstatRegularFileObject(temporaryPath),
+      lstatRegularFileObject(destinationPath),
+    ])
+    if (
+      temporary === null ||
+      destination === null ||
+      !sameFileObject(temporary, expected) ||
+      !sameFileObject(destination, expected) ||
+      !sameFileObject(temporary, destination)
+    ) {
+      return false
+    }
+    await unlink(destinationPath)
+    const remaining = await lstatRegularFileObject(temporaryPath)
+    if (
+      remaining === null ||
+      remaining.nlink !== 1 ||
+      !sameFileObject(remaining, expected)
+    ) {
+      return false
+    }
+    await unlink(temporaryPath)
+    return (
+      !(await pathEntryExists(temporaryPath)) &&
+      !(await pathEntryExists(destinationPath))
+    )
+  } catch {
+    return false
+  }
+}
+
+async function rollbackPublishedDestination(
+  destinationPath: string,
+  expected: IFileIdentity
+): Promise<boolean> {
+  try {
+    const destination = await lstatRegularFileObject(destinationPath)
+    if (
+      destination === null ||
+      destination.nlink !== 1 ||
+      !sameFileObject(destination, expected)
+    ) {
+      return false
+    }
+    await unlink(destinationPath)
+    return !(await pathEntryExists(destinationPath))
+  } catch {
+    return false
+  }
 }
 
 async function publishExclusiveCopy(
@@ -959,20 +1082,67 @@ async function publishExclusiveCopy(
       }
       throw error
     })
-    await unlink(temporaryPath)
+    try {
+      await unlink(temporaryPath)
+    } catch {
+      const rolledBack = await rollbackLinkedPublication(
+        temporaryPath,
+        destinationPath,
+        temporaryIdentity
+      )
+      temporaryPath = null
+      temporaryIdentity = null
+      if (!rolledBack) {
+        throw new RepositoryHooksManagerError(
+          'changed-reinspect',
+          'Hook publication could not be rolled back safely. Inspect the hooks again.'
+        )
+      }
+      throw new RepositoryHooksManagerError(
+        'operation-failed',
+        'The new hook could not be published safely.'
+      )
+    }
     temporaryPath = null
-    const published = await lstatIdentity(destinationPath)
+    let published: IFileIdentity | null = null
+    try {
+      published = await lstatIdentity(destinationPath)
+    } catch {
+      // Handled by the verified rollback below.
+    }
     if (published === null || published.nlink !== 1) {
+      const rolledBack = await rollbackPublishedDestination(
+        destinationPath,
+        temporaryIdentity
+      )
+      temporaryIdentity = null
+      if (!rolledBack) {
+        throw new RepositoryHooksManagerError(
+          'changed-reinspect',
+          'Hook publication could not be verified or rolled back. Inspect the hooks again.'
+        )
+      }
       throw new RepositoryHooksManagerError(
         'operation-failed',
         'The new hook could not be verified safely.'
       )
     }
+    temporaryIdentity = null
     return published
   } finally {
     await sourceHandle.close().catch(() => {})
-    if (temporaryPath !== null && temporaryIdentity !== null) {
-      await unlinkExact(temporaryPath, temporaryIdentity).catch(() => {})
+    if (temporaryPath !== null) {
+      if (
+        temporaryIdentity === null ||
+        !(await unlinkExact(temporaryPath, temporaryIdentity)
+          .then(() => true)
+          .catch(() => false))
+      ) {
+        throw new RepositoryHooksManagerError(
+          'changed-reinspect',
+          'A temporary hook could not be cleaned up safely. Inspect the hooks again.'
+        )
+      }
     }
   }
 }
@@ -982,6 +1152,7 @@ export async function applyReviewedRepositoryHookAction(
   request: IRepositoryHookMutationRequest,
   signal?: AbortSignal
 ): Promise<IRepositoryHooksSnapshot> {
+  let mutationCompleted = false
   try {
     validateMutationRequest(request)
     throwIfAborted(signal)
@@ -1013,7 +1184,8 @@ export async function applyReviewedRepositoryHookAction(
       await revalidateLocation(repositoryPath, reviewed.location, signal)
       await requireSameFile(source)
       throwIfAborted(signal)
-      await unlink(source.path)
+      await unlinkExact(source.path, source.identity)
+      mutationCompleted = true
     } else {
       const destinationPath = join(
         reviewed.location.path,
@@ -1032,11 +1204,22 @@ export async function applyReviewedRepositoryHookAction(
           await revalidateLocation(repositoryPath, reviewed.location, signal)
           await requireSameFile(source)
           throwIfAborted(signal)
-          await unlink(source.path)
+          await unlinkExact(source.path, source.identity)
+          mutationCompleted = true
         } catch (error) {
-          await unlinkExact(destinationPath, published).catch(() => {})
+          const rolledBack = await unlinkExact(destinationPath, published)
+            .then(() => true)
+            .catch(() => false)
+          if (!rolledBack) {
+            throw new RepositoryHooksManagerError(
+              'changed-reinspect',
+              'The hook change could not be rolled back safely. Inspect the hooks again.'
+            )
+          }
           throw error
         }
+      } else {
+        mutationCompleted = true
       }
     }
     // Once an active/disabled hook has been published or removed, cancellation
@@ -1044,6 +1227,18 @@ export async function applyReviewedRepositoryHookAction(
     // and return the exact resulting state instead.
     return inspectRepositoryHooks(repositoryPath)
   } catch (error) {
+    if (
+      mutationCompleted &&
+      !(
+        error instanceof RepositoryHooksManagerError &&
+        error.kind === 'changed-reinspect'
+      )
+    ) {
+      throw new RepositoryHooksManagerError(
+        'changed-reinspect',
+        'The hook change reached its completion boundary, but the result could not be reinspected. Inspect the hooks again.'
+      )
+    }
     if (error instanceof RepositoryHooksManagerError) {
       throw error
     }
