@@ -43,6 +43,14 @@ export function getPullAllFallbackAccountKeys(
 
   const seen = new Set<string>()
   const sameOriginAccounts = accounts.filter(account => {
+    // The unforced credential helper skips accounts without a token. Filter
+    // them before choosing the first identity to exclude, otherwise a stale
+    // tokenless entry can make the fallback retry the identity Git already
+    // used instead of advancing to the next signed-in account.
+    if (account.token.length === 0) {
+      return false
+    }
+
     const key = getAccountKey(account)
     if (seen.has(key)) {
       return false
@@ -52,10 +60,7 @@ export function getPullAllFallbackAccountKeys(
     return getOrigin(getHTMLURL(account.endpoint)) === remoteOrigin
   })
 
-  const fallbackKeys = sameOriginAccounts
-    .slice(1)
-    .filter(account => account.token.length > 0)
-    .map(getAccountKey)
+  const fallbackKeys = sameOriginAccounts.slice(1).map(getAccountKey)
 
   if (
     repositoryAccountKey === null ||

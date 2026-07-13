@@ -27,6 +27,10 @@ export function getCloneAccountKeys(
 
   const seen = new Set<string>()
   return accounts.flatMap(account => {
+    if (account.token.length === 0) {
+      return []
+    }
+
     const key = getAccountKey(account)
     if (seen.has(key)) {
       return []
@@ -40,9 +44,7 @@ export function getCloneAccountKeys(
       return []
     }
 
-    return account.token.length > 0 && accountOrigin === remoteOrigin
-      ? [key]
-      : []
+    return accountOrigin === remoteOrigin ? [key] : []
   })
 }
 

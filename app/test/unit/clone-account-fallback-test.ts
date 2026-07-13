@@ -64,6 +64,19 @@ describe('clone account fallback', () => {
     }
   })
 
+  it('does not let a stale tokenless copy mask a refreshed account', () => {
+    const stale = account(1, getDotComAPIEndpoint(), '')
+    const refreshed = account(1)
+
+    assert.deepStrictEqual(
+      getCloneAccountKeys('https://github.com/owner/repository.git', [
+        stale,
+        refreshed,
+      ]),
+      [getAccountKey(refreshed)]
+    )
+  })
+
   it('prefers the API-matched identity for a generic exact-origin clone', () => {
     const first = account(1, 'https://127.0.0.1:38443/api/v3')
     const matched = account(2, 'https://127.0.0.1:38443/api/v3')
