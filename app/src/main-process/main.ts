@@ -71,6 +71,12 @@ import {
   updateActionsTransferAccounts,
 } from './actions-transfer'
 import {
+  cancelGitHubReleaseTransfer,
+  handleGitHubReleaseAssetDownload,
+  handleGitHubReleaseAssetUpload,
+  updateGitHubReleaseTransferAccounts,
+} from './github-release-transfer'
+import {
   findWindowForRepositoryPath as findOwningWindow,
   nextWindowScope,
 } from './window-routing'
@@ -500,6 +506,15 @@ app.on('ready', () => {
   ipcMain.on('cancel-actions-transfer', (event, operationId) => {
     cancelActionsTransfer(event.sender.id, operationId)
   })
+  ipcMain.handle('download-release-asset', (event, request) =>
+    handleGitHubReleaseAssetDownload(event.sender, request)
+  )
+  ipcMain.handle('upload-release-asset', (event, request) =>
+    handleGitHubReleaseAssetUpload(event.sender, request)
+  )
+  ipcMain.on('cancel-github-release-transfer', (event, operationId) => {
+    cancelGitHubReleaseTransfer(event.sender.id, operationId)
+  })
 
   const orderedWebRequest = new OrderedWebRequest(
     session.defaultSession.webRequest
@@ -531,6 +546,7 @@ app.on('ready', () => {
   ipcMain.on('update-accounts', (event, accounts) => {
     updateAccounts(accounts)
     updateActionsTransferAccounts(accounts)
+    updateGitHubReleaseTransferAccounts(accounts)
     const fingerprint = JSON.stringify(accounts)
     if (fingerprint === accountsFingerprint) {
       return

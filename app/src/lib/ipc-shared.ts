@@ -40,6 +40,13 @@ import {
   IActionsJobLogTransferRequest,
   IActionsTransferProgressEvent,
 } from './actions-transfer'
+import {
+  GitHubReleaseAssetDownloadTransferResult,
+  GitHubReleaseAssetUploadTransferResult,
+  IGitHubReleaseAssetDownloadRequest,
+  IGitHubReleaseAssetUploadRequest,
+  IGitHubReleaseTransferProgressEvent,
+} from './github-release-transfer'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -50,6 +57,10 @@ import {
 export type RequestChannels = {
   'cancel-actions-transfer': (operationId: string) => void
   'actions-transfer-progress': (event: IActionsTransferProgressEvent) => void
+  'cancel-github-release-transfer': (operationId: string) => void
+  'github-release-transfer-progress': (
+    event: IGitHubReleaseTransferProgressEvent
+  ) => void
   'agent-command': (command: IAgentCommandEnvelope) => void
   'agent-command-result': (id: string, result: AgentCommandResult) => void
   'agent-server-status': (status: IAgentServerStatus) => void
@@ -144,6 +155,12 @@ export type RequestResponseChannels = {
   'fetch-actions-job-log': (
     request: IActionsJobLogTransferRequest
   ) => Promise<ActionsJobLogTransferResult>
+  'download-release-asset': (
+    request: IGitHubReleaseAssetDownloadRequest
+  ) => Promise<GitHubReleaseAssetDownloadTransferResult>
+  'upload-release-asset': (
+    request: IGitHubReleaseAssetUploadRequest
+  ) => Promise<GitHubReleaseAssetUploadTransferResult>
   'get-agent-server-status': () => Promise<IAgentServerStatus>
   'regenerate-agent-server-token': () => Promise<IAgentServerStatus>
   'get-path': (path: PathType) => Promise<string>

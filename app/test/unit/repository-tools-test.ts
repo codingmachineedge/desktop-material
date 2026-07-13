@@ -334,4 +334,22 @@ describe('repository section order', () => {
       3
     )
   })
+
+  it('places Releases before Repository Tools when both provider views are available', () => {
+    assert.deepStrictEqual(getRepositorySections(true, true), [
+      RepositorySectionTab.Changes,
+      RepositorySectionTab.History,
+      RepositorySectionTab.Actions,
+      RepositorySectionTab.Releases,
+      RepositorySectionTab.RepositoryTools,
+    ])
+    assert.equal(
+      getRepositorySectionVisualIndex(
+        RepositorySectionTab.RepositoryTools,
+        true,
+        true
+      ),
+      4
+    )
+  })
 })
