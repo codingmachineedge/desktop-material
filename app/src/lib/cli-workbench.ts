@@ -21,6 +21,12 @@ export type GuidedBundleImportOperation =
 export type GuidedShallowInspectionOperation = 'status' | 'remotes'
 
 export type GuidedPatchSessionOperation = 'continue' | 'skip' | 'abort'
+export type GuidedBisectInspectionOperation =
+  | 'state'
+  | 'head'
+  | 'worktree'
+  | 'remaining'
+export type GuidedBisectVerdict = 'good' | 'bad' | 'skip'
 export type RepositorySigningScope = 'local' | 'global'
 export type RepositorySigningFormat = 'openpgp' | 'ssh' | 'x509'
 
@@ -108,6 +114,32 @@ export type CLICommandRecipe =
   | {
       readonly kind: 'repository-patch-session'
       readonly operation: GuidedPatchSessionOperation
+    }
+  | {
+      readonly kind: 'repository-bisect-resolve'
+      readonly revision: string
+    }
+  | {
+      readonly kind: 'repository-bisect-range'
+      readonly goodOid: string
+      readonly badOid: string
+    }
+  | {
+      readonly kind: 'repository-bisect-inspection'
+      readonly operation: GuidedBisectInspectionOperation
+    }
+  | {
+      readonly kind: 'repository-bisect-start'
+      readonly goodOid: string
+      readonly badOid: string
+    }
+  | {
+      readonly kind: 'repository-bisect-mark'
+      readonly verdict: GuidedBisectVerdict
+      readonly expectedHead: string
+    }
+  | {
+      readonly kind: 'repository-bisect-reset'
     }
   | {
       readonly kind: 'repository-signing-inspection'

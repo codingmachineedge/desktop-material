@@ -3,6 +3,18 @@ import { lstat, realpath, stat } from 'fs/promises'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { StringDecoder } from 'string_decoder'
 import { CLICommandRecipe } from '../../lib/cli-workbench'
+import {
+  normalizeRepositoryBisectObjectId,
+  prepareRepositoryBisectMark,
+  prepareRepositoryBisectRange,
+  prepareRepositoryBisectRevision,
+  prepareRepositoryBisectStart,
+  RepositoryBisectHeadArgs,
+  RepositoryBisectRemainingArgs,
+  RepositoryBisectResetArgs,
+  RepositoryBisectStateArgs,
+  RepositoryBisectWorktreeArgs,
+} from '../../lib/repository-bisect'
 import { normalizeRepositoryLFSPattern } from '../../lib/repository-lfs'
 import { normalizeRepositorySigningKey } from '../../lib/repository-signing'
 import {
@@ -615,6 +627,106 @@ function bindCLICommandRecipe(value: unknown): IBoundCLICommand {
         remote: null,
       }
     }
+    case 'repository-bisect-resolve': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'revision']) ||
+        typeof value.revision !== 'string'
+      ) {
+        throw new Error('Repository bisect revision is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectRevision(value.revision).args,
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-range': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'goodOid', 'badOid']) ||
+        typeof value.goodOid !== 'string' ||
+        typeof value.badOid !== 'string'
+      ) {
+        throw new Error('Repository bisect range is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectRange(value.goodOid, value.badOid).args,
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-inspection': {
+      if (!hasOnlyKeys(value, ['kind', 'operation'])) {
+        throw new Error('Repository bisect inspection is invalid.')
+      }
+      let args: ReadonlyArray<string>
+      switch (value.operation) {
+        case 'state':
+          args = RepositoryBisectStateArgs
+          break
+        case 'head':
+          args = RepositoryBisectHeadArgs
+          break
+        case 'worktree':
+          args = RepositoryBisectWorktreeArgs
+          break
+        case 'remaining':
+          args = RepositoryBisectRemainingArgs
+          break
+        default:
+          throw new Error('Unknown repository bisect inspection.')
+      }
+      return {
+        args,
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-start': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'goodOid', 'badOid']) ||
+        typeof value.goodOid !== 'string' ||
+        typeof value.badOid !== 'string'
+      ) {
+        throw new Error('Repository bisect start is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectStart(value.goodOid, value.badOid).args,
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-mark': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'verdict', 'expectedHead']) ||
+        (value.verdict !== 'good' &&
+          value.verdict !== 'bad' &&
+          value.verdict !== 'skip') ||
+        typeof value.expectedHead !== 'string'
+      ) {
+        throw new Error('Repository bisect result is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectMark(value.verdict, value.expectedHead)
+          .args,
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-reset':
+      if (!hasOnlyKeys(value, ['kind'])) {
+        throw new Error('Repository bisect reset is invalid.')
+      }
+      return {
+        args: RepositoryBisectResetArgs,
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
     case 'repository-signing-inspection': {
       if (!hasOnlyKeys(value, ['kind', 'scope', 'operation'])) {
         throw new Error('Signing configuration inspection is invalid.')
@@ -741,6 +853,20 @@ export interface ICLICommandValidationDependencies {
     repositoryPath: string
   ) => Promise<ReadonlyArray<string>>
   readonly canonicalizePath: (path: string) => Promise<string>
+  readonly inspectBisectMutationState: (
+    repositoryPath: string
+  ) => Promise<IRepositoryBisectMutationState>
+  readonly isBisectRangeValid: (
+    repositoryPath: string,
+    goodOid: string,
+    badOid: string
+  ) => Promise<boolean>
+}
+
+export interface IRepositoryBisectMutationState {
+  readonly active: boolean
+  readonly clean: boolean
+  readonly head: string
 }
 
 export interface IValidatedCLICommandRequest {
@@ -778,6 +904,37 @@ function runGitProbe(
           return
         }
         resolveProbe(stdout)
+      }
+    )
+  })
+}
+
+function runGitBooleanProbe(
+  tool: IResolvedCLIWorkbenchTool,
+  repositoryPath: string,
+  args: ReadonlyArray<string>
+): Promise<boolean> {
+  return new Promise((resolveProbe, rejectProbe) => {
+    execFile(
+      tool.executable,
+      [...args],
+      {
+        cwd: repositoryPath,
+        env: tool.env,
+        encoding: 'utf8',
+        maxBuffer: MaximumProbeOutputBytes,
+        windowsHide: true,
+      },
+      error => {
+        if (error === null) {
+          resolveProbe(true)
+          return
+        }
+        if (error.code === 1) {
+          resolveProbe(false)
+          return
+        }
+        rejectProbe(new Error('Bundled Git could not verify the repository.'))
       }
     )
   })
@@ -830,6 +987,37 @@ export function createCLICommandValidationDependencies(
       return remotes
     },
     canonicalizePath: canonicalizePotentialPath,
+    inspectBisectMutationState: async repositoryPath => {
+      const [headOutput, refsOutput, statusOutput] = await Promise.all([
+        runGitProbe(tool, repositoryPath, ['rev-parse', '--verify', 'HEAD']),
+        runGitProbe(tool, repositoryPath, [
+          'for-each-ref',
+          '--format=%(refname)',
+          'refs/bisect',
+        ]),
+        runGitProbe(tool, repositoryPath, RepositoryBisectWorktreeArgs),
+      ])
+      const head = normalizeRepositoryBisectObjectId(headOutput.trim())
+      const refs = refsOutput.split(/\r?\n/).filter(line => line.length > 0)
+      if (
+        refs.length > 512 ||
+        refs.some(ref => !ref.startsWith('refs/bisect/'))
+      ) {
+        throw new Error('Bundled Git returned invalid bisect session state.')
+      }
+      return {
+        active: refs.length > 0,
+        clean: statusOutput.length === 0,
+        head,
+      }
+    },
+    isBisectRangeValid: (repositoryPath, goodOid, badOid) =>
+      runGitBooleanProbe(tool, repositoryPath, [
+        'merge-base',
+        '--is-ancestor',
+        goodOid,
+        badOid,
+      ]),
   }
 }
 
@@ -1031,6 +1219,78 @@ async function validateRemote(
   }
 }
 
+function isBisectMutationRecipe(
+  recipe: CLICommandRecipe
+): recipe is Extract<
+  CLICommandRecipe,
+  | { readonly kind: 'repository-bisect-start' }
+  | { readonly kind: 'repository-bisect-mark' }
+  | { readonly kind: 'repository-bisect-reset' }
+> {
+  return (
+    recipe.kind === 'repository-bisect-start' ||
+    recipe.kind === 'repository-bisect-mark' ||
+    recipe.kind === 'repository-bisect-reset'
+  )
+}
+
+/**
+ * Deny stale, nested, or dirty bisect mutations. This probe runs during IPC
+ * validation and again in the final pre-spawn window.
+ */
+async function validateBisectMutationState(
+  recipe: CLICommandRecipe,
+  repositoryPath: string,
+  dependencies: ICLICommandValidationDependencies
+): Promise<void> {
+  if (!isBisectMutationRecipe(recipe)) {
+    return
+  }
+  let state: IRepositoryBisectMutationState
+  try {
+    state = await dependencies.inspectBisectMutationState(repositoryPath)
+  } catch {
+    throw new Error('Bundled Git could not verify the bisect session.')
+  }
+  if (!state.clean) {
+    throw new Error(
+      'Commit, stash, or discard working-tree changes before moving the bisect session.'
+    )
+  }
+  if (recipe.kind === 'repository-bisect-start') {
+    let rangeValid: boolean
+    try {
+      rangeValid = await dependencies.isBisectRangeValid(
+        repositoryPath,
+        recipe.goodOid,
+        recipe.badOid
+      )
+    } catch {
+      throw new Error('Bundled Git could not verify the bisect range.')
+    }
+    if (!rangeValid) {
+      throw new Error('The known-good commit must be an ancestor of known-bad.')
+    }
+    if (state.active) {
+      throw new Error(
+        'A bisect session is already active. Inspect or reset it first.'
+      )
+    }
+    return
+  }
+  if (!state.active) {
+    throw new Error('No active bisect session was found.')
+  }
+  if (
+    recipe.kind === 'repository-bisect-mark' &&
+    state.head !== recipe.expectedHead
+  ) {
+    throw new Error(
+      'HEAD changed after review. Inspect the bisect session again.'
+    )
+  }
+}
+
 /**
  * Bind the untrusted IPC payload to one exact guided recipe before spawn. The
  * returned argv is created here; renderer-provided argv and tools are rejected.
@@ -1066,6 +1326,11 @@ export async function validateCLICommandRequest(
     )
   }
   const context = await validateRepositoryContext(repositoryPath, dependencies)
+  await validateBisectMutationState(
+    recipe as CLICommandRecipe,
+    context.rootPath,
+    dependencies
+  )
   if (bound.remote !== null) {
     await validateRemote(bound.remote, repositoryPath, dependencies)
   }
@@ -1129,6 +1394,11 @@ export async function revalidateCLICommandBeforeSpawn(
   dependencies: ICLICommandValidationDependencies
 ): Promise<void> {
   const context = await validateRepositoryContext(request.cwd, dependencies)
+  await validateBisectMutationState(
+    request.recipe,
+    context.rootPath,
+    dependencies
+  )
   if (request.remote !== null) {
     await validateRemote(request.remote, request.cwd, dependencies)
   }

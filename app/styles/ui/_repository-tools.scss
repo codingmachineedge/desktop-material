@@ -18,7 +18,9 @@
 .repository-patch-series,
 .repository-patch-series *,
 .repository-commit-rewrite,
-.repository-commit-rewrite * {
+.repository-commit-rewrite *,
+.repository-bisect-session,
+.repository-bisect-session * {
   box-sizing: border-box;
   min-width: 0;
 }
@@ -27,7 +29,8 @@
 .repository-commit-rewrite-card,
 .repository-commit-rewrite-plan,
 .repository-commit-rewrite-confirmation,
-.repository-commit-rewrite-recovery {
+.repository-commit-rewrite-recovery,
+.repository-bisect-session {
   display: grid;
   gap: 12px;
 }
@@ -154,6 +157,211 @@
   color: var(--md-sys-color-on-surface-variant);
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.repository-bisect-session {
+  display: grid;
+  gap: 12px;
+}
+
+.repository-bisect-card {
+  gap: 14px;
+}
+
+.repository-bisect-state,
+.repository-bisect-progress,
+.repository-bisect-form {
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 12px;
+}
+
+.repository-bisect-state {
+  > div {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  strong,
+  p,
+  code,
+  span {
+    margin: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  p {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  span {
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+
+    &.active {
+      background: var(--md-sys-color-tertiary-container);
+      color: var(--md-sys-color-on-tertiary-container);
+    }
+
+    &.inactive {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+      color: var(--md-sys-color-primary);
+    }
+  }
+}
+
+.repository-bisect-form {
+  grid-template-columns: minmax(0, 1fr);
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  input {
+    background: var(--md-sys-color-surface);
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 8px;
+    color: var(--md-sys-color-on-surface);
+    font: inherit;
+    max-width: 100%;
+    min-height: 36px;
+    min-width: 0;
+    padding: 7px 9px;
+    width: 100%;
+  }
+
+  .button-component {
+    align-self: start;
+    height: auto;
+    max-width: 100%;
+    min-height: 32px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+.repository-bisect-progress {
+  > p {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  ol {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li {
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: 9px;
+    border-top: 3px solid var(--md-sys-color-outline);
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 9px;
+
+    &.good {
+      border-top-color: var(--md-sys-color-primary);
+    }
+
+    &.current {
+      border-top-color: var(--md-sys-color-tertiary);
+    }
+
+    &.bad {
+      border-top-color: var(--md-sys-color-error);
+    }
+
+    span,
+    code,
+    small {
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    span {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    code,
+    small {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 11px;
+    }
+  }
+}
+
+.repository-bisect-complete {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+  border-radius: 8px;
+  color: var(--md-sys-color-primary) !important;
+  font-weight: 600;
+  padding: 9px;
+}
+
+.repository-bisect-dirty {
+  background: var(--md-sys-color-error-container);
+  border-radius: 9px;
+  color: var(--md-sys-color-on-error-container);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  word-break: break-word;
+}
+
+.repository-bisect-confirmation {
+  background: var(--md-sys-color-tertiary-container);
+  border-radius: 10px;
+  color: var(--md-sys-color-on-tertiary-container);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 12px;
+
+  strong,
+  p,
+  code {
+    margin: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  p {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
+.repository-bisect-reset {
+  justify-self: start;
 }
 
 .repository-patch-series {
@@ -997,13 +1205,16 @@
 
   .repository-admin-form .button-component,
   .repository-admin-inline-form .button-component,
-  .repository-lfs-patterns .button-component {
+  .repository-lfs-patterns .button-component,
+  .repository-bisect-form .button-component,
+  .repository-bisect-reset {
     align-self: stretch;
     width: 100%;
   }
 
   .repository-commit-rewrite-row-controls,
-  .repository-commit-rewrite-confirmation dl > div {
+  .repository-commit-rewrite-confirmation dl > div,
+  .repository-bisect-progress ol {
     grid-template-columns: minmax(0, 1fr);
   }
 }

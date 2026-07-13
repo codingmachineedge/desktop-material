@@ -151,6 +151,18 @@ function argsForRecipe(request: ICLICommandRequest): ReadonlyArray<string> {
       ]
     case 'repository-patch-session':
       return ['am', `--${recipe.operation}`]
+    case 'repository-bisect-resolve':
+      return ['rev-parse', recipe.revision]
+    case 'repository-bisect-range':
+      return ['merge-base', recipe.goodOid, recipe.badOid]
+    case 'repository-bisect-inspection':
+      return ['bisect-inspection', recipe.operation]
+    case 'repository-bisect-start':
+      return ['bisect', 'start', recipe.badOid, recipe.goodOid]
+    case 'repository-bisect-mark':
+      return ['bisect', recipe.verdict, recipe.expectedHead]
+    case 'repository-bisect-reset':
+      return ['bisect', 'reset']
     case 'repository-signing-inspection':
       return ['config', recipe.scope, recipe.operation]
     case 'repository-signing-update':
@@ -209,6 +221,7 @@ describe('Repository tools', () => {
     assert.ok(screen.getByText('View recent ref movements'))
     assert.ok(screen.getByText('Export repository artifacts'))
     assert.ok(screen.getByText('Import a branch from a Git bundle'))
+    assert.ok(screen.getByText('Guided bisect'))
     assert.equal(screen.queryByRole('searchbox'), null)
     assert.equal(screen.queryByRole('textbox'), null)
     assert.equal(screen.queryByText(/command arguments/i), null)
