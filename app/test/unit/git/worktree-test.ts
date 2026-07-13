@@ -334,8 +334,13 @@ describe('git/worktree', () => {
         entries: [{ path: 'README', contents: 'hello' }],
       })
       await exec(['branch', 'feature-lock'], repo.path)
-      const worktreePath = repo.path + '-wt-lock'
-      await exec(['worktree', 'add', worktreePath, 'feature-lock'], repo.path)
+      const logicalWorktreePath = repo.path + '-wt-lock'
+      await exec(
+        ['worktree', 'add', logicalWorktreePath, 'feature-lock'],
+        repo.path
+      )
+      const repositoryPath = await realpath(repo.path)
+      const worktreePath = await realpath(logicalWorktreePath)
 
       await lockWorktree(repo, worktreePath)
       assert.equal(
@@ -350,7 +355,7 @@ describe('git/worktree', () => {
         false
       )
 
-      await repairWorktrees(repo, [repo.path, worktreePath])
+      await repairWorktrees(repo, [repositoryPath, worktreePath])
       assert.equal((await listWorktrees(repo)).length, 2)
     })
 

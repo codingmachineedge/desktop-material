@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { exec } from 'dugite'
-import { mkdir, rm, symlink, writeFile } from 'fs/promises'
+import { mkdir, realpath, rm, symlink, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
 
 import {
@@ -12,7 +12,7 @@ import {
 import { createTempDirectory } from '../../helpers/temp'
 
 async function setupNestedRepository(t: import('node:test').TestContext) {
-  const base = await createTempDirectory(t)
+  const base = await realpath(await createTempDirectory(t))
   const repositoryPath = join(base, 'repository')
   const outsidePath = join(base, 'outside')
   await mkdir(join(repositoryPath, 'nested'), { recursive: true })

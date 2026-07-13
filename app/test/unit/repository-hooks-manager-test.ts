@@ -5,6 +5,7 @@ import {
   link,
   mkdir,
   readFile,
+  realpath,
   readdir,
   rename,
   symlink,
@@ -28,9 +29,10 @@ const hookBody = '#!/bin/sh\nexit 0\n'
 
 async function setupHooks(t: Parameters<typeof setupEmptyRepository>[0]) {
   const repository = await setupEmptyRepository(t)
-  const hooksPath = join(repository.path, '.git', 'hooks')
+  const repositoryPath = await realpath(repository.path)
+  const hooksPath = join(repositoryPath, '.git', 'hooks')
   await mkdir(hooksPath)
-  return { repository, hooksPath }
+  return { repositoryPath, hooksPath }
 }
 
 function findHook(
@@ -57,15 +59,15 @@ function findAction(
 
 describe('repository hooks manager', () => {
   it('inspects every known client hook with neutral location and bounded metadata', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const active = join(hooksPath, 'pre-commit')
     await writeFile(active, hookBody)
     await chmod(active, 0o755)
-    assert.deepEqual(await Array.fromAsync(getRepoHooks(repository.path)), [
+    assert.deepEqual(await Array.fromAsync(getRepoHooks(repositoryPath)), [
       'pre-commit',
     ])
 
-    const snapshot = await inspectRepositoryHooks(repository.path)
+    const snapshot = await inspectRepositoryHooks(repositoryPath)
     assert.equal(snapshot.locationKind, 'default')
     assert.equal(snapshot.locationLabel, '.git/hooks')
     assert.equal(snapshot.directoryAvailable, true)
@@ -81,29 +83,29 @@ describe('repository hooks manager', () => {
     assert.equal(hook.active.metadata?.fileKind, 'script')
     assert.equal(hook.disabled.state, 'missing')
     assert.ok(findAction(hook, 'disable-active').token.match(/^[0-9a-f]{64}$/))
-    assert.equal(JSON.stringify(snapshot).includes(repository.path), false)
+    assert.equal(JSON.stringify(snapshot).includes(repositoryPath), false)
     assert.equal(JSON.stringify(snapshot).includes(hooksPath), false)
     assert.equal(JSON.stringify(snapshot).includes(hookBody), false)
   })
 
   it('disables and re-enables only the exact reviewed hook without replacing files', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const active = join(hooksPath, 'pre-commit')
     const disabled = join(hooksPath, 'pre-commit.disabled')
     await writeFile(active, hookBody)
     await chmod(active, 0o755)
 
     const disable = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-commit'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-commit'),
       'disable-active'
     )
     const disabledSnapshot = await applyReviewedRepositoryHookAction(
-      repository.path,
+      repositoryPath,
       { hookName: 'pre-commit', action: disable.action, token: disable.token }
     )
     assert.equal(existsSync(active), false)
     assert.equal(await readFile(disabled, 'utf8'), hookBody)
-    assert.deepEqual(await Array.fromAsync(getRepoHooks(repository.path)), [])
+    assert.deepEqual(await Array.fromAsync(getRepoHooks(repositoryPath)), [])
     assert.equal(
       findHook(disabledSnapshot, 'pre-commit').disabled.state,
       'present'
@@ -114,12 +116,12 @@ describe('repository hooks manager', () => {
       'enable-disabled'
     )
     const enabledSnapshot = await applyReviewedRepositoryHookAction(
-      repository.path,
+      repositoryPath,
       { hookName: 'pre-commit', action: enable.action, token: enable.token }
     )
     assert.equal(await readFile(active, 'utf8'), hookBody)
     assert.equal(existsSync(disabled), false)
-    assert.deepEqual(await Array.fromAsync(getRepoHooks(repository.path)), [
+    assert.deepEqual(await Array.fromAsync(getRepoHooks(repositoryPath)), [
       'pre-commit',
     ])
     assert.equal(
@@ -135,16 +137,16 @@ describe('repository hooks manager', () => {
   })
 
   it('installs a reviewed sample as a create-new active hook and keeps the sample', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const sample = join(hooksPath, 'commit-msg.sample')
     const active = join(hooksPath, 'commit-msg')
     await writeFile(sample, hookBody)
 
     const install = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'commit-msg'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'commit-msg'),
       'install-sample'
     )
-    const result = await applyReviewedRepositoryHookAction(repository.path, {
+    const result = await applyReviewedRepositoryHookAction(repositoryPath, {
       hookName: 'commit-msg',
       action: install.action,
       token: install.token,
@@ -157,15 +159,15 @@ describe('repository hooks manager', () => {
   })
 
   it('permanently removes only an exact reviewed disabled hook', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const disabled = join(hooksPath, 'pre-push.disabled')
     await writeFile(disabled, hookBody)
     const remove = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-push'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-push'),
       'remove-disabled'
     )
 
-    const result = await applyReviewedRepositoryHookAction(repository.path, {
+    const result = await applyReviewedRepositoryHookAction(repositoryPath, {
       hookName: 'pre-push',
       action: remove.action,
       token: remove.token,
@@ -175,17 +177,17 @@ describe('repository hooks manager', () => {
   })
 
   it('rejects stale content, destination races, and core.hooksPath drift', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const active = join(hooksPath, 'pre-commit')
     const disabled = join(hooksPath, 'pre-commit.disabled')
     await writeFile(active, hookBody)
     const first = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-commit'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-commit'),
       'disable-active'
     )
     await writeFile(active, `${hookBody}# changed\n`)
     await assert.rejects(
-      applyReviewedRepositoryHookAction(repository.path, {
+      applyReviewedRepositoryHookAction(repositoryPath, {
         hookName: 'pre-commit',
         action: first.action,
         token: first.token,
@@ -196,12 +198,12 @@ describe('repository hooks manager', () => {
     )
 
     const second = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-commit'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-commit'),
       'disable-active'
     )
     await writeFile(disabled, 'existing destination')
     await assert.rejects(
-      applyReviewedRepositoryHookAction(repository.path, {
+      applyReviewedRepositoryHookAction(repositoryPath, {
         hookName: 'pre-commit',
         action: second.action,
         token: second.token,
@@ -213,15 +215,15 @@ describe('repository hooks manager', () => {
     assert.equal(await readFile(disabled, 'utf8'), 'existing destination')
     await writeFile(disabled, hookBody)
 
-    const thirdSnapshot = await inspectRepositoryHooks(repository.path)
+    const thirdSnapshot = await inspectRepositoryHooks(repositoryPath)
     const third = findAction(
       findHook(thirdSnapshot, 'pre-commit'),
       'remove-disabled'
     )
-    const alternate = await createTempDirectory(t)
-    await exec(['config', 'core.hooksPath', alternate], repository.path)
+    const alternate = await realpath(await createTempDirectory(t))
+    await exec(['config', 'core.hooksPath', alternate], repositoryPath)
     await assert.rejects(
-      applyReviewedRepositoryHookAction(repository.path, {
+      applyReviewedRepositoryHookAction(repositoryPath, {
         hookName: 'pre-commit',
         action: third.action,
         token: third.token,
@@ -234,19 +236,19 @@ describe('repository hooks manager', () => {
   })
 
   it('rejects a same-content file identity swap before the unlink boundary', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const active = join(hooksPath, 'pre-commit')
     const displaced = join(hooksPath, 'displaced-hook')
     await writeFile(active, hookBody)
     const review = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-commit'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-commit'),
       'disable-active'
     )
     await rename(active, displaced)
     await writeFile(active, hookBody)
 
     await assert.rejects(
-      applyReviewedRepositoryHookAction(repository.path, {
+      applyReviewedRepositoryHookAction(repositoryPath, {
         hookName: 'pre-commit',
         action: review.action,
         token: review.token,
@@ -261,12 +263,12 @@ describe('repository hooks manager', () => {
   })
 
   it('rolls back a newly published destination when cancellation wins before source removal', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const active = join(hooksPath, 'pre-commit')
     const disabled = join(hooksPath, 'pre-commit.disabled')
     await writeFile(active, hookBody)
     const review = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-commit'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-commit'),
       'disable-active'
     )
     const signal = {
@@ -277,7 +279,7 @@ describe('repository hooks manager', () => {
 
     await assert.rejects(
       applyReviewedRepositoryHookAction(
-        repository.path,
+        repositoryPath,
         {
           hookName: 'pre-commit',
           action: review.action,
@@ -293,11 +295,11 @@ describe('repository hooks manager', () => {
   })
 
   it('returns the changed state instead of a clean cancellation after unlink', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const disabled = join(hooksPath, 'pre-push.disabled')
     await writeFile(disabled, hookBody)
     const review = findAction(
-      findHook(await inspectRepositoryHooks(repository.path), 'pre-push'),
+      findHook(await inspectRepositoryHooks(repositoryPath), 'pre-push'),
       'remove-disabled'
     )
     const signal = {
@@ -307,7 +309,7 @@ describe('repository hooks manager', () => {
     } as AbortSignal
 
     const result = await applyReviewedRepositoryHookAction(
-      repository.path,
+      repositoryPath,
       {
         hookName: 'pre-push',
         action: review.action,
@@ -319,21 +321,18 @@ describe('repository hooks manager', () => {
   })
 
   it('blocks traversal, unknown hook names, symlinks, and hard-link aliases', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
-    await exec(
-      ['config', 'core.hooksPath', '../outside-hooks'],
-      repository.path
-    )
+    const { repositoryPath, hooksPath } = await setupHooks(t)
+    await exec(['config', 'core.hooksPath', '../outside-hooks'], repositoryPath)
     await assert.rejects(
-      inspectRepositoryHooks(repository.path),
+      inspectRepositoryHooks(repositoryPath),
       (error: unknown) =>
         error instanceof RepositoryHooksManagerError &&
         error.kind === 'unsafe-location'
     )
-    await exec(['config', '--unset', 'core.hooksPath'], repository.path)
+    await exec(['config', '--unset', 'core.hooksPath'], repositoryPath)
 
     await assert.rejects(
-      applyReviewedRepositoryHookAction(repository.path, {
+      applyReviewedRepositoryHookAction(repositoryPath, {
         hookName: '../pre-commit' as 'pre-commit',
         action: 'disable-active',
         token: 'a'.repeat(64),
@@ -347,7 +346,7 @@ describe('repository hooks manager', () => {
     const alias = join(hooksPath, 'alias')
     await writeFile(linked, hookBody)
     await link(linked, alias)
-    let snapshot = await inspectRepositoryHooks(repository.path)
+    let snapshot = await inspectRepositoryHooks(repositoryPath)
     assert.equal(findHook(snapshot, 'pre-commit').active.state, 'unsafe')
     assert.equal(findHook(snapshot, 'pre-commit').actions.length, 0)
 
@@ -362,7 +361,7 @@ describe('repository hooks manager', () => {
         }
       }),
     ])
-    snapshot = await inspectRepositoryHooks(repository.path)
+    snapshot = await inspectRepositoryHooks(repositoryPath)
     if (existsSync(join(hooksPath, 'commit-msg'))) {
       assert.equal(findHook(snapshot, 'commit-msg').active.state, 'unsafe')
     }
@@ -370,25 +369,26 @@ describe('repository hooks manager', () => {
 
   it('uses a neutral configured label and reveals only through the reviewed proxy', async t => {
     const repository = await setupEmptyRepository(t)
-    const configuredHooks = await createTempDirectory(t)
-    await exec(['config', 'core.hooksPath', configuredHooks], repository.path)
+    const repositoryPath = await realpath(repository.path)
+    const configuredHooks = await realpath(await createTempDirectory(t))
+    await exec(['config', 'core.hooksPath', configuredHooks], repositoryPath)
 
-    const snapshot = await inspectRepositoryHooks(repository.path)
+    const snapshot = await inspectRepositoryHooks(repositoryPath)
     assert.equal(snapshot.locationLabel, 'Configured hooks folder')
     assert.equal(JSON.stringify(snapshot).includes(configuredHooks), false)
     let revealed: string | null = null
-    await revealRepositoryHooks(repository.path, async path => {
+    await revealRepositoryHooks(repositoryPath, async path => {
       revealed = path
     })
     assert.equal(revealed, configuredHooks)
   })
 
   it('honors cancellation before inspection without touching the repository', async t => {
-    const { repository, hooksPath } = await setupHooks(t)
+    const { repositoryPath, hooksPath } = await setupHooks(t)
     const controller = new AbortController()
     controller.abort()
     await assert.rejects(
-      inspectRepositoryHooks(repository.path, controller.signal),
+      inspectRepositoryHooks(repositoryPath, controller.signal),
       (error: unknown) =>
         error instanceof RepositoryHooksManagerError && error.kind === 'aborted'
     )
