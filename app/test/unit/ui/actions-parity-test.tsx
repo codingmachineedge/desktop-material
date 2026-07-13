@@ -124,6 +124,43 @@ describe('Actions parity controls', () => {
     assert.ok(screen.getByRole('button', { name: 'Re-run' }))
   })
 
+  it('describes truncated branch and actor metadata without title attributes', () => {
+    const run: IAPIWorkflowRun = {
+      ...createRun(APICheckStatus.Completed, APICheckConclusion.Success),
+      actor: {
+        id: 12,
+        login: 'octocat',
+        avatar_url: 'https://avatars.example.invalid/octocat.png',
+        html_url: 'https://example.invalid/octocat',
+        type: 'User',
+      },
+    }
+    render(
+      <RunList
+        runs={[run]}
+        selectedRunId={null}
+        busyRunId={null}
+        onSelect={() => {}}
+        onRerun={() => {}}
+        onRerunFailed={() => {}}
+        onRequestCancel={() => {}}
+      />
+    )
+
+    assert.ok(screen.getByText('Branch:'))
+    assert.ok(screen.getByText('Actor:'))
+    assert.ok(
+      screen.getByRole('button', {
+        name: /Branch: feature\/actions-parity.*Actor: octocat/,
+      })
+    )
+    assert.equal(
+      screen.getByText('feature/actions-parity').getAttribute('title'),
+      null
+    )
+    assert.equal(screen.getByText('octocat').getAttribute('title'), null)
+  })
+
   it('re-runs only an individual failed job', () => {
     const failed = createJob(
       11,
