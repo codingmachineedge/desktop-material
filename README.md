@@ -104,7 +104,7 @@ Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is t
 | **Done** | Remove known compact-layout sideways overflow | Settings, floating surfaces, repository rail, toolbar, Merge All, Pull All, Build & Run, Actions, and screenshot gallery now wrap, stack, clamp, or vertically scroll at compact sizes |
 | **Active** | Turn audited CLI capabilities into named repository functions | First batch: status summary, repository health, maintenance preview/run, and reflog recovery; fixed safe recipes, purpose-built controls, confirmation, streaming results, cancel, and repository refresh |
 | **Active** | Harden GitHub transport and expand named GitHub functions | Current GitHub.com API versioning and credential/header precedence, followed by Notifications, Issues, PR review/merge, Releases, repository rules/settings, and deeper Actions administration |
-| **Active** | Complete the official GitKraken Desktop history comparison | Deduplicated 0.x–12.x feature matrix, current-app coverage, implementable local features, and clearly separated proprietary/cloud services |
+| **Done** | Complete the official GitKraken Desktop history comparison | Official surviving 0.6–6.0 posts plus 7.x–12.3 release archives were deduplicated into current-app coverage, implementable local gaps, and explicitly separated proprietary/cloud services |
 | **Blocked — environment** | Build and interactively verify every changed UI off-screen | The exact headless verifier passes preflight, but this checkout has no installed root dependencies or `cross-env`; the mandated no-download gate therefore refuses to launch an unbuilt app |
 | **Queued after build** | Refresh README, wiki, Pages, and screenshot evidence | Capture at desktop and compact widths, inspect original pixels for clipping/overlap/oversized text, record hashes, then publish the same verified state |
 
@@ -116,6 +116,16 @@ Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is t
 | **GitHub CLI** | Native repository, pull-request reading, Actions browsing/logs/dispatch/rerun/cancel, account, organization, clone, fork, and publish foundations | Notifications; complete issue and PR authoring/review/merge; releases/assets; labels/milestones; rulesets/settings/collaborators; Actions artifacts/caches/runners/secrets/variables/environments; Projects and Discussions | `gh` can back provider-scoped functions internally; users interact with purpose-built forms, previews, confirmations, and results |
 | **GitHub REST and GraphQL** | Account-scoped API layer plus safe request/confirmation/redaction contracts | Version and permission awareness; Notifications; Issues; PR review/merge; Releases; rate limits and bounded pagination; security, deployment, Pages, organization, team, and administration surfaces | The full schema is coverage evidence and an implementation checklist, not an endpoint browser; supported operations become named app features |
 | **GitKraken parity references** | Graph, diff, commit/stash/branch/remote/worktree flows, repository tabs, provider accounts, themes, search, automation, multi-window work, and many Material-native productivity tools | Evaluate blame/history, editor and terminal workflows, undo/redo breadth, shallow/sparse controls, branch pin/filter/activity, Gitflow/hooks/signing, richer PR/issues/Launchpad-style triage, conflict prevention, and agent-session worktrees | Proprietary GitKraken cloud, enterprise, AI, and collaboration services remain reference points, not copied services, branding, or assets |
+
+### Native parity waves
+
+| Priority | Guided app functions | State |
+|---|---|---|
+| **P0** | Repository status/health/maintenance/reflog tools; file history and blame; current GitHub transport security | **Active** |
+| **P1 Git** | Command palette; full interactive-rebase todo editor; shallow and sparse controls; restore files from a commit; signing verification/settings; hooks, LFS, remotes, worktrees, and patch/bundle workflows | **Planned** |
+| **P1 GitHub** | Notifications; Issues; PR authoring/review/merge; Releases/assets; repository rules/settings/collaborators; Actions artifacts/caches/runners/secrets/variables/environments | **Planned** |
+| **P2** | Local multi-repository workspaces; provider-neutral triage inbox; local agent/worktree dashboard; Gitflow; deep links; maintenance/activity journal; branch pin/hide/solo; selected security/deployment/Pages/org/team functions | **Planned** |
+| **Reference only** | GitKraken Cloud Workspaces/Patches, Team presence, Launchpad sync, Insights, Code Review service, shared AI credits, organization policy, and on-prem commercial services | **Not copied** |
 
 ### Verification roadmap
 
