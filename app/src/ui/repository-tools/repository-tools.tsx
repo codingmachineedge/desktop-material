@@ -42,6 +42,7 @@ import {
   RepositoryCommitRewrite,
 } from './commit-rewrite'
 import { Repository } from '../../models/repository'
+import type { IRepositoryShallowHistoryFetchRequest } from '../../lib/git'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -74,6 +75,10 @@ export interface IRepositoryToolsProps {
   readonly repository: Repository
   readonly repositoryPath: string
   readonly onRefreshRepository: () => Promise<void>
+  readonly onFetchShallowHistory?: (
+    request: IRepositoryShallowHistoryFetchRequest,
+    signal: AbortSignal
+  ) => Promise<{ readonly usedFallbackAccount: boolean }>
   readonly client?: IRepositoryToolsClient
   readonly chooseArchiveDestination?: (
     format: RepositoryArchiveFormat,
@@ -841,6 +846,7 @@ export class RepositoryTools extends React.Component<
         }
         client={this.client}
         onRefreshRepository={this.props.onRefreshRepository}
+        onFetchHistory={this.props.onFetchShallowHistory}
         onBusyChanged={this.onShallowHistoryBusyChanged}
       />
     )

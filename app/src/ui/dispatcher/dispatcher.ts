@@ -42,6 +42,7 @@ import {
   listWorktrees,
   IManagedSubmodule,
   IRemoteManagementApplyOptions,
+  IRepositoryShallowHistoryFetchRequest,
 } from '../../lib/git'
 import { isGitOnPath } from '../../lib/is-git-on-path'
 import {
@@ -705,6 +706,19 @@ export class Dispatcher {
    */
   public refreshRepository(repository: Repository): Promise<void> {
     return this.appStore._refreshOrRecoverRepository(repository)
+  }
+
+  /** Fetch a reviewed shallow-history recipe through Desktop authentication. */
+  public fetchRepositoryShallowHistory(
+    repository: Repository,
+    request: IRepositoryShallowHistoryFetchRequest,
+    signal?: AbortSignal
+  ): Promise<{ readonly usedFallbackAccount: boolean }> {
+    return this.appStore._fetchRepositoryShallowHistory(
+      repository,
+      request,
+      signal
+    )
   }
 
   /**

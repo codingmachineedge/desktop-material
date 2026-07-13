@@ -57,6 +57,7 @@ import {
 import { GitHubReleasesView } from './github-releases'
 import { GitHubIssuesView } from './github-issues'
 import { RepositoryTools } from './repository-tools'
+import type { IRepositoryShallowHistoryFetchRequest } from '../lib/git'
 import { RepositoryProviderTriage } from './repository-tools/provider-triage'
 import {
   getRepositorySections,
@@ -229,6 +230,16 @@ export class RepositoryView extends React.Component<
 
   private readonly refreshRepository = () =>
     this.props.dispatcher.refreshRepository(this.props.repository)
+
+  private readonly fetchRepositoryShallowHistory = (
+    request: IRepositoryShallowHistoryFetchRequest,
+    signal: AbortSignal
+  ) =>
+    this.props.dispatcher.fetchRepositoryShallowHistory(
+      this.props.repository,
+      request,
+      signal
+    )
 
   private getSelectedSection() {
     const section = this.props.state.selectedSection
@@ -897,6 +908,7 @@ export class RepositoryView extends React.Component<
           repository={this.props.repository}
           repositoryPath={this.props.repository.path}
           onRefreshRepository={this.refreshRepository}
+          onFetchShallowHistory={this.fetchRepositoryShallowHistory}
         />
       )
     } else {
