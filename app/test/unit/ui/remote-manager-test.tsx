@@ -130,20 +130,20 @@ describe('Remote Manager', () => {
     )
     assert.equal(getPublishes(), 1)
 
-    fireEvent.change(screen.getByLabelText('New remote name'), {
+    fireEvent.change(screen.getByLabelText(/new remote name/i), {
       target: { value: 'upstream' },
     })
-    fireEvent.change(screen.getByLabelText('New fetch URL'), {
+    fireEvent.change(screen.getByLabelText(/new fetch URL/i), {
       target: { value: 'https://user:secret@example.test/team/project.git' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Add remote' }))
+    fireEvent.click(screen.getByRole('button', { name: /add remote/i }))
     assert.ok(screen.getByRole('alert').textContent?.includes('credentials'))
     assert.equal(states.length, 0)
 
-    fireEvent.change(screen.getByLabelText('New fetch URL'), {
+    fireEvent.change(screen.getByLabelText(/new fetch URL/i), {
       target: { value: 'https://example.test/team/project.git' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Add remote' }))
+    fireEvent.click(screen.getByRole('button', { name: /add remote/i }))
     assert.ok(screen.getByLabelText('upstream remote name'))
     assert.equal(states.at(-1)?.dirty, true)
   })

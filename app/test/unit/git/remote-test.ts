@@ -1,5 +1,6 @@
-import { describe, it } from 'node:test'
+import { describe, it, TestContext } from 'node:test'
 import assert from 'node:assert'
+import { realpath } from 'fs/promises'
 import { Repository } from '../../../src/models/repository'
 import {
   getRemotes,
@@ -25,6 +26,18 @@ import {
   createRemoteDrafts,
   createRemoteManagementPlan,
 } from '../../../src/lib/remote-management'
+
+async function setupPhysicalEmptyRepository(
+  t: TestContext
+): Promise<Repository> {
+  const repository = await setupEmptyRepository(t)
+  return new Repository(
+    await realpath(repository.path),
+    repository.id,
+    repository.gitHubRepository,
+    repository.missing
+  )
+}
 
 describe('git/remote', () => {
   describe('getRemotes', () => {
@@ -218,7 +231,7 @@ describe('git/remote', () => {
           !error.message.includes('sensitive-value')
       )
 
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
         repository.path
@@ -233,7 +246,7 @@ describe('git/remote', () => {
     })
 
     it('applies reviewed rename, URL, prune, tracking, add, and remove settings', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
         repository.path
@@ -307,7 +320,7 @@ describe('git/remote', () => {
     })
 
     it('fails closed when remote state changes after review', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
         repository.path
@@ -334,7 +347,7 @@ describe('git/remote', () => {
     })
 
     it('redacts stored HTTP userinfo and honors pre-spawn cancellation', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         [
           'remote',
@@ -367,7 +380,7 @@ describe('git/remote', () => {
     })
 
     it('preserves a raw credentialed URL across rename and metadata edits', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       const rawUrl =
         'https://user:credential-value@example.test/team/project.git'
       await exec(['remote', 'add', 'origin', rawUrl], repository.path)
@@ -404,7 +417,7 @@ describe('git/remote', () => {
     })
 
     it('uses temporary names to safely swap two existing remote names', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         ['remote', 'add', 'alpha', 'https://example.test/team/alpha.git'],
         repository.path
@@ -432,7 +445,7 @@ describe('git/remote', () => {
     })
 
     it('warns about partial state when cancellation crosses the mutation boundary', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
         repository.path
@@ -457,7 +470,7 @@ describe('git/remote', () => {
     })
 
     it('rejects a missing exact default-branch tracking ref', async t => {
-      const repository = await setupEmptyRepository(t)
+      const repository = await setupPhysicalEmptyRepository(t)
       await exec(
         ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
         repository.path
