@@ -2,8 +2,10 @@ import { CloningRepository } from '../../models/cloning-repository'
 import { ICloneProgress } from '../../models/progress'
 import { CloneOptions } from '../../models/clone-options'
 import { RetryAction, RetryActionType } from '../../models/retry-actions'
+import { Account } from '../../models/account'
 
 import { clone as cloneRepo } from '../git'
+import { cloneWithAccountFallback } from '../automation/clone-account-fallback'
 import { ErrorWithMetadata } from '../error-with-metadata'
 import { BaseStore } from './base-store'
 
@@ -11,6 +13,14 @@ import { BaseStore } from './base-store'
 export class CloningRepositoriesStore extends BaseStore {
   private readonly _repositories = new Array<CloningRepository>()
   private readonly stateByID = new Map<number, ICloneProgress>()
+
+  public constructor(
+    private readonly getAccounts: () => Promise<
+      ReadonlyArray<Account>
+    > = async () => []
+  ) {
+    super()
+  }
 
   /**
    * Clone the repository at the URL to the path.
@@ -33,6 +43,8 @@ export class CloningRepositoriesStore extends BaseStore {
        * bookkeeping, so composing stores can mirror progress per item.
        */
       readonly onProgress?: (progress: ICloneProgress) => void
+      /** Called after clone succeeds with the identity that completed it. */
+      readonly onSuccess?: (accountKey: string | null) => void
     }
   ): Promise<boolean> {
     const repository = new CloningRepository(path, url)
@@ -45,11 +57,25 @@ export class CloningRepositoriesStore extends BaseStore {
 
     let success = true
     try {
-      await cloneRepo(url, path, options, progress => {
-        this.stateByID.set(repository.id, progress)
-        opts?.onProgress?.(progress)
-        this.emitUpdate()
-      })
+      const result = await cloneWithAccountFallback(
+        url,
+        this.getAccounts,
+        options.accountKey ?? null,
+        accountKey =>
+          cloneRepo(
+            url,
+            path,
+            options,
+            progress => {
+              this.stateByID.set(repository.id, progress)
+              opts?.onProgress?.(progress)
+              this.emitUpdate()
+            },
+            accountKey
+          )
+      )
+      repository.accountKey = result.accountKey
+      opts?.onSuccess?.(result.accountKey)
     } catch (e) {
       success = false
 

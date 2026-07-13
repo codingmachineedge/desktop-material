@@ -128,7 +128,9 @@ export function createTestStores(): ITestStores {
   const issuesStore = createTestIssuesStore()
   const commitStatusStore = createTestCommitStatusStore(accountsStore)
   const repositoryStateCache = new RepositoryStateCache(statsStore)
-  const cloningRepositoriesStore = createTestCloningRepositoriesStore()
+  const cloningRepositoriesStore = new CloningRepositoriesStore(() =>
+    accountsStore.getAll()
+  )
   const apiRepositoriesStore = createTestApiRepositoriesStore(accountsStore)
 
   return {

@@ -165,6 +165,9 @@ export interface IAPIRepositoryCloneInfo {
   /** Canonical clone URL of the repository. */
   readonly url: string
 
+  /** Stable signed-in account identity that resolved this repository. */
+  readonly accountKey?: string
+
   /**
    * Default branch of the repository, if any. This is usually either retrieved
    * from the API for GitHub repositories, or undefined for other repositories.

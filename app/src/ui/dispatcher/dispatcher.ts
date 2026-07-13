@@ -78,6 +78,7 @@ import { Branch, IAheadBehind } from '../../models/branch'
 import { BranchesTab } from '../../models/branches-tab'
 import { BranchSortOrder } from '../../models/branch-sort-order'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
+import { CloneOptions } from '../../models/clone-options'
 import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
 import { CloningRepository } from '../../models/cloning-repository'
 import { Commit, ICommitContext, CommitOneLine } from '../../models/commit'
@@ -450,9 +451,10 @@ export class Dispatcher {
    * this will post an error to that affect.
    */
   public addRepositories(
-    paths: ReadonlyArray<string>
+    paths: ReadonlyArray<string>,
+    accountKeysByPath?: ReadonlyMap<string, string>
   ): Promise<ReadonlyArray<Repository>> {
-    return this.appStore._addRepositories(paths)
+    return this.appStore._addRepositories(paths, accountKeysByPath)
   }
 
   /**
@@ -1121,7 +1123,7 @@ export class Dispatcher {
   public async clone(
     url: string,
     path: string,
-    options?: { branch?: string; defaultBranch?: string }
+    options?: CloneOptions
   ): Promise<Repository | null> {
     return this.appStore._completeOpenInDesktop(async () => {
       const { promise, repository } = this.appStore._clone(url, path, options)
@@ -1132,7 +1134,14 @@ export class Dispatcher {
         return null
       }
 
-      const addedRepositories = await this.addRepositories([path])
+      const accountKeysByPath =
+        repository.accountKey === null
+          ? undefined
+          : new Map([[path, repository.accountKey]])
+      const addedRepositories = await this.addRepositories(
+        [path],
+        accountKeysByPath
+      )
 
       if (addedRepositories.length < 1) {
         return null

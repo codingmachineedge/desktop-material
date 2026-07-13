@@ -5,7 +5,7 @@ import {
   urlMatchesRemote,
   urlMatchesCloneURL,
 } from '../../src/lib/repository-matching'
-import { Account } from '../../src/models/account'
+import { Account, getAccountKey } from '../../src/models/account'
 import { GitHubRepository } from '../../src/models/github-repository'
 import { gitHubRepoFixture } from '../helpers/github-repo-builder'
 
@@ -117,6 +117,46 @@ describe('repository-matching', () => {
         'https://github.com/someuser/somerepo.git'
       )
       assert(repo === null)
+    })
+
+    it('honors an exact repository account binding on a shared host', () => {
+      const first = new Account(
+        'first',
+        'https://api.github.com',
+        'first-token',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+      const selected = new Account(
+        'selected',
+        'https://api.github.com',
+        'selected-token',
+        [],
+        '',
+        2,
+        '',
+        'free'
+      )
+
+      const repo = matchGitHubRepository(
+        [first, selected],
+        'https://github.com/someuser/private-repo.git',
+        getAccountKey(selected)
+      )
+
+      assert(repo !== null)
+      assert.equal(repo.account, selected)
+      assert.equal(
+        matchGitHubRepository(
+          [first, selected],
+          'https://github.com/someuser/private-repo.git',
+          'signed-out-account'
+        ),
+        null
+      )
     })
   })
 

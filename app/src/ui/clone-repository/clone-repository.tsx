@@ -4,6 +4,7 @@ import { Dispatcher } from '../dispatcher'
 import { getDefaultDir, setDefaultDir } from '../lib/default-dir'
 import {
   Account,
+  getAccountKey,
   isBitbucketAccount,
   isDotComAccount,
   isEnterpriseAccount,
@@ -810,6 +811,9 @@ export class CloneRepository extends React.Component<
       const repo = repositories?.find(r => r.clone_url === url) ?? null
       return {
         url,
+        ...(account !== null && account.token.length > 0
+          ? { accountKey: getAccountKey(account) }
+          : {}),
         ...(repo
           ? { name: repo.name, defaultBranch: repo.default_branch }
           : {}),
@@ -950,24 +954,37 @@ export class CloneRepository extends React.Component<
   private async resolveCloneInfo(): Promise<IAPIRepositoryCloneInfo | null> {
     const { url, lastParsedIdentifier } = this.getSelectedTabState()
 
+    const tab = this.props.selectedTab
+    const selectedAccount =
+      tab === CloneRepositoryTab.Generic ? null : this.getAccountForTab(tab)
+    const account =
+      selectedAccount ??
+      (await findAccountForRemoteURL(url, this.props.accounts))
+    const accountKey =
+      selectedAccount !== null && selectedAccount.token.length > 0
+        ? getAccountKey(selectedAccount)
+        : undefined
+
     if (url.endsWith('.wiki.git')) {
-      return { url }
+      return { url, accountKey }
     }
 
-    const account = await findAccountForRemoteURL(url, this.props.accounts)
     if (lastParsedIdentifier !== null && account !== null) {
       const api = API.fromAccount(account)
       const { owner, name } = lastParsedIdentifier
       // Respect the user's preference if they provided an SSH URL
       const protocol = parseRemote(url)?.protocol
 
-      return api.fetchRepositoryCloneInfo(owner, name, protocol).catch(err => {
-        log.error(`Failed to look up repository clone info for '${url}'`, err)
-        return { url }
-      })
+      return api
+        .fetchRepositoryCloneInfo(owner, name, protocol)
+        .then(info => (info === null ? null : { ...info, accountKey }))
+        .catch(err => {
+          log.error(`Failed to look up repository clone info for '${url}'`, err)
+          return { url, accountKey }
+        })
     }
 
-    return { url }
+    return { url, accountKey }
   }
 
   private onItemClicked = (repository: IAPIRepository, source: ClickSource) => {
@@ -1000,11 +1017,11 @@ export class CloneRepository extends React.Component<
       return
     }
 
-    const { url, defaultBranch } = cloneInfo
+    const { url, defaultBranch, accountKey } = cloneInfo
 
     this.props.dispatcher.closeFoldout(FoldoutType.Repository)
     try {
-      this.cloneImpl(url.trim(), path, defaultBranch)
+      this.cloneImpl(url.trim(), path, defaultBranch, accountKey)
     } catch (e) {
       log.error(`CloneRepository: clone failed to complete to ${path}`, e)
       this.setState({ loading: false })
@@ -1012,8 +1029,16 @@ export class CloneRepository extends React.Component<
     }
   }
 
-  private cloneImpl(url: string, path: string, defaultBranch?: string) {
-    this.props.dispatcher.clone(url, path, { defaultBranch })
+  private cloneImpl(
+    url: string,
+    path: string,
+    defaultBranch?: string,
+    accountKey?: string
+  ) {
+    this.props.dispatcher.clone(url, path, {
+      defaultBranch,
+      ...(accountKey !== undefined ? { accountKey } : {}),
+    })
     this.props.onDismissed()
 
     setDefaultDir(Path.resolve(path, '..'))

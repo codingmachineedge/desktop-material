@@ -28,7 +28,8 @@ export async function clone(
   url: string,
   path: string,
   options: CloneOptions,
-  progressCallback?: (progress: ICloneProgress) => void
+  progressCallback?: (progress: ICloneProgress) => void,
+  credentialAccountKey?: string
 ): Promise<void> {
   const env = {
     ...(await envForRemoteOperation(url)),
@@ -44,7 +45,7 @@ export async function clone(
     '--recursive',
   ]
 
-  let opts: IGitStringExecutionOptions = { env }
+  let opts: IGitStringExecutionOptions = { env, credentialAccountKey }
 
   if (progressCallback) {
     args.push('--progress')

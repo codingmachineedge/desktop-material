@@ -40,6 +40,7 @@ import {
   DefaultBranchSortOrder,
 } from '../../models/branch-sort-order'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
+import { CloneOptions } from '../../models/clone-options'
 import { CloningRepository } from '../../models/cloning-repository'
 import {
   getPreferAbsoluteDates,
@@ -5394,7 +5395,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     const remote = gitStore.defaultRemote
     return remote !== null
-      ? matchGitHubRepository(this.accounts, remote.url)
+      ? matchGitHubRepository(this.accounts, remote.url, repository.accountKey)
       : null
   }
 
@@ -6805,7 +6806,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   public _clone(
     url: string,
     path: string,
-    options: { branch?: string; defaultBranch?: string } = {}
+    options: CloneOptions = {}
   ): {
     promise: Promise<boolean>
     repository: CloningRepository
@@ -6863,12 +6864,21 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return
     }
 
-    const clonedPaths = state.items
-      .filter(item => state.statuses.get(item.path)?.kind === 'done')
-      .map(item => item.path)
+    const clonedItems = state.items.filter(
+      item => state.statuses.get(item.path)?.kind === 'done'
+    )
+    const clonedPaths = clonedItems.map(item => item.path)
+
+    const accountKeysByPath = new Map<string, string>()
+    for (const item of clonedItems) {
+      const accountKey = state.statuses.get(item.path)?.accountKey
+      if (accountKey !== undefined) {
+        accountKeysByPath.set(item.path, accountKey)
+      }
+    }
 
     if (clonedPaths.length > 0) {
-      await this._addRepositories(clonedPaths)
+      await this._addRepositories(clonedPaths, accountKeysByPath)
       this.statsStore.recordCloneRepository()
     }
 
@@ -9375,7 +9385,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   public async _addRepositories(
-    paths: ReadonlyArray<string>
+    paths: ReadonlyArray<string>,
+    accountKeysByPath: ReadonlyMap<string, string> = new Map()
   ): Promise<ReadonlyArray<Repository>> {
     const addedRepositories = new Array<Repository>()
     const lfsRepositories = new Array<Repository>()
@@ -9414,7 +9425,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
         const addedRepo = await this.repositoriesStore.addRepository(
           validatedPath,
-          repositoryType.gitDir
+          repositoryType.gitDir,
+          {
+            accountKey:
+              accountKeysByPath.get(path) ??
+              accountKeysByPath.get(validatedPath) ??
+              null,
+          }
         )
 
         // initialize the remotes for this new repository to ensure it can fetch
@@ -9527,8 +9544,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const found = repositories.find(r => r.path === path)
 
     if (found) {
+      const accountBoundRepository =
+        repository.accountKey === null
+          ? found
+          : await this.repositoriesStore.updateRepositoryAccount(
+              found,
+              repository.accountKey
+            )
       const updatedRepository = await this._updateRepositoryMissing(
-        found,
+        accountBoundRepository,
         false
       )
       await this._selectRepository(updatedRepository)

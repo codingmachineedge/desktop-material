@@ -33,6 +33,7 @@ import { shallowEquals } from '../equality'
 
 type AddRepositoryOptions = {
   missing?: boolean
+  accountKey?: string | null
 }
 
 /** The store for local repositories. */
@@ -264,6 +265,7 @@ export class RepositoriesStore extends TypedBaseStore<
           lastStashCheckDate: null,
           alias: null,
           gitDir,
+          accountKey: opts?.accountKey ?? null,
         }
         const id = await this.db.repositories.add(dbRepo)
         return this.toRepository({ id, ...dbRepo })

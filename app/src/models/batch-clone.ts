@@ -35,6 +35,9 @@ export interface IBatchCloneItemStatus {
 
   /** The error that caused a `failed` status, when applicable. */
   readonly error?: Error
+
+  /** Stable identity that completed the clone, when fallback was used. */
+  readonly accountKey?: string
 }
 
 /** A single repository to be cloned as part of a batch. */
@@ -50,6 +53,9 @@ export interface IBatchCloneItem {
 
   /** The repository's default branch, when known. */
   readonly defaultBranch?: string
+
+  /** Stable signed-in account identity preferred for the first HTTPS attempt. */
+  readonly accountKey?: string
 }
 
 /** Public state describing the progress of an in-flight (or finished) batch. */
@@ -76,6 +82,7 @@ export interface IBatchCloneInput {
   /** A preferred folder name; when omitted it is derived from the URL. */
   readonly name?: string
   readonly defaultBranch?: string
+  readonly accountKey?: string
 }
 
 /** True when a status is terminal (no further transitions expected). */
@@ -149,6 +156,9 @@ export function buildBatchCloneItems(
       path: Path.join(baseDirectory, name),
       ...(input.defaultBranch !== undefined
         ? { defaultBranch: input.defaultBranch }
+        : {}),
+      ...(input.accountKey !== undefined
+        ? { accountKey: input.accountKey }
         : {}),
     }
   })
