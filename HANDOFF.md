@@ -8,18 +8,17 @@ The original requested roadmap, **M0 through M18**, is complete and shipped on
 responsive, public documentation, and canonical wiki evidence remains recorded
 below as historical proof for that exact tree.
 
-The later guided Git, GitHub, and provider expansion is now **implementation-
-complete and locally accepted** as M19. Exact app source
+The later guided Git, GitHub, and provider expansion is **complete and shipped**
+as M19. Exact app source
 `5e80e678d062b65a82c0991b352e5a861c7469e5` passed the reproducible production
-build and isolated hidden-desktop proof. It is not yet a final publication
-result: the documentation/image union, exhaustive final-tree revalidation,
-`main` promotion, CI/Pages/wiki/release checks, artifact purge, and owned-
-resource cleanup must still close before M19 can be called shipped.
+build and isolated hidden-desktop proof. Documentation/image union
+`a890ab579c63651e5089ee433b259f0fc9198fbf` and final code/release baseline
+`a0c2f19433631d577979c8c8a88a5151f5ab0656` then passed the distinct `main`,
+CI, Pages, wiki, release, privacy, artifact-purge, and cleanup gates below.
 
-### Guided roadmap completion run — live status
+### Guided roadmap completion run — final status
 
-The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Accepted application source
+The guided-roadmap completion is finalized on `main`. Accepted application source
 `5e80e678d062b65a82c0991b352e5a861c7469e5` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
@@ -70,10 +69,9 @@ account-class-only ledger. The final union additionally routes deepen and
 unshallow fetches through the Desktop credential trampoline and bounded
 exact-origin account fallback; matches provider scheme, host, and effective
 port (including IPv6/default-port normalization); and excludes tokenless
-candidates or stale tokenless repository bindings. Nothing in this live section
-claims publication on `main`: final documentation/wiki synchronization,
-exhaustive revalidation, CI, Pages, installer release, artifact purge, and
-cleanup remain mandatory gates before this run can close.
+candidates or stale tokenless repository bindings. That app-source evidence is
+preserved separately from the successful final `main` publication identities
+and public checks recorded below.
 
 At earlier checkpoint `32b7bb6b…`, the Windows full-suite launcher ran all 363
 test files in two bounded batches. That closing integration run exited zero;
@@ -102,19 +100,24 @@ command at exact accepted app source
 `5e80e678d062b65a82c0991b352e5a861c7469e5`. It returned
 `client_ok: true`, return code `0`, and no timeout after webpack, native
 dependencies, bundled-Git copying, Sass validation, license generation, and the
-final unpackaged `out` build. Final exhaustive gates must still be repeated on
-the documentation/image union; the successful app-source build is not relabeled
-as that later merge SHA.
+final unpackaged `out` build. The exhaustive final-tree gates were repeated at
+the later `main` identities below; the successful app-source build is not
+relabeled as either later SHA.
 
-### Closing evidence placeholders — fill only after success
+### Closing evidence — complete
 
 - [x] **Accepted app source:**
   `5e80e678d062b65a82c0991b352e5a861c7469e5`.
-- [ ] **Final publication source:** exact documentation/image merge SHA and
-  exact merged `main` SHA.
-- [ ] **Repository gates:** repeat the exhaustive unit total, lint, TypeScript,
-  formatting, diff/conflict/privacy scans on the final union. The exact
-  production build is already accepted for app source `5e80e678…`.
+- [x] **Final publication source:** documentation/image union
+  `a890ab579c63651e5089ee433b259f0fc9198fbf`; final code/release baseline
+  `a0c2f19433631d577979c8c8a88a5151f5ab0656`.
+- [x] **Repository gates:** all seven CI jobs passed at `a0c2f194…`. Windows x64
+  ran 2,533 tests across the 365-file two-batch suite with 2,532 passes, one
+  intentional skip, and zero failures/cancellations; macOS arm64 ran 2,531 with
+  2,530 passes, one intentional skip, and zero failures/cancellations. Lint,
+  TypeScript, formatting, diff, privacy, builds, script tests, and both packaged
+  E2E lanes passed. The exact production build remains attributed to app source
+  `5e80e678…`.
 - [x] **Off-screen acceptance:** deterministic synthetic cross-account clone
   ledger and representative Foundation/P0/P1/Later interaction matrix with
   exact MCP/app-source identity. The proof-owned resource cleanup is verified
@@ -127,11 +130,12 @@ as that later merge SHA.
   the tracked image set at
   `cf24acc3a45e67b1eac93333263354936e7fd059`, and every dimension, byte count,
   and SHA-256 below was re-verified after promotion.
-- [ ] **GitHub/publication:** exact-SHA CI, Pages, canonical wiki, installer and
-  public release, asset count/size/digests, zero workflow artifacts, and live
-  URLs.
-- [ ] **Repository cleanup:** all completed worktrees removed; local `main`
-  clean and equal to `origin/main`; CI left enabled.
+- [x] **GitHub/publication:** exact-SHA CI, Pages, canonical wiki, installer and
+  public release, asset count/size/digests, zero retained Actions artifacts, and
+  live URLs are recorded below.
+- [x] **Repository cleanup:** all completed worktrees and proof resources are
+  removed; local `main` is clean and equal to `origin/main`; Actions is enabled;
+  active workers and retained Actions artifacts both report zero.
 
 The final 1450×997 review found real horizontal clipping in the shell toolbar
 and Changes card. The responsive flex/containment correction is now shipped,
@@ -221,19 +225,20 @@ The earlier pull-request routing/REST and Actions artifact redirect gaps are
 closed in this implementation tree, including userinfo/alternate-SSH/cross-
 repository head binding, bounded provider responses, chained-redirect
 credential stripping, pagination, and stale-request rejection. Exact app source
-`5e80e678…` now has its own production/off-screen evidence; those local results
-do not substitute for the later final-tree revalidation or public `main` gates.
+`5e80e678…` has its own production/off-screen evidence; final-tree revalidation
+and public `main` evidence are recorded separately at `a890ab579c…` and
+`a0c2f19433…`.
 
 ### Guided parity wave summary
 
 | Wave | State | Integrated capability |
 | --- | --- | --- |
-| **Foundation** | **ACCEPTED LOCALLY** | Repository Tools foundation, file history/blame/restore, shallow clone/deepening, sparse checkout, archives, bundles, Notifications, and guided Issue creation. |
-| **P0** | **ACCEPTED LOCALLY** | Complete pull-request lifecycle; Actions artifact hardening/pagination/download/digest context; effective branch-rule inspection. |
-| **P1** | **ACCEPTED LOCALLY** | Patch series, structured commit rewrite, Releases/assets, signing, LFS, and complete worktree administration. |
-| **P2** | **IMPLEMENTATION COMPLETE** | Persisted branch pin/hide/solo/restore visibility controls. |
-| **Later** | **ACCEPTED LOCALLY** | Merge-tree conflict preview, bisect, complete stash/remote/hooks managers, richer GitHub Issues, and provider-neutral triage. |
-| **Closing gate** | **LOCAL APP-SOURCE ACCEPTANCE COMPLETE; PUBLICATION PENDING** | Exact app source/build and representative hidden-desktop proof are recorded. Final documentation/image union, exhaustive revalidation, `main`, CI/Pages/wiki/release publication, artifact purge, and cleanup remain open. |
+| **Foundation** | **SHIPPED** | Repository Tools foundation, file history/blame/restore, shallow clone/deepening, sparse checkout, archives, bundles, Notifications, and guided Issue creation. |
+| **P0** | **SHIPPED** | Complete pull-request lifecycle; Actions artifact hardening/pagination/download/digest context; effective branch-rule inspection. |
+| **P1** | **SHIPPED** | Patch series, structured commit rewrite, Releases/assets, signing, LFS, and complete worktree administration. |
+| **P2** | **SHIPPED** | Persisted branch pin/hide/solo/restore visibility controls. |
+| **Later** | **SHIPPED** | Merge-tree conflict preview, bisect, complete stash/remote/hooks managers, richer GitHub Issues, and provider-neutral triage. |
+| **Closing gate** | **COMPLETE** | Exact app source/build and representative hidden-desktop proof are recorded; final documentation/image union, exhaustive revalidation, `main`, CI/Pages/wiki/release publication, artifact purge, and cleanup passed. |
 
 ### Sanitized squash verification
 
@@ -255,10 +260,10 @@ not part of this branch's ancestry. The integration gate recorded:
   token-shaped value retained by the scan is a deliberate synthetic response-
   redaction fixture.
 
-The README and PLAN now agree that every named guided wave is implementation-
-complete, app source `5e80e678…` is accepted locally, and final public `main`
-evidence remains pending. Reference-only proprietary cloud/team/AI services
-remain explicitly outside this roadmap.
+The README and PLAN now agree that every named guided wave is shipped, app
+source `5e80e678…` is accepted with exact production/off-screen evidence, and
+the later public `main` evidence is complete. Reference-only proprietary
+cloud/team/AI services remain explicitly outside this roadmap.
 
 ## Completed milestone summary
 
@@ -635,9 +640,58 @@ the fixture then stopped through its owned stop marker, both loopback listeners
 were absent, the hidden desktop listed zero remaining windows and was closed
 exactly once, and both synthetic credential entries were verified absent. The
 owned path alias, safe working root, and Temp run root were each resolved to
-their recorded exact target before removal and are all verified absent. Agent
-worktree removal and final `main` synchronization remain part of the repository
-cleanup gate above.
+their recorded exact target before removal and are all verified absent. All
+completed agent worktrees were subsequently verified clean and merged before
+removal; local `main` was synchronized with `origin/main`.
+
+## M19 final publication and repository evidence
+
+- **Code and CI:** final code/release baseline
+  `a0c2f19433631d577979c8c8a88a5151f5ab0656` passed all seven jobs in
+  [CI 29274841990](https://github.com/codingmachineedge/desktop-material/actions/runs/29274841990):
+  Lint, Windows x64/arm64, macOS x64/arm64, and both packaged E2E smoke lanes.
+  The formerly failing Windows x64 and macOS arm64 full-unit lanes both passed.
+- **Installer and release:**
+  [Build Installers 29274842059](https://github.com/codingmachineedge/desktop-material/actions/runs/29274842059)
+  succeeded for exact SHA `a0c2f194…` and published public, non-draft,
+  non-prerelease release
+  [`v3.6.3-beta3-b0000000083`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000083).
+  Its lightweight tag points directly to that commit. Each asset URL returned
+  HTTP 200; every asset was streamed independently, and computed bytes/SHA-256
+  matched the release metadata:
+
+  | Release asset | Bytes | SHA-256 |
+  | --- | ---: | --- |
+  | `GitHubDesktop-3.6.3-beta3-b0000000083-full.nupkg` | 308,216,183 | `47a6f31ef4cd0d380fc10db3daaa6de12100d90b2b0dbf0ed27b6137b9fb016a` |
+  | `GitHubDesktop-3.6.3-beta3-b0000000083-x64-full.nupkg` | 308,216,183 | `47a6f31ef4cd0d380fc10db3daaa6de12100d90b2b0dbf0ed27b6137b9fb016a` |
+  | `GitHubDesktopSetup-x64.exe` | 308,336,640 | `165960a99209a4df2a44b8ed79e36d35980a884fe576dbb8b68a2f7faf19fa78` |
+  | `GitHubDesktopSetup-x64.msi` | 307,916,800 | `510c77289632541fdd6859e59623b5a961a98bf3aabb2e7d00a65f3bd993caac` |
+  | `RELEASES` | 102 | `e92cbeeb7d775d6a3d4f5c972ca7d1d2ae0d6e5f55105661ded84803634a9d23` |
+
+- **Pages and screenshots:** documentation/image union
+  `a890ab579c63651e5089ee433b259f0fc9198fbf` passed
+  [Pages 29272714314](https://github.com/codingmachineedge/desktop-material/actions/runs/29272714314)
+  and deployment `5428939908`. The
+  [Pages site](https://codingmachineedge.github.io/desktop-material/) returns
+  HTTP 200. All 40 tracked PNGs match both raw `main` and Pages byte-for-byte
+  and by SHA-256: 80/80 live comparisons, 0 failures, 4,272,687 bytes per
+  surface; sorted manifest SHA-256
+  `9d173feacd309d46ac63d7898fd36eb4165bd57e738bf7cd511f6ecfa8cdaa4d`.
+- **Canonical wiki:** wiki `master`
+  `9f9c8010c8fcf275e39ae3e805856728ac6a23f8` matches all seven
+  `a890ab579c…:docs/wiki` Markdown blobs exactly, with no missing or stale
+  Markdown pages. Live
+  [Home](https://github.com/codingmachineedge/desktop-material/wiki),
+  [User Guide](https://github.com/codingmachineedge/desktop-material/wiki/User-Guide),
+  [Developer Guide](https://github.com/codingmachineedge/desktop-material/wiki/Developer-Guide),
+  and [Feature Gallery](https://github.com/codingmachineedge/desktop-material/wiki/Feature-Gallery)
+  return HTTP 200.
+- **Privacy and cleanup:** the exact 3,011-file tracked-tree audit found zero
+  current-user names/paths/emails, provider-token signatures, private keys, or
+  personal files. Proof processes, listeners, credentials, hidden desktop,
+  aliases, fixtures, Temp roots, and all completed agent worktrees are absent.
+  The administrative audit left Actions enabled with zero active workers and
+  deleted all 184 retained Actions artifacts, leaving the inventory at zero.
 
 ## Previous root-finalized publication and accessibility evidence
 
@@ -686,10 +740,9 @@ recorded:
   `main` baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
 
 Those links and checks remain evidence for their stated historical baselines;
-they are not presented as validation of this code integration. Because the
-guided-function squash changes application code, its eventual `main` SHA needs
-fresh CI, installer/release applicability, Pages, and public-documentation
-verification before the repository-wide closing gate can be called current.
+they are not presented as validation of M19. Fresh M19 CI, installer/release,
+Pages, wiki, screenshot, privacy, and cleanup evidence is recorded immediately
+above.
 
 ## Maintenance constraints
 

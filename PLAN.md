@@ -2,22 +2,20 @@
 
 ## Current status
 
-Milestones **M0 through M18 are shipped on `main`** through historical
-implementation baseline `b2699faccb07728fe9aa2838aa13355d71e172b0`.
-The later guided parity milestone, **M19**, is implementation-complete and
-locally accepted at exact app source
-`5e80e678d062b65a82c0991b352e5a861c7469e5` on
-`codex/guided-final-gate`. Every named P0, P1, P2, and Later capability is in
-that source tree with focused regression evidence; the exact MCP production
-build and isolated hidden-desktop interaction completed against that app
-source. M19 is not yet described as shipped on `main`: the final documentation
-and image union, exhaustive revalidation, `main` promotion, CI, Pages,
-canonical wiki, release, artifact purge, and owned-resource cleanup remain open.
+Milestones **M0 through M19 are shipped on `main`**. The exact M19 application
+source `5e80e678d062b65a82c0991b352e5a861c7469e5` passed the required MCP
+production build and isolated hidden-desktop interaction. The documentation and
+accepted 14-image union reached `main` at
+`a890ab579c63651e5089ee433b259f0fc9198fbf`; final code/release baseline
+`a0c2f19433631d577979c8c8a88a5151f5ab0656` passed all seven jobs in
+[CI 29274841990](https://github.com/codingmachineedge/desktop-material/actions/runs/29274841990)
+and [Build Installers 29274842059](https://github.com/codingmachineedge/desktop-material/actions/runs/29274842059).
 
-The accepted source also carries the bounded Windows full-suite launcher and
-the reviewed exact-origin clone, Pull All, and history-deepening recovery fixes.
-Its local results are app-source evidence, not the later final-tree or remote
-publication result; the open gates below must still be closed at their own SHAs.
+The shipped tree includes the bounded Windows full-suite launcher and reviewed
+exact-origin clone, Pull All, and history-deepening recovery fixes. Pages run
+`29272714314`, wiki commit `9f9c8010c8…`, release
+`v3.6.3-beta3-b0000000083`, downloaded asset digests, privacy, artifact purge,
+and owned-resource cleanup are all verified below.
 
 The M0–M18 baseline includes the responsive-shell correction prompted by the final
 1450×997 review, its exact-size headless regression capture, the public
@@ -63,7 +61,7 @@ end of this plan and must be filled only after each check actually succeeds.
 | **M16 — Multi-window** | **COMPLETE** | Tab-aware window creation/routing, scoped selected repositories and tabs, safe shared-profile serialization, and multi-window menu/context actions. | `app/src/main-process/window-routing.ts`, `app/src/main-process/app-window.ts`, `app/src/main-process/main.ts`, `app/src/lib/window-scope.ts`, `app/test/unit/window-routing-test.ts` |
 | **M17 — GitLab, Bitbucket, and self-hosted GitLab** | **COMPLETE** | Provider API foundation, GitLab PAT and Bitbucket sign-in, self-hosted endpoint support, provider clone browsing, cross-host PR/status routing, credential isolation, and provider documentation. | `app/src/lib/api.ts`, `app/src/lib/stores/accounts-store.ts`, `app/src/ui/preferences/accounts.tsx`, `app/src/ui/clone-repository/`, `docs/integrations/gitlab.md`, `docs/integrations/bitbucket.md` |
 | **M18 — Final Material alignment** | **COMPLETE** | Full MD3 shell, tokens, motion, navigation rail, floating workspace cards, dialogs/sheets, de-stocked controls, final post-shell polish, accessibility coverage, and clipping/layout fixes across milestone surfaces. | `app/styles/_material.scss`, `app/styles/_material-shell.scss`, `app/styles/ui/`, `app/src/ui/app.tsx`, `app/test/unit/post-shell-style-test.ts`, `app/test/unit/ui/` |
-| **M19 — Guided Git, GitHub, and provider parity** | **LOCAL ACCEPTANCE COMPLETE — PUBLICATION PENDING** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. Exact app source `5e80e678…` is built and accepted off-screen; final `main` and public evidence remain open. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
+| **M19 — Guided Git, GitHub, and provider parity** | **COMPLETE** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. Exact app source `5e80e678…` is built and accepted off-screen; exact `main` publication evidence is complete. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
 
 ## M19 guided parity implementation ledger
 
@@ -74,7 +72,7 @@ end of this plan and must be filled only after each check actually succeeds.
 | **P1** | **IMPLEMENTATION COMPLETE** | Patch-series export/import, structured local-commit rewrite, GitHub Releases/assets, commit/tag signing, Git LFS, and complete worktree lifecycle administration. |
 | **P2** | **IMPLEMENTATION COMPLETE** | Persisted branch pin, hide, solo, and restore controls with clear filtered-state recovery. |
 | **Later** | **IMPLEMENTATION COMPLETE** | Exact merge-tree conflict paths, guided bisect, complete repository-wide Stash Manager, guarded Remote Manager, safe Repository Hooks Manager, richer GitHub Issues, and exact-account GitHub/GitLab/Bitbucket triage. |
-| **Closing acceptance** | **LOCAL APP-SOURCE GATE COMPLETE; PUBLICATION PENDING** | Exact source/build and isolated off-screen interaction are accepted with 14 inspected synthetic-only captures. Exhaustive final documentation/image-union gates, `main`, CI/Pages/wiki/release verification, artifact purge, and owned-resource cleanup remain open. |
+| **Closing acceptance** | **COMPLETE** | Exact source/build and isolated off-screen interaction are accepted with 14 inspected synthetic-only captures. Final documentation/image-union gates, `main`, CI/Pages/wiki/release verification, artifact purge, and owned-resource cleanup all passed. |
 
 ## Additional completed product work
 
@@ -180,9 +178,8 @@ error, screenshot, or retained ledger. Its redacted cross-account evidence was:
 The following 14 synthetic-only PNGs were reopened at original resolution and
 accepted as nonblank, unclipped, and identity-safe. Every canonical candidate
 was captured from exact built app source `5e80e678…`; compositor-banded earlier
-attempts were rejected rather than promoted. The files must be promoted
-unchanged with the final documentation/image union before their later merge SHA
-is published.
+attempts were rejected rather than promoted. The exact files were promoted
+unchanged in final documentation/image union `a890ab579c…`.
 
 | M19 accepted capture candidate | App source/build | Dimensions | Bytes | SHA-256 |
 | --- | --- | ---: | ---: | --- |
@@ -201,10 +198,10 @@ is published.
 | `material-github-issues.png` | `5e80e678…` | 1452×1001 | 123,243 | `423d201a90346548ca9b36cdc472b11e144cf3aff1f79179939e44fb50e606bc` |
 | `material-native-pull-request.png` | `5e80e678…` | 1452×1001 | 152,440 | `9fd4c407f74639b58607c1c2c3158c2278f71ac3fe4088bb66bc5e3cf24434cb` |
 
-This local proof does not close remote publication or cleanup. The application,
-loopback listener, synthetic credential entries, hidden desktop, owned temporary
-roots, and completed worktrees must still be removed and verified absent after
-the screenshot/documentation work finishes.
+This app-source proof is intentionally distinct from the later publication
+identities. The application, loopback listener, synthetic credential entries,
+hidden desktop, owned temporary roots, and completed worktrees were subsequently
+removed and verified absent as part of the final cleanup gate.
 
 ## Prior M0–M18 integrated validation evidence
 
@@ -265,8 +262,38 @@ The later clone hardening tree at implementation commit
 | `material-clone-account-fallback.png` | 2048×1228 | 140,143 | `89bb755ad37f6d8537815d411526fa6e16aeee9cd16446deabbc17595cb3623c` |
 
 Those three same-name rows are commit-pinned historical values; the M19
-documentation/image union intentionally replaces their current tracked files
-with the accepted M19 PNGs and hashes recorded above.
+documentation/image union replaced their current tracked files with the
+accepted M19 PNGs and hashes recorded above.
+
+## M19 final publication evidence
+
+1. Final documentation/image union
+   `a890ab579c63651e5089ee433b259f0fc9198fbf` reached `main`. Its
+   [Pages run 29272714314](https://github.com/codingmachineedge/desktop-material/actions/runs/29272714314)
+   and deployment `5428939908` succeeded. All 40 tracked PNGs match their Git
+   blobs on raw `main` and live Pages: **80/80** byte-and-SHA comparisons,
+   **0 failures**, **4,272,687 bytes per surface**.
+2. Final code/release baseline
+   `a0c2f19433631d577979c8c8a88a5151f5ab0656` passed all seven jobs in
+   [CI 29274841990](https://github.com/codingmachineedge/desktop-material/actions/runs/29274841990).
+   Windows x64 ran 365 unit-test files in two batches: **2,533 tests, 2,532
+   passed, 1 intentional skip, 0 failed/cancelled**. macOS arm64 ran **2,531
+   tests, 2,530 passed, 1 intentional skip, 0 failed/cancelled**. Script tests
+   passed **15/15** on both full-unit lanes; both packaged E2E jobs passed.
+3. [Build Installers 29274842059](https://github.com/codingmachineedge/desktop-material/actions/runs/29274842059)
+   published public, non-draft, non-prerelease release
+   [`v3.6.3-beta3-b0000000083`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000083).
+   Its lightweight tag points directly to `a0c2f194…`; all five public assets
+   are non-empty, and independently streamed byte counts and SHA-256 values
+   match GitHub's metadata exactly.
+4. Canonical wiki commit `9f9c8010c8fcf275e39ae3e805856728ac6a23f8`
+   matches all seven `docs/wiki` Markdown blobs from `a890ab579c…` exactly.
+   Home, User Guide, Developer Guide, and Feature Gallery return HTTP 200.
+5. The 3,011-file tracked privacy scan found zero current-user paths, names,
+   emails, provider-token signatures, private keys, or personal files. All
+   proof-owned resources and completed agent worktrees are absent; local
+   `main` equals `origin/main`; Actions is enabled; active workers and retained
+   Actions artifacts both report zero at the administrative closure check.
 
 ## Historical root-finalized publication evidence
 
@@ -308,9 +335,8 @@ The secure clone implementation commit
 
 The later guided-function integration intentionally excludes privacy-tainted
 feature ancestry. Its named P0/P1/P2/Later corrections and focused regressions
-are now present at the M19 checkpoint recorded above. This document does not
-reuse historical CI, installer, release, Pages, wiki, or screenshot evidence as
-proof for that newer source tree.
+are present at the M19 checkpoints recorded above. The fresh M19 evidence is
+kept separate from the historical M0–M18 evidence that follows.
 
 ## M19 closing evidence checklist
 
@@ -325,9 +351,10 @@ proof for that newer source tree.
   byte counts, SHA-256 digests, and exact `5e80e678…` source/build provenance.
 - [x] Promote those exact 14 files unchanged and verify their tracked hashes in
   the final documentation/image union.
-- [ ] Record the merge to `main`, exact-SHA CI, Pages, canonical wiki,
+- [x] Record the merge to `main`, exact-SHA CI, Pages, canonical wiki,
   installer/release, release-asset/digest, and public live-URL evidence.
 - [x] Record cleanup of every proof-owned process, hidden desktop, credential,
   fixture, alias, and temporary root.
-- [ ] Remove every completed agent worktree and finish with clean local `main`
-  equal to `origin/main`.
+- [x] Remove every completed agent worktree and finish with clean local `main`
+  equal to `origin/main`, Actions enabled, zero active workers, and zero retained
+  Actions artifacts.
