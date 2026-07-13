@@ -20,9 +20,9 @@ import {
 } from '../remote-management'
 import { sanitizeRemoteUrl } from '../repo-list-file'
 import { git, isMaxBufferExceededError } from './core'
-import { getRemoteHEAD } from './remote'
 
 const MaximumRemoteInspectionOutput = 128 * 1024
+const MaximumRemoteSymbolicRefOutput = 1024
 
 type RemoteManagementErrorKind =
   | 'aborted'
@@ -188,6 +188,51 @@ async function readConfigValues(
     : []
 }
 
+/** Parse one exact remote HEAD without echoing malformed ref data in errors. */
+export function parseRemoteManagerDefaultBranch(
+  output: string,
+  remoteName: string
+): string | null {
+  if (Buffer.byteLength(output, 'utf8') > MaximumRemoteSymbolicRefOutput) {
+    throw new RemoteManagementError(
+      'too-large',
+      'Git returned too much remote default-branch data to review safely.'
+    )
+  }
+  const namespace = `refs/remotes/${normalizeRemoteName(remoteName)}/`
+  const value = output.trim()
+  if (
+    value.length <= namespace.length ||
+    !value.startsWith(namespace) ||
+    value === `${namespace}HEAD`
+  ) {
+    return null
+  }
+  return normalizeRemoteBranch(value.slice(namespace.length))
+}
+
+async function readRemoteDefaultBranch(
+  repository: Repository,
+  remoteName: string,
+  signal?: AbortSignal
+): Promise<string | null> {
+  throwIfAborted(signal)
+  const result = await git(
+    ['symbolic-ref', '--quiet', `refs/remotes/${remoteName}/HEAD`],
+    repository.path,
+    'inspectRemoteManagerDefaultBranch',
+    {
+      maxBuffer: MaximumRemoteSymbolicRefOutput,
+      successExitCodes: new Set([0, 1, 128]),
+      processCallback: getAbortableProcessCallback(signal),
+    }
+  )
+  throwIfAborted(signal)
+  return result.exitCode === 0
+    ? parseRemoteManagerDefaultBranch(result.stdout, remoteName)
+    : null
+}
+
 async function inspectRawRemoteSnapshot(
   repository: Repository,
   signal?: AbortSignal
@@ -227,7 +272,7 @@ async function inspectRawRemoteSnapshot(
           readConfigValues(repository, `remote.${name}.url`, signal),
           readConfigValues(repository, `remote.${name}.pushurl`, signal),
           readConfigValues(repository, `remote.${name}.prune`, signal, true),
-          getRemoteHEAD(repository, name),
+          readRemoteDefaultBranch(repository, name, signal),
         ])
       throwIfAborted(signal)
       if (

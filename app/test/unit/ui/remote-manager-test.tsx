@@ -161,6 +161,12 @@ describe('Remote Manager', () => {
     const { states } = renderRemoteManager(masked)
     assert.doesNotMatch(document.body.textContent ?? '', /credential-value/)
     assert.ok(screen.getByText(/credentials were masked/i))
+    fireEvent.click(screen.getByLabelText('Use a separate push URL for origin'))
+    assert.equal(
+      (screen.getByLabelText('origin push URL') as HTMLInputElement).value,
+      ''
+    )
+    fireEvent.click(screen.getByLabelText('Use a separate push URL for origin'))
     fireEvent.change(screen.getByLabelText('origin stale branch pruning'), {
       target: { value: 'enabled' },
     })

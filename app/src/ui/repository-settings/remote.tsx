@@ -436,10 +436,14 @@ function RemoteRow(props: IRemoteRowProps) {
   const onSeparatePushChanged = React.useCallback(
     (event: React.FormEvent<HTMLInputElement>) =>
       props.onChanged(index, {
-        pushUrl: event.currentTarget.checked ? remote.fetchUrl : null,
+        pushUrl: event.currentTarget.checked
+          ? remote.fetchUrlHasCredentials
+            ? ''
+            : remote.fetchUrl
+          : null,
         pushUrlHasCredentials: false,
       }),
-    [props.onChanged, index, remote.fetchUrl]
+    [props.onChanged, index, remote.fetchUrl, remote.fetchUrlHasCredentials]
   )
   const onPruneChanged = React.useCallback(
     (event: React.FormEvent<HTMLSelectElement>) =>

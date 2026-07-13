@@ -18,6 +18,7 @@ import { setConfigValue } from '../../../src/lib/git'
 import {
   applyRemoteManagementPlan,
   getRemoteManagementSnapshot,
+  parseRemoteManagerDefaultBranch,
   RemoteManagementError,
 } from '../../../src/lib/git/remote-manager'
 import {
@@ -204,6 +205,33 @@ describe('git/remote', () => {
   })
 
   describe('Remote Manager coordination', () => {
+    it('sanitizes oversized default-ref output and aborts snapshot inspection', async t => {
+      assert.throws(
+        () =>
+          parseRemoteManagerDefaultBranch(
+            `refs/remotes/origin/${'sensitive-value'.repeat(100)}`,
+            'origin'
+          ),
+        (error: unknown) =>
+          error instanceof RemoteManagementError &&
+          error.kind === 'too-large' &&
+          !error.message.includes('sensitive-value')
+      )
+
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
+        repository.path
+      )
+      const controller = new AbortController()
+      controller.abort()
+      await assert.rejects(
+        getRemoteManagementSnapshot(repository, controller.signal),
+        (error: unknown) =>
+          error instanceof RemoteManagementError && error.kind === 'aborted'
+      )
+    })
+
     it('applies reviewed rename, URL, prune, tracking, add, and remove settings', async t => {
       const repository = await setupEmptyRepository(t)
       await exec(
