@@ -16,7 +16,11 @@ import {
 } from '../../models/branch'
 import { Tip, TipState } from '../../models/tip'
 import { Commit } from '../../models/commit'
-import { IRemote } from '../../models/remote'
+import {
+  IRemote,
+  IRemoteManagementPlan,
+  IRemoteManagementSnapshot,
+} from '../../models/remote'
 import { IFetchProgress, IRevertProgress } from '../../models/progress'
 import {
   ICommitMessage,
@@ -74,6 +78,8 @@ import {
   updateRemoteHEAD,
   getRemoteHEAD,
   MergeOptions,
+  applyRemoteManagementPlan,
+  IRemoteManagementApplyOptions,
 } from '../git'
 import { GitError as DugiteError } from '../../lib/git'
 import { GitError } from 'dugite'
@@ -1603,6 +1609,19 @@ export class GitStore extends BaseStore {
     await this.loadRemotes()
 
     this.emitUpdate()
+  }
+
+  /** Apply one confirmed, stale-state guarded Remote Manager plan. */
+  public async applyRemoteManagementPlan(
+    plan: IRemoteManagementPlan,
+    options: IRemoteManagementApplyOptions
+  ): Promise<IRemoteManagementSnapshot> {
+    try {
+      return await applyRemoteManagementPlan(this.repository, plan, options)
+    } finally {
+      await this.loadRemotes()
+      this.emitUpdate()
+    }
   }
 
   public async discardChanges(

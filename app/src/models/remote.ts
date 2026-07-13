@@ -15,6 +15,65 @@ export interface IRemote {
   readonly url: string
 }
 
+/** Whether one remote inherits, enables, or disables fetch pruning. */
+export type RemotePruneSetting = 'inherit' | 'enabled' | 'disabled'
+
+/**
+ * The bounded, display-safe configuration exposed by Remote Manager.
+ * Credential-bearing HTTP userinfo is removed before these values reach the
+ * renderer. The matching `*UrlHasCredentials` flag lets the UI explain that
+ * an unchanged, masked value will be preserved on disk.
+ */
+export interface IRemoteConfiguration {
+  readonly name: string
+  readonly fetchUrl: string
+  readonly fetchUrlHasCredentials: boolean
+  readonly pushUrl: string | null
+  readonly pushUrlHasCredentials: boolean
+  readonly prune: RemotePruneSetting
+  readonly defaultBranch: string | null
+}
+
+/** An exact, opaque snapshot used to reject stale Remote Manager reviews. */
+export interface IRemoteManagementSnapshot {
+  readonly token: string
+  readonly remotes: ReadonlyArray<IRemoteConfiguration>
+}
+
+/** One editable row. `originalName` remains stable while the row is renamed. */
+export interface IRemoteDraft extends IRemoteConfiguration {
+  readonly originalName: string | null
+}
+
+/** One final desired remote and only the fields approved for mutation. */
+export interface IRemoteManagementUpdate {
+  readonly originalName: string | null
+  readonly name: string
+  readonly fetchUrl?: string
+  readonly pushUrl?: string | null
+  readonly prune?: RemotePruneSetting
+  readonly defaultBranch?: string | null
+}
+
+/** A URL-free description safe to render in the confirmation surface. */
+export interface IRemoteManagementReviewItem {
+  readonly remoteName: string
+  readonly description: string
+  readonly destructive: boolean
+}
+
+/**
+ * The immutable plan confirmed by the user. URLs may be present only when the
+ * user explicitly supplied a replacement; reviews and errors never render
+ * them.
+ */
+export interface IRemoteManagementPlan {
+  readonly expectedSnapshotToken: string
+  readonly removed: ReadonlyArray<string>
+  readonly updates: ReadonlyArray<IRemoteManagementUpdate>
+  readonly review: ReadonlyArray<IRemoteManagementReviewItem>
+}
+
 /**
  * Gets a value indicating whether two remotes can be considered
  * structurally equivalent to each other.

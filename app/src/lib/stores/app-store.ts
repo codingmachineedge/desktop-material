@@ -72,6 +72,8 @@ import {
 import {
   forkPullRequestRemoteName,
   IRemote,
+  IRemoteManagementPlan,
+  IRemoteManagementSnapshot,
   remoteEquals,
 } from '../../models/remote'
 import {
@@ -259,6 +261,7 @@ import {
   syncSubmodules,
   removeSubmodule,
   IManagedSubmodule,
+  IRemoteManagementApplyOptions,
   unstageAll,
 } from '../git'
 import {
@@ -9032,6 +9035,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<void> {
     const gitStore = this.gitStoreCache.get(repository)
     await gitStore.removeRemote(name)
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _applyRemoteManagementPlan(
+    repository: Repository,
+    plan: IRemoteManagementPlan,
+    options: IRemoteManagementApplyOptions
+  ): Promise<IRemoteManagementSnapshot> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return gitStore.applyRemoteManagementPlan(plan, options)
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
