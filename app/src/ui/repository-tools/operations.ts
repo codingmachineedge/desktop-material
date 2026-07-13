@@ -38,7 +38,155 @@ export interface IRepositoryBundleImportRequest
   readonly createBranchArgs: ReadonlyArray<string>
 }
 
+export type RepositoryShallowHistoryAction = 'deepen' | 'unshallow'
+
+export interface IRepositoryShallowHistoryRequest {
+  readonly action: RepositoryShallowHistoryAction
+  readonly remote: string
+  readonly deepenBy: number | null
+  /** Fixed fetch recipe. The UI never accepts an editable refspec or argv. */
+  readonly args: ReadonlyArray<string>
+}
+
 const MaximumBundleRefs = 5_000
+const MaximumFetchRemotes = 128
+const MaximumDeepenCommitCount = 1_000_000
+
+/** The bounded, read-only check used before review and again before mutation. */
+export function prepareRepositoryShallowStatusInspection(): ReadonlyArray<string> {
+  return ['rev-parse', '--is-shallow-repository']
+}
+
+/** Enumerate remote names without expanding URLs, credentials, or refspecs. */
+export function prepareRepositoryFetchRemoteInspection(): ReadonlyArray<string> {
+  return ['remote']
+}
+
+/** Parse only Git's exact boolean shallow-repository response. */
+export function parseRepositoryShallowStatus(output: string): boolean {
+  if (Buffer.byteLength(output, 'utf8') > 64) {
+    throw new Error('Git returned an invalid shallow-history status.')
+  }
+  if (/^true(?:\r?\n)?$/.test(output)) {
+    return true
+  }
+  if (/^false(?:\r?\n)?$/.test(output)) {
+    return false
+  }
+  throw new Error('Git returned an invalid shallow-history status.')
+}
+
+function normalizeRepositoryFetchRemote(remote: string): string {
+  if (
+    remote.length === 0 ||
+    remote.length > 255 ||
+    remote !== remote.trim() ||
+    remote === '.' ||
+    remote === '..' ||
+    remote.endsWith('.') ||
+    remote.endsWith('/') ||
+    remote.includes('..') ||
+    remote.includes('//') ||
+    !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(remote)
+  ) {
+    throw new Error('Choose a valid configured fetch remote.')
+  }
+  return remote
+}
+
+/**
+ * Parse the one-name-per-line output from `git remote`. Unsafe option-like,
+ * control-character, and ambiguous names are rejected instead of passed on.
+ */
+export function parseRepositoryFetchRemotes(
+  output: string
+): ReadonlyArray<string> {
+  if (Buffer.byteLength(output, 'utf8') > 64 * 1024) {
+    throw new Error('Git returned too many fetch remotes to review safely.')
+  }
+
+  const remotes = new Set<string>()
+  for (const line of output.split(/\r?\n/)) {
+    if (line.length === 0) {
+      continue
+    }
+    const remote = normalizeRepositoryFetchRemote(line)
+    if (remotes.has(remote)) {
+      throw new Error('Git returned a duplicate fetch remote.')
+    }
+    remotes.add(remote)
+    if (remotes.size > MaximumFetchRemotes) {
+      throw new Error('Git returned too many fetch remotes to review safely.')
+    }
+  }
+  return [...remotes]
+}
+
+/** Accept one bounded decimal count, never an option or free-form argument. */
+export function normalizeRepositoryDeepenCommitCount(value: string): number {
+  const normalized = value.trim()
+  if (!/^[1-9][0-9]{0,6}$/.test(normalized)) {
+    throw new Error(
+      `Enter a whole commit count from 1 to ${MaximumDeepenCommitCount.toLocaleString(
+        'en-US'
+      )}.`
+    )
+  }
+  const count = Number(normalized)
+  if (!Number.isSafeInteger(count) || count > MaximumDeepenCommitCount) {
+    throw new Error(
+      `Enter a whole commit count from 1 to ${MaximumDeepenCommitCount.toLocaleString(
+        'en-US'
+      )}.`
+    )
+  }
+  return count
+}
+
+function prepareRepositoryShallowFetch(
+  action: RepositoryShallowHistoryAction,
+  remote: string,
+  deepenBy: number | null
+): IRepositoryShallowHistoryRequest {
+  const normalizedRemote = normalizeRepositoryFetchRemote(remote)
+  const depthArgument =
+    action === 'deepen' && deepenBy !== null
+      ? `--deepen=${deepenBy}`
+      : '--unshallow'
+  return {
+    action,
+    remote: normalizedRemote,
+    deepenBy,
+    args: [
+      'fetch',
+      '--no-auto-maintenance',
+      '--no-recurse-submodules',
+      '--no-write-fetch-head',
+      depthArgument,
+      '--',
+      normalizedRemote,
+    ],
+  }
+}
+
+/** Build the fixed recipe for fetching a bounded number of older commits. */
+export function prepareRepositoryHistoryDeepen(
+  remote: string,
+  deepenBy: string
+): IRepositoryShallowHistoryRequest {
+  return prepareRepositoryShallowFetch(
+    'deepen',
+    remote,
+    normalizeRepositoryDeepenCommitCount(deepenBy)
+  )
+}
+
+/** Build the distinct fixed recipe for removing Git's shallow boundary. */
+export function prepareRepositoryHistoryUnshallow(
+  remote: string
+): IRepositoryShallowHistoryRequest {
+  return prepareRepositoryShallowFetch('unshallow', remote, null)
+}
 
 function normalizeRepositoryBundlePath(bundlePath: string): string {
   const value = bundlePath

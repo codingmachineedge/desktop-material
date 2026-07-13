@@ -30,6 +30,7 @@ import {
   RepositoryToolOperations,
 } from './operations'
 import { RepositoryBundleImport } from './bundle-import'
+import { RepositoryShallowHistory } from './shallow-history'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -97,6 +98,7 @@ interface IRepositoryToolsState {
   readonly output: string
   readonly error: string | null
   readonly bundleImportBusy: boolean
+  readonly shallowHistoryBusy: boolean
 }
 
 let nextOperationSequence = 0
@@ -128,6 +130,7 @@ export class RepositoryTools extends React.Component<
       output: '',
       error: null,
       bundleImportBusy: false,
+      shallowHistoryBusy: false,
     }
   }
 
@@ -155,6 +158,7 @@ export class RepositoryTools extends React.Component<
         output: '',
         error: null,
         bundleImportBusy: false,
+        shallowHistoryBusy: false,
       })
     }
   }
@@ -203,12 +207,22 @@ export class RepositoryTools extends React.Component<
   }
 
   private isBusy() {
-    return this.runId !== null || this.state.bundleImportBusy
+    return (
+      this.runId !== null ||
+      this.state.bundleImportBusy ||
+      this.state.shallowHistoryBusy
+    )
   }
 
   private onBundleImportBusyChanged = (bundleImportBusy: boolean) => {
     if (this.state.bundleImportBusy !== bundleImportBusy) {
       this.setState({ bundleImportBusy })
+    }
+  }
+
+  private onShallowHistoryBusyChanged = (shallowHistoryBusy: boolean) => {
+    if (this.state.shallowHistoryBusy !== shallowHistoryBusy) {
+      this.setState({ shallowHistoryBusy })
     }
   }
 
@@ -634,11 +648,31 @@ export class RepositoryTools extends React.Component<
     return (
       <RepositoryBundleImport
         repositoryPath={this.props.repositoryPath}
-        disabled={this.runId !== null || !this.state.gitAvailable}
+        disabled={
+          this.runId !== null ||
+          this.state.shallowHistoryBusy ||
+          !this.state.gitAvailable
+        }
         client={this.client}
         onRefreshRepository={this.props.onRefreshRepository}
         onBusyChanged={this.onBundleImportBusyChanged}
         chooseBundleToImport={this.props.chooseBundleToImport}
+      />
+    )
+  }
+
+  private renderShallowHistory() {
+    return (
+      <RepositoryShallowHistory
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onShallowHistoryBusyChanged}
       />
     )
   }
@@ -751,7 +785,7 @@ export class RepositoryTools extends React.Component<
           </div>
           <div className="repository-tool-controls">
             <Button
-              disabled={!this.isBusy()}
+              disabled={this.runId === null}
               onClick={() => void this.onCancel()}
             >
               Cancel
@@ -812,6 +846,7 @@ export class RepositoryTools extends React.Component<
         )}
         <div className="repository-tools-layout">
           <div className="repository-tools-functions">
+            {this.renderShallowHistory()}
             {this.renderCategory('Diagnostics')}
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}
