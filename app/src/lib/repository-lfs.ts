@@ -106,8 +106,10 @@ function normalizeStatusPath(value: string): string {
     value.length > 4096 ||
     /[\u0000-\u001f\u007f]/.test(value) ||
     value.startsWith('/') ||
+    value.startsWith('\\') ||
     /^[A-Za-z]:[\\/]/.test(value) ||
-    value.split(/[\\/]/).includes('..')
+    value.split(/[\\/]/).includes('..') ||
+    /^\.git(?:[\\/]|$)/i.test(value)
   ) {
     throw new Error('Git LFS returned an invalid repository-relative path.')
   }

@@ -111,6 +111,9 @@ export function parseRepositorySigningConfig(
     ) {
       throw new Error('Git returned an invalid signing configuration value.')
     }
+    if (values.has(match[1])) {
+      throw new Error('Git returned duplicate signing configuration values.')
+    }
     values.set(match[1], match[2])
   }
 
@@ -249,6 +252,15 @@ export function parseRepositorySigningTags(
       fields[0].length === 0 ||
       fields[0].length > 1024 ||
       fields[0].startsWith('-') ||
+      fields[0] === '@' ||
+      fields[0].endsWith('/') ||
+      fields[0].endsWith('.') ||
+      fields[0].includes('..') ||
+      fields[0].includes('//') ||
+      fields[0].includes('@{') ||
+      fields[0]
+        .split('/')
+        .some(part => part.startsWith('.') || part.endsWith('.lock')) ||
       fields[1] !== 'tag' ||
       !ObjectID.test(fields[2]) ||
       /[\x00-\x20\x7f~^:?*\[\\]/.test(fields[0]) ||

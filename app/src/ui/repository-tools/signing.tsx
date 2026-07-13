@@ -118,6 +118,7 @@ export class RepositorySigning extends React.Component<
   private commandOutputTruncated = false
   private pendingSettingsOutput = ''
   private cancelRequested = false
+  private mutationStarted = false
   private repositoryGeneration = 0
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
@@ -169,12 +170,14 @@ export class RepositorySigning extends React.Component<
       this.subscribe(this.props.client)
     }
     this.props.onBusyChanged(false)
+    this.mutationStarted = false
     this.setState(this.initialState())
   }
 
   public componentWillUnmount() {
     this.mounted = false
     this.repositoryGeneration++
+    this.mutationStarted = false
     this.unsubscribe()
     this.cancelRun()
   }
@@ -260,11 +263,15 @@ export class RepositorySigning extends React.Component<
     this.runId = null
     if (this.cancelRequested || event.state === 'cancelled') {
       this.cancelRequested = false
+      const mutationStarted = this.mutationStarted
+      this.mutationStarted = false
       this.setBusy(false)
       this.setState({
         phase: 'cancelled',
         review: null,
-        status: 'Signing operation cancelled. Review the current state again.',
+        status: mutationStarted
+          ? 'Signing operation cancelled. Some reviewed settings may already be applied; inspect the current state again.'
+          : 'Signing operation cancelled. No reviewed signing update was started.',
         error: null,
       })
       return
@@ -353,6 +360,7 @@ export class RepositorySigning extends React.Component<
         const local = this.state.local ?? emptyConfig('local')
         const effective = getEffectiveRepositorySigningConfig(local, global)
         this.setBusy(false)
+        this.mutationStarted = false
         this.setState({
           phase: 'ready',
           global,
@@ -523,6 +531,7 @@ export class RepositorySigning extends React.Component<
         recipes.length
       }…`,
     })
+    this.mutationStarted = true
     this.startCommand('applying', recipes[index], true)
   }
 
@@ -545,14 +554,20 @@ export class RepositorySigning extends React.Component<
   }
 
   private fail(message: string) {
+    const mutationStarted = this.mutationStarted
     this.runId = null
     this.cancelRequested = false
+    this.mutationStarted = false
     this.setBusy(false)
     this.setState({
       phase: 'failed',
       review: null,
-      status: 'The signing operation stopped safely.',
-      error: message,
+      status: mutationStarted
+        ? 'The signing update did not fully complete.'
+        : 'The signing operation stopped safely.',
+      error: mutationStarted
+        ? `${message} Some reviewed settings may already be applied; inspect signing settings again before another update.`
+        : message,
     })
   }
 
@@ -561,6 +576,7 @@ export class RepositorySigning extends React.Component<
       return
     }
     this.setBusy(true)
+    this.mutationStarted = false
     this.setState({
       ...this.initialState(),
       phase: 'inspecting-local-settings',

@@ -253,6 +253,36 @@ describe('Repository signing administration', () => {
     )
   })
 
+  it('warns that a sequential update may be partially applied on failure', async () => {
+    const client = new FakeSigningClient()
+    renderSigning(client)
+    await inspectSigning(client)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review signing settings' })
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Apply signing settings' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 5))
+    emitCompleted(
+      client,
+      4,
+      'gpg.format\nssh\0commit.gpgsign\ntrue\0tag.gpgsign\nfalse\0'
+    )
+    await waitFor(() => assert.equal(client.starts.length, 6))
+    emitCompleted(client, 5, 'user.signingkey\0')
+    await waitFor(() => assert.equal(client.starts.length, 7))
+    client.emitState({
+      id: client.starts[6].id,
+      state: 'failed',
+      exitCode: 5,
+      signal: null,
+    })
+
+    assert.ok(await screen.findByText(/may already be applied/i))
+    assert.ok(screen.getByText('The signing update did not fully complete.'))
+  })
+
   it('reports safe commit and annotated-tag verification states', async () => {
     const client = new FakeSigningClient()
     renderSigning(client)

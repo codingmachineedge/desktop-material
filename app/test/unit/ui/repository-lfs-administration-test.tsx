@@ -232,6 +232,32 @@ describe('Repository Git LFS administration', () => {
     assert.equal(client.starts[4].confirmed, true)
   })
 
+  it('warns that a failed pull may have changed bounded repository state', async () => {
+    const client = new FakeLFSClient()
+    renderLFS(client)
+    await inspectLFS(client)
+    fireEvent.click(screen.getByRole('button', { name: 'Review pull' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Confirm Git LFS action' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 4))
+    assert.deepStrictEqual(client.starts[3].recipe, {
+      kind: 'repository-lfs-operation',
+      operation: 'pull',
+    })
+    client.emitState({
+      id: client.starts[3].id,
+      state: 'failed',
+      exitCode: 2,
+      signal: null,
+    })
+
+    assert.ok(await screen.findByText(/working-tree files may have changed/i))
+    assert.ok(
+      screen.getByText('The reviewed Git LFS action did not fully complete.')
+    )
+  })
+
   it('rejects unsafe patterns before any mutation recipe is created', async () => {
     const client = new FakeLFSClient()
     renderLFS(client)

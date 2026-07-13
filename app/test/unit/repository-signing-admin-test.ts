@@ -72,8 +72,24 @@ describe('repository signing administration models', () => {
       /invalid commit signing value/
     )
     assert.throws(
+      () =>
+        parseRepositorySigningConfig(
+          'gpg.format\nssh\0gpg.format\nopenpgp\0',
+          'local'
+        ),
+      /duplicate signing configuration values/
+    )
+    assert.throws(
       () => parseRepositorySigningKeyPresence('a'.repeat(17_000)),
       /invalid signing-key presence data/
+    )
+    assert.throws(
+      () =>
+        parseRepositorySigningConfig(
+          'gpg.format\nopenpgp\0'.repeat(4_000),
+          'local'
+        ),
+      /too much signing configuration/
     )
   })
 
@@ -120,8 +136,18 @@ describe('repository signing administration models', () => {
       /invalid annotated tag list/
     )
     assert.throws(
-      () => parseRepositorySigningTags(`${`tag\0tag\0${oid}\n`.repeat(101)}`),
-      /invalid annotated tag list|too many tags/
+      () =>
+        parseRepositorySigningTags(
+          Array.from(
+            { length: 101 },
+            (_, index) => `tag-${index}\0tag\0${oid}\n`
+          ).join('')
+        ),
+      /too many tags/
+    )
+    assert.throws(
+      () => parseRepositorySigningTags(`bad@{tag\0tag\0${oid}\n`),
+      /invalid annotated tag list/
     )
   })
 

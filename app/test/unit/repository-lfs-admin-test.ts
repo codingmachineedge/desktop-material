@@ -74,6 +74,17 @@ describe('repository Git LFS administration models', () => {
       () => parseRepositoryLFSPatterns('{"patterns":"secret"}'),
       /invalid tracked-pattern data/
     )
+    assert.throws(
+      () =>
+        parseRepositoryLFSPatterns(
+          JSON.stringify({
+            patterns: Array.from({ length: 1001 }, (_, index) => ({
+              pattern: `asset-${index}.bin`,
+            })),
+          })
+        ),
+      /too many tracked patterns/
+    )
   })
 
   it('lists only bounded safe repository-relative LFS status paths', () => {
@@ -91,8 +102,36 @@ describe('repository Git LFS administration models', () => {
       /invalid repository-relative path/
     )
     assert.throws(
+      () =>
+        parseRepositoryLFSStatus(
+          JSON.stringify({ files: { '\\\\server\\share\\secret.bin': {} } })
+        ),
+      /invalid repository-relative path/
+    )
+    assert.throws(
+      () =>
+        parseRepositoryLFSStatus(
+          JSON.stringify({ files: { '.git/config': {} } })
+        ),
+      /invalid repository-relative path/
+    )
+    assert.throws(
       () => parseRepositoryLFSStatus('{"files":[]}'),
       /invalid status data/
+    )
+    assert.throws(
+      () =>
+        parseRepositoryLFSStatus(
+          JSON.stringify({
+            files: Object.fromEntries(
+              Array.from({ length: 1001 }, (_, index) => [
+                `asset-${index}.bin`,
+                {},
+              ])
+            ),
+          })
+        ),
+      /too many status paths/
     )
   })
 
@@ -106,5 +145,9 @@ describe('repository Git LFS administration models', () => {
     )
     assert.match(summary, /reported 2 bounded result lines/)
     assert.doesNotMatch(summary, /abcdef|456 MB/)
+    assert.throws(
+      () => summarizeRepositoryLFSPrunePreview('x\n'.repeat(140_000)),
+      /too much prune-preview data/
+    )
   })
 })

@@ -107,6 +107,7 @@ export class RepositoryLFSAdministration extends React.Component<
   private commandStdout = ''
   private commandOutputTruncated = false
   private cancelRequested = false
+  private mutationStarted = false
   private repositoryGeneration = 0
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
@@ -151,12 +152,14 @@ export class RepositoryLFSAdministration extends React.Component<
       this.subscribe(this.props.client)
     }
     this.props.onBusyChanged(false)
+    this.mutationStarted = false
     this.setState(this.initialState())
   }
 
   public componentWillUnmount() {
     this.mounted = false
     this.repositoryGeneration++
+    this.mutationStarted = false
     this.unsubscribe()
     this.cancelRun()
   }
@@ -242,11 +245,15 @@ export class RepositoryLFSAdministration extends React.Component<
     this.runId = null
     if (this.cancelRequested || event.state === 'cancelled') {
       this.cancelRequested = false
+      const mutationStarted = this.mutationStarted
+      this.mutationStarted = false
       this.setBusy(false)
       this.setState({
         phase: 'cancelled',
         review: null,
-        status: 'Git LFS operation cancelled. Inspect current state again.',
+        status: mutationStarted
+          ? 'Git LFS operation cancelled. Objects, hooks, attributes, or matching working-tree files may have changed; inspect current state again.'
+          : 'Git LFS operation cancelled before a reviewed mutation started.',
         error: null,
       })
       return
@@ -257,18 +264,19 @@ export class RepositoryLFSAdministration extends React.Component<
     }
     if (event.state !== 'completed') {
       const unavailable = phase === 'checking-version'
-      this.setBusy(false)
-      this.setState({
-        phase: 'failed',
-        available: unavailable ? false : this.state.available,
-        review: null,
-        status: unavailable
-          ? 'The bundled Git LFS runtime is unavailable.'
-          : 'The Git LFS operation stopped safely.',
-        error: unavailable
-          ? 'Git LFS could not be started from the bundled Git runtime.'
-          : 'Git LFS could not complete the bounded operation.',
-      })
+      if (unavailable) {
+        this.mutationStarted = false
+        this.setBusy(false)
+        this.setState({
+          phase: 'failed',
+          available: false,
+          review: null,
+          status: 'The bundled Git LFS runtime is unavailable.',
+          error: 'Git LFS could not be started from the bundled Git runtime.',
+        })
+      } else {
+        this.fail('Git LFS could not complete the bounded operation.')
+      }
       return
     }
     try {
@@ -307,6 +315,7 @@ export class RepositoryLFSAdministration extends React.Component<
       case 'checking-status': {
         const lfsStatus = parseRepositoryLFSStatus(this.commandStdout)
         this.setBusy(false)
+        this.mutationStarted = false
         this.setState({
           phase: 'ready',
           lfsStatus,
@@ -358,6 +367,7 @@ export class RepositoryLFSAdministration extends React.Component<
           },
           true
         )
+        this.mutationStarted = true
         return
       }
       case 'running':
@@ -395,14 +405,20 @@ export class RepositoryLFSAdministration extends React.Component<
   }
 
   private fail(message: string) {
+    const mutationStarted = this.mutationStarted
     this.runId = null
     this.cancelRequested = false
+    this.mutationStarted = false
     this.setBusy(false)
     this.setState({
       phase: 'failed',
       review: null,
-      status: 'The Git LFS operation stopped safely.',
-      error: message,
+      status: mutationStarted
+        ? 'The reviewed Git LFS action did not fully complete.'
+        : 'The Git LFS operation stopped safely.',
+      error: mutationStarted
+        ? `${message} Objects, hooks, attributes, or matching working-tree files may have changed; inspect Git LFS state again.`
+        : message,
     })
   }
 
@@ -411,6 +427,7 @@ export class RepositoryLFSAdministration extends React.Component<
       return
     }
     this.setBusy(true)
+    this.mutationStarted = false
     this.setState({
       ...this.initialState(),
       phase: 'checking-version',
@@ -539,6 +556,7 @@ export class RepositoryLFSAdministration extends React.Component<
       return
     }
     this.setState({ status: `${operationTitle(review.operation)}…` })
+    this.mutationStarted = true
     this.startCommand(
       'running',
       { kind: 'repository-lfs-operation', operation: review.operation },

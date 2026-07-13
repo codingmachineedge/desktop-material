@@ -643,6 +643,21 @@ describe('CLI workbench runner helpers', () => {
         ),
         /confirmation/i
       )
+      await assert.rejects(
+        validateCLICommandRequest(
+          {
+            ...request(
+              root,
+              { kind: 'repository-lfs-inspection', operation: 'version' },
+              false,
+              'forged-environment'
+            ),
+            environment: { GIT_EXEC_PATH: 'C:/payload' },
+          },
+          dependencies
+        ),
+        /Invalid CLI command request/
+      )
     } finally {
       await rm(root, { recursive: true, force: true })
     }
