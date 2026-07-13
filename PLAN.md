@@ -1,13 +1,23 @@
-# Desktop Material — Completed Feature Plan
+# Desktop Material — Feature and Acceptance Plan
 
-## Final status
+## Current status
 
-The feature-expansion roadmap and its handoff work are complete. Milestones
-**M0 through M18 are shipped on `main`** through final implementation baseline
-`b2699faccb07728fe9aa2838aa13355d71e172b0`. There is no remaining queued,
-partial, or in-flight implementation work in this plan.
+Milestones **M0 through M18 are shipped on `main`** through historical
+implementation baseline `b2699faccb07728fe9aa2838aa13355d71e172b0`.
+The later guided parity milestone, **M19**, is implementation-complete through
+integration checkpoint `a00e751c575c80dee345b1b51b1d411dcd20e911` on
+`codex/guided-final-gate`. Every named P0, P1, P2, and Later capability is in
+that source tree with focused regression evidence. M19 is not yet described as
+shipped on `main`: exhaustive final gates, the exact production/off-screen
+acceptance run, accepted screenshots, documentation/wiki synchronization, CI,
+Pages, release verification, and cleanup remain open.
 
-That baseline includes the responsive-shell correction prompted by the final
+That checkpoint also changed the Windows unit launcher to run the full 360-file
+suite in two bounded batches; its interim integration run exited successfully.
+It is not the final post-merge acceptance result and must not replace the open
+closing checklist below.
+
+The M0–M18 baseline includes the responsive-shell correction prompted by the final
 1450×997 review, its exact-size headless regression capture, the public
 README/Pages/wiki propagation, the shared Node/jsdom UI-test storage fix, and
 secure GitHub Actions log downloads with stale-response protection.
@@ -24,9 +34,11 @@ for a generic URL, or the first eligible exact-origin account when lookup is
 inconclusive. It remains unforced only when no eligible identity exists, then
 silently retries another account only after an authentication/not-found failure
 from that exact HTTPS origin while retaining any custom origin port.
-The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF.md).
+Historical publication evidence is recorded below and in
+[`HANDOFF.md`](HANDOFF.md). The closing M19 evidence checklist appears at the
+end of this plan and must be filled only after each check actually succeeds.
 
-## Shipped milestone ledger
+## Product milestone ledger
 
 | Milestone | Status | Delivered capability | Important implementation paths |
 | --- | --- | --- | --- |
@@ -49,6 +61,18 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
 | **M16 — Multi-window** | **COMPLETE** | Tab-aware window creation/routing, scoped selected repositories and tabs, safe shared-profile serialization, and multi-window menu/context actions. | `app/src/main-process/window-routing.ts`, `app/src/main-process/app-window.ts`, `app/src/main-process/main.ts`, `app/src/lib/window-scope.ts`, `app/test/unit/window-routing-test.ts` |
 | **M17 — GitLab, Bitbucket, and self-hosted GitLab** | **COMPLETE** | Provider API foundation, GitLab PAT and Bitbucket sign-in, self-hosted endpoint support, provider clone browsing, cross-host PR/status routing, credential isolation, and provider documentation. | `app/src/lib/api.ts`, `app/src/lib/stores/accounts-store.ts`, `app/src/ui/preferences/accounts.tsx`, `app/src/ui/clone-repository/`, `docs/integrations/gitlab.md`, `docs/integrations/bitbucket.md` |
 | **M18 — Final Material alignment** | **COMPLETE** | Full MD3 shell, tokens, motion, navigation rail, floating workspace cards, dialogs/sheets, de-stocked controls, final post-shell polish, accessibility coverage, and clipping/layout fixes across milestone surfaces. | `app/styles/_material.scss`, `app/styles/_material-shell.scss`, `app/styles/ui/`, `app/src/ui/app.tsx`, `app/test/unit/post-shell-style-test.ts`, `app/test/unit/ui/` |
+| **M19 — Guided Git, GitHub, and provider parity** | **IMPLEMENTATION COMPLETE — FINAL ACCEPTANCE PENDING** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
+
+## M19 guided parity implementation ledger
+
+| Wave | Status | Integrated named functions |
+| --- | --- | --- |
+| **Foundation** | **IMPLEMENTATION COMPLETE** | Bounded Repository Tools runner; file history/blame and guarded restore; status/health/maintenance/reflog; shallow clone/deepening; sparse checkout; archives; bundle export/verify/create-only import; Notifications and guided Issue creation. |
+| **P0** | **IMPLEMENTATION COMPLETE** | Pull-request templates, reviewers, assignees, labels, review/update/close/reopen/merge; paginated Actions artifacts with bounded redirect/download/digest handling; effective current-branch rule inspection. |
+| **P1** | **IMPLEMENTATION COMPLETE** | Patch-series export/import, structured local-commit rewrite, GitHub Releases/assets, commit/tag signing, Git LFS, and complete worktree lifecycle administration. |
+| **P2** | **IMPLEMENTATION COMPLETE** | Persisted branch pin, hide, solo, and restore controls with clear filtered-state recovery. |
+| **Later** | **IMPLEMENTATION COMPLETE** | Exact merge-tree conflict paths, guided bisect, complete repository-wide Stash Manager, guarded Remote Manager, safe Repository Hooks Manager, richer GitHub Issues, and exact-account GitHub/GitLab/Bitbucket triage. |
+| **Closing acceptance** | **PENDING** | Exhaustive final union, exact production build, isolated off-screen interaction, inspected screenshots, `main` merge, CI/Pages/wiki/release verification, and owned-resource cleanup. |
 
 ## Additional completed product work
 
@@ -119,9 +143,9 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
     account key is persisted for later repository matching and retries without
     exposing a token, login, selector, or credentials dialog.
 
-## Final integrated validation evidence
+## Prior M0–M18 integrated validation evidence
 
-The exhaustive final run on the same application/test tree shipped by
+The exhaustive historical run on the same application/test tree shipped by
 `b2699faccb07728fe9aa2838aa13355d71e172b0` recorded:
 
 - unit suite: **1,880 tests — 1,879 passed, 0 failed, 1 intentional skip**;
@@ -161,7 +185,7 @@ The later clone hardening tree at implementation commit
 - every owned proof process, listener, Temp path, and synthetic credential
   entry was removed after the accepted capture.
 
-| Final capture | Dimensions | Bytes | SHA-256 |
+| Historical accepted capture | Dimensions | Bytes | SHA-256 |
 | --- | ---: | ---: | --- |
 | `material-agent-access.png` | 1443×992 | 110,128 | `644891eaa37c878cb577065822681ee8fd33a018a92e0b89822b43e67393ef93` |
 | `material-automation.png` | 1443×992 | 87,304 | `efe45408a390301294d5e23193b619eec858fcef4abb147d82709513c5bb3843` |
@@ -177,9 +201,9 @@ The later clone hardening tree at implementation commit
 | `material-pull-all-account-fallback.png` | 2048×1228 | 114,222 | `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991` |
 | `material-clone-account-fallback.png` | 2048×1228 | 140,143 | `89bb755ad37f6d8537815d411526fa6e16aeee9cd16446deabbc17595cb3623c` |
 
-## Root-finalized publication evidence
+## Historical root-finalized publication evidence
 
-The publication gate is closed:
+The M0–M18 publication gate was closed with this evidence:
 
 1. Final implementation baseline `b2699faccb07728fe9aa2838aa13355d71e172b0`
    passed all seven jobs in
@@ -215,13 +239,24 @@ The secure clone implementation commit
 `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d` is present in first reviewed
 `main` baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
 
-The later guided-function squash changes application code while intentionally
-excluding the source feature branch's commit ancestry. Its local integration
-checks are recorded in `HANDOFF.md`; it does not claim closing CI, installer,
-release, Pages, or public-documentation results for the eventual `main` SHA.
-Those rows must be refreshed from GitHub after the integration lands. Because
-this is a code integration, installer/release applicability must be evaluated
-alongside CI and Pages rather than treated as a documentation-only skip. The
-sanitized squash is an integration base until the pending pull-request
-routing/REST corrections, Actions artifact chained-redirect hardening, and their
-focused regressions are applied.
+The later guided-function integration intentionally excludes privacy-tainted
+feature ancestry. Its named P0/P1/P2/Later corrections and focused regressions
+are now present at the M19 checkpoint recorded above. This document does not
+reuse historical CI, installer, release, Pages, wiki, or screenshot evidence as
+proof for that newer source tree.
+
+## M19 closing evidence checklist
+
+- [ ] Replace the integration checkpoint with the exact final accepted source
+  SHA and record exhaustive unit, lint, TypeScript, formatting, diff, privacy,
+  and production-build results.
+- [ ] Record the deterministic synthetic cross-account clone ledger and exact
+  off-screen interaction matrix for representative Foundation/P0/P1/P2/Later
+  surfaces.
+- [ ] Add only inspected, identity-safe screenshots, with dimensions, byte
+  counts, SHA-256 digests, and their exact source/build SHA.
+- [ ] Record the merge to `main`, exact-SHA CI, Pages, canonical wiki,
+  installer/release, release-asset/digest, and public live-URL evidence.
+- [ ] Record cleanup of every owned process, hidden desktop, credential,
+  fixture, temporary root, and completed worktree; finish with clean local
+  `main` equal to `origin/main`.
