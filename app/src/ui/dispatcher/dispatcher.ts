@@ -1115,8 +1115,12 @@ export class Dispatcher {
    * Clone a missing repository to the previous path, and update it's
    * state in the repository list if the clone completes without error.
    */
-  public cloneAgain(url: string, path: string): Promise<void> {
-    return this.appStore._cloneAgain(url, path)
+  public cloneAgain(
+    url: string,
+    path: string,
+    accountKey: string | null = null
+  ): Promise<void> {
+    return this.appStore._cloneAgain(url, path, accountKey)
   }
 
   /** Clone the repository to the path. */
