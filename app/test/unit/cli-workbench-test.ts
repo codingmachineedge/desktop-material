@@ -28,7 +28,7 @@ describe('CLI workbench command contract', () => {
         '--client-secret',
         'also-secret',
       ]),
-      'gh auth login --token=[redacted] --client-secret "[redacted]"'
+      'gh auth login --token=[redacted] --client-secret [redacted]'
     )
     assert.equal(
       formatCLICommand('git', ['log', '--author', 'Mona Lisa']),

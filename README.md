@@ -102,8 +102,9 @@ Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is t
 | **Done** | Add safe GitHub feature request/response contracts | Selected-host relative paths, traversal rejection, mutation confirmation, bounded streamed responses, safe-header allowlisting, and deep credential redaction |
 | **Done** | Extend native Actions controls | Run/job reruns, normal and force cancellation, workflow enable/disable, confirmations, and responsive long-metadata containment |
 | **Done** | Remove known compact-layout sideways overflow | Settings, floating surfaces, repository rail, toolbar, Merge All, Pull All, Build & Run, Actions, and screenshot gallery now wrap, stack, clamp, or vertically scroll at compact sizes |
-| **Active** | Turn audited CLI capabilities into named repository functions | First batch: status summary, repository health, maintenance preview/run, and reflog recovery; fixed safe recipes, purpose-built controls, confirmation, streaming results, cancel, and repository refresh |
-| **Active** | Harden GitHub transport and expand named GitHub functions | Current GitHub.com API versioning and credential/header precedence, followed by Notifications, Issues, PR review/merge, Releases, repository rules/settings, and deeper Actions administration |
+| **Done** | Add the first guided repository-function batch | Status summary, repository health, maintenance preview/run, and reflog recovery use fixed safe recipes, purpose-built controls, confirmation, streaming results, exact cancel, and repository refresh—without a raw command search/editor |
+| **Active** | Expand audited Git capabilities as named functions | File history and blame are underway, followed by patch/bundle exchange, interactive rebase, shallow/sparse controls, restore-from-commit, signatures, hooks, LFS, remotes, and worktrees |
+| **Active** | Expand named GitHub functions on a hardened transport | GitHub.com REST versioning and credential/header precedence are done; Notifications is next, followed by Issues, PR review/merge, Releases, repository rules/settings, and deeper Actions administration |
 | **Done** | Complete the official GitKraken Desktop history comparison | Official surviving 0.6–6.0 posts plus 7.x–12.3 release archives were deduplicated into current-app coverage, implementable local gaps, and explicitly separated proprietary/cloud services |
 | **Blocked — environment** | Build and interactively verify every changed UI off-screen | The exact headless verifier passes preflight, but this checkout has no installed root dependencies or `cross-env`; the mandated no-download gate therefore refuses to launch an unbuilt app |
 | **Queued after build** | Refresh README, wiki, Pages, and screenshot evidence | Capture at desktop and compact widths, inspect original pixels for clipping/overlap/oversized text, record hashes, then publish the same verified state |
@@ -121,7 +122,7 @@ Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is t
 
 | Priority | Guided app functions | State |
 |---|---|---|
-| **P0** | Repository status/health/maintenance/reflog tools; file history and blame; current GitHub transport security | **Active** |
+| **P0** | Repository status/health/maintenance/reflog tools; file history and blame; current GitHub transport security | **Repository tools and transport done; file history/blame active** |
 | **P1 Git** | Command palette; full interactive-rebase todo editor; shallow and sparse controls; restore files from a commit; signing verification/settings; hooks, LFS, remotes, worktrees, and patch/bundle workflows | **Planned** |
 | **P1 GitHub** | Notifications; Issues; PR authoring/review/merge; Releases/assets; repository rules/settings/collaborators; Actions artifacts/caches/runners/secrets/variables/environments | **Planned** |
 | **P2** | Local multi-repository workspaces; provider-neutral triage inbox; local agent/worktree dashboard; Gitflow; deep links; maintenance/activity journal; branch pin/hide/solo; selected security/deployment/Pages/org/team functions | **Planned** |
