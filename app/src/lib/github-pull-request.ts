@@ -4,7 +4,6 @@ import { IRemote } from '../models/remote'
 import { Repository } from '../models/repository'
 import { APIError } from './http'
 import { validateGitHubRepositoryPart } from './github-issue'
-import { parseRepositoryIdentifier } from './remote-parsing'
 
 export const GitHubPullRequestTitleMaximumLength = 256
 export const GitHubPullRequestBodyMaximumLength = 65536
@@ -308,19 +307,85 @@ function getExactGitHubRepositoryHTMLURL(
     : null
 }
 
-function getRepositoryURLHostname(
+function repositoryPath(prefix: string, repository: GitHubRepository): string {
+  return `${prefix}/${encodeURIComponent(
+    repository.owner.login
+  )}/${encodeURIComponent(repository.name)}`.replace(/^\/\//, '/')
+}
+
+function matchesRepositoryPath(
+  actualPath: string,
+  expectedPath: string
+): boolean {
+  const normalized = actualPath.replace(/\/$/, '')
+  return normalized === expectedPath || normalized === `${expectedPath}.git`
+}
+
+/**
+ * Bind a Git remote to the endpoint-derived provider identity. HTTP(S) clone
+ * URLs must preserve the exact origin and web base path. SSH is intentionally
+ * narrower: canonical git user, provider host, default port, and owner/repo.
+ */
+function isExactGitHubRepositoryRemoteURL(
   value: string,
-  parsed: ReturnType<typeof parseRepositoryIdentifier>
-): string | null {
+  repository: GitHubRepository,
+  providerHTMLURL: string
+): boolean {
+  let providerURL: URL
   try {
-    const url = new URL(value)
-    if (['http:', 'https:'].includes(url.protocol)) {
-      return url.hostname
-    }
+    providerURL = new URL(providerHTMLURL)
   } catch {
-    // SSH/scp-style Git remotes are handled by parseRepositoryIdentifier.
+    return false
   }
-  return parsed?.hostname ?? null
+
+  const matchesSCPStyleRemote = () => {
+    const scp = /^git@([^/:]+):([^/]+)\/([^/]+)\/?$/.exec(value)
+    if (scp === null) {
+      return false
+    }
+
+    const name = scp[3].endsWith('.git') ? scp[3].slice(0, -4) : scp[3]
+    return (
+      scp[1].toLowerCase() === providerURL.hostname.toLowerCase() &&
+      scp[2].toLowerCase() === repository.owner.login.toLowerCase() &&
+      name.toLowerCase() === repository.name.toLowerCase()
+    )
+  }
+
+  try {
+    const remoteURL = new URL(value)
+    if (['http:', 'https:'].includes(remoteURL.protocol)) {
+      return (
+        remoteURL.origin === providerURL.origin &&
+        remoteURL.search === '' &&
+        remoteURL.hash === '' &&
+        matchesRepositoryPath(
+          remoteURL.pathname,
+          repositoryPath(providerURL.pathname.replace(/\/+$/, ''), repository)
+        )
+      )
+    }
+
+    if (remoteURL.protocol === 'ssh:') {
+      return (
+        remoteURL.hostname.toLowerCase() ===
+          providerURL.hostname.toLowerCase() &&
+        (remoteURL.port === '' || remoteURL.port === '22') &&
+        remoteURL.username === 'git' &&
+        remoteURL.password === '' &&
+        remoteURL.search === '' &&
+        remoteURL.hash === '' &&
+        matchesRepositoryPath(
+          remoteURL.pathname,
+          repositoryPath('', repository)
+        )
+      )
+    }
+
+    return matchesSCPStyleRemote()
+  } catch {
+    return matchesSCPStyleRemote()
+  }
 }
 
 /** Build the exact head value expected by GitHub for same-repo and fork PRs. */
@@ -340,34 +405,23 @@ export function getGitHubPullRequestHead(
     )
   }
 
-  const remoteRepository = parseRepositoryIdentifier(sourceRemote.url)
   const providerSourceURL = getExactGitHubRepositoryHTMLURL(
     source,
     providerHTMLURL
   )
-  const sourceRepositoryURL =
-    source.cloneURL === null ? source.htmlURL : source.cloneURL
-  const sourceRepository =
-    sourceRepositoryURL === null
-      ? null
-      : parseRepositoryIdentifier(sourceRepositoryURL)
-  const remoteHostname = getRepositoryURLHostname(
-    sourceRemote.url,
-    remoteRepository
-  )
-  const sourceHostname =
-    sourceRepositoryURL === null
-      ? null
-      : getRepositoryURLHostname(sourceRepositoryURL, sourceRepository)
   if (
-    remoteRepository === null ||
     providerSourceURL === null ||
-    sourceRepository === null ||
-    remoteRepository.owner.toLowerCase() !== source.owner.login.toLowerCase() ||
-    remoteRepository.name.toLowerCase() !== source.name.toLowerCase() ||
-    (sourceHostname !== null &&
-      remoteHostname?.toLowerCase() !== sourceHostname.toLowerCase()) ||
-    remoteHostname?.toLowerCase() !== providerSourceURL.hostname.toLowerCase()
+    !isExactGitHubRepositoryRemoteURL(
+      sourceRemote.url,
+      source,
+      providerHTMLURL
+    ) ||
+    (source.cloneURL !== null &&
+      !isExactGitHubRepositoryRemoteURL(
+        source.cloneURL,
+        source,
+        providerHTMLURL
+      ))
   ) {
     throw new Error(
       'The current branch upstream does not belong to the source repository.'

@@ -209,6 +209,77 @@ describe('GitHub pull request validation', () => {
     )
   })
 
+  it('binds HTTPS, enterprise-base, custom HTTP, and SSH remotes to the provider', () => {
+    const branch = createBranch('feature', 'origin/published-feature')
+    const cases = [
+      {
+        html: 'https://github.com/octocat/material',
+        provider: 'https://github.com',
+        remote: 'https://github.com/octocat/material.git',
+      },
+      {
+        html: 'https://github.example.test/code/octocat/material',
+        provider: 'https://github.example.test/code',
+        remote: 'https://github.example.test/code/octocat/material.git',
+      },
+      {
+        html: 'http://github.internal:8080/code/octocat/material',
+        provider: 'http://github.internal:8080/code',
+        remote: 'http://github.internal:8080/code/octocat/material.git',
+      },
+      {
+        html: 'https://github.com/octocat/material',
+        provider: 'https://github.com',
+        remote: 'git@github.com:octocat/material.git',
+      },
+      {
+        html: 'https://github.com/octocat/material',
+        provider: 'https://github.com',
+        remote: 'ssh://git@github.com/octocat/material.git',
+      },
+    ]
+
+    for (const fixture of cases) {
+      const source = createGitHubRepository('octocat', 'material', fixture.html)
+      assert.equal(
+        getGitHubPullRequestHead(
+          source,
+          source,
+          branch,
+          createRemote('origin', fixture.remote),
+          fixture.provider
+        ),
+        'published-feature'
+      )
+    }
+  })
+
+  it('rejects alternate HTTP ports/base paths and non-default SSH routes', () => {
+    const source = createGitHubRepository(
+      'octocat',
+      'material',
+      'https://github.example.test/code/octocat/material'
+    )
+    const branch = createBranch('feature', 'origin/published-feature')
+
+    for (const remote of [
+      'https://github.example.test:8443/code/octocat/material.git',
+      'https://github.example.test/other/octocat/material.git',
+      'ssh://git@github.example.test:2222/octocat/material.git',
+      'ssh://git@github.example.test/other/octocat/material.git',
+    ]) {
+      assert.throws(() =>
+        getGitHubPullRequestHead(
+          source,
+          source,
+          branch,
+          createRemote('origin', remote),
+          'https://github.example.test/code'
+        )
+      )
+    }
+  })
+
   it('maps self and parent base branches to exact differently named remotes', () => {
     const parent = createGitHubRepository(
       'desktop',
