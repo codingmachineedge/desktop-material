@@ -111,6 +111,11 @@ See [Agent API](Agent-API) for connection steps, command names, and the security
 
 These features follow the same Store/Dispatcher rule rather than creating parallel state paths:
 
+The [Guided Feature Gallery](Feature-Gallery) is the documentation manifest for the synthetic
+acceptance views associated with these subsystems. Keep captures free of personal paths, account
+identifiers, credentials, signed URLs, and unbounded provider payloads. A tracked image reference
+does not replace exact-source build, CI, public publication, release, or cleanup evidence.
+
 - **Accounts, organizations, and providers** — account state and organization loading live in
   `app/src/lib/stores/accounts-store.ts`; provider credentials are modelled in the account/auth
   layer; `app/src/ui/clone-repository/` merges personal and organization repositories and hosts the

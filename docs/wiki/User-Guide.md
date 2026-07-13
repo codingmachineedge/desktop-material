@@ -18,6 +18,7 @@ implementation-complete in the current integration tree; final production/off-sc
 - [Multi-clone](#multi-clone)
 - [Clone account fallback](#clone-account-fallback)
 - [Guided Git, GitHub, and provider functions](#guided-git-github-and-provider-functions)
+- [Guided Feature Gallery](Feature-Gallery)
 - [One-click commit & push](#one-click-commit--push)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
@@ -226,6 +227,9 @@ The complete guided implementation described here still needs the final exact-tr
 off-screen acceptance gate before publication; earlier screenshots prove only the historical trees
 named in their evidence manifests.
 
+The [Guided Feature Gallery](Feature-Gallery) is the synthetic-data visual manifest for the 14
+guided views. Its presence does not pre-claim the remaining publication gates.
+
 ### Shallow clone
 
 Open **File → Clone repository… → URL** when you need only recent history:
@@ -237,6 +241,10 @@ Open **File → Clone repository… → URL** when you need only recent history:
 
 The form explains that it fetches the current branch and recursive submodules. If you need older
 history later, use the named deepen-history action in **Repository tools**.
+
+![Reviewed shallow clone with a bounded commit depth](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-shallow-clone-safe.png)
+
+![Deepen-history result without displaying the signed-in account used](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepen.png)
 
 ### Sparse checkout
 
@@ -251,6 +259,8 @@ state leaves all working-tree paths eligible to appear locally.
 These forms wrap labels and stack actions as space narrows. Page-level sideways scrolling is not
 part of the workflow; only inherently spatial content such as code, diffs, and logs may scroll
 horizontally when preserving columns is necessary.
+
+![Validated cone-mode sparse-checkout review](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
 
 ### Repository Tools administration
 
@@ -271,6 +281,10 @@ Open **Repository → Repository tools…** for the reviewed administration work
   summaries for GitHub, GitLab, or Bitbucket. It exposes safe provider links and explicit partial,
   capped, unsupported, and error states; Bitbucket Issues are explicitly unsupported.
 
+![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
+
+![Account- and repository-bound provider triage with bounded results](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-provider-triage.png)
+
 ### Branch, worktree, stash, remote, and conflict controls
 
 - Use a branch context menu to **pin**, **hide**, or **solo** a branch; the filtered-state controls
@@ -282,6 +296,10 @@ Open **Repository → Repository tools…** for the reviewed administration work
   the exact selected stash and keeps partial-success details visible.
 - **Repository settings → Remote** manages every named remote through reviewed add, rename, URL/
   push-URL update, default selection, and guarded removal operations.
+
+![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
+
+![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
 
 ### GitHub lifecycle workspaces
 
@@ -295,6 +313,14 @@ Open **Repository → Repository tools…** for the reviewed administration work
   uses bounded cancelable upload/download transfers that present filenames rather than local paths.
 - **Issues** supports bounded browse/search/filter/sort/pagination, exact detail and comments,
   metadata edits, new comments, and close/reopen operations tied to the reviewed issue snapshot.
+
+![Native pull-request creation with bounded metadata](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-native-pull-request.png)
+
+![Bounded Actions artifact download with a locally computed digest](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-download.png)
+
+![Repository-bound Releases and assets workspace](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-releases.png)
+
+![Issue detail, comments, and reviewed lifecycle controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-issues.png)
 
 ---
 

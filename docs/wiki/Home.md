@@ -30,6 +30,7 @@ P0/P1/P2/Later Git, GitHub, and provider parity wave described below.
 | Page | What it covers |
 | --- | --- |
 | [User Guide](User-Guide) | Task-oriented walkthrough for accounts, guided Git/GitHub/provider functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
+| [Guided Feature Gallery](Feature-Gallery) | Synthetic-data visual manifest for clone, pull-all, deepen, sparse checkout, repository administration, GitHub lifecycle, and provider triage. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
@@ -118,6 +119,10 @@ catalogue:
 
 These functions remain marked **integration complete, final acceptance pending** until their exact
 production tree and public promotion evidence is recorded.
+
+The [Guided Feature Gallery](Feature-Gallery) maps the candidate 14-image set to these workflows.
+Its asset list is documentation metadata, not a substitute for the final `main`, CI, public-site,
+wiki, installer, release, or cleanup gates.
 
 ![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
