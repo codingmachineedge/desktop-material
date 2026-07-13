@@ -856,6 +856,11 @@ export interface ICLICommandValidationDependencies {
   readonly inspectBisectMutationState: (
     repositoryPath: string
   ) => Promise<IRepositoryBisectMutationState>
+  readonly isBisectRangeValid: (
+    repositoryPath: string,
+    goodOid: string,
+    badOid: string
+  ) => Promise<boolean>
 }
 
 export interface IRepositoryBisectMutationState {
@@ -899,6 +904,37 @@ function runGitProbe(
           return
         }
         resolveProbe(stdout)
+      }
+    )
+  })
+}
+
+function runGitBooleanProbe(
+  tool: IResolvedCLIWorkbenchTool,
+  repositoryPath: string,
+  args: ReadonlyArray<string>
+): Promise<boolean> {
+  return new Promise((resolveProbe, rejectProbe) => {
+    execFile(
+      tool.executable,
+      [...args],
+      {
+        cwd: repositoryPath,
+        env: tool.env,
+        encoding: 'utf8',
+        maxBuffer: MaximumProbeOutputBytes,
+        windowsHide: true,
+      },
+      error => {
+        if (error === null) {
+          resolveProbe(true)
+          return
+        }
+        if (error.code === 1) {
+          resolveProbe(false)
+          return
+        }
+        rejectProbe(new Error('Bundled Git could not verify the repository.'))
       }
     )
   })
@@ -975,6 +1011,13 @@ export function createCLICommandValidationDependencies(
         head,
       }
     },
+    isBisectRangeValid: (repositoryPath, goodOid, badOid) =>
+      runGitBooleanProbe(tool, repositoryPath, [
+        'merge-base',
+        '--is-ancestor',
+        goodOid,
+        badOid,
+      ]),
   }
 }
 
@@ -1215,6 +1258,19 @@ async function validateBisectMutationState(
     )
   }
   if (recipe.kind === 'repository-bisect-start') {
+    let rangeValid: boolean
+    try {
+      rangeValid = await dependencies.isBisectRangeValid(
+        repositoryPath,
+        recipe.goodOid,
+        recipe.badOid
+      )
+    } catch {
+      throw new Error('Bundled Git could not verify the bisect range.')
+    }
+    if (!rangeValid) {
+      throw new Error('The known-good commit must be an ancestor of known-bad.')
+    }
     if (state.active) {
       throw new Error(
         'A bisect session is already active. Inspect or reset it first.'

@@ -40,6 +40,7 @@ function fakeDependencies(
       clean: true,
       head: 'a'.repeat(40),
     }),
+    isBisectRangeValid: async () => true,
     ...overrides,
   }
 }
@@ -655,6 +656,35 @@ describe('CLI workbench runner helpers', () => {
       }),
     })
     try {
+      const start = await validateCLICommandRequest(
+        request(
+          root,
+          {
+            kind: 'repository-bisect-start',
+            goodOid: 'a'.repeat(40),
+            badOid: 'b'.repeat(40),
+          },
+          true,
+          'bisect-start'
+        ),
+        fakeDependencies(root)
+      )
+      assert.deepStrictEqual(start.args, [
+        'bisect',
+        'start',
+        'b'.repeat(40),
+        'a'.repeat(40),
+      ])
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(
+          start,
+          fakeDependencies(root, {
+            isBisectRangeValid: async () => false,
+          })
+        ),
+        /must be an ancestor/
+      )
+
       const mark = await validateCLICommandRequest(
         request(
           root,
