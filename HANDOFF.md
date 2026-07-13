@@ -18,8 +18,8 @@ and cleanup must still close before M19 can be called shipped.
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Documentation checkpoint
-`ac794db8f094b609f661bfa63bad34a321b84090` contains the
+`codex/guided-final-gate`. Current source checkpoint
+`a00e751c575c80dee345b1b51b1d411dcd20e911` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -65,6 +65,11 @@ the deterministic account-proof fixture, exhaustive gates, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
 can be closed.
+
+The current source checkpoint also makes the Windows full-suite launcher run
+all 360 test files in two bounded batches. That interim integration run exited
+successfully, but it predates the final accepted union and is not recorded as
+the closing post-merge test result.
 
 ### Closing evidence placeholders — fill only after success
 

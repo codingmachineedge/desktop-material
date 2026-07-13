@@ -5,12 +5,17 @@
 Milestones **M0 through M18 are shipped on `main`** through historical
 implementation baseline `b2699faccb07728fe9aa2838aa13355d71e172b0`.
 The later guided parity milestone, **M19**, is implementation-complete through
-integration checkpoint `ac794db8f094b609f661bfa63bad34a321b84090` on
+integration checkpoint `a00e751c575c80dee345b1b51b1d411dcd20e911` on
 `codex/guided-final-gate`. Every named P0, P1, P2, and Later capability is in
 that source tree with focused regression evidence. M19 is not yet described as
 shipped on `main`: exhaustive final gates, the exact production/off-screen
 acceptance run, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, release verification, and cleanup remain open.
+
+That checkpoint also changed the Windows unit launcher to run the full 360-file
+suite in two bounded batches; its interim integration run exited successfully.
+It is not the final post-merge acceptance result and must not replace the open
+closing checklist below.
 
 The M0–M18 baseline includes the responsive-shell correction prompted by the final
 1450×997 review, its exact-size headless regression capture, the public
