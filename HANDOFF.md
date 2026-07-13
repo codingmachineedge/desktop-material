@@ -1,193 +1,194 @@
-# Desktop Material — Session Handoff
+# Desktop Material — Final Handoff
 
-This document captures the working state and the environment setup needed to
-build, run, and verify the app. The full feature plan lives in
-[`PLAN.md`](PLAN.md); this file is the "how to pick up where we left off".
+## Outcome
 
-## What shipped this session (all on `main`)
+The requested roadmap is implemented: **M0 through M18 are complete and
+shipped on `main`** through the pre-documentation integration SHA
+`4da59bd38308fff45b48f09819d08cbc356ee946`. The implementation work, merge
+fixes, full local validation, production build, and final headless screenshots
+are complete. There is no remaining queued or in-flight feature work in
+[`PLAN.md`](PLAN.md).
 
-| Area | Commit(s) | Notes |
+This file deliberately does **not** claim that the final documentation merge is
+already public. After these two closing documents are merged, the root
+integrator must verify the resulting `main` SHA, applicable CI and Pages runs,
+README/site assets, canonical wiki publication, and the final
+accessibility/clipping gate. That post-merge evidence belongs in the root's
+final response.
+
+## Completed milestone summary
+
+| Milestone | Status | Shipped result |
 | --- | --- | --- |
-| **M0 — Publishing** | `d367c92` | README rewrite, Material Design 3 GitHub Pages site under `site/` (live at https://codingmachineedge.github.io/desktop-material/), wiki sources under `docs/wiki/`, screenshots in `docs/assets/screenshots/`, CI enabled on `main`. |
-| **Installer + release** | `52b2abf` (+ `75a28a5`) | `.github/workflows/build-installers.yml` builds the **Windows** installer and publishes a **full GitHub release on every push to `main`** (direct-to-release, no artifacts; macOS dropped). |
-| **CI fixes** | `e50a6df` | Formatted a pre-existing Prettier violation (`app/styles/ui/_button.scss`); switched CI off the unavailable `macos-14-xlarge` runner to `macos-14`. |
-| **M1 — Per-account profiles** | `9826361` | Each account gets a git repo under `userData/profiles/<sanitized>/` that auto-commits UI-settings changes. Verified: 15 unit tests, built + passed Windows E2E-smoke on CI. |
-| **M2 — Repository tabs** | `18b3876`, `007845c` | Browser-style tab strip + per-tab "Tab text style" editor. **Verified headlessly matching the design prototype.** |
-| **M3 — Settings history manager** | `4114fa2`, `b89b9ce`, wiki `c818fd5` | Shared Git-backed history UI, lazy diffs, logical undo/redo, restore-to-point, audit commits, menu/shortcut wiring, tab/settings reconciliation, live screenshot, and published README/Pages/wiki docs. Verified live on an isolated Win32 Headless Desktop. |
-| **M4 — Non-modal dialogs** | `690ea60a`, `e9cf5b3d` | Non-modal floating dialog framework: drag-by-header, bring-to-front, cascade, pointer-events-none layer so the app stays interactive behind open dialogs. Preferences rebuilt as the MD3 940×660 dialog (left rail + Active chip + pill footer). Verified live headless: the app is interactive behind open dialogs. |
-| **M18 — MD3 shell visual clone** | 17 commits `…`→`80be0f6e` | Full visual clone of the design prototype: MD3 color/motion/shape tokens + 16 keyframes; app-bar branding + pill inline menu; floating pill toolbar with repo/branch chips + a sync pill with an ahead badge; left icon navigation rail (Changes badge/History/Branches/Settings/avatar); floating radius-24 workspace cards; full MD3 workspace surfaces (tri-state checkboxes, tonal status chips, token diff colors, inverse-surface undo banner, redesigned welcome flow + blank slate); repository & branch left side sheets; clone dialog restyle + tab-style popover. Verified live headless. |
-| **Conformance Waves A/B** | `420e199`→`b5e0300` | Design-conformance sweep vs the prototype: composer 2-row description + ellipsized commit label; tab geometry (38px raised active tab); app-bar chip stagger + chevron rotate; rail icons 22px; Settings footer order; Changes panel header (H1 + count chip); diff header subline + `+adds`/`−dels` chips + open-in-editor; Settings branded "Settings" with a full-height rail; repository/branch side-sheet FAB + current markers + headers; inline tab-format button + 38px title bar. Fixed a real E2E regression from the non-modal work (`ebfd6bd`: dialog `data-busy` gates the app during in-flight ops). |
-| **Gitignore manager** | `35cc6d9`, `2a75fa2` | Per-repo `.gitignore` manager (Repository → Manage .gitignore…): CC0 template catalog (~19, generated from the bundled github/gitignore), repo-content auto-suggest, searchable catalog, marker-section merge (idempotent/reversible). 37 tests. Verified live headless. |
-| **Unhide gated features** | `0e63c2b`→`d2998bb` | Fork ships a **production** channel despite the beta tag, so beta-gated features were hidden. Flipped safe ones on: README-overwrite warning, previous-tag suggestions, accessible list tooltips, unhandled-rejection reporting, WSL shell detection, default git-hooks env. Plus the update-URL fix (stop polling upstream's updater). |
-| **One-click Build & Run** | `bedd4ea`→`45bcba5` (+ `215523c`) | Detect build profile (node/pnpm/yarn, rust, go, dotnet, python, java, make/cmake) → auto-gitignore build outputs → install → build → run, streamed to an MD3 log panel; bounded auto-fix; **auto-install missing toolchains** (winget/corepack) with single-prompt UAC pre-elevation; **multiple .NET project picker**; **minimize** the log panel; per-repo Build & Run settings tab. |
-| **M8 (partial) — UI scaling + auto-fit** | `44e450a` | Fixes "too big on small windows": `lib/zoom.ts`, AppStore as single zoom owner, 150ms-debounced auto-fit multiplier (on by default), Appearance 50–200% slider + auto-fit switch, composes with Ctrl +/−/0. |
-| **De-stock (full Material)** | `749949b`, `3cb437c`… | Re-tinted the remaining stock surfaces through Material tokens (both themes): tooltips (vars were never remapped), autocomplete popup, segmented controls, split-buttons, diff-options, author-input, banners, app-menu rows, dialog internals, History/CI surfaces. |
-| **M5 — Notification centre** | `6f5230a`, `14597ca` | Bell + right side sheet backed by its own local git repo; unread badges, mark read/unread, delete, mark-all; git-backed notification history (shared VersionedStoreHistory). |
-| **M6 — Search + regex builder** | `6b9e76b`, `40e59df` | Fuzzy/substring/regex filter modes + case toggle + per-list filter chips across search bars; full regex builder (blocks, flags, live tester); inline MD3 filter chip row on Changes. |
-| **User-feedback fixes** | `40e59df`→`c844912` | Account-picker selection by identity (bug); Word-like tab editor (searchable font picker, full color picker, size that enlarges the tab); settings/notification history clickability; fork auto-update via the GitHub releases feed. |
+| **M0** | **COMPLETE** | CI, Pages, Windows installer/release workflow, README, wiki sources, and screenshot pipeline. |
+| **M1** | **COMPLETE** | Token-safe per-account settings repositories with serialized Git history and recovery. |
+| **M2** | **COMPLETE** | Persistent browser-style repository tabs with range/regex close controls and rich per-tab styling. |
+| **M3** | **COMPLETE** | Reusable Git-backed settings history, diffs, undo/redo, and restore-to-point. |
+| **M4** | **COMPLETE** | Draggable non-modal dialogs and Material side sheets that preserve background interaction. |
+| **M5** | **COMPLETE** | Notification centre with unread controls, Git-backed event log, and notification history. |
+| **M6** | **COMPLETE** | Shared fuzzy/substring/regex search modes, filters, and full regex builder. |
+| **M7** | **COMPLETE** | Parallel/sequential multi-clone plus URL-only repository export/import. |
+| **M8** | **COMPLETE** | 50–200% UI scaling, auto-fit, and full GitHub organization repository browsing. |
+| **M9** | **COMPLETE** | One-click commit/push, schedulers, safe auto-pull, and merge-all branches/worktrees. |
+| **M10** | **COMPLETE** | GitHub Actions runs, reruns, workflow dispatch, job detail, and searchable logs. |
+| **M11** | **COMPLETE** | Secure localhost MCP/REST agent server, renderer bridge, stdio proxy, CLI, and Preferences UI. |
+| **M12** | **COMPLETE** | Desktop Plus quick-win parity: telemetry off, status/sort controls, Material actions, identity, permanent discard, hide-recent, and accessibility tooltips. |
+| **M13** | **COMPLETE** | Repository metadata/defaults, pinning/grouping, branch pills, Pull all, remotes, and submodules. |
+| **M14** | **COMPLETE** | History metadata/regex search, commit graph, guarded deletion, SVG preview, and branch presets. |
+| **M15** | **COMPLETE** | Multiple stashes per branch and the rebranded Desktop Material CLI. |
+| **M16** | **COMPLETE** | Tab-aware multi-window lifecycle, routing, scoping, and serialized profile mutation. |
+| **M17** | **COMPLETE** | GitLab/Bitbucket providers, self-hosted GitLab PAT flow, clone browsing, and cross-host PR/status routing. |
+| **M18** | **COMPLETE** | Full Material shell and final post-shell polish, including layout, clipping, and accessibility regression coverage. |
 
-Working tree is clean; everything through `c844912ba2` is pushed. **Batch 2 is building in parallel worktrees** (layout/clipping fixes, cramped search row, History search bar, multi-remote manager, submodule manager, tab close-left/right/others + close-containing-regex, and M7 multi-clone). The full outstanding queue (with per-item detail) lives in the session task list; the milestone plan is [`PLAN.md`](PLAN.md).
+Additional shipped work includes the `.gitignore` manager, Build & Run with
+toolchain/project handling, multi-remote and submodule managers, fork-owned
+updating, and the merge-wave integration fixes listed in Git history.
 
-## Working method (this session)
+## Merged implementation ledger
 
-- **Parallel worktrees for speed.** Independent, file-disjoint features are built by concurrent Opus agents, each in its own git worktree (no shared `node_modules`, so agents self-review types/imports and a **merge integrator** runs `yarn lint` + `tsc` + the unit suite on `main` after each `--no-ff` merge, fixing trivia, then pushes and removes the worktree). Two waves have landed this way (5-feature + 6-feedback); a third is in flight.
-- **Verification runtime.** The unit runner works on the system Node with `node script/test.mjs --no-experimental-webstorage` (Node 26 ships a `localStorage` global that otherwise collides); it **hangs at the tail** after reporting — scan the streamed output for failures (ignore only the environmental `get-shell-env` pwsh test) and kill the lingering worker. Latest full-suite baseline: **2,165 passing / 0 new failures**.
-- **Headless viewport.** The default off-screen launch window is below the app's 1240×700 minimum at 150% display scale, which makes layouts falsely look clipped/too-big. Launch Electron with `--remote-debugging-port=9223` and resize via CDP page eval `window.resizeTo(2100,1250)` before judging (Electron's CDP lacks `Browser.setWindowBounds`); measure the real DOM over CDP. Only compare at ≥1240×700 CSS px.
+These are the first paths to inspect when maintaining each subsystem:
 
-## Published M3 state
-
-- Published M3 content SHA: `b89b9cedb2d232b2ea313f7bc11b7508c1573d54`
-  (the later handoff-only update does not alter the shipped app, site, or image).
-- Code SHA `4114fa2bb00d8dfc67c84b7ed16d0f506050bb30` passed
-  [CI](https://github.com/codingmachineedge/desktop-material/actions/runs/29176909891)
-  and [Build Installers](https://github.com/codingmachineedge/desktop-material/actions/runs/29176909881).
-- Documentation SHA `b89b9cedb2d232b2ea313f7bc11b7508c1573d54`
-  passed [CI](https://github.com/codingmachineedge/desktop-material/actions/runs/29177022962)
-  and [Deploy Pages](https://github.com/codingmachineedge/desktop-material/actions/runs/29177022975).
-- The [live project site](https://codingmachineedge.github.io/desktop-material/)
-  and its Settings history image return HTTP 200. The live PNG is 108,337
-  bytes and exactly matches the tracked SHA-256
-  `abbcc34aa02949d2144f008c9ed10b4414f721843890643d65d8e0b9360c3da1`.
-- [Release `v3.6.3-beta3-build.8`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-build.8)
-  is public, non-draft, non-prerelease, cites the exact code SHA, and contains
-  three non-empty GitHub-digested assets (NUPKG, EXE, MSI).
-- The [GitHub wiki](https://github.com/codingmachineedge/desktop-material/wiki)
-  is initialized and all six canonical pages are published at wiki commit
-  `c818fd5b6859a12ed297fe93334bd5a434fe9cc8`. Live `Home` and `User Guide`
-  return HTTP 200, contain the M3 Settings History content, and render the exact
-  raw-main screenshot URL.
-
-## Published state after the visual clone (M18 shell + M4)
-
-- The MD3 shell + M4 code shipped through `80be0f6e02`.
-- A docs-accuracy pass then rewrote **README**, the **`site/`** Pages source, and the wiki
-  **Home** and **User Guide** to split **Shipped today** (multi-account M1, repo tabs M2, settings
-  history M3, non-modal dialogs M4, the full MD3 shell) from **On the roadmap** (notification centre,
-  regex builder, multi-clone, automation, Actions panel, MCP server, gitignore manager, Build & Run,
-  org support, UI scaling, GitLab/Bitbucket, desktop-plus parity). This corrects earlier docs that
-  described notification centre, automation, and regex search as if shipped.
-- New hero + gallery screenshots are tracked under `docs/assets/screenshots/`
-  (`material-workspace-changes.png` is the hero). The wiki pages reference them via raw-main URLs.
-- The Automation, Regex Guide, and Agent API wiki pages remain as roadmap design docs and are now
-  labelled **Planned** on the wiki Home page.
-
-## Critical environment setup
-
-- Use the repository runtime from `.tool-versions` (**Node 24.15.0**). The M3 full
-  suite was verified with the bundled Node 24.14 runtime. System Node 26 exposes an
-  experimental global `localStorage` that collides with the test runner; run the unit
-  suite with **`node --no-experimental-webstorage`** (the test-runner flag that
-  disables that global) to run green on Node 26. Node 24.15.0 remains the release
-  validation runtime.
-- `node_modules/electron/dist/electron.exe` is present and the production build
-  runs from the repository. If a future install loses native modules on VS 2026,
-  refresh the repo-local `node-gyp` from a current global install, then run
-  `npm rebuild` and `yarn run postinstall`.
-- Do not download dependencies during an unattended capture. The reproducible
-  build uses only installed packages.
-
-## How to run and verify the UI without touching the real desktop
-
-Use the exact lowlevel MCP checkout at
-`C:\Users\cntow\Documents\GitHub\lowlevel-computer-use-mcp` (verified commit
-`beed66ca6ed2503e6170ee1e1158247f1c2f0140`) through its HTTP endpoint
-`http://127.0.0.1:8765/mcp`. The repeatable client and safety workflow live in
-`.codex/skills/verify-desktop-material-headless/`.
-
-1. Build through MCP `run_command`:
-   `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`.
-2. Create unique Temp fixture/user-data paths and one uniquely named Win32
-   Headless Desktop.
-3. Launch `node_modules/electron/dist/electron.exe --disable-gpu out/main.js`
-   on that desktop with the isolated paths, then discover the current HWND.
-4. Use only HWND-bound background clicks/keys and PrintWindow screenshots. Never
-   call `show_headless_desktop`, focus a normal window, or send global input.
-5. Inspect the Temp screenshot at original resolution before promoting it, then
-   revalidate the exact HWND/PID, close the app and desktop, and remove owned
-   Temp paths.
-
-## M3 verification evidence
-
-- Focused M3/regression suite: **56/56 passed**.
-- Full unit suite under Node 24.14: **1,519 tests; 1,518 passed, 1 skipped, 0 failed**.
-- Standalone popup regression under Node 26: **26/26 passed**.
-- `yarn tsc --noEmit --skipLibCheck`: passed.
-- Repository-wide `yarn lint`: passed.
-- Production unpackaged build through the exact lowlevel MCP server: passed;
-  webpack emitted `out/` successfully.
-- Live UI smoke: Settings history opened on an isolated Headless Desktop, then
-  Undo and Redo were exercised with HWND-bound background clicks.
-- Promoted screenshot: `docs/assets/screenshots/settings-history-manager.png`,
-  **1443×992**, SHA-256
-  `abbcc34aa02949d2144f008c9ed10b4414f721843890643d65d8e0b9360c3da1`.
-- `git diff --check` and the changed-file secret scan passed.
-
-## Visual clone + M4 verification evidence (at `80be0f6e02`)
-
-- Full unit suite: **1,521 tests; 1,520 passed, 1 skipped, 0 failed** (run under Node with
-  `--no-experimental-webstorage`; see the environment note above).
-- Production unpackaged build through the exact lowlevel MCP server: passed; webpack emitted `out/`.
-- Live UI smoke on an isolated Win32 Headless Desktop, driven only by HWND-bound background input:
-  - The **MD3 shell** renders — icon navigation rail, floating pill toolbar with repo/branch chips
-    and the sync pill, repository tabs, and the floating Changes card.
-  - The **repository and branch side sheets** open and list their content.
-  - **Preferences** opens as the MD3 940×660 dialog with the left rail, Active chip, and pill footer.
-  - **Non-modal interactivity confirmed**: with a dialog open, the app behind it still responds to
-    input (the pointer-events-none dialog layer works as designed).
-- Promoted screenshots (all fresh, verified): `material-workspace-changes.png` (hero),
-  `material-history.png`, `material-welcome.png`, `material-settings.png`,
-  `material-repositories-sheet.png`, `material-branches-sheet.png`.
-
-## Architecture added (for continuing the plan)
-
-- **Profiles (M1):** `app/src/models/profile.ts`, `app/src/lib/profiles/*`,
-  `app/src/lib/stores/profile-store.ts`. Settings writes, tab writes, flushes,
-  history reads, and history mutations share one per-profile queue so concurrent
-  changes cannot be folded into an undo/redo operation or lost.
-- **Tabs (M2):** `app/src/models/repository-tab.ts`,
+- **Profiles, tabs, and history:** `app/src/lib/profiles/`,
+  `app/src/lib/stores/profile-store.ts`,
   `app/src/lib/stores/repository-tabs-store.ts`,
-  `app/src/ui/repository-tabs/*`, styles in
-  `app/styles/ui/_repository-tabs.scss`. The strip mounts in `app.tsx`
-  `renderApp()` above the toolbar; selection→tab is hooked in `index.tsx`.
-- **History (M3):** `app/src/ui/version-history/*` is the reusable history UI;
-  `app/src/ui/settings-history/*` is its settings wrapper. Profile history APIs
-  provide paged commits, selected-file diffs, logical multi-level undo/redo, and
-  restore-to-point without rewriting history. Menu, popup, dispatcher, and app
-  store wiring make Settings history non-modal. Restores rebind an active tab by
-  repository ID/path and refresh active diffs when whitespace settings change.
+  `app/src/ui/repository-tabs/`, `app/src/ui/version-history/`, and
+  `app/src/ui/settings-history/`.
+- **Notifications and search:**
+  `app/src/lib/stores/notification-centre-store.ts`,
+  `app/src/ui/notifications/`, `app/src/lib/fuzzy-find.ts`,
+  `app/src/ui/lib/filter-mode-control.tsx`, and
+  `app/src/ui/lib/regex-builder/`.
+- **Clone, organizations, and transfer:**
+  `app/src/lib/stores/batch-clone-store.ts`,
+  `app/src/ui/clone-repository/`, `app/src/lib/repo-list-file.ts`, and
+  `app/src/ui/repository-list-transfer/`.
+- **Automation:** `app/src/lib/automation/`,
+  `app/src/lib/stores/helpers/automation-scheduler.ts`,
+  `app/src/ui/preferences/automation.tsx`,
+  `app/src/ui/repository-settings/automation-overrides.tsx`, and
+  `app/src/ui/merge-all/`.
+- **Actions and agent access:** `app/src/lib/stores/actions-store.ts`,
+  `app/src/ui/actions/`, `app/src/lib/agent-commands.ts`,
+  `app/src/main-process/agent-server/`,
+  `app/src/lib/agent-command-executor.ts`, `script/agent/`, and
+  `docs/agent-api.md`.
+- **Repository parity:** `app/src/lib/databases/repositories-database.ts`,
+  `app/src/ui/repository-settings/`, `app/src/ui/pull-all/`,
+  `app/src/ui/history/`, `app/src/ui/diff/image-diffs/`,
+  `app/src/ui/stashing/`, and `app/src/cli/`.
+- **Providers and windows:** `app/src/lib/api.ts`,
+  `app/src/lib/stores/accounts-store.ts`,
+  `app/src/main-process/window-routing.ts`,
+  `app/src/main-process/app-window.ts`, `app/src/lib/window-scope.ts`, and
+  `docs/integrations/`.
+- **Material UI:** `app/styles/_material.scss`,
+  `app/styles/_material-shell.scss`, `app/styles/ui/`, and
+  `app/src/ui/app.tsx`.
 
-## Next up (see PLAN.md and the session task list for detail)
+## Final integrated validation evidence
 
-Shipped through `c844912ba2`: the MD3 shell clone, M4 dialogs, conformance A/B, gitignore manager,
-unhide, Build & Run, UI scaling/auto-fit, the full de-stock pass, **M5** notification centre, and
-**M6** search + regex builder, plus a wave of user-feedback fixes (account-picker bug, Word-like tab
-editor, history clickability, fork auto-update).
+The final pre-documentation integration run at `4da59bd383` recorded:
 
-**In flight (batch 2, parallel worktrees):** dark-theme clipping fixes (file-row + New-branch FAB),
-menu-divider cleanup, cramped search-row layout, **History search bar**, **multi-remote manager**,
-**full submodule manager**, tab close-left/right/others + close-containing (regex), and **M7**
-multi-clone + export/import.
+- **239 files** in the integration validation scope;
+- **1,850 unit tests: 1,849 passed, 0 failed, 1 intentional skip**;
+- `yarn lint`: **passed**;
+- `yarn tsc --noEmit --skipLibCheck`: **passed**;
+- production unpackaged build: **passed** with
+  `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`;
+- build and GUI verification through the exact low-level MCP checkout at
+  `beed66ca6ed2503e6170ee1e1158247f1c2f0140`;
+- the reproducible build emitted `out/`, and Electron was exercised only on a
+  uniquely named off-screen Win32 Headless Desktop with isolated fixture and
+  user-data paths;
+- all final promoted captures were visually inspected at original resolution,
+  nonblank, private-data-free, and exactly **1443×992**.
 
-**Queued (from user feedback + PLAN):** version-history search/filters/regex (settings + notification,
-shared component); branch search + "checkout branch as worktree"; then **M8** GitHub orgs → **M9**
-automation (one-click commit+push, schedulers, merge-all) → **M10** Actions panel → **M11** agent
-server (MCP + REST + CLI) → **M12–M15** desktop-plus parity → **M16** multi-window → **M17**
-GitLab/Bitbucket + self-hosted GitLab PAT.
+### Final headless capture ledger
 
-Overarching constraint: the UI must faithfully match the design prototype. It was adapted from
-`Desktop Material v2.dc.html` in the supplied `Material Design UI Recreation.zip`; verify each
-screen with the headless pipeline above (resize the window past 1240×700 first). The
-screenshot/verify scripts live in the session workflow dir.
+| Screenshot | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `docs/assets/screenshots/material-agent-access.png` | 110,128 | `644891eaa37c878cb577065822681ee8fd33a018a92e0b89822b43e67393ef93` |
+| `docs/assets/screenshots/material-automation.png` | 87,304 | `efe45408a390301294d5e23193b619eec858fcef4abb147d82709513c5bb3843` |
+| `docs/assets/screenshots/material-branch-merge-all.png` | 116,134 | `c5cb41e17d67c627758ef43620c255c8272f85ed182a741c086a80d735c8719e` |
+| `docs/assets/screenshots/material-history-power-tools.png` | 127,723 | `2df21a9a1f5cb9f39b541a5678583d5c314d4254e12a615f9369b462af92d797` |
+| `docs/assets/screenshots/material-multi-window-menu.png` | 115,719 | `9a6cbcbb4c257eac3312b76f8ed0077a6a123901a6bee9b7793b926a61310c66` |
+| `docs/assets/screenshots/material-notification-center.png` | 111,723 | `f8d0cf33723b1c9793d165ab39fd0cec2ccd41b50136d36f6be9c3d34b7d4709` |
+| `docs/assets/screenshots/material-provider-accounts.png` | 117,558 | `91ab46ec566676f0c87534f5e72795e31a62adeecf6bf2597e533920ff428cff` |
+| `docs/assets/screenshots/material-workspace-changes.png` | 123,162 | `3155b321f9aabb73ee6a40000c69f8931f1915920216818a362ec974cc3a4621` |
 
-## Gotchas
+Earlier verified captures, including
+`docs/assets/screenshots/settings-history-manager.png`, remain tracked; that M3
+image is also 1443×992 and has SHA-256
+`abbcc34aa02949d2144f008c9ed10b4414f721843890643d65d8e0b9360c3da1`.
 
-- Keep settings, tabs, flushes, and history actions on the same profile queue;
-  splitting them reintroduces lost updates and corrupt undo/redo semantics.
-- Preserve restored-tab reconciliation by both repository ID and normalized path,
-  and refresh active diffs after restoring whitespace preferences.
-- Keep tokens out of profile repos, exports, and any agent bridge — the
-  settings registry is an allowlist by construction.
-- `build-installers.yml` cuts a release on every non-docs push to `main`; this
-  is intentional (per request) but consumes CI minutes.
-- The user commits directly to the repo too (e.g. `PLAN.md`) — pull before large
-  local work.
+## Headless verification environment
+
+- Project: `C:\Users\cntow\Documents\GitHub\desktop-material`
+- MCP checkout: `C:\Users\cntow\Documents\GitHub\lowlevel-computer-use-mcp`
+- Required MCP SHA: `beed66ca6ed2503e6170ee1e1158247f1c2f0140`
+- MCP endpoint: `http://127.0.0.1:8765/mcp`
+- Skill and client: `.codex/skills/verify-desktop-material-headless/`
+- Release runtime: Node **24.15.0** from `.tool-versions`; when system Node 26
+  is used for tests, disable its experimental web storage global.
+
+The safety contract is mandatory:
+
+1. Write a run manifest and record the initial dirty-state baseline.
+2. Preflight the scheduled MCP task and exact MCP source SHA.
+3. Build without downloading dependencies.
+4. Create one uniquely named off-screen desktop and one owned Temp run root.
+5. Launch the absolute Electron binary with isolated `--user-data-dir` and
+   disposable `--cli-open`; save the returned PID and discover the live HWND.
+6. Use only HWND-bound background input and `client_only` screenshots. Never
+   call `show_headless_desktop`, focus a normal window, or send global input.
+7. Treat `rendered_ok` as transport success only; inspect pixels at original
+   resolution for blank frames, theme, clipping, private data, and dimensions.
+8. Revalidate HWND/PID before close; use exact saved-PID termination only as a
+   fallback; close the desktop exactly once; delete only the owned Temp root.
+
+## Root-finalized publication and accessibility gate
+
+After merging these closing docs, root must perform and report all of the
+following against the resulting final `main` SHA:
+
+1. **Git state:** local `main` equals `origin/main`; no delegated branch content
+   remains unmerged; unrelated pre-existing files remain untouched.
+2. **CI:** every applicable CI, Pages, and release workflow is successful or
+   correctly skipped for that exact SHA. Include the workflow URLs.
+3. **Pages and README:** public pages return HTTP 200, show the final shipped
+   ledger rather than roadmap labels, and serve each referenced screenshot with
+   the tracked hash.
+4. **Wiki:** push the canonical `docs/wiki/` mirror, record the wiki commit, and
+   verify the live pages plus raw-main screenshot references.
+5. **Accessibility:** keyboard navigation and focus order work; interactive
+   controls have accessible names, roles, and state; focus remains visible;
+   dark/light contrast and disabled/error states remain legible; no regression
+   exists in list tooltip, dialog, tab, Actions, agent-access, or provider
+   surfaces.
+6. **Clipping and scaling:** inspect the supported minimum viewport and the
+   **1443×992** verification viewport in light/dark themes and representative
+   50%, 100%, 150%, and 200% scaling. Confirm no clipped file rows, FABs,
+   search/filter rows, branch controls, tab actions, remote/submodule controls,
+   Pull-all content, workflow/log controls, or horizontal page overflow.
+7. **Final evidence:** record the pushed SHA, workflow URLs, public URLs, wiki
+   SHA, response status, screenshot names/sizes/hashes, and audit result.
+
+Until root completes that gate, the correct status is: **all implementation
+milestones and local/headless verification are complete; final public
+verification for the documentation merge is pending root finalization**.
+
+## Maintenance constraints
+
+- Keep account identity on `endpoint#id`; never collapse provider accounts by
+  login or host alone.
+- Keep profile settings, tab mutations, history operations, and multi-window
+  updates on the serialized profile queue.
+- Keep secrets out of profile/notification Git repositories, exports, logs,
+  screenshots, and agent responses.
+- Keep agent access localhost-only, opt-in, token-gated, origin-checked, and
+  response-redacted.
+- Preserve Material token usage when adapting upstream or Desktop Plus code;
+  do not import their branding or SCSS wholesale.
+- `build-installers.yml` intentionally publishes a release on qualifying
+  non-documentation pushes to `main`; verify whether a docs-only merge is
+  correctly skipped before reporting the final release state.
