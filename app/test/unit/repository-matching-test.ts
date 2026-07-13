@@ -4,6 +4,7 @@ import {
   matchGitHubRepository,
   urlMatchesRemote,
   urlMatchesCloneURL,
+  urlsMatch,
 } from '../../src/lib/repository-matching'
 import { Account, getAccountKey } from '../../src/models/account'
 import { GitHubRepository } from '../../src/models/github-repository'
@@ -119,6 +120,152 @@ describe('repository-matching', () => {
       assert(repo === null)
     })
 
+    it('matches a GitHub Enterprise HTTPS remote on a non-default port', () => {
+      const account = new Account(
+        'enterprise-user',
+        'https://localhost:64301/api/v3',
+        '',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+
+      const repo = matchGitHubRepository(
+        [account],
+        'https://localhost:64301/material-proof/guided-proof.git'
+      )
+
+      assert(repo !== null)
+      assert.equal(repo.name, 'guided-proof')
+      assert.equal(repo.owner, 'material-proof')
+      assert.equal(repo.account, account)
+    })
+
+    it('does not match a GitHub Enterprise remote on a different port', () => {
+      const account = new Account(
+        'enterprise-user',
+        'https://localhost:64301/api/v3',
+        '',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+
+      assert.equal(
+        matchGitHubRepository(
+          [account],
+          'https://localhost:64302/material-proof/guided-proof.git'
+        ),
+        null
+      )
+    })
+
+    it('normalizes hostname casing and the default HTTPS port', () => {
+      const account = new Account(
+        'enterprise-user',
+        'https://LOCALHOST:443/api/v3',
+        '',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+
+      const repo = matchGitHubRepository(
+        [account],
+        'https://localhost/material-proof/guided-proof.git'
+      )
+
+      assert(repo !== null)
+      assert.equal(repo.account, account)
+    })
+
+    it('does not match a web remote from a different scheme origin', () => {
+      const account = new Account(
+        'enterprise-user',
+        'http://localhost:80/api/v3',
+        '',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+
+      assert.equal(
+        matchGitHubRepository(
+          [account],
+          'https://localhost/material-proof/guided-proof.git'
+        ),
+        null
+      )
+    })
+
+    it('canonicalizes IPv6 authorities without dropping the port', () => {
+      const account = new Account(
+        'enterprise-user',
+        'https://[0:0:0:0:0:0:0:1]:64301/api/v3',
+        '',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+
+      const repo = matchGitHubRepository(
+        [account],
+        'https://[::1]:64301/material-proof/guided-proof.git'
+      )
+
+      assert(repo !== null)
+      assert.equal(repo.account, account)
+      assert.equal(
+        matchGitHubRepository(
+          [account],
+          'https://[::1]:64302/material-proof/guided-proof.git'
+        ),
+        null
+      )
+    })
+
+    it('uses accountKey identity on a shared non-default-port origin', () => {
+      const first = new Account(
+        'first',
+        'https://localhost:64301/api/v3',
+        'first-token',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+      const selected = new Account(
+        'selected',
+        'https://localhost:64301/api/v3',
+        'selected-token',
+        [],
+        '',
+        2,
+        '',
+        'free'
+      )
+
+      const repo = matchGitHubRepository(
+        [first, selected],
+        'https://localhost:64301/someuser/private-repo.git',
+        getAccountKey(selected)
+      )
+
+      assert(repo !== null)
+      assert.equal(repo.account, selected)
+    })
+
     it('honors an exact repository account binding on a shared host', () => {
       const first = new Account(
         'first',
@@ -204,6 +351,18 @@ describe('repository-matching', () => {
         const htmlURL = 'https://github.com/shiftkey/desktop'
         assert(urlMatchesRemote(htmlURL, remote))
       })
+
+      it('normalizes a default HTTPS port', () => {
+        const cloneURL = 'https://github.com:443/shiftkey/desktop.git'
+        assert(urlMatchesRemote(cloneURL, remoteWithSuffix))
+      })
+
+      it('does not match a different web origin', () => {
+        const differentPort = 'https://github.com:8443/shiftkey/desktop.git'
+        const differentScheme = 'http://github.com/shiftkey/desktop.git'
+        assert(!urlMatchesRemote(differentPort, remoteWithSuffix))
+        assert(!urlMatchesRemote(differentScheme, remoteWithSuffix))
+      })
     })
 
     describe('with SSH remote', () => {
@@ -224,6 +383,26 @@ describe('repository-matching', () => {
         const htmlURL = 'https://github.com/shiftkey/desktop'
         assert(urlMatchesRemote(htmlURL, remote))
       })
+    })
+  })
+
+  describe('urlsMatch', () => {
+    it('normalizes equivalent web authorities', () => {
+      assert(
+        urlsMatch(
+          'https://LOCALHOST:443/owner/repository.git',
+          'https://localhost/owner/repository.git'
+        )
+      )
+    })
+
+    it('does not match different web origins', () => {
+      assert(
+        !urlsMatch(
+          'https://localhost:64301/owner/repository.git',
+          'https://localhost:64302/owner/repository.git'
+        )
+      )
     })
   })
 

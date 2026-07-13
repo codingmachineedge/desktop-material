@@ -1,4 +1,4 @@
-import * as URL from 'url'
+import { URL } from 'url'
 import * as Path from 'path'
 
 import { Account, getAccountKey } from '../models/account'
@@ -25,12 +25,103 @@ export interface IMatchedGitHubRepository {
   readonly account: Account
 }
 
+interface IRepositoryAuthority {
+  /** A canonical hostname, without a transport-specific port. */
+  readonly hostname: string
+
+  /** The canonical HTTP(S) origin, when the repository URL is a web URL. */
+  readonly webOrigin: string | null
+}
+
+/**
+ * Parse the authority represented by a repository URL.
+ *
+ * WHATWG URL parsing gives us case-normalized hostnames, canonical IPv6
+ * literals, and default-port normalization. Git's scp-like SSH syntax isn't a
+ * valid URL, so callers can provide the hostname already extracted by
+ * `parseRemote` as a fallback for those remotes.
+ */
+function parseRepositoryAuthority(
+  value: string,
+  fallbackHostname: string | null = null
+): IRepositoryAuthority | null {
+  try {
+    const parsed = new URL(value)
+
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (parsed.hostname.length === 0) {
+        return null
+      }
+
+      return {
+        hostname: parsed.hostname.toLowerCase(),
+        webOrigin: parsed.origin,
+      }
+    }
+
+    if (parsed.hostname.length > 0) {
+      return {
+        hostname: parsed.hostname.toLowerCase(),
+        webOrigin: null,
+      }
+    }
+  } catch {
+    // Fall through for Git's scp-like SSH syntax. A malformed HTTP(S) URL must
+    // never degrade to a hostname-only comparison and accidentally cross an
+    // origin boundary.
+    if (/^https?:\/\//i.test(value)) {
+      return null
+    }
+  }
+
+  if (fallbackHostname === null) {
+    return null
+  }
+
+  return {
+    hostname: fallbackHostname.toLowerCase(),
+    webOrigin: null,
+  }
+}
+
+/**
+ * Compare repository authorities without discarding a non-default web port.
+ *
+ * Two HTTP(S) URLs must have the same canonical origin, including scheme and
+ * port. If either side is an SSH remote there is no shared web origin to
+ * compare, so preserve the existing Git behavior of matching by hostname.
+ */
+function repositoryAuthoritiesMatch(
+  firstURL: string,
+  firstFallbackHostname: string | null,
+  secondURL: string,
+  secondFallbackHostname: string | null
+): boolean {
+  const first = parseRepositoryAuthority(firstURL, firstFallbackHostname)
+  const second = parseRepositoryAuthority(secondURL, secondFallbackHostname)
+
+  if (first === null || second === null) {
+    return false
+  }
+
+  if (first.webOrigin !== null && second.webOrigin !== null) {
+    return first.webOrigin === second.webOrigin
+  }
+
+  return caseInsensitiveEquals(first.hostname, second.hostname)
+}
+
 /** Try to use the list of users and a remote URL to guess a GitHub repository. */
 export function matchGitHubRepository(
   accounts: ReadonlyArray<Account>,
   remote: string,
   accountKey: string | null = null
 ): IMatchedGitHubRepository | null {
+  const parsedRemote = parseRemote(remote)
+  if (parsedRemote === null) {
+    return null
+  }
+
   const candidateAccounts =
     accountKey === null
       ? accounts
@@ -38,13 +129,11 @@ export function matchGitHubRepository(
 
   for (const account of candidateAccounts) {
     const htmlURL = getHTMLURL(account.endpoint)
-    const { hostname } = URL.parse(htmlURL)
-    const parsedRemote = parseRemote(remote)
 
-    if (parsedRemote !== null && hostname !== null) {
-      if (parsedRemote.hostname.toLowerCase() === hostname.toLowerCase()) {
-        return { name: parsedRemote.name, owner: parsedRemote.owner, account }
-      }
+    if (
+      repositoryAuthoritiesMatch(htmlURL, null, remote, parsedRemote.hostname)
+    ) {
+      return { name: parsedRemote.name, owner: parsedRemote.owner, account }
     }
   }
 
@@ -105,7 +194,14 @@ export function urlMatchesRemote(url: string | null, remote: IRemote): boolean {
     return false
   }
 
-  if (!caseInsensitiveEquals(remoteUrl.hostname, cloneUrl.hostname)) {
+  if (
+    !repositoryAuthoritiesMatch(
+      remote.url,
+      remoteUrl.hostname,
+      url,
+      cloneUrl.hostname
+    )
+  ) {
     return false
   }
 
@@ -144,10 +240,22 @@ export function urlsMatch(url1: string, url2: string) {
   const firstIdentifier = parseRepositoryIdentifier(url1)
   const secondIdentifier = parseRepositoryIdentifier(url2)
 
+  const authoritiesMatch =
+    firstIdentifier !== null &&
+    secondIdentifier !== null &&
+    (firstIdentifier.hostname === null || secondIdentifier.hostname === null
+      ? firstIdentifier.hostname === secondIdentifier.hostname
+      : repositoryAuthoritiesMatch(
+          url1,
+          firstIdentifier.hostname,
+          url2,
+          secondIdentifier.hostname
+        ))
+
   return (
     firstIdentifier !== null &&
     secondIdentifier !== null &&
-    firstIdentifier.hostname === secondIdentifier.hostname &&
+    authoritiesMatch &&
     firstIdentifier.owner === secondIdentifier.owner &&
     firstIdentifier.name === secondIdentifier.name
   )
