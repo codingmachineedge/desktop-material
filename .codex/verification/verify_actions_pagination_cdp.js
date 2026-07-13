@@ -285,6 +285,22 @@ async function clickButton(client, label) {
   }
 }
 
+async function clickButtonStartingWith(client, label) {
+  const clicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll('button')]
+        .find(value => value.textContent.trim().startsWith(${JSON.stringify(
+          label
+        )}) && !value.disabled)
+      if (!button) return false
+      button.click()
+      return true
+    })()`
+  )
+  if (!clicked) fail(`Button starting with ${label} was unavailable.`)
+}
+
 function validateCapturePath(value, label) {
   if (value === undefined) {
     fail(`${label} is required.`)
@@ -441,7 +457,7 @@ async function interact(client, options) {
   }
   await waitFor(
     client,
-    `document.querySelector('#actions-tab') !== null || [...document.querySelectorAll('button')].some(value => value.textContent.trim() === 'Add repository' && !value.disabled)`,
+    `document.querySelector('#actions-tab') !== null || [...document.querySelectorAll('button')].some(value => (value.textContent.trim() === 'Add repository' || value.textContent.trim().startsWith('Fetch origin')) && !value.disabled)`,
     'app shell or Add local repository confirmation'
   )
   if (
@@ -451,6 +467,16 @@ async function interact(client, options) {
     )
   ) {
     await clickButton(client, 'Add repository')
+  }
+  if (
+    !(await evaluate(client, `document.querySelector('#actions-tab') !== null`))
+  ) {
+    await waitFor(
+      client,
+      `[...document.querySelectorAll('button')].some(value => value.textContent.trim().startsWith('Fetch origin') && !value.disabled)`,
+      'Fetch origin association action'
+    )
+    await clickButtonStartingWith(client, 'Fetch origin')
   }
   await waitFor(
     client,
