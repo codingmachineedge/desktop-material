@@ -88,6 +88,8 @@ non-modal dialog framework.
 - **Clipping-safe scaling** — choose 50–200% UI scaling; auto-fit caps the effective scale when a
   small window cannot contain the requested size. At the supported minimum window, 200% safely
   auto-fits to 96% while preserving every title-bar, navigation, Appearance, and footer control.
+- **Responsive overflow guard** — at 1450×997, the toolbar and complete Changes card remain inside
+  the viewport, including filter, commit-composer, and action controls, with no horizontal overflow.
 
 ![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
@@ -96,3 +98,5 @@ non-modal dialog framework.
 ![Open repositories and worktrees in another window](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)
 
 ![Requested 200 percent UI scale auto-fitted without clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
+
+![Responsive regression proof at 1450 by 997 with toolbar and Changes controls fully contained and no horizontal overflow](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-responsive-overflow-fixed.png)

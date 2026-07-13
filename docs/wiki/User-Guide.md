@@ -245,7 +245,13 @@ Desktop Material scales its whole interface independently of the OS:
 Combined with the animated light/dark theme, this lets you tune the workspace for a laptop panel, a
 4K monitor, or a shared screen without touching system display settings.
 
+The 1450×997 responsive regression check keeps the toolbar and complete Changes card inside the
+viewport—including filter, changed-file, summary, description, settings, and commit controls—with
+no page-level horizontal overflow.
+
 ![Requested 200 percent UI scale auto-fitted to 96 percent at the minimum window size](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
+
+![Responsive regression proof at 1450 by 997 with toolbar and Changes controls fully contained and no horizontal overflow](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-responsive-overflow-fixed.png)
 
 ---
 
