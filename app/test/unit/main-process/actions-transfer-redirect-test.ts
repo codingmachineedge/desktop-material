@@ -213,6 +213,34 @@ describe('main-process Actions redirect transport', () => {
     assert.equal(requests, 1)
   })
 
+  it('does not request after cancellation during DNS resolution', async () => {
+    const controller = new AbortController()
+    let completeResolution:
+      | ((addresses: ReadonlyArray<IActionsTransferResolvedAddress>) => void)
+      | undefined
+    let requests = 0
+    const pending = fetchActionsTransferRedirect({
+      location: signedURL('archive.zip'),
+      githubDotCom: true,
+      signal: controller.signal,
+      dependencies: dependencies(
+        async () =>
+          new Promise(resolve => {
+            completeResolution = resolve
+          }),
+        async () => {
+          requests++
+          return new Response('unexpected')
+        }
+      ),
+    })
+
+    controller.abort()
+    completeResolution?.([publicAddress])
+    await assert.rejects(pending, { name: 'AbortError' })
+    assert.equal(requests, 0)
+  })
+
   it('allows public GHES storage but rejects private enterprise pivots', async () => {
     let requests = 0
     const publicResponse = await fetchActionsTransferRedirect({
@@ -269,6 +297,25 @@ describe('main-process Actions redirect transport', () => {
     assert.equal(resolves, 0)
 
     const location = signedURL('secret.zip')
+    await assert.rejects(
+      fetchActionsTransferRedirect({
+        location,
+        githubDotCom: true,
+        signal: new AbortController().signal,
+        dependencies: dependencies(
+          async () => {
+            throw new Error(`failed to resolve ${location}`)
+          },
+          async () => new Response('unexpected')
+        ),
+      }),
+      error =>
+        error instanceof ActionsTransferRedirectError &&
+        error.kind === 'unsafe-redirect' &&
+        !error.message.includes('never-log-this-value') &&
+        !error.message.includes(signedHost)
+    )
+
     await assert.rejects(
       fetchActionsTransferRedirect({
         location,
