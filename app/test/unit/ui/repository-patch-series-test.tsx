@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
+import { resolve } from 'node:path'
 import * as React from 'react'
 import {
   ICLICommandOutputEvent,
@@ -8,6 +9,20 @@ import {
 } from '../../../src/lib/cli-workbench'
 import { RepositoryPatchSeries } from '../../../src/ui/repository-tools'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+
+const repositoryPath = resolve('patch-series-fixtures', 'repository')
+const exportBasePath = resolve('patch-series-fixtures', 'exports', 'review')
+const exportDestination = `${exportBasePath}.patches`
+const firstPatchPath = resolve(
+  'patch-series-fixtures',
+  'patches',
+  '0001-first.patch'
+)
+const secondPatchPath = resolve(
+  'patch-series-fixtures',
+  'patches',
+  '0002-second.patch'
+)
 
 class FakePatchClient {
   public readonly starts = new Array<ICLICommandRequest>()
@@ -52,7 +67,7 @@ function renderPatchSeries(
 ) {
   return render(
     <RepositoryPatchSeries
-      repositoryPath="C:/repo"
+      repositoryPath={repositoryPath}
       disabled={false}
       client={client}
       onRefreshRepository={options.onRefreshRepository ?? (async () => {})}
@@ -68,7 +83,7 @@ describe('Repository patch series', () => {
     const client = new FakePatchClient()
     let refreshes = 0
     renderPatchSeries(client, {
-      chooseExportDestination: async () => 'C:/exports/review',
+      chooseExportDestination: async () => exportBasePath,
       onRefreshRepository: async () => {
         refreshes++
       },
@@ -86,7 +101,7 @@ describe('Repository patch series', () => {
     await waitFor(() => assert.equal(client.starts.length, 1))
     assert.deepEqual(client.starts[0].recipe, {
       kind: 'repository-patch-export',
-      destination: 'C:\\exports\\review.patches',
+      destination: exportDestination,
     })
     assert.equal(client.starts[0].confirmed, true)
 
@@ -105,10 +120,7 @@ describe('Repository patch series', () => {
   it('reviews patch order and exposes continue, skip, and abort recovery', async () => {
     const client = new FakePatchClient()
     renderPatchSeries(client, {
-      choosePatchFiles: async () => [
-        'C:/patches/0001-first.patch',
-        'C:/patches/0002-second.patch',
-      ],
+      choosePatchFiles: async () => [firstPatchPath, secondPatchPath],
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Choose patch files' }))
@@ -119,10 +131,7 @@ describe('Repository patch series', () => {
     await waitFor(() => assert.equal(client.starts.length, 1))
     assert.deepEqual(client.starts[0].recipe, {
       kind: 'repository-patch-import',
-      patchPaths: [
-        'C:\\patches\\0001-first.patch',
-        'C:\\patches\\0002-second.patch',
-      ],
+      patchPaths: [firstPatchPath, secondPatchPath],
     })
 
     client.emitState({
@@ -145,7 +154,7 @@ describe('Repository patch series', () => {
   it('cancels only the exact active patch run', async () => {
     const client = new FakePatchClient()
     renderPatchSeries(client, {
-      chooseExportDestination: async () => 'C:/exports/review.patches',
+      chooseExportDestination: async () => exportDestination,
     })
     fireEvent.click(
       screen.getByRole('button', { name: 'Choose export destination' })
@@ -164,7 +173,7 @@ describe('Repository patch series', () => {
       throw new Error('Rejected before Git started.')
     }
     renderPatchSeries(client, {
-      choosePatchFiles: async () => ['C:/patches/0001-first.patch'],
+      choosePatchFiles: async () => [firstPatchPath],
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Choose patch files' }))

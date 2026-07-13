@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
+import { join, resolve } from 'node:path'
 import {
   assertRepositoryBundleSourceUnchanged,
   getRepositoryToolOperation,
@@ -19,6 +20,10 @@ import {
   getRepositorySections,
   getRepositorySectionVisualIndex,
 } from '../../src/ui/repository-sections'
+
+const repositoryPath = resolve('repository-tool-fixtures', 'repository')
+const exportsDirectory = resolve('repository-tool-fixtures', 'exports')
+const patchesDirectory = resolve('repository-tool-fixtures', 'patches')
 
 describe('repository tool recipes', () => {
   it('exposes only reviewed, named fixed Git functions', () => {
@@ -83,106 +88,99 @@ describe('repository tool recipes', () => {
   })
 
   it('prepares only contained ZIP and TAR exports from HEAD', () => {
+    const zipBase = join(exportsDirectory, 'repo')
+    const zipDestination = `${zipBase}.zip`
     assert.deepStrictEqual(
-      prepareRepositoryArchive('C:\\work\\repo', 'C:\\exports\\repo', 'zip'),
+      prepareRepositoryArchive(repositoryPath, zipBase, 'zip'),
       {
         format: 'zip',
-        destination: 'C:\\exports\\repo.zip',
-        args: [
-          'archive',
-          '--format=zip',
-          '--output=C:\\exports\\repo.zip',
-          'HEAD',
-        ],
+        destination: zipDestination,
+        args: ['archive', '--format=zip', `--output=${zipDestination}`, 'HEAD'],
       }
     )
+    const tarDestination = join(exportsDirectory, 'repo.TAR')
     assert.equal(
-      prepareRepositoryArchive('C:\\work\\repo', 'C:\\exports\\repo.TAR', 'tar')
+      prepareRepositoryArchive(repositoryPath, tarDestination, 'tar')
         .destination,
-      'C:\\exports\\repo.TAR'
+      tarDestination
     )
     assert.throws(() =>
-      prepareRepositoryArchive('C:\\work\\repo', 'relative.zip', 'zip')
+      prepareRepositoryArchive(repositoryPath, 'relative.zip', 'zip')
     )
     assert.throws(() =>
       prepareRepositoryArchive(
-        'C:\\work\\repo',
-        'C:\\work\\repo\\.git\\private.zip',
+        repositoryPath,
+        join(repositoryPath, '.git', 'private.zip'),
         'zip'
       )
     )
   })
 
   it('prepares a contained full-history bundle with no editable ref', () => {
+    const bundleBase = join(exportsDirectory, 'backup')
+    const bundleDestination = `${bundleBase}.bundle`
     assert.deepStrictEqual(
-      prepareRepositoryBundle('C:\\work\\repo', 'C:\\exports\\backup'),
+      prepareRepositoryBundle(repositoryPath, bundleBase),
       {
         format: 'bundle',
-        destination: 'C:\\exports\\backup.bundle',
-        args: ['bundle', 'create', 'C:\\exports\\backup.bundle', '--all'],
+        destination: bundleDestination,
+        args: ['bundle', 'create', bundleDestination, '--all'],
       }
     )
     assert.throws(() =>
       prepareRepositoryBundle(
-        'C:\\work\\repo',
-        'C:\\work\\repo\\.git\\backup.bundle'
+        repositoryPath,
+        join(repositoryPath, '.git', 'backup.bundle')
       )
     )
   })
 
   it('prepares create-new upstream patch export and bounded patch import', () => {
+    const patchExportBase = join(exportsDirectory, 'review-series')
+    const patchExportDestination = `${patchExportBase}.patches`
     assert.deepStrictEqual(
-      prepareRepositoryPatchExport(
-        'C:\\work\\repo',
-        'C:\\exports\\review-series'
-      ),
+      prepareRepositoryPatchExport(repositoryPath, patchExportBase),
       {
-        destination: 'C:\\exports\\review-series.patches',
+        destination: patchExportDestination,
         args: [
           'format-patch',
           '--no-signature',
           '--numbered',
-          '--output-directory=C:\\exports\\review-series.patches',
+          `--output-directory=${patchExportDestination}`,
           '@{upstream}..HEAD',
         ],
       }
     )
-    assert.deepStrictEqual(
-      prepareRepositoryPatchImport([
-        'C:\\patches\\0001.patch',
-        'C:\\patches\\0002.patch',
-      ]),
-      {
-        patchPaths: ['C:\\patches\\0001.patch', 'C:\\patches\\0002.patch'],
-        args: [
-          'am',
-          '--3way',
-          '--keep-cr',
-          '--no-gpg-sign',
-          '--',
-          'C:\\patches\\0001.patch',
-          'C:\\patches\\0002.patch',
-        ],
-      }
-    )
+    const patchPaths = [
+      join(patchesDirectory, '0001.patch'),
+      join(patchesDirectory, '0002.patch'),
+    ]
+    assert.deepStrictEqual(prepareRepositoryPatchImport(patchPaths), {
+      patchPaths,
+      args: ['am', '--3way', '--keep-cr', '--no-gpg-sign', '--', ...patchPaths],
+    })
     assert.throws(() => prepareRepositoryPatchImport([]))
     assert.throws(() =>
-      prepareRepositoryPatchImport(['C:\\patches\\not-a-patch.txt'])
+      prepareRepositoryPatchImport([join(patchesDirectory, 'not-a-patch.txt')])
     )
+    const duplicatePatch = join(patchesDirectory, 'same.patch')
     assert.throws(() =>
-      prepareRepositoryPatchImport([
-        'C:\\patches\\same.patch',
-        'C:\\patches\\same.patch',
-      ])
+      prepareRepositoryPatchImport([duplicatePatch, duplicatePatch])
     )
   })
 
   it('prepares only an absolute bundle for read-only verification', () => {
-    assert.deepStrictEqual(
-      prepareRepositoryBundleVerification('C:\\exports\\backup.bundle'),
-      ['bundle', 'verify', 'C:\\exports\\backup.bundle']
-    )
-    for (const path of ['backup.bundle', 'C:\\exports\\backup.zip', '']) {
+    const bundlePath = join(exportsDirectory, 'backup.bundle')
+    assert.deepStrictEqual(prepareRepositoryBundleVerification(bundlePath), [
+      'bundle',
+      'verify',
+      bundlePath,
+    ])
+    for (const path of [
+      'backup.bundle',
+      join(exportsDirectory, 'backup.zip'),
+      '',
+    ]) {
       assert.throws(() => prepareRepositoryBundleVerification(path))
     }
   })
@@ -235,15 +233,16 @@ describe('repository tool recipes', () => {
       oid: 'a'.repeat(40),
       ref: 'refs/heads/release',
     }
+    const bundlePath = join(exportsDirectory, 'backup.bundle')
     const request = prepareRepositoryBundleImport(
-      'C:\\exports\\backup.bundle',
+      bundlePath,
       source,
       'restored/release'
     )
     assert.deepStrictEqual(request, {
-      bundlePath: 'C:\\exports\\backup.bundle',
-      verifyArgs: ['bundle', 'verify', 'C:\\exports\\backup.bundle'],
-      listHeadsArgs: ['bundle', 'list-heads', 'C:\\exports\\backup.bundle'],
+      bundlePath,
+      verifyArgs: ['bundle', 'verify', bundlePath],
+      listHeadsArgs: ['bundle', 'list-heads', bundlePath],
       source,
       branchName: 'restored/release',
       destinationRef: 'refs/heads/restored/release',
@@ -263,7 +262,7 @@ describe('repository tool recipes', () => {
         '--no-write-fetch-head',
         '--no-tags',
         '--no-auto-maintenance',
-        'C:\\exports\\backup.bundle',
+        bundlePath,
         'refs/heads/release',
       ],
       validateCommitArgs: ['cat-file', '-e', `${'a'.repeat(40)}^{commit}`],
@@ -278,14 +277,11 @@ describe('repository tool recipes', () => {
     assert.ok(
       request.createBranchArgs.every(argument => !argument.includes(':'))
     )
-    assert.deepStrictEqual(
-      prepareRepositoryBundleInspection('C:\\exports\\backup.bundle'),
-      {
-        bundlePath: 'C:\\exports\\backup.bundle',
-        verifyArgs: ['bundle', 'verify', 'C:\\exports\\backup.bundle'],
-        listHeadsArgs: ['bundle', 'list-heads', 'C:\\exports\\backup.bundle'],
-      }
-    )
+    assert.deepStrictEqual(prepareRepositoryBundleInspection(bundlePath), {
+      bundlePath,
+      verifyArgs: ['bundle', 'verify', bundlePath],
+      listHeadsArgs: ['bundle', 'list-heads', bundlePath],
+    })
   })
 
   it('fails closed if the selected advertised source changes', () => {

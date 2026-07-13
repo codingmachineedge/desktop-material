@@ -2,7 +2,7 @@ import { describe, it, mock } from 'node:test'
 import assert from 'node:assert'
 import { createHash } from 'crypto'
 import { mkdtemp, open, readFile, readdir, rm, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { tmpdir } from 'os'
 import {
   ActionsArtifactDownloadError,
@@ -94,7 +94,9 @@ describe('Actions artifact archive download', () => {
 
   it('adds the archive extension and requires an absolute destination', () => {
     assert.ok(
-      normalizeActionsArtifactDestination('C:\\safe\\package').endsWith('.zip')
+      normalizeActionsArtifactDestination(
+        resolve('artifact-fixtures', 'package')
+      ).endsWith('.zip')
     )
     assert.throws(() => normalizeActionsArtifactDestination('package.zip'), {
       name: 'ActionsArtifactDownloadError',
