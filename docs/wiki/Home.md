@@ -9,12 +9,17 @@ workflow intact underneath.
 On top of that shell, Desktop Material ships multi-provider accounts and organizations, automation,
 GitHub Actions and logs, agent access, searchable graph History, multiple stashes, pull-all,
 multi-window workflows, per-account repository tabs, Git-backed settings and notifications, and a
-non-modal dialog framework.
+non-modal dialog framework. The current integration tree also contains the complete guided
+P0/P1/P2/Later Git, GitHub, and provider parity wave described below.
 
 > **Status:** Desktop Material is in **active development**. Preview builds are published from the
 > project's [GitHub Releases](https://github.com/codingmachineedge/desktop-material/releases).
 > Feature-parity references come from [desktop-plus](https://github.com/severity1/desktop-plus)
 > (MIT).
+>
+> The guided M19 source implementation is complete, but this documentation does not pre-claim its
+> final production/off-screen acceptance, `main` promotion, CI, Pages/wiki, installer/release, or
+> cleanup evidence. Follow the repository's PLAN and HANDOFF for that closing gate.
 
 ![Desktop Material Changes view with the MD3 shell](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-workspace-changes.png)
 
@@ -24,7 +29,7 @@ non-modal dialog framework.
 
 | Page | What it covers |
 | --- | --- |
-| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
+| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, guided Git/GitHub/provider functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
@@ -32,7 +37,7 @@ non-modal dialog framework.
 
 ---
 
-## Shipped today
+## Product capabilities
 
 - **Material Design 3 Expressive shell** with animated light/dark theming and M3 color tokens: an
   app bar with an inline pill menu, a left icon navigation rail (Changes with a badge, History,
@@ -94,6 +99,25 @@ non-modal dialog framework.
   the viewport, including filter, commit-composer, and action controls, with no horizontal overflow.
 - **No page-level sideways scrolling** — task forms wrap text and stack controls when space narrows.
   Horizontal scrolling is reserved for spatial content such as code, diffs, and logs when needed.
+
+### Guided M19 parity implementation
+
+The implementation-complete guided wave adds named task surfaces instead of a raw command or API
+catalogue:
+
+- **Git administration** — patch-series exchange, structured local-commit rewrite, commit/tag
+  signing, Git LFS, complete worktree lifecycle, branch pin/hide/solo/restore, exact merge-tree
+  conflict paths, guided bisect, the repository-wide Stash Manager, guarded Remote Manager, and the
+  safe Repository Hooks Manager.
+- **GitHub lifecycle** — pull-request templates/metadata/review/update/close/reopen/merge, paginated
+  Actions artifacts with bounded download/digest context, effective branch rules, Releases/assets,
+  and richer Issue browsing/edit/comment/close/reopen workflows.
+- **Provider-neutral triage** — bounded Issue and pull-request summaries for the exact selected
+  GitHub, GitLab, or Bitbucket account and repository, with safe links and explicit unsupported,
+  partial, capped, and error states. Bitbucket Issues are explicitly unsupported by that provider.
+
+These functions remain marked **integration complete, final acceptance pending** until their exact
+production tree and public promotion evidence is recorded.
 
 ![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
