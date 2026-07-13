@@ -123,13 +123,36 @@ These features follow the same Store/Dispatcher rule rather than creating parall
 - **GitHub Actions and logs** — `app/src/lib/stores/actions-store.ts` owns API state; the run list,
   run details, workflow-dispatch dialog, and searchable log viewer live in `app/src/ui/actions/`;
   `app/src/lib/actions-log-parser/` parses log markup without coupling it to React.
+  `app/src/lib/actions-artifacts.ts` and `app/src/lib/actions-branch-rules.ts` own bounded artifact
+  and effective-rule projections; transfer code must keep redirect credentials stripped and stale
+  account/repository generations cancelable.
+- **Guided Git administration** — named Repository Tools panels live in
+  `app/src/ui/repository-tools/`; bounded models and operations live in
+  `app/src/lib/git/format-patch.ts`, `app/src/lib/git/structured-commit-rewrite.ts`,
+  `app/src/lib/repository-signing.ts`, `app/src/lib/repository-lfs.ts`,
+  `app/src/lib/repository-bisect.ts`, and `app/src/lib/hooks/repository-hooks-manager.ts`. Preserve
+  review fingerprints, exact source/destination identity checks, and cancel/uncertain boundaries;
+  never turn this layer into a raw command editor.
+- **GitHub lifecycle workspaces** — pull-request state lives in
+  `app/src/lib/stores/pull-request-lifecycle-store.ts`; Releases and Issues use their dedicated
+  stores under `app/src/lib/stores/` and views under `app/src/ui/github-releases/` and
+  `app/src/ui/github-issues/`. Keep all writes account/repository/item/operation/payload-bound and
+  cap streamed API and asset responses before parsing or writing.
+- **Provider-neutral triage** — `app/src/lib/provider-triage.ts` contains provider adapters,
+  `app/src/lib/provider-triage-json.ts` validates bounded projections,
+  `app/src/lib/stores/provider-triage-store.ts` owns cancelable account/repository generations, and
+  `app/src/ui/repository-tools/provider-triage.tsx` renders safe neutral states. Do not retain raw
+  provider payloads, tokens, or repository paths in the store.
 - **History search and graph** — the pure matching helper is `app/src/lib/commit-search.ts`; the
   lane model and renderer are `app/src/ui/history/commit-graph-model.ts` and
   `app/src/ui/history/commit-graph.tsx`. Keep graph construction independent from filtered list row
   indices.
-- **Multiple stashes** — Git operations remain in `app/src/lib/git/stash.ts`, entries use
-  `app/src/models/stash-entry.ts`, and the Changes list plus `app/src/ui/stashing/` target the
-  explicitly selected stash for inspect, restore, or discard.
+- **Stashes, remotes, worktrees, and branch visibility** — Git operations remain in
+  `app/src/lib/git/stash.ts`, `app/src/lib/git/remote-manager.ts`, and
+  `app/src/lib/git/worktree.ts`; the complete manager surfaces live in `app/src/ui/stashing/`,
+  `app/src/ui/repository-settings/remote.tsx`, and `app/src/ui/worktrees/`.
+  `app/src/lib/branch-visibility.ts` owns persisted pin/hide/solo state. Mutations must revalidate the
+  exact reviewed identity and leave partial/uncertain results explicit.
 - **Multi-window and CLI routing** — `app/src/main-process/window-routing.ts` chooses a destination
   window, `app/src/main-process/app-window.ts` owns each native window, and
   `app/src/lib/window-scope.ts` plus `app/src/lib/profiles/profile-tabs-file.ts` keep tab state
