@@ -117,13 +117,16 @@ as that later merge SHA.
   production build is already accepted for app source `5e80e678…`.
 - [x] **Off-screen acceptance:** deterministic synthetic cross-account clone
   ledger and representative Foundation/P0/P1/Later interaction matrix with
-  exact MCP/app-source identity. Owned-resource cleanup remains separate below.
+  exact MCP/app-source identity. The proof-owned resource cleanup is verified
+  below.
 - [x] **Screenshots:** 14 accepted filenames, dimensions, byte counts, SHA-256
   digests, exact `5e80e678…` app-source/build provenance,
   original-resolution inspection, and synthetic-only identity statement
   recorded below.
-- [ ] **Screenshot promotion:** copy only those exact 14 inspected files into
-  the tracked image set and re-verify every hash in the final union.
+- [x] **Screenshot promotion:** the exact 14 inspected files were copied into
+  the tracked image set at
+  `cf24acc3a45e67b1eac93333263354936e7fd059`, and every dimension, byte count,
+  and SHA-256 below was re-verified after promotion.
 - [ ] **GitHub/publication:** exact-SHA CI, Pages, canonical wiki, installer and
   public release, asset count/size/digests, zero workflow artifacts, and live
   URLs.
@@ -596,8 +599,8 @@ credential selector, raw provider payload, or process/window identifier.
 
 Task forms follow a no-page-level-sideways-scroll policy: labels wrap and action
 groups stack when practical, while horizontal scrolling is reserved for spatial
-code, diff, or log content. Promotion of the exact files and final hash
-revalidation remain open until the documentation/image union is assembled.
+code, diff, or log content. The exact files are promoted and their final tracked
+hashes match the inspection ledger below.
 
 ## Headless verification environment
 
@@ -626,11 +629,15 @@ The safety contract is mandatory:
 8. Revalidate HWND/PID before close; use exact saved-PID termination only as a
    fallback; close the desktop exactly once; delete only the owned Temp root.
 
-For this active run, capture and interaction are complete but the owned app,
-listener, synthetic credential entries, hidden desktop, temporary roots, and
-worktrees are intentionally not marked cleaned until the screenshot and
-documentation work has finished. The final handoff must replace this sentence
-with verified-absent evidence, not an expectation.
+The proof cleanup completed after screenshot promotion. The exact saved app
+process was terminated only after its background close request was ignored;
+the fixture then stopped through its owned stop marker, both loopback listeners
+were absent, the hidden desktop listed zero remaining windows and was closed
+exactly once, and both synthetic credential entries were verified absent. The
+owned path alias, safe working root, and Temp run root were each resolved to
+their recorded exact target before removal and are all verified absent. Agent
+worktree removal and final `main` synchronization remain part of the repository
+cleanup gate above.
 
 ## Previous root-finalized publication and accessibility evidence
 

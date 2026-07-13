@@ -323,10 +323,11 @@ proof for that newer source tree.
   Foundation/P0/P1/Later surfaces.
 - [x] Record all 14 inspected, identity-safe capture candidates with dimensions,
   byte counts, SHA-256 digests, and exact `5e80e678…` source/build provenance.
-- [ ] Promote those exact 14 files unchanged and verify their tracked hashes in
+- [x] Promote those exact 14 files unchanged and verify their tracked hashes in
   the final documentation/image union.
 - [ ] Record the merge to `main`, exact-SHA CI, Pages, canonical wiki,
   installer/release, release-asset/digest, and public live-URL evidence.
-- [ ] Record cleanup of every owned process, hidden desktop, credential,
-  fixture, temporary root, and completed worktree; finish with clean local
-  `main` equal to `origin/main`.
+- [x] Record cleanup of every proof-owned process, hidden desktop, credential,
+  fixture, alias, and temporary root.
+- [ ] Remove every completed agent worktree and finish with clean local `main`
+  equal to `origin/main`.

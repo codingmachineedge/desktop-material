@@ -29,7 +29,8 @@ Details about how the team is organizing and shipping GitHub Desktop:
  - **[Issue Triage](process/issue-triage.md)** - how we address issues reported
     by users
  - **[Pull Requests](process/pull-requests.md)** - how code contributions are submitted and reviewed
- - **[Releasing Updates](process/releasing-updates.md)** - how we deploy things
+ - **[Writing Release Notes](process/writing-release-notes.md)** - how
+    user-facing changes are described for a release
 
 ## Technical
 
