@@ -1,4 +1,14 @@
+import * as Path from 'path'
+
 export type RepositoryToolCategory = 'Diagnostics' | 'Maintenance' | 'Recovery'
+
+export type RepositoryArchiveFormat = 'zip' | 'tar'
+
+export interface IRepositoryArchiveRequest {
+  readonly format: RepositoryArchiveFormat
+  readonly destination: string
+  readonly args: ReadonlyArray<string>
+}
 
 export type RepositoryToolID =
   | 'status-summary'
@@ -95,4 +105,53 @@ export function getRepositoryToolOperation(
     throw new Error(`Unknown repository tool: ${id}`)
   }
   return operation
+}
+
+/**
+ * Contain and normalize the only user-selected value accepted by the archive
+ * function. The source ref and Git arguments remain fixed and reviewed.
+ */
+export function prepareRepositoryArchive(
+  repositoryPath: string,
+  destination: string,
+  format: RepositoryArchiveFormat
+): IRepositoryArchiveRequest {
+  const value = destination.trim()
+  if (value.length === 0 || value.includes('\0') || !Path.isAbsolute(value)) {
+    throw new Error(
+      'Choose an absolute destination for the repository archive.'
+    )
+  }
+
+  const extension = `.${format}`
+  const normalizedDestination = value.toLowerCase().endsWith(extension)
+    ? value
+    : `${value}${extension}`
+  const resolvedRepository = Path.resolve(repositoryPath)
+  const resolvedDestination = Path.resolve(normalizedDestination)
+  const gitDirectory = Path.join(resolvedRepository, '.git')
+  const relativeToGitDirectory = Path.relative(
+    gitDirectory,
+    resolvedDestination
+  )
+
+  if (
+    relativeToGitDirectory.length === 0 ||
+    (!relativeToGitDirectory.startsWith(`..${Path.sep}`) &&
+      relativeToGitDirectory !== '..' &&
+      !Path.isAbsolute(relativeToGitDirectory))
+  ) {
+    throw new Error('Repository archives cannot be saved inside .git.')
+  }
+
+  return {
+    format,
+    destination: resolvedDestination,
+    args: [
+      'archive',
+      `--format=${format}`,
+      `--output=${resolvedDestination}`,
+      'HEAD',
+    ],
+  }
 }

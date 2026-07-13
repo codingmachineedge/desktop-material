@@ -27,5 +27,9 @@ describe('Repository tools responsive styles', () => {
     )
     assert.match(styles, /@media \(max-width: 700px\)/)
     assert.match(styles, /flex-direction: column/)
+    assert.match(
+      styles,
+      /\.repository-tool-confirmation[\s\S]*overflow-wrap: anywhere/
+    )
   })
 })

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import * as Path from 'path'
 import {
   ICLICommandOutputEvent,
   ICLICommandRequest,
@@ -11,17 +12,23 @@ import {
   getCLIWorkbenchCatalog,
   onCLICommandOutput,
   onCLICommandState,
+  showItemInFolder,
+  showSaveDialog,
   startCLICommand,
 } from '../main-process-proxy'
 import {
   getRepositoryToolOperation,
+  IRepositoryArchiveRequest,
   IRepositoryToolOperation,
+  prepareRepositoryArchive,
+  RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
   RepositoryToolOperations,
 } from './operations'
 
 const MaxOutputBytes = 4 * 1024 * 1024
+type RepositoryToolResultID = RepositoryToolID | 'archive-export'
 
 export interface IRepositoryToolsClient {
   readonly getCatalog: () => Promise<ICLIWorkbenchCatalog>
@@ -47,6 +54,11 @@ export interface IRepositoryToolsProps {
   readonly repositoryPath: string
   readonly onRefreshRepository: () => Promise<void>
   readonly client?: IRepositoryToolsClient
+  readonly chooseArchiveDestination?: (
+    format: RepositoryArchiveFormat,
+    defaultPath: string
+  ) => Promise<string | null>
+  readonly revealArchive?: (path: string) => Promise<void>
 }
 
 type OperationStatus =
@@ -63,9 +75,11 @@ interface IRepositoryToolsState {
   readonly gitVersion: string | null
   readonly availabilityLoading: boolean
   readonly availabilityError: string | null
-  readonly activeOperation: RepositoryToolID | null
-  readonly resultOperation: RepositoryToolID | null
+  readonly activeOperation: RepositoryToolResultID | null
+  readonly resultOperation: RepositoryToolResultID | null
   readonly confirmationOperation: RepositoryToolID | null
+  readonly archiveRequest: IRepositoryArchiveRequest | null
+  readonly completedArchivePath: string | null
   readonly status: OperationStatus
   readonly output: string
   readonly error: string | null
@@ -82,6 +96,7 @@ export class RepositoryTools extends React.Component<
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
   private confirmButton: HTMLButtonElement | null = null
+  private archiveRunDestination: string | null = null
 
   public constructor(props: IRepositoryToolsProps) {
     super(props)
@@ -93,6 +108,8 @@ export class RepositoryTools extends React.Component<
       activeOperation: null,
       resultOperation: null,
       confirmationOperation: null,
+      archiveRequest: null,
+      completedArchivePath: null,
       status: 'idle',
       output: '',
       error: null,
@@ -117,6 +134,8 @@ export class RepositoryTools extends React.Component<
         activeOperation: null,
         resultOperation: null,
         confirmationOperation: null,
+        archiveRequest: null,
+        completedArchivePath: null,
         status: 'idle',
         output: '',
         error: null,
@@ -188,15 +207,25 @@ export class RepositoryTools extends React.Component<
     operation: IRepositoryToolOperation,
     confirmed: boolean
   ) {
+    return this.startCommand(operation.id, operation.args, confirmed)
+  }
+
+  private async startCommand(
+    operation: RepositoryToolResultID,
+    args: ReadonlyArray<string>,
+    confirmed: boolean
+  ) {
     if (this.isBusy()) {
       return
     }
     const id = `repository-tool-${Date.now()}-${++nextOperationSequence}`
     this.runId = id
     this.setState({
-      activeOperation: operation.id,
-      resultOperation: operation.id,
+      activeOperation: operation,
+      resultOperation: operation,
       confirmationOperation: null,
+      archiveRequest: null,
+      completedArchivePath: null,
       status: 'starting',
       output: '',
       error: null,
@@ -205,7 +234,7 @@ export class RepositoryTools extends React.Component<
       await this.client.start({
         id,
         tool: 'git',
-        args: operation.args,
+        args,
         cwd: this.props.repositoryPath,
         confirmed,
       })
@@ -222,6 +251,80 @@ export class RepositoryTools extends React.Component<
         })
       }
     }
+  }
+
+  private chooseArchiveDestination = async (
+    format: RepositoryArchiveFormat
+  ) => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+
+    const defaultPath = Path.join(
+      Path.dirname(this.props.repositoryPath),
+      `${Path.basename(this.props.repositoryPath)}.${format}`
+    )
+    try {
+      const destination = this.props.chooseArchiveDestination
+        ? await this.props.chooseArchiveDestination(format, defaultPath)
+        : await showSaveDialog({
+            title: `Export ${format.toUpperCase()} repository archive`,
+            defaultPath,
+            filters: [
+              {
+                name: `${format.toUpperCase()} archive`,
+                extensions: [format],
+              },
+            ],
+          })
+      if (destination === null || !this.mounted) {
+        return
+      }
+      const archiveRequest = prepareRepositoryArchive(
+        this.props.repositoryPath,
+        destination,
+        format
+      )
+      this.setState({ archiveRequest, error: null }, () =>
+        this.confirmButton?.focus()
+      )
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to prepare the repository archive.',
+        })
+      }
+    }
+  }
+
+  private onConfirmArchive = () => {
+    const request = this.state.archiveRequest
+    if (request === null) {
+      return
+    }
+    this.archiveRunDestination = request.destination
+    void this.startCommand('archive-export', request.args, true)
+  }
+
+  private onRevealArchive = () => {
+    const path = this.state.completedArchivePath
+    if (path === null) {
+      return
+    }
+    const reveal = this.props.revealArchive ?? showItemInFolder
+    void reveal(path).catch(error => {
+      if (this.mounted) {
+        this.setState({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to reveal the exported archive.',
+        })
+      }
+    })
   }
 
   private onConfirmOperation = () => {
@@ -279,15 +382,24 @@ export class RepositoryTools extends React.Component<
     const shouldRefresh =
       event.state === 'completed' &&
       completedOperation !== null &&
+      completedOperation !== 'archive-export' &&
       getRepositoryToolOperation(completedOperation).mutatesRepository
+    const archivePath =
+      completedOperation === 'archive-export'
+        ? this.archiveRunDestination
+        : null
+    this.archiveRunDestination = null
     this.runId = null
     this.setState(state => ({
       activeOperation: null,
       status: event.state,
       error: event.error ?? null,
+      completedArchivePath: event.state === 'completed' ? archivePath : null,
       output:
         event.state === 'completed' && state.output.length === 0
-          ? 'Completed successfully. Git reported no additional details.'
+          ? archivePath === null
+            ? 'Completed successfully. Git reported no additional details.'
+            : `Archive exported successfully: ${Path.basename(archivePath)}`
           : state.output,
     }))
     if (shouldRefresh) {
@@ -370,6 +482,43 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderExport() {
+    return (
+      <section
+        className="repository-tools-category"
+        aria-labelledby="repository-tools-export-title"
+      >
+        <h2 id="repository-tools-export-title">Export</h2>
+        <article className="repository-tool-card repository-archive-card">
+          <div>
+            <h3>Export repository archive</h3>
+            <p>
+              Create a source archive from the current HEAD commit. Git metadata
+              and uncommitted working-tree changes are not included.
+            </p>
+          </div>
+          <div
+            className="repository-tool-controls"
+            aria-label="Repository archive formats"
+          >
+            <Button
+              disabled={this.isBusy() || !this.state.gitAvailable}
+              onClick={() => void this.chooseArchiveDestination('zip')}
+            >
+              Export ZIP
+            </Button>
+            <Button
+              disabled={this.isBusy() || !this.state.gitAvailable}
+              onClick={() => void this.chooseArchiveDestination('tar')}
+            >
+              Export TAR
+            </Button>
+          </div>
+        </article>
+      </section>
+    )
+  }
+
   private renderConfirmation() {
     const id = this.state.confirmationOperation
     if (id === null) {
@@ -405,9 +554,50 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderArchiveConfirmation() {
+    const request = this.state.archiveRequest
+    if (request === null) {
+      return null
+    }
+    return (
+      <div
+        className="repository-tool-confirmation"
+        role="alertdialog"
+        aria-labelledby="repository-archive-confirm-title"
+        aria-describedby="repository-archive-confirm-description"
+      >
+        <strong id="repository-archive-confirm-title">
+          Export {request.format.toUpperCase()} archive from HEAD?
+        </strong>
+        <p id="repository-archive-confirm-description">
+          Destination:{' '}
+          <span title={request.destination}>{request.destination}</span>
+        </p>
+        <p>
+          The native save picker handles replacement confirmation when the file
+          already exists. Uncommitted changes are not included.
+        </p>
+        <div className="repository-tool-controls">
+          <Button
+            className="repository-tool-confirm-button"
+            onButtonRef={button => (this.confirmButton = button)}
+            onClick={this.onConfirmArchive}
+          >
+            Export archive
+          </Button>
+          <Button onClick={() => this.setState({ archiveRequest: null })}>
+            Go back
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   private renderResults() {
     const operation =
       this.state.resultOperation === null
+        ? null
+        : this.state.resultOperation === 'archive-export'
         ? null
         : getRepositoryToolOperation(this.state.resultOperation)
     return (
@@ -418,7 +608,11 @@ export class RepositoryTools extends React.Component<
         <div className="repository-tools-results-heading">
           <div>
             <h2 id="repository-tools-results-title">Results</h2>
-            <span>{operation?.title ?? 'Choose a repository tool'}</span>
+            <span>
+              {this.state.resultOperation === 'archive-export'
+                ? 'Export repository archive'
+                : operation?.title ?? 'Choose a repository tool'}
+            </span>
           </div>
           <div className="repository-tool-controls">
             <Button
@@ -433,6 +627,9 @@ export class RepositoryTools extends React.Component<
             >
               Clear
             </Button>
+            {this.state.completedArchivePath !== null && (
+              <Button onClick={this.onRevealArchive}>Show in folder</Button>
+            )}
           </div>
         </div>
         <div
@@ -483,9 +680,11 @@ export class RepositoryTools extends React.Component<
             {this.renderCategory('Diagnostics')}
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}
+            {this.renderExport()}
           </div>
           <aside className="repository-tools-results-column">
             {this.renderConfirmation()}
+            {this.renderArchiveConfirmation()}
             {this.renderResults()}
           </aside>
         </div>

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   getRepositoryToolOperation,
+  prepareRepositoryArchive,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -61,6 +62,37 @@ describe('repository tool recipes', () => {
     assert.match(
       maintenance.confirmationDescription ?? '',
       /rewrite object packs/i
+    )
+  })
+
+  it('prepares only contained ZIP and TAR exports from HEAD', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryArchive('C:\\work\\repo', 'C:\\exports\\repo', 'zip'),
+      {
+        format: 'zip',
+        destination: 'C:\\exports\\repo.zip',
+        args: [
+          'archive',
+          '--format=zip',
+          '--output=C:\\exports\\repo.zip',
+          'HEAD',
+        ],
+      }
+    )
+    assert.equal(
+      prepareRepositoryArchive('C:\\work\\repo', 'C:\\exports\\repo.TAR', 'tar')
+        .destination,
+      'C:\\exports\\repo.TAR'
+    )
+    assert.throws(() =>
+      prepareRepositoryArchive('C:\\work\\repo', 'relative.zip', 'zip')
+    )
+    assert.throws(() =>
+      prepareRepositoryArchive(
+        'C:\\work\\repo',
+        'C:\\work\\repo\\.git\\private.zip',
+        'zip'
+      )
     )
   })
 })
