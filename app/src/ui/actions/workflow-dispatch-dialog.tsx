@@ -10,6 +10,7 @@ import {
 import { ActionsStore } from '../../lib/stores/actions-store'
 import { Button } from '../lib/button'
 import { Select } from '../lib/select'
+import { trapActionsDialogFocus } from './actions-dialog-focus'
 
 interface IWorkflowDispatchDialogProps {
   readonly repository: Repository
@@ -42,6 +43,7 @@ export class WorkflowDispatchDialog extends React.Component<
   IWorkflowDispatchDialogState
 > {
   private dialog: HTMLFormElement | null = null
+  private previousFocus: HTMLElement | null = null
 
   public constructor(props: IWorkflowDispatchDialogProps) {
     super(props)
@@ -62,8 +64,18 @@ export class WorkflowDispatchDialog extends React.Component<
   }
 
   public componentDidMount() {
+    this.previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
     this.loadDefinition()
     this.dialog?.focus()
+  }
+
+  public componentWillUnmount() {
+    if (this.previousFocus?.isConnected) {
+      this.previousFocus.focus()
+    }
   }
 
   private setDialogRef = (dialog: HTMLFormElement | null) => {
@@ -71,6 +83,8 @@ export class WorkflowDispatchDialog extends React.Component<
   }
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    event.stopPropagation()
+    trapActionsDialogFocus(event, event.currentTarget)
     if (event.key === 'Escape' && !this.state.submitting) {
       event.preventDefault()
       this.props.onDismissed()
@@ -207,7 +221,7 @@ export class WorkflowDispatchDialog extends React.Component<
         <form
           className="workflow-dispatch-dialog"
           role="dialog"
-          aria-modal="false"
+          aria-modal="true"
           aria-labelledby="workflow-dispatch-title"
           tabIndex={-1}
           ref={this.setDialogRef}

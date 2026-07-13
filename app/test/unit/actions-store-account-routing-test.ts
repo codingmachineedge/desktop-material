@@ -80,10 +80,48 @@ describe('ActionsStore exact account routing', () => {
     )
     const selectedAccounts = new Array<Account>()
     const artifactPages = new Array<number>()
+    const jobPages = new Array<number>()
+    const reviews = new Array<{
+      ids: ReadonlyArray<number>
+      state: string
+      comment: string
+    }>()
     const fakeAPI = {
       fetchWorkflows: async () => ({ workflows: [] }),
       fetchWorkflowRuns: async () => ({ workflow_runs: [] }),
       fetchWorkflowRunJobs: async () => ({ jobs: [] }),
+      fetchWorkflowRunJobPage: async (
+        _owner: string,
+        _name: string,
+        runId: number,
+        attempt: number,
+        _latestAttempt: number,
+        page: number
+      ) => {
+        jobPages.push(page)
+        return {
+          runId,
+          attempt,
+          totalCount: 0,
+          jobs: [],
+          page,
+          nextPage: null,
+          truncated: false,
+        }
+      },
+      fetchWorkflowRunPendingDeployments: async () => [],
+      fetchWorkflowRunReviewHistory: async () => [],
+      reviewWorkflowRunPendingDeployments: async (
+        _owner: string,
+        _name: string,
+        _runId: number,
+        ids: ReadonlyArray<number>,
+        state: string,
+        comment: string
+      ) => {
+        reviews.push({ ids, state, comment })
+      },
+      approveForkWorkflowRun: async () => undefined,
       fetchWorkflowRunArtifacts: async (
         _owner: string,
         _name: string,
@@ -103,6 +141,7 @@ describe('ActionsStore exact account routing', () => {
       rerunWorkflowRun: async () => undefined,
       rerunFailedJobs: async () => true,
       rerunJob: async () => true,
+      rerunWorkflowJob: async () => undefined,
       cancelWorkflowRun: async () => undefined,
       setWorkflowEnabled: async () => undefined,
       fetchWorkflowFileContent: async () => 'name: CI',
@@ -128,6 +167,9 @@ describe('ActionsStore exact account routing', () => {
       Reflect.set(store, 'refresh', async () => undefined)
 
       await store.fetchJobs(repository, 7)
+      await store.fetchJobPage(repository, 7, 2, 2, 2)
+      await store.fetchPendingDeployments(repository, 7)
+      await store.fetchRunReviewHistory(repository, 7)
       await store.fetchArtifacts(repository, 7, 2)
       await store.fetchArtifactAttestationPresence(
         repository,
@@ -136,6 +178,14 @@ describe('ActionsStore exact account routing', () => {
       await store.rerun(repository, 7)
       await store.rerunFailed(repository, 7)
       await store.rerunJob(repository, 11)
+      await store.reviewPendingDeployments(
+        repository,
+        7,
+        [101],
+        'approved',
+        'Ready'
+      )
+      await store.approveForkRun(repository, 7)
       await store.cancelRun(repository, 7, false)
       await store.setWorkflowEnabled(repository, 3, false)
       await store.fetchWorkflowSource(repository, {
@@ -167,9 +217,13 @@ describe('ActionsStore exact account routing', () => {
         controller.signal
       )
 
-      assert.equal(selectedAccounts.length, 11)
+      assert.equal(selectedAccounts.length, 16)
       assert.ok(selectedAccounts.every(account => account === second))
       assert.deepEqual(artifactPages, [2])
+      assert.deepEqual(jobPages, [2])
+      assert.deepEqual(reviews, [
+        { ids: [101], state: 'approved', comment: 'Ready' },
+      ])
       assert.deepEqual(
         ipcRequests.map(({ channel, request }) => ({
           channel,

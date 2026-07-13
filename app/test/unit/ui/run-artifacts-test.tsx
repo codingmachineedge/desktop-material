@@ -135,7 +135,8 @@ describe('Actions run artifacts', () => {
 
     assert.ok(await screen.findByRole('heading', { name: longName }))
     assert.ok(screen.getByText(digest))
-    assert.ok(screen.getByText(/#42 · attempt 2 · push/))
+    assert.ok(screen.getByText(/#42 · push/))
+    assert.ok(screen.getByText('Workflow run · all attempts'))
     assert.ok(screen.getByText(/feature\/artifact-browser · b{12}/))
     assert.ok(screen.getByText(/Showing 1 loaded of 120 artifacts/))
     assert.ok(

@@ -6,6 +6,7 @@ import {
   IActionsState,
   accountSupportsActions,
   actionsArtifactError,
+  actionsInspectorError,
   actionsMutationError,
   getActionsAccount,
   getActionsRepositoryKey,
@@ -444,6 +445,79 @@ describe('ActionsStore helpers', () => {
   it('preserves non-API operation errors', () => {
     const original = new Error('network unavailable')
     assert.equal(actionsMutationError(original, 'cancel-run'), original)
+  })
+
+  it('explains run-inspector account, permission, support, and service failures', () => {
+    const unauthorized = actionsInspectorError(
+      new APIError(new Response(null, { status: 401 }), null),
+      'load-jobs'
+    )
+    assert.match(unauthorized.message, /Sign in again/)
+
+    const denied = actionsInspectorError(
+      new APIError(new Response(null, { status: 403 }), null),
+      'load-pending-deployments'
+    )
+    assert.match(denied.message, /Actions and deployment access/)
+
+    const unavailable = actionsInspectorError(
+      new APIError(new Response(null, { status: 404 }), null),
+      'load-review-history'
+    )
+    assert.match(unavailable.message, /Enterprise version/)
+
+    const sensitive = 'secret-inspector-token='.padEnd(20_000, 'x')
+    const serviceFailure = actionsInspectorError(
+      new APIError(new Response(null, { status: 503 }), {
+        message: sensitive,
+      }),
+      'load-jobs'
+    )
+    assert.match(serviceFailure.message, /service returned an error \(503\)/)
+    assert.equal(
+      serviceFailure.message.includes('secret-inspector-token'),
+      false
+    )
+    assert.ok(serviceFailure.message.length < 220)
+
+    const canceled = new Error('canceled')
+    canceled.name = 'AbortError'
+    assert.equal(actionsInspectorError(canceled, 'load-jobs'), canceled)
+  })
+
+  it('explains deployment and fork-run mutation failures', () => {
+    const signedOut = actionsMutationError(
+      new APIError(new Response(null, { status: 401 }), null),
+      'review-deployments'
+    )
+    assert.match(signedOut.message, /Sign in again/)
+
+    const reviewDenied = actionsMutationError(
+      new APIError(new Response(null, { status: 403 }), null),
+      'review-deployments'
+    )
+    assert.match(reviewDenied.message, /review these pending deployments/)
+    assert.match(reviewDenied.message, /Deployments write access/)
+
+    const forkConflict = actionsMutationError(
+      new APIError(new Response(null, { status: 409 }), null),
+      'approve-fork-run'
+    )
+    assert.match(forkConflict.message, /approve this fork workflow run/)
+    assert.match(forkConflict.message, /current state/)
+
+    const sensitive = 'secret-mutation-token='.padEnd(20_000, 'x')
+    const serviceFailure = actionsMutationError(
+      new APIError(new Response(null, { status: 502 }), {
+        message: sensitive,
+      }),
+      'approve-fork-run'
+    )
+    assert.match(serviceFailure.message, /service returned an error \(502\)/)
+    assert.equal(
+      serviceFailure.message.includes('secret-mutation-token'),
+      false
+    )
   })
 
   it('explains artifact account, permission, expiration, and capability failures', () => {

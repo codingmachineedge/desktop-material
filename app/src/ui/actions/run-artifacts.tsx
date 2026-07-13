@@ -570,13 +570,10 @@ export class RunArtifacts extends React.Component<
             <dd>{formatDate(artifact.expiresAt)}</dd>
           </div>
           <div>
-            <dt>Workflow run</dt>
+            <dt>Workflow run · all attempts</dt>
             <dd>
-              #{this.props.run.run_number ?? this.props.run.id}
-              {this.props.run.run_attempt
-                ? ` · attempt ${this.props.run.run_attempt}`
-                : ''}{' '}
-              · {this.props.run.event}
+              #{this.props.run.run_number ?? this.props.run.id} ·{' '}
+              {this.props.run.event}
             </dd>
           </div>
           <div>

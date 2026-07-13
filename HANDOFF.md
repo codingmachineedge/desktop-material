@@ -387,6 +387,16 @@ four-function slice, typed operation boundary, and Actions run/artifact
 pagination are production-verified. Job pagination/approvals and the
 PR/Issue/Release waves remain next.
 
+## 2026-07-13 Actions run inspector implementation checkpoint
+
+The active roadmap slice now exists as named app functions rather than a command or API catalogue. The run detail pane selects the latest or a historical attempt, loads strict 50-job pages, retains page one through a later-page retry, and sends an exact loaded job to the existing bounded log transfer or throwing re-run mutation. Run-level pending deployments and review history load independently; selected approvable environments use a dedicated required 1–1024-character decision dialog, while an eligible first-time fork run has a separate confirmation.
+
+Every new API/store surface stays on the repository-selected same-endpoint account. Current jobs use the fixed latest-attempt path, historical jobs use the fixed attempt path, deployment reviews send only normalized environment ids/state/comment, and fork approval is bodyless. Same-run attempt changes abort and generation-guard stale jobs; repository/account/run changes also cancel child work. Artifacts are now correctly labelled as run-level outputs across all attempts.
+
+Focused implementation evidence is green: TypeScript `--noEmit`, targeted ESLint with the repository rule directory, responsive style contracts, and 124/124 Actions checks across 22 suites. Those checks cover strict bounded parsing (including single-byte response streams), fixed paths and bodies, permission-aware bounded errors, exact-account routing, current→historical stale-request cancellation, latest-attempt page revalidation, shortened-page stopping, 50→51 retained retry, exact recovered-job log/re-run targeting, 101-attempt bounded navigation, locked deployment selection, required bounded comments, approval submission, separate fork confirmation, consuming modal scrims, and contained/restored focus.
+
+Do not call this production-verified yet. The next continuation must extend the deterministic loopback provider, run its tests, commit and push that coherent checkpoint, build the exact pushed source, and exercise it through the owned off-screen desktop described by `.codex/run-manifests/2026-07-13-actions-run-inspector-ui-gate.md`. Promote screenshots and update README/wiki/Pages only after original-resolution inspection and zero-overflow/clipping/outside-control/overlap geometry receipts at the supported minimum, short-height, and requested 200% scale.
+
 ## Maintenance constraints
 
 - Keep account identity on `endpoint#id`; never collapse provider accounts by

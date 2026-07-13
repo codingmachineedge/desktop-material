@@ -6,7 +6,7 @@
 - Expected remote: `origin` (`codingmachineedge/desktop-material`)
 - Exact built and exercised source: pending
 - Owned off-screen desktop: `DesktopMaterialRunInspector-20260713-93cb7f41`
-- Disposable fixture root: `%TEMP%\desktop-material-actions-run-inspector-20260713-93cb7f41`
+- Disposable fixture root: `%TEMP%\desktop-material-p0-ui-20260713-actions-run-inspector-93cb7f41`
 - Screenshot theme and target: light, original 960×660 PNGs
 - Public repository mutations authorized: milestone commits/pushes, separate wiki merge/push, and Pages workflow dispatch; no GitHub API mutation may target a public provider
 
@@ -54,6 +54,16 @@ Every accepted state must have equal document/body client and scroll widths, no 
 - Deterministic loopback provider tests plus an Actions run-inspector CDP verifier.
 - Focused TypeScript, lint, formatting, style-contract, and production-build checks.
 
+## Implementation checkpoint
+
+- The renderer exposes purpose-built attempt selection, bounded job paging, later-page retry, exact job logs/re-run, deployment review, review history, and fork-run approval controls. It does not expose a command, endpoint, method, or GraphQL editor.
+- The API layer uses fixed current-attempt and historical-attempt paths, bounded streamed metadata, strict response validation, exact normalized review bodies, and bodyless fork approval.
+- The store routes every new read and mutation through the repository-selected same-endpoint account and maps account, permission, unsupported-version, conflict, and service failures to bounded actionable copy.
+- Same-run attempt changes abort the prior request and increment the operation generation. Later-page failures retain already loaded jobs and leave the named retry control available. Re-running a recovered job preserves the selected attempt and all loaded pages.
+- Long run/job/step/environment/reviewer/comment/error text and action groups have zero-min-width, wrapping, stacking, and bounded-dialog style contracts. The job log header now wraps globally; the intrinsically spatial log body remains the only allowed horizontal-pan surface.
+- Focused result before provider work: TypeScript `--noEmit` passed, targeted ESLint passed with the repository rule directory, Prettier rewrote the touched TypeScript/SCSS files cleanly, and the Actions suite passed 124/124 checks across 22 suites. The regression set now includes bounded single-byte JSON chunks, nonshrinking totals, 101-attempt reachability, retained-list recovery, latest-attempt historical-page reconstruction, shorter-page stopping, eligibility invalidation, and modal focus containment.
+- Remaining: deterministic provider routes/tests, production build, exact-request CDP receipt, original-resolution screenshot inspection, README/wiki/Pages evidence, and cleanup/publication receipt.
+
 ## Documentation and evidence allowlist
 
 - `README.md`
@@ -67,4 +77,4 @@ Every accepted state must have equal document/body client and scroll widths, no 
 
 ## Publication and cleanup receipt
 
-Pending implementation, hidden-desktop production verification, screenshot inspection, documentation publication, separate wiki push, Pages artifact verification, credential deletion, process/port shutdown, desktop closure, and containment-checked disposable-root removal.
+Implementation and focused checks complete. Pending deterministic provider completion, hidden-desktop production verification, screenshot inspection, documentation publication, separate wiki push, Pages artifact verification, credential deletion, process/port shutdown, desktop closure, and containment-checked disposable-root removal.

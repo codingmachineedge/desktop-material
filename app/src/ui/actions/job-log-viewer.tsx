@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { AutoSizer, List, ListRowProps } from 'react-virtualized'
 import memoizeOne from 'memoize-one'
-import { IAPIWorkflowJob } from '../../lib/api'
+import { IActionsJob } from '../../lib/actions-jobs'
 import { ActionsLogParser } from '../../lib/actions-log-parser/action-log-parser'
 import {
   ILogLineTemplateData,
@@ -10,9 +10,10 @@ import {
 import { APIError } from '../../lib/http'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
+import { trapActionsDialogFocus } from './actions-dialog-focus'
 
 interface IJobLogViewerProps {
-  readonly job: IAPIWorkflowJob
+  readonly job: IActionsJob
   readonly log: string
   readonly loading: boolean
   readonly error: Error | null
@@ -62,6 +63,7 @@ export class JobLogViewer extends React.Component<
 > {
   private list: List | null = null
   private viewer: HTMLElement | null = null
+  private previousFocus: HTMLElement | null = null
   private readonly groupToggleHandlers = new Map<number, () => void>()
   private parseLog = memoizeOne((log: string, prefix: string) =>
     new ActionsLogParser(log, prefix).getParsedLogLinesTemplateData()
@@ -87,7 +89,17 @@ export class JobLogViewer extends React.Component<
   }
 
   public componentDidMount() {
+    this.previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
     this.viewer?.focus()
+  }
+
+  public componentWillUnmount() {
+    if (this.previousFocus?.isConnected) {
+      this.previousFocus.focus()
+    }
   }
 
   private setViewerRef = (viewer: HTMLElement | null) => {
@@ -95,6 +107,8 @@ export class JobLogViewer extends React.Component<
   }
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    event.stopPropagation()
+    trapActionsDialogFocus(event, event.currentTarget)
     if (event.key === 'Escape') {
       event.preventDefault()
       this.props.onClose()
@@ -102,8 +116,8 @@ export class JobLogViewer extends React.Component<
   }
 
   private getLines() {
-    const prefix = this.props.job.html_url
-      ? `${this.props.job.html_url}#step`
+    const prefix = this.props.job.htmlUrl
+      ? `${this.props.job.htmlUrl}#step`
       : ''
     return this.getVisibleLines(
       this.parseLog(this.props.log, prefix),
@@ -239,81 +253,82 @@ export class JobLogViewer extends React.Component<
       this.props.error.responseStatus === 410
 
     return (
-      // The log overlay intentionally handles Escape while focus is anywhere
-      // inside the labelled dialog region.
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-      <section
-        className="actions-log-viewer"
-        role="dialog"
-        aria-modal="false"
-        aria-label={`${this.props.job.name} logs`}
-        tabIndex={-1}
-        ref={this.setViewerRef}
-        onKeyDown={this.onKeyDown}
-      >
-        <header>
-          <div>
-            <span className="eyebrow">Job log</span>
-            <h2>{this.props.job.name}</h2>
+      <div className="actions-dialog-layer">
+        {/* The log overlay handles Escape and contains keyboard focus. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+        <section
+          className="actions-log-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${this.props.job.name} logs`}
+          tabIndex={-1}
+          ref={this.setViewerRef}
+          onKeyDown={this.onKeyDown}
+        >
+          <header>
+            <div>
+              <span className="eyebrow">Job log</span>
+              <h2>{this.props.job.name}</h2>
+            </div>
+            <Button onClick={this.props.onClose}>Close</Button>
+          </header>
+          <div className="actions-log-search">
+            <input
+              type="search"
+              value={this.state.search}
+              onChange={this.onSearch}
+              placeholder="Search logs"
+              aria-label="Search logs"
+            />
+            <span role="status" aria-live="polite" aria-atomic="true">
+              {matches.length === 0
+                ? 'No matches'
+                : `${Math.min(this.state.match + 1, matches.length)} of ${
+                    matches.length
+                  }`}
+            </span>
+            <Button
+              size="small"
+              disabled={matches.length === 0}
+              onClick={this.previousMatch}
+            >
+              Previous
+            </Button>
+            <Button
+              size="small"
+              disabled={matches.length === 0}
+              onClick={this.nextMatch}
+            >
+              Next
+            </Button>
           </div>
-          <Button onClick={this.props.onClose}>Close</Button>
-        </header>
-        <div className="actions-log-search">
-          <input
-            type="search"
-            value={this.state.search}
-            onChange={this.onSearch}
-            placeholder="Search logs"
-            aria-label="Search logs"
-          />
-          <span role="status" aria-live="polite" aria-atomic="true">
-            {matches.length === 0
-              ? 'No matches'
-              : `${Math.min(this.state.match + 1, matches.length)} of ${
-                  matches.length
-                }`}
-          </span>
-          <Button
-            size="small"
-            disabled={matches.length === 0}
-            onClick={this.previousMatch}
-          >
-            Previous
-          </Button>
-          <Button
-            size="small"
-            disabled={matches.length === 0}
-            onClick={this.nextMatch}
-          >
-            Next
-          </Button>
-        </div>
-        {this.props.loading ? (
-          <div className="actions-loading">Downloading job log…</div>
-        ) : this.props.error ? (
-          <div className="actions-inline-error" role="alert">
-            {expired
-              ? 'These workflow logs have expired on GitHub.'
-              : this.props.error.message}
-          </div>
-        ) : (
-          <div className="actions-log-list">
-            <AutoSizer>
-              {({ width, height }) => (
-                <List
-                  ref={this.setListRef}
-                  width={width}
-                  height={height}
-                  rowCount={lines.length}
-                  rowHeight={24}
-                  rowRenderer={this.renderRow}
-                  overscanRowCount={20}
-                />
-              )}
-            </AutoSizer>
-          </div>
-        )}
-      </section>
+          {this.props.loading ? (
+            <div className="actions-loading">Downloading job log…</div>
+          ) : this.props.error ? (
+            <div className="actions-inline-error" role="alert">
+              {expired
+                ? 'These workflow logs have expired on GitHub.'
+                : this.props.error.message}
+            </div>
+          ) : (
+            <div className="actions-log-list">
+              <AutoSizer>
+                {({ width, height }) => (
+                  <List
+                    ref={this.setListRef}
+                    width={width}
+                    height={height}
+                    rowCount={lines.length}
+                    rowHeight={24}
+                    rowRenderer={this.renderRow}
+                    overscanRowCount={20}
+                  />
+                )}
+              </AutoSizer>
+            </div>
+          )}
+        </section>
+      </div>
     )
   }
 }

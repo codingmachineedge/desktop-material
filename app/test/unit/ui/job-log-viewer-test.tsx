@@ -2,14 +2,14 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import * as React from 'react'
 
-import { IAPIWorkflowJob } from '../../../src/lib/api'
+import { IActionsJob } from '../../../src/lib/actions-jobs'
 import { JobLogViewer } from '../../../src/ui/actions/job-log-viewer'
 import { render, screen } from '../../helpers/ui/render'
 
 const job = {
   name: 'build',
-  html_url: 'https://github.example/actions/jobs/1',
-} as IAPIWorkflowJob
+  htmlUrl: 'https://github.example/actions/jobs/1',
+} as IActionsJob
 
 describe('JobLogViewer', () => {
   it('labels search and announces its result count', () => {

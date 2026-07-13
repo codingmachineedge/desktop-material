@@ -55,6 +55,27 @@ import {
   parseBoundedActionsArtifactAPIError,
   readBoundedActionsArtifactJSON,
 } from './actions-artifact-json'
+import {
+  ActionsJobPageSize,
+  IActionsJobList,
+  parseActionsJobList,
+  validateActionsJobAttempt,
+  validateActionsJobIdentifier,
+  validateActionsJobPage,
+} from './actions-jobs'
+import {
+  ActionsRunReviewState,
+  createActionsRunReviewRequest,
+  IActionsPendingDeployment,
+  IActionsRunReviewHistory,
+  parseActionsPendingDeployments,
+  parseActionsRunReviewHistory,
+} from './actions-run-reviews'
+import {
+  ActionsMetadataJSONError,
+  parseBoundedActionsAPIError,
+  readBoundedActionsJSON,
+} from './actions-response'
 import { createGitHubAPIRequestHeaders } from './github-rest-api-version'
 export {
   createGitHubAPIRequestHeaders,
@@ -1243,6 +1264,44 @@ async function boundedActionsArtifactResponse(
   return value
 }
 
+async function boundedActionsMetadataResponse(
+  response: Response,
+  signal?: AbortSignal
+): Promise<unknown> {
+  let value: unknown
+  try {
+    value = await readBoundedActionsJSON(response, signal)
+  } catch (error) {
+    if (!response.ok && error instanceof ActionsMetadataJSONError) {
+      throw new APIError(response, null)
+    }
+    throw error
+  }
+  if (!response.ok) {
+    throw new APIError(response, parseBoundedActionsAPIError(value))
+  }
+  return value
+}
+
+async function requireSuccessfulActionsMutation(
+  response: Response,
+  signal?: AbortSignal
+): Promise<void> {
+  if (response.ok) {
+    await response.body?.cancel().catch(() => undefined)
+    return
+  }
+  let value: unknown = null
+  try {
+    value = await readBoundedActionsJSON(response, signal)
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') {
+      throw error
+    }
+  }
+  throw new APIError(response, parseBoundedActionsAPIError(value))
+}
+
 /**
  * An object for making authenticated requests to the GitHub API
  */
@@ -2138,6 +2197,111 @@ export class API {
     return null
   }
 
+  /** List one bounded page of jobs for the current or an earlier run attempt. */
+  public async fetchWorkflowRunJobPage(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    attempt: number | null,
+    latestAttempt: number | null,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IActionsJobList> {
+    const runId = validateActionsJobIdentifier(workflowRunId, 'workflow run id')
+    const requestedPage = validateActionsJobPage(page)
+    if ((attempt === null) !== (latestAttempt === null)) {
+      throw new Error('Workflow run attempt context is invalid.')
+    }
+    if (attempt !== null && latestAttempt !== null) {
+      validateActionsJobAttempt(attempt)
+      validateActionsJobAttempt(latestAttempt)
+      if (attempt > latestAttempt) {
+        throw new Error('Workflow run attempt is newer than this run.')
+      }
+    }
+
+    const path =
+      attempt === null || attempt === latestAttempt
+        ? `repos/${owner}/${name}/actions/runs/${runId}/jobs?filter=latest&per_page=${ActionsJobPageSize}&page=${requestedPage}`
+        : `repos/${owner}/${name}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=${ActionsJobPageSize}&page=${requestedPage}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseActionsJobList(
+      await boundedActionsMetadataResponse(response, signal),
+      runId,
+      attempt,
+      requestedPage
+    )
+  }
+
+  /** Inspect environments awaiting a human deployment review for one run. */
+  public async fetchWorkflowRunPendingDeployments(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<IActionsPendingDeployment>> {
+    const runId = validateActionsJobIdentifier(workflowRunId, 'workflow run id')
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${owner}/${name}/actions/runs/${runId}/pending_deployments`,
+      { signal }
+    )
+    return parseActionsPendingDeployments(
+      await boundedActionsMetadataResponse(response, signal)
+    )
+  }
+
+  /** Inspect the bounded human-review history for one workflow run. */
+  public async fetchWorkflowRunReviewHistory(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<IActionsRunReviewHistory>> {
+    const runId = validateActionsJobIdentifier(workflowRunId, 'workflow run id')
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${owner}/${name}/actions/runs/${runId}/approvals`,
+      { signal }
+    )
+    return parseActionsRunReviewHistory(
+      await boundedActionsMetadataResponse(response, signal)
+    )
+  }
+
+  /** Approve or reject exactly the selected pending deployment environments. */
+  public async reviewWorkflowRunPendingDeployments(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    environmentIds: ReadonlyArray<number>,
+    state: ActionsRunReviewState,
+    comment: string
+  ): Promise<void> {
+    const runId = validateActionsJobIdentifier(workflowRunId, 'workflow run id')
+    const body = createActionsRunReviewRequest(environmentIds, state, comment)
+    const response = await this.ghRequest(
+      'POST',
+      `repos/${owner}/${name}/actions/runs/${runId}/pending_deployments`,
+      { body }
+    )
+    await requireSuccessfulActionsMutation(response)
+  }
+
+  /** Approve one eligible first-time-contributor fork workflow run. */
+  public async approveForkWorkflowRun(
+    owner: string,
+    name: string,
+    workflowRunId: number
+  ): Promise<void> {
+    const runId = validateActionsJobIdentifier(workflowRunId, 'workflow run id')
+    const response = await this.ghRequest(
+      'POST',
+      `repos/${owner}/${name}/actions/runs/${runId}/approve`
+    )
+    await requireSuccessfulActionsMutation(response)
+  }
+
   /** List workflows configured for a repository. */
   public async fetchWorkflows(
     owner: string,
@@ -2371,6 +2535,20 @@ export class API {
         )
         return false
       })
+  }
+
+  /** Re-run one exact job while preserving permission-aware API failures. */
+  public async rerunWorkflowJob(
+    owner: string,
+    name: string,
+    jobId: number
+  ): Promise<void> {
+    const id = validateActionsJobIdentifier(jobId, 'workflow job id')
+    const response = await this.ghRequest(
+      'POST',
+      `/repos/${owner}/${name}/actions/jobs/${id}/rerun`
+    )
+    await requireSuccessfulActionsMutation(response)
   }
 
   public async getAvatarToken() {

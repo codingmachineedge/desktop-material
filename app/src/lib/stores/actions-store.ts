@@ -21,6 +21,12 @@ import {
   fetchActionsJobLogThroughMainProcess,
 } from '../actions-transfer-client'
 import { ActionsTransferError } from '../actions-transfer'
+import { IActionsJobList } from '../actions-jobs'
+import {
+  ActionsRunReviewState,
+  IActionsPendingDeployment,
+  IActionsRunReviewHistory,
+} from '../actions-run-reviews'
 import { AccountsStore } from './accounts-store'
 import { Repository } from '../../models/repository'
 import { getAccountForRepository } from '../get-account-for-repository'
@@ -31,6 +37,13 @@ export type ActionsMutation =
   | 'force-cancel-run'
   | 'enable-workflow'
   | 'disable-workflow'
+  | 'review-deployments'
+  | 'approve-fork-run'
+
+export type ActionsInspectorOperation =
+  | 'load-jobs'
+  | 'load-pending-deployments'
+  | 'load-review-history'
 
 export type ActionsArtifactOperation = 'list' | 'attestations' | 'download'
 
@@ -40,6 +53,16 @@ const mutationLabels: Readonly<Record<ActionsMutation, string>> = {
   'force-cancel-run': 'force-cancel this workflow run',
   'enable-workflow': 'enable this workflow',
   'disable-workflow': 'disable this workflow',
+  'review-deployments': 'review these pending deployments',
+  'approve-fork-run': 'approve this fork workflow run',
+}
+
+const inspectorOperationLabels: Readonly<
+  Record<ActionsInspectorOperation, string>
+> = {
+  'load-jobs': 'load jobs for this workflow run attempt',
+  'load-pending-deployments': 'load pending deployments for this workflow run',
+  'load-review-history': 'load deployment review history for this workflow run',
 }
 
 /** Turn API failures into actionable, capability-aware Actions messages. */
@@ -52,14 +75,21 @@ export function actionsMutationError(
   }
 
   const action = mutationLabels[mutation]
+  if (error.responseStatus === 401) {
+    return new Error(`GitHub could not ${action}. Sign in again and retry.`)
+  }
   if (error.responseStatus === 403) {
     if (error.rateLimitReset !== null) {
       return new Error(
         `GitHub cannot ${action} until the API rate limit resets at ${error.rateLimitReset.toLocaleTimeString()}.`
       )
     }
+    const permission =
+      mutation === 'review-deployments'
+        ? 'Deployments write access'
+        : 'Actions write access'
     return new Error(
-      `GitHub denied permission to ${action}. Check that the selected account has Actions write access to this repository.`
+      `GitHub denied permission to ${action}. Check that the selected account has ${permission} to this repository.`
     )
   }
   if (error.responseStatus === 404) {
@@ -70,6 +100,50 @@ export function actionsMutationError(
   if (error.responseStatus === 409 || error.responseStatus === 422) {
     return new Error(
       `GitHub could not ${action} in its current state. Refresh Actions and try again.`
+    )
+  }
+  if (error.responseStatus >= 500) {
+    return new Error(
+      `GitHub could not ${action} because the service returned an error (${error.responseStatus}). Retry in a moment.`
+    )
+  }
+  return error
+}
+
+/** Turn run-inspector reads into account, permission, and support guidance. */
+export function actionsInspectorError(
+  error: unknown,
+  operation: ActionsInspectorOperation
+): Error {
+  if ((error as Error)?.name === 'AbortError') {
+    return error as Error
+  }
+  if (!(error instanceof APIError)) {
+    return error instanceof Error ? error : new Error(String(error))
+  }
+
+  const action = inspectorOperationLabels[operation]
+  if (error.responseStatus === 401) {
+    return new Error(`GitHub could not ${action}. Sign in again and retry.`)
+  }
+  if (error.responseStatus === 403) {
+    if (error.rateLimitReset !== null) {
+      return new Error(
+        `GitHub cannot ${action} until the API rate limit resets at ${error.rateLimitReset.toLocaleTimeString()}.`
+      )
+    }
+    return new Error(
+      `GitHub denied permission to ${action}. Check the selected account's Actions and deployment access.`
+    )
+  }
+  if (error.responseStatus === 404) {
+    return new Error(
+      `GitHub could not ${action}. The run or attempt may no longer exist, or this GitHub Enterprise version may not support the function.`
+    )
+  }
+  if (error.responseStatus >= 500) {
+    return new Error(
+      `GitHub could not ${action} because the service returned an error (${error.responseStatus}). Retry in a moment.`
     )
   }
   return error
@@ -766,14 +840,11 @@ export class ActionsStore {
   public async rerunJob(repository: Repository, jobId: number) {
     const gitHubRepository = this.gitHubFor(repository)
     await this.mutate('rerun-job', async () => {
-      const succeeded = await this.apiFor(repository).rerunJob(
+      await this.apiFor(repository).rerunWorkflowJob(
         gitHubRepository.owner.login,
         gitHubRepository.name,
         jobId
       )
-      if (!succeeded) {
-        throw new Error('GitHub could not re-run this failed job.')
-      }
     })
     await this.refresh(repository, true)
   }
@@ -823,6 +894,102 @@ export class ActionsStore {
       runId
     )
     return result?.jobs ?? []
+  }
+
+  public async fetchJobPage(
+    repository: Repository,
+    runId: number,
+    attempt: number | null,
+    latestAttempt: number | null,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IActionsJobList> {
+    try {
+      const gitHubRepository = this.gitHubFor(repository)
+      return await this.apiFor(repository).fetchWorkflowRunJobPage(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        runId,
+        attempt,
+        latestAttempt,
+        page,
+        signal
+      )
+    } catch (error) {
+      throw actionsInspectorError(error, 'load-jobs')
+    }
+  }
+
+  public async fetchPendingDeployments(
+    repository: Repository,
+    runId: number,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<IActionsPendingDeployment>> {
+    try {
+      const gitHubRepository = this.gitHubFor(repository)
+      return await this.apiFor(repository).fetchWorkflowRunPendingDeployments(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        runId,
+        signal
+      )
+    } catch (error) {
+      throw actionsInspectorError(error, 'load-pending-deployments')
+    }
+  }
+
+  public async fetchRunReviewHistory(
+    repository: Repository,
+    runId: number,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<IActionsRunReviewHistory>> {
+    try {
+      const gitHubRepository = this.gitHubFor(repository)
+      return await this.apiFor(repository).fetchWorkflowRunReviewHistory(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        runId,
+        signal
+      )
+    } catch (error) {
+      throw actionsInspectorError(error, 'load-review-history')
+    }
+  }
+
+  public async reviewPendingDeployments(
+    repository: Repository,
+    runId: number,
+    environmentIds: ReadonlyArray<number>,
+    state: ActionsRunReviewState,
+    comment: string
+  ): Promise<void> {
+    const gitHubRepository = this.gitHubFor(repository)
+    await this.mutate('review-deployments', () =>
+      this.apiFor(repository).reviewWorkflowRunPendingDeployments(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        runId,
+        environmentIds,
+        state,
+        comment
+      )
+    )
+    await this.refresh(repository, true)
+  }
+
+  public async approveForkRun(
+    repository: Repository,
+    runId: number
+  ): Promise<void> {
+    const gitHubRepository = this.gitHubFor(repository)
+    await this.mutate('approve-fork-run', () =>
+      this.apiFor(repository).approveForkWorkflowRun(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        runId
+      )
+    )
+    await this.refresh(repository, true)
   }
 
   public fetchJobLogs(
