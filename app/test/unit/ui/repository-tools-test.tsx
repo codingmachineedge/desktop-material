@@ -75,7 +75,8 @@ function renderTools(
     defaultPath: string
   ) => Promise<string | null>,
   revealArchive?: (path: string) => Promise<void>,
-  chooseBundleDestination?: (defaultPath: string) => Promise<string | null>
+  chooseBundleDestination?: (defaultPath: string) => Promise<string | null>,
+  chooseBundleToVerify?: () => Promise<string | null>
 ) {
   return render(
     <RepositoryTools
@@ -85,6 +86,7 @@ function renderTools(
       chooseArchiveDestination={chooseArchiveDestination}
       revealArchive={revealArchive}
       chooseBundleDestination={chooseBundleDestination}
+      chooseBundleToVerify={chooseBundleToVerify}
     />
   )
 }
@@ -296,5 +298,27 @@ describe('Repository tools', () => {
       '--all',
     ])
     assert.equal(client.starts[0].confirmed, true)
+  })
+
+  it('verifies a selected bundle without confirmation or mutation', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(
+      client,
+      async () => {},
+      undefined,
+      undefined,
+      undefined,
+      async () => 'C:/exports/repository.bundle'
+    )
+    await screen.findByText('git version 2.55.0')
+    fireEvent.click(screen.getByRole('button', { name: 'Verify a bundle' }))
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].args, [
+      'bundle',
+      'verify',
+      'C:\\exports\\repository.bundle',
+    ])
+    assert.equal(client.starts[0].confirmed, false)
+    assert.equal(screen.queryByRole('alertdialog'), null)
   })
 })

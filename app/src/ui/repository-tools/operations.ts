@@ -205,3 +205,19 @@ export function prepareRepositoryBundle(
     args: ['bundle', 'create', resolvedDestination, '--all'],
   }
 }
+
+/** Prepare a read-only prerequisite and integrity check for a selected bundle. */
+export function prepareRepositoryBundleVerification(
+  bundlePath: string
+): ReadonlyArray<string> {
+  const value = bundlePath.trim()
+  if (
+    value.length === 0 ||
+    value.includes('\0') ||
+    !Path.isAbsolute(value) ||
+    !value.toLowerCase().endsWith('.bundle')
+  ) {
+    throw new Error('Choose an absolute .bundle file to verify.')
+  }
+  return ['bundle', 'verify', Path.resolve(value)]
+}
