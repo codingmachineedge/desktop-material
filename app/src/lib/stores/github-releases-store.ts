@@ -575,6 +575,9 @@ export class GitHubReleasesStore {
       'update',
       signal,
       async (context, requestSignal) => {
+        if (update.releaseId !== review.releaseId) {
+          throw staleReviewError()
+        }
         await this.revalidateReviewedRelease(
           repository,
           context,

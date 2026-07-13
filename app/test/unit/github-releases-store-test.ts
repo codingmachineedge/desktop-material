@@ -353,6 +353,38 @@ describe('GitHub Releases store', () => {
     ])
   })
 
+  it('rejects an update whose release id differs from the reviewed release', async () => {
+    const accountsStore = new FakeAccountsStore([selected])
+    let fetches = 0
+    let updates = 0
+    const store = await storeWith(
+      accountsStore,
+      dependencies(() =>
+        fakeAPI({
+          fetchRelease: async () => {
+            fetches++
+            return release
+          },
+          updateRelease: async () => {
+            updates++
+            return release
+          },
+        })
+      )
+    )
+
+    await assert.rejects(
+      store.update(
+        repository,
+        store.createMutationReview(repository, release),
+        { ...release, releaseId: release.id + 1 }
+      ),
+      error => error instanceof GitHubReleasesError && error.kind === 'conflict'
+    )
+    assert.equal(fetches, 0)
+    assert.equal(updates, 0)
+  })
+
   it('re-fetches exact reviewed state and fails every mutation closed when stale', async () => {
     const accountsStore = new FakeAccountsStore([selected])
     let remoteRelease: IGitHubRelease = {
