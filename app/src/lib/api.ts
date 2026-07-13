@@ -41,6 +41,14 @@ import {
   normalizeGitHubPullRequestDraft,
   validateCreatedGitHubPullRequest,
 } from './github-pull-request'
+import {
+  ActionsArtifactPageSize,
+  IActionsArtifactList,
+  isSupportedActionsArtifactDigest,
+  parseActionsArtifactAttestationPresence,
+  parseActionsArtifactList,
+  validateActionsArtifactIdentifier,
+} from './actions-artifacts'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
 const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
@@ -1892,6 +1900,104 @@ export class API {
 
     const response = await this.ghRequest('GET', `${path}?${query}`)
     return await parsedResponse<IAPIWorkflowRuns>(response)
+  }
+
+  /** List the bounded first page of artifacts produced by one workflow run. */
+  public async fetchWorkflowRunArtifacts(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    signal?: AbortSignal
+  ): Promise<IActionsArtifactList> {
+    const runId = validateActionsArtifactIdentifier(
+      workflowRunId,
+      'workflow run id'
+    )
+    const path = `repos/${owner}/${name}/actions/runs/${runId}/artifacts?per_page=${ActionsArtifactPageSize}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseActionsArtifactList(
+      await parsedResponse<unknown>(response),
+      runId
+    )
+  }
+
+  /** Check for a matching attestation record without claiming verification. */
+  public async fetchArtifactAttestationPresence(
+    owner: string,
+    name: string,
+    digest: string,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    if (!isSupportedActionsArtifactDigest(digest)) {
+      throw new Error('Artifact attestation lookup requires a SHA-256 digest.')
+    }
+    const subject = encodeURIComponent(digest.toLowerCase())
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${owner}/${name}/attestations/${subject}?per_page=1`,
+      { signal }
+    )
+    return parseActionsArtifactAttestationPresence(
+      await parsedResponse<unknown>(response)
+    )
+  }
+
+  /**
+   * Obtain an artifact's signed archive response. The authenticated API
+   * redirect is followed by a new anonymous request so the account token can
+   * never be forwarded to GitHub's blob-storage host.
+   */
+  public async fetchWorkflowArtifactArchive(
+    owner: string,
+    name: string,
+    artifactId: number,
+    signal?: AbortSignal
+  ): Promise<Response> {
+    const id = validateActionsArtifactIdentifier(artifactId, 'artifact id')
+    const path = `repos/${owner}/${name}/actions/artifacts/${id}/zip`
+    const response = await this.ghRequest('GET', path, {
+      redirect: 'manual',
+      signal,
+    })
+
+    if (response.status === 410) {
+      throw new APIError(response, {
+        message: 'This artifact has expired and can no longer be downloaded.',
+      })
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('Location')
+      if (location === null) {
+        throw new Error('GitHub did not provide an artifact download URL.')
+      }
+      let archiveURL: URL.URL
+      try {
+        archiveURL = new URL.URL(location)
+      } catch {
+        throw new Error('GitHub provided an invalid artifact download URL.')
+      }
+      if (archiveURL.protocol !== 'https:' && archiveURL.protocol !== 'http:') {
+        throw new Error('GitHub provided an unsafe artifact download URL.')
+      }
+      const accountProtocol = new URL.URL(this.endpoint).protocol
+      if (archiveURL.protocol === 'http:' && accountProtocol !== 'http:') {
+        throw new Error(
+          'GitHub provided an insecure artifact download URL for this HTTPS account.'
+        )
+      }
+
+      const archive = await fetch(archiveURL.toString(), { signal })
+      if (!archive.ok) {
+        throw new APIError(archive, null)
+      }
+      return archive
+    }
+
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+    return response
   }
 
   /** Re-run every job in a workflow run. */

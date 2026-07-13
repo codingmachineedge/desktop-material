@@ -7,8 +7,13 @@ import {
 } from '../../lib/api'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
+import { GitHubRepository } from '../../models/github-repository'
+import { ActionsStore } from '../../lib/stores/actions-store'
+import { RunArtifacts } from './run-artifacts'
 
 interface IRunDetailsProps {
+  readonly repository: GitHubRepository
+  readonly actionsStore: ActionsStore
   readonly run: IAPIWorkflowRun
   readonly jobs: ReadonlyArray<IAPIWorkflowJob>
   readonly loading: boolean
@@ -115,6 +120,11 @@ export class RunDetails extends React.PureComponent<IRunDetailsProps> {
             onRerunJob={this.props.onRerunJob}
           />
         ))}
+        <RunArtifacts
+          repository={this.props.repository}
+          run={run}
+          actionsStore={this.props.actionsStore}
+        />
       </aside>
     )
   }

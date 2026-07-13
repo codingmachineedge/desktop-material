@@ -16,6 +16,22 @@ import {
   WorkflowStateControl,
 } from '../../../src/ui/actions/workflow-state-control'
 import { fireEvent, render, screen } from '../../helpers/ui/render'
+import { GitHubRepository } from '../../../src/models/github-repository'
+import { Owner } from '../../../src/models/owner'
+import { ActionsStore } from '../../../src/lib/stores/actions-store'
+
+const repository = new GitHubRepository(
+  'repo',
+  new Owner('owner', 'https://api.github.com', 1),
+  1
+)
+const actionsStore = {
+  fetchArtifacts: async () => ({
+    totalCount: 0,
+    artifacts: [],
+    truncated: false,
+  }),
+} as unknown as ActionsStore
 
 const createRun = (
   status: APICheckStatus,
@@ -90,9 +106,7 @@ describe('Actions parity controls', () => {
 
     view.rerender(
       <RunList
-        runs={[
-          createRun(APICheckStatus.Completed, APICheckConclusion.Failure),
-        ]}
+        runs={[createRun(APICheckStatus.Completed, APICheckConclusion.Failure)]}
         selectedRunId={null}
         busyRunId={null}
         onSelect={() => {}}
@@ -118,6 +132,8 @@ describe('Actions parity controls', () => {
     let requested: IAPIWorkflowJob | null = null
     render(
       <RunDetails
+        repository={repository}
+        actionsStore={actionsStore}
         run={createRun(APICheckStatus.Completed, APICheckConclusion.Failure)}
         jobs={[failed, succeeded]}
         loading={false}
@@ -158,7 +174,9 @@ describe('Actions parity controls', () => {
     )
 
     assert.ok(screen.getByRole('alertdialog'))
-    fireEvent.click(screen.getByRole('checkbox', { name: /Force cancellation/ }))
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Force cancellation/ })
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Force cancel run' }))
     assert.equal(force, true)
   })
