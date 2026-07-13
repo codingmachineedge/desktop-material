@@ -4,10 +4,13 @@ import {
   API,
   ActionsLogMaximumBytes,
   ActionsLogTruncationMarker,
+  createGitHubAPIRequestHeaders,
   getBitbucketAPIEndpoint,
   getEndpointForRepository,
   getGitLabAPIEndpoint,
   getNextPagePathWithIncreasingPageSize,
+  GitHubDotComRESTAPIVersion,
+  GitHubRESTAPIVersionHeader,
 } from '../../src/lib/api'
 import { APIError } from '../../src/lib/http'
 import { CopilotError } from '../../src/lib/copilot-error'
@@ -81,6 +84,64 @@ describe('API', () => {
         getEndpointForRepository('https://bitbucket.org/team/project.git'),
         getBitbucketAPIEndpoint()
       )
+    })
+  })
+
+  describe('GitHub REST API versioning', () => {
+    it('pins GitHub.com REST requests to the current stable version', () => {
+      const headers = createGitHubAPIRequestHeaders(
+        'https://api.github.com',
+        '/user',
+        { 'x-github-api-version': '2022-11-28' }
+      )
+
+      assert.equal(
+        headers.get(GitHubRESTAPIVersionHeader),
+        GitHubDotComRESTAPIVersion
+      )
+    })
+
+    it('applies versioning in the GitHub request layer only for REST', async () => {
+      const api = new API('https://api.github.com', 'account-token')
+      const receivedHeaders = new Array<Headers>()
+      Reflect.set(
+        api,
+        'request',
+        async (
+          _endpoint: string,
+          _method: string,
+          _path: string,
+          options?: { customHeaders?: HeadersInit }
+        ) => {
+          receivedHeaders.push(new Headers(options?.customHeaders))
+          return new Response('{}')
+        }
+      )
+
+      await api.fetchAccount()
+      const ghRequest = Reflect.get(api, 'ghRequest') as (
+        method: 'POST',
+        path: string
+      ) => Promise<Response>
+      await ghRequest.call(api, 'POST', '/graphql')
+
+      assert.equal(
+        receivedHeaders[0].get(GitHubRESTAPIVersionHeader),
+        GitHubDotComRESTAPIVersion
+      )
+      assert.equal(receivedHeaders[1].get(GitHubRESTAPIVersionHeader), null)
+    })
+
+    it('does not version GraphQL, GHES, GitLab, or Bitbucket requests', () => {
+      for (const [endpoint, path] of [
+        ['https://api.github.com', '/graphql'],
+        ['https://github.example.test/api/v3', '/user'],
+        ['https://gitlab.com/api/v4', '/user'],
+        ['https://api.bitbucket.org/2.0', '/user'],
+      ]) {
+        const headers = createGitHubAPIRequestHeaders(endpoint, path)
+        assert.equal(headers.get(GitHubRESTAPIVersionHeader), null)
+      }
     })
   })
 

@@ -143,6 +143,45 @@ export type GitHubAccountType = 'User' | 'Organization'
 /** The OAuth scopes we want to request */
 const oauthScopes = ['repo', 'user', 'workflow']
 
+/** The current stable REST API version used for GitHub.com requests. */
+export const GitHubDotComRESTAPIVersion = '2026-03-10'
+
+export const GitHubRESTAPIVersionHeader = 'X-GitHub-Api-Version'
+
+function isGraphQLRequestPath(path: string): boolean {
+  return path.split(/[?#]/, 1)[0].replace(/^\/+/, '') === 'graphql'
+}
+
+/**
+ * Return the REST API version to use for a request, if one is known to be
+ * supported by the endpoint. This is deliberately GitHub.com-only until GHES
+ * reports supported API versions through a capability probe.
+ */
+export function getGitHubRESTAPIVersion(
+  endpoint: string,
+  path: string
+): string | null {
+  return isDotCom(endpoint) && !isGraphQLRequestPath(path)
+    ? GitHubDotComRESTAPIVersion
+    : null
+}
+
+/** Add the stable REST version to GitHub.com API request headers. */
+export function createGitHubAPIRequestHeaders(
+  endpoint: string,
+  path: string,
+  customHeaders?: HeadersInit
+): Headers {
+  const headers = new Headers(customHeaders)
+  const version = getGitHubRESTAPIVersion(endpoint, path)
+
+  if (version !== null) {
+    headers.set(GitHubRESTAPIVersionHeader, version)
+  }
+
+  return headers
+}
+
 /**
  * Information about a repository as returned by the GitHub API.
  */
@@ -2060,7 +2099,14 @@ export class API {
       redirect?: RequestRedirect
     } = {}
   ): Promise<Response> {
-    const response = await this.request(this.endpoint, method, path, options)
+    const response = await this.request(this.endpoint, method, path, {
+      ...options,
+      customHeaders: createGitHubAPIRequestHeaders(
+        this.endpoint,
+        path,
+        options.customHeaders
+      ),
+    })
 
     // Only consider invalid token when the status is 401 and the response has
     // the X-GitHub-Request-Id header, meaning it comes from GH(E) and not from
@@ -2439,13 +2485,16 @@ export async function deleteToken(account: Account) {
   }
   try {
     const creds = Buffer.from(`${ClientID}:${ClientSecret}`).toString('base64')
+    const path = `applications/${ClientID}/token`
     const response = await request(
       account.endpoint,
       null,
       'DELETE',
-      `applications/${ClientID}/token`,
+      path,
       { access_token: account.token },
-      { Authorization: `Basic ${creds}` }
+      createGitHubAPIRequestHeaders(account.endpoint, path, {
+        Authorization: `Basic ${creds}`,
+      })
     )
 
     return response.status === 204
