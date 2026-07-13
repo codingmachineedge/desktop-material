@@ -14,6 +14,30 @@ The later guided Git and GitHub expansion is a separate living roadmap. This
 handoff records the completed functions integrated from that work without
 claiming that its remaining README roadmap items are finished.
 
+### Guided roadmap completion run — live status
+
+The final guided-roadmap completion is active on
+`codex/guided-final-gate`. Integration checkpoint `2a6abf0346` contains the
+privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
+and artifact transfer, the complete native pull-request lifecycle, interactive
+artifact pagination, effective branch-rule inspection, patch-series exchange,
+complete worktree lifecycle administration, branch pin/hide/solo/restore,
+exact merge-tree conflict paths, signing and Git LFS administration,
+structured local-commit rewriting, guided bisect sessions, and the complete
+repository-wide native stash manager. Each completed phase was committed and
+pushed after its focused security, TypeScript, lint, formatting, and privacy
+gates passed. The bisect integration union passed 75 focused
+Git/model/UI/style/sibling tests; the stash integration passed 46 focused
+Git/UI/style tests and a root TypeScript gate before its merge was pushed.
+
+Releases/assets, the complete remote manager, and repository hooks are in
+isolated worktrees. Richer Issue workflows and provider-neutral triage follow
+those integrations. Nothing in this live section claims publication on
+`main`: final production build, off-screen
+interaction, accepted screenshots, documentation/wiki synchronization, CI,
+Pages, installer release, and cleanup remain mandatory gates before this run
+can be closed.
+
 The final 1450×997 review found real horizontal clipping in the shell toolbar
 and Changes card. The responsive flex/containment correction is now shipped,
 covered by style regressions, and demonstrated by the tracked exact-size image

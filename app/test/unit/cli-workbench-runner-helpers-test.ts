@@ -35,6 +35,12 @@ function fakeDependencies(
     }),
     listRemotes: async () => ['origin', 'upstream'],
     canonicalizePath: async path => resolve(path),
+    inspectBisectMutationState: async () => ({
+      active: false,
+      clean: true,
+      head: 'a'.repeat(40),
+    }),
+    isBisectRangeValid: async () => true,
     ...overrides,
   }
 }
@@ -328,6 +334,21 @@ describe('CLI workbench runner helpers', () => {
         },
         {
           recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'local',
+            operation: 'settings',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--local',
+            '--null',
+            '--get-regexp',
+            '^(gpg\\.format|commit\\.gpgsign|tag\\.gpgsign)$',
+          ],
+        },
+        {
+          recipe: {
             kind: 'repository-patch-import',
             patchPaths: [patchPath],
           },
@@ -338,6 +359,264 @@ describe('CLI workbench runner helpers', () => {
           recipe: { kind: 'repository-patch-session' as const, operation },
           confirmed: true,
           args: ['am', `--${operation}`],
+        })),
+        {
+          recipe: {
+            kind: 'repository-bisect-resolve',
+            revision: 'feature/fix',
+          },
+          confirmed: false,
+          args: [
+            'rev-parse',
+            '--verify',
+            '--end-of-options',
+            'feature/fix^{commit}',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-bisect-range',
+            goodOid: 'a'.repeat(40),
+            badOid: 'b'.repeat(40),
+          },
+          confirmed: false,
+          args: ['merge-base', '--is-ancestor', 'a'.repeat(40), 'b'.repeat(40)],
+        },
+        ...(
+          [
+            [
+              'state',
+              [
+                'for-each-ref',
+                '--format=%(refname)%00%(objectname)',
+                'refs/bisect',
+              ],
+            ],
+            ['head', ['show', '--no-patch', '--format=%H%x00%h%x00%s', 'HEAD']],
+            [
+              'worktree',
+              ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+            ],
+            [
+              'remaining',
+              [
+                'rev-list',
+                '--count',
+                'refs/bisect/bad',
+                '--not',
+                '--glob=refs/bisect/good-*',
+              ],
+            ],
+          ] as const
+        ).map(([operation, args]) => ({
+          recipe: {
+            kind: 'repository-bisect-inspection' as const,
+            operation,
+          },
+          confirmed: false,
+          args,
+        })),
+        {
+          recipe: {
+            kind: 'repository-bisect-start',
+            goodOid: 'a'.repeat(40),
+            badOid: 'b'.repeat(40),
+          },
+          confirmed: true,
+          args: ['bisect', 'start', 'b'.repeat(40), 'a'.repeat(40)],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'global',
+            operation: 'settings',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--global',
+            '--null',
+            '--get-regexp',
+            '^(gpg\\.format|commit\\.gpgsign|tag\\.gpgsign)$',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'local',
+            operation: 'key-presence',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--local',
+            '--null',
+            '--name-only',
+            '--get-regexp',
+            '^user\\.signingkey$',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-inspection',
+            scope: 'global',
+            operation: 'key-presence',
+          },
+          confirmed: false,
+          args: [
+            'config',
+            '--global',
+            '--null',
+            '--name-only',
+            '--get-regexp',
+            '^user\\.signingkey$',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'local',
+            operation: 'set-format',
+            format: 'ssh',
+          },
+          confirmed: true,
+          args: ['config', '--local', '--replace-all', 'gpg.format', 'ssh'],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'global',
+            operation: 'set-key',
+            format: 'openpgp',
+            key: '0x0123456789abcdef',
+          },
+          confirmed: true,
+          args: [
+            'config',
+            '--global',
+            '--replace-all',
+            'user.signingkey',
+            '0123456789ABCDEF',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'local',
+            operation: 'set-commit-signing',
+            enabled: true,
+          },
+          confirmed: true,
+          args: [
+            'config',
+            '--local',
+            '--type=bool',
+            '--replace-all',
+            'commit.gpgsign',
+            'true',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-update',
+            scope: 'local',
+            operation: 'set-tag-signing',
+            enabled: false,
+          },
+          confirmed: true,
+          args: [
+            'config',
+            '--local',
+            '--type=bool',
+            '--replace-all',
+            'tag.gpgsign',
+            'false',
+          ],
+        },
+        {
+          recipe: { kind: 'repository-signing-list-tags' },
+          confirmed: false,
+          args: [
+            'for-each-ref',
+            '--count=100',
+            '--sort=-creatordate',
+            '--format=%(refname:strip=2)%00%(objecttype)%00%(objectname)',
+            'refs/tags',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-verify',
+            target: 'head',
+            tagName: null,
+            expectedObject: null,
+          },
+          confirmed: false,
+          args: [
+            'log',
+            '-1',
+            '--no-show-signature',
+            '--format=%H%x00%G?%x00%GF%x00%GK',
+            'HEAD',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-signing-verify',
+            target: 'tag',
+            tagName: 'v2.0.0',
+            expectedObject: 'b'.repeat(40),
+          },
+          confirmed: false,
+          args: [
+            'for-each-ref',
+            '--count=1',
+            '--format=%(objectname)%00%(signature:grade)%00%(signature:fingerprint)%00%(signature:key)',
+            'refs/tags/v2.0.0',
+          ],
+        },
+        ...(
+          [
+            ['version', ['lfs', 'version']],
+            ['patterns', ['lfs', 'track', '--json']],
+            ['status', ['lfs', 'status', '--json']],
+            ['prune-preview', ['lfs', 'prune', '--dry-run', '--verify-remote']],
+          ] as const
+        ).map(([operation, args]) => ({
+          recipe: { kind: 'repository-lfs-inspection' as const, operation },
+          confirmed: false,
+          args,
+        })),
+        {
+          recipe: {
+            kind: 'repository-lfs-pattern',
+            operation: 'track',
+            pattern: 'assets/**/*.psd',
+          },
+          confirmed: true,
+          args: ['lfs', 'track', '--', 'assets/**/*.psd'],
+        },
+        {
+          recipe: {
+            kind: 'repository-lfs-pattern',
+            operation: 'untrack',
+            pattern: '*.zip',
+          },
+          confirmed: true,
+          args: ['lfs', 'untrack', '--', '*.zip'],
+        },
+        ...(
+          [
+            ['install', ['lfs', 'install', '--local']],
+            ['uninstall', ['lfs', 'uninstall', '--local']],
+            ['fetch', ['lfs', 'fetch']],
+            ['pull', ['lfs', 'pull']],
+            ['prune', ['lfs', 'prune', '--verify-remote']],
+          ] as const
+        ).map(([operation, args]) => ({
+          recipe: { kind: 'repository-lfs-operation' as const, operation },
+          confirmed: true,
+          args,
         })),
       ] as const
 
@@ -354,7 +633,310 @@ describe('CLI workbench runner helpers', () => {
         assert.deepStrictEqual(validated.args, candidate.args)
         assert.equal(validated.tool, 'git')
         assert.equal(validated.cwd, root)
+        assert.deepStrictEqual(
+          validated.environment,
+          candidate.recipe.kind.startsWith('repository-lfs-')
+            ? { GIT_LFS_TRACK_NO_INSTALL_HOOKS: '1' }
+            : {}
+        )
       }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('binds bisect mutations to a clean active state and the reviewed HEAD', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-bisect-guard-'))
+    const head = 'c'.repeat(40)
+    const active = fakeDependencies(root, {
+      inspectBisectMutationState: async () => ({
+        active: true,
+        clean: true,
+        head,
+      }),
+    })
+    try {
+      const start = await validateCLICommandRequest(
+        request(
+          root,
+          {
+            kind: 'repository-bisect-start',
+            goodOid: 'a'.repeat(40),
+            badOid: 'b'.repeat(40),
+          },
+          true,
+          'bisect-start'
+        ),
+        fakeDependencies(root)
+      )
+      assert.deepStrictEqual(start.args, [
+        'bisect',
+        'start',
+        'b'.repeat(40),
+        'a'.repeat(40),
+      ])
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(
+          start,
+          fakeDependencies(root, {
+            isBisectRangeValid: async () => false,
+          })
+        ),
+        /must be an ancestor/
+      )
+
+      const mark = await validateCLICommandRequest(
+        request(
+          root,
+          {
+            kind: 'repository-bisect-mark',
+            verdict: 'good',
+            expectedHead: head,
+          },
+          true,
+          'bisect-mark'
+        ),
+        active
+      )
+      assert.deepStrictEqual(mark.args, ['bisect', 'good', head])
+
+      const reset = await validateCLICommandRequest(
+        request(
+          root,
+          { kind: 'repository-bisect-reset' },
+          true,
+          'bisect-reset'
+        ),
+        active
+      )
+      assert.deepStrictEqual(reset.args, ['bisect', 'reset'])
+
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            {
+              kind: 'repository-bisect-start',
+              goodOid: 'a'.repeat(40),
+              badOid: 'b'.repeat(40),
+            },
+            true
+          ),
+          active
+        ),
+        /already active/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            {
+              kind: 'repository-bisect-mark',
+              verdict: 'bad',
+              expectedHead: head,
+            },
+            true
+          ),
+          fakeDependencies(root, {
+            inspectBisectMutationState: async () => ({
+              active: true,
+              clean: false,
+              head,
+            }),
+          })
+        ),
+        /Commit, stash, or discard/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            {
+              kind: 'repository-bisect-mark',
+              verdict: 'skip',
+              expectedHead: head,
+            },
+            true
+          ),
+          fakeDependencies(root, {
+            inspectBisectMutationState: async () => ({
+              active: true,
+              clean: true,
+              head: 'd'.repeat(40),
+            }),
+          })
+        ),
+        /HEAD changed after review/
+      )
+
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(
+          mark,
+          fakeDependencies(root, {
+            inspectBisectMutationState: async () => ({
+              active: false,
+              clean: true,
+              head,
+            }),
+          })
+        ),
+        /No active bisect session/
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed for malformed bisect recipes and revision expressions', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-bisect-deny-'))
+    const dependencies = fakeDependencies(root)
+    const invalidRecipes: ReadonlyArray<unknown> = [
+      { kind: 'repository-bisect-resolve', revision: '--help' },
+      { kind: 'repository-bisect-resolve', revision: 'HEAD~2' },
+      { kind: 'repository-bisect-resolve', revision: 'main..feature' },
+      {
+        kind: 'repository-bisect-range',
+        goodOid: 'a'.repeat(40),
+        badOid: 'a'.repeat(40),
+      },
+      { kind: 'repository-bisect-inspection', operation: 'log' },
+      {
+        kind: 'repository-bisect-mark',
+        verdict: 'run',
+        expectedHead: 'a'.repeat(40),
+      },
+      {
+        kind: 'repository-bisect-start',
+        goodOid: 'a'.repeat(40),
+        badOid: 'b'.repeat(40),
+        args: ['bisect', 'run', 'payload'],
+      },
+      { kind: 'repository-bisect-reset', target: 'main' },
+    ]
+    try {
+      for (const [index, recipe] of invalidRecipes.entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            request(root, recipe, true, `bad-bisect-${index}`),
+            dependencies
+          )
+        )
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed for malformed signing and Git LFS recipes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-admin-deny-'))
+    const dependencies = fakeDependencies(root)
+    const invalidRecipes: ReadonlyArray<unknown> = [
+      {
+        kind: 'repository-signing-inspection',
+        scope: 'system',
+        operation: 'settings',
+      },
+      {
+        kind: 'repository-signing-inspection',
+        scope: 'local',
+        operation: 'settings',
+        argv: ['config', '--global', '--list'],
+      },
+      {
+        kind: 'repository-signing-inspection',
+        scope: 'local',
+        operation: 'raw-key',
+      },
+      {
+        kind: 'repository-signing-update',
+        scope: 'local',
+        operation: 'set-format',
+        format: 'custom',
+      },
+      {
+        kind: 'repository-signing-update',
+        scope: 'local',
+        operation: 'set-key',
+        format: 'ssh',
+        key: 'C:/private/id_ed25519',
+      },
+      {
+        kind: 'repository-signing-update',
+        scope: 'local',
+        operation: 'set-commit-signing',
+        enabled: 'true',
+      },
+      {
+        kind: 'repository-signing-verify',
+        target: 'tag',
+        tagName: '--upload-pack=payload',
+        expectedObject: 'a'.repeat(40),
+      },
+      {
+        kind: 'repository-signing-verify',
+        target: 'tag',
+        tagName: 'v1.0.0',
+        expectedObject: '../HEAD',
+      },
+      {
+        kind: 'repository-signing-verify',
+        target: 'head',
+        tagName: 'v1.0.0',
+        expectedObject: null,
+      },
+      { kind: 'repository-lfs-inspection', operation: 'env' },
+      {
+        kind: 'repository-lfs-pattern',
+        operation: 'track',
+        pattern: '../outside.bin',
+      },
+      {
+        kind: 'repository-lfs-pattern',
+        operation: 'track',
+        pattern: '*.bin',
+        environment: { GIT_EXEC_PATH: 'C:/payload' },
+      },
+      { kind: 'repository-lfs-operation', operation: 'push' },
+    ]
+    try {
+      for (const [index, recipe] of invalidRecipes.entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            request(root, recipe, true, `invalid-admin-${index}`),
+            dependencies
+          )
+        )
+      }
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            {
+              kind: 'repository-lfs-operation',
+              operation: 'prune',
+            },
+            false,
+            'unconfirmed-lfs-prune'
+          ),
+          dependencies
+        ),
+        /confirmation/i
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          {
+            ...request(
+              root,
+              { kind: 'repository-lfs-inspection', operation: 'version' },
+              false,
+              'forged-environment'
+            ),
+            environment: { GIT_EXEC_PATH: 'C:/payload' },
+          },
+          dependencies
+        ),
+        /Invalid CLI command request/
+      )
     } finally {
       await rm(root, { recursive: true, force: true })
     }

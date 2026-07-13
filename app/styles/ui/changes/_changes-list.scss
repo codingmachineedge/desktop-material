@@ -295,6 +295,365 @@
   }
 }
 
+// Complete repository-wide stash manager. The header stays compact in the
+// Changes sidebar; the expanded panel scrolls vertically and all action rows
+// wrap instead of forcing page-level horizontal scrolling at high zoom.
+.stash-manager {
+  .stash-manager-header {
+    gap: 10px;
+
+    > .button-component {
+      flex: 0 0 auto;
+      min-width: 70px;
+      padding-inline: 12px;
+    }
+  }
+
+  .stash-manager-header-copy {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+
+    strong,
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      font-size: 11px;
+      font-weight: var(--font-weight-normal);
+    }
+  }
+
+  .stash-manager-panel {
+    max-height: min(62vh, 650px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    overscroll-behavior: contain;
+  }
+
+  .stash-manager-create,
+  .stash-manager-inventory {
+    display: flex;
+    min-width: 0;
+    padding: 12px;
+    flex-direction: column;
+    gap: 8px;
+
+    h4,
+    h5,
+    p {
+      min-width: 0;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    h4 {
+      font-size: 13px;
+    }
+
+    label,
+    legend {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    input[type='text'] {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      min-height: 36px;
+      padding: 7px 10px;
+      border: 1px solid var(--md-sys-color-outline);
+      border-radius: 10px;
+      background: var(--md-sys-color-surface-container-lowest);
+      color: var(--md-sys-color-on-surface);
+      font: inherit;
+
+      &:focus-visible {
+        border-color: var(--md-sys-color-primary);
+        outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent);
+        outline-offset: 1px;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+      }
+    }
+  }
+
+  .stash-manager-create {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+
+    fieldset {
+      display: flex;
+      min-width: 0;
+      margin: 0;
+      padding: 8px 10px 10px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 12px;
+      flex-direction: column;
+      gap: 7px;
+
+      label {
+        display: flex;
+        align-items: flex-start;
+        min-width: 0;
+        gap: 8px;
+        font-weight: var(--font-weight-normal);
+        overflow-wrap: anywhere;
+      }
+
+      input {
+        flex: 0 0 auto;
+        margin-top: 1px;
+      }
+    }
+  }
+
+  .stash-manager-primary-action {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .stash-manager-caption,
+  .stash-manager-empty {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .stash-manager-warning,
+  .stash-manager-error,
+  .stash-manager-status {
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .stash-manager-warning {
+    background: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+  }
+
+  .stash-manager-error {
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+  }
+
+  .stash-manager-status {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  .stash-manager-inventory-heading {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+
+    h4 {
+      flex: 1 1 140px;
+    }
+
+    .button-component {
+      flex: 0 1 auto;
+      max-width: 100%;
+    }
+  }
+
+  .stash-manager-branch-group {
+    min-width: 0;
+
+    > h5 {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      min-height: 30px;
+      padding: 4px 7px;
+      color: var(--md-sys-color-on-surface-variant);
+      gap: 7px;
+
+      > span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        flex: 1 1 auto;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .current,
+      .count {
+        flex: 0 0 auto;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+        font-size: 10px;
+      }
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    li {
+      min-width: 0;
+      margin-bottom: 5px;
+      overflow: hidden;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: var(--md-sys-color-surface-container);
+
+      &.selected {
+        border-color: var(--md-sys-color-primary);
+        background: var(--md-sys-color-secondary-container);
+      }
+    }
+  }
+
+  .stash-manager-entry-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 44px;
+    padding: 3px 7px;
+    gap: 5px;
+
+    > input[type='checkbox'],
+    > .octicon {
+      flex: 0 0 auto;
+    }
+
+    > input[type='checkbox']:focus-visible,
+    .stash-manager-entry-main:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 36%, transparent);
+      outline-offset: 1px;
+    }
+  }
+
+  .stash-manager-entry-main {
+    display: flex;
+    min-width: 0;
+    padding: 5px 6px;
+    border: 0;
+    background: transparent;
+    color: var(--md-sys-color-on-surface);
+    flex: 1 1 auto;
+    flex-direction: column;
+    font: inherit;
+    text-align: left;
+
+    &:hover {
+      border-radius: 8px;
+      background: var(--md-sys-color-surface-container-high);
+    }
+  }
+
+  .stash-manager-entry-title,
+  .stash-manager-entry-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stash-manager-entry-title {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .stash-manager-entry-meta {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+  }
+
+  .stash-manager-focused-actions,
+  .stash-manager-editor,
+  .stash-manager-confirmation {
+    display: flex;
+    min-width: 0;
+    padding: 8px;
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stash-manager-action-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 6px;
+
+    .button-component {
+      width: 100%;
+      min-width: 0;
+      padding-inline: 8px;
+    }
+  }
+
+  .stash-manager-editor-actions {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 7px;
+
+    .button-component {
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+
+  .stash-manager-confirmation {
+    border: 1px solid var(--md-sys-color-error);
+    border-radius: 10px;
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+  }
+
+  .stash-manager-busy {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 9px 12px;
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    background: var(--md-sys-color-surface-container-high);
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    z-index: 1;
+
+    span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .stash-manager-announcement {
+    min-height: 0;
+    padding: 0 12px 12px;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .stash-manager-danger-action {
+    color: var(--md-sys-color-on-error-container);
+  }
+}
+
 .undo-enter {
   max-height: 0;
   overflow: hidden;

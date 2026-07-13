@@ -45,10 +45,9 @@ import {
   Foldout,
 } from '../../lib/app-state'
 import { ContinueRebase } from './continue-rebase'
-import { Octicon, OcticonSymbolVariant } from '../octicons'
+import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
-import { IStashEntry, stashEntryLabel } from '../../models/stash-entry'
-import classNames from 'classnames'
+import { IStashEntry } from '../../models/stash-entry'
 import { hasWritePermission } from '../../models/github-repository'
 import { hasConflictedFiles } from '../../lib/status'
 import { createObservableRef } from '../lib/observable-ref'
@@ -56,7 +55,7 @@ import { Popup, PopupType } from '../../models/popup'
 import { EOL } from 'os'
 import { RepoRulesInfo } from '../../models/repo-rules'
 import { IAheadBehind } from '../../models/branch'
-import { StashDiffViewerId } from '../stashing'
+import { StashManager } from '../stashing'
 import { AugmentedSectionFilterList } from '../lib/augmented-filter-list'
 import { IFilterListGroup, IFilterListItem } from '../lib/filter-list'
 import { ClickSource } from '../lib/list'
@@ -84,7 +83,6 @@ import {
 } from '../lib/filter-list-mode'
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
-import { generateStashListContextMenu } from '../stashing/stash-list-item-context-menu'
 import { createFileHistoryMenuItem } from '../file-history'
 
 export interface IChangesListItem extends IFilterListItem {
@@ -94,21 +92,6 @@ export interface IChangesListItem extends IFilterListItem {
 }
 
 const RowHeight = 29
-const StashIcon: OcticonSymbolVariant = {
-  w: 16,
-  h: 16,
-  p: [
-    'M10.5 1.286h-9a.214.214 0 0 0-.214.214v9a.214.214 0 0 0 .214.214h9a.214.214 0 0 0 ' +
-      '.214-.214v-9a.214.214 0 0 0-.214-.214zM1.5 0h9A1.5 1.5 0 0 1 12 1.5v9a1.5 1.5 0 0 1-1.5 ' +
-      '1.5h-9A1.5 1.5 0 0 1 0 10.5v-9A1.5 1.5 0 0 1 1.5 0zm5.712 7.212a1.714 1.714 0 1 ' +
-      '1-2.424-2.424 1.714 1.714 0 0 1 2.424 2.424zM2.015 12.71c.102.729.728 1.29 1.485 ' +
-      '1.29h9a1.5 1.5 0 0 0 1.5-1.5v-9a1.5 1.5 0 0 0-1.29-1.485v1.442a.216.216 0 0 1 ' +
-      '.004.043v9a.214.214 0 0 1-.214.214h-9a.216.216 0 0 1-.043-.004H2.015zm2 2c.102.729.728 ' +
-      '1.29 1.485 1.29h9a1.5 1.5 0 0 0 1.5-1.5v-9a1.5 1.5 0 0 0-1.29-1.485v1.442a.216.216 0 0 1 ' +
-      '.004.043v9a.214.214 0 0 1-.214.214h-9a.216.216 0 0 1-.043-.004H4.015z',
-  ],
-}
-
 const GitIgnoreFileName = '.gitignore'
 
 interface IFilterChangesListProps {
@@ -217,11 +200,12 @@ interface IFilterChangesListProps {
   /** The name of the currently selected external editor */
   readonly externalEditorLabel?: string
 
-  readonly stashEntries: ReadonlyArray<IStashEntry>
+  readonly allStashEntries: ReadonlyArray<IStashEntry>
+  readonly foreignStashEntryCount: number
+  readonly stashInventoryTruncated: boolean
 
   readonly isShowingStashEntry: boolean
   readonly selectedStashEntry: IStashEntry | null
-  readonly askForConfirmationOnDiscardStash: boolean
 
   /**
    * Whether we should show the onboarding tutorial nudge
@@ -1178,99 +1162,21 @@ export class FilterChangesList extends React.Component<
     }
   }
 
-  private onStashEntryClicked = (entry: IStashEntry) => {
-    const { isShowingStashEntry, selectedStashEntry, dispatcher, repository } =
-      this.props
-
-    if (
-      isShowingStashEntry &&
-      selectedStashEntry?.stashSha === entry.stashSha
-    ) {
-      dispatcher.selectWorkingDirectoryFiles(repository)
-
-      // If the button is clicked, that implies the stash was not restored or discarded
-      dispatcher.incrementMetric('noActionTakenOnStashCount')
-    } else {
-      dispatcher.selectStashedFile(repository, entry)
-      dispatcher.incrementMetric('stashViewCount')
-    }
-  }
-
-  private onStashEntryClickedFn = (entry: IStashEntry) => () =>
-    this.onStashEntryClicked(entry)
-
-  private onStashEntryContextMenu =
-    (entry: IStashEntry) => (event: React.MouseEvent) => {
-      event.preventDefault()
-      this.showStashEntryContextMenu(entry)
-    }
-
-  private onStashEntryKeyDown =
-    (entry: IStashEntry) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (!isStashContextMenuKey(event.key, event.shiftKey)) {
-        return
-      }
-      event.preventDefault()
-      this.showStashEntryContextMenu(entry)
-    }
-
-  private showStashEntryContextMenu(entry: IStashEntry) {
-    showContextualMenu(
-      generateStashListContextMenu({
-        stashEntry: entry,
-        repository: this.props.repository,
-        dispatcher: this.props.dispatcher,
-        askForConfirmationOnDiscardStash:
-          this.props.askForConfirmationOnDiscardStash,
-      })
-    )
-  }
-
   private renderStashedChanges() {
-    const { stashEntries } = this.props
-    if (stashEntries.length === 0) {
-      return null
-    }
-
     return (
-      <section className="stashed-changes-section" aria-label="Stashes">
-        <div className="stashed-changes-header">
-          <Octicon className="stack-icon" symbol={StashIcon} />
-          <span>
-            {stashEntries.length === 1
-              ? '1 stash'
-              : `${stashEntries.length} stashes`}
-          </span>
-        </div>
-        <div className="stashed-changes-list">
-          {stashEntries.map(entry => {
-            const selected =
-              this.props.isShowingStashEntry &&
-              this.props.selectedStashEntry?.stashSha === entry.stashSha
-            return (
-              <button
-                key={entry.stashSha}
-                className={classNames(
-                  'stashed-changes-button',
-                  selected ? 'selected' : null
-                )}
-                onClick={this.onStashEntryClickedFn(entry)}
-                onContextMenu={this.onStashEntryContextMenu(entry)}
-                onKeyDown={this.onStashEntryKeyDown(entry)}
-                aria-expanded={selected}
-                aria-controls={selected ? StashDiffViewerId : undefined}
-                aria-haspopup="menu"
-                aria-label={`${stashEntryLabel(
-                  entry
-                )}. Press Enter to open. Press Shift+F10 for actions.`}
-              >
-                <span className="text">{stashEntryLabel(entry)}</span>
-                <Octicon symbol={octicons.chevronRight} />
-              </button>
-            )
-          })}
-        </div>
-      </section>
+      <StashManager
+        repository={this.props.repository}
+        dispatcher={this.props.dispatcher}
+        branch={this.props.branch}
+        workingDirectory={this.props.workingDirectory}
+        selectedFileIDs={this.props.selectedFileIDs}
+        allStashEntries={this.props.allStashEntries}
+        foreignStashEntryCount={this.props.foreignStashEntryCount}
+        stashInventoryTruncated={this.props.stashInventoryTruncated}
+        selectedStashEntry={this.props.selectedStashEntry}
+        isShowingStashEntry={this.props.isShowingStashEntry}
+        hasConflicts={this.props.conflictState !== null}
+      />
     )
   }
 

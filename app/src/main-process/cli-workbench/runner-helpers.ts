@@ -4,6 +4,20 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { StringDecoder } from 'string_decoder'
 import { CLICommandRecipe } from '../../lib/cli-workbench'
 import {
+  normalizeRepositoryBisectObjectId,
+  prepareRepositoryBisectMark,
+  prepareRepositoryBisectRange,
+  prepareRepositoryBisectRevision,
+  prepareRepositoryBisectStart,
+  RepositoryBisectHeadArgs,
+  RepositoryBisectRemainingArgs,
+  RepositoryBisectResetArgs,
+  RepositoryBisectStateArgs,
+  RepositoryBisectWorktreeArgs,
+} from '../../lib/repository-bisect'
+import { normalizeRepositoryLFSPattern } from '../../lib/repository-lfs'
+import { normalizeRepositorySigningKey } from '../../lib/repository-signing'
+import {
   IResolvedCLIWorkbenchTool,
   resolveCLIWorkbenchTool,
 } from './tool-resolver'
@@ -166,6 +180,185 @@ interface IBoundCLICommand {
   readonly outputDestination: string | null
   readonly remote: string | null
   readonly inputPaths?: ReadonlyArray<string>
+  readonly environment?: Readonly<Record<string, string>>
+}
+
+const SigningConfigPattern = '^(gpg\\.format|commit\\.gpgsign|tag\\.gpgsign)$'
+const LFSInspectionEnvironment = {
+  GIT_LFS_TRACK_NO_INSTALL_HOOKS: '1',
+} as const
+
+function signingScopeFlag(value: unknown): '--local' | '--global' {
+  if (value === 'local') {
+    return '--local'
+  }
+  if (value === 'global') {
+    return '--global'
+  }
+  throw new Error('Choose a valid signing configuration scope.')
+}
+
+function normalizeSigningFormat(value: unknown): 'openpgp' | 'ssh' | 'x509' {
+  if (value === 'openpgp' || value === 'ssh' || value === 'x509') {
+    return value
+  }
+  throw new Error('Choose a supported signing format.')
+}
+
+function normalizeTagName(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('Choose a valid annotated tag.')
+  }
+  const tagName = value.trim()
+  if (
+    tagName.length === 0 ||
+    tagName.length > 1000 ||
+    tagName === '@' ||
+    tagName.startsWith('-') ||
+    !isValidFullRefName(`refs/tags/${tagName}`)
+  ) {
+    throw new Error('Choose a valid annotated tag.')
+  }
+  return tagName
+}
+
+function normalizeExpectedObject(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value)
+  ) {
+    throw new Error('The reviewed tag object is invalid.')
+  }
+  return value
+}
+
+function bindSigningUpdateRecipe(
+  recipe: Record<string, unknown>
+): IBoundCLICommand {
+  const scope = signingScopeFlag(recipe.scope)
+  switch (recipe.operation) {
+    case 'set-format': {
+      if (!hasOnlyKeys(recipe, ['kind', 'scope', 'operation', 'format'])) {
+        throw new Error('Signing-format update is invalid.')
+      }
+      const format = normalizeSigningFormat(recipe.format)
+      return {
+        args: ['config', scope, '--replace-all', 'gpg.format', format],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'set-key': {
+      if (
+        !hasOnlyKeys(recipe, ['kind', 'scope', 'operation', 'format', 'key']) ||
+        typeof recipe.key !== 'string'
+      ) {
+        throw new Error('Signing-key update is invalid.')
+      }
+      const format = normalizeSigningFormat(recipe.format)
+      const key = normalizeRepositorySigningKey(format, recipe.key)
+      return {
+        args: ['config', scope, '--replace-all', 'user.signingkey', key],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'set-commit-signing':
+    case 'set-tag-signing': {
+      if (
+        !hasOnlyKeys(recipe, ['kind', 'scope', 'operation', 'enabled']) ||
+        typeof recipe.enabled !== 'boolean'
+      ) {
+        throw new Error('Signing-toggle update is invalid.')
+      }
+      return {
+        args: [
+          'config',
+          scope,
+          '--type=bool',
+          '--replace-all',
+          recipe.operation === 'set-commit-signing'
+            ? 'commit.gpgsign'
+            : 'tag.gpgsign',
+          String(recipe.enabled),
+        ],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    default:
+      throw new Error('Unknown signing configuration update.')
+  }
+}
+
+function bindLFSInspectionRecipe(
+  recipe: Record<string, unknown>
+): IBoundCLICommand {
+  if (!hasOnlyKeys(recipe, ['kind', 'operation'])) {
+    throw new Error('Git LFS inspection is invalid.')
+  }
+  let args: ReadonlyArray<string>
+  switch (recipe.operation) {
+    case 'version':
+      args = ['lfs', 'version']
+      break
+    case 'patterns':
+      args = ['lfs', 'track', '--json']
+      break
+    case 'status':
+      args = ['lfs', 'status', '--json']
+      break
+    case 'prune-preview':
+      args = ['lfs', 'prune', '--dry-run', '--verify-remote']
+      break
+    default:
+      throw new Error('Unknown Git LFS inspection.')
+  }
+  return {
+    args,
+    requiresConfirmation: false,
+    outputDestination: null,
+    remote: null,
+    environment: LFSInspectionEnvironment,
+  }
+}
+
+function bindLFSOperationRecipe(
+  recipe: Record<string, unknown>
+): IBoundCLICommand {
+  if (!hasOnlyKeys(recipe, ['kind', 'operation'])) {
+    throw new Error('Git LFS operation is invalid.')
+  }
+  let args: ReadonlyArray<string>
+  switch (recipe.operation) {
+    case 'install':
+      args = ['lfs', 'install', '--local']
+      break
+    case 'uninstall':
+      args = ['lfs', 'uninstall', '--local']
+      break
+    case 'fetch':
+      args = ['lfs', 'fetch']
+      break
+    case 'pull':
+      args = ['lfs', 'pull']
+      break
+    case 'prune':
+      args = ['lfs', 'prune', '--verify-remote']
+      break
+    default:
+      throw new Error('Unknown Git LFS operation.')
+  }
+  return {
+    args,
+    requiresConfirmation: true,
+    outputDestination: null,
+    remote: null,
+    environment: LFSInspectionEnvironment,
+  }
 }
 
 const RepositoryToolArgs = {
@@ -434,6 +627,213 @@ function bindCLICommandRecipe(value: unknown): IBoundCLICommand {
         remote: null,
       }
     }
+    case 'repository-bisect-resolve': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'revision']) ||
+        typeof value.revision !== 'string'
+      ) {
+        throw new Error('Repository bisect revision is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectRevision(value.revision).args,
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-range': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'goodOid', 'badOid']) ||
+        typeof value.goodOid !== 'string' ||
+        typeof value.badOid !== 'string'
+      ) {
+        throw new Error('Repository bisect range is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectRange(value.goodOid, value.badOid).args,
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-inspection': {
+      if (!hasOnlyKeys(value, ['kind', 'operation'])) {
+        throw new Error('Repository bisect inspection is invalid.')
+      }
+      let args: ReadonlyArray<string>
+      switch (value.operation) {
+        case 'state':
+          args = RepositoryBisectStateArgs
+          break
+        case 'head':
+          args = RepositoryBisectHeadArgs
+          break
+        case 'worktree':
+          args = RepositoryBisectWorktreeArgs
+          break
+        case 'remaining':
+          args = RepositoryBisectRemainingArgs
+          break
+        default:
+          throw new Error('Unknown repository bisect inspection.')
+      }
+      return {
+        args,
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-start': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'goodOid', 'badOid']) ||
+        typeof value.goodOid !== 'string' ||
+        typeof value.badOid !== 'string'
+      ) {
+        throw new Error('Repository bisect start is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectStart(value.goodOid, value.badOid).args,
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-mark': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'verdict', 'expectedHead']) ||
+        (value.verdict !== 'good' &&
+          value.verdict !== 'bad' &&
+          value.verdict !== 'skip') ||
+        typeof value.expectedHead !== 'string'
+      ) {
+        throw new Error('Repository bisect result is invalid.')
+      }
+      return {
+        args: prepareRepositoryBisectMark(value.verdict, value.expectedHead)
+          .args,
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-bisect-reset':
+      if (!hasOnlyKeys(value, ['kind'])) {
+        throw new Error('Repository bisect reset is invalid.')
+      }
+      return {
+        args: RepositoryBisectResetArgs,
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+      }
+    case 'repository-signing-inspection': {
+      if (!hasOnlyKeys(value, ['kind', 'scope', 'operation'])) {
+        throw new Error('Signing configuration inspection is invalid.')
+      }
+      const scope = signingScopeFlag(value.scope)
+      if (value.operation === 'key-presence') {
+        return {
+          args: [
+            'config',
+            scope,
+            '--null',
+            '--name-only',
+            '--get-regexp',
+            '^user\\.signingkey$',
+          ],
+          requiresConfirmation: false,
+          outputDestination: null,
+          remote: null,
+        }
+      }
+      if (value.operation !== 'settings') {
+        throw new Error('Unknown signing configuration inspection.')
+      }
+      return {
+        args: ['config', scope, '--null', '--get-regexp', SigningConfigPattern],
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-signing-update':
+      return bindSigningUpdateRecipe(value)
+    case 'repository-signing-list-tags':
+      if (!hasOnlyKeys(value, ['kind'])) {
+        throw new Error('Signing tag inspection is invalid.')
+      }
+      return {
+        args: [
+          'for-each-ref',
+          '--count=100',
+          '--sort=-creatordate',
+          '--format=%(refname:strip=2)%00%(objecttype)%00%(objectname)',
+          'refs/tags',
+        ],
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    case 'repository-signing-verify': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'target', 'tagName', 'expectedObject']) ||
+        (value.target !== 'head' && value.target !== 'tag')
+      ) {
+        throw new Error('Signature-verification request is invalid.')
+      }
+      if (value.target === 'head') {
+        if (value.tagName !== null || value.expectedObject !== null) {
+          throw new Error('HEAD signature verification is invalid.')
+        }
+        return {
+          args: [
+            'log',
+            '-1',
+            '--no-show-signature',
+            '--format=%H%x00%G?%x00%GF%x00%GK',
+            'HEAD',
+          ],
+          requiresConfirmation: false,
+          outputDestination: null,
+          remote: null,
+        }
+      }
+      const tagName = normalizeTagName(value.tagName)
+      normalizeExpectedObject(value.expectedObject)
+      return {
+        args: [
+          'for-each-ref',
+          '--count=1',
+          '--format=%(objectname)%00%(signature:grade)%00%(signature:fingerprint)%00%(signature:key)',
+          `refs/tags/${tagName}`,
+        ],
+        requiresConfirmation: false,
+        outputDestination: null,
+        remote: null,
+      }
+    }
+    case 'repository-lfs-inspection':
+      return bindLFSInspectionRecipe(value)
+    case 'repository-lfs-pattern': {
+      if (
+        !hasOnlyKeys(value, ['kind', 'operation', 'pattern']) ||
+        (value.operation !== 'track' && value.operation !== 'untrack') ||
+        typeof value.pattern !== 'string'
+      ) {
+        throw new Error('Git LFS pattern update is invalid.')
+      }
+      const pattern = normalizeRepositoryLFSPattern(value.pattern)
+      return {
+        args: ['lfs', value.operation, '--', pattern],
+        requiresConfirmation: true,
+        outputDestination: null,
+        remote: null,
+        environment: LFSInspectionEnvironment,
+      }
+    }
+    case 'repository-lfs-operation':
+      return bindLFSOperationRecipe(value)
     default:
       throw new Error('Unknown guided CLI command recipe.')
   }
@@ -453,6 +853,20 @@ export interface ICLICommandValidationDependencies {
     repositoryPath: string
   ) => Promise<ReadonlyArray<string>>
   readonly canonicalizePath: (path: string) => Promise<string>
+  readonly inspectBisectMutationState: (
+    repositoryPath: string
+  ) => Promise<IRepositoryBisectMutationState>
+  readonly isBisectRangeValid: (
+    repositoryPath: string,
+    goodOid: string,
+    badOid: string
+  ) => Promise<boolean>
+}
+
+export interface IRepositoryBisectMutationState {
+  readonly active: boolean
+  readonly clean: boolean
+  readonly head: string
 }
 
 export interface IValidatedCLICommandRequest {
@@ -465,6 +879,7 @@ export interface IValidatedCLICommandRequest {
   readonly outputDestination: string | null
   readonly remote: string | null
   readonly inputPaths: ReadonlyArray<string>
+  readonly environment: Readonly<Record<string, string>>
 }
 
 function runGitProbe(
@@ -489,6 +904,37 @@ function runGitProbe(
           return
         }
         resolveProbe(stdout)
+      }
+    )
+  })
+}
+
+function runGitBooleanProbe(
+  tool: IResolvedCLIWorkbenchTool,
+  repositoryPath: string,
+  args: ReadonlyArray<string>
+): Promise<boolean> {
+  return new Promise((resolveProbe, rejectProbe) => {
+    execFile(
+      tool.executable,
+      [...args],
+      {
+        cwd: repositoryPath,
+        env: tool.env,
+        encoding: 'utf8',
+        maxBuffer: MaximumProbeOutputBytes,
+        windowsHide: true,
+      },
+      error => {
+        if (error === null) {
+          resolveProbe(true)
+          return
+        }
+        if (error.code === 1) {
+          resolveProbe(false)
+          return
+        }
+        rejectProbe(new Error('Bundled Git could not verify the repository.'))
       }
     )
   })
@@ -541,6 +987,37 @@ export function createCLICommandValidationDependencies(
       return remotes
     },
     canonicalizePath: canonicalizePotentialPath,
+    inspectBisectMutationState: async repositoryPath => {
+      const [headOutput, refsOutput, statusOutput] = await Promise.all([
+        runGitProbe(tool, repositoryPath, ['rev-parse', '--verify', 'HEAD']),
+        runGitProbe(tool, repositoryPath, [
+          'for-each-ref',
+          '--format=%(refname)',
+          'refs/bisect',
+        ]),
+        runGitProbe(tool, repositoryPath, RepositoryBisectWorktreeArgs),
+      ])
+      const head = normalizeRepositoryBisectObjectId(headOutput.trim())
+      const refs = refsOutput.split(/\r?\n/).filter(line => line.length > 0)
+      if (
+        refs.length > 512 ||
+        refs.some(ref => !ref.startsWith('refs/bisect/'))
+      ) {
+        throw new Error('Bundled Git returned invalid bisect session state.')
+      }
+      return {
+        active: refs.length > 0,
+        clean: statusOutput.length === 0,
+        head,
+      }
+    },
+    isBisectRangeValid: (repositoryPath, goodOid, badOid) =>
+      runGitBooleanProbe(tool, repositoryPath, [
+        'merge-base',
+        '--is-ancestor',
+        goodOid,
+        badOid,
+      ]),
   }
 }
 
@@ -742,6 +1219,78 @@ async function validateRemote(
   }
 }
 
+function isBisectMutationRecipe(
+  recipe: CLICommandRecipe
+): recipe is Extract<
+  CLICommandRecipe,
+  | { readonly kind: 'repository-bisect-start' }
+  | { readonly kind: 'repository-bisect-mark' }
+  | { readonly kind: 'repository-bisect-reset' }
+> {
+  return (
+    recipe.kind === 'repository-bisect-start' ||
+    recipe.kind === 'repository-bisect-mark' ||
+    recipe.kind === 'repository-bisect-reset'
+  )
+}
+
+/**
+ * Deny stale, nested, or dirty bisect mutations. This probe runs during IPC
+ * validation and again in the final pre-spawn window.
+ */
+async function validateBisectMutationState(
+  recipe: CLICommandRecipe,
+  repositoryPath: string,
+  dependencies: ICLICommandValidationDependencies
+): Promise<void> {
+  if (!isBisectMutationRecipe(recipe)) {
+    return
+  }
+  let state: IRepositoryBisectMutationState
+  try {
+    state = await dependencies.inspectBisectMutationState(repositoryPath)
+  } catch {
+    throw new Error('Bundled Git could not verify the bisect session.')
+  }
+  if (!state.clean) {
+    throw new Error(
+      'Commit, stash, or discard working-tree changes before moving the bisect session.'
+    )
+  }
+  if (recipe.kind === 'repository-bisect-start') {
+    let rangeValid: boolean
+    try {
+      rangeValid = await dependencies.isBisectRangeValid(
+        repositoryPath,
+        recipe.goodOid,
+        recipe.badOid
+      )
+    } catch {
+      throw new Error('Bundled Git could not verify the bisect range.')
+    }
+    if (!rangeValid) {
+      throw new Error('The known-good commit must be an ancestor of known-bad.')
+    }
+    if (state.active) {
+      throw new Error(
+        'A bisect session is already active. Inspect or reset it first.'
+      )
+    }
+    return
+  }
+  if (!state.active) {
+    throw new Error('No active bisect session was found.')
+  }
+  if (
+    recipe.kind === 'repository-bisect-mark' &&
+    state.head !== recipe.expectedHead
+  ) {
+    throw new Error(
+      'HEAD changed after review. Inspect the bisect session again.'
+    )
+  }
+}
+
 /**
  * Bind the untrusted IPC payload to one exact guided recipe before spawn. The
  * returned argv is created here; renderer-provided argv and tools are rejected.
@@ -777,6 +1326,11 @@ export async function validateCLICommandRequest(
     )
   }
   const context = await validateRepositoryContext(repositoryPath, dependencies)
+  await validateBisectMutationState(
+    recipe as CLICommandRecipe,
+    context.rootPath,
+    dependencies
+  )
   if (bound.remote !== null) {
     await validateRemote(bound.remote, repositoryPath, dependencies)
   }
@@ -830,6 +1384,7 @@ export async function validateCLICommandRequest(
     outputDestination,
     remote: bound.remote,
     inputPaths,
+    environment: bound.environment ?? {},
   }
 }
 
@@ -839,6 +1394,11 @@ export async function revalidateCLICommandBeforeSpawn(
   dependencies: ICLICommandValidationDependencies
 ): Promise<void> {
   const context = await validateRepositoryContext(request.cwd, dependencies)
+  await validateBisectMutationState(
+    request.recipe,
+    context.rootPath,
+    dependencies
+  )
   if (request.remote !== null) {
     await validateRemote(request.remote, request.cwd, dependencies)
   }

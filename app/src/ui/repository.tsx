@@ -450,9 +450,6 @@ export class RepositoryView extends React.Component<
         askForConfirmationOnDiscardChanges={
           this.props.askForConfirmationOnDiscardChanges
         }
-        askForConfirmationOnDiscardStash={
-          this.props.askForConfirmationOnDiscardStash
-        }
         askForConfirmationOnCommitFilteredChanges={
           this.props.askForConfirmationOnCommitFilteredChanges
         }
@@ -843,6 +840,7 @@ export class RepositoryView extends React.Component<
     } else if (selectedSection === RepositorySectionTab.RepositoryTools) {
       return (
         <RepositoryTools
+          repository={this.props.repository}
           repositoryPath={this.props.repository.path}
           onRefreshRepository={this.refreshRepository}
         />

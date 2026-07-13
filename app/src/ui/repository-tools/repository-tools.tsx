@@ -31,8 +31,16 @@ import {
   RepositoryToolOperations,
 } from './operations'
 import { RepositoryBundleImport } from './bundle-import'
+import { RepositoryBisectSession } from './bisect-session'
+import { RepositoryLFSAdministration } from './lfs-administration'
 import { RepositoryShallowHistory } from './shallow-history'
 import { RepositoryPatchSeries } from './patch-series'
+import { RepositorySigning } from './signing'
+import {
+  IRepositoryCommitRewriteClient,
+  RepositoryCommitRewrite,
+} from './commit-rewrite'
+import { Repository } from '../../models/repository'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -62,6 +70,7 @@ const defaultClient: IRepositoryToolsClient = {
 }
 
 export interface IRepositoryToolsProps {
+  readonly repository: Repository
   readonly repositoryPath: string
   readonly onRefreshRepository: () => Promise<void>
   readonly client?: IRepositoryToolsClient
@@ -79,6 +88,7 @@ export interface IRepositoryToolsProps {
   ) => Promise<string | null>
   readonly choosePatchFiles?: () => Promise<ReadonlyArray<string>>
   readonly revealArchive?: (path: string) => Promise<void>
+  readonly commitRewriteClient?: IRepositoryCommitRewriteClient
 }
 
 type OperationStatus =
@@ -106,6 +116,10 @@ interface IRepositoryToolsState {
   readonly bundleImportBusy: boolean
   readonly shallowHistoryBusy: boolean
   readonly patchSeriesBusy: boolean
+  readonly signingBusy: boolean
+  readonly lfsBusy: boolean
+  readonly commitRewriteBusy: boolean
+  readonly bisectBusy: boolean
 }
 
 let nextOperationSequence = 0
@@ -145,6 +159,10 @@ export class RepositoryTools extends React.Component<
       bundleImportBusy: false,
       shallowHistoryBusy: false,
       patchSeriesBusy: false,
+      signingBusy: false,
+      lfsBusy: false,
+      commitRewriteBusy: false,
+      bisectBusy: false,
     }
   }
 
@@ -174,6 +192,10 @@ export class RepositoryTools extends React.Component<
         bundleImportBusy: false,
         shallowHistoryBusy: false,
         patchSeriesBusy: false,
+        signingBusy: false,
+        lfsBusy: false,
+        commitRewriteBusy: false,
+        bisectBusy: false,
       })
     }
   }
@@ -226,7 +248,11 @@ export class RepositoryTools extends React.Component<
       this.runId !== null ||
       this.state.bundleImportBusy ||
       this.state.shallowHistoryBusy ||
-      this.state.patchSeriesBusy
+      this.state.patchSeriesBusy ||
+      this.state.signingBusy ||
+      this.state.lfsBusy ||
+      this.state.commitRewriteBusy ||
+      this.state.bisectBusy
     )
   }
 
@@ -245,6 +271,30 @@ export class RepositoryTools extends React.Component<
   private onPatchSeriesBusyChanged = (patchSeriesBusy: boolean) => {
     if (this.state.patchSeriesBusy !== patchSeriesBusy) {
       this.setState({ patchSeriesBusy })
+    }
+  }
+
+  private onSigningBusyChanged = (signingBusy: boolean) => {
+    if (this.state.signingBusy !== signingBusy) {
+      this.setState({ signingBusy })
+    }
+  }
+
+  private onLFSBusyChanged = (lfsBusy: boolean) => {
+    if (this.state.lfsBusy !== lfsBusy) {
+      this.setState({ lfsBusy })
+    }
+  }
+
+  private onCommitRewriteBusyChanged = (commitRewriteBusy: boolean) => {
+    if (this.state.commitRewriteBusy !== commitRewriteBusy) {
+      this.setState({ commitRewriteBusy })
+    }
+  }
+
+  private onBisectBusyChanged = (bisectBusy: boolean) => {
+    if (this.state.bisectBusy !== bisectBusy) {
+      this.setState({ bisectBusy })
     }
   }
 
@@ -722,6 +772,10 @@ export class RepositoryTools extends React.Component<
           this.runId !== null ||
           this.state.shallowHistoryBusy ||
           this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
+          this.state.commitRewriteBusy ||
+          this.state.bisectBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -741,6 +795,10 @@ export class RepositoryTools extends React.Component<
           this.state.bundleImportBusy ||
           this.state.shallowHistoryBusy ||
           this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
+          this.state.commitRewriteBusy ||
+          this.state.bisectBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
@@ -760,11 +818,99 @@ export class RepositoryTools extends React.Component<
           this.runId !== null ||
           this.state.bundleImportBusy ||
           this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
+          this.state.commitRewriteBusy ||
+          this.state.bisectBusy ||
           !this.state.gitAvailable
         }
         client={this.client}
         onRefreshRepository={this.props.onRefreshRepository}
         onBusyChanged={this.onShallowHistoryBusyChanged}
+      />
+    )
+  }
+
+  private renderSigning() {
+    return (
+      <RepositorySigning
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.lfsBusy ||
+          this.state.commitRewriteBusy ||
+          this.state.bisectBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onSigningBusyChanged}
+      />
+    )
+  }
+
+  private renderLFSAdministration() {
+    return (
+      <RepositoryLFSAdministration
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.commitRewriteBusy ||
+          this.state.bisectBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onLFSBusyChanged}
+      />
+    )
+  }
+
+  private renderCommitRewrite() {
+    return (
+      <RepositoryCommitRewrite
+        repository={this.props.repository}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
+          this.state.bisectBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.props.commitRewriteClient}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onCommitRewriteBusyChanged}
+      />
+    )
+  }
+
+  private renderBisectSession() {
+    return (
+      <RepositoryBisectSession
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          this.state.signingBusy ||
+          this.state.lfsBusy ||
+          this.state.commitRewriteBusy ||
+          !this.state.gitAvailable
+        }
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onBisectBusyChanged}
       />
     )
   }
@@ -929,11 +1075,15 @@ export class RepositoryTools extends React.Component<
         <div className="repository-tools-layout">
           <div className="repository-tools-functions">
             {this.renderShallowHistory()}
+            {this.renderBisectSession()}
+            {this.renderSigning()}
+            {this.renderLFSAdministration()}
             {this.renderCategory('Diagnostics')}
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}
             {this.renderExport()}
             {this.renderPatchSeries()}
+            {this.renderCommitRewrite()}
             {this.renderImport()}
           </div>
           <aside className="repository-tools-results-column">
