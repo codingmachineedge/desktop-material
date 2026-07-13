@@ -549,6 +549,8 @@ async function validateOutputDestination(
   context: IRepositoryGitContext,
   dependencies: ICLICommandValidationDependencies
 ): Promise<string> {
+  await assertOutputDestinationDoesNotExist(destination)
+
   let canonicalDestination: string
   let canonicalGitDirectory: string
   let canonicalGitCommonDirectory: string
@@ -572,7 +574,27 @@ async function validateOutputDestination(
   ) {
     throw new Error('Repository exports cannot be saved inside Git storage.')
   }
+
+  // Repeat after canonicalization so a destination created while its parent
+  // aliases were being resolved also fails the create-new-only contract.
+  await assertOutputDestinationDoesNotExist(destination)
   return canonicalDestination
+}
+
+async function assertOutputDestinationDoesNotExist(
+  destination: string
+): Promise<void> {
+  try {
+    await lstat(destination)
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return
+    }
+    throw new Error('Unable to verify the selected destination path.')
+  }
+  throw new Error(
+    'Repository exports cannot overwrite an existing destination.'
+  )
 }
 
 async function validateRemote(

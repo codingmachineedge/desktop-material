@@ -1,9 +1,12 @@
 import { execFileSync } from 'child_process'
+import { createHash } from 'crypto'
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   mkdir,
   mkdtemp,
+  link,
+  readFile,
   realpath,
   rename,
   rm,
@@ -569,6 +572,149 @@ describe('CLI workbench runner helpers', () => {
         revalidateCLICommandBeforeSpawn(validated, fixture.dependencies),
         /inside Git storage|destination path changed/
       )
+    } finally {
+      await rm(fixture.fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('uses create-new-only exports and rechecks destination creation before spawn', async () => {
+    const fixture = await createRepositoryFixture()
+    try {
+      const existingArchive = join(fixture.exportsDirectory, 'existing.zip')
+      const existingBundle = join(fixture.exportsDirectory, 'existing.bundle')
+      await writeFile(existingArchive, 'existing archive sentinel\n')
+      await writeFile(existingBundle, 'existing bundle sentinel\n')
+
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.repository,
+            {
+              kind: 'repository-archive',
+              format: 'zip',
+              destination: existingArchive,
+            },
+            true
+          ),
+          fixture.dependencies
+        ),
+        /cannot overwrite an existing destination/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.repository,
+            {
+              kind: 'repository-bundle-export',
+              destination: existingBundle,
+            },
+            true
+          ),
+          fixture.dependencies
+        ),
+        /cannot overwrite an existing destination/
+      )
+
+      const missingArchive = join(fixture.exportsDirectory, 'missing.zip')
+      const missingBundle = join(fixture.exportsDirectory, 'missing.bundle')
+      const validatedArchive = await validateCLICommandRequest(
+        request(
+          fixture.repository,
+          {
+            kind: 'repository-archive',
+            format: 'zip',
+            destination: missingArchive,
+          },
+          true
+        ),
+        fixture.dependencies
+      )
+      const validatedBundle = await validateCLICommandRequest(
+        request(
+          fixture.repository,
+          {
+            kind: 'repository-bundle-export',
+            destination: missingBundle,
+          },
+          true
+        ),
+        fixture.dependencies
+      )
+      assert.equal(validatedArchive.outputDestination, missingArchive)
+      assert.equal(validatedBundle.outputDestination, missingBundle)
+      await revalidateCLICommandBeforeSpawn(
+        validatedArchive,
+        fixture.dependencies
+      )
+      await revalidateCLICommandBeforeSpawn(
+        validatedBundle,
+        fixture.dependencies
+      )
+
+      await writeFile(missingArchive, 'created after archive review\n')
+      await writeFile(missingBundle, 'created after bundle review\n')
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(validatedArchive, fixture.dependencies),
+        /cannot overwrite an existing destination/
+      )
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(validatedBundle, fixture.dependencies),
+        /cannot overwrite an existing destination/
+      )
+    } finally {
+      await rm(fixture.fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects archive and bundle hard links without changing Git config', async t => {
+    const fixture = await createRepositoryFixture()
+    try {
+      const configPath = join(fixture.repository, '.git', 'config')
+      const archiveAlias = join(fixture.exportsDirectory, 'config-alias.zip')
+      const bundleAlias = join(fixture.exportsDirectory, 'config-alias.bundle')
+      const before = await readFile(configPath)
+      const beforeHash = createHash('sha256').update(before).digest('hex')
+      try {
+        await link(configPath, archiveAlias)
+        await link(configPath, bundleAlias)
+      } catch (error) {
+        if (
+          ['EPERM', 'ENOTSUP', 'EOPNOTSUPP'].includes(
+            (error as NodeJS.ErrnoException).code ?? ''
+          )
+        ) {
+          t.skip('hard links are not supported in this environment')
+          return
+        }
+        throw error
+      }
+
+      const recipes = [
+        {
+          kind: 'repository-archive',
+          format: 'zip',
+          destination: archiveAlias,
+        },
+        {
+          kind: 'repository-bundle-export',
+          destination: bundleAlias,
+        },
+      ] as const
+      for (const [index, recipe] of recipes.entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            request(fixture.repository, recipe, true, `hardlink-${index}`),
+            fixture.dependencies
+          ),
+          /cannot overwrite an existing destination/
+        )
+        const after = await readFile(configPath)
+        assert.deepStrictEqual(after, before)
+        assert.equal(
+          createHash('sha256').update(after).digest('hex'),
+          beforeHash
+        )
+      }
     } finally {
       await rm(fixture.fixture, { recursive: true, force: true })
     }
