@@ -6,7 +6,7 @@ import { Repository } from '../../../src/models/repository'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
 import { RepositoryListItem } from '../../../src/ui/repositories-list/repository-list-item'
-import { render, fireEvent, screen, waitFor } from '../../helpers/ui/render'
+import { render, fireEvent, screen } from '../../helpers/ui/render'
 import { IMatches } from '../../../src/lib/fuzzy-find'
 import {
   advanceTimersBy,
@@ -84,7 +84,7 @@ describe('RepositoryListItem', () => {
     assert.equal(name?.textContent, 'octocat/desktop-app')
   })
 
-  it('shows tooltip content for the repository full name, alias, and path', async () => {
+  it('leaves repository tooltips to the accessible list row', () => {
     const repository = createRepository('desktop-app')
     const view = render(
       <RepositoryListItem
@@ -109,9 +109,9 @@ describe('RepositoryListItem', () => {
     fireEvent.mouseMove(row, { clientX: 20, clientY: 20 })
     advanceTimersBy(400)
 
-    await waitFor(() => {
-      assert.ok(screen.getByText('octocat/desktop', { selector: 'strong' }))
-      assert.ok(screen.getByText(fixtureRepositoryPath))
-    })
+    // The promoted accessible-list tooltip is rendered by RepositoriesList's
+    // ListRow wrapper. RepositoryListItem must keep its legacy hover tooltip
+    // disabled so pointer and keyboard users don't receive duplicate content.
+    assert.equal(screen.queryByRole('tooltip'), null)
   })
 })
