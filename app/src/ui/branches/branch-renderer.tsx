@@ -19,7 +19,8 @@ export function renderDefaultBranch(
   const branch = item.branch
   const currentBranchName = currentBranch ? currentBranch.name : null
   const isLocalOnly =
-    branch.type === BranchType.Local && (branch.upstream === null || branch.isGone)
+    branch.type === BranchType.Local &&
+    (branch.upstream === null || branch.isGone)
   return (
     <BranchListItem
       name={branch.name}
@@ -39,7 +40,8 @@ export function getDefaultAriaLabelForBranch(
 ): string {
   const branch = item.branch
   const localOnlySuffix =
-    branch.type === BranchType.Local && (branch.upstream === null || branch.isGone)
+    branch.type === BranchType.Local &&
+    (branch.upstream === null || branch.isGone)
       ? ', not published'
       : ''
 

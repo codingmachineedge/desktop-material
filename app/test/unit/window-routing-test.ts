@@ -3,6 +3,7 @@ import assert from 'node:assert'
 import {
   findWindowForRepositoryPath,
   nextWindowScope,
+  normalizeRepositoryPath,
 } from '../../src/main-process/window-routing'
 import { windowScopeFromHash } from '../../src/lib/window-scope'
 
@@ -25,6 +26,21 @@ describe('multi-window routing', () => {
     assert.equal(
       nextWindowScope(new Set(['primary', 'window-2', 'window-4'])),
       'window-3'
+    )
+  })
+
+  it('normalizes repository paths independently of the runner platform', () => {
+    assert.equal(
+      normalizeRepositoryPath('C:\\Repos\\App\\', true),
+      'c:/repos/app'
+    )
+    assert.equal(
+      normalizeRepositoryPath('\\\\Server\\Share\\Repo\\', true),
+      '//server/share/repo'
+    )
+    assert.equal(
+      normalizeRepositoryPath('/Users/example/repo/', false),
+      '/Users/example/repo'
     )
   })
 

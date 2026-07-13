@@ -26,7 +26,13 @@ export function normalizeRepositoryPath(
   path: string,
   caseInsensitive: boolean
 ): string {
-  const normalized = Path.normalize(path).replace(/[\\/]+$/, '')
+  const pathImplementation = /^(?:[A-Za-z]:[\\/]|\\\\)/.test(path)
+    ? Path.win32
+    : Path.posix
+  const normalized = pathImplementation
+    .normalize(path)
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
   return caseInsensitive ? normalized.toLowerCase() : normalized
 }
 
@@ -37,7 +43,7 @@ function pathContainsTarget(
 ): boolean {
   const repository = normalizeRepositoryPath(repositoryPath, caseInsensitive)
   const target = normalizeRepositoryPath(targetPath, caseInsensitive)
-  return target === repository || target.startsWith(repository + Path.sep)
+  return target === repository || target.startsWith(repository + '/')
 }
 
 /**
