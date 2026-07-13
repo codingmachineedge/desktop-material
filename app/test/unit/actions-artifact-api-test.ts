@@ -6,6 +6,11 @@ import {
   ActionsArtifactJSONMaximumBytes,
 } from '../../src/lib/actions-artifact-json'
 import { APIError } from '../../src/lib/http'
+import {
+  ActionsArtifactAttestationMaximumBytes,
+  ActionsArtifactAttestationProbePageSize,
+  ActionsArtifactProvenancePredicate,
+} from '../../src/lib/actions-artifact-provenance'
 
 const responseArtifact = {
   id: 19,
@@ -83,6 +88,119 @@ describe('GitHub Actions artifact API', () => {
     )
     await assert.rejects(() =>
       api.fetchArtifactAttestationPresence('owner', 'repo', 'md5:bad')
+    )
+  })
+
+  it('fetches only bounded canonical bundles for the exact subject and policy', async () => {
+    const api = new API('https://api.github.com', 'secret-token')
+    const controller = new AbortController()
+    let request:
+      | { method: string; path: string; signal?: AbortSignal }
+      | undefined
+    Reflect.set(
+      api,
+      'ghRequest',
+      async (
+        method: string,
+        path: string,
+        options?: { signal?: AbortSignal }
+      ) => {
+        request = { method, path, signal: options?.signal }
+        return new Response(
+          JSON.stringify({
+            attestations: [
+              {
+                bundle: {
+                  mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
+                  verificationMaterial: {},
+                  dsseEnvelope: {},
+                },
+                bundle_url: 'not returned',
+              },
+            ],
+          })
+        )
+      }
+    )
+    const digest = `sha256:${'A'.repeat(64)}`
+    const result = await api.fetchArtifactAttestationBundles(
+      'owner',
+      'repo',
+      digest,
+      controller.signal
+    )
+
+    assert.deepEqual(request, {
+      method: 'GET',
+      path: `repos/owner/repo/attestations/${encodeURIComponent(
+        digest.toLowerCase()
+      )}?per_page=${ActionsArtifactAttestationProbePageSize}&predicate_type=${encodeURIComponent(
+        ActionsArtifactProvenancePredicate
+      )}`,
+      signal: controller.signal,
+    })
+    assert.equal(result.bundles.length, 1)
+    assert.equal(result.bundles[0].includes('bundle_url'), false)
+  })
+
+  it('uses the larger success cap only for bounded attestation bundles', async () => {
+    const api = new API('https://api.github.com', 'secret-token')
+    const valid = JSON.stringify({ attestations: [] })
+    Reflect.set(
+      api,
+      'ghRequest',
+      async () =>
+        new Response(valid, {
+          headers: {
+            'Content-Length': String(ActionsArtifactJSONMaximumBytes + 1),
+          },
+        })
+    )
+    assert.deepEqual(
+      await api.fetchArtifactAttestationBundles(
+        'owner',
+        'repo',
+        `sha256:${'a'.repeat(64)}`
+      ),
+      { bundles: [], serializedBytes: 0 }
+    )
+
+    Reflect.set(
+      api,
+      'ghRequest',
+      async () =>
+        new Response(valid, {
+          headers: {
+            'Content-Length': String(
+              ActionsArtifactAttestationMaximumBytes + 1
+            ),
+          },
+        })
+    )
+    await assert.rejects(() =>
+      api.fetchArtifactAttestationBundles(
+        'owner',
+        'repo',
+        `sha256:${'a'.repeat(64)}`
+      )
+    )
+
+    Reflect.set(
+      api,
+      'ghRequest',
+      async () =>
+        new Response(
+          new Uint8Array(ActionsArtifactJSONMaximumBytes + 1).fill(65),
+          { status: 403 }
+        )
+    )
+    await assert.rejects(
+      api.fetchArtifactAttestationBundles(
+        'owner',
+        'repo',
+        `sha256:${'a'.repeat(64)}`
+      ),
+      error => error instanceof APIError && error.responseStatus === 403
     )
   })
 

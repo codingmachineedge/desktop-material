@@ -21,6 +21,7 @@ import {
   fetchActionsJobLogThroughMainProcess,
 } from '../actions-transfer-client'
 import { ActionsTransferError } from '../actions-transfer'
+import { IActionsArtifactAttestationBundleSet } from '../actions-artifact-provenance'
 import { IActionsJobList } from '../actions-jobs'
 import {
   ActionsRunReviewState,
@@ -45,7 +46,11 @@ export type ActionsInspectorOperation =
   | 'load-pending-deployments'
   | 'load-review-history'
 
-export type ActionsArtifactOperation = 'list' | 'attestations' | 'download'
+export type ActionsArtifactOperation =
+  | 'list'
+  | 'attestations'
+  | 'verification-bundles'
+  | 'download'
 
 const mutationLabels: Readonly<Record<ActionsMutation, string>> = {
   'rerun-job': 're-run this job',
@@ -154,6 +159,7 @@ const artifactOperationLabels: Readonly<
 > = {
   list: 'load artifacts for this workflow run',
   attestations: 'check artifact attestation records',
+  'verification-bundles': 'load artifact attestations for verification',
   download: 'download this artifact',
 }
 
@@ -1041,6 +1047,25 @@ export class ActionsStore {
       )
     } catch (error) {
       throw actionsArtifactError(error, 'attestations')
+    }
+  }
+
+  /** Internal verifier input; callers must never retain bundles in UI state. */
+  public async fetchArtifactAttestationBundles(
+    repository: Repository,
+    digest: string,
+    signal?: AbortSignal
+  ): Promise<IActionsArtifactAttestationBundleSet> {
+    try {
+      const gitHubRepository = this.gitHubFor(repository)
+      return await this.apiFor(repository).fetchArtifactAttestationBundles(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        digest,
+        signal
+      )
+    } catch (error) {
+      throw actionsArtifactError(error, 'verification-bundles')
     }
   }
 

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   endpointSatisfies,
+  supportsArtifactAttestationVerification,
   supportsRepoRules,
   VersionConstraint,
 } from '../../src/lib/endpoint-capabilities'
@@ -87,6 +88,29 @@ describe('endpoint-capabilities', () => {
       assert.equal(
         supportsRepoRules('https://unknown.example.test/api/v3', () => null),
         true
+      )
+    })
+  })
+
+  describe('supportsArtifactAttestationVerification', () => {
+    it('supports GitHub.com and GHE.com but fails closed on GHES', () => {
+      assert.equal(
+        supportsArtifactAttestationVerification('https://api.github.com'),
+        true
+      )
+      assert.equal(
+        supportsArtifactAttestationVerification('https://github.com'),
+        true
+      )
+      assert.equal(
+        supportsArtifactAttestationVerification('https://api.contoso.ghe.com'),
+        true
+      )
+      assert.equal(
+        supportsArtifactAttestationVerification(
+          'https://github.corporate.example/api/v3'
+        ),
+        false
       )
     })
   })

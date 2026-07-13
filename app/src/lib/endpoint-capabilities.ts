@@ -162,6 +162,16 @@ export const supportsActions = endpointSatisfies({
   es: '>= 3.1.0',
 })
 
+/**
+ * `gh attestation verify` supports GitHub.com and GHE.com trust roots, but not
+ * ordinary GitHub Enterprise Server hosts. Unsupported hosts stay explicitly
+ * unavailable instead of producing a false verification failure.
+ */
+export const supportsArtifactAttestationVerification = endpointSatisfies({
+  dotcom: true,
+  es: false,
+})
+
 export const supportsAliveSessions = endpointSatisfies({ dotcom: true })
 
 /**

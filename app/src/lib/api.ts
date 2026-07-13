@@ -56,6 +56,13 @@ import {
   readBoundedActionsArtifactJSON,
 } from './actions-artifact-json'
 import {
+  ActionsArtifactAttestationMaximumBytes,
+  ActionsArtifactAttestationProbePageSize,
+  ActionsArtifactProvenancePredicate,
+  IActionsArtifactAttestationBundleSet,
+  parseActionsArtifactAttestationBundles,
+} from './actions-artifact-provenance'
+import {
   ActionsJobPageSize,
   IActionsJobList,
   parseActionsJobList,
@@ -612,6 +619,16 @@ export interface IAPIWorkflowRun {
   readonly updated_at?: string
   readonly html_url?: string
   readonly actor?: IAPIIdentity
+  /** Workflow file reported by the Actions run API. */
+  readonly path?: string
+  /** Exact reusable-workflow metadata reported by the Actions run API. */
+  readonly referenced_workflows?: ReadonlyArray<IAPIReferencedWorkflow>
+}
+
+export interface IAPIReferencedWorkflow {
+  readonly path: string
+  readonly ref: string
+  readonly sha: string
 }
 
 export interface IAPIWorkflowJobs {
@@ -1247,11 +1264,16 @@ export interface IAPICreatePushProtectionBypassResponse {
 
 async function boundedActionsArtifactResponse(
   response: Response,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maximumBytes?: number
 ): Promise<unknown> {
   let value: unknown
   try {
-    value = await readBoundedActionsArtifactJSON(response, signal)
+    value = await readBoundedActionsArtifactJSON(
+      response,
+      signal,
+      response.ok ? maximumBytes : undefined
+    )
   } catch (error) {
     if (!response.ok && error instanceof ActionsArtifactJSONError) {
       throw new APIError(response, null)
@@ -2390,6 +2412,35 @@ export class API {
     )
     return parseActionsArtifactAttestationPresence(
       await boundedActionsArtifactResponse(response, signal)
+    )
+  }
+
+  /**
+   * Fetch only bounded canonical Sigstore bundles for internal verification.
+   * Provider wrapper metadata is discarded before this method returns.
+   */
+  public async fetchArtifactAttestationBundles(
+    owner: string,
+    name: string,
+    digest: string,
+    signal?: AbortSignal
+  ): Promise<IActionsArtifactAttestationBundleSet> {
+    if (!isSupportedActionsArtifactDigest(digest)) {
+      throw new Error('Artifact attestation lookup requires a SHA-256 digest.')
+    }
+    const subject = encodeURIComponent(digest.toLowerCase())
+    const predicate = encodeURIComponent(ActionsArtifactProvenancePredicate)
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${owner}/${name}/attestations/${subject}?per_page=${ActionsArtifactAttestationProbePageSize}&predicate_type=${predicate}`,
+      { signal }
+    )
+    return parseActionsArtifactAttestationBundles(
+      await boundedActionsArtifactResponse(
+        response,
+        signal,
+        ActionsArtifactAttestationMaximumBytes
+      )
     )
   }
 

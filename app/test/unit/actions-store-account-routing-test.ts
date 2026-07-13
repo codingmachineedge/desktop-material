@@ -138,6 +138,10 @@ describe('ActionsStore exact account routing', () => {
         }
       },
       fetchArtifactAttestationPresence: async () => false,
+      fetchArtifactAttestationBundles: async () => ({
+        bundles: [],
+        serializedBytes: 0,
+      }),
       rerunWorkflowRun: async () => undefined,
       rerunFailedJobs: async () => true,
       rerunJob: async () => true,
@@ -172,6 +176,10 @@ describe('ActionsStore exact account routing', () => {
       await store.fetchRunReviewHistory(repository, 7)
       await store.fetchArtifacts(repository, 7, 2)
       await store.fetchArtifactAttestationPresence(
+        repository,
+        `sha256:${'a'.repeat(64)}`
+      )
+      await store.fetchArtifactAttestationBundles(
         repository,
         `sha256:${'a'.repeat(64)}`
       )
@@ -217,7 +225,7 @@ describe('ActionsStore exact account routing', () => {
         controller.signal
       )
 
-      assert.equal(selectedAccounts.length, 16)
+      assert.equal(selectedAccounts.length, 17)
       assert.ok(selectedAccounts.every(account => account === second))
       assert.deepEqual(artifactPages, [2])
       assert.deepEqual(jobPages, [2])

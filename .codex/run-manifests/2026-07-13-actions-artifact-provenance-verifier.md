@@ -18,14 +18,16 @@
 
 ## Current checkpoint
 
-This is a documentation-only kickoff. It records the bounded product contract and exposes its implementation gates in the README roadmap. It does not claim that subject inventory, cryptographic verification, UI, tests, production interaction, screenshots, wiki publication, or Pages verification are implemented or complete.
+The provider contract and signer-metadata checkpoint is implemented. The app now distinguishes a 31st probe record from its 30-bundle verification ceiling, strips provider wrapper fields into canonical one-line Sigstore bundle JSON, enforces the 8 MiB aggregate ceiling, keeps ordinary artifact/error bodies at their existing 1 MiB cap, and routes bundle lookup through the repository-selected same-endpoint account. It also records exact workflow-run/reusable-workflow metadata, builds only complete signer identities, and fails verifier capability closed on ordinary GHES.
 
-Kickoff checks passed for the new manifest's Markdown structure, the README's existing-rule-compatible Markdown structure, the manifest link/target, stale archive-only wording, and `git diff --check`.
+Focused results for this checkpoint:
 
-Current documentation allowlist:
+- provenance/API/account/capability tests: 24 passed, 0 failed
+- full TypeScript `--noEmit`: passed
+- focused ESLint with the repository rules directory: passed
+- focused Prettier and `git diff --check`: passed
 
-- `README.md`
-- `.codex/run-manifests/2026-07-13-actions-artifact-provenance-verifier.md`
+Safe ZIP inventory, selected-subject digesting, cryptographic verification, UI, production interaction, screenshots, wiki publication, and Pages verification remain pending.
 
 ## App-native product contract
 
@@ -69,7 +71,7 @@ These are safety ceilings, not claims that every allowed byte count must be load
 - The main process receives only the completed-download identity, selected normalized entry identity or explicit archive-subject choice, normalized verification policy, and validated bundles. It rechecks all invariants and digests rather than trusting renderer state.
 - The verifier executable is capability-detected. It runs hidden with `shell: false`, closed stdin, a fixed argument vector, sanitized environment, one exact cancellable process tree, a 120-second deadline, 1 MiB stdout/stderr ceilings, and a unique owned bundle Temp file that is always removed.
 - Exit zero is insufficient by itself: bounded JSON must parse into at least one verified result whose subject digest, predicate, source, signer, issuer, and supported trust evidence exactly match policy.
-- Tokens, authorization headers, arbitrary environment variables, arbitrary paths, raw arguments, raw provider responses, and raw verifier output never cross the IPC contract or appear in the UI.
+- Tokens, authorization headers, arbitrary environment variables, arbitrary paths, raw arguments, raw provider envelopes, and raw verifier output never cross the provenance IPC contract or appear in React state, DOM, logs, or telemetry. Only bounded canonical Sigstore bundle JSON may cross to the verifier; the pre-existing artifact download transport remains outside this new contract.
 - Repository, selected account, workflow run, artifact download, archive path/digest, entry selection, or policy changes cancel and invalidate stale operations before they can repopulate state.
 
 ## Expected UI state and ordered interaction
@@ -99,8 +101,9 @@ No public repository, workflow, artifact, attestation, or release mutation is pa
 
 ## Delivery checkpoints
 
-- **Active — contract and metadata:** this kickoff records the two-digest contract. Safe ZIP inventory/parser, selected-account bundle lookup, normalized metadata, and store lifecycle remain to be implemented and tested.
-- **Queued — verifier and IPC:** implement the fixed verifier policy, main-process digest/extraction boundary, typed IPC, cancellation, exact cleanup, and normalized outcomes.
+- **Done — provider contract and signer metadata:** bounded canonical bundle parsing, exact subject/predicate request construction, selected-account routing, GitHub.com/GHE.com capability gating, workflow-run reusable-signer metadata, and exact signer-candidate validation are implemented and focused-tested.
+- **Active — safe inventory and digest IPC:** implement the opaque sender-scoped completed-download registry, strict ZIP inventory/parser, selected-entry digest preparation, typed IPC, cancellation, and exact cleanup.
+- **Queued — verifier and IPC:** implement the fixed offline verifier policy, re-extraction/digest boundary, normalized output, time/output ceilings, cancellation, and exact process/Temp cleanup.
 - **Queued — modal and result UI:** implement explicit subject selection, policy review, progress/cancel/retry, evidence/result views, focus restoration, and responsive containment.
 - **Queued — focused and adversarial tests:** parser, ZIP safety, provider/API, store, IPC, process, React, accessibility, style-contract, deterministic-provider, and negative-policy gates.
 - **Queued — production headless verification:** exact production build, isolated interaction matrix, provider/process/cleanup receipts, inspected screenshots, and source-SHA binding.
@@ -132,7 +135,7 @@ No implementation checkpoint may move to **Done** on documentation or mocked UI 
 ## Verification and evidence placeholders
 
 - Implementation commits and exact production source: **Pending**
-- Focused parser/API/store/IPC/React/style checks: **Pending**
+- Focused parser/API/store/IPC/React/style checks: **Provider contract subset passed (24 tests + TypeScript + focused ESLint); remaining layers pending**
 - Deterministic provider request and policy receipt: **Pending**
 - Exact production build receipt: **Pending**
 - Hidden-desktop interaction and geometry receipt: **Pending**
