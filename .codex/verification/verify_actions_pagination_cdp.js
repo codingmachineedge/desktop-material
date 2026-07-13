@@ -148,12 +148,52 @@ async function evaluate(client, expression) {
 async function waitFor(client, expression, label, timeout = 20_000) {
   const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
-    if (await evaluate(client, expression)) {
-      return
+    try {
+      if (await evaluate(client, expression)) {
+        return
+      }
+    } catch (error) {
+      if (
+        !String(error).includes('context') &&
+        !String(error).includes('reload')
+      ) {
+        throw error
+      }
     }
     await new Promise(resolve => setTimeout(resolve, 100))
   }
   fail(`Timed out waiting for ${label}.`)
+}
+
+async function seedIsolatedProfile(client) {
+  const reload = await evaluate(
+    client,
+    `(() => {
+      const expected = {
+        'has-shown-welcome-flow': '1',
+        'theme': 'light',
+        'zoom-auto-fit-enabled': '1',
+        'stats-opt-out': '1',
+        'has-sent-stats-opt-in-ping': '1'
+      }
+      let changed = false
+      for (const [key, value] of Object.entries(expected)) {
+        if (localStorage.getItem(key) !== value) {
+          localStorage.setItem(key, value)
+          changed = true
+        }
+      }
+      return changed
+    })()`
+  )
+  if (reload) {
+    await client.send('Page.reload', { ignoreCache: true })
+    await waitFor(
+      client,
+      `document.readyState === 'complete'`,
+      'isolated profile reload'
+    )
+  }
 }
 
 async function clickButton(client, label) {
@@ -324,6 +364,7 @@ async function interact(client, options) {
     'sentinel-capture'
   )
 
+  await seedIsolatedProfile(client)
   await waitFor(
     client,
     `document.querySelector('#actions-tab') !== null`,
