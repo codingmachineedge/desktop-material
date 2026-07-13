@@ -1,133 +1,27 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import {
-  assessCLICommand,
-  CLIWorkbenchQuickActions,
-  formatCLICommand,
-  getCLICommandBlockReason,
-  parseCLIArguments,
-} from '../../src/lib/cli-workbench'
+import { ICLICommandRequest } from '../../src/lib/cli-workbench'
 
-describe('CLI workbench command contract', () => {
-  it('parses quoted arguments into an explicit argv', () => {
-    assert.deepEqual(parseCLIArguments('log --author "Mona Lisa" --all'), [
-      'log',
-      '--author',
-      'Mona Lisa',
-      '--all',
+describe('guided CLI command contract', () => {
+  it('exposes a named structured recipe instead of renderer argv', () => {
+    const request: ICLICommandRequest = {
+      id: 'repository-tool-1',
+      repositoryPath: 'C:\\work\\repository',
+      recipe: {
+        kind: 'repository-tool',
+        operation: 'status-summary',
+      },
+      confirmed: false,
+    }
+
+    assert.deepStrictEqual(Object.keys(request).sort(), [
+      'confirmed',
+      'id',
+      'recipe',
+      'repositoryPath',
     ])
-    assert.deepEqual(parseCLIArguments('  '), [])
-  })
-
-  it('renders a copyable preview without credential values', () => {
-    assert.equal(
-      formatCLICommand('gh', [
-        'auth',
-        'login',
-        '--token=secret',
-        '--client-secret',
-        'also-secret',
-      ]),
-      'gh auth login --token=[redacted] --client-secret [redacted]'
-    )
-    assert.equal(
-      formatCLICommand('git', ['log', '--author', 'Mona Lisa']),
-      'git log --author "Mona Lisa"'
-    )
-  })
-
-  it('requires confirmation for destructive Git operations', () => {
-    assert.equal(assessCLICommand('git', ['status']).risk, 'read')
-    assert.equal(assessCLICommand('git', ['commit', '-m', 'ok']).risk, 'write')
-    assert.equal(
-      assessCLICommand('git', ['push', '--force-with-lease'])
-        .requiresConfirmation,
-      true
-    )
-    assert.equal(
-      assessCLICommand('git', ['-C', 'somewhere', 'clean', '-fd']).risk,
-      'destructive'
-    )
-    assert.equal(
-      assessCLICommand('git', ['stash', 'drop', 'stash@{0}']).risk,
-      'destructive'
-    )
-    assert.equal(
-      assessCLICommand('git', ['remote', 'prune', 'origin']).risk,
-      'destructive'
-    )
-    assert.equal(
-      assessCLICommand('git', ['branch', '--force', 'main', 'HEAD~']).risk,
-      'destructive'
-    )
-    assert.equal(
-      assessCLICommand('git', ['tag', '-f', 'v1', 'HEAD~']).risk,
-      'destructive'
-    )
-  })
-
-  it('requires confirmation for destructive GitHub operations', () => {
-    assert.equal(assessCLICommand('gh', ['pr', 'list']).risk, 'read')
-    assert.equal(assessCLICommand('gh', ['pr', 'create']).risk, 'write')
-    assert.equal(
-      assessCLICommand('gh', ['repo', 'delete', 'owner/name']).risk,
-      'destructive'
-    )
-    assert.equal(
-      assessCLICommand('gh', ['workflow', 'disable', 'ci.yml'])
-        .requiresConfirmation,
-      true
-    )
-    assert.equal(
-      assessCLICommand('gh', ['api', '-X', 'PATCH', 'repos/o/r']).risk,
-      'write'
-    )
-  })
-
-  it('blocks GitHub CLI commands that print stored credentials', () => {
-    assert.match(
-      getCLICommandBlockReason('gh', ['auth', 'token']) ?? '',
-      /cannot display stored authentication tokens/
-    )
-    assert.match(
-      getCLICommandBlockReason('gh', ['auth', 'status', '--show-token']) ?? '',
-      /cannot display stored authentication tokens/
-    )
-    assert.match(
-      getCLICommandBlockReason('gh', ['auth', 'status', '-t']) ?? '',
-      /cannot display stored authentication tokens/
-    )
-    assert.equal(getCLICommandBlockReason('gh', ['auth', 'login']), null)
-    assert.match(
-      getCLICommandBlockReason('git', ['credential', 'fill']) ?? '',
-      /cannot display stored authentication credentials/
-    )
-    assert.match(
-      getCLICommandBlockReason('git', ['credential-manager', 'get']) ?? '',
-      /cannot display stored authentication credentials/
-    )
-    assert.match(
-      getCLICommandBlockReason('git', [
-        '-C',
-        'credential',
-        'credential',
-        'fill',
-      ]) ?? '',
-      /cannot display stored authentication credentials/
-    )
-    assert.equal(
-      getCLICommandBlockReason('git', ['credential', 'approve']),
-      null
-    )
-  })
-
-  it('ships unique, valid quick actions without limiting custom commands', () => {
-    const ids = CLIWorkbenchQuickActions.map(action => action.id)
-    assert.equal(ids.length, new Set(ids).size)
-    assert.ok(
-      CLIWorkbenchQuickActions.every(
-        action => action.args.length > 0 && action.description.length > 0
-      )
-    )
+    assert.equal('args' in request, false)
+    assert.equal('cwd' in request, false)
+    assert.equal('tool' in request, false)
   })
 })

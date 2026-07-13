@@ -113,6 +113,32 @@ const dispatcher = {
 } as unknown as Dispatcher
 
 describe('NotificationCentrePanel', () => {
+  it('does not consume Escape while a popup is in front of the panel', () => {
+    const closed: boolean[] = []
+    const stackDispatcher = {
+      ...dispatcher,
+      setNotificationCentreOpen: (open: boolean) => closed.push(open),
+    } as unknown as Dispatcher
+    const panel = (isTopMost: boolean) => (
+      <NotificationCentrePanel
+        dispatcher={stackDispatcher}
+        entries={[localEntry]}
+        unreadCount={1}
+        repositories={[]}
+        accounts={[]}
+        isTopMost={isTopMost}
+      />
+    )
+    const view = render(panel(false))
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.deepStrictEqual(closed, [])
+
+    view.rerender(panel(true))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.deepStrictEqual(closed, [false])
+  })
+
   it('keeps Local as the default source with connected keyboard tabs', () => {
     render(
       <NotificationCentrePanel
@@ -121,6 +147,7 @@ describe('NotificationCentrePanel', () => {
         unreadCount={1}
         repositories={[]}
         accounts={[]}
+        isTopMost={true}
       />
     )
 
@@ -169,6 +196,7 @@ describe('NotificationCentrePanel', () => {
         unreadCount={1}
         repositories={[]}
         accounts={[]}
+        isTopMost={true}
       />
     )
 
@@ -239,6 +267,7 @@ describe('NotificationCentrePanel', () => {
         unreadCount={0}
         repositories={[]}
         accounts={[first, second, thirdParty]}
+        isTopMost={true}
         githubNotificationsStore={store}
       />
     )
@@ -344,6 +373,7 @@ describe('NotificationCentrePanel', () => {
         unreadCount={0}
         repositories={[]}
         accounts={[selected]}
+        isTopMost={true}
         githubNotificationsStore={store}
       />
     )

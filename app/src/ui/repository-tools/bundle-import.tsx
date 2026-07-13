@@ -1,5 +1,8 @@
 import * as React from 'react'
 import {
+  CLICommandRecipe,
+  GuidedBundleImportOperation,
+  GuidedBundleInspectionOperation,
   ICLICommandOutputEvent,
   ICLICommandRequest,
   ICLICommandStateEvent,
@@ -74,6 +77,26 @@ let nextBundleImportSequence = 0
 
 function appendBoundedOutput(current: string, value: string): string {
   return `${current}${value}`.slice(-MaxImportOutput)
+}
+
+function bundleInspectionRecipe(
+  operation: GuidedBundleInspectionOperation,
+  bundlePath: string
+): CLICommandRecipe {
+  return { kind: 'repository-bundle-inspection', operation, bundlePath }
+}
+
+function bundleImportRecipe(
+  operation: GuidedBundleImportOperation,
+  request: IRepositoryBundleImportRequest
+): CLICommandRecipe {
+  return {
+    kind: 'repository-bundle-import',
+    operation,
+    bundlePath: request.bundlePath,
+    source: request.source,
+    branchName: request.branchName,
+  }
 }
 
 function stepTitle(phase: BundleImportPhase): string {
@@ -266,7 +289,7 @@ export class RepositoryBundleImport extends React.Component<
           if (this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
             void this.startCommand(
               'inspection-verification',
-              inspection.verifyArgs,
+              bundleInspectionRecipe('verify', inspection.bundlePath),
               false
             )
           }
@@ -288,7 +311,7 @@ export class RepositoryBundleImport extends React.Component<
 
   private async startCommand(
     phase: BundleImportPhase,
-    args: ReadonlyArray<string>,
+    recipe: CLICommandRecipe,
     confirmed: boolean
   ) {
     if (this.runId !== null || !this.mounted) {
@@ -309,9 +332,8 @@ export class RepositoryBundleImport extends React.Component<
     try {
       await this.props.client.start({
         id,
-        tool: 'git',
-        args,
-        cwd: this.props.repositoryPath,
+        repositoryPath: this.props.repositoryPath,
+        recipe,
         confirmed,
       })
     } catch (error) {
@@ -413,7 +435,11 @@ export class RepositoryBundleImport extends React.Component<
           () => this.confirmButton?.focus()
         )
       } else {
-        void this.startCommand('fetching', request.fetchObjectsArgs, true)
+        void this.startCommand(
+          'fetching',
+          bundleImportRecipe('fetch-objects', request),
+          true
+        )
       }
       return
     }
@@ -449,7 +475,7 @@ export class RepositoryBundleImport extends React.Component<
           const inspection = prepareRepositoryBundleInspection(bundlePath)
           void this.startCommand(
             'inspection-listing',
-            inspection.listHeadsArgs,
+            bundleInspectionRecipe('list-heads', inspection.bundlePath),
             false
           )
           return
@@ -478,7 +504,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'review-destination',
-            request.checkDestinationArgs,
+            bundleImportRecipe('check-destination', request),
             false
           )
           return
@@ -490,7 +516,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'recheck-listing',
-            request.listHeadsArgs,
+            bundleInspectionRecipe('list-heads', request.bundlePath),
             false
           )
           return
@@ -504,7 +530,7 @@ export class RepositoryBundleImport extends React.Component<
           assertRepositoryBundleSourceUnchanged(currentHeads, request.source)
           void this.startCommand(
             'recheck-validation',
-            request.validateDestinationArgs,
+            bundleImportRecipe('validate-destination', request),
             false
           )
           return
@@ -517,7 +543,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'recheck-destination',
-            request.checkDestinationArgs,
+            bundleImportRecipe('check-destination', request),
             false
           )
           return
@@ -529,7 +555,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'validating-commit',
-            request.validateCommitArgs,
+            bundleImportRecipe('validate-commit', request),
             false
           )
           return
@@ -539,7 +565,11 @@ export class RepositoryBundleImport extends React.Component<
               'The prepared bundle import is no longer available.'
             )
           }
-          void this.startCommand('creating', request.createBranchArgs, true)
+          void this.startCommand(
+            'creating',
+            bundleImportRecipe('create-branch', request),
+            true
+          )
           return
         case 'creating':
           if (request === null) {
@@ -636,7 +666,7 @@ export class RepositoryBundleImport extends React.Component<
         () =>
           void this.startCommand(
             'review-validation',
-            request.validateDestinationArgs,
+            bundleImportRecipe('validate-destination', request),
             false
           )
       )
@@ -661,7 +691,11 @@ export class RepositoryBundleImport extends React.Component<
       return
     }
     this.setBusy(true)
-    void this.startCommand('recheck-verification', request.verifyArgs, false)
+    void this.startCommand(
+      'recheck-verification',
+      bundleInspectionRecipe('verify', request.bundlePath),
+      false
+    )
   }
 
   private onCancel = async () => {

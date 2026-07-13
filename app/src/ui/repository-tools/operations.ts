@@ -1,4 +1,5 @@
 import * as Path from 'path'
+import { GuidedRepositoryToolID } from '../../lib/cli-workbench'
 
 export type RepositoryToolCategory = 'Diagnostics' | 'Maintenance' | 'Recovery'
 
@@ -365,6 +366,9 @@ function normalizeRepositoryExportDestination(
   destination: string,
   extension: string
 ): string {
+  // This renderer-side check provides immediate feedback only. The main
+  // process resolves the repository's real Git admin/common directories and
+  // canonical destination aliases twice before it constructs and spawns argv.
   const value = destination.trim()
   if (value.length === 0 || value.includes('\0') || !Path.isAbsolute(value)) {
     throw new Error('Choose an absolute destination for the repository export.')
@@ -393,13 +397,7 @@ function normalizeRepositoryExportDestination(
   return resolvedDestination
 }
 
-export type RepositoryToolID =
-  | 'status-summary'
-  | 'repository-health'
-  | 'maintenance-preview'
-  | 'maintenance-run'
-  | 'reflog-view'
-  | 'signature-audit'
+export type RepositoryToolID = GuidedRepositoryToolID
 
 export interface IRepositoryToolOperation {
   readonly id: RepositoryToolID
@@ -512,8 +510,8 @@ export function getRepositoryToolOperation(
 }
 
 /**
- * Contain and normalize the only user-selected value accepted by the archive
- * function. The source ref and Git arguments remain fixed and reviewed.
+ * Normalize the only user-selected value accepted by the archive function.
+ * Canonical Git-storage containment is enforced again by the main process.
  */
 export function prepareRepositoryArchive(
   repositoryPath: string,

@@ -10,6 +10,7 @@ import {
 import {
   IRepositoryBundleImportRequest,
   IRepositoryToolsClient,
+  getRepositoryToolOperation,
   prepareRepositoryBundleImport,
   RepositoryBundleImport,
   RepositoryTools,
@@ -70,6 +71,69 @@ class FakeRepositoryToolsClient implements IRepositoryToolsClient {
   }
 }
 
+function argsForRecipe(request: ICLICommandRequest): ReadonlyArray<string> {
+  const recipe = request.recipe
+  switch (recipe.kind) {
+    case 'repository-tool':
+      return getRepositoryToolOperation(recipe.operation).args
+    case 'repository-archive':
+      return [
+        'archive',
+        `--format=${recipe.format}`,
+        `--output=${recipe.destination}`,
+        'HEAD',
+      ]
+    case 'repository-bundle-export':
+      return ['bundle', 'create', recipe.destination, '--all']
+    case 'repository-bundle-inspection':
+      return ['bundle', recipe.operation, recipe.bundlePath]
+    case 'repository-bundle-import': {
+      const destinationRef = `refs/heads/${recipe.branchName}`
+      switch (recipe.operation) {
+        case 'validate-destination':
+          return ['check-ref-format', '--branch', recipe.branchName]
+        case 'check-destination':
+          return ['show-ref', '--verify', '--quiet', destinationRef]
+        case 'fetch-objects':
+          return [
+            'fetch',
+            '--no-write-fetch-head',
+            '--no-tags',
+            '--no-auto-maintenance',
+            recipe.bundlePath,
+            recipe.source.ref,
+          ]
+        case 'validate-commit':
+          return ['cat-file', '-e', `${recipe.source.oid}^{commit}`]
+        case 'create-branch':
+          return [
+            'branch',
+            '--no-track',
+            '--',
+            recipe.branchName,
+            recipe.source.oid,
+          ]
+      }
+    }
+    case 'repository-shallow-inspection':
+      return recipe.operation === 'status'
+        ? ['rev-parse', '--is-shallow-repository']
+        : ['remote']
+    case 'repository-shallow-fetch':
+      return [
+        'fetch',
+        '--no-auto-maintenance',
+        '--no-recurse-submodules',
+        '--no-write-fetch-head',
+        recipe.action === 'deepen'
+          ? `--deepen=${recipe.deepenBy}`
+          : '--unshallow',
+        '--',
+        recipe.remote,
+      ]
+  }
+}
+
 function renderTools(
   client: FakeRepositoryToolsClient,
   onRefreshRepository = async () => {},
@@ -126,9 +190,8 @@ describe('Repository tools', () => {
     await waitFor(() => assert.equal(client.starts.length, 1))
     assert.deepStrictEqual(client.starts[0], {
       id: client.starts[0].id,
-      tool: 'git',
-      args: ['status', '--short', '--branch'],
-      cwd: 'C:/repo',
+      repositoryPath: 'C:/repo',
+      recipe: { kind: 'repository-tool', operation: 'status-summary' },
       confirmed: false,
     })
   })
@@ -144,7 +207,7 @@ describe('Repository tools', () => {
     assert.ok(card)
     fireEvent.click(card.querySelector('button') as HTMLButtonElement)
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepStrictEqual(client.starts[0].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[0]), [
       'reflog',
       'show',
       '--date=local',
@@ -166,7 +229,10 @@ describe('Repository tools', () => {
     assert.ok(screen.getByRole('alertdialog'))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm maintenance' }))
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepStrictEqual(client.starts[0].args, ['maintenance', 'run'])
+    assert.deepStrictEqual(argsForRecipe(client.starts[0]), [
+      'maintenance',
+      'run',
+    ])
     assert.equal(client.starts[0].confirmed, true)
 
     const id = client.starts[0].id
@@ -245,7 +311,7 @@ describe('Repository tools', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Export archive' }))
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepStrictEqual(client.starts[0].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[0]), [
       'archive',
       '--format=zip',
       '--output=C:\\exports\\repository-source.zip',
@@ -297,7 +363,7 @@ describe('Repository tools', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Export bundle' }))
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepStrictEqual(client.starts[0].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[0]), [
       'bundle',
       'create',
       'C:\\exports\\all-history.bundle',
@@ -319,7 +385,7 @@ describe('Repository tools', () => {
     await screen.findByText('git version 2.55.0')
     fireEvent.click(screen.getByRole('button', { name: 'Verify a bundle' }))
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepStrictEqual(client.starts[0].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[0]), [
       'bundle',
       'verify',
       'C:\\exports\\repository.bundle',
@@ -349,7 +415,7 @@ describe('Repository tools', () => {
       screen.getByRole('button', { name: 'Choose and inspect a bundle' })
     )
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepStrictEqual(client.starts[0].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[0]), [
       'bundle',
       'verify',
       'C:\\exports\\repository.bundle',
@@ -362,7 +428,7 @@ describe('Repository tools', () => {
     })
 
     await waitFor(() => assert.equal(client.starts.length, 2))
-    assert.deepStrictEqual(client.starts[1].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[1]), [
       'bundle',
       'list-heads',
       'C:\\exports\\repository.bundle',
@@ -389,7 +455,7 @@ describe('Repository tools', () => {
     )
 
     await waitFor(() => assert.equal(client.starts.length, 3))
-    assert.deepStrictEqual(client.starts[2].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[2]), [
       'check-ref-format',
       '--branch',
       'imported/main',
@@ -401,7 +467,7 @@ describe('Repository tools', () => {
       signal: null,
     })
     await waitFor(() => assert.equal(client.starts.length, 4))
-    assert.deepStrictEqual(client.starts[3].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[3]), [
       'show-ref',
       '--verify',
       '--quiet',
@@ -422,7 +488,10 @@ describe('Repository tools', () => {
     )
 
     await waitFor(() => assert.equal(client.starts.length, 5))
-    assert.deepStrictEqual(client.starts[4].args, client.starts[0].args)
+    assert.deepStrictEqual(
+      argsForRecipe(client.starts[4]),
+      argsForRecipe(client.starts[0])
+    )
     client.emitState({
       id: client.starts[4].id,
       state: 'completed',
@@ -442,7 +511,10 @@ describe('Repository tools', () => {
       signal: null,
     })
     await waitFor(() => assert.equal(client.starts.length, 7))
-    assert.deepStrictEqual(client.starts[6].args, client.starts[2].args)
+    assert.deepStrictEqual(
+      argsForRecipe(client.starts[6]),
+      argsForRecipe(client.starts[2])
+    )
     client.emitState({
       id: client.starts[6].id,
       state: 'completed',
@@ -450,7 +522,10 @@ describe('Repository tools', () => {
       signal: null,
     })
     await waitFor(() => assert.equal(client.starts.length, 8))
-    assert.deepStrictEqual(client.starts[7].args, client.starts[3].args)
+    assert.deepStrictEqual(
+      argsForRecipe(client.starts[7]),
+      argsForRecipe(client.starts[3])
+    )
     client.emitState({
       id: client.starts[7].id,
       state: 'failed',
@@ -459,7 +534,7 @@ describe('Repository tools', () => {
     })
 
     await waitFor(() => assert.equal(client.starts.length, 9))
-    assert.deepStrictEqual(client.starts[8].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[8]), [
       'fetch',
       '--no-write-fetch-head',
       '--no-tags',
@@ -476,7 +551,7 @@ describe('Repository tools', () => {
     })
 
     await waitFor(() => assert.equal(client.starts.length, 10))
-    assert.deepStrictEqual(client.starts[9].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[9]), [
       'cat-file',
       '-e',
       `${sourceOID}^{commit}`,
@@ -490,7 +565,7 @@ describe('Repository tools', () => {
     })
 
     await waitFor(() => assert.equal(client.starts.length, 11))
-    assert.deepStrictEqual(client.starts[10].args, [
+    assert.deepStrictEqual(argsForRecipe(client.starts[10]), [
       'branch',
       '--no-track',
       '--',
@@ -608,11 +683,19 @@ describe('Repository tools', () => {
     await screen.findByText(/already exists.*will not be overwritten/i)
     assert.equal(client.starts.length, 8)
     assert.equal(
-      client.starts.some(start => start.args[0] === 'fetch'),
+      client.starts.some(
+        start =>
+          start.recipe.kind === 'repository-bundle-import' &&
+          start.recipe.operation === 'fetch-objects'
+      ),
       false
     )
     assert.equal(
-      client.starts.some(start => start.args[0] === 'branch'),
+      client.starts.some(
+        start =>
+          start.recipe.kind === 'repository-bundle-import' &&
+          start.recipe.operation === 'create-branch'
+      ),
       false
     )
   })

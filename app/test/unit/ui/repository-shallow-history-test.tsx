@@ -85,15 +85,18 @@ async function inspectShallowRepository(
 ) {
   fireEvent.click(screen.getByRole('button', { name: 'Check history status' }))
   await waitFor(() => assert.equal(client.starts.length, 1))
-  assert.deepStrictEqual(client.starts[0].args, [
-    'rev-parse',
-    '--is-shallow-repository',
-  ])
+  assert.deepStrictEqual(client.starts[0].recipe, {
+    kind: 'repository-shallow-inspection',
+    operation: 'status',
+  })
   assert.equal(client.starts[0].confirmed, false)
   emitCompleted(client, 0, 'true\n')
 
   await waitFor(() => assert.equal(client.starts.length, 2))
-  assert.deepStrictEqual(client.starts[1].args, ['remote'])
+  assert.deepStrictEqual(client.starts[1].recipe, {
+    kind: 'repository-shallow-inspection',
+    operation: 'remotes',
+  })
   emitCompleted(client, 1, remotes)
   await screen.findByLabelText('Additional commits')
 }
@@ -103,14 +106,17 @@ async function advanceReviewedActionToFetch(client: FakeShallowHistoryClient) {
     screen.getByRole('button', { name: /^(Deepen by|Fetch full history)/ })
   )
   await waitFor(() => assert.equal(client.starts.length, 3))
-  assert.deepStrictEqual(client.starts[2].args, [
-    'rev-parse',
-    '--is-shallow-repository',
-  ])
+  assert.deepStrictEqual(client.starts[2].recipe, {
+    kind: 'repository-shallow-inspection',
+    operation: 'status',
+  })
   emitCompleted(client, 2, 'true\n')
 
   await waitFor(() => assert.equal(client.starts.length, 4))
-  assert.deepStrictEqual(client.starts[3].args, ['remote'])
+  assert.deepStrictEqual(client.starts[3].recipe, {
+    kind: 'repository-shallow-inspection',
+    operation: 'remotes',
+  })
   emitCompleted(client, 3, 'origin\nupstream\n')
   await waitFor(() => assert.equal(client.starts.length, 5))
 }
@@ -189,27 +195,23 @@ describe('Repository shallow history', () => {
     await advanceReviewedActionToFetch(client)
     assert.deepStrictEqual(client.starts[4], {
       id: client.starts[4].id,
-      tool: 'git',
-      args: [
-        'fetch',
-        '--no-auto-maintenance',
-        '--no-recurse-submodules',
-        '--no-write-fetch-head',
-        '--deepen=75',
-        '--',
-        'origin',
-      ],
-      cwd: 'C:/repo',
+      repositoryPath: 'C:/repo',
+      recipe: {
+        kind: 'repository-shallow-fetch',
+        action: 'deepen',
+        remote: 'origin',
+        deepenBy: 75,
+      },
       confirmed: true,
     })
 
     emitCompleted(client, 4, 'Fetched older objects.\n')
     await waitFor(() => assert.equal(refreshes, 1))
     await waitFor(() => assert.equal(client.starts.length, 6))
-    assert.deepStrictEqual(client.starts[5].args, [
-      'rev-parse',
-      '--is-shallow-repository',
-    ])
+    assert.deepStrictEqual(client.starts[5].recipe, {
+      kind: 'repository-shallow-inspection',
+      operation: 'status',
+    })
     emitCompleted(client, 5, 'true\n')
 
     assert.ok(
@@ -240,15 +242,12 @@ describe('Repository shallow history', () => {
       /Remove this repository’s shallow boundary/
     )
     await advanceReviewedActionToFetch(client)
-    assert.deepStrictEqual(client.starts[4].args, [
-      'fetch',
-      '--no-auto-maintenance',
-      '--no-recurse-submodules',
-      '--no-write-fetch-head',
-      '--unshallow',
-      '--',
-      'origin',
-    ])
+    assert.deepStrictEqual(client.starts[4].recipe, {
+      kind: 'repository-shallow-fetch',
+      action: 'unshallow',
+      remote: 'origin',
+      deepenBy: null,
+    })
     assert.equal(client.starts[4].confirmed, true)
 
     emitCompleted(client, 4)
@@ -283,7 +282,9 @@ describe('Repository shallow history', () => {
     )
     assert.equal(client.starts.length, 3)
     assert.equal(
-      client.starts.some(start => start.args[0] === 'fetch'),
+      client.starts.some(
+        start => start.recipe.kind === 'repository-shallow-fetch'
+      ),
       false
     )
   })
@@ -308,7 +309,9 @@ describe('Repository shallow history', () => {
     )
     assert.equal(client.starts.length, 4)
     assert.equal(
-      client.starts.some(start => start.args[0] === 'fetch'),
+      client.starts.some(
+        start => start.recipe.kind === 'repository-shallow-fetch'
+      ),
       false
     )
   })
@@ -327,7 +330,9 @@ describe('Repository shallow history', () => {
     assert.ok(await screen.findByText(/valid configured fetch remote/i))
     assert.equal(screen.queryByLabelText('Fetch remote'), null)
     assert.equal(
-      client.starts.some(start => start.args[0] === 'fetch'),
+      client.starts.some(
+        start => start.recipe.kind === 'repository-shallow-fetch'
+      ),
       false
     )
   })
@@ -418,7 +423,7 @@ describe('Repository shallow history', () => {
       screen.getByRole('button', { name: 'Check history status' })
     )
     await waitFor(() => assert.equal(client.starts.length, 2))
-    assert.equal(client.starts[1].cwd, 'C:/second')
+    assert.equal(client.starts[1].repositoryPath, 'C:/second')
   })
 
   it('drops a delayed refresh completion after repository replacement', async () => {

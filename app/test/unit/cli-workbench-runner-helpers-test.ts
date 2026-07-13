@@ -1,115 +1,685 @@
+import { execFileSync } from 'child_process'
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { mkdtemp, rm } from 'fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'fs/promises'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import {
   CLICommandOutputLimiter,
+  createCLICommandValidationDependencies,
+  ICLICommandValidationDependencies,
+  revalidateCLICommandBeforeSpawn,
   validateCLICommandRequest,
 } from '../../src/main-process/cli-workbench/runner-helpers'
 
+function fakeDependencies(
+  rootPath: string,
+  overrides: Partial<ICLICommandValidationDependencies> = {}
+): ICLICommandValidationDependencies {
+  return {
+    inspectRepository: async () => ({
+      rootPath,
+      gitDirectory: join(rootPath, '.git'),
+      gitCommonDirectory: join(rootPath, '.git'),
+    }),
+    listRemotes: async () => ['origin', 'upstream'],
+    canonicalizePath: async path => resolve(path),
+    ...overrides,
+  }
+}
+
+function request(
+  repositoryPath: string,
+  recipe: unknown,
+  confirmed = false,
+  id = 'guided-1'
+) {
+  return { id, repositoryPath, recipe, confirmed }
+}
+
+function runGit(repositoryPath: string, args: ReadonlyArray<string>): string {
+  return execFileSync('git', [...args], {
+    cwd: repositoryPath,
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+}
+
+async function createRepositoryFixture() {
+  const fixture = await mkdtemp(join(tmpdir(), 'desktop-guided-runner-'))
+  const repository = join(fixture, 'repository')
+  const linkedWorktree = join(fixture, 'linked-worktree')
+  const exportsDirectory = join(fixture, 'exports')
+  await mkdir(repository)
+  await mkdir(exportsDirectory)
+  runGit(repository, ['init'])
+  await writeFile(join(repository, 'README.md'), 'fixture\n')
+  runGit(repository, ['add', 'README.md'])
+  runGit(repository, [
+    '-c',
+    'user.name=Desktop Material Tests',
+    '-c',
+    'user.email=tests@example.invalid',
+    'commit',
+    '-m',
+    'fixture',
+  ])
+  runGit(repository, [
+    'worktree',
+    'add',
+    '-b',
+    'linked-fixture',
+    linkedWorktree,
+  ])
+  const dependencies = createCLICommandValidationDependencies({
+    executable: 'git',
+    env: process.env,
+  })
+  return {
+    fixture,
+    repository,
+    linkedWorktree,
+    exportsDirectory,
+    dependencies,
+  }
+}
+
 describe('CLI workbench runner helpers', () => {
-  it('accepts only normalized git/gh argv in an existing absolute cwd', async () => {
-    const cwd = await mkdtemp(join(tmpdir(), 'desktop-cli-runner-'))
+  it('reconstructs every shipped guided family from structured parameters', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-cli-recipes-'))
+    const destination = join(tmpdir(), 'desktop-cli-export')
+    const bundlePath = join(tmpdir(), 'desktop-cli-input.bundle')
+    const source = { oid: 'a'.repeat(40), ref: 'refs/heads/main' }
+    const dependencies = fakeDependencies(root)
     try {
-      assert.deepEqual(
-        await validateCLICommandRequest({
-          id: 'run-1',
-          tool: 'git',
-          args: ['status', '--short'],
-          cwd,
-        }),
+      const allowed = [
         {
-          id: 'run-1',
-          tool: 'git',
-          args: ['status', '--short'],
-          cwd,
+          recipe: { kind: 'repository-tool', operation: 'status-summary' },
           confirmed: false,
-        }
-      )
-      await assert.rejects(
-        validateCLICommandRequest({
-          id: 'run-2',
-          tool: 'powershell',
-          args: ['-Command', 'echo unsafe'],
-          cwd,
-        }),
-        /tool is invalid/
-      )
-      await assert.rejects(
-        validateCLICommandRequest({
-          id: 'run-3',
-          tool: 'git',
-          args: ['status\0--short'],
-          cwd,
-        }),
-        /arguments are invalid/
-      )
-      await assert.rejects(
-        validateCLICommandRequest({
-          id: 'run-4',
-          tool: 'gh',
-          args: ['status'],
-          cwd: join(cwd, 'missing'),
-        }),
-        /does not exist/
-      )
-      await assert.rejects(
-        validateCLICommandRequest({
-          id: 'run-relative',
-          tool: 'git',
-          args: ['status'],
-          cwd: '.',
-        }),
-        /working directory is invalid/
-      )
-      await assert.rejects(
-        validateCLICommandRequest({
-          id: 'run-large',
-          tool: 'git',
-          args: ['status', 'x'.repeat(31 * 1024)],
-          cwd,
-        }),
-        /arguments are too large/
-      )
-      await assert.rejects(
-        validateCLICommandRequest({
-          id: 'run-secret',
-          tool: 'gh',
-          args: ['auth', 'status', '--show-token'],
-          cwd,
-        }),
-        /cannot display stored authentication tokens/
-      )
+          args: ['status', '--short', '--branch'],
+        },
+        {
+          recipe: {
+            kind: 'repository-tool',
+            operation: 'repository-health',
+          },
+          confirmed: false,
+          args: ['fsck', '--full'],
+        },
+        {
+          recipe: {
+            kind: 'repository-tool',
+            operation: 'signature-audit',
+          },
+          confirmed: false,
+          args: [
+            'log',
+            '--format=%h%x09%G?%x09%GS%x09%s',
+            '--show-signature',
+            '-50',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-tool',
+            operation: 'maintenance-preview',
+          },
+          confirmed: false,
+          args: ['count-objects', '-vH'],
+        },
+        {
+          recipe: { kind: 'repository-tool', operation: 'maintenance-run' },
+          confirmed: true,
+          args: ['maintenance', 'run'],
+        },
+        {
+          recipe: { kind: 'repository-tool', operation: 'reflog-view' },
+          confirmed: false,
+          args: ['reflog', 'show', '--date=local', '-50'],
+        },
+        {
+          recipe: {
+            kind: 'repository-archive',
+            format: 'zip',
+            destination,
+          },
+          confirmed: true,
+          args: [
+            'archive',
+            '--format=zip',
+            `--output=${destination}.zip`,
+            'HEAD',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-archive',
+            format: 'tar',
+            destination,
+          },
+          confirmed: true,
+          args: [
+            'archive',
+            '--format=tar',
+            `--output=${destination}.tar`,
+            'HEAD',
+          ],
+        },
+        {
+          recipe: { kind: 'repository-bundle-export', destination },
+          confirmed: true,
+          args: ['bundle', 'create', `${destination}.bundle`, '--all'],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-inspection',
+            operation: 'verify',
+            bundlePath,
+          },
+          confirmed: false,
+          args: ['bundle', 'verify', bundlePath],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-inspection',
+            operation: 'list-heads',
+            bundlePath,
+          },
+          confirmed: false,
+          args: ['bundle', 'list-heads', bundlePath],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-import',
+            operation: 'validate-destination',
+            bundlePath,
+            source,
+            branchName: 'imported/main',
+          },
+          confirmed: false,
+          args: ['check-ref-format', '--branch', 'imported/main'],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-import',
+            operation: 'check-destination',
+            bundlePath,
+            source,
+            branchName: 'imported/main',
+          },
+          confirmed: false,
+          args: ['show-ref', '--verify', '--quiet', 'refs/heads/imported/main'],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-import',
+            operation: 'fetch-objects',
+            bundlePath,
+            source,
+            branchName: 'imported/main',
+          },
+          confirmed: true,
+          args: [
+            'fetch',
+            '--no-write-fetch-head',
+            '--no-tags',
+            '--no-auto-maintenance',
+            bundlePath,
+            source.ref,
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-import',
+            operation: 'validate-commit',
+            bundlePath,
+            source,
+            branchName: 'imported/main',
+          },
+          confirmed: false,
+          args: ['cat-file', '-e', `${source.oid}^{commit}`],
+        },
+        {
+          recipe: {
+            kind: 'repository-bundle-import',
+            operation: 'create-branch',
+            bundlePath,
+            source,
+            branchName: 'imported/main',
+          },
+          confirmed: true,
+          args: ['branch', '--no-track', '--', 'imported/main', source.oid],
+        },
+        {
+          recipe: {
+            kind: 'repository-shallow-inspection',
+            operation: 'status',
+          },
+          confirmed: false,
+          args: ['rev-parse', '--is-shallow-repository'],
+        },
+        {
+          recipe: {
+            kind: 'repository-shallow-inspection',
+            operation: 'remotes',
+          },
+          confirmed: false,
+          args: ['remote'],
+        },
+        {
+          recipe: {
+            kind: 'repository-shallow-fetch',
+            action: 'deepen',
+            remote: 'origin',
+            deepenBy: 75,
+          },
+          confirmed: true,
+          args: [
+            'fetch',
+            '--no-auto-maintenance',
+            '--no-recurse-submodules',
+            '--no-write-fetch-head',
+            '--deepen=75',
+            '--',
+            'origin',
+          ],
+        },
+        {
+          recipe: {
+            kind: 'repository-shallow-fetch',
+            action: 'unshallow',
+            remote: 'upstream',
+            deepenBy: null,
+          },
+          confirmed: true,
+          args: [
+            'fetch',
+            '--no-auto-maintenance',
+            '--no-recurse-submodules',
+            '--no-write-fetch-head',
+            '--unshallow',
+            '--',
+            'upstream',
+          ],
+        },
+      ] as const
+
+      for (const [index, candidate] of allowed.entries()) {
+        const validated = await validateCLICommandRequest(
+          request(
+            root,
+            candidate.recipe,
+            candidate.confirmed,
+            `allowed-${index}`
+          ),
+          dependencies
+        )
+        assert.deepStrictEqual(validated.args, candidate.args)
+        assert.equal(validated.tool, 'git')
+        assert.equal(validated.cwd, root)
+      }
     } finally {
-      await rm(cwd, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true })
     }
   })
 
-  it('enforces destructive confirmation again at the main-process boundary', async () => {
-    const cwd = await mkdtemp(join(tmpdir(), 'desktop-cli-runner-'))
+  it('rejects every legacy argv/tool/cwd bypass even with forged confirmation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-cli-deny-'))
+    const dependencies = fakeDependencies(root)
     try {
-      const request = {
-        id: 'run-destructive',
-        tool: 'git',
-        args: ['clean', '-fd'],
-        cwd,
-      } as const
+      const bypasses: ReadonlyArray<ReadonlyArray<string>> = [
+        ['-c', 'alias.pwn=!echo executed', 'pwn'],
+        ['--exec-path=C:\\payload', 'pwn'],
+        ['--git-dir=C:\\repo\\.git', '--work-tree=C:\\Windows', 'status'],
+        ['-c', 'diff.external=payload', 'diff'],
+        ['-c', 'core.pager=payload', '--paginate', 'log'],
+        ['-c', 'filter.pwn.smudge=payload', 'cat-file', '--filters'],
+        ['-c', 'credential.helper=!payload', 'credential', 'approve'],
+        ['upload-pack', '--advertise-refs', '.'],
+        ['receive-pack', '--advertise-refs', '.'],
+      ]
+      for (const [index, args] of bypasses.entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            {
+              id: `legacy-git-${index}`,
+              tool: 'git',
+              args,
+              cwd: root,
+              confirmed: true,
+            },
+            dependencies
+          ),
+          /Invalid CLI command request/
+        )
+      }
+      for (const [index, args] of [
+        ['alias', 'set', 'pwn', 'payload', '--shell'],
+        ['pwn'],
+        ['api', '--input', 'C:\\Windows\\win.ini', '--method', 'DELETE'],
+        ['extension', 'exec', 'payload'],
+      ].entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            {
+              id: `legacy-gh-${index}`,
+              tool: 'gh',
+              args,
+              cwd: root,
+              confirmed: true,
+            },
+            dependencies
+          ),
+          /Invalid CLI command request/
+        )
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed on unknown recipes, extra argv fields, and mismatched confirmation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-cli-schema-'))
+    const dependencies = fakeDependencies(root)
+    try {
       await assert.rejects(
-        validateCLICommandRequest(request),
+        validateCLICommandRequest(
+          {
+            ...request(root, {
+              kind: 'repository-tool',
+              operation: 'status-summary',
+            }),
+            args: ['status'],
+          },
+          dependencies
+        ),
+        /Invalid CLI command request/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            { kind: 'repository-tool', operation: 'upload-pack' },
+            true
+          ),
+          dependencies
+        ),
+        /Unknown guided repository tool recipe/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            { kind: 'repository-tool', operation: 'status-summary' },
+            true
+          ),
+          dependencies
+        ),
+        /Confirmation is not valid/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(root, {
+            kind: 'repository-tool',
+            operation: 'maintenance-run',
+          }),
+          dependencies
+        ),
         /requires confirmation/
       )
-      assert.equal(
-        (
-          await validateCLICommandRequest({
-            ...request,
-            confirmed: true,
-          })
-        ).confirmed,
-        true
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(root, { kind: 'github-api', input: 'payload' }, true),
+          dependencies
+        ),
+        /Unknown guided CLI command recipe/
       )
     } finally {
-      await rm(cwd, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects non-repositories, subdirectory cwd values, and forged remotes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-cli-context-'))
+    const subdirectory = join(root, 'subdirectory')
+    await mkdir(subdirectory)
+    try {
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(root, {
+            kind: 'repository-tool',
+            operation: 'status-summary',
+          }),
+          fakeDependencies(root, {
+            inspectRepository: async () => {
+              throw new Error('not a repository')
+            },
+          })
+        ),
+        /require a repository verified by bundled Git/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(subdirectory, {
+            kind: 'repository-tool',
+            operation: 'status-summary',
+          }),
+          fakeDependencies(root)
+        ),
+        /exact repository root/
+      )
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            root,
+            {
+              kind: 'repository-shallow-fetch',
+              action: 'deepen',
+              remote: 'forged-local-path',
+              deepenBy: 50,
+            },
+            true
+          ),
+          fakeDependencies(root)
+        ),
+        /configured fetch remote/
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('uses canonical repository and destination paths and rechecks mutations', async t => {
+    const fixture = await createRepositoryFixture()
+    const repositoryAlias = join(fixture.fixture, 'repository-alias')
+    const alternateRepository = join(fixture.fixture, 'alternate-repository')
+    const safeParent = join(fixture.fixture, 'safe-parent')
+    const movedSafeParent = join(fixture.fixture, 'moved-safe-parent')
+    await mkdir(alternateRepository)
+    runGit(alternateRepository, ['init'])
+    await mkdir(safeParent)
+    try {
+      try {
+        await symlink(
+          fixture.repository,
+          repositoryAlias,
+          process.platform === 'win32' ? 'junction' : 'dir'
+        )
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EPERM') {
+          t.skip('directory links are not supported in this environment')
+          return
+        }
+        throw error
+      }
+
+      const selectedDestination = join(
+        safeParent,
+        'repository-through-alias.bundle'
+      )
+      const validated = await validateCLICommandRequest(
+        request(
+          repositoryAlias,
+          {
+            kind: 'repository-bundle-export',
+            destination: selectedDestination,
+          },
+          true
+        ),
+        fixture.dependencies
+      )
+      assert.equal(validated.cwd, await realpath(fixture.repository))
+      assert.equal(
+        validated.outputDestination,
+        await realpath(safeParent).then(parent =>
+          join(parent, 'repository-through-alias.bundle')
+        )
+      )
+      assert.deepStrictEqual(validated.args, [
+        'bundle',
+        'create',
+        validated.outputDestination,
+        '--all',
+      ])
+
+      await rm(repositoryAlias, { recursive: true, force: true })
+      await symlink(
+        alternateRepository,
+        repositoryAlias,
+        process.platform === 'win32' ? 'junction' : 'dir'
+      )
+      await revalidateCLICommandBeforeSpawn(validated, fixture.dependencies)
+      assert.equal(validated.cwd, await realpath(fixture.repository))
+
+      await rename(safeParent, movedSafeParent)
+      await symlink(
+        join(fixture.repository, '.git'),
+        safeParent,
+        process.platform === 'win32' ? 'junction' : 'dir'
+      )
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(validated, fixture.dependencies),
+        /inside Git storage|destination path changed/
+      )
+    } finally {
+      await rm(fixture.fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects main, linked-worktree, common-dir, and link aliases into Git storage', async t => {
+    const fixture = await createRepositoryFixture()
+    try {
+      const mainContext = await fixture.dependencies.inspectRepository(
+        fixture.repository
+      )
+      const linkedContext = await fixture.dependencies.inspectRepository(
+        fixture.linkedWorktree
+      )
+      const forbidden = [
+        join(mainContext.gitDirectory, 'audit.bundle'),
+        join(linkedContext.gitDirectory, 'audit.bundle'),
+        join(linkedContext.gitCommonDirectory, 'refs', 'heads', 'audit.bundle'),
+      ]
+      for (const [index, destination] of forbidden.entries()) {
+        await assert.rejects(
+          validateCLICommandRequest(
+            request(
+              fixture.linkedWorktree,
+              { kind: 'repository-bundle-export', destination },
+              true,
+              `forbidden-${index}`
+            ),
+            fixture.dependencies
+          ),
+          /inside Git storage/
+        )
+      }
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.linkedWorktree,
+            {
+              kind: 'repository-archive',
+              format: 'zip',
+              destination: join(
+                linkedContext.gitCommonDirectory,
+                'refs',
+                'heads',
+                'archive.zip'
+              ),
+            },
+            true,
+            'forbidden-archive'
+          ),
+          fixture.dependencies
+        ),
+        /inside Git storage/
+      )
+
+      const gitAlias = join(fixture.fixture, 'git-storage-alias')
+      try {
+        await symlink(
+          linkedContext.gitCommonDirectory,
+          gitAlias,
+          process.platform === 'win32' ? 'junction' : 'dir'
+        )
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EPERM') {
+          t.skip('directory links are not supported in this environment')
+          return
+        }
+        throw error
+      }
+      await assert.rejects(
+        validateCLICommandRequest(
+          request(
+            fixture.linkedWorktree,
+            {
+              kind: 'repository-bundle-export',
+              destination: join(gitAlias, 'refs', 'heads', 'alias.bundle'),
+            },
+            true
+          ),
+          fixture.dependencies
+        ),
+        /inside Git storage/
+      )
+    } finally {
+      await rm(fixture.fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed when destination canonicalization fails before spawn', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'desktop-cli-path-failure-'))
+    const destination = join(tmpdir(), 'desktop-cli-path-failure.bundle')
+    const base = fakeDependencies(root)
+    try {
+      const validated = await validateCLICommandRequest(
+        request(root, { kind: 'repository-bundle-export', destination }, true),
+        base
+      )
+      await assert.rejects(
+        revalidateCLICommandBeforeSpawn(validated, {
+          ...base,
+          canonicalizePath: async path => {
+            if (path === validated.outputDestination) {
+              throw new Error('path failure')
+            }
+            return resolve(path)
+          },
+        }),
+        /Unable to verify the selected destination path/
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 
