@@ -110,7 +110,7 @@ export class FileHistory extends React.Component<
     }
   }
 
-  private onPanelMouseDown = () => {
+  private onPanelPointerDown = () => {
     if (!this.context.isTopMost) {
       this.context.onRequestFront?.()
     }
@@ -427,8 +427,11 @@ export class FileHistory extends React.Component<
           <code>{entry.shortSha}</code>
           <span className="file-history-entry-copy">
             <strong title={entry.summary}>{entry.summary}</strong>
-            <span title={`${entry.authorName} <${entry.authorEmail}>`}>
+            <span>
               {entry.authorName}
+              <span className="sr-only">
+                {` Author email: ${entry.authorEmail}`}
+              </span>
             </span>
           </span>
           <RelativeTime
@@ -460,6 +463,28 @@ export class FileHistory extends React.Component<
       },
       () => this.restoreConfirmButton?.focus()
     )
+  }
+
+  private onRequestRestore = () => {
+    const entry = this.getSelectedHistoryEntry()
+    if (entry !== null) {
+      this.requestRestore(entry)
+    }
+  }
+
+  private onRestoreConfirmButtonRef = (button: HTMLButtonElement | null) => {
+    this.restoreConfirmButton = button
+  }
+
+  private onConfirmRestoreClick = () => {
+    void this.confirmRestore()
+  }
+
+  private onRestoreGoBack = () => {
+    this.setState({
+      restoreConfirmationSha: null,
+      restoreError: null,
+    })
   }
 
   private confirmRestore = async () => {
@@ -512,28 +537,22 @@ export class FileHistory extends React.Component<
           Restore this file version?
         </strong>
         <p id="file-history-restore-description">
-          <span title={this.props.path}>{this.props.path}</span> will be
-          replaced in the working tree with commit{' '}
-          <code title={entry.sha}>{entry.shortSha}</code>. Existing commits and
-          the staging area remain unchanged, but current unstaged content at
-          this path can be lost.
+          <span>{this.props.path}</span> will be replaced in the working tree
+          with commit <code title={entry.sha}>{entry.shortSha}</code>. Existing
+          commits and the staging area remain unchanged, but current unstaged
+          content at this path can be lost.
         </p>
         <div className="file-history-restore-actions">
           <Button
-            onButtonRef={button => (this.restoreConfirmButton = button)}
+            onButtonRef={this.onRestoreConfirmButtonRef}
             disabled={this.state.restoring}
-            onClick={() => void this.confirmRestore()}
+            onClick={this.onConfirmRestoreClick}
           >
             {this.state.restoring ? 'Restoring…' : 'Restore to working tree'}
           </Button>
           <Button
             disabled={this.state.restoring}
-            onClick={() =>
-              this.setState({
-                restoreConfirmationSha: null,
-                restoreError: null,
-              })
-            }
+            onClick={this.onRestoreGoBack}
           >
             Go back
           </Button>
@@ -578,7 +597,7 @@ export class FileHistory extends React.Component<
         <div className="file-history-restore-controls">
           <Button
             disabled={this.state.restoring}
-            onClick={() => this.requestRestore(entry)}
+            onClick={this.onRequestRestore}
           >
             Restore this version
           </Button>
@@ -708,8 +727,9 @@ export class FileHistory extends React.Component<
         onClick={this.onBlameLineClick}
         onKeyDown={this.onBlameLineKeyDown}
       >
-        <span className="file-blame-sha" title={line.sha}>
-          {line.shortSha}
+        <span className="file-blame-sha">
+          <span aria-hidden="true">{line.shortSha}</span>
+          <span className="sr-only">{`Commit ${line.sha}`}</span>
         </span>
         <span className="file-blame-line-number">{line.finalLine}</span>
         <code>{line.content.length === 0 ? '\u00a0' : line.content}</code>
@@ -768,7 +788,7 @@ export class FileHistory extends React.Component<
         aria-modal="false"
         aria-labelledby="file-history-title"
         aria-busy={this.state.historyLoading || this.state.blameLoading}
-        onMouseDown={this.onPanelMouseDown}
+        onPointerDown={this.onPanelPointerDown}
       >
         {this.renderHeader()}
         {this.renderTabs()}

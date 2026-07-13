@@ -50,6 +50,9 @@ describe('File History native UI contracts', () => {
     assert.match(ui, /aria-selected=/)
     assert.match(ui, /aria-live="polite"/)
     assert.match(ui, /controller\.signal/)
+    assert.match(ui, /onPointerDown=\{this\.onPanelPointerDown\}/)
+    assert.match(ui, /Author email:/)
+    assert.match(ui, /className="sr-only">\{`Commit \$\{line\.sha\}`\}/)
     assert.match(ui, />\s*Retry/)
   })
 
@@ -62,6 +65,10 @@ describe('File History native UI contracts', () => {
     assert.match(ui, /role="alertdialog"/)
     assert.match(ui, /restoreFileFromCommit\(/)
     assert.match(ui, /onRefreshRepository\(\)/)
+    assert.match(ui, /onButtonRef=\{this\.onRestoreConfirmButtonRef\}/)
+    assert.match(ui, /onClick=\{this\.onConfirmRestoreClick\}/)
+    assert.match(ui, /onClick=\{this\.onRestoreGoBack\}/)
+    assert.match(ui, /onClick=\{this\.onRequestRestore\}/)
     assert.match(
       git,
       /\['restore', `--source=\$\{sha\}`, '--worktree', '--', path\]/
