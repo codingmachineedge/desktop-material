@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from http.client import HTTPConnection
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -172,6 +173,215 @@ class ProviderStateTests(unittest.TestCase):
             response = self.state.dispatch("GET", target, self.headers)
             self.assertEqual(response.status, 422)
 
+    def test_actions_run_inspector_pages_attempts_and_one_shot_retry_are_exact(
+        self,
+    ) -> None:
+        inspector = self.state.workflow_run_for(provider.WORKFLOW_RUN_COUNT - 1)
+        self.assertEqual(inspector["id"], provider.INSPECTOR_WORKFLOW_RUN_ID)
+        self.assertEqual(inspector["run_attempt"], provider.INSPECTOR_LATEST_ATTEMPT)
+        self.assertEqual(inspector["conclusion"], "action_required")
+
+        latest_root = (
+            self.repo_path
+            + f"/actions/runs/{provider.INSPECTOR_WORKFLOW_RUN_ID}/jobs"
+        )
+        latest_first = self.state.dispatch(
+            "GET",
+            latest_root + "?filter=latest&per_page=50&page=1",
+            self.headers,
+        )
+        latest_failure = self.state.dispatch(
+            "GET",
+            latest_root + "?filter=latest&per_page=50&page=2",
+            self.headers,
+        )
+        latest_second = self.state.dispatch(
+            "GET",
+            latest_root + "?filter=latest&per_page=50&page=2",
+            self.headers,
+        )
+        first_body = self.json(latest_first)
+        second_body = self.json(latest_second)
+        self.assertEqual(latest_first.status, 200)
+        self.assertEqual(latest_failure.status, 503)
+        self.assertEqual(latest_second.status, 200)
+        self.assertEqual(first_body["total_count"], provider.INSPECTOR_JOB_COUNT)
+        self.assertEqual(len(first_body["jobs"]), 50)
+        self.assertEqual(len(second_body["jobs"]), 1)
+        self.assertEqual(
+            second_body["jobs"][0]["id"],
+            provider.INSPECTOR_CURRENT_JOB_SENTINEL_ID,
+        )
+        self.assertEqual(
+            second_body["jobs"][0]["run_id"],
+            provider.INSPECTOR_WORKFLOW_RUN_ID,
+        )
+
+        historical_root = (
+            self.repo_path
+            + f"/actions/runs/{provider.INSPECTOR_WORKFLOW_RUN_ID}"
+            + "/attempts/1/jobs"
+        )
+        historical_first = self.state.dispatch(
+            "GET",
+            historical_root + "?per_page=50&page=1",
+            self.headers,
+        )
+        historical_second = self.state.dispatch(
+            "GET",
+            historical_root + "?per_page=50&page=2",
+            self.headers,
+        )
+        self.assertEqual(len(self.json(historical_first)["jobs"]), 50)
+        self.assertEqual(
+            self.json(historical_second)["jobs"][0]["id"],
+            provider.INSPECTOR_HISTORICAL_JOB_SENTINEL_ID,
+        )
+
+        for target in (
+            latest_root + "?per_page=50&page=1",
+            latest_root + "?filter=all&per_page=50&page=1",
+            historical_root + "?filter=latest&per_page=50&page=1",
+            historical_root + "?per_page=49&page=1",
+        ):
+            response = self.state.dispatch("GET", target, self.headers)
+            self.assertEqual(response.status, 422)
+
+    def test_pending_deployment_review_and_fork_approval_are_stateful(self) -> None:
+        run_root = (
+            self.repo_path
+            + f"/actions/runs/{provider.INSPECTOR_WORKFLOW_RUN_ID}"
+        )
+        pending = self.state.dispatch(
+            "GET", run_root + "/pending_deployments", self.headers
+        )
+        pending_body = self.json(pending)
+        self.assertEqual(
+            [value["environment"]["id"] for value in pending_body],
+            list(provider.PENDING_ENVIRONMENT_IDS),
+        )
+        self.assertEqual(
+            [value["current_user_can_approve"] for value in pending_body],
+            [True, False],
+        )
+        history = self.state.dispatch(
+            "GET", run_root + "/approvals", self.headers
+        )
+        self.assertEqual(len(self.json(history)), 1)
+
+        request = {
+            "environment_ids": [provider.PENDING_ENVIRONMENT_IDS[0]],
+            "state": "approved",
+            "comment": "Approved after inspecting the exact page-two job log.",
+        }
+        reviewed = self.state.dispatch(
+            "POST",
+            run_root + "/pending_deployments",
+            self.headers,
+            json.dumps(request).encode("utf-8"),
+        )
+        self.assertEqual(reviewed.status, 204)
+        self.assertEqual(self.state.review_requests, [request])
+        pending_after = self.json(
+            self.state.dispatch(
+                "GET", run_root + "/pending_deployments", self.headers
+            )
+        )
+        self.assertEqual(
+            [value["environment"]["id"] for value in pending_after],
+            [provider.PENDING_ENVIRONMENT_IDS[1]],
+        )
+        history_after = self.json(
+            self.state.dispatch("GET", run_root + "/approvals", self.headers)
+        )
+        self.assertEqual(len(history_after), 2)
+        self.assertEqual(history_after[-1]["comment"], request["comment"])
+        stale = self.state.dispatch(
+            "POST",
+            run_root + "/pending_deployments",
+            self.headers,
+            json.dumps(request).encode("utf-8"),
+        )
+        self.assertEqual(stale.status, 409)
+
+        approved = self.state.dispatch(
+            "POST", run_root + "/approve", self.headers
+        )
+        self.assertEqual(approved.status, 204)
+        self.assertTrue(self.state.fork_approved)
+        self.assertEqual(
+            self.state.workflow_run_for(provider.WORKFLOW_RUN_COUNT - 1)[
+                "conclusion"
+            ],
+            "neutral",
+        )
+        duplicate = self.state.dispatch(
+            "POST", run_root + "/approve", self.headers
+        )
+        self.assertEqual(duplicate.status, 409)
+
+        rejected_state = provider.ProviderState(self.artifact)
+        rejected_request = {
+            "environment_ids": [provider.PENDING_ENVIRONMENT_IDS[0]],
+            "state": "rejected",
+            "comment": "Keep pending until\tthe responsive evidence is complete.",
+        }
+        rejected = rejected_state.dispatch(
+            "POST",
+            run_root + "/pending_deployments",
+            self.headers,
+            json.dumps(rejected_request).encode("utf-8"),
+        )
+        self.assertEqual(rejected.status, 204)
+        self.assertEqual(rejected_state.review_requests, [rejected_request])
+        for invalid_comment in (
+            "   ",
+            " leading text",
+            "trailing text ",
+            "contains\x7fdelete",
+        ):
+            invalid_state = provider.ProviderState(self.artifact)
+            invalid_request = dict(rejected_request, comment=invalid_comment)
+            invalid = invalid_state.dispatch(
+                "POST",
+                run_root + "/pending_deployments",
+                self.headers,
+                json.dumps(invalid_request).encode("utf-8"),
+            )
+            self.assertEqual(invalid.status, 422)
+
+    def test_job_log_redirect_content_and_exact_rerun_are_bounded(self) -> None:
+        job_id = provider.INSPECTOR_CURRENT_JOB_SENTINEL_ID
+        api_root = self.repo_path + f"/actions/jobs/{job_id}"
+        redirect = self.state.dispatch("GET", api_root + "/logs", self.headers)
+        self.assertEqual(redirect.status, 302)
+        self.assertEqual(
+            redirect.headers["Location"],
+            f"/downloads/actions/jobs/{job_id}/logs",
+        )
+        content = self.state.dispatch(
+            "GET", redirect.headers["Location"], {}
+        )
+        self.assertEqual(content.status, 200)
+        self.assertIn(f"Exact workflow job {job_id}", content.body.decode())
+
+        rerun = self.state.dispatch("POST", api_root + "/rerun", self.headers)
+        self.assertEqual(rerun.status, 201)
+        self.assertEqual(self.state.rerun_job_ids, {job_id})
+        duplicate = self.state.dispatch("POST", api_root + "/rerun", self.headers)
+        self.assertEqual(duplicate.status, 409)
+        self.assertEqual(self.state.rerun_job_ids, {job_id})
+        with_body = self.state.dispatch(
+            "POST", api_root + "/rerun", self.headers, b"{}"
+        )
+        self.assertEqual(with_body.status, 422)
+        wrong = self.state.dispatch(
+            "POST",
+            self.repo_path + "/actions/jobs/1/rerun",
+            self.headers,
+        )
+        self.assertEqual(wrong.status, 404)
+
     def test_pull_request_is_in_memory_and_echoes_reviewed_fields(self) -> None:
         request = {
             "title": "Verify production P0 workflows",
@@ -213,6 +423,21 @@ class ProviderStateTests(unittest.TestCase):
             self.headers,
         )
         self.assertEqual(response.status, 405)
+
+        oversized_identifier = "9" * 5_000
+        for method, path in (
+            (
+                "GET",
+                self.repo_path + f"/actions/jobs/{oversized_identifier}/logs",
+            ),
+            (
+                "POST",
+                self.repo_path + f"/actions/jobs/{oversized_identifier}/rerun",
+            ),
+        ):
+            rejected = self.state.dispatch(method, path, self.headers)
+            self.assertEqual(rejected.status, 404)
+        self.assertEqual(self.state.rerun_job_ids, set())
 
 
 class ProviderHTTPIntegrationTests(unittest.TestCase):
@@ -308,6 +533,30 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                 self.assertEqual(
                     repository["clone_url"], state.repository_clone_url
                 )
+
+                mutation_path = (
+                    f"/api/v3/repos/{provider.OWNER}/{provider.REPOSITORY}"
+                    f"/actions/jobs/{provider.INSPECTOR_CURRENT_JOB_SENTINEL_ID}/rerun"
+                )
+                for header, value, expected in (
+                    ("Content-Length", "invalid", 400),
+                    ("Content-Length", str(16 * 1024 * 1024 + 1), 413),
+                    ("Content-Length", "9" * 5_000, 413),
+                    ("Transfer-Encoding", "chunked", 400),
+                ):
+                    connection = HTTPConnection("127.0.0.1", port, timeout=10)
+                    connection.putrequest("POST", mutation_path)
+                    connection.putheader(
+                        "Authorization", f"Bearer {provider.FIXTURE_TOKEN}"
+                    )
+                    connection.putheader(header, value)
+                    connection.endheaders()
+                    invalid_response = connection.getresponse()
+                    self.assertEqual(invalid_response.status, expected)
+                    self.assertEqual(invalid_response.getheader("Connection"), "close")
+                    invalid_response.read()
+                    connection.close()
+                self.assertEqual(state.rerun_job_ids, set())
 
                 proxy = f"http://127.0.0.1:{port}"
                 run(

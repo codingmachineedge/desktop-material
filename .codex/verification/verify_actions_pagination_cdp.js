@@ -287,7 +287,7 @@ async function clickButton(client, label) {
     `(() => {
       const button = [...document.querySelectorAll('button')].find(value =>
         value.textContent.trim() === ${JSON.stringify(label)} &&
-        value.getAttribute('aria-disabled') !== 'true'
+        value.getAttribute('aria-disabled') !== 'true' && !value.disabled
       )
       if (!button) return false
       button.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -652,9 +652,23 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  process.stderr.write(
-    `${error?.stack || error?.message || String(error ?? 'Unknown error.')}\n`
-  )
-  process.exitCode = 1
-})
+if (require.main === module) {
+  main().catch(error => {
+    process.stderr.write(
+      `${error?.stack || error?.message || String(error ?? 'Unknown error.')}\n`
+    )
+    process.exitCode = 1
+  })
+}
+
+module.exports = {
+  CDPClient,
+  capture,
+  clickButton,
+  evaluate,
+  fail,
+  getJSON,
+  seedIsolatedProfile,
+  validateCapturePath,
+  waitFor,
+}

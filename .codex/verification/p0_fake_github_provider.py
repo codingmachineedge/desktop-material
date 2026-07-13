@@ -3,7 +3,7 @@
 
 The server exposes a deliberately small REST surface and delegates the exact
 fixture repository path to ``git http-backend``. It never proxies requests and
-rejects every API mutation except creation of an in-memory pull request.
+admits only the explicitly modeled in-memory pull request and Actions mutations.
 """
 
 from __future__ import annotations
@@ -40,6 +40,19 @@ WORKFLOW_RUN_COUNT = 52
 SUCCESS_WORKFLOW_RUN_COUNT = 51
 WORKFLOW_RUN_PAGE_SIZE = 50
 WORKFLOW_RUN_SENTINEL_ID = WORKFLOW_RUN_ID + SUCCESS_WORKFLOW_RUN_COUNT - 1
+INSPECTOR_WORKFLOW_RUN_ID = WORKFLOW_RUN_ID + WORKFLOW_RUN_COUNT - 1
+INSPECTOR_LATEST_ATTEMPT = 2
+INSPECTOR_JOB_COUNT = 51
+INSPECTOR_JOB_PAGE_SIZE = 50
+INSPECTOR_CURRENT_JOB_ID = 85_051
+INSPECTOR_CURRENT_JOB_SENTINEL_ID = (
+    INSPECTOR_CURRENT_JOB_ID + INSPECTOR_JOB_COUNT - 1
+)
+INSPECTOR_HISTORICAL_JOB_ID = 85_000
+INSPECTOR_HISTORICAL_JOB_SENTINEL_ID = (
+    INSPECTOR_HISTORICAL_JOB_ID + INSPECTOR_JOB_COUNT - 1
+)
+PENDING_ENVIRONMENT_IDS = (86_101, 86_102)
 ARTIFACT_COUNT = 31
 ARTIFACT_PAGE_SIZE = 30
 ARTIFACT_SENTINEL_ID = ARTIFACT_ID + ARTIFACT_COUNT - 1
@@ -49,6 +62,8 @@ FIXTURE_HTML_URL = "http://material-provider.invalid"
 ENTERPRISE_VERSION = "3.17.2"
 FIXED_TIME = "2026-07-13T14:30:00Z"
 HEAD_SHA = "7" * 40
+MAX_REQUEST_BODY_BYTES = 16 * 1024 * 1024
+MAX_ROUTE_IDENTIFIER_DIGITS = 18
 
 
 @dataclass(frozen=True)
@@ -72,6 +87,25 @@ def json_response(value: Any, status: int = HTTPStatus.OK) -> FixtureResponse:
 
 def empty_response(status: int = HTTPStatus.NO_CONTENT) -> FixtureResponse:
     return FixtureResponse(int(status), {"Content-Length": "0"}, b"")
+
+
+def text_response(
+    value: str,
+    status: int = HTTPStatus.OK,
+    content_type: str = "text/plain; charset=utf-8",
+) -> FixtureResponse:
+    body = value.encode("utf-8")
+    return FixtureResponse(
+        int(status),
+        {"Content-Type": content_type, "Content-Length": str(len(body))},
+        body,
+    )
+
+
+def parse_route_identifier(value: str) -> int:
+    """Parse a regex-validated decimal id without reaching Python's int limit."""
+
+    return -1 if len(value) > MAX_ROUTE_IDENTIFIER_DIGITS else int(value)
 
 
 def make_deterministic_artifact(path: Path) -> None:
@@ -128,6 +162,12 @@ class ProviderState:
         self.html_url = html_url.rstrip("/")
         self.pull_requests: list[dict[str, Any]] = []
         self._lock = threading.Lock()
+        self.inspector_page_two_failures_remaining = 1
+        self.pending_environment_ids = set(PENDING_ENVIRONMENT_IDS)
+        self.review_history = [self._initial_review_history()]
+        self.review_requests: list[dict[str, Any]] = []
+        self.rerun_job_ids: set[int] = set()
+        self.fork_approved = False
         self.artifact_bytes = artifact_path.read_bytes()
         self.artifact_hex_digest = hashlib.sha256(self.artifact_bytes).hexdigest()
 
@@ -205,6 +245,7 @@ class ProviderState:
         run_id = WORKFLOW_RUN_ID + index
         success = index < SUCCESS_WORKFLOW_RUN_COUNT
         sentinel = run_id == WORKFLOW_RUN_SENTINEL_ID
+        inspector = run_id == INSPECTOR_WORKFLOW_RUN_ID
         branch = (
             "feature/material-verification-with-a-deliberately-long-page-two-"
             "sentinel-branch-name-that-must-wrap-without-clipping"
@@ -212,10 +253,15 @@ class ProviderState:
             else FEATURE_BRANCH
         )
         title = (
-            "Page two sentinel verifies complete workflow run pagination, "
-            "wrapped titles, wrapped branch names, and zero sideways scrolling"
-            if sentinel
-            else f"Production pagination fixture run {index + 1:02d}"
+            "Actions run inspector verifies attempt navigation, page-two job "
+            "recovery, deployment review, fork approval, and zero sideways scrolling"
+            if inspector
+            else (
+                "Page two sentinel verifies complete workflow run pagination, "
+                "wrapped titles, wrapped branch names, and zero sideways scrolling"
+                if sentinel
+                else f"Production pagination fixture run {index + 1:02d}"
+            )
         )
         actor = dict(self.identity)
         actor["login"] = (
@@ -236,11 +282,19 @@ class ProviderState:
             "check_suite_id": 84_102 + index,
             "event": "pull_request",
             "run_number": 73 + index,
-            "run_attempt": 1,
+            "run_attempt": INSPECTOR_LATEST_ATTEMPT if inspector else 1,
             "head_branch": branch,
             "head_sha": HEAD_SHA,
             "status": "completed",
-            "conclusion": "success" if success else "failure",
+            "conclusion": (
+                "neutral"
+                if inspector and self.fork_approved
+                else "action_required"
+                if inspector
+                else "success"
+                if success
+                else "failure"
+            ),
             "html_url": f"{self.repository_html_url}/actions/runs/{run_id}",
             "actor": actor,
         }
@@ -280,6 +334,279 @@ class ProviderState:
                 "head_sha": HEAD_SHA,
             },
         }
+
+    def _environment(self, environment_id: int) -> dict[str, Any]:
+        if environment_id not in PENDING_ENVIRONMENT_IDS:
+            raise ValueError("Pending environment is outside the fixture.")
+        approvable = environment_id == PENDING_ENVIRONMENT_IDS[0]
+        name = (
+            "Production environment with an intentionally long responsive name "
+            "that must wrap without clipping or sideways scrolling"
+            if approvable
+            else "Locked deployment environment that this account cannot approve"
+        )
+        reviewers: list[dict[str, Any]] = [
+            {
+                "type": "Team",
+                "reviewer": {
+                    "id": 86_201,
+                    "name": "Release reviewers with a deliberately long responsive team name",
+                    "slug": "release-reviewers",
+                    "html_url": f"{self.html_url}/orgs/{OWNER}/teams/release-reviewers",
+                },
+            }
+        ]
+        if approvable:
+            reviewers.append(
+                {
+                    "type": "User",
+                    "reviewer": {
+                        "id": ACCOUNT_ID,
+                        "login": ACCOUNT_LOGIN,
+                        "html_url": f"{self.html_url}/{ACCOUNT_LOGIN}",
+                    },
+                }
+            )
+        return {
+            "environment": {
+                "id": environment_id,
+                "name": name,
+                "html_url": (
+                    f"{self.repository_html_url}/deployments/activity_log"
+                    f"?environment={environment_id}"
+                ),
+            },
+            "wait_timer": 15 if approvable else 0,
+            "wait_timer_started_at": FIXED_TIME,
+            "current_user_can_approve": approvable,
+            "reviewers": reviewers,
+        }
+
+    def _review_user(self) -> dict[str, Any]:
+        return {
+            "id": ACCOUNT_ID,
+            "login": ACCOUNT_LOGIN,
+            "html_url": f"{self.html_url}/{ACCOUNT_LOGIN}",
+        }
+
+    def _reviewed_environment(self, environment_id: int) -> dict[str, Any]:
+        environment = self._environment(environment_id)["environment"]
+        return {
+            "id": environment["id"],
+            "name": environment["name"],
+            "html_url": environment["html_url"],
+        }
+
+    def _initial_review_history(self) -> dict[str, Any]:
+        return {
+            "state": "rejected",
+            "comment": (
+                "Earlier synthetic evidence was held until the narrow viewport "
+                "and page-two job log were both inspected."
+            ),
+            "environments": [
+                self._reviewed_environment(PENDING_ENVIRONMENT_IDS[1])
+            ],
+            "user": self._review_user(),
+        }
+
+    def _pending_deployments(self) -> FixtureResponse:
+        with self._lock:
+            environment_ids = sorted(self.pending_environment_ids)
+        return json_response(
+            [self._environment(environment_id) for environment_id in environment_ids]
+        )
+
+    def _review_history_response(self) -> FixtureResponse:
+        with self._lock:
+            history = list(self.review_history)
+        return json_response(history)
+
+    def _review_pending_deployments(self, body: bytes) -> FixtureResponse:
+        try:
+            request = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return json_response({"message": "Invalid JSON"}, HTTPStatus.BAD_REQUEST)
+        if not isinstance(request, dict) or set(request) != {
+            "environment_ids",
+            "state",
+            "comment",
+        }:
+            return json_response(
+                {"message": "Unexpected deployment review fields"},
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+        environment_ids = request["environment_ids"]
+        state = request["state"]
+        comment = request["comment"]
+        if (
+            environment_ids != [PENDING_ENVIRONMENT_IDS[0]]
+            or state not in ("approved", "rejected")
+            or not isinstance(comment, str)
+            or not comment
+            or len(comment) > 1_024
+            or comment != comment.strip()
+            or any(
+                ord(value) < 9
+                or ord(value) in {11, 12, 13, 127}
+                or 14 <= ord(value) <= 31
+                for value in comment
+            )
+        ):
+            return json_response(
+                {"message": "Invalid deployment review fields"},
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+        with self._lock:
+            if PENDING_ENVIRONMENT_IDS[0] not in self.pending_environment_ids:
+                return json_response(
+                    {"message": "Deployment is no longer pending"},
+                    HTTPStatus.CONFLICT,
+                )
+            self.pending_environment_ids.remove(PENDING_ENVIRONMENT_IDS[0])
+            self.review_requests.append(request)
+            self.review_history.append(
+                {
+                    "state": state,
+                    "comment": comment,
+                    "environments": [
+                        self._reviewed_environment(PENDING_ENVIRONMENT_IDS[0])
+                    ],
+                    "user": self._review_user(),
+                }
+            )
+        return empty_response()
+
+    def inspector_job_for(self, index: int, attempt: int) -> dict[str, Any]:
+        if index < 0 or index >= INSPECTOR_JOB_COUNT:
+            raise ValueError("Inspector job index is outside the fixture.")
+        if attempt not in {1, INSPECTOR_LATEST_ATTEMPT}:
+            raise ValueError("Inspector job attempt is outside the fixture.")
+        first_id = (
+            INSPECTOR_CURRENT_JOB_ID
+            if attempt == INSPECTOR_LATEST_ATTEMPT
+            else INSPECTOR_HISTORICAL_JOB_ID
+        )
+        job_id = first_id + index
+        sentinel = index == INSPECTOR_JOB_COUNT - 1
+        conclusion = "failure" if sentinel else "success"
+        name = (
+            (
+                "Page-two current-attempt Windows packaging sentinel with an "
+                "intentionally long responsive name"
+            )
+            if sentinel and attempt == INSPECTOR_LATEST_ATTEMPT
+            else (
+                "Page-two historical-attempt Linux timeout sentinel with an "
+                "intentionally long responsive name"
+                if sentinel
+                else f"Attempt {attempt} production verification job {index + 1:02d}"
+            )
+        )
+        final_step = (
+            "Verify a long job-step identity wraps without clipping, overlap, "
+            "or horizontal document scrolling"
+            if sentinel
+            else "Verify deterministic fixture state"
+        )
+        return {
+            "id": job_id,
+            "run_id": INSPECTOR_WORKFLOW_RUN_ID,
+            "name": name,
+            "status": "completed",
+            "conclusion": conclusion,
+            "completed_at": FIXED_TIME,
+            "started_at": FIXED_TIME,
+            "html_url": (
+                f"{self.repository_html_url}/actions/runs/"
+                f"{INSPECTOR_WORKFLOW_RUN_ID}/job/{job_id}"
+            ),
+            "steps": [
+                {
+                    "name": "Check out the synthetic fixture repository",
+                    "number": 1,
+                    "status": "completed",
+                    "conclusion": "success",
+                    "completed_at": FIXED_TIME,
+                    "started_at": FIXED_TIME,
+                },
+                {
+                    "name": final_step,
+                    "number": 2,
+                    "status": "completed",
+                    "conclusion": conclusion,
+                    "completed_at": FIXED_TIME,
+                    "started_at": FIXED_TIME,
+                },
+            ],
+        }
+
+    def _inspector_jobs(
+        self,
+        query: Mapping[str, list[str]],
+        *,
+        attempt: int,
+        latest: bool,
+    ) -> FixtureResponse:
+        allowed = {"page", "per_page", "filter"} if latest else {"page", "per_page"}
+        paging = self._page(
+            query,
+            expected_page_size=INSPECTOR_JOB_PAGE_SIZE,
+            allowed=allowed,
+        )
+        if (
+            paging is None
+            or (latest and query.get("filter") != ["latest"])
+            or (not latest and "filter" in query)
+        ):
+            return json_response(
+                {"message": "Invalid workflow job pagination or attempt filter."},
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+        page, page_size = paging
+        if latest and page == 2:
+            with self._lock:
+                if self.inspector_page_two_failures_remaining > 0:
+                    self.inspector_page_two_failures_remaining -= 1
+                    return json_response(
+                        {"message": "Synthetic one-shot page-two service failure"},
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                    )
+        jobs = [
+            self.inspector_job_for(index, attempt)
+            for index in range(INSPECTOR_JOB_COUNT)
+        ]
+        start = (page - 1) * page_size
+        return json_response(
+            {
+                "total_count": len(jobs),
+                "jobs": jobs[start : start + page_size],
+            }
+        )
+
+    @staticmethod
+    def is_inspector_job_id(value: int) -> bool:
+        return (
+            INSPECTOR_HISTORICAL_JOB_ID
+            <= value
+            <= INSPECTOR_HISTORICAL_JOB_SENTINEL_ID
+            or INSPECTOR_CURRENT_JOB_ID
+            <= value
+            <= INSPECTOR_CURRENT_JOB_SENTINEL_ID
+        )
+
+    def inspector_job_log(self, job_id: int) -> str:
+        if not self.is_inspector_job_id(job_id):
+            raise ValueError("Inspector job log is outside the fixture.")
+        return (
+            "2026-07-13T14:30:00.000Z ##[group]Desktop Material production UI gate\n"
+            "2026-07-13T14:30:00.100Z \u001b[32mLoopback fixture authenticated\u001b[0m\n"
+            f"2026-07-13T14:30:00.200Z Exact workflow job {job_id}\n"
+            "2026-07-13T14:30:00.300Z No credentials or user data are present.\n"
+            "2026-07-13T14:30:00.400Z Long log content wraps inside the owned "
+            "viewer without widening the document or overlapping search controls.\n"
+            "2026-07-13T14:30:00.500Z ##[endgroup]\n"
+        )
 
     @staticmethod
     def is_fixture_run_id(value: int) -> bool:
@@ -477,6 +804,12 @@ class ProviderState:
         parsed = urlsplit(raw_target)
         path = unquote(parsed.path)
         query = parse_qs(parsed.query, keep_blank_values=True)
+        log_download_match = re.fullmatch(r"/downloads/actions/jobs/(\d+)/logs", path)
+        if method == "GET" and log_download_match is not None and not query:
+            job_id = parse_route_identifier(log_download_match.group(1))
+            if not self.is_inspector_job_id(job_id):
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            return text_response(self.inspector_job_log(job_id))
         api_prefix = "/api/v3"
         if not path.startswith(api_prefix):
             return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
@@ -602,34 +935,159 @@ class ProviderState:
             resource,
         )
         if method == "GET" and jobs_match is not None:
-            run_id = int(jobs_match.group(1))
+            run_id = parse_route_identifier(jobs_match.group(1))
             if not self.is_fixture_run_id(run_id):
                 return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            if run_id == INSPECTOR_WORKFLOW_RUN_ID:
+                return self._inspector_jobs(
+                    query,
+                    attempt=INSPECTOR_LATEST_ATTEMPT,
+                    latest=True,
+                )
+            if query:
+                paging = self._page(
+                    query,
+                    expected_page_size=INSPECTOR_JOB_PAGE_SIZE,
+                    allowed={"page", "per_page", "filter"},
+                )
+                if paging is None or query.get("filter") != ["latest"]:
+                    return json_response(
+                        {"message": "Invalid workflow job pagination."},
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                    )
+                page, _page_size = paging
+            else:
+                page = 1
             job_id = WORKFLOW_JOB_ID + (run_id - WORKFLOW_RUN_ID)
             return json_response(
                 {
                     "total_count": 1,
-                    "jobs": [
-                        {
-                            "id": job_id,
-                            "name": "Verify regular, narrow, short, and 200 percent viewport layouts",
-                            "status": "completed",
-                            "conclusion": "success",
-                            "completed_at": FIXED_TIME,
-                            "started_at": FIXED_TIME,
-                            "html_url": f"{self.repository_html_url}/actions/runs/{run_id}/job/{job_id}",
-                            "steps": [],
-                        }
-                    ],
+                    "jobs": (
+                        [
+                            {
+                                "id": job_id,
+                                "run_id": run_id,
+                                "name": "Verify regular, narrow, short, and 200 percent viewport layouts",
+                                "status": "completed",
+                                "conclusion": "success",
+                                "completed_at": FIXED_TIME,
+                                "started_at": FIXED_TIME,
+                                "html_url": f"{self.repository_html_url}/actions/runs/{run_id}/job/{job_id}",
+                                "steps": [],
+                            }
+                        ]
+                        if page == 1
+                        else []
+                    ),
                 }
             )
+
+        historical_jobs_match = re.fullmatch(
+            re.escape(f"{repo_root}/actions/runs/")
+            + r"(\d+)/attempts/(\d+)/jobs",
+            resource,
+        )
+        if method == "GET" and historical_jobs_match is not None:
+            run_id = parse_route_identifier(historical_jobs_match.group(1))
+            attempt = parse_route_identifier(historical_jobs_match.group(2))
+            if run_id != INSPECTOR_WORKFLOW_RUN_ID or attempt != 1:
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            return self._inspector_jobs(query, attempt=attempt, latest=False)
+
+        run_pending_match = re.fullmatch(
+            re.escape(f"{repo_root}/actions/runs/")
+            + r"(\d+)/pending_deployments",
+            resource,
+        )
+        if run_pending_match is not None:
+            run_id = parse_route_identifier(run_pending_match.group(1))
+            if run_id != INSPECTOR_WORKFLOW_RUN_ID or query:
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            if method == "GET":
+                return self._pending_deployments()
+            if method == "POST":
+                return self._review_pending_deployments(body)
+
+        run_approvals_match = re.fullmatch(
+            re.escape(f"{repo_root}/actions/runs/") + r"(\d+)/approvals",
+            resource,
+        )
+        if method == "GET" and run_approvals_match is not None:
+            run_id = parse_route_identifier(run_approvals_match.group(1))
+            if run_id != INSPECTOR_WORKFLOW_RUN_ID or query:
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            return self._review_history_response()
+
+        job_logs_match = re.fullmatch(
+            re.escape(f"{repo_root}/actions/jobs/") + r"(\d+)/logs",
+            resource,
+        )
+        if method == "GET" and job_logs_match is not None:
+            job_id = parse_route_identifier(job_logs_match.group(1))
+            if not self.is_inspector_job_id(job_id) or query:
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            return FixtureResponse(
+                int(HTTPStatus.FOUND),
+                {
+                    "Content-Length": "0",
+                    "Location": f"/downloads/actions/jobs/{job_id}/logs",
+                },
+                b"",
+            )
+
+        rerun_job_match = re.fullmatch(
+            re.escape(f"{repo_root}/actions/jobs/") + r"(\d+)/rerun",
+            resource,
+        )
+        if method == "POST" and rerun_job_match is not None:
+            job_id = parse_route_identifier(rerun_job_match.group(1))
+            if job_id not in {
+                INSPECTOR_CURRENT_JOB_SENTINEL_ID,
+                INSPECTOR_HISTORICAL_JOB_SENTINEL_ID,
+            } or query:
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            if body:
+                return json_response(
+                    {"message": "Job re-run body must be empty"},
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                )
+            with self._lock:
+                if job_id in self.rerun_job_ids:
+                    return json_response(
+                        {"message": "Job re-run was already requested"},
+                        HTTPStatus.CONFLICT,
+                    )
+                self.rerun_job_ids.add(job_id)
+            return empty_response(HTTPStatus.CREATED)
+
+        approve_run_match = re.fullmatch(
+            re.escape(f"{repo_root}/actions/runs/") + r"(\d+)/approve",
+            resource,
+        )
+        if method == "POST" and approve_run_match is not None:
+            run_id = parse_route_identifier(approve_run_match.group(1))
+            if run_id != INSPECTOR_WORKFLOW_RUN_ID or query:
+                return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
+            if body:
+                return json_response(
+                    {"message": "Fork approval body must be empty"},
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                )
+            with self._lock:
+                if self.fork_approved:
+                    return json_response(
+                        {"message": "Fork run is already approved"},
+                        HTTPStatus.CONFLICT,
+                    )
+                self.fork_approved = True
+            return empty_response()
 
         artifacts_match = re.fullmatch(
             re.escape(f"{repo_root}/actions/runs/") + r"(\d+)/artifacts",
             resource,
         )
         if method == "GET" and artifacts_match is not None:
-            run_id = int(artifacts_match.group(1))
+            run_id = parse_route_identifier(artifacts_match.group(1))
             if not self.is_fixture_run_id(run_id):
                 return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
             return self._artifacts(query, run_id)
@@ -639,7 +1097,7 @@ class ProviderState:
             resource,
         )
         if method == "GET" and download_match is not None:
-            artifact_id = int(download_match.group(1))
+            artifact_id = parse_route_identifier(download_match.group(1))
             if not self.is_fixture_artifact_id(artifact_id):
                 return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
             return FixtureResponse(
@@ -775,17 +1233,39 @@ class FixtureRequestHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:  # noqa: N802
         self._handle()
 
-    def _read_body(self) -> bytes:
+    def _read_body(self) -> tuple[bytes, FixtureResponse | None]:
+        if self.headers.get("Transfer-Encoding") is not None:
+            return b"", json_response(
+                {"message": "Chunked request bodies are not supported"},
+                HTTPStatus.BAD_REQUEST,
+            )
         value = self.headers.get("Content-Length")
         if value is None:
-            return b""
-        try:
-            length = int(value)
-        except ValueError:
-            return b""
-        if length < 0 or length > 16 * 1024 * 1024:
-            return b""
-        return self.rfile.read(length)
+            return b"", None
+        if re.fullmatch(r"\d+", value) is None:
+            return b"", json_response(
+                {"message": "Invalid Content-Length"},
+                HTTPStatus.BAD_REQUEST,
+            )
+        normalized_value = value.lstrip("0") or "0"
+        if len(normalized_value) > len(str(MAX_REQUEST_BODY_BYTES)):
+            return b"", json_response(
+                {"message": "Request body is too large"},
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+        length = int(normalized_value)
+        if length > MAX_REQUEST_BODY_BYTES:
+            return b"", json_response(
+                {"message": "Request body is too large"},
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+        body = self.rfile.read(length)
+        if len(body) != length:
+            return b"", json_response(
+                {"message": "Incomplete request body"},
+                HTTPStatus.BAD_REQUEST,
+            )
+        return body, None
 
     def _is_git_request(self) -> bool:
         parsed = urlsplit(self.path)
@@ -801,7 +1281,28 @@ class FixtureRequestHandler(BaseHTTPRequestHandler):
         ) and ".." not in unquote(parsed.path).split("/")
 
     def _handle(self) -> None:
-        body = self._read_body()
+        body, body_error = self._read_body()
+        if body_error is not None:
+            self.close_connection = True
+            body_error = FixtureResponse(
+                body_error.status,
+                {**body_error.headers, "Connection": "close"},
+                body_error.body,
+            )
+            self.server.append_log(
+                {
+                    "kind": "api",
+                    "method": self.command,
+                    "path": self.path,
+                    "status": int(body_error.status),
+                    "authorized": self.server.state._authorized(
+                        dict(self.headers.items())
+                    ),
+                    "body_sha256": None,
+                }
+            )
+            self._send(body_error, include_body=self.command != "HEAD")
+            return
         if self._is_git_request():
             self._serve_git_backend(body)
             return
@@ -1035,6 +1536,14 @@ def main(argv: list[str]) -> int:
         "workflowRunCount": WORKFLOW_RUN_COUNT,
         "successfulWorkflowRunCount": SUCCESS_WORKFLOW_RUN_COUNT,
         "workflowRunSentinelId": WORKFLOW_RUN_SENTINEL_ID,
+        "inspectorWorkflowRunId": INSPECTOR_WORKFLOW_RUN_ID,
+        "inspectorLatestAttempt": INSPECTOR_LATEST_ATTEMPT,
+        "inspectorJobCount": INSPECTOR_JOB_COUNT,
+        "inspectorCurrentJobId": INSPECTOR_CURRENT_JOB_ID,
+        "inspectorCurrentJobSentinelId": INSPECTOR_CURRENT_JOB_SENTINEL_ID,
+        "inspectorHistoricalJobId": INSPECTOR_HISTORICAL_JOB_ID,
+        "inspectorHistoricalJobSentinelId": INSPECTOR_HISTORICAL_JOB_SENTINEL_ID,
+        "pendingEnvironmentIds": list(PENDING_ENVIRONMENT_IDS),
         "artifactId": ARTIFACT_ID,
         "artifactCount": ARTIFACT_COUNT,
         "artifactSentinelId": ARTIFACT_SENTINEL_ID,
