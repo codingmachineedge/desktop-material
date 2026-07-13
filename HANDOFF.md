@@ -82,6 +82,15 @@ flows. The implementation is `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`;
 its first reviewed `main` baseline is
 `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
 
+The reported cross-account clone failure was traced to an installed `b69`
+runtime built before this fallback existed: its unpacked renderer contains no
+clone-account-fallback module, and the failing runtime event preceded the first
+fallback commit. The current integration then passed all 23 focused
+account-affinity, account-exhaustion, retry-metadata, and credential-trampoline
+regressions. Final acceptance still requires exercising the corrected
+production bundle on the isolated off-screen desktop; the visible installed
+application was not restarted or controlled during diagnosis.
+
 ## Guided-function integration
 
 The privacy-safe squash integration adds the completed guided-function work
