@@ -22,6 +22,7 @@ import { WorkflowDispatchDialog } from './workflow-dispatch-dialog'
 import { JobLogViewer } from './job-log-viewer'
 import { ActionsConfirmationDialog } from './actions-confirmation-dialog'
 import { WorkflowStateControl } from './workflow-state-control'
+import { BranchRules } from './branch-rules'
 
 type ActionsConfirmation =
   | { readonly kind: 'cancel-run'; readonly run: IAPIWorkflowRun }
@@ -33,6 +34,7 @@ type ActionsConfirmation =
 
 interface IActionsViewProps {
   readonly repository: Repository
+  readonly currentBranch: string | null
   readonly branchNames: ReadonlyArray<string>
   readonly actionsStore: ActionsStore
 }
@@ -785,6 +787,11 @@ export class ActionsView extends React.Component<
             <option value="failure">Failure</option>
           </Select>
         </section>
+        <BranchRules
+          repository={this.props.repository}
+          currentBranch={this.props.currentBranch}
+          actionsStore={this.props.actionsStore}
+        />
         <WorkflowStateControl
           workflow={selectedWorkflow}
           busyWorkflowId={this.state.busyWorkflowId}
@@ -826,7 +833,9 @@ export class ActionsView extends React.Component<
               this.state.workflow === 'all' ? null : Number(this.state.workflow)
             }
             branchNames={this.props.branchNames}
-            initialRef={this.props.branchNames[0] ?? 'main'}
+            initialRef={
+              this.props.currentBranch ?? this.props.branchNames[0] ?? 'main'
+            }
             actionsStore={this.props.actionsStore}
             onSubmit={this.dispatchWorkflow}
             onDismissed={this.closeDispatch}

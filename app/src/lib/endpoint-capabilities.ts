@@ -164,4 +164,8 @@ export const supportsActions = endpointSatisfies({
 
 export const supportsAliveSessions = endpointSatisfies({ dotcom: true })
 
-export const supportsRepoRules = endpointSatisfies({ dotcom: true })
+/** Repository rulesets reached GitHub Enterprise Server in the 3.12 series. */
+export const supportsRepoRules = endpointSatisfies({
+  dotcom: true,
+  es: '>= 3.12.0',
+})

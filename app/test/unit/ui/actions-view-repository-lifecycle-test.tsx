@@ -174,6 +174,7 @@ describe('ActionsView repository lifecycle', () => {
     const view = render(
       <ActionsView
         repository={first}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />
@@ -184,6 +185,7 @@ describe('ActionsView repository lifecycle', () => {
     view.rerender(
       <ActionsView
         repository={second}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />
@@ -210,6 +212,7 @@ describe('ActionsView repository lifecycle', () => {
     render(
       <ActionsView
         repository={selected}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />
@@ -256,6 +259,7 @@ describe('ActionsView repository lifecycle', () => {
     render(
       <ActionsView
         repository={selected}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />
@@ -301,6 +305,7 @@ describe('ActionsView repository lifecycle', () => {
     const view = render(
       <ActionsView
         repository={selected}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />
@@ -312,6 +317,7 @@ describe('ActionsView repository lifecycle', () => {
     view.rerender(
       <ActionsView
         repository={reconfigured}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />
@@ -342,6 +348,7 @@ describe('ActionsView repository lifecycle', () => {
     render(
       <ActionsView
         repository={selected}
+        currentBranch={null}
         branchNames={[]}
         actionsStore={store as unknown as ActionsStore}
       />

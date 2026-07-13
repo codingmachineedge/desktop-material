@@ -2,9 +2,10 @@ import { Disposable } from 'event-kit'
 import { Account, getAccountKey } from '../../models/account'
 import { GitHubRepository } from '../../models/github-repository'
 import { API, IAPIWorkflow, IAPIWorkflowJob, IAPIWorkflowRun } from '../api'
-import { supportsActions } from '../endpoint-capabilities'
+import { supportsActions, supportsRepoRules } from '../endpoint-capabilities'
 import { APIError } from '../http'
 import { IActionsArtifact, IActionsArtifactList } from '../actions-artifacts'
+import { IActionsBranchRuleList } from '../actions-branch-rules'
 import {
   IActionsArtifactDownloadProgress,
   IActionsArtifactDownloadResult,
@@ -26,6 +27,26 @@ export type ActionsMutation =
   | 'disable-workflow'
 
 export type ActionsArtifactOperation = 'list' | 'attestations' | 'download'
+
+export type ActionsBranchRulesErrorKind =
+  | 'authentication'
+  | 'permission'
+  | 'not-found'
+  | 'unsupported'
+  | 'rate-limit'
+  | 'service'
+  | 'invalid-response'
+
+export class ActionsBranchRulesError extends Error {
+  public constructor(
+    public readonly kind: ActionsBranchRulesErrorKind,
+    message: string,
+    public readonly responseStatus: number | null = null
+  ) {
+    super(message)
+    this.name = 'ActionsBranchRulesError'
+  }
+}
 
 const mutationLabels: Readonly<Record<ActionsMutation, string>> = {
   'rerun-job': 're-run this job',
@@ -127,6 +148,70 @@ export function actionsArtifactError(
   }
   return new Error(
     `GitHub could not ${action} (HTTP ${responseStatus}). Refresh and retry.`
+  )
+}
+
+/** Preserve distinct capability, authentication, and permission UI states. */
+export function actionsBranchRulesError(error: unknown): Error {
+  if ((error as Error)?.name === 'AbortError') {
+    return error as Error
+  }
+  if (error instanceof ActionsBranchRulesError) {
+    return error
+  }
+  if (!(error instanceof APIError)) {
+    return new ActionsBranchRulesError(
+      'invalid-response',
+      'GitHub returned branch rule data that the app could not safely process.'
+    )
+  }
+
+  if (error.responseStatus === 401) {
+    return new ActionsBranchRulesError(
+      'authentication',
+      'GitHub could not inspect branch rules. Sign in again and retry.',
+      401
+    )
+  }
+  if (error.responseStatus === 403) {
+    if (error.rateLimitReset !== null) {
+      return new ActionsBranchRulesError(
+        'rate-limit',
+        `GitHub cannot inspect branch rules until the API rate limit resets at ${error.rateLimitReset.toLocaleTimeString()}.`,
+        403
+      )
+    }
+    if (/upgrade.*enable this feature/i.test(error.apiError?.message ?? '')) {
+      return new ActionsBranchRulesError(
+        'unsupported',
+        'Effective branch rules are not available on this GitHub Enterprise Server version or license.',
+        403
+      )
+    }
+    return new ActionsBranchRulesError(
+      'permission',
+      'GitHub denied permission to inspect effective branch rules with the selected account.',
+      403
+    )
+  }
+  if (error.responseStatus === 404) {
+    return new ActionsBranchRulesError(
+      'not-found',
+      'GitHub could not find effective branch rules for this repository. The selected account may not have access.',
+      404
+    )
+  }
+  if (error.responseStatus >= 500) {
+    return new ActionsBranchRulesError(
+      'service',
+      `GitHub could not inspect branch rules because the service returned an error (${error.responseStatus}).`,
+      error.responseStatus
+    )
+  }
+  return new ActionsBranchRulesError(
+    'invalid-response',
+    `GitHub could not inspect branch rules (HTTP ${error.responseStatus}).`,
+    error.responseStatus
   )
 }
 
@@ -599,6 +684,39 @@ export class ActionsStore {
       return result
     } catch (error) {
       throw actionsArtifactError(error, 'list')
+    }
+  }
+
+  public async fetchBranchRules(
+    repository: Repository,
+    branch: string,
+    signal?: AbortSignal
+  ): Promise<IActionsBranchRuleList> {
+    const gitHubRepository = this.gitHubFor(repository)
+    if (!supportsRepoRules(gitHubRepository.endpoint)) {
+      throw new ActionsBranchRulesError(
+        'unsupported',
+        'Effective branch rules require GitHub.com, GHE.com, or GitHub Enterprise Server 3.12 or later.'
+      )
+    }
+    const api = this.apiFor(repository)
+    const accountsGeneration = this.accountsGeneration
+    try {
+      const result = await api.fetchEffectiveBranchRules(
+        gitHubRepository.owner.login,
+        gitHubRepository.name,
+        branch,
+        signal
+      )
+      if (
+        signal?.aborted === true ||
+        accountsGeneration !== this.accountsGeneration
+      ) {
+        throw canceledAccountRequest()
+      }
+      return result
+    } catch (error) {
+      throw actionsBranchRulesError(error)
     }
   }
 

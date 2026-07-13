@@ -46,4 +46,23 @@ describe('Actions artifact responsive styles', () => {
       /@media \(max-width: 620px\)[\s\S]*?\.actions-artifact-buttons\s*\{[\s\S]*?flex: 1 1 100%;/
     )
   })
+
+  it('keeps the branch-rules inspector bounded and stacked at minimum width', () => {
+    assert.match(
+      source,
+      /\.actions-branch-rules\s*\{[\s\S]*?min-width: 0;[\s\S]*?max-height: min\(260px, 35vh\);[\s\S]*?overflow: hidden;/
+    )
+    assert.match(
+      source,
+      /\.actions-branch-rules-result[\s\S]*?ul\s*\{[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      source,
+      /@media \(max-width: 620px\)[\s\S]*?\.actions-branch-rules\s*\{[\s\S]*?flex-direction: column;/
+    )
+    assert.match(
+      source,
+      /@media \(max-width: 620px\)[\s\S]*?\.actions-branch-rules-result li\s*\{[\s\S]*?flex-direction: column;/
+    )
+  })
 })
