@@ -50,6 +50,18 @@ describe('CLI workbench command contract', () => {
       assessCLICommand('git', ['stash', 'drop', 'stash@{0}']).risk,
       'destructive'
     )
+    assert.equal(
+      assessCLICommand('git', ['remote', 'prune', 'origin']).risk,
+      'destructive'
+    )
+    assert.equal(
+      assessCLICommand('git', ['branch', '--force', 'main', 'HEAD~']).risk,
+      'destructive'
+    )
+    assert.equal(
+      assessCLICommand('git', ['tag', '-f', 'v1', 'HEAD~']).risk,
+      'destructive'
+    )
   })
 
   it('requires confirmation for destructive GitHub operations', () => {

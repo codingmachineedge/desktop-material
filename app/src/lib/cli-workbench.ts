@@ -16,6 +16,8 @@ export interface ICLICommandRequest {
   readonly tool: CLIWorkbenchTool
   readonly args: ReadonlyArray<string>
   readonly cwd: string
+  /** Set only after the user confirms a destructive command assessment. */
+  readonly confirmed?: boolean
 }
 
 export interface ICLICommandOutputEvent {
@@ -37,6 +39,21 @@ export interface ICLICommandCatalogEntry {
   readonly command: string
   readonly summary: string
   readonly category: string
+}
+
+/** Runtime availability and command discovery for one supported executable. */
+export interface ICLIWorkbenchToolCatalog {
+  readonly tool: CLIWorkbenchTool
+  readonly available: boolean
+  readonly version: string | null
+  readonly error: string | null
+  readonly entries: ReadonlyArray<ICLICommandCatalogEntry>
+}
+
+/** Complete runtime catalog returned to the workbench renderer. */
+export interface ICLIWorkbenchCatalog {
+  readonly tools: ReadonlyArray<ICLIWorkbenchToolCatalog>
+  readonly entries: ReadonlyArray<ICLICommandCatalogEntry>
 }
 
 export interface ICLIWorkbenchQuickAction {
@@ -323,11 +340,17 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   ) {
     return destructive('This push can delete or rewrite remote refs.')
   }
-  if (command === 'branch' && includesAny(rest, ['--delete', '-d', '-D'])) {
-    return destructive('This command deletes one or more branches.')
+  if (
+    command === 'branch' &&
+    includesAny(rest, ['--delete', '--force', '-d', '-D', '-f'])
+  ) {
+    return destructive('This command deletes or rewrites one or more branches.')
   }
-  if (command === 'tag' && includesAny(rest, ['--delete', '-d'])) {
-    return destructive('This command deletes one or more tags.')
+  if (
+    command === 'tag' &&
+    includesAny(rest, ['--delete', '--force', '-d', '-f'])
+  ) {
+    return destructive('This command deletes or rewrites one or more tags.')
   }
   if (command === 'stash' && ['clear', 'drop'].includes(rest[0])) {
     return destructive('This command permanently removes stash entries.')
@@ -341,8 +364,10 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   if (command === 'worktree' && ['prune', 'remove'].includes(rest[0])) {
     return destructive('This command removes worktree metadata or files.')
   }
-  if (command === 'remote' && ['remove', 'rm'].includes(rest[0])) {
-    return destructive('This command removes a configured remote.')
+  if (command === 'remote' && ['prune', 'remove', 'rm'].includes(rest[0])) {
+    return destructive(
+      'This command removes a configured remote or remote-tracking refs.'
+    )
   }
   if (command === 'submodule' && rest[0] === 'deinit') {
     return destructive('This command unregisters submodules and removes their worktrees.')
