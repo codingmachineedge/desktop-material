@@ -385,11 +385,33 @@
     overflow-wrap: anywhere;
   }
 
-  .button-component {
+  .button-component,
+  .actions-artifacts-header-buttons {
     max-width: 100%;
     flex: 0 1 auto;
+  }
+
+  .button-component {
     white-space: normal;
   }
+}
+
+.actions-artifacts-header-buttons,
+.actions-artifact-pagination {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+
+  .button-component {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+.actions-artifact-pagination {
+  margin: 0 0 10px;
 }
 
 .actions-artifact-grid {
@@ -758,6 +780,16 @@
 
   .actions-artifacts-header {
     align-items: stretch;
+    flex-direction: column;
+
+    .button-component,
+    .actions-artifacts-header-buttons {
+      width: 100%;
+    }
+  }
+
+  .actions-artifacts-header-buttons,
+  .actions-artifact-pagination {
     flex-direction: column;
 
     .button-component {

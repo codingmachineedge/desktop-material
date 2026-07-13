@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
+  ActionsArtifactMaximumPages,
   ActionsArtifactPageSize,
+  appendActionsArtifactPage,
   getActionsArtifactDefaultFileName,
   parseActionsArtifactAttestationPresence,
   parseActionsArtifactList,
@@ -35,6 +37,9 @@ describe('GitHub Actions artifact contracts', () => {
 
     assert.equal(parsed.totalCount, 2)
     assert.equal(parsed.truncated, true)
+    assert.equal(parsed.page, 1)
+    assert.equal(parsed.nextPage, 2)
+    assert.equal(parsed.capped, false)
     assert.equal(parsed.artifacts[0].digest, digest.toLowerCase())
     assert.deepEqual(parsed.artifacts[0].workflowRun, {
       id: 7,
@@ -44,6 +49,74 @@ describe('GitHub Actions artifact contracts', () => {
     assert.equal(
       parsed.artifacts[0].expiresAt?.toISOString(),
       '2026-10-11T10:00:00.000Z'
+    )
+  })
+
+  it('appends contiguous pages and rejects duplicates or provider churn', () => {
+    const first = parseActionsArtifactList(
+      {
+        total_count: 101,
+        artifacts: Array.from({ length: 100 }, (_, id) =>
+          artifact({ id: id + 1 })
+        ),
+      },
+      7
+    )
+    const second = parseActionsArtifactList(
+      { total_count: 101, artifacts: [artifact({ id: 101 })] },
+      7,
+      2
+    )
+    const merged = appendActionsArtifactPage(first, second)
+
+    assert.equal(merged.artifacts.length, 101)
+    assert.equal(merged.page, 2)
+    assert.equal(merged.nextPage, null)
+    assert.equal(merged.truncated, false)
+
+    assert.throws(() =>
+      appendActionsArtifactPage(
+        first,
+        parseActionsArtifactList(
+          { total_count: 101, artifacts: [artifact({ id: 1 })] },
+          7,
+          2
+        )
+      )
+    )
+    assert.throws(() =>
+      appendActionsArtifactPage(
+        first,
+        parseActionsArtifactList(
+          { total_count: 102, artifacts: [artifact({ id: 101 })] },
+          7,
+          2
+        )
+      )
+    )
+  })
+
+  it('caps pagination after ten bounded pages', () => {
+    const page = parseActionsArtifactList(
+      {
+        total_count: ActionsArtifactMaximumPages * ActionsArtifactPageSize + 1,
+        artifacts: Array.from({ length: 100 }, (_, id) =>
+          artifact({ id: id + 901 })
+        ),
+      },
+      7,
+      ActionsArtifactMaximumPages
+    )
+
+    assert.equal(page.nextPage, null)
+    assert.equal(page.truncated, true)
+    assert.equal(page.capped, true)
+    assert.throws(() =>
+      parseActionsArtifactList(
+        { total_count: 0, artifacts: [] },
+        7,
+        ActionsArtifactMaximumPages + 1
+      )
     )
   })
 

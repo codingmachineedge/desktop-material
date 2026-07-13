@@ -40,7 +40,7 @@ describe('GitHub Actions artifact API', () => {
       ) => {
         request = { method, path, signal: options?.signal }
         return new Response(
-          JSON.stringify({ total_count: 1, artifacts: [responseArtifact] })
+          JSON.stringify({ total_count: 101, artifacts: [responseArtifact] })
         )
       }
     )
@@ -49,12 +49,13 @@ describe('GitHub Actions artifact API', () => {
       'owner',
       'repo',
       7,
+      2,
       controller.signal
     )
 
     assert.deepEqual(request, {
       method: 'GET',
-      path: 'repos/owner/repo/actions/runs/7/artifacts?per_page=100',
+      path: 'repos/owner/repo/actions/runs/7/artifacts?per_page=100&page=2',
       signal: controller.signal,
     })
     assert.equal(result.artifacts[0].id, 19)
@@ -152,6 +153,9 @@ describe('GitHub Actions artifact API', () => {
 
     await assert.rejects(() =>
       api.fetchWorkflowRunArtifacts('owner', 'repo', 0)
+    )
+    await assert.rejects(() =>
+      api.fetchWorkflowRunArtifacts('owner', 'repo', 7, 11)
     )
     assert.equal(requests, 0)
   })

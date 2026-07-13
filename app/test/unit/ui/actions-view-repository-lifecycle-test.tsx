@@ -137,6 +137,7 @@ class TestActionsStore {
   public fetchArtifacts(
     _repository: Repository,
     _runId: number,
+    _page: number,
     signal?: AbortSignal
   ) {
     this.artifactSignals.push(signal)

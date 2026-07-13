@@ -2,6 +2,12 @@
 export const ActionsArtifactPageSize = 100
 
 /**
+ * Interactive pagination is deliberately finite. A user can inspect at most
+ * 1,000 artifact records for one workflow run without refreshing the list.
+ */
+export const ActionsArtifactMaximumPages = 10
+
+/**
  * A deliberate application safety limit. Artifact archives are streamed, but
  * the app still refuses unexpectedly large transfers before writing them.
  */
@@ -29,8 +35,14 @@ export interface IActionsArtifact {
 export interface IActionsArtifactList {
   readonly totalCount: number
   readonly artifacts: ReadonlyArray<IActionsArtifact>
-  /** True when the bounded first page does not contain every artifact. */
+  /** The highest contiguous page represented by `artifacts`. */
+  readonly page: number
+  /** The next page the UI may request, or null when the list is complete. */
+  readonly nextPage: number | null
+  /** True when GitHub reports records beyond the pages already represented. */
   readonly truncated: boolean
+  /** True when more records exist but the application page cap was reached. */
+  readonly capped: boolean
 }
 
 const controlCharacters = /[\u0000-\u001f\u007f]/
@@ -158,13 +170,19 @@ function parseWorkflowRun(
 
 /**
  * Validate and normalize GitHub's artifact list before any response reaches UI
- * state. The parser accepts only the bounded first page requested by the app.
+ * state. Each response is limited to one GitHub-sized page and tied to the
+ * exact workflow run and page requested by the app.
  */
 export function parseActionsArtifactList(
   value: unknown,
-  expectedRunId: number
+  expectedRunId: number,
+  page: number = 1
 ): IActionsArtifactList {
   safeInteger(expectedRunId, 'workflow run id', 1)
+  safeInteger(page, 'artifact page', 1)
+  if (page > ActionsArtifactMaximumPages) {
+    throw new Error('The requested artifact page exceeds the app safety limit.')
+  }
   const input = record(value, 'artifact list')
   const totalCount = safeInteger(input.total_count, 'artifact count')
   if (!Array.isArray(input.artifacts)) {
@@ -200,14 +218,56 @@ export function parseActionsArtifactList(
     }
   })
 
-  if (totalCount < artifacts.length) {
+  const pageStart = (page - 1) * ActionsArtifactPageSize
+  if (totalCount < pageStart + artifacts.length) {
     throw new Error('GitHub returned an inconsistent artifact count.')
   }
+
+  const truncated = totalCount > pageStart + artifacts.length
+  const capped = truncated && page === ActionsArtifactMaximumPages
 
   return {
     totalCount,
     artifacts,
-    truncated: totalCount > artifacts.length,
+    page,
+    nextPage: truncated && !capped ? page + 1 : null,
+    truncated,
+    capped,
+  }
+}
+
+/**
+ * Append an exact contiguous artifact page while rejecting provider churn or
+ * duplicate records. Callers keep the already-rendered list when this throws
+ * and can ask the user to refresh from page one.
+ */
+export function appendActionsArtifactPage(
+  current: IActionsArtifactList,
+  next: IActionsArtifactList
+): IActionsArtifactList {
+  if (current.nextPage === null || next.page !== current.nextPage) {
+    throw new Error('GitHub returned an unexpected artifact page.')
+  }
+  if (current.totalCount !== next.totalCount) {
+    throw new Error(
+      'The artifact list changed while loading another page. Refresh artifacts and try again.'
+    )
+  }
+
+  const ids = new Set(current.artifacts.map(artifact => artifact.id))
+  if (next.artifacts.some(artifact => ids.has(artifact.id))) {
+    throw new Error(
+      'The artifact list changed while loading another page. Refresh artifacts and try again.'
+    )
+  }
+
+  return {
+    totalCount: current.totalCount,
+    artifacts: [...current.artifacts, ...next.artifacts],
+    page: next.page,
+    nextPage: next.nextPage,
+    truncated: next.truncated,
+    capped: next.capped,
   }
 }
 

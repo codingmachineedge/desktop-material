@@ -2,6 +2,7 @@ import * as React from 'react'
 import { IAPIWorkflowRun } from '../../lib/api'
 import {
   ActionsArtifactMaximumDownloadBytes,
+  appendActionsArtifactPage,
   getActionsArtifactDefaultFileName,
   IActionsArtifact,
   IActionsArtifactList,
@@ -42,6 +43,7 @@ interface IRunArtifactsProps {
 
 interface IRunArtifactsState {
   readonly loading: boolean
+  readonly loadingPage: number | null
   readonly list: IActionsArtifactList | null
   readonly error: string | null
   readonly checks: Readonly<Record<number, AttestationCheck>>
@@ -55,6 +57,7 @@ interface IRunArtifactsState {
 
 const initialState = (): IRunArtifactsState => ({
   loading: true,
+  loadingPage: 1,
   list: null,
   error: null,
   checks: {},
@@ -134,33 +137,73 @@ export class RunArtifacts extends React.Component<
     this.downloadController = null
   }
 
-  private loadArtifacts = () => {
+  private loadArtifacts = () => this.loadArtifactPage(1)
+
+  private loadMoreArtifacts = () => {
+    const page = this.state.list?.nextPage
+    if (page !== null && page !== undefined) {
+      this.loadArtifactPage(page)
+    }
+  }
+
+  private loadArtifactPage(page: number) {
     this.loadController?.abort()
     const controller = new AbortController()
     this.loadController = controller
-    this.setState({ loading: true, error: null })
+    if (page === 1) {
+      this.setState({
+        loading: true,
+        loadingPage: page,
+        list: null,
+        error: null,
+        checks: {},
+        operationMessage: null,
+        operationError: null,
+        completedDownload: null,
+      })
+    } else {
+      this.setState({
+        loading: true,
+        loadingPage: page,
+        error: null,
+        operationMessage: null,
+      })
+    }
     void this.props.actionsStore
       .fetchArtifacts(
         this.props.repository,
         this.props.run.id,
+        page,
         controller.signal
       )
-      .then(list => {
+      .then(pageResult => {
         if (this.mounted && this.loadController === controller) {
-          this.setState({ loading: false, list, error: null })
+          this.setState(state => ({
+            loading: false,
+            loadingPage: null,
+            list:
+              page === 1 || state.list === null
+                ? pageResult
+                : appendActionsArtifactPage(state.list, pageResult),
+            error: null,
+          }))
         }
       })
       .catch(error => {
-        if (
-          this.mounted &&
-          this.loadController === controller &&
-          (error as Error)?.name !== 'AbortError'
-        ) {
-          this.setState({
-            loading: false,
-            list: null,
-            error: errorMessage(error, 'Unable to load workflow artifacts.'),
-          })
+        if (this.mounted && this.loadController === controller) {
+          if ((error as Error)?.name === 'AbortError') {
+            this.setState({
+              loading: false,
+              loadingPage: null,
+              operationMessage: 'Artifact loading canceled.',
+            })
+          } else {
+            this.setState({
+              loading: false,
+              loadingPage: null,
+              error: errorMessage(error, 'Unable to load workflow artifacts.'),
+            })
+          }
         }
       })
       .finally(() => {
@@ -168,6 +211,16 @@ export class RunArtifacts extends React.Component<
           this.loadController = null
         }
       })
+  }
+
+  private cancelArtifactLoad = () => {
+    this.loadController?.abort()
+    this.loadController = null
+    this.setState({
+      loading: false,
+      loadingPage: null,
+      operationMessage: 'Artifact loading canceled.',
+    })
   }
 
   private checkAttestations = (artifact: IActionsArtifact) => {
@@ -634,22 +687,31 @@ export class RunArtifacts extends React.Component<
             <span className="eyebrow">Run outputs</span>
             <h3 id="actions-artifacts-heading">Artifacts</h3>
           </div>
-          <Button
-            size="small"
-            onClick={this.loadArtifacts}
-            disabled={
-              this.state.loading ||
-              this.state.choosingArtifactId !== null ||
-              this.state.downloadingArtifactId !== null
-            }
-          >
-            Refresh artifacts
-          </Button>
+          <div className="actions-artifacts-header-buttons">
+            {this.state.loading && (
+              <Button size="small" onClick={this.cancelArtifactLoad}>
+                Cancel loading
+              </Button>
+            )}
+            <Button
+              size="small"
+              onClick={this.loadArtifacts}
+              disabled={
+                this.state.loading ||
+                this.state.choosingArtifactId !== null ||
+                this.state.downloadingArtifactId !== null
+              }
+            >
+              Refresh artifacts
+            </Button>
+          </div>
         </header>
 
         {this.state.loading && (
           <div className="actions-loading" role="status">
-            Loading artifacts…
+            {this.state.loadingPage === 1
+              ? 'Loading artifacts…'
+              : `Loading artifact page ${this.state.loadingPage}…`}
           </div>
         )}
         {this.state.error && (
@@ -664,11 +726,31 @@ export class RunArtifacts extends React.Component<
               No artifacts were returned for this workflow run.
             </div>
           )}
-        {list?.truncated && (
+        {list !== null && (
           <p className="actions-artifact-page-note" role="status">
-            Showing the first {list.artifacts.length} of {list.totalCount}{' '}
-            artifacts. The list is intentionally bounded.
+            Showing {list.artifacts.length} of {list.totalCount} artifacts.
+            {list.capped
+              ? ' The 1,000-record application safety limit has been reached.'
+              : list.truncated
+              ? ' More artifacts are available.'
+              : ' The list is complete.'}
           </p>
+        )}
+        {list?.nextPage !== null && list?.nextPage !== undefined && (
+          <div className="actions-artifact-pagination">
+            <Button
+              size="small"
+              className="button-component-primary"
+              onClick={this.loadMoreArtifacts}
+              disabled={
+                this.state.loading ||
+                this.state.choosingArtifactId !== null ||
+                this.state.downloadingArtifactId !== null
+              }
+            >
+              Load next 100
+            </Button>
+          </div>
         )}
         {this.state.operationError && (
           <div className="actions-inline-error" role="alert" aria-atomic="true">

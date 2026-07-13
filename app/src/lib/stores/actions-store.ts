@@ -210,6 +210,12 @@ function actionsAccountsEqual(
   )
 }
 
+function canceledAccountRequest(): Error {
+  const error = new Error('The selected GitHub account changed.')
+  error.name = 'AbortError'
+  return error
+}
+
 /** Compare the API fields used by the run list before notifying subscribers. */
 export function workflowRunsEqual(
   left: ReadonlyArray<IAPIWorkflowRun>,
@@ -571,16 +577,26 @@ export class ActionsStore {
   public async fetchArtifacts(
     repository: Repository,
     runId: number,
+    page: number = 1,
     signal?: AbortSignal
   ): Promise<IActionsArtifactList> {
+    const accountsGeneration = this.accountsGeneration
     try {
       const gitHubRepository = this.gitHubFor(repository)
-      return await this.apiFor(repository).fetchWorkflowRunArtifacts(
+      const result = await this.apiFor(repository).fetchWorkflowRunArtifacts(
         gitHubRepository.owner.login,
         gitHubRepository.name,
         runId,
+        page,
         signal
       )
+      if (
+        signal?.aborted === true ||
+        accountsGeneration !== this.accountsGeneration
+      ) {
+        throw canceledAccountRequest()
+      }
+      return result
     } catch (error) {
       throw actionsArtifactError(error, 'list')
     }

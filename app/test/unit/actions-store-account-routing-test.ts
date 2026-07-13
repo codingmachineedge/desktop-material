@@ -86,7 +86,10 @@ describe('ActionsStore exact account routing', () => {
       fetchWorkflowRunArtifacts: async () => ({
         totalCount: 0,
         artifacts: [],
+        page: 1,
+        nextPage: null,
         truncated: false,
+        capped: false,
       }),
       fetchArtifactAttestationPresence: async () => false,
       rerunWorkflowRun: async () => undefined,

@@ -43,6 +43,7 @@ import {
   validateCreatedGitHubPullRequest,
 } from './github-pull-request'
 import {
+  ActionsArtifactMaximumPages,
   ActionsArtifactPageSize,
   IActionsArtifactList,
   isSupportedActionsArtifactDigest,
@@ -1912,17 +1913,28 @@ export class API {
     owner: string,
     name: string,
     workflowRunId: number,
+    page: number = 1,
     signal?: AbortSignal
   ): Promise<IActionsArtifactList> {
     const runId = validateActionsArtifactIdentifier(
       workflowRunId,
       'workflow run id'
     )
-    const path = `repos/${owner}/${name}/actions/runs/${runId}/artifacts?per_page=${ActionsArtifactPageSize}`
+    const artifactPage = validateActionsArtifactIdentifier(
+      page,
+      'artifact page'
+    )
+    if (artifactPage > ActionsArtifactMaximumPages) {
+      throw new Error(
+        'The requested artifact page exceeds the app safety limit.'
+      )
+    }
+    const path = `repos/${owner}/${name}/actions/runs/${runId}/artifacts?per_page=${ActionsArtifactPageSize}&page=${artifactPage}`
     const response = await this.ghRequest('GET', path, { signal })
     return parseActionsArtifactList(
       await boundedActionsArtifactResponse(response, signal),
-      runId
+      runId,
+      artifactPage
     )
   }
 
