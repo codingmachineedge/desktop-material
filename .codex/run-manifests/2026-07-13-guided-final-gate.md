@@ -19,9 +19,15 @@
   lowlevel-computer-use-mcp --http --host 127.0.0.1 --port 8765`; that checkout
   is `beed66ca6ed2503e6170ee1e1158247f1c2f0140`; the active GitHub identity is
   `codingmachineedge`; Actions is enabled with all actions allowed and no
-  queued or active worker. The initial clean integration branch SHA is
-  `175ccf069a13a9c850463d0e24c2da746026f346`; replace this with the exact
-  accepted source SHA before the GUI phase.
+  queued or active worker. The exact accepted code/test source for the GUI
+  phase is clean, remote-exact
+  `32b7bb6b955f1b1a58388e12aea5d54810148d4f`: all 363 unit files passed in
+  two Windows-safe batches, script tests passed 15/15, application and script
+  TypeScript passed, repository-wide Prettier and ESLint passed, diff/conflict
+  and personal-data scans passed, and high-confidence secret matches are zero.
+  The required MCP production build returned `client_ok: true`, return code
+  `0`, and `timed_out: false` after rebuilding the production bundles, bundled
+  Git helpers, Sass validation, licenses, and unpackaged `out` tree.
 - Expected UI states:
   1. The URL clone form shows bounded shallow-clone controls and completes a
      synthetic exact-origin clone without exposing its disposable path.

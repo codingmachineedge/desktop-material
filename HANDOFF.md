@@ -19,7 +19,7 @@ and cleanup must still close before M19 can be called shipped.
 
 The final guided-roadmap completion is active on
 `codex/guided-final-gate`. Current source checkpoint
-`60ca172f6a95579cebd802ef9b2aecf64f061275` contains the
+`32b7bb6b955f1b1a58388e12aea5d54810148d4f` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -59,17 +59,26 @@ states without retaining raw provider payloads, tokens, or repository paths;
 Bitbucket Issues are explicitly reported as unsupported. The final feature
 worktree passed 110 focused API/JSON/store/UI/style/sibling tests, TypeScript,
 full lint and formatting, privacy scans, and an 8 GiB production webpack build.
-Root repeated the combined affected union at 108/108 after merge. Nothing in
-this live section claims publication on `main`: final integration hardening,
-the deterministic account-proof fixture, exhaustive gates, off-screen
+Root repeated the combined affected union at 108/108 after merge. The final
+union now also includes a deterministic loopback HTTPS proof fixture and a
+production `CloningRepositoriesStore` integration that reproduces account A's
+private-repository-style not-found result, automatically succeeds with account
+B, verifies the three-commit clone and B affinity, and keeps both synthetic
+tokens out of arguments, environments, errors, metadata, readiness, and the
+account-class-only ledger. Nothing in this live section claims publication on
+`main`: final integration hardening, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
 can be closed.
 
-The current source checkpoint also makes the Windows full-suite launcher run
-all 360 test files in two bounded batches. That interim integration run exited
-successfully, but it predates the final accepted union and is not recorded as
-the closing post-merge test result.
+The current source checkpoint makes the Windows full-suite launcher run all
+363 test files in two bounded batches. The closing post-merge run exited zero;
+its final batch reports 626/626 with no failures, cancellations, skips, or
+todos. Script tests passed 15/15, including all five fixture scenarios;
+application TypeScript, script compilation, repository-wide Prettier, ESLint,
+diff/conflict checks, and the personal-data/authorship scan also passed. The
+only high-confidence secret-shaped test literal was split without changing its
+runtime redaction assertion, leaving the tracked scan at zero.
 
 An independent final integration audit then passed 732/732 tests across the
 126-file changed union and closed six additional fail-closed seams: Release
@@ -83,11 +92,11 @@ security/account-routing union at 81/81 after merge.
 The initialized root worktree also reproduced a production-only failure before
 the off-screen gate: the completed renderer exceeded the previous hard-coded
 4 GiB webpack heap. Checkpoint `60ca172f6a` raises only the production compiler
-ceiling to the already-proven 8 GiB value. The identical unpackaged production
-command then completed webpack, dependency copying, SASS validation, license
-generation, and the final `out` build. This remains interim local evidence; the
-closing gate still requires the exact final SHA to repeat the build through the
-low-level MCP server.
+ceiling to the already-proven 8 GiB value. At exact accepted source
+`32b7bb6b95`, the required low-level MCP HTTP client then ran the identical
+unpackaged production command successfully in 233 seconds: `client_ok: true`,
+return code `0`, and no timeout after webpack, dependency and bundled-Git
+copying, SASS validation, license generation, and the final `out` build.
 
 ### Closing evidence placeholders — fill only after success
 
