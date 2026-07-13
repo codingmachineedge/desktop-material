@@ -13,6 +13,7 @@ import {
   ActionsStore,
   IActionsState,
 } from '../../../src/lib/stores/actions-store'
+import { APIError } from '../../../src/lib/http'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
 import { Repository } from '../../../src/models/repository'
@@ -104,6 +105,7 @@ class TestActionsStore {
   public readonly disposed = new Array<string>()
   public readonly artifactSignals = new Array<AbortSignal | undefined>()
   public readonly logSignals = new Array<AbortSignal | undefined>()
+  public refreshStates: ReadonlyArray<IActionsState> = [invalidatedState]
 
   public constructor(
     private readonly states: ReadonlyMap<string, IActionsState>
@@ -123,7 +125,9 @@ class TestActionsStore {
   }
 
   public async refresh(repository: Repository) {
-    this.callbacks.get(repository.hash)?.(invalidatedState)
+    for (const next of this.refreshStates) {
+      this.callbacks.get(repository.hash)?.(next)
+    }
   }
 
   public fetchJobs(repository: Repository) {
@@ -215,6 +219,137 @@ describe('ActionsView repository lifecycle', () => {
     await waitFor(() => assert.notEqual(screen.queryByText(job.name), null))
     fireEvent.click(screen.getByRole('button', { name: 'View logs' }))
     assert.equal(store.logSignals.length, 1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => {
+      assert.equal(screen.queryByLabelText('Run 42 details'), null)
+      assert.equal(screen.queryByText(job.name), null)
+    })
+    assert.equal(store.logSignals[0]?.aborted, true)
+    assert.equal(store.artifactSignals[0]?.aborted, true)
+  })
+
+  it('drops stale jobs after account invalidation with a colliding run id', async () => {
+    const selected = repository('same-repository', 4)
+    const refreshedJob: IAPIWorkflowJob = {
+      ...job,
+      id: 12,
+      name: 'Fresh selected-account job',
+    }
+    let resolveStaleJobs!: (jobs: ReadonlyArray<IAPIWorkflowJob>) => void
+    const staleJobs = new Promise<ReadonlyArray<IAPIWorkflowJob>>(resolve => {
+      resolveStaleJobs = resolve
+    })
+    let requests = 0
+    const store = new TestActionsStore(
+      new Map([[selected.hash, state(workflowRun('Account A run'))]])
+    )
+    store.fetchJobsImpl = async () =>
+      ++requests === 1 ? staleJobs : [refreshedJob]
+    store.refreshStates = [
+      invalidatedState,
+      state(workflowRun('Account B run')),
+    ]
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={[]}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Account A run/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    fireEvent.click(screen.getByRole('button', { name: /Account B run/ }))
+
+    await waitFor(() =>
+      assert.notEqual(screen.queryByText(refreshedJob.name), null)
+    )
+    resolveStaleJobs([job])
+    await waitFor(() => {
+      assert.equal(screen.queryByText(job.name), null)
+      assert.notEqual(screen.queryByText(refreshedJob.name), null)
+    })
+  })
+
+  it('preserves Actions state across unrelated repository preference edits', async () => {
+    const selected = repository('stable-actions', 5)
+    const reconfigured = new Repository(
+      selected.path,
+      selected.id,
+      selected.gitHubRepository,
+      selected.missing,
+      'A new local alias',
+      selected.workflowPreferences,
+      selected.isTutorialRepository,
+      selected.gitDir,
+      selected.accountKey,
+      {
+        defaultProfileId: 'release',
+        elevated: true,
+        autoRunAfterBuild: false,
+        autoIgnoreBuildOutputs: false,
+      },
+      'A new repository group'
+    )
+    assert.notEqual(selected.hash, reconfigured.hash)
+    const store = new TestActionsStore(
+      new Map([[selected.hash, state(workflowRun('Stable run'))]])
+    )
+    const view = render(
+      <ActionsView
+        repository={selected}
+        branchNames={[]}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Stable run/ }))
+    await waitFor(() => assert.notEqual(screen.queryByText(job.name), null))
+    assert.equal(store.artifactSignals.length, 1)
+
+    view.rerender(
+      <ActionsView
+        repository={reconfigured}
+        branchNames={[]}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+
+    assert.notEqual(screen.queryByLabelText('Run 42 details'), null)
+    assert.notEqual(screen.queryByText(job.name), null)
+    assert.deepEqual(store.disposed, [])
+    assert.equal(store.artifactSignals.length, 1)
+    assert.equal(store.artifactSignals[0]?.aborted, false)
+  })
+
+  it('clears stale run content when GitHub revokes authorization', async () => {
+    const selected = repository('revoked-actions', 6)
+    const store = new TestActionsStore(
+      new Map([[selected.hash, state(workflowRun('Prior credential run'))]])
+    )
+    store.refreshStates = [
+      {
+        ...invalidatedState,
+        error: new APIError(
+          new Response(null, { status: 401, statusText: 'Unauthorized' }),
+          null
+        ),
+        lastUpdated: new Date(),
+      },
+    ]
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={[]}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: /Prior credential run/ })
+    )
+    await waitFor(() => assert.notEqual(screen.queryByText(job.name), null))
+    fireEvent.click(screen.getByRole('button', { name: 'View logs' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
 

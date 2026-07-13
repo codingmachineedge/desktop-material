@@ -4,9 +4,11 @@ import { EventEmitter } from 'events'
 import { mkdtemp, readFile, readdir, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { Readable } from 'stream'
 import { describe, it } from 'node:test'
 import {
   cancelActionsTransfer,
+  createElectronActionsFetcher,
   handleActionsArtifactTransfer,
   handleActionsJobLogTransfer,
   IActionsTransferSender,
@@ -54,6 +56,34 @@ class ThrowingSender extends TestSender {
   }
 }
 
+class FakeClientRequest extends EventEmitter {
+  public aborted = false
+
+  public constructor(
+    private readonly onEnd: () => void,
+    private readonly closeBeforeResponse: boolean = false
+  ) {
+    super()
+  }
+
+  public end() {
+    if (this.closeBeforeResponse) {
+      this.emit('close')
+    }
+    queueMicrotask(this.onEnd)
+    return this
+  }
+
+  public abort() {
+    if (this.aborted) {
+      return
+    }
+    this.aborted = true
+    this.emit('abort')
+    this.emit('close')
+  }
+}
+
 const artifactRequest = (
   destination: string,
   overrides: Partial<IActionsArtifactTransferRequest> = {}
@@ -95,6 +125,137 @@ async function withDirectory(run: (directory: string) => Promise<void>) {
 }
 
 describe('main-process Actions transfer', () => {
+  it('captures Electron ClientRequest redirects without following them', async () => {
+    const requestedOptions =
+      new Array<Electron.ClientRequestConstructorOptions>()
+    let request: FakeClientRequest
+    const isolatedSession = {} as Electron.Session
+    const fetcher = createElectronActionsFetcher(
+      nextOptions => {
+        requestedOptions.push(nextOptions)
+        request = new FakeClientRequest(() => {
+          request.emit(
+            'redirect',
+            302,
+            'GET',
+            'https://blob.example.test/archive.zip',
+            {
+              location: ['https://blob.example.test/archive.zip'],
+            }
+          )
+          request.emit('error', new Error('Redirect was cancelled'))
+          request.emit('close')
+        })
+        return request as unknown as Electron.ClientRequest
+      },
+      () => isolatedSession
+    )
+
+    const response = await fetcher('https://api.github.com/artifact', {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer selected-account-token',
+        Accept: 'application/vnd.github+json',
+      },
+      redirect: 'manual',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+    })
+
+    assert.equal(response.status, 302)
+    assert.equal(
+      response.headers.get('location'),
+      'https://blob.example.test/archive.zip'
+    )
+    const options = requestedOptions[0]
+    assert.equal(options.url, 'https://api.github.com/artifact')
+    assert.equal(options.method, 'GET')
+    assert.equal(options.redirect, 'manual')
+    assert.equal(options.credentials, 'omit')
+    assert.equal(options.useSessionCookies, false)
+    assert.equal(options.referrerPolicy, 'no-referrer')
+    assert.equal(options.cache, 'no-store')
+    assert.equal(options.session, isolatedSession)
+    assert.equal(
+      (options.headers as Record<string, string>).authorization,
+      'Bearer selected-account-token'
+    )
+  })
+
+  it('streams Electron responses and binds body cancellation to ClientRequest', async () => {
+    const responseStream = Object.assign(Readable.from([archive]), {
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: {
+        'content-length': String(archive.byteLength),
+      },
+    })
+    let responseRequest: FakeClientRequest
+    const responseFetcher = createElectronActionsFetcher(
+      () => {
+        responseRequest = new FakeClientRequest(() => {
+          responseRequest.emit('response', responseStream)
+        }, true)
+        return responseRequest as unknown as Electron.ClientRequest
+      },
+      () => ({} as Electron.Session)
+    )
+    const responseController = new AbortController()
+    const response = await responseFetcher('https://blob.example.test/file', {
+      signal: responseController.signal,
+    })
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), archive)
+    responseController.abort()
+    assert.equal(responseRequest!.aborted, false)
+
+    const pendingBody = Object.assign(
+      new Readable({
+        read() {},
+      }),
+      {
+        statusCode: 200,
+        statusMessage: 'OK',
+        headers: {},
+      }
+    )
+    let bodyRequest: FakeClientRequest
+    const bodyFetcher = createElectronActionsFetcher(
+      () => {
+        bodyRequest = new FakeClientRequest(() => {
+          bodyRequest.emit('response', pendingBody)
+        })
+        return bodyRequest as unknown as Electron.ClientRequest
+      },
+      () => ({} as Electron.Session)
+    )
+    const cancelableResponse = await bodyFetcher(
+      'https://blob.example.test/cancelable',
+      {}
+    )
+    await cancelableResponse.body?.cancel('preflight failed')
+    assert.equal(bodyRequest!.aborted, true)
+
+    let pendingRequest: FakeClientRequest
+    const pendingFetcher = createElectronActionsFetcher(
+      () => {
+        pendingRequest = new FakeClientRequest(() => undefined)
+        return pendingRequest as unknown as Electron.ClientRequest
+      },
+      () => ({} as Electron.Session)
+    )
+    const controller = new AbortController()
+    const pending = pendingFetcher('https://blob.example.test/pending', {
+      signal: controller.signal,
+    })
+    controller.abort()
+    await assert.rejects(pending, error => {
+      assert.equal((error as Error).name, 'AbortError')
+      return true
+    })
+    assert.equal(pendingRequest!.aborted, true)
+  })
+
   it('validates every hop, strips auth after the API, and streams to disk', async () => {
     await withDirectory(async directory => {
       const requests = new Array<{
@@ -206,6 +367,39 @@ describe('main-process Actions transfer', () => {
       assert.equal(excessive.ok, false)
       assert.equal(excessive.ok ? '' : excessive.reason, 'too-many-redirects')
       assert.equal(redirectFetches, 6)
+      assert.deepEqual(await readdir(directory), [])
+    })
+  })
+
+  it('cancels the final response stream when artifact preflight fails', async () => {
+    await withDirectory(async directory => {
+      let canceled = false
+      const response = new Response(
+        new ReadableStream<Uint8Array>({
+          cancel() {
+            canceled = true
+          },
+        }),
+        {
+          headers: {
+            'Content-Length': String(archive.byteLength + 1),
+          },
+        }
+      )
+      const result = await handleActionsArtifactTransfer(
+        new TestSender(18),
+        artifactRequest(join(directory, 'mismatch.zip'), {
+          operationId: '8'.repeat(32),
+        }),
+        async () => response
+      )
+
+      assert.deepEqual(result, {
+        ok: false,
+        reason: 'size-mismatch',
+        status: null,
+      })
+      assert.equal(canceled, true)
       assert.deepEqual(await readdir(directory), [])
     })
   })
@@ -349,6 +543,26 @@ describe('main-process Actions transfer', () => {
         reason: 'invalid-request',
         status: null,
       })
+      assert.equal(fetches, 0)
+
+      for (const [index, owner] of ['.', '..'].entries()) {
+        const dotSegment = await handleActionsArtifactTransfer(
+          new TestSender(20 + index),
+          artifactRequest(join(directory, `dot-segment-${index}.zip`), {
+            operationId: `${index + 6}`.repeat(32),
+            owner,
+          }),
+          async () => {
+            fetches++
+            return new Response(archive)
+          }
+        )
+        assert.deepEqual(dotSegment, {
+          ok: false,
+          reason: 'invalid-request',
+          status: null,
+        })
+      }
       assert.equal(fetches, 0)
     })
   })

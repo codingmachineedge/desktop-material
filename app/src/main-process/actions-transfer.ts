@@ -1,4 +1,5 @@
-import { net } from 'electron'
+import { net, session } from 'electron'
+import { Readable } from 'stream'
 import {
   ActionsArtifactDownloadError,
   downloadActionsArtifactArchive,
@@ -23,6 +24,10 @@ import {
 import { createGitHubAPIRequestHeaders } from '../lib/github-rest-api-version'
 
 type ActionsFetcher = (input: string, init: RequestInit) => Promise<Response>
+type ActionsRequestFactory = (
+  options: Electron.ClientRequestConstructorOptions
+) => Electron.ClientRequest
+type ActionsSessionFactory = () => Electron.Session
 
 export interface IActionsTransferSender {
   readonly id: number
@@ -54,6 +59,9 @@ interface IActiveTransfer {
 const activeTransfers = new Map<string, IActiveTransfer>()
 const operationIdPattern = /^[a-f0-9]{32}$/
 const forbiddenPartCharacters = /[\u0000-\u001f\u007f/\\?#]/
+const actionsTransferPartition = 'actions-transfer'
+
+let actionsTransferSession: Electron.Session | null = null
 
 const transferKey = (senderId: number, operationId: string) =>
   `${senderId}:${operationId}`
@@ -83,6 +91,8 @@ function validatePart(value: unknown): string {
     typeof value !== 'string' ||
     value.length === 0 ||
     value.length > 255 ||
+    value === '.' ||
+    value === '..' ||
     forbiddenPartCharacters.test(value)
   ) {
     throw new TransferFailure('invalid-request')
@@ -299,9 +309,225 @@ function mapFailure(error: unknown): IActionsTransferFailure {
   return failure('network')
 }
 
-function electronFetcher(input: string, init: RequestInit) {
-  return net.fetch(input, init)
+function getActionsTransferSession(): Electron.Session {
+  // This non-persistent partition has no renderer webRequest hooks, cookies, or
+  // cached account authentication from the app's default session. Keep it lazy
+  // because Electron sessions are only available after app readiness.
+  return (actionsTransferSession ??= session.fromPartition(
+    actionsTransferPartition,
+    { cache: false }
+  ))
 }
+
+function toElectronRequestHeaders(
+  headers: HeadersInit | undefined
+): Record<string, string> {
+  return Object.fromEntries(new Headers(headers).entries())
+}
+
+function toResponseHeaders(
+  values: Readonly<Record<string, string | ReadonlyArray<string>>>
+): Headers {
+  const headers = new Headers()
+  for (const [name, value] of Object.entries(values)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        headers.append(name, item)
+      }
+    } else {
+      headers.append(name, value as string)
+    }
+  }
+  return headers
+}
+
+function transferAbortError(): DOMException {
+  return new DOMException('Actions transfer canceled.', 'AbortError')
+}
+
+function electronResponseBody(
+  response: Electron.IncomingMessage,
+  request: Electron.ClientRequest,
+  onFinished: () => void
+): ReadableStream<Uint8Array> {
+  const source = Readable.toWeb(
+    response as unknown as Readable
+  ) as unknown as ReadableStream<Uint8Array>
+  const reader = source.getReader()
+  let finished = false
+  let canceled = false
+  let finishReported = false
+  const reportFinished = () => {
+    if (!finishReported) {
+      finishReported = true
+      onFinished()
+    }
+  }
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const next = await reader.read()
+        if (canceled) {
+          return
+        }
+        if (next.done) {
+          finished = true
+          reportFinished()
+          reader.releaseLock()
+          controller.close()
+        } else {
+          controller.enqueue(next.value)
+        }
+      } catch (error) {
+        if (!canceled) {
+          request.abort()
+          reportFinished()
+          controller.error(error)
+        }
+      }
+    },
+    async cancel(reason) {
+      canceled = true
+      if (!finished) {
+        request.abort()
+      }
+      try {
+        await reader.cancel(reason)
+      } finally {
+        reportFinished()
+      }
+    },
+  })
+}
+
+/**
+ * Adapt Electron's ClientRequest to the small Fetch response surface consumed
+ * by the transfer pipeline. ClientRequest exposes a redirect event even though
+ * Electron net.fetch rejects `redirect: "manual"`; resolving from that event
+ * lets the caller validate and issue each hop itself without forwarding auth.
+ */
+export function createElectronActionsFetcher(
+  requestFactory: ActionsRequestFactory = options => net.request(options),
+  sessionFactory: ActionsSessionFactory = getActionsTransferSession
+): ActionsFetcher {
+  return async (input, init) =>
+    await new Promise<Response>((resolve, reject) => {
+      const signal = init.signal
+      if (signal?.aborted) {
+        reject(transferAbortError())
+        return
+      }
+
+      let request: Electron.ClientRequest
+      try {
+        request = requestFactory({
+          url: input,
+          method: 'GET',
+          headers: toElectronRequestHeaders(init.headers),
+          session: sessionFactory(),
+          redirect: 'manual',
+          credentials: 'omit',
+          useSessionCookies: false,
+          referrerPolicy: 'no-referrer',
+          cache: 'no-store',
+        })
+      } catch (error) {
+        reject(error)
+        return
+      }
+
+      let settled = false
+      const resolveOnce = (response: Response) => {
+        if (!settled) {
+          settled = true
+          resolve(response)
+        }
+      }
+      const rejectOnce = (error: unknown) => {
+        if (!settled) {
+          settled = true
+          reject(error)
+        }
+      }
+      const onAbort = () => {
+        request.abort()
+        rejectOnce(transferAbortError())
+      }
+      const removeAbortListener = () =>
+        signal?.removeEventListener('abort', onAbort)
+
+      signal?.addEventListener('abort', onAbort, { once: true })
+      request.on(
+        'redirect',
+        (statusCode, _method, redirectUrl, responseHeaders) => {
+          try {
+            const headers = toResponseHeaders(responseHeaders)
+            if (!headers.has('location')) {
+              headers.set('location', redirectUrl)
+            }
+            // Do not call followRedirect. Electron will cancel this one request
+            // after the synchronous event; aborting makes that boundary explicit.
+            // Its expected later error is ignored because the captured redirect
+            // response has already been resolved.
+            resolveOnce(new Response(null, { status: statusCode, headers }))
+          } catch (error) {
+            rejectOnce(error)
+          } finally {
+            request.abort()
+            removeAbortListener()
+          }
+        }
+      )
+      request.on('response', response => {
+        try {
+          const statusHasNoBody =
+            response.statusCode === 204 ||
+            response.statusCode === 205 ||
+            response.statusCode === 304
+          const body = statusHasNoBody
+            ? null
+            : electronResponseBody(response, request, removeAbortListener)
+          resolveOnce(
+            new Response(body, {
+              status: response.statusCode,
+              statusText: response.statusMessage,
+              headers: toResponseHeaders(response.headers),
+            })
+          )
+          if (body === null) {
+            removeAbortListener()
+          }
+        } catch (error) {
+          rejectOnce(error)
+          request.abort()
+          removeAbortListener()
+        }
+      })
+      request.on('abort', () => {
+        removeAbortListener()
+        rejectOnce(transferAbortError())
+      })
+      request.on('error', error => {
+        removeAbortListener()
+        rejectOnce(error)
+      })
+
+      if (signal?.aborted) {
+        onAbort()
+        return
+      }
+
+      try {
+        request.end()
+      } catch (error) {
+        removeAbortListener()
+        rejectOnce(error)
+      }
+    })
+}
+
+const electronFetcher = createElectronActionsFetcher()
 
 export async function handleActionsArtifactTransfer(
   sender: IActionsTransferSender,
@@ -319,44 +545,51 @@ export async function handleActionsArtifactTransfer(
       active.controller.signal,
       fetcher
     )
-    let lastProgressAt = 0
-    const result = await downloadActionsArtifactArchive({
-      artifact: {
-        id: request.artifact.id,
-        name: 'artifact',
-        sizeInBytes: request.artifact.sizeInBytes,
-        expired: request.artifact.expired,
-        createdAt: new Date(0),
-        expiresAt: null,
-        updatedAt: new Date(0),
-        digest: request.artifact.digest,
-        workflowRun: null,
-      },
-      response,
-      destination: request.destination,
-      signal: active.controller.signal,
-      onProgress: progress => {
-        const now = Date.now()
-        if (
-          !sender.isDestroyed() &&
-          (now - lastProgressAt >= 100 ||
-            progress.receivedBytes === progress.totalBytes)
-        ) {
-          lastProgressAt = now
-          try {
-            sender.send('actions-transfer-progress', {
-              operationId: request.operationId,
-              ...progress,
-            })
-          } catch {
-            // Renderer destruction can race the isDestroyed check. Abort the
-            // owning transfer without replacing cancellation with a send error.
-            active?.controller.abort()
+    try {
+      let lastProgressAt = 0
+      const result = await downloadActionsArtifactArchive({
+        artifact: {
+          id: request.artifact.id,
+          name: 'artifact',
+          sizeInBytes: request.artifact.sizeInBytes,
+          expired: request.artifact.expired,
+          createdAt: new Date(0),
+          expiresAt: null,
+          updatedAt: new Date(0),
+          digest: request.artifact.digest,
+          workflowRun: null,
+        },
+        response,
+        destination: request.destination,
+        signal: active.controller.signal,
+        onProgress: progress => {
+          const now = Date.now()
+          if (
+            !sender.isDestroyed() &&
+            (now - lastProgressAt >= 100 ||
+              progress.receivedBytes === progress.totalBytes)
+          ) {
+            lastProgressAt = now
+            try {
+              sender.send('actions-transfer-progress', {
+                operationId: request.operationId,
+                ...progress,
+              })
+            } catch {
+              // Renderer destruction can race the isDestroyed check. Abort the
+              // owning transfer without replacing cancellation with a send error.
+              active?.controller.abort()
+            }
           }
-        }
-      },
-    })
-    return { ok: true, ...result }
+        },
+      })
+      return { ok: true, ...result }
+    } catch (error) {
+      // Preflight failures can occur before the download helper owns a reader.
+      // Always tear down the final network stream before ending the operation.
+      await response.body?.cancel().catch(() => undefined)
+      throw error
+    }
   } catch (error) {
     return mapFailure(error)
   } finally {
@@ -442,8 +675,13 @@ export async function handleActionsJobLogTransfer(
       active.controller.signal,
       fetcher
     )
-    const result = await readBoundedJobLog(response, active.controller.signal)
-    return { ok: true, ...result }
+    try {
+      const result = await readBoundedJobLog(response, active.controller.signal)
+      return { ok: true, ...result }
+    } catch (error) {
+      await response.body?.cancel().catch(() => undefined)
+      throw error
+    }
   } catch (error) {
     return mapFailure(error)
   } finally {
