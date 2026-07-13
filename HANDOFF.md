@@ -283,13 +283,13 @@ The closing gate is complete:
   114,222 bytes with SHA-256
   `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991`.
 - **Wiki:** the canonical six-file mirror is pushed at
-  `6df402780eea3b32987d40e46094fb10e8ce769e`. The live
+  `2d169244373f27a6b08f6c9594ec433ff561880b`. The live
   [Home](https://github.com/codingmachineedge/desktop-material/wiki) and
   [User Guide](https://github.com/codingmachineedge/desktop-material/wiki/User-Guide)
   return HTTP 200 and render the 1450×997 responsive proof; the final User
   Guide source also embeds the 2048×1228 Actions job-log proof from raw `main`.
-  The canonical source now embeds the 2048×1228 Pull All account-fallback proof
-  through its raw-main URL for the next wiki mirror update.
+  The published User Guide embeds the 2048×1228 Pull All account-fallback proof
+  through its raw-main URL.
 - **Accessibility and clipping:** the exact-size hidden-desktop review shows
   every repository/worktree/branch/sync/one-click/build toolbar control, all
   Changes filter/composer controls, and no horizontal scrollbar. The supported

@@ -155,9 +155,9 @@ The publication gate is closed:
    Its Pages and raw-main image URLs both return the tracked 114,222 bytes with
    SHA-256 `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991`.
 4. The canonical six-file `docs/wiki/` mirror is published at wiki commit
-   `6df402780eea3b32987d40e46094fb10e8ce769e`; the live Home and User Guide
-   return HTTP 200. The canonical User Guide source now embeds the Pull All
-   proof through its raw-main URL for the next wiki mirror update.
+   `2d169244373f27a6b08f6c9594ec433ff561880b`; the live Home and User Guide
+   return HTTP 200, and the published User Guide embeds the Pull All proof
+   through its raw-main URL.
 5. The final headless audit verified the exact 1450×997 review size, the
    supported minimum behavior, and requested 200% scaling auto-fit. Toolbar,
    Changes search/filter/composer controls, rows, actions, and the page shell no
