@@ -38,6 +38,19 @@ account rejected, fallback account accepted. The neutral renderer result is
 exactly `Pull completed using another signed-in account.` and does not expose
 which account or token succeeded.
 
+Secure clone account fallback is also complete. A hosted clone preserves the
+user-selected account for its first attempt. A generic URL clone chooses the
+API-matched token-bearing account, or the first eligible exact-origin account
+when lookup is inconclusive, specifically to avoid a manual credentials prompt;
+it remains unforced only when no eligible identity exists. Only an HTTPS
+authentication/not-found ambiguity can silently try another token-bearing
+account for the exact rejecting origin, including a non-default port. The
+successful stable account key is persisted before initial repository matching
+and remains attached to single, batch, missing-repository, and retry-clone
+flows. The implementation is `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`;
+its first reviewed `main` baseline is
+`3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
+
 ## Completed milestone summary
 
 | Milestone | Status | Shipped result |
@@ -49,7 +62,7 @@ which account or token succeeded.
 | **M4** | **COMPLETE** | Draggable non-modal dialogs and Material side sheets that preserve background interaction. |
 | **M5** | **COMPLETE** | Notification centre with unread controls, Git-backed event log, and notification history. |
 | **M6** | **COMPLETE** | Shared fuzzy/substring/regex search modes, filters, and full regex builder. |
-| **M7** | **COMPLETE** | Parallel/sequential multi-clone plus URL-only repository export/import. |
+| **M7** | **COMPLETE** | Parallel/sequential multi-clone, URL-only repository export/import, and secure exact-origin clone account fallback with persisted affinity. |
 | **M8** | **COMPLETE** | 50–200% UI scaling, auto-fit, and full GitHub organization repository browsing. |
 | **M9** | **COMPLETE** | One-click commit/push, schedulers, safe auto-pull, and merge-all branches/worktrees. |
 | **M10** | **COMPLETE** | GitHub Actions runs, reruns, workflow dispatch, job detail, and searchable logs. |
@@ -81,7 +94,11 @@ These are the first paths to inspect when maintaining each subsystem:
   `app/src/ui/lib/filter-mode-control.tsx`, and
   `app/src/ui/lib/regex-builder/`.
 - **Clone, organizations, and transfer:**
-  `app/src/lib/stores/batch-clone-store.ts`,
+  `app/src/lib/automation/clone-account-fallback.ts`,
+  `app/src/lib/git/authentication-failure-origin.ts`,
+  `app/src/lib/git/clone.ts`, `app/src/lib/stores/batch-clone-store.ts`,
+  `app/src/lib/stores/cloning-repositories-store.ts`,
+  `app/src/lib/stores/repositories-store.ts`,
   `app/src/ui/clone-repository/`, `app/src/lib/repo-list-file.ts`, and
   `app/src/ui/repository-list-transfer/`.
 - **Automation:** `app/src/lib/automation/`,
@@ -138,6 +155,23 @@ The exhaustive final run on the same application/test tree shipped by
   proof is **2048×1228** and contains no token value, signed URL, account name,
   local path, email address, or personal identifier.
 
+### Secure clone account fallback validation
+
+The later clone hardening tree at implementation commit
+`0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`, first reviewed on `main` at
+`3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`, recorded:
+
+- **627 suites and 1,906 tests: 1,905 passed, 0 failed, 1 intentional skip**;
+- full source lint, repository-wide Prettier, and TypeScript: **passed**;
+- the exact MCP-driven unpackaged production build: **passed**;
+- an isolated hidden-desktop HTTPS smart-Git sequence of account A rejected,
+  then account B silently accepted, with the cloned repository clean on `main`
+  at `c9eee876c4451d380f8cc7628b5971f624f9395f`;
+- preservation of the fixture's custom-port exact origin, with no credentials
+  dialog shown; and
+- complete cleanup of every owned application/server process, listener, Temp
+  path, and synthetic credential entry.
+
 ### Final headless capture ledger
 
 | Screenshot | Dimensions | Bytes | SHA-256 |
@@ -154,6 +188,7 @@ The exhaustive final run on the same application/test tree shipped by
 | `docs/assets/screenshots/material-responsive-overflow-fixed.png` | 1450×997 | 132,049 | `160c622c6630d96eda26b5ff3be6705c31dbe55d6ffa6d1376575425770278bf` |
 | `docs/assets/screenshots/material-actions-job-log.png` | 2048×1228 | 155,579 | `6f8a96a9bff8a9c76f89b44aaf3c84a71574aed11ef994db93d12d2749ca0409` |
 | `docs/assets/screenshots/material-pull-all-account-fallback.png` | 2048×1228 | 114,222 | `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991` |
+| `docs/assets/screenshots/material-clone-account-fallback.png` | 2048×1228 | 140,143 | `89bb755ad37f6d8537815d411526fa6e16aeee9cd16446deabbc17595cb3623c` |
 
 Earlier verified captures, including
 `docs/assets/screenshots/settings-history-manager.png`, remain tracked; that M3
@@ -234,6 +269,32 @@ pattern scanning all pass on the published source-only set.
   `Pull completed using another signed-in account.` without exposing an account
   name or token.
 
+## Secure clone account fallback
+
+- A valid hosted-tab account selection is forced for the first clone attempt.
+  For a generic URL, `getPreferredGenericCloneAccountKey` chooses the
+  API-matched token-bearing account or, if lookup is inconclusive, the first
+  eligible exact-origin account. Only a clone with no eligible identity keeps
+  normal unforced behavior, preventing an avoidable credentials prompt.
+- Only HTTPS authentication failure or HTTPS repository-not-found ambiguity can
+  start fallback. SSH, malformed URLs, certificate failures, transport errors,
+  and other non-authentication failures are not retried across accounts.
+- Eligible candidates are token-bearing signed-in accounts whose configured
+  HTML endpoint has the same scheme, host, and port as the origin that rejected
+  the credential. Lookalike hosts, scheme changes, and port changes fail closed.
+- The credential helper records only the rejected origin and internal stable
+  account selector. Neither a token nor selector is added to a Git child
+  environment, command line, log, screenshot, or error message.
+- A successful fallback account key propagates through clone completion and is
+  persisted before initial API matching. Single clone, batch clone,
+  missing-repository recovery, and retry actions therefore keep the account
+  that actually succeeded instead of rebinding to the first same-host account.
+- The accepted 2048×1228 light-theme capture is
+  `material-clone-account-fallback.png`. The redacted server ledger proves
+  account A rejected, account B accepted, advertisement served, and pack served;
+  the cloned repository is clean at
+  `c9eee876c4451d380f8cc7628b5971f624f9395f`, and no credentials dialog appears.
+
 ## Headless verification environment
 
 - Project: `%USERPROFILE%\Documents\GitHub\desktop-material`
@@ -300,6 +361,12 @@ The closing gate is complete:
   targeted personal-identifier and common-secret scans. Public local-path
   examples use `%USERPROFILE%`; the Pull All proof contains only synthetic
   loopback/repository labels and no real identity, token, local path, or email.
+- **Secure clone implementation checkpoint:** implementation commit
+  `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d` is present in first reviewed
+  `main` baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
+  This roadmap-only branch does not claim final CI, installer, release, or
+  Pages results for its future integration SHA; root integration must refresh
+  those rows from GitHub after merge.
 - **Git and delegation:** every delegated commit is merged into `main`, every
   delegated branch was pushed, and completed agent worktrees were removed only
   after clean-state, remote-SHA, and ancestry checks.
@@ -321,6 +388,11 @@ final task response because a commit cannot include its own hash.
   token-bearing exact-origin accounts, with repository preference plus stable
   order. Never retry SSH/non-auth failures, expose the selector to Git children,
   relax same-origin fail-closed behavior, or force it across submodule origins.
+- Keep clone fallback limited to the HTTPS auth/not-found ambiguity reported by
+  the rejecting exact origin, including its port. Preserve hosted selection,
+  proactive eligible generic-account selection, no-eligible-only unforced
+  behavior, successful-account persistence, and the internal-only selector;
+  never add a credentials-dialog fallback.
 - Keep agent access localhost-only, opt-in, token-gated, origin-checked, and
   response-redacted.
 - Preserve Material token usage when adapting upstream or Desktop Plus code;
