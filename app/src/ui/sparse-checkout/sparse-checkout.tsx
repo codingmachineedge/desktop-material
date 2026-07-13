@@ -97,6 +97,7 @@ export class SparseCheckoutManager extends React.Component<
   private mutationSequence = 0
   private confirmButton: HTMLButtonElement | null = null
   private cancelButton: HTMLButtonElement | null = null
+  private closeButton: HTMLButtonElement | null = null
   private refreshButton: HTMLButtonElement | null = null
   private reviewButton: HTMLButtonElement | null = null
   private panel: HTMLElement | null = null
@@ -127,8 +128,8 @@ export class SparseCheckoutManager extends React.Component<
     void this.loadState(true)
   }
 
-  public componentDidUpdate(previousProps: ISparseCheckoutProps) {
-    if (previousProps.repository.path !== this.props.repository.path) {
+  public componentDidUpdate(prevProps: ISparseCheckoutProps) {
+    if (prevProps.repository.path !== this.props.repository.path) {
       this.mutationSequence++
       this.loadController?.abort()
       this.mutationController?.abort()
@@ -160,15 +161,29 @@ export class SparseCheckoutManager extends React.Component<
   }
 
   private onWindowKeyDown = (event: KeyboardEvent) => {
-    if (!this.context.isTopMost || event.defaultPrevented) {
+    if (
+      !this.context.isTopMost ||
+      event.defaultPrevented ||
+      this.panel === null ||
+      !this.panel.contains(document.activeElement)
+    ) {
       return
     }
-    const shortcutKey = __DARWIN__ ? event.metaKey : event.ctrlKey
-    if (shortcutKey && event.key === 'w') {
+
+    const closeShortcut = __DARWIN__
+      ? event.metaKey && !event.ctrlKey
+      : event.ctrlKey && !event.metaKey
+    if (
+      closeShortcut &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === 'w'
+    ) {
       event.preventDefault()
-      if (this.state.busy && this.mutationController !== null) {
-        this.cancelMutation()
-      } else {
+      // Closing is disabled while Git is mutating the worktree. Escape and the
+      // explicit Cancel operation button remain the cancellation controls;
+      // the close shortcut must not silently change meaning while busy.
+      if (!(this.state.busy && this.mutationController !== null)) {
         this.props.onDismissed()
       }
       return
@@ -190,6 +205,26 @@ export class SparseCheckoutManager extends React.Component<
     if (!this.context.isTopMost) {
       this.context.onRequestFront?.()
     }
+  }
+
+  private onPanelRef = (panel: HTMLElement | null) => {
+    this.panel = panel
+  }
+
+  private onConfirmButtonRef = (button: HTMLButtonElement | null) => {
+    this.confirmButton = button
+  }
+
+  private onCancelButtonRef = (button: HTMLButtonElement | null) => {
+    this.cancelButton = button
+  }
+
+  private onCloseButtonRef = (button: HTMLButtonElement | null) => {
+    this.closeButton = button
+  }
+
+  private onRefreshButtonRef = (button: HTMLButtonElement | null) => {
+    this.refreshButton = button
   }
 
   private async loadState(resetEditor: boolean): Promise<string | null> {
@@ -241,6 +276,13 @@ export class SparseCheckoutManager extends React.Component<
   }
 
   private onInputChanged = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    // The DOM control is disabled during review and mutation, but keep the
+    // reviewed snapshot invariant at the event boundary as well. This guards
+    // synthetic input and any delayed change event already queued by Chromium.
+    if (this.state.pending !== null || this.state.busy) {
+      return
+    }
+
     const input = event.currentTarget.value
     this.setState({
       input,
@@ -254,7 +296,7 @@ export class SparseCheckoutManager extends React.Component<
     kind: SparseCheckoutMutation,
     event: React.MouseEvent<HTMLButtonElement>
   ) => {
-    if (this.state.busy || this.state.loading) {
+    if (this.state.busy || this.state.loading || this.state.pending !== null) {
       return
     }
 
@@ -281,15 +323,41 @@ export class SparseCheckoutManager extends React.Component<
     )
   }
 
+  private requestSetMutation = (event: React.MouseEvent<HTMLButtonElement>) => {
+    this.requestMutation('set', event)
+  }
+
+  private requestReapplyMutation = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    this.requestMutation('reapply', event)
+  }
+
+  private requestDisableMutation = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    this.requestMutation('disable', event)
+  }
+
   private cancelReview = () => {
     this.setState({ pending: null }, () => this.reviewButton?.focus())
   }
 
   private cancelMutation = () => {
     if (this.mutationController !== null) {
-      this.setState({ status: 'Cancelling and refreshing the repository…' })
+      this.setState({ status: 'Cancelling operation…' })
       this.mutationController.abort()
     }
+  }
+
+  private refreshState = () => {
+    // Mirror the disabled state in the handler so a reviewed snapshot cannot
+    // become detached from newly loaded repository state.
+    if (this.state.loading || this.state.busy || this.state.pending !== null) {
+      return
+    }
+
+    void this.loadState(true)
   }
 
   private isCurrentMutation(sequence: number, repositoryPath: string) {
@@ -359,17 +427,21 @@ export class SparseCheckoutManager extends React.Component<
         return
       }
 
-      this.setState({
-        status: 'Refreshing repository and sparse-checkout state…',
-        error: null,
-      })
+      this.setState(
+        {
+          status: 'Refreshing repository and sparse-checkout state…',
+          error: null,
+        },
+        () => this.closeButton?.focus()
+      )
 
       let refreshError: string | null = null
       try {
         await this.props.onRefreshRepository()
       } catch {
-        refreshError =
-          'The sparse-checkout command finished, but refreshing the repository view failed.'
+        refreshError = cancelled
+          ? 'The operation was cancelled, but refreshing the repository view failed.'
+          : 'The sparse-checkout command finished, but refreshing the repository view failed.'
       }
 
       if (!this.isCurrentMutation(sequence, repositoryPath)) {
@@ -398,6 +470,10 @@ export class SparseCheckoutManager extends React.Component<
     }
   }
 
+  private onConfirmMutation = () => {
+    void this.confirmMutation()
+  }
+
   private getBlockedReason(state: ISparseCheckoutState): string | null {
     if (!state.supported) {
       return 'This Git runtime does not support sparse checkout. Git 2.25 or newer is required.'
@@ -419,10 +495,7 @@ export class SparseCheckoutManager extends React.Component<
       return <span className="sparse-checkout-badge error">State error</span>
     }
     return (
-      <div
-        className="sparse-checkout-badges"
-        aria-label="Sparse checkout state"
-      >
+      <div className="sparse-checkout-badges">
         <span
           className={`sparse-checkout-badge ${state.enabled ? 'enabled' : ''}`}
         >
@@ -549,14 +622,14 @@ export class SparseCheckoutManager extends React.Component<
           <Button
             className="sparse-checkout-write-button"
             disabled={this.state.busy || reviewing || invalid}
-            onClick={event => this.requestMutation('set', event)}
+            onClick={this.requestSetMutation}
           >
             {state.enabled ? 'Review directory update' : 'Review enable'}
           </Button>
           {state.enabled ? (
             <Button
               disabled={this.state.busy || reviewing}
-              onClick={event => this.requestMutation('reapply', event)}
+              onClick={this.requestReapplyMutation}
             >
               Review reapply
             </Button>
@@ -580,7 +653,7 @@ export class SparseCheckoutManager extends React.Component<
         <Button
           className="sparse-checkout-write-button"
           disabled={this.state.busy || this.state.pending !== null}
-          onClick={event => this.requestMutation('disable', event)}
+          onClick={this.requestDisableMutation}
         >
           Review disable
         </Button>
@@ -623,8 +696,8 @@ export class SparseCheckoutManager extends React.Component<
         <div className="sparse-checkout-controls">
           <Button
             className="sparse-checkout-confirm-button"
-            onButtonRef={button => (this.confirmButton = button)}
-            onClick={() => void this.confirmMutation()}
+            onButtonRef={this.onConfirmButtonRef}
+            onClick={this.onConfirmMutation}
           >
             {pending.kind === 'disable'
               ? 'Disable sparse checkout'
@@ -643,11 +716,13 @@ export class SparseCheckoutManager extends React.Component<
     const blocked =
       sparseState === null ? null : this.getBlockedReason(sparseState)
     return (
+      // This focusable non-modal dialog raises itself on pointer interaction.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
       <section
         className="sparse-checkout-panel"
         role="dialog"
         tabIndex={-1}
-        ref={panel => (this.panel = panel)}
+        ref={this.onPanelRef}
         aria-modal="false"
         aria-labelledby="sparse-checkout-title"
         aria-busy={this.state.loading || this.state.busy}
@@ -679,8 +754,8 @@ export class SparseCheckoutManager extends React.Component<
               this.state.busy ||
               this.state.pending !== null
             }
-            onButtonRef={button => (this.refreshButton = button)}
-            onClick={() => void this.loadState(true)}
+            onButtonRef={this.onRefreshButtonRef}
+            onClick={this.refreshState}
           >
             <Octicon symbol={octicons.sync} />
           </Button>
@@ -689,6 +764,7 @@ export class SparseCheckoutManager extends React.Component<
             ariaLabel="Close sparse checkout"
             tooltip="Close sparse checkout"
             disabled={this.state.busy && this.mutationController !== null}
+            onButtonRef={this.onCloseButtonRef}
             onClick={this.props.onDismissed}
           >
             <Octicon symbol={octicons.x} />
@@ -698,7 +774,7 @@ export class SparseCheckoutManager extends React.Component<
           {this.renderStatus(sparseState)}
           {this.state.busy && this.mutationController !== null ? (
             <Button
-              onButtonRef={button => (this.cancelButton = button)}
+              onButtonRef={this.onCancelButtonRef}
               onClick={this.cancelMutation}
             >
               Cancel operation
