@@ -89,10 +89,56 @@ persist it into the relevant profile repo and commit through the same path.
 ## MCP / agent server
 
 Desktop Material embeds an **MCP server**, with a **local HTTP + CLI fallback**, that lets an AI
-agent drive the app (list repos/accounts, clone, commit, push, pull, branches, trigger workflows).
-It binds **`127.0.0.1` only**, is **token-gated and opt-in**, and **never exposes account tokens**.
-This subsystem is **on the roadmap / in development** — see [Agent API](Agent-API) for the exposed
-surface and the security model.
+agent drive the app (accounts/repos/tabs, single or batch clone, status, commit, fetch/pull/push,
+branches, automation, and workflow dispatch). It binds **`127.0.0.1` only**, is **token-gated and
+opt-in**, and **never exposes account tokens**.
+
+- `app/src/main-process/agent-server/` owns the loopback server, MCP/REST parsing, token lifecycle,
+  request limits, and command queue.
+- `app/src/lib/agent-commands.ts` is the versioned command/schema source of truth shared by both
+  Electron processes.
+- `app/src/lib/agent-command-executor.ts` resolves repository targets and sends allowed operations
+  through the same Dispatcher/AppStore paths used by the UI.
+- `app/src/ui/preferences/agent-access.tsx` controls opt-in lifecycle and token rotation.
+- `script/agent/mcp-stdio-proxy.js` and `script/agent/desktop-agent.js` are the shipped stdio and CLI
+  clients. They read the app's restricted connection file instead of embedding a port or token.
+
+See [Agent API](Agent-API) for connection steps, command names, and the security model.
+
+---
+
+## Shipped feature subsystems
+
+These features follow the same Store/Dispatcher rule rather than creating parallel state paths:
+
+- **Accounts, organizations, and providers** — account state and organization loading live in
+  `app/src/lib/stores/accounts-store.ts`; provider credentials are modelled in the account/auth
+  layer; `app/src/ui/clone-repository/` merges personal and organization repositories and hosts the
+  GitLab/Bitbucket browser; publish ownership is selected in `app/src/ui/publish-repository/`.
+- **Automation** — typed settings and safety predicates live in `app/src/lib/automation/`, the
+  scheduler is `app/src/lib/stores/helpers/automation-scheduler.ts`, global/account controls are in
+  `app/src/ui/preferences/automation.tsx`, repository overrides are in
+  `app/src/ui/repository-settings/automation-overrides.tsx`, and merge-all/pull-all surfaces live in
+  `app/src/ui/merge-all/` and `app/src/ui/pull-all/`.
+- **GitHub Actions and logs** — `app/src/lib/stores/actions-store.ts` owns API state; the run list,
+  run details, workflow-dispatch dialog, and searchable log viewer live in `app/src/ui/actions/`;
+  `app/src/lib/actions-log-parser/` parses log markup without coupling it to React.
+- **History search and graph** — the pure matching helper is `app/src/lib/commit-search.ts`; the
+  lane model and renderer are `app/src/ui/history/commit-graph-model.ts` and
+  `app/src/ui/history/commit-graph.tsx`. Keep graph construction independent from filtered list row
+  indices.
+- **Multiple stashes** — Git operations remain in `app/src/lib/git/stash.ts`, entries use
+  `app/src/models/stash-entry.ts`, and the Changes list plus `app/src/ui/stashing/` target the
+  explicitly selected stash for inspect, restore, or discard.
+- **Multi-window and CLI routing** — `app/src/main-process/window-routing.ts` chooses a destination
+  window, `app/src/main-process/app-window.ts` owns each native window, and
+  `app/src/lib/window-scope.ts` plus `app/src/lib/profiles/profile-tabs-file.ts` keep tab state
+  isolated by window scope. `app/src/lib/cli-action.ts` contains the open/clone launch contract; do
+  not route an action by assuming the first window is active.
+- **Desktop-plus parity controls** — repository pinning/grouping, Pull all, branch presets/default
+  branch, repository editor overrides, SVG diff controls, and pushed-history safety confirmations
+  are integrated into their existing repository, branch, diff, and undo/reset/tag surfaces rather
+  than a separate compatibility layer.
 
 ---
 
