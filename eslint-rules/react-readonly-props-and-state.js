@@ -14,7 +14,7 @@
 
 /**
  * @typedef {import('@typescript-eslint/experimental-utils').TSESLint.RuleModule} RuleModule
- * @typedef {import("@typescript-eslint/typescript-estree").TSESTree.TSInterfaceBody} TSInterfaceBody
+ * @typedef {import("@typescript-eslint/experimental-utils").TSESTree.TSInterfaceBody} TSInterfaceBody
  */
 
 /** @type {RuleModule} */
