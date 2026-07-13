@@ -1644,6 +1644,36 @@ export class API {
     }
   }
 
+  /** Cancel a workflow run, optionally bypassing normal cancellation hooks. */
+  public async cancelWorkflowRun(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    force: boolean = false
+  ): Promise<void> {
+    const action = force ? 'force-cancel' : 'cancel'
+    const path = `repos/${owner}/${name}/actions/runs/${workflowRunId}/${action}`
+    const response = await this.ghRequest('POST', path)
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Enable or disable a repository workflow. */
+  public async setWorkflowEnabled(
+    owner: string,
+    name: string,
+    workflowId: number,
+    enabled: boolean
+  ): Promise<void> {
+    const action = enabled ? 'enable' : 'disable'
+    const path = `repos/${owner}/${name}/actions/workflows/${workflowId}/${action}`
+    const response = await this.ghRequest('PUT', path)
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
   /** Dispatch a workflow supporting the workflow_dispatch event. */
   public async dispatchWorkflow(
     owner: string,

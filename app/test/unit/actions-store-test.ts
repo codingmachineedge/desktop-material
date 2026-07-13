@@ -3,11 +3,13 @@ import assert from 'node:assert'
 import { IAPIWorkflowRun } from '../../src/lib/api'
 import {
   accountSupportsActions,
+  actionsMutationError,
   workflowRunsEqual,
 } from '../../src/lib/stores/actions-store'
 import { Account } from '../../src/models/account'
 import { Owner } from '../../src/models/owner'
 import { GitHubRepository } from '../../src/models/github-repository'
+import { APIError } from '../../src/lib/http'
 
 const run = (id: number, updatedAt: string) =>
   ({ id, updated_at: updatedAt } as IAPIWorkflowRun)
@@ -49,5 +51,30 @@ describe('ActionsStore helpers', () => {
     )
 
     assert.equal(accountSupportsActions(repository, [account]), false)
+  })
+
+  it('explains permission and Enterprise capability failures', () => {
+    const denied = actionsMutationError(
+      new APIError(
+        new Response(null, { status: 403 }),
+        { message: 'Forbidden' }
+      ),
+      'disable-workflow'
+    )
+    assert.match(denied.message, /Actions write access/)
+
+    const unavailable = actionsMutationError(
+      new APIError(
+        new Response(null, { status: 404 }),
+        { message: 'Not Found' }
+      ),
+      'enable-workflow'
+    )
+    assert.match(unavailable.message, /GitHub Enterprise version/)
+  })
+
+  it('preserves non-API operation errors', () => {
+    const original = new Error('network unavailable')
+    assert.equal(actionsMutationError(original, 'cancel-run'), original)
   })
 })
