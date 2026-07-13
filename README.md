@@ -86,6 +86,43 @@ These features are implemented and live on `main`.
 
 **Also shipped:** multi-clone with organization chips, parallel/sequential modes and URL-only import/export; one-click commit and push with a generated message; self-update checks against Desktop Material releases; SVG diff hardening and display controls; safer undo/reset/tag deletion confirmations; and responsive, keyboard-accessible MD3 surfaces throughout the app.
 
+## Roadmaps
+
+These are living delivery roadmaps for the active `mega-feature-update` branch. An item moves to **Done** only after its implementation and focused checks are committed and pushed. UI milestones additionally require an off-screen production build, interactive exercise, and inspected screenshots before the evidence and documentation tasks can be marked done.
+
+Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is the [Git, GitHub, and GitKraken parity run manifest](.codex/run-manifests/2026-07-12-git-gh-interactive-audit.md).
+
+### Delivery roadmap
+
+| Status | Milestone | Completion evidence |
+|---|---|---|
+| **Done** | Inventory the installed Git 2.55 and GitHub CLI 2.96 command trees | Complete command catalogs are parsed at runtime rather than maintained as a stale hard-coded list |
+| **Done** | Inventory the official GitHub REST and GraphQL surfaces | REST baseline: 790 paths, 1,196 operations, and 51 categories; GraphQL baseline: 32 query fields and 268 mutation fields |
+| **Done** | Add a bounded CLI execution foundation | `git`/`gh` only, no shell, repository-bound working directory, output/input limits, cancellation, ownership cleanup, credential-command blocking, and bundled-Git environment support |
+| **Done** | Add safe request contracts for a GitHub API workbench | Selected-host relative paths, traversal rejection, body/response limits, mutation confirmation, and credential redaction |
+| **Done** | Extend native Actions controls | Run/job reruns, normal and force cancellation, workflow enable/disable, confirmations, and responsive long-metadata containment |
+| **Done** | Remove known compact-layout sideways overflow | Settings, floating surfaces, repository rail, toolbar, Merge All, Pull All, Build & Run, Actions, and screenshot gallery now wrap, stack, clamp, or vertically scroll at compact sizes |
+| **Active** | Expose the CLI foundation through an interactive Workbench | Searchable live catalog, safe previews, risk labels, destructive confirmation, streaming output, input, cancel, keyboard access, and repository refresh |
+| **Active** | Harden GitHub transport and expose the API foundation interactively | Current GitHub.com API versioning, credential/header precedence, REST operation picker, GraphQL document mode, permissions/rate limits, pagination, cancellation, and destructive confirmation |
+| **Active** | Complete the official GitKraken Desktop history comparison | Deduplicated 0.x–12.x feature matrix, current-app coverage, implementable local features, and clearly separated proprietary/cloud services |
+| **Blocked — environment** | Build and interactively verify every changed UI off-screen | The exact headless verifier passes preflight, but this checkout has no installed root dependencies or `cross-env`; the mandated no-download gate therefore refuses to launch an unbuilt app |
+| **Queued after build** | Refresh README, wiki, Pages, and screenshot evidence | Capture at desktop and compact widths, inspect original pixels for clipping/overlap/oversized text, record hashes, then publish the same verified state |
+
+### Capability roadmap
+
+| Area | Available now | Next native interactive milestones | Long-tail access |
+|---|---|---|---|
+| **Git** | Core repository, branch, commit, diff, history, stash, remote, worktree, merge, rebase, fetch/pull/push, automation, and guarded cleanup workflows | Archive/bundle and patch exchange; richer blame/file history; signature verification; reflog recovery and repository health; complete remote/worktree/stash administration; bisect, sparse/shallow, range-diff, notes, grep, and config tools | The repository-bound CLI Workbench keeps the full installed `git` catalog reachable with explicit argv and risk review |
+| **GitHub CLI** | Native repository, pull-request reading, Actions browsing/logs/dispatch/rerun/cancel, account, organization, clone, fork, and publish foundations | Notifications; complete issue and PR authoring/review/merge; releases/assets; labels/milestones; rulesets/settings/collaborators; Actions artifacts/caches/runners/secrets/variables/environments; Projects and Discussions | The CLI Workbench keeps the full installed `gh` catalog reachable while blocking credential-revealing commands |
+| **GitHub REST and GraphQL** | Account-scoped API layer plus safe Workbench request/confirmation/redaction contracts | Version and permission awareness; schema-driven REST; parsed GraphQL queries/mutations; rate limits; bounded pagination; security, deployment, Pages, organization, team, and administration surfaces | The API Workbench will cover supported operations without arbitrary hosts, token fields, shell execution, or unrestricted headers |
+| **GitKraken parity references** | Graph, diff, commit/stash/branch/remote/worktree flows, repository tabs, provider accounts, themes, search, automation, multi-window work, and many Material-native productivity tools | Evaluate blame/history, editor and terminal workflows, undo/redo breadth, shallow/sparse controls, branch pin/filter/activity, Gitflow/hooks/signing, richer PR/issues/Launchpad-style triage, conflict prevention, and agent-session worktrees | Proprietary GitKraken cloud, enterprise, AI, and collaboration services remain reference points, not copied services, branding, or assets |
+
+### Verification roadmap
+
+- Keep page and dialog shells free of horizontal scrolling wherever responsive wrapping or stacking can preserve usability; only bounded code, diff, log, and JSON panes may scroll sideways.
+- Verify desktop and minimum supported windows, 50–200% UI scaling, light/dark themes, long repository/branch/host names, destructive confirmations, keyboard focus, and screen-reader labels.
+- Commit and push each coherent milestone. Documentation and screenshots must name the exact verified commit and must never claim an unbuilt state was exercised.
+
 ## Screenshots
 
 | | |
