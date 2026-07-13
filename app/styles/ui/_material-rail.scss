@@ -22,6 +22,12 @@
   gap: 6px;
   padding: 10px 0;
   width: 88px;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 
   // The vertical section TabBar sheds the shell card treatment inside the rail.
   .tab-bar {
@@ -199,6 +205,66 @@
 
     &:active {
       transform: scale(0.9);
+    }
+  }
+}
+
+// At 200% zoom the supported minimum window exposes a very short CSS
+// viewport. Keep every destination and both recovery controls reachable by
+// scrolling vertically, while visually collapsing labels without removing
+// them from the accessibility tree.
+@media (max-height: 520px) {
+  .repository-rail {
+    width: 72px;
+    gap: 2px;
+    padding: 4px 0;
+
+    .tab-bar {
+      gap: 2px;
+    }
+
+    .tab-bar.vertical .tab-bar-item,
+    .rail-nav-button {
+      width: 56px;
+      min-height: 40px;
+      padding: 2px 0;
+    }
+
+    .rail-item {
+      gap: 0;
+    }
+
+    .rail-pill {
+      width: 44px;
+      height: 32px;
+    }
+
+    .rail-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .rail-pill .counter {
+      right: 2px;
+      top: 0;
+    }
+
+    .rail-spacer {
+      min-height: 0;
+    }
+
+    .rail-settings,
+    .rail-avatar {
+      width: 44px;
+      min-height: 40px;
+      flex: none;
     }
   }
 }

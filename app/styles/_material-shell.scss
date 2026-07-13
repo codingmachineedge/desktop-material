@@ -340,6 +340,121 @@ body {
   }
 }
 
+// Compact/high-zoom app bar. Preserve whole action targets and their DOM text
+// while prioritising the icons; only wrap complete controls when one row truly
+// cannot fit. This avoids the previous zero-width flex collapse.
+@media (max-width: 760px), (max-height: 420px) {
+  #desktop-app-toolbar {
+    min-height: 56px;
+    gap: 6px;
+    padding: 4px 8px;
+    overflow-x: hidden;
+
+    & > * {
+      flex: 0 1 auto;
+      min-width: 40px !important;
+      max-width: 92px !important;
+    }
+
+    & > .sidebar-section,
+    & > .resizable-component {
+      flex: 0 1 auto;
+      width: auto !important;
+      max-width: 92px !important;
+    }
+
+    & > .one-click-commit-push-button,
+    & > .build-run-toolbar-button {
+      flex: 0 1 auto;
+    }
+
+    & > *:has(.push-pull-button) {
+      margin-left: 0;
+      min-width: 48px !important;
+    }
+
+    & > #push-pull-button-state {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      min-width: 0 !important;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+    }
+
+    .toolbar-button {
+      width: 48px !important;
+      min-width: 40px !important;
+      max-width: 48px !important;
+      flex: none !important;
+
+      > button {
+        width: 48px;
+        min-width: 40px;
+        height: 48px;
+        min-height: 40px;
+        justify-content: center;
+        gap: 0;
+        padding: 0 7px;
+
+        .text {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          clip-path: inset(50%);
+          white-space: nowrap;
+        }
+      }
+
+      &:not(.toolbar-dropdown-arrow-button) > button .dropdownArrow {
+        display: none;
+      }
+    }
+
+    .toolbar-dropdown-arrow-button {
+      width: 40px !important;
+      min-width: 40px !important;
+      max-width: 40px !important;
+
+      > button {
+        width: 40px;
+        padding: 0;
+      }
+    }
+
+    .push-pull-button .ahead-behind {
+      display: none;
+    }
+
+    .build-run-toolbar-button {
+      max-width: 92px !important;
+
+      .build-run-primary {
+        width: 48px !important;
+      }
+
+      .build-run-disclosure {
+        width: 40px;
+        min-width: 40px;
+        height: 48px;
+        padding: 0;
+      }
+    }
+  }
+}
+
+@media (max-width: 440px) {
+  #desktop-app-toolbar {
+    flex-wrap: wrap;
+    align-content: center;
+  }
+}
+
 // Workspace canvas: the region holding the tab strip, toolbar and the floating
 // cards reads as surface-container (per spec §0), so the level1 cards lift off a
 // slightly recessed backdrop. Overrides the shared surface fill declared above.
