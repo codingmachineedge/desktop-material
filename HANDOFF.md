@@ -39,14 +39,17 @@ exactly `Pull completed using another signed-in account.` and does not expose
 which account or token succeeded.
 
 Secure clone account fallback is also complete. A hosted clone preserves the
-user-selected account for its first attempt, while a generic URL clone keeps
-normal credential resolution first. Only an HTTPS authentication/not-found
-ambiguity can silently try another token-bearing account for the exact origin
-that rejected the credential, including a non-default port. The successful
-stable account key is persisted before initial repository matching and remains
-attached to single, batch, missing-repository, and retry-clone flows. The
-implementation is `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`; its first reviewed
-`main` baseline is `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
+user-selected account for its first attempt. A generic URL clone chooses the
+API-matched token-bearing account, or the first eligible exact-origin account
+when lookup is inconclusive, specifically to avoid a manual credentials prompt;
+it remains unforced only when no eligible identity exists. Only an HTTPS
+authentication/not-found ambiguity can silently try another token-bearing
+account for the exact rejecting origin, including a non-default port. The
+successful stable account key is persisted before initial repository matching
+and remains attached to single, batch, missing-repository, and retry-clone
+flows. The implementation is `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`;
+its first reviewed `main` baseline is
+`3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
 
 ## Completed milestone summary
 
@@ -268,8 +271,11 @@ pattern scanning all pass on the published source-only set.
 
 ## Secure clone account fallback
 
-- A valid hosted-tab account selection is forced for the first clone attempt;
-  generic URL clones retain the existing unforced first attempt.
+- A valid hosted-tab account selection is forced for the first clone attempt.
+  For a generic URL, `getPreferredGenericCloneAccountKey` chooses the
+  API-matched token-bearing account or, if lookup is inconclusive, the first
+  eligible exact-origin account. Only a clone with no eligible identity keeps
+  normal unforced behavior, preventing an avoidable credentials prompt.
 - Only HTTPS authentication failure or HTTPS repository-not-found ambiguity can
   start fallback. SSH, malformed URLs, certificate failures, transport errors,
   and other non-authentication failures are not retried across accounts.
@@ -384,8 +390,9 @@ final task response because a commit cannot include its own hash.
   relax same-origin fail-closed behavior, or force it across submodule origins.
 - Keep clone fallback limited to the HTTPS auth/not-found ambiguity reported by
   the rejecting exact origin, including its port. Preserve hosted selection,
-  generic unforced-first behavior, successful-account persistence, and the
-  internal-only selector; never add a credentials-dialog fallback.
+  proactive eligible generic-account selection, no-eligible-only unforced
+  behavior, successful-account persistence, and the internal-only selector;
+  never add a credentials-dialog fallback.
 - Keep agent access localhost-only, opt-in, token-gated, origin-checked, and
   response-redacted.
 - Preserve Material token usage when adapting upstream or Desktop Plus code;

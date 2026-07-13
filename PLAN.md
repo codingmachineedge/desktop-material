@@ -19,9 +19,11 @@ for the exact HTTPS origin. The accepted proof image is committed at
 A later secure clone account-fallback milestone is shipped at implementation
 commit `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`, with first reviewed `main`
 baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`. Clone now preserves the
-selected or successful account affinity, silently tries another token-bearing
-account only for the rejected exact HTTPS origin, and retains a custom origin
-port throughout matching and retry.
+hosted selection and proactively chooses the API-matched token-bearing account
+for a generic URL, or the first eligible exact-origin account when lookup is
+inconclusive. It remains unforced only when no eligible identity exists, then
+silently retries another account only after an authentication/not-found failure
+from that exact HTTPS origin while retaining any custom origin port.
 The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF.md).
 
 ## Shipped milestone ledger
@@ -74,13 +76,15 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
   remaining token-bearing signed-in accounts for that exact HTML origin. A
   repository-bound account is preferred, then the stable account order is
   retained; SSH and non-authentication failures are never retried.
-- Clone preserves a valid hosted-account selection for the first attempt while
-  generic URL clones keep normal credential resolution first. An HTTPS
-  authentication/not-found ambiguity is bound to the origin that rejected it;
-  only remaining token-bearing accounts for that exact scheme, host, and port
-  are eligible. The successful account key is persisted before initial
-  repository matching and is retained by single, batch, missing-repository,
-  and retry-clone paths.
+- Clone preserves a valid hosted-account selection for the first attempt. For a
+  generic URL it chooses the API-matched token-bearing account, or the first
+  eligible exact-origin account when lookup is inconclusive, so Git does not
+  open a manual credentials prompt. The attempt remains unforced only when no
+  eligible identity exists. An HTTPS authentication/not-found ambiguity is
+  bound to the rejecting origin; only remaining token-bearing accounts for that
+  exact scheme, host, and port are eligible. The successful account key is
+  persisted before initial repository matching and retained by single, batch,
+  missing-repository, and retry-clone paths.
 - Account selection, profile mutation serialization, export rendering,
   provider routing, submodule display, repository tooltips, and other integration
   regressions found during the merge waves were fixed before the final build.
@@ -109,6 +113,8 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
     resolution.
 11. Clone account fallback remains HTTPS-auth/not-found-only and is scoped to
     the origin that rejected the credential, including any non-default port.
+    A generic URL selects the API-matched token-bearing identity or the first
+    eligible exact-origin identity and remains unforced only when none exists.
     Account selectors stay internal to the trampoline; the successful stable
     account key is persisted for later repository matching and retries without
     exposing a token, login, selector, or credentials dialog.
