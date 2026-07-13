@@ -253,15 +253,24 @@
 }
 
 .branch-chip {
+  min-width: 0;
+  max-width: min(100%, 220px);
+  overflow: hidden;
   min-height: 21px;
   padding: 0 8px;
   background: var(--md-sys-color-surface-container-highest);
+  text-overflow: ellipsis;
 }
 
 .actions-actor {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   img {
     width: 18px;

@@ -72,6 +72,8 @@ class RunListItem extends React.PureComponent<
     const failed = run.conclusion === APICheckConclusion.Failure
     const active = isWorkflowRunActive(run)
     const actor = run.actor
+    const title = run.display_title || run.name
+    const branch = run.head_branch ?? 'detached'
 
     return (
       <li>
@@ -90,14 +92,14 @@ class RunListItem extends React.PureComponent<
               {status.label}
             </span>
             <span className="actions-run-summary">
-              <strong>{run.display_title || run.name}</strong>
+              <strong title={title}>{title}</strong>
               <span className="actions-run-meta">
-                <span className="branch-chip">
-                  {run.head_branch ?? 'detached'}
+                <span className="branch-chip" title={branch}>
+                  {branch}
                 </span>
                 <span>{run.event}</span>
                 {actor && (
-                  <span className="actions-actor">
+                  <span className="actions-actor" title={actor.login}>
                     <img src={actor.avatar_url} alt="" />
                     {actor.login}
                   </span>

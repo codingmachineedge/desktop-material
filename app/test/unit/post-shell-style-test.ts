@@ -28,6 +28,10 @@ describe('post-shell MD3 style contracts', () => {
       /\.actions-workflow-management\s*\{[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/
     )
     assert.match(
+      actions,
+      /\.branch-chip\s*\{[\s\S]*?max-width: min\(100%, 220px\);[\s\S]*?text-overflow: ellipsis;/
+    )
+    assert.match(
       actionsDialogs,
       /\.actions-confirmation-dialog\s*\{[\s\S]*?width: min\(520px, 100%\);/
     )
