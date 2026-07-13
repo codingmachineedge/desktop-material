@@ -219,6 +219,18 @@
             </article>
 
             <article class="card">
+              <div class="glyph" aria-hidden="true">🔐</div>
+              <h3>Secure clone fallback <span class="tag">Shipped</span></h3>
+              <p>
+                Generic HTTPS clones use an eligible signed-in account without a
+                credential prompt, retry only exact-origin authentication or
+                not-found ambiguity, and retain the successful account affinity.
+                Tokenless or missing selections and SSH, non-authentication, or
+                cross-origin failures stay fail closed.
+              </p>
+            </article>
+
+            <article class="card">
               <div class="glyph" aria-hidden="true">⚡</div>
               <h3>Automation <span class="tag">Shipped</span></h3>
               <p>
@@ -406,6 +418,24 @@
               <figcaption>
                 Pull all fallback
                 <span class="tag">Exact origin · token-safe</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-clone-account-fallback.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-clone-account-fallback.png"
+                  alt="Desktop Material workspace after a generic HTTPS repository clone completed through exact-origin signed-in account fallback without displaying a credential prompt"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Clone account fallback
+                <span class="tag">No prompt · exact origin</span>
               </figcaption>
             </figure>
 

@@ -29,6 +29,7 @@ These features are implemented and live on `main`.
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
 - Browse complete GitHub organization repository lists, filter cloning by organization, and choose an organization when publishing
 - Add GitLab accounts, including self-hosted endpoints, with a personal access token; add Bitbucket accounts with an app password, then browse and clone their repositories from the provider tab
+- Clone a private repository from a generic HTTPS URL without a credential prompt when an eligible signed-in account matches the exact origin. Only authentication or repository-not-found ambiguity can try another exact-origin account; the successful account affinity is retained, while tokenless, missing, SSH, non-authentication, and cross-origin credentials never widen fallback
 - The repository list can hide its automatically maintained Recent group from **Settings → Appearance**
 - Repositories can be pinned from their context menu into a dedicated top group
 
@@ -103,6 +104,8 @@ These features are implemented and live on `main`.
 | **200% auto-fit** — minimum-window dark-theme verification with no clipped controls | **Responsive fit** — 1450×997 proof that toolbar and Changes controls fit without horizontal overflow |
 | ![GitHub Actions Windows x64 job log loaded securely in the searchable in-app viewer](docs/assets/screenshots/material-actions-job-log.png) | ![Pull all repositories dialog showing a repository pulled using another signed-in account](docs/assets/screenshots/material-pull-all-account-fallback.png) |
 | **Actions logs** — live 2048×1228 proof of secure redirect handling, credential stripping, safe errors, search, and collapsible groups | **Pull all fallback** — exact-origin signed-in account retry with neutral, token-safe per-repository results |
+| ![Desktop Material workspace after a generic HTTPS repository clone completed through exact-origin signed-in account fallback without displaying a credential prompt](docs/assets/screenshots/material-clone-account-fallback.png) | |
+| **Clone fallback** — generic HTTPS clone completed with exact-origin signed-in account recovery, persisted affinity, and no credential prompt | |
 
 ## Building
 
