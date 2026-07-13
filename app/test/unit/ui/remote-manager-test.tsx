@@ -110,6 +110,11 @@ describe('Remote Manager', () => {
       review.textContent ?? '',
       /Remove this remote and its remote-tracking references/
     )
+    assert.match(
+      review.textContent ?? '',
+      /removes the current hosted\/account-bound remote/
+    )
+    assert.match(review.textContent ?? '', /hosted actions will refresh/)
     fireEvent.click(
       within(review).getByRole('button', { name: 'Confirm remote changes' })
     )

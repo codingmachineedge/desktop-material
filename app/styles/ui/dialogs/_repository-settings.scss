@@ -356,6 +356,14 @@
         }
       }
 
+      .remote-account-warning {
+        background: var(--md-sys-color-error-container);
+        border-radius: var(--md-sys-shape-corner-medium);
+        color: var(--md-sys-color-on-error-container);
+        font-weight: var(--font-weight-semibold);
+        padding: var(--spacing);
+      }
+
       .remote-review-actions {
         display: flex;
         flex-wrap: wrap;

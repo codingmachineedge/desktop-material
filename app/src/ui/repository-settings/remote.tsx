@@ -261,6 +261,14 @@ export class Remote extends React.Component<IRemoteProps, IRemoteState> {
             </li>
           ))}
         </ul>
+        {this.props.preferredRemoteName !== null &&
+          review.removed.includes(this.props.preferredRemoteName) && (
+            <p className="remote-account-warning">
+              This plan removes the current hosted/account-bound remote. After
+              Save, repository matching, fetch/push targets, and hosted actions
+              will refresh; add or select another suitable remote if needed.
+            </p>
+          )}
         <p id="remote-review-description">
           URLs, credentials, command lines, and local paths are intentionally
           omitted. Save uses fixed Git arguments, checks the repository again,
