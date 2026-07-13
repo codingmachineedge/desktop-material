@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
+import { join, resolve } from 'node:path'
 
 import {
   FileBlameLineLimit,
@@ -53,14 +54,23 @@ describe('git/file-history-parser', () => {
     }
   })
   it('contains repository-relative paths before invoking Git', () => {
+    const repositoryPath = resolve('file-history-fixtures', 'repository')
     assert.equal(
-      normalizeFileHistoryPath('C:\\repo', 'src\\feature/file.ts'),
+      normalizeFileHistoryPath(
+        repositoryPath,
+        join('src', 'feature', 'file.ts')
+      ),
       'src/feature/file.ts'
     )
 
-    for (const path of ['', '..\\secret', 'C:\\secret.txt', 'src/../../x']) {
+    for (const path of [
+      '',
+      join('..', 'secret'),
+      resolve(repositoryPath, '..', 'secret.txt'),
+      'src/../../x',
+    ]) {
       assert.throws(
-        () => normalizeFileHistoryPath('C:\\repo', path),
+        () => normalizeFileHistoryPath(repositoryPath, path),
         (error: unknown) =>
           error instanceof FileHistoryUnavailableError &&
           error.kind === 'invalid-path'

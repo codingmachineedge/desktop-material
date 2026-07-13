@@ -1305,6 +1305,7 @@ describe('CLI workbench runner helpers', () => {
 
       const missingArchive = join(fixture.exportsDirectory, 'missing.zip')
       const missingBundle = join(fixture.exportsDirectory, 'missing.bundle')
+      const canonicalExportsDirectory = await realpath(fixture.exportsDirectory)
       const validatedArchive = await validateCLICommandRequest(
         request(
           fixture.repository,
@@ -1328,8 +1329,14 @@ describe('CLI workbench runner helpers', () => {
         ),
         fixture.dependencies
       )
-      assert.equal(validatedArchive.outputDestination, missingArchive)
-      assert.equal(validatedBundle.outputDestination, missingBundle)
+      assert.equal(
+        validatedArchive.outputDestination,
+        join(canonicalExportsDirectory, 'missing.zip')
+      )
+      assert.equal(
+        validatedBundle.outputDestination,
+        join(canonicalExportsDirectory, 'missing.bundle')
+      )
       await revalidateCLICommandBeforeSpawn(
         validatedArchive,
         fixture.dependencies

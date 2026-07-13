@@ -1,5 +1,6 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
+import { resolve } from 'node:path'
 import * as React from 'react'
 import { Account, getAccountKey } from '../../../src/models/account'
 import { GitHubRepository } from '../../../src/models/github-repository'
@@ -18,6 +19,14 @@ import { updateEndpointVersion } from '../../../src/lib/endpoint-capabilities'
 import { GitHubReleasesView } from '../../../src/ui/github-releases'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 
+const repositoryPath = resolve('release-fixtures', 'material')
+const uploadAssetPath = resolve('release-fixtures', 'build', 'desktop.exe')
+const downloadAssetPath = resolve(
+  'release-fixtures',
+  'downloads',
+  'desktop.exe'
+)
+
 const account = new Account(
   'fixture-bot',
   'https://api.github.com',
@@ -33,7 +42,7 @@ const remote = new GitHubRepository(
   1
 )
 const repository = new Repository(
-  'C:\\fixture\\material',
+  repositoryPath,
   1,
   remote,
   false,
@@ -121,7 +130,7 @@ function fakeStore(overrides: Record<string, unknown> = {}) {
     }),
     downloadAsset: async () => ({
       ok: true,
-      path: 'C:\\fixture\\downloads\\desktop.exe',
+      path: downloadAssetPath,
       bytes: asset.sizeInBytes,
       localDigest: asset.digest!,
       matchesGitHubDigest: true,
@@ -354,10 +363,8 @@ describe('GitHub Releases view', () => {
         repository={repository}
         accounts={[account]}
         releasesStore={store}
-        chooseUploadFile={async () => 'C:\\fixture\\build\\desktop.exe'}
-        chooseDownloadDestination={async () =>
-          'C:\\fixture\\downloads\\desktop.exe'
-        }
+        chooseUploadFile={async () => uploadAssetPath}
+        chooseDownloadDestination={async () => downloadAssetPath}
         revealDownload={async path => {
           reveals.push(path)
         }}
@@ -373,14 +380,14 @@ describe('GitHub Releases view', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Review upload' }))
     assert.equal(uploads.length, 0)
-    assert.equal(screen.queryByText('C:\\fixture\\build\\desktop.exe'), null)
+    assert.equal(screen.queryByText(uploadAssetPath), null)
     const uploadButtons = screen.getAllByRole('button', {
       name: 'Upload asset',
     })
     fireEvent.click(uploadButtons[uploadButtons.length - 1])
     await waitFor(() => assert.equal(uploads.length, 1))
     assert.deepEqual(uploads[0], {
-      path: 'C:\\fixture\\build\\desktop.exe',
+      path: uploadAssetPath,
       name: 'desktop.exe',
       label: 'Reviewed Windows installer',
     })
@@ -391,7 +398,7 @@ describe('GitHub Releases view', () => {
     await waitFor(() => assert.equal(downloads.length, 1))
     fireEvent.click(screen.getByRole('button', { name: 'Show in folder' }))
     await waitFor(() => assert.equal(reveals.length, 1))
-    assert.equal(reveals[0], 'C:\\fixture\\downloads\\desktop.exe')
+    assert.equal(reveals[0], downloadAssetPath)
   })
 
   it('shows transfer progress and cancels an in-flight upload', async () => {
@@ -431,7 +438,7 @@ describe('GitHub Releases view', () => {
         repository={repository}
         accounts={[account]}
         releasesStore={store}
-        chooseUploadFile={async () => 'C:\\fixture\\build\\desktop.exe'}
+        chooseUploadFile={async () => uploadAssetPath}
       />
     )
     await waitFor(() =>
@@ -488,7 +495,7 @@ describe('GitHub Releases view', () => {
       2
     )
     const otherRepository = new Repository(
-      'C:\\fixture\\current',
+      resolve('release-fixtures', 'current'),
       2,
       otherRemote,
       false,
@@ -572,7 +579,7 @@ describe('GitHub Releases view', () => {
       'Fixture Enterprise'
     )
     const unsupportedRepository = new Repository(
-      'C:\\fixture\\enterprise',
+      resolve('release-fixtures', 'enterprise'),
       91,
       new GitHubRepository(
         'enterprise',
