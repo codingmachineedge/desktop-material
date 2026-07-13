@@ -119,8 +119,9 @@ as that later merge SHA.
   ledger and representative Foundation/P0/P1/Later interaction matrix with
   exact MCP/app-source identity. Owned-resource cleanup remains separate below.
 - [x] **Screenshots:** 14 accepted filenames, dimensions, byte counts, SHA-256
-  digests, individual app-source/build provenance, original-resolution
-  inspection, and synthetic-only identity statement recorded below.
+  digests, exact `5e80e678…` app-source/build provenance,
+  original-resolution inspection, and synthetic-only identity statement
+  recorded below.
 - [ ] **Screenshot promotion:** copy only those exact 14 inspected files into
   the tracked image set and re-verify every hash in the final union.
 - [ ] **GitHub/publication:** exact-SHA CI, Pages, canonical wiki, installer and
@@ -567,15 +568,14 @@ set.
 The exact `5e80e678…` bundle supplied cross-account clone, Pull All, and
 history-deepening receipts plus representative Foundation, P0, P1, and Later
 surfaces. The P2 branch-visibility controls remain covered by focused model/UI
-regressions; this ledger does not claim a dedicated P2 screenshot. The older
-`32b7bb6b…` shallow/sparse/stash pixels remain explicitly labeled rather than
-being misrepresented as final-source captures.
+regressions; this ledger does not claim a dedicated P2 screenshot. All 14 clean
+accepted frames come from the same exact build.
 
 | M19 accepted capture target | App source/build | Dimensions | Bytes | SHA-256 |
 | --- | --- | ---: | ---: | --- |
-| `docs/assets/screenshots/material-shallow-clone-safe.png` | `32b7bb6b…` | 1443×992 | 86,305 | `926575457408ea49a1a29617b50a429a75fbc394f48ae8cba0a5a418461acd0a` |
-| `docs/assets/screenshots/material-sparse-checkout-safe.png` | `32b7bb6b…` | 1443×992 | 113,831 | `2ed3530f661466b5794a5eda5501e15e54e6aa4d2e47f35a43156a043004b5e5` |
-| `docs/assets/screenshots/material-stash-manager.png` | `32b7bb6b…` | 1443×992 | 121,038 | `21403cb9a5517d904e467dc70a5f8356fe44ba36f5ca66bb46f707557690837f` |
+| `docs/assets/screenshots/material-shallow-clone-safe.png` | `5e80e678…` | 1452×1001 | 144,543 | `a29b242b08e90b802632226e5af161ed0761ef26bc0ad5e77714b6d2353b87ea` |
+| `docs/assets/screenshots/material-sparse-checkout-safe.png` | `5e80e678…` | 1452×1001 | 120,929 | `cf0fd31bdb470c93b24dd04807443f82a2d4f99e5cccda2fbf345c397c329218` |
+| `docs/assets/screenshots/material-stash-manager.png` | `5e80e678…` | 1452×1001 | 141,437 | `923a7e831ae999c1fcb681e5003108c22eb6632692916915366bdb2ad59c63e9` |
 | `docs/assets/screenshots/material-clone-account-fallback.png` | `5e80e678…` | 1452×1001 | 164,039 | `d562616bbcfeb6c7f92dfaa600a58265e5f954dfe80999e9383d615400b444f4` |
 | `docs/assets/screenshots/material-pull-all-account-fallback.png` | `5e80e678…` | 1452×1001 | 121,304 | `3a00b1b61e79e8abadb363b8d63ce5f1ebece4d895a476cc9ca4c983a638a5de` |
 | `docs/assets/screenshots/material-history-deepen.png` | `5e80e678…` | 1452×1001 | 106,548 | `5e6bdfa9d9a935b9f5fd8d6d3e7cad80dab28cca6f425ef0356b684f74cb8089` |

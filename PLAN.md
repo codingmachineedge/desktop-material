@@ -178,17 +178,17 @@ error, screenshot, or retained ledger. Its redacted cross-account evidence was:
   fixture. No public provider object was changed.
 
 The following 14 synthetic-only PNGs were reopened at original resolution and
-accepted as nonblank, unclipped, and identity-safe. Their provenance remains
-explicit: three were captured from built app source `32b7bb6b…`, before the last
-cross-account/lifecycle merges; eleven were captured from exact built app source
-`5e80e678…`. The files must be promoted unchanged with the final
-documentation/image union before their later merge SHA is published.
+accepted as nonblank, unclipped, and identity-safe. Every canonical candidate
+was captured from exact built app source `5e80e678…`; compositor-banded earlier
+attempts were rejected rather than promoted. The files must be promoted
+unchanged with the final documentation/image union before their later merge SHA
+is published.
 
 | M19 accepted capture candidate | App source/build | Dimensions | Bytes | SHA-256 |
 | --- | --- | ---: | ---: | --- |
-| `material-shallow-clone-safe.png` | `32b7bb6b…` | 1443×992 | 86,305 | `926575457408ea49a1a29617b50a429a75fbc394f48ae8cba0a5a418461acd0a` |
-| `material-sparse-checkout-safe.png` | `32b7bb6b…` | 1443×992 | 113,831 | `2ed3530f661466b5794a5eda5501e15e54e6aa4d2e47f35a43156a043004b5e5` |
-| `material-stash-manager.png` | `32b7bb6b…` | 1443×992 | 121,038 | `21403cb9a5517d904e467dc70a5f8356fe44ba36f5ca66bb46f707557690837f` |
+| `material-shallow-clone-safe.png` | `5e80e678…` | 1452×1001 | 144,543 | `a29b242b08e90b802632226e5af161ed0761ef26bc0ad5e77714b6d2353b87ea` |
+| `material-sparse-checkout-safe.png` | `5e80e678…` | 1452×1001 | 120,929 | `cf0fd31bdb470c93b24dd04807443f82a2d4f99e5cccda2fbf345c397c329218` |
+| `material-stash-manager.png` | `5e80e678…` | 1452×1001 | 141,437 | `923a7e831ae999c1fcb681e5003108c22eb6632692916915366bdb2ad59c63e9` |
 | `material-clone-account-fallback.png` | `5e80e678…` | 1452×1001 | 164,039 | `d562616bbcfeb6c7f92dfaa600a58265e5f954dfe80999e9383d615400b444f4` |
 | `material-pull-all-account-fallback.png` | `5e80e678…` | 1452×1001 | 121,304 | `3a00b1b61e79e8abadb363b8d63ce5f1ebece4d895a476cc9ca4c983a638a5de` |
 | `material-history-deepen.png` | `5e80e678…` | 1452×1001 | 106,548 | `5e6bdfa9d9a935b9f5fd8d6d3e7cad80dab28cca6f425ef0356b684f74cb8089` |
@@ -322,8 +322,7 @@ proof for that newer source tree.
   ledger and exact off-screen interaction matrix for representative
   Foundation/P0/P1/Later surfaces.
 - [x] Record all 14 inspected, identity-safe capture candidates with dimensions,
-  byte counts, SHA-256 digests, and their individual `32b7bb6b…` or
-  `5e80e678…` source/build provenance.
+  byte counts, SHA-256 digests, and exact `5e80e678…` source/build provenance.
 - [ ] Promote those exact 14 files unchanged and verify their tracked hashes in
   the final documentation/image union.
 - [ ] Record the merge to `main`, exact-SHA CI, Pages, canonical wiki,

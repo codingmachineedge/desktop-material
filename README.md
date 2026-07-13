@@ -138,7 +138,7 @@ the earlier inventory and proof history remains in the
 | **Accepted locally; publication pending** | Expand audited Git capabilities as named functions | Exact app source `5e80e678…` was production-built and exercised off-screen across shallow clone/deepening, sparse checkout, Repository Tools, Stash Manager, Remote Manager, and cross-account recovery; final `main` publication evidence remains open |
 | **Accepted locally; publication pending** | Expand named GitHub and provider functions on hardened transports | Exact app source `5e80e678…` was exercised against a synthetic loopback provider across native PR creation, Actions logs/artifacts, Releases, Issues, and provider triage; final `main` publication evidence remains open |
 | **Done** | Complete the official GitKraken Desktop history comparison | Official surviving 0.6–6.0 posts plus 7.x–12.3 release archives were deduplicated into current-app coverage, implementable local gaps, and explicitly separated proprietary/cloud services |
-| **Done for accepted app source** | Build and interactively verify representative changed UI off-screen | Exact app source `5e80e678…` passed the MCP production build and final hidden-desktop clone/Pull All/deepen plus Foundation/P0/P1/Later interactions. Three earlier capture candidates come from built app source `32b7bb6b…`; eleven come from `5e80e678…`. All 14 were inspected, and their individual provenance is recorded in PLAN/HANDOFF |
+| **Done for accepted app source** | Build and interactively verify representative changed UI off-screen | Exact app source `5e80e678…` passed the MCP production build and final hidden-desktop clone/Pull All/deepen plus Foundation/P0/P1/Later interactions. All 14 clean accepted frames come from that exact build and are recorded in PLAN/HANDOFF |
 | **Local evidence reconciled; publication pending** | Refresh README, wiki, Pages, and screenshot evidence | README/PLAN/HANDOFF identify the accepted app source and 14-image ledger without claiming `main`. Screenshot promotion, canonical wiki/Pages synchronization, final merge SHA, CI/release links, artifact purge, and cleanup must be added only after success |
 
 ### Capability roadmap
@@ -171,7 +171,7 @@ the earlier inventory and proof history remains in the
 
 - [x] Record accepted app source `5e80e678d062b65a82c0991b352e5a861c7469e5` and its successful exact MCP production build; repeat exhaustive repository gates after the documentation/image union is final.
 - [x] Exercise that exact production bundle on one isolated off-screen desktop, including deterministic cross-account clone recovery and representative Foundation/P0/P1/Later surfaces.
-- [x] Inspect all 14 synthetic-only capture candidates at original resolution and record dimensions, bytes, SHA-256, and their individual `32b7bb6b…` or `5e80e678…` app-source provenance; promote only those exact files with the final documentation union.
+- [x] Inspect all 14 synthetic-only exact-`5e80e678…` capture candidates at original resolution and record dimensions, bytes, and SHA-256; promote only those exact files with the final documentation union.
 - [ ] Merge the accepted tree to `main`, then record exact-SHA CI, Pages, canonical wiki, installer/release, asset/digest, and live-URL evidence.
 - [ ] Verify owned processes, desktops, credentials, fixtures, worktrees, and temporary roots are removed; leave `main` clean and equal to `origin/main`.
 
