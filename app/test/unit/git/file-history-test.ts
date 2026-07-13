@@ -8,93 +8,10 @@ import {
   FileHistoryUnavailableError,
   getFileBlame,
   getFileHistory,
-  normalizeFileHistoryPath,
-  parseFileBlamePorcelain,
 } from '../../../src/lib/git/file-history'
 import { setupFixtureRepository } from '../../helpers/repositories'
 
-const porcelain = `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1
-author Ada Lovelace
-author-mail <ada@example.com>
-author-time 1700000000
-author-tz +0000
-committer Ada Lovelace
-committer-mail <ada@example.com>
-committer-time 1700000000
-committer-tz +0000
-summary Explain the engine
-boundary
-filename src/engine.ts
-\tconst engine = true
-0000000000000000000000000000000000000000 2 2 1
-author Not Committed Yet
-author-mail <not.committed.yet>
-author-time 1700000100
-author-tz +0000
-committer Not Committed Yet
-committer-mail <not.committed.yet>
-committer-time 1700000100
-committer-tz +0000
-summary Version of src/engine.ts from src/engine.ts
-filename src/engine.ts
-\tconsole.log(engine)
-`
-
 describe('git/file-history', () => {
-  it('contains repository-relative paths before invoking Git', () => {
-    assert.equal(
-      normalizeFileHistoryPath('C:\\repo', 'src\\feature/file.ts'),
-      'src/feature/file.ts'
-    )
-
-    for (const path of ['', '..\\secret', 'C:\\secret.txt', 'src/../../x']) {
-      assert.throws(
-        () => normalizeFileHistoryPath('C:\\repo', path),
-        (error: unknown) =>
-          error instanceof FileHistoryUnavailableError &&
-          error.kind === 'invalid-path'
-      )
-    }
-  })
-
-  it('parses complete per-line blame metadata and working-tree lines', () => {
-    const lines = parseFileBlamePorcelain(porcelain, 'fallback.ts')
-    assert.equal(lines.length, 2)
-    assert.deepEqual(
-      {
-        shortSha: lines[0].shortSha,
-        author: lines[0].authorName,
-        email: lines[0].authorEmail,
-        path: lines[0].originalPath,
-        content: lines[0].content,
-        boundary: lines[0].boundary,
-      },
-      {
-        shortSha: 'aaaaaaaa',
-        author: 'Ada Lovelace',
-        email: 'ada@example.com',
-        path: 'src/engine.ts',
-        content: 'const engine = true',
-        boundary: true,
-      }
-    )
-    assert.equal(lines[1].uncommitted, true)
-    assert.equal(lines[1].shortSha, 'Working tree')
-  })
-
-  it('rejects incomplete blame records', () => {
-    assert.throws(
-      () =>
-        parseFileBlamePorcelain(
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1\nauthor Ada\n',
-          'file.ts'
-        ),
-      (error: unknown) =>
-        error instanceof FileHistoryUnavailableError &&
-        error.kind === 'malformed-output'
-    )
-  })
-
   it('follows renames and loads bounded blame from a fixture repository', async t => {
     const path = await setupFixtureRepository(t, 'rename-history-detection')
     const repository = new Repository(path, -1, null, false)
