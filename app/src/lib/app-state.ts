@@ -522,6 +522,7 @@ export enum RepositorySectionTab {
   History,
   Actions,
   RepositoryTools,
+  Releases,
 }
 
 /**
@@ -901,6 +902,15 @@ export interface IChangesState {
 
   /** Desktop-created stashes for the current branch, newest first. */
   readonly stashEntries: ReadonlyArray<IStashEntry>
+
+  /** Desktop-managed stashes across every branch in this repository. */
+  readonly allStashEntries: ReadonlyArray<IStashEntry>
+
+  /** Foreign Git stashes visible in the bounded inventory but never editable here. */
+  readonly foreignStashEntryCount: number
+
+  /** True when the repository stash inventory exceeds the safe display bound. */
+  readonly stashInventoryTruncated: boolean
 
   /**
    * The current selection state in the Changes view. Can be either

@@ -18,6 +18,7 @@ import {
   RepositoryTabsStore,
   BuildRunStore,
   ActionsStore,
+  GitHubReleasesStore,
 } from '../lib/stores'
 import { RepositoryTabStrip } from './repository-tabs/repository-tab-strip'
 import { BuildRunToolbarButton } from './build-run/build-run-toolbar-button'
@@ -279,6 +280,7 @@ interface IAppProps {
   readonly repositoryTabsStore: RepositoryTabsStore
   readonly buildRunStore: BuildRunStore
   readonly actionsStore: ActionsStore
+  readonly releasesStore: GitHubReleasesStore
   readonly startTime: number
 }
 
@@ -4388,6 +4390,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           allowEmptyCommit={selectedState.state.allowEmptyCommit}
           onUpdateCommitOptions={this.onUpdateCommitOptions}
           actionsStore={this.props.actionsStore}
+          releasesStore={this.props.releasesStore}
         />
       )
     } else if (selectedState.type === SelectionType.CloningRepository) {

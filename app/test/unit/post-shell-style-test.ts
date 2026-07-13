@@ -176,4 +176,21 @@ describe('post-shell MD3 style contracts', () => {
       /\.commit-message-component\s*\{[\s\S]*?max-width: calc\(100% - 24px\);[\s\S]*?min-width: 0;/
     )
   })
+
+  it('keeps the repository-wide stash manager bounded and responsive', () => {
+    const changes = readStyle('changes/_changes-list.scss')
+
+    assert.match(
+      changes,
+      /\.stash-manager-panel\s*\{[\s\S]*?max-height: min\(62vh, 650px\);[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      changes,
+      /\.stash-manager-action-grid\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(104px, 1fr\)\);/
+    )
+    assert.match(
+      changes,
+      /\.stash-manager-busy\s*\{[\s\S]*?position: sticky;[\s\S]*?flex-wrap: wrap;/
+    )
+  })
 })

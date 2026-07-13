@@ -371,17 +371,27 @@ import { isGHES } from '../endpoint-capabilities'
 import { Banner, BannerType } from '../../models/banner'
 import { ComputedAction } from '../../models/computed-action'
 import {
+  applyDesktopStashEntry,
+  clearReviewedDesktopStashes,
+  createBranchFromDesktopStash,
   createDesktopStashEntry,
+  createNamedDesktopStashEntry,
   getLastDesktopStashEntryForBranch,
   popStashEntry,
-  dropDesktopStashEntry,
   moveStashEntry,
+  StashManagerError,
+  updateDesktopStashEntry,
 } from '../git/stash'
 import {
   UncommittedChangesStrategy,
   defaultUncommittedChangesStrategy,
 } from '../../models/uncommitted-changes-strategy'
-import { IStashEntry, StashedChangesLoadStates } from '../../models/stash-entry'
+import {
+  ICreateManagedStashRequest,
+  IStashEntry,
+  IUpdateManagedStashRequest,
+  StashedChangesLoadStates,
+} from '../../models/stash-entry'
 import { arrayEquals } from '../equality'
 import { MenuLabelsEvent } from '../../models/menu-labels'
 import { findRemoteBranchName } from './helpers/find-branch-name'
@@ -1641,25 +1651,26 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.repositoryStateCache.updateChangesState(repository, state => {
       const stashEntries = gitStore.currentBranchStashEntries
+      const allStashEntries = gitStore.allDesktopStashEntries
 
       // Figure out what selection changes we need to make as a result of this
       // change.
       if (state.selection.kind === ChangesSelectionKind.Stash) {
         const selectedStashSha = state.selection.selectedStashEntry?.stashSha
-        if (state.stashEntries.length > 0) {
-          if (stashEntries.length === 0) {
+        if (state.allStashEntries.length > 0) {
+          if (allStashEntries.length === 0) {
             // We're showing a stash and all entries have disappeared,
             // so we need to switch back over to the working directory.
             selectWorkingDirectory = true
           } else if (
             selectedStashSha !== undefined &&
-            !stashEntries.some(entry => entry.stashSha === selectedStashSha)
+            !allStashEntries.some(entry => entry.stashSha === selectedStashSha)
           ) {
             // The selected stash disappeared, so select the next newest one.
             selectStashEntry = true
           } else if (
             state.selection.selectedStashEntry !==
-            stashEntries.find(entry => entry.stashSha === selectedStashSha)
+            allStashEntries.find(entry => entry.stashSha === selectedStashSha)
           ) {
             // File metadata is loaded asynchronously and replaces the entry
             // object. Re-select it so the diff viewer observes the loaded copy.
@@ -1673,6 +1684,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         showCoAuthoredBy: gitStore.showCoAuthoredBy,
         coAuthors: gitStore.coAuthors,
         stashEntries,
+        allStashEntries,
+        foreignStashEntryCount: gitStore.foreignStashEntryCount,
+        stashInventoryTruncated: gitStore.stashInventoryTruncated,
       }
     })
 
@@ -3787,6 +3801,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       })
     } else if (
       selectedSection !== RepositorySectionTab.Actions &&
+      selectedSection !== RepositorySectionTab.Releases &&
       selectedSection !== RepositorySectionTab.RepositoryTools
     ) {
       return assertNever(selectedSection, `Unknown section: ${selectedSection}`)
@@ -3982,13 +3997,25 @@ export class AppStore extends TypedBaseStore<IAppState> {
     stashEntry?: IStashEntry,
     file?: CommittedFileChange | null
   ): Promise<void> {
+    let reviewedStashEntry = stashEntry
+    if (
+      reviewedStashEntry !== undefined &&
+      reviewedStashEntry.files.kind === StashedChangesLoadStates.NotLoaded
+    ) {
+      reviewedStashEntry =
+        (await this.gitStoreCache
+          .get(repository)
+          .loadFilesForStashEntry(reviewedStashEntry)) ?? reviewedStashEntry
+    }
+
     this.repositoryStateCache.update(repository, () => ({
       selectedSection: RepositorySectionTab.Changes,
     }))
     this.repositoryStateCache.updateChangesState(repository, state => {
       let selectedStashedFile: CommittedFileChange | null = null
       const { selection } = state
-      const targetStashEntry = stashEntry ?? this.getSelectedStashEntry(state)
+      const targetStashEntry =
+        reviewedStashEntry ?? this.getSelectedStashEntry(state)
 
       const currentlySelectedFile =
         selection.kind === ChangesSelectionKind.Stash
@@ -4053,8 +4080,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         ? state.selection.selectedStashEntry?.stashSha
         : undefined
     return (
-      state.stashEntries.find(entry => entry.stashSha === selectedSha) ??
+      state.allStashEntries.find(entry => entry.stashSha === selectedSha) ??
       state.stashEntries[0] ??
+      state.allStashEntries[0] ??
       null
     )
   }
@@ -4544,6 +4572,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       })
     } else if (
       section === RepositorySectionTab.Actions ||
+      section === RepositorySectionTab.Releases ||
       section === RepositorySectionTab.RepositoryTools
     ) {
       refreshSectionPromise = Promise.resolve()
@@ -5312,6 +5341,150 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     return false
+  }
+
+  /** Create a reviewed named stash from all changes or an exact selected set. */
+  public async _createManagedStash(
+    repository: Repository,
+    request: ICreateManagedStashRequest,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    let state = this.repositoryStateCache.get(repository)
+    const tip = state.branchesState.tip
+    if (tip.kind !== TipState.Valid) {
+      throw new StashManagerError(
+        'stale-entry',
+        'Check out a local branch before creating a managed stash.'
+      )
+    }
+
+    let selectedPaths: ReadonlyArray<string> | null = null
+    if (request.scope === 'selected') {
+      if (request.selectedPaths.length === 0) {
+        throw new StashManagerError(
+          'invalid-input',
+          'Select at least one changed file, or choose all changes.'
+        )
+      }
+
+      // A path-scoped stash would otherwise include unrelated staged changes.
+      // Match the existing selected-stash behavior, then re-read status and
+      // verify every reviewed path at the mutation boundary.
+      await unstageAll(repository)
+      await this._loadStatus(repository)
+      state = this.repositoryStateCache.get(repository)
+      if (
+        state.branchesState.tip.kind !== TipState.Valid ||
+        state.branchesState.tip.branch.name !== tip.branch.name
+      ) {
+        throw new StashManagerError(
+          'stale-entry',
+          'The checked-out branch changed during review. Nothing was stashed.'
+        )
+      }
+      const currentFiles = new Map(
+        state.changesState.workingDirectory.files.map(file => [file.path, file])
+      )
+      if (request.selectedPaths.some(path => !currentFiles.has(path))) {
+        throw new StashManagerError(
+          'stale-entry',
+          'The selected changes changed during review. Refresh and choose them again.'
+        )
+      }
+      selectedPaths = request.selectedPaths.filter(
+        path =>
+          request.includeUntracked ||
+          currentFiles.get(path)?.status.kind !== AppFileStatusKind.Untracked
+      )
+      if (selectedPaths.length === 0) {
+        throw new StashManagerError(
+          'invalid-input',
+          'The selection contains only untracked files. Enable Include untracked or choose tracked changes.'
+        )
+      }
+    }
+
+    try {
+      const created = await createNamedDesktopStashEntry(
+        repository,
+        tip.branch,
+        request.displayName,
+        selectedPaths,
+        request.includeUntracked,
+        signal
+      )
+      if (created) {
+        this.statsStore.increment('stashCreatedOnCurrentBranchCount')
+      }
+      return created
+    } finally {
+      await this._refreshRepository(repository)
+    }
+  }
+
+  /** Apply a reviewed stash while retaining its recovery entry. */
+  public async _applyStashKeepingEntry(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      await applyDesktopStashEntry(repository, stashEntry.stashSha, signal)
+    } finally {
+      await this._refreshRepository(repository)
+    }
+  }
+
+  /** Rename and/or move the branch association for a reviewed stash. */
+  public async _updateManagedStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    request: IUpdateManagedStashRequest,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      await updateDesktopStashEntry(
+        repository,
+        stashEntry.stashSha,
+        request.branchName,
+        request.displayName,
+        signal
+      )
+    } finally {
+      await this.gitStoreCache.get(repository).loadStashEntries()
+    }
+  }
+
+  /** Create and check out a validated local branch from a reviewed stash. */
+  public async _createBranchFromManagedStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    branchName: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      await createBranchFromDesktopStash(
+        repository,
+        stashEntry.stashSha,
+        branchName,
+        signal
+      )
+    } finally {
+      await this._refreshRepository(repository)
+    }
+  }
+
+  /** Clear only the exact Desktop-managed entries reviewed in the UI. */
+  public async _clearReviewedManagedStashes(
+    repository: Repository,
+    stashShas: ReadonlyArray<string>,
+    signal?: AbortSignal
+  ): Promise<number> {
+    try {
+      return await clearReviewedDesktopStashes(repository, stashShas, signal)
+    } finally {
+      await this.gitStoreCache.get(repository).loadStashEntries()
+    }
   }
 
   /**
@@ -10653,14 +10826,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
-  public async _popStashEntry(repository: Repository, stashEntry: IStashEntry) {
-    await popStashEntry(repository, stashEntry.stashSha)
-    log.info(
-      `[AppStore. _popStashEntry] popped stash with commit id ${stashEntry.stashSha}`
-    )
-
-    this.statsStore.increment('stashRestoreCount')
-    await this._refreshRepository(repository)
+  public async _popStashEntry(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    signal?: AbortSignal
+  ) {
+    try {
+      await popStashEntry(repository, stashEntry.stashSha, signal)
+      log.info(
+        `[AppStore. _popStashEntry] popped stash with commit id ${stashEntry.stashSha}`
+      )
+      this.statsStore.increment('stashRestoreCount')
+    } finally {
+      // A failed apply may have left conflicts to resolve. Always refresh the
+      // exact repository while retaining the stash as recovery material.
+      await this._refreshRepository(repository)
+    }
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
@@ -10670,7 +10851,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ) {
     const gitStore = this.gitStoreCache.get(repository)
     await gitStore.performFailableOperation(() => {
-      return dropDesktopStashEntry(repository, stashEntry.stashSha)
+      return clearReviewedDesktopStashes(repository, [
+        stashEntry.stashSha,
+      ]).then(() => undefined)
     })
     log.info(
       `[AppStore. _dropStashEntry] dropped stash with commit id ${stashEntry.stashSha}`

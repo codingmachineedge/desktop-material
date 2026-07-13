@@ -83,6 +83,27 @@ import {
   validateActionsBranchName,
 } from './actions-branch-rules'
 import { createGitHubAPIRequestHeaders } from './github-rest-api-version'
+import { boundedGitHubReleaseResponse } from './github-release-json'
+import {
+  GitHubReleaseAssetMaximumPages,
+  GitHubReleaseAssetPageSize,
+  GitHubReleaseMaximumPages,
+  GitHubReleasePageSize,
+  IGitHubRelease,
+  IGitHubReleaseAsset,
+  IGitHubReleaseAssetList,
+  IGitHubReleaseDraft,
+  IGitHubReleaseList,
+  IGitHubReleaseUpdate,
+  normalizeGitHubReleaseDraft,
+  normalizeGitHubReleaseUpdate,
+  parseGitHubRelease,
+  parseGitHubReleaseAsset,
+  parseGitHubReleaseAssetList,
+  parseGitHubReleaseList,
+  validateGitHubReleaseIdentifier,
+  validateGitHubReleaseRepositoryPart,
+} from './github-releases'
 export {
   createGitHubAPIRequestHeaders,
   getGitHubRESTAPIVersion,
@@ -2296,6 +2317,242 @@ export class API {
       runId,
       artifactPage
     )
+  }
+
+  /** List one bounded, locally generated page of repository releases. */
+  public async fetchReleases(
+    owner: string,
+    name: string,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseList> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > GitHubReleaseMaximumPages
+    ) {
+      throw new Error(
+        'The requested release page exceeds the app safety limit.'
+      )
+    }
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases?per_page=${GitHubReleasePageSize}&page=${page}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubReleaseList(
+      await boundedGitHubReleaseResponse(response, signal),
+      page
+    )
+  }
+
+  /** Re-fetch one exact release through the bounded JSON parser before mutation. */
+  public async fetchRelease(
+    owner: string,
+    name: string,
+    releaseId: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeReleaseId}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeReleaseId
+    )
+  }
+
+  /** List one bounded, locally generated page of assets for one release. */
+  public async fetchReleaseAssets(
+    owner: string,
+    name: string,
+    releaseId: number,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseAssetList> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > GitHubReleaseAssetMaximumPages
+    ) {
+      throw new Error(
+        'The requested release asset page exceeds the app safety limit.'
+      )
+    }
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeReleaseId}/assets?per_page=${GitHubReleaseAssetPageSize}&page=${page}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubReleaseAssetList(
+      await boundedGitHubReleaseResponse(response, signal),
+      page
+    )
+  }
+
+  /** Re-fetch one exact release asset through the bounded parser before deletion. */
+  public async fetchReleaseAsset(
+    owner: string,
+    name: string,
+    assetId: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseAsset> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeAssetId = validateGitHubReleaseIdentifier(assetId, 'asset id')
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/assets/${safeAssetId}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubReleaseAsset(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeAssetId
+    )
+  }
+
+  /** Create an unpublished release draft. Publishing is a separate review. */
+  public async createReleaseDraft(
+    owner: string,
+    name: string,
+    draft: IGitHubReleaseDraft,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeDraft = normalizeGitHubReleaseDraft(draft)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases`
+    const response = await this.ghRequest('POST', path, {
+      body: {
+        tag_name: safeDraft.tagName,
+        target_commitish: safeDraft.targetCommitish,
+        name: safeDraft.name,
+        body: safeDraft.body,
+        draft: true,
+        prerelease: safeDraft.prerelease,
+      },
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const release = parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal)
+    )
+    if (!release.draft) {
+      throw new Error(
+        'GitHub did not create the release as an unpublished draft.'
+      )
+    }
+    return release
+  }
+
+  /** Update reviewed metadata without changing draft publication state. */
+  public async updateRelease(
+    owner: string,
+    name: string,
+    update: IGitHubReleaseUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeUpdate = normalizeGitHubReleaseUpdate(update)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeUpdate.releaseId}`
+    const response = await this.ghRequest('PATCH', path, {
+      body: {
+        tag_name: safeUpdate.tagName,
+        target_commitish: safeUpdate.targetCommitish,
+        name: safeUpdate.name,
+        body: safeUpdate.body,
+        prerelease: safeUpdate.prerelease,
+      },
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    return parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeUpdate.releaseId
+    )
+  }
+
+  /** Publish one exact draft after the renderer's explicit review step. */
+  public async publishRelease(
+    owner: string,
+    name: string,
+    releaseId: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeReleaseId}`
+    const response = await this.ghRequest('PATCH', path, {
+      body: { draft: false },
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const release = parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeReleaseId
+    )
+    if (release.draft) {
+      throw new Error('GitHub did not publish the reviewed release draft.')
+    }
+    return release
+  }
+
+  /** Delete one exact release. Callers must provide the reviewed identifier. */
+  public async deleteRelease(
+    owner: string,
+    name: string,
+    releaseId: number,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    const response = await this.ghRequest(
+      'DELETE',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/releases/${safeReleaseId}`,
+      { customHeaders: { Accept: 'application/vnd.github+json' }, signal }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Delete one exact release asset. */
+  public async deleteReleaseAsset(
+    owner: string,
+    name: string,
+    assetId: number,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeAssetId = validateGitHubReleaseIdentifier(assetId, 'asset id')
+    const response = await this.ghRequest(
+      'DELETE',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/releases/assets/${safeAssetId}`,
+      { customHeaders: { Accept: 'application/vnd.github+json' }, signal }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
   }
 
   /**
