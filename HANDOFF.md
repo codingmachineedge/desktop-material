@@ -17,21 +17,23 @@ claiming that its remaining README roadmap items are finished.
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Integration checkpoint `6e97a49466` contains the
+`codex/guided-final-gate`. Integration checkpoint `2a6abf0346` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
 complete worktree lifecycle administration, branch pin/hide/solo/restore,
 exact merge-tree conflict paths, signing and Git LFS administration,
-structured local-commit rewriting, and guided bisect sessions. Each completed
-phase was committed and pushed after its focused security, TypeScript, lint,
-formatting, and privacy gates passed. The bisect integration union also passed
-75 focused Git/model/UI/style/sibling tests before its merge was pushed.
+structured local-commit rewriting, guided bisect sessions, and the complete
+repository-wide native stash manager. Each completed phase was committed and
+pushed after its focused security, TypeScript, lint, formatting, and privacy
+gates passed. The bisect integration union passed 75 focused
+Git/model/UI/style/sibling tests; the stash integration passed 46 focused
+Git/UI/style tests and a root TypeScript gate before its merge was pushed.
 
-Releases/assets, the complete stash manager, and the complete remote manager
-are in isolated worktrees. Repository hooks, richer Issue workflows, and
-provider-neutral triage follow those integrations. Nothing in this live
-section claims publication on `main`: final production build, off-screen
+Releases/assets, the complete remote manager, and repository hooks are in
+isolated worktrees. Richer Issue workflows and provider-neutral triage follow
+those integrations. Nothing in this live section claims publication on
+`main`: final production build, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
 can be closed.
