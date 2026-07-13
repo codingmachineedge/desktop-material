@@ -1,4 +1,7 @@
 #preferences {
+  container-name: preferences-dialog;
+  container-type: inline-size;
+
   .automation-preferences {
     .automation-toggle-row,
     .automation-account-row {
@@ -166,6 +169,8 @@
   // the scrollable active tab, and the footer. Because the footer lives inside
   // the pane (not spanning the card) the rail reaches the full card height.
   .preferences-content-pane {
+    container-name: preferences-pane;
+    container-type: inline-size;
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -809,6 +814,132 @@
             }
           }
         }
+      }
+    }
+  }
+
+  // The scale controls must remain reachable even when the user has disabled
+  // auto-fit and selected 200%. Container queries are intentional here: the
+  // settings card can be narrow while the Electron viewport is still wider.
+  @container preferences-dialog (max-width: 620px) {
+    .preferences-rail {
+      width: 72px;
+      padding: 12px 8px 10px;
+
+      .preferences-title {
+        margin: 0 0 8px;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .tab-bar.vertical {
+        align-items: center;
+        gap: 2px;
+
+        .tab-bar-item {
+          width: 48px;
+          min-width: 48px;
+          min-height: 40px;
+          justify-content: center;
+          margin: 0;
+          padding: 0;
+          font-size: 0;
+
+          .icon {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+          }
+        }
+      }
+
+      .preferences-version {
+        display: none;
+      }
+    }
+
+    .preferences-pane-header {
+      padding: 6px 6px 0 0;
+    }
+
+    .tab-container {
+      padding: 4px 14px 10px;
+    }
+
+    .dialog-footer {
+      padding: 8px 12px 10px;
+
+      .button-group {
+        width: 100%;
+        min-width: 0;
+        flex-wrap: wrap;
+      }
+
+      button {
+        max-width: 100%;
+        min-width: min(120px, 100%);
+        flex: 1 1 120px;
+      }
+    }
+  }
+
+  @container preferences-pane (max-width: 520px) {
+    .automation-preferences {
+      .automation-toggle-row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: var(--spacing);
+
+        select {
+          width: 100%;
+          min-width: 0;
+        }
+      }
+
+      .automation-account-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .scaling-section .scaling-slider-row {
+      align-items: stretch;
+      flex-wrap: wrap;
+
+      .scaling-slider {
+        flex-basis: calc(100% - 64px);
+        min-width: 0;
+      }
+    }
+
+    .accounts-tab {
+      .provider-sign-in-card {
+        grid-template-columns: minmax(0, 1fr);
+
+        .button-component {
+          width: 100%;
+        }
+      }
+
+      .account-info {
+        flex-direction: column;
+
+        .user-info-container {
+          min-width: 0;
+          margin-bottom: var(--spacing);
+        }
+
+        .button-component {
+          width: 100%;
+          align-self: stretch;
+        }
+      }
+    }
+
+    .theme-selector {
+      flex-wrap: wrap;
+
+      .radio-button-component {
+        min-width: min(140px, 100%);
       }
     }
   }
