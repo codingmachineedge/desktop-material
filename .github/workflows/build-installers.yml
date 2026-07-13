@@ -103,7 +103,8 @@ jobs:
           # releases/latest/download/<name> would 404 during the client update.
           if [ -e dist/RELEASES ]; then
             cp dist/RELEASES installers/
-            while read -r _sha name _size; do
+            # Squirrel may omit the final newline, so process a populated EOF record.
+            while read -r _sha name _size || [[ -n "$name" ]]; do
               [ -z "$name" ] && continue
               [ -e "installers/$name" ] && continue
               case "$name" in
