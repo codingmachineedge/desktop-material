@@ -228,6 +228,12 @@ export class StashManager extends React.Component<
     ).length
   }
 
+  private get effectiveSelectedCount(): number {
+    return this.state.includeUntracked
+      ? this.selectedPaths.length
+      : this.selectedPaths.length - this.selectedUntrackedCount
+  }
+
   private get focusedEntry(): IStashEntry | null {
     return (
       this.props.allStashEntries.find(
@@ -570,7 +576,8 @@ export class StashManager extends React.Component<
       this.props.branch === null ||
       this.props.hasConflicts ||
       this.state.createName.trim().length === 0 ||
-      (this.state.createScope === 'selected' && selectedCount === 0)
+      (this.state.createScope === 'selected' &&
+        this.effectiveSelectedCount === 0)
     const untrackedWarning =
       this.state.createScope === 'selected' &&
       !this.state.includeUntracked &&
@@ -778,6 +785,7 @@ export class StashManager extends React.Component<
           id={StashMetadataBranchInputId}
           type="text"
           list="desktop-material-stash-branches"
+          maxLength={1024}
           value={this.state.metadataBranch}
           disabled={busy}
           onChange={this.onMetadataBranchChanged}
@@ -822,6 +830,7 @@ export class StashManager extends React.Component<
         <input
           id={StashBranchInputId}
           type="text"
+          maxLength={1024}
           value={this.state.newBranchName}
           disabled={busy}
           onChange={this.onNewBranchNameChanged}

@@ -646,7 +646,7 @@ export async function applyDesktopStashEntry(
   const entry = await requireDesktopStashEntry(repository, stashSha, signal)
   try {
     await git(
-      ['stash', 'apply', '--quiet', entry.name],
+      ['stash', 'apply', '--quiet', entry.stashSha],
       repository.path,
       'applyDesktopStashEntry',
       stashGitOptions(signal)

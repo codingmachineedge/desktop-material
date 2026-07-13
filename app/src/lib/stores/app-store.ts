@@ -5377,16 +5377,26 @@ export class AppStore extends TypedBaseStore<IAppState> {
           'The checked-out branch changed during review. Nothing was stashed.'
         )
       }
-      const currentPaths = new Set(
-        state.changesState.workingDirectory.files.map(file => file.path)
+      const currentFiles = new Map(
+        state.changesState.workingDirectory.files.map(file => [file.path, file])
       )
-      if (request.selectedPaths.some(path => !currentPaths.has(path))) {
+      if (request.selectedPaths.some(path => !currentFiles.has(path))) {
         throw new StashManagerError(
           'stale-entry',
           'The selected changes changed during review. Refresh and choose them again.'
         )
       }
-      selectedPaths = request.selectedPaths
+      selectedPaths = request.selectedPaths.filter(
+        path =>
+          request.includeUntracked ||
+          currentFiles.get(path)?.status.kind !== AppFileStatusKind.Untracked
+      )
+      if (selectedPaths.length === 0) {
+        throw new StashManagerError(
+          'invalid-input',
+          'The selection contains only untracked files. Enable Include untracked or choose tracked changes.'
+        )
+      }
     }
 
     try {

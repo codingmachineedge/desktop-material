@@ -45,6 +45,8 @@ class FakeStashDispatcher {
   public readonly applied: IStashEntry[] = []
   public readonly restored: IStashEntry[] = []
   public readonly cleared: ReadonlyArray<string>[] = []
+  public readonly updates: unknown[] = []
+  public readonly branches: string[] = []
 
   public createManagedStash = async (
     _repository: Repository,
@@ -87,8 +89,21 @@ class FakeStashDispatcher {
     return stashShas.length
   }
 
-  public updateManagedStash = async () => {}
-  public createBranchFromManagedStash = async () => {}
+  public updateManagedStash = async (
+    _repository: Repository,
+    _stashEntry: IStashEntry,
+    request: unknown
+  ) => {
+    this.updates.push(request)
+  }
+
+  public createBranchFromManagedStash = async (
+    _repository: Repository,
+    _stashEntry: IStashEntry,
+    branchName: string
+  ) => {
+    this.branches.push(branchName)
+  }
 }
 
 function renderManager(
@@ -192,6 +207,80 @@ describe('stash manager', () => {
 
     await waitFor(() => assert.equal(fake.cleared.length, 1))
     assert.deepEqual(fake.cleared[0], [mainEntry.stashSha])
+  })
+
+  it('reviews metadata updates and branch creation through task-specific forms', async () => {
+    const fake = renderManager()
+    fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
+    fireEvent.click(screen.getByRole('button', { name: /Main review/ }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename or move' }))
+    fireEvent.change(
+      screen.getByLabelText('Name', {
+        selector: '#desktop-material-stash-metadata-name',
+      }),
+      {
+        target: { value: 'Renamed review' },
+      }
+    )
+    fireEvent.change(screen.getByLabelText('Branch association'), {
+      target: { value: 'feature/moved' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save details' }))
+    await waitFor(() => assert.equal(fake.updates.length, 1))
+    assert.deepEqual(fake.updates[0], {
+      displayName: 'Renamed review',
+      branchName: 'feature/moved',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Main review/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'New branch' }))
+    fireEvent.change(screen.getByLabelText('New local branch'), {
+      target: { value: 'recovery/main-review' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review branch creation' })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Create branch' }))
+    await waitFor(() =>
+      assert.deepEqual(fake.branches, ['recovery/main-review'])
+    )
+  })
+
+  it('aborts the exact in-flight operation from the sticky busy control', async () => {
+    const fake = new FakeStashDispatcher()
+    let aborted = false
+    fake.createManagedStash = async (
+      _repository: Repository,
+      _request: unknown,
+      signal?: AbortSignal
+    ) => {
+      await new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener(
+          'abort',
+          () => {
+            aborted = true
+            reject(new StashManagerError('aborted', 'cancelled'))
+          },
+          { once: true }
+        )
+      })
+      return false
+    }
+    renderManager(fake)
+    fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'Long operation' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create named stash' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel operation' }))
+
+    await waitFor(() => assert.equal(aborted, true))
+    assert(
+      screen.getByText(
+        'Creating named stash cancelled. The repository was refreshed.'
+      )
+    )
   })
 
   it('turns cancellation and Git failures into bounded recovery guidance', () => {
