@@ -1,4 +1,6 @@
 export { RepositoryTools } from './repository-tools'
+export { RepositoryBundleImport } from './bundle-import'
+export type { IRepositoryBundleImportProps } from './bundle-import'
 export type {
   IRepositoryToolsClient,
   IRepositoryToolsProps,

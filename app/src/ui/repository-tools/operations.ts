@@ -32,6 +32,8 @@ export interface IRepositoryBundleImportRequest
   readonly checkDestinationArgs: ReadonlyArray<string>
   /** Import objects without writing FETCH_HEAD or any local ref. */
   readonly fetchObjectsArgs: ReadonlyArray<string>
+  /** Require the advertised object to peel to a commit before branch creation. */
+  readonly validateCommitArgs: ReadonlyArray<string>
   /** Git branch refuses to replace a ref that appeared after the recheck. */
   readonly createBranchArgs: ReadonlyArray<string>
 }
@@ -39,7 +41,7 @@ export interface IRepositoryBundleImportRequest
 const MaximumBundleRefs = 5_000
 
 function normalizeRepositoryBundlePath(bundlePath: string): string {
-  const value = bundlePath.trim()
+  const value = bundlePath
   if (
     value.length === 0 ||
     value.includes('\0') ||
@@ -176,6 +178,7 @@ export function prepareRepositoryBundleImport(
       inspection.bundlePath,
       source.ref,
     ],
+    validateCommitArgs: ['cat-file', '-e', `${source.oid}^{commit}`],
     createBranchArgs: [
       'branch',
       '--no-track',

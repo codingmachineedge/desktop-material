@@ -217,6 +217,7 @@ describe('repository tool recipes', () => {
         'C:\\exports\\backup.bundle',
         'refs/heads/release',
       ],
+      validateCommitArgs: ['cat-file', '-e', `${'a'.repeat(40)}^{commit}`],
       createBranchArgs: [
         'branch',
         '--no-track',

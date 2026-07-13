@@ -76,7 +76,8 @@ function renderTools(
   ) => Promise<string | null>,
   revealArchive?: (path: string) => Promise<void>,
   chooseBundleDestination?: (defaultPath: string) => Promise<string | null>,
-  chooseBundleToVerify?: () => Promise<string | null>
+  chooseBundleToVerify?: () => Promise<string | null>,
+  chooseBundleToImport?: () => Promise<string | null>
 ) {
   return render(
     <RepositoryTools
@@ -87,6 +88,7 @@ function renderTools(
       revealArchive={revealArchive}
       chooseBundleDestination={chooseBundleDestination}
       chooseBundleToVerify={chooseBundleToVerify}
+      chooseBundleToImport={chooseBundleToImport}
     />
   )
 }
@@ -104,6 +106,7 @@ describe('Repository tools', () => {
     assert.ok(screen.getByText('Run repository maintenance'))
     assert.ok(screen.getByText('View recent ref movements'))
     assert.ok(screen.getByText('Export repository artifacts'))
+    assert.ok(screen.getByText('Import a branch from a Git bundle'))
     assert.equal(screen.queryByRole('searchbox'), null)
     assert.equal(screen.queryByRole('textbox'), null)
     assert.equal(screen.queryByText(/command arguments/i), null)
@@ -320,5 +323,328 @@ describe('Repository tools', () => {
     ])
     assert.equal(client.starts[0].confirmed, false)
     assert.equal(screen.queryByRole('alertdialog'), null)
+  })
+
+  it('imports one advertised bundle ref through review and mutation-boundary rechecks', async () => {
+    const client = new FakeRepositoryToolsClient()
+    let refreshes = 0
+    const sourceOID = 'a'.repeat(40)
+    renderTools(
+      client,
+      async () => {
+        refreshes++
+      },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => 'C:/exports/repository.bundle'
+    )
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].args, [
+      'bundle',
+      'verify',
+      'C:\\exports\\repository.bundle',
+    ])
+    client.emitState({
+      id: client.starts[0].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+
+    await waitFor(() => assert.equal(client.starts.length, 2))
+    assert.deepStrictEqual(client.starts[1].args, [
+      'bundle',
+      'list-heads',
+      'C:\\exports\\repository.bundle',
+    ])
+    client.emitOutput({
+      id: client.starts[1].id,
+      stream: 'stdout',
+      data: `${sourceOID} refs/heads/main\n${'b'.repeat(40)} refs/tags/v2\n`,
+    })
+    client.emitState({
+      id: client.starts[1].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+
+    const source = await screen.findByLabelText('Advertised source ref')
+    assert.equal((source as HTMLSelectElement).value, 'refs/heads/main')
+    fireEvent.change(screen.getByLabelText('New local branch'), {
+      target: { value: 'imported/main' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review bundle import' })
+    )
+
+    await waitFor(() => assert.equal(client.starts.length, 3))
+    assert.deepStrictEqual(client.starts[2].args, [
+      'check-ref-format',
+      '--branch',
+      'imported/main',
+    ])
+    client.emitState({
+      id: client.starts[2].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 4))
+    assert.deepStrictEqual(client.starts[3].args, [
+      'show-ref',
+      '--verify',
+      '--quiet',
+      'refs/heads/imported/main',
+    ])
+    client.emitState({
+      id: client.starts[3].id,
+      state: 'failed',
+      exitCode: 1,
+      signal: null,
+    })
+
+    const confirmation = await screen.findByRole('alertdialog')
+    assert.match(confirmation.textContent ?? '', /refs\/heads\/main/)
+    assert.match(confirmation.textContent ?? '', /refs\/heads\/imported\/main/)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Import to new branch' })
+    )
+
+    await waitFor(() => assert.equal(client.starts.length, 5))
+    assert.deepStrictEqual(client.starts[4].args, client.starts[0].args)
+    client.emitState({
+      id: client.starts[4].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 6))
+    client.emitOutput({
+      id: client.starts[5].id,
+      stream: 'stdout',
+      data: `${sourceOID} refs/heads/main\n`,
+    })
+    client.emitState({
+      id: client.starts[5].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 7))
+    assert.deepStrictEqual(client.starts[6].args, client.starts[2].args)
+    client.emitState({
+      id: client.starts[6].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 8))
+    assert.deepStrictEqual(client.starts[7].args, client.starts[3].args)
+    client.emitState({
+      id: client.starts[7].id,
+      state: 'failed',
+      exitCode: 1,
+      signal: null,
+    })
+
+    await waitFor(() => assert.equal(client.starts.length, 9))
+    assert.deepStrictEqual(client.starts[8].args, [
+      'fetch',
+      '--no-write-fetch-head',
+      '--no-tags',
+      '--no-auto-maintenance',
+      'C:\\exports\\repository.bundle',
+      'refs/heads/main',
+    ])
+    assert.equal(client.starts[8].confirmed, true)
+    client.emitState({
+      id: client.starts[8].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+
+    await waitFor(() => assert.equal(client.starts.length, 10))
+    assert.deepStrictEqual(client.starts[9].args, [
+      'cat-file',
+      '-e',
+      `${sourceOID}^{commit}`,
+    ])
+    assert.equal(client.starts[9].confirmed, false)
+    client.emitState({
+      id: client.starts[9].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+
+    await waitFor(() => assert.equal(client.starts.length, 11))
+    assert.deepStrictEqual(client.starts[10].args, [
+      'branch',
+      '--no-track',
+      '--',
+      'imported/main',
+      sourceOID,
+    ])
+    assert.equal(client.starts[10].confirmed, true)
+    client.emitState({
+      id: client.starts[10].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+
+    await waitFor(() => assert.equal(refreshes, 1))
+    assert.ok(
+      await screen.findByText('Imported refs/heads/main as imported/main.')
+    )
+  })
+
+  it('never imports when the destination appears during the final recheck', async () => {
+    const client = new FakeRepositoryToolsClient()
+    const sourceOID = 'a'.repeat(40)
+    renderTools(
+      client,
+      async () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => 'C:/exports/repository.bundle'
+    )
+    await screen.findByText('git version 2.55.0')
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    client.emitState({
+      id: client.starts[0].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 2))
+    client.emitOutput({
+      id: client.starts[1].id,
+      stream: 'stdout',
+      data: `${sourceOID} refs/heads/main\n`,
+    })
+    client.emitState({
+      id: client.starts[1].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await screen.findByLabelText('New local branch')
+    fireEvent.change(screen.getByLabelText('New local branch'), {
+      target: { value: 'imported/main' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review bundle import' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 3))
+    client.emitState({
+      id: client.starts[2].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 4))
+    client.emitState({
+      id: client.starts[3].id,
+      state: 'failed',
+      exitCode: 1,
+      signal: null,
+    })
+    await screen.findByRole('alertdialog')
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Import to new branch' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 5))
+    client.emitState({
+      id: client.starts[4].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 6))
+    client.emitOutput({
+      id: client.starts[5].id,
+      stream: 'stdout',
+      data: `${sourceOID} refs/heads/main\n`,
+    })
+    client.emitState({
+      id: client.starts[5].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 7))
+    client.emitState({
+      id: client.starts[6].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() => assert.equal(client.starts.length, 8))
+
+    client.emitState({
+      id: client.starts[7].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await screen.findByText(/already exists.*will not be overwritten/i)
+    assert.equal(client.starts.length, 8)
+    assert.equal(
+      client.starts.some(start => start.args[0] === 'fetch'),
+      false
+    )
+    assert.equal(
+      client.starts.some(start => start.args[0] === 'branch'),
+      false
+    )
+  })
+
+  it('cancels the exact active bundle inspection without advancing', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(
+      client,
+      async () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => 'C:/exports/repository.bundle'
+    )
+    await screen.findByText('git version 2.55.0')
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cancel bundle operation' })
+    )
+    await waitFor(() =>
+      assert.deepStrictEqual(client.cancels, [client.starts[0].id])
+    )
+    client.emitState({
+      id: client.starts[0].id,
+      state: 'cancelled',
+      exitCode: null,
+      signal: 'SIGTERM',
+    })
+    await screen.findByText(
+      'Bundle operation cancelled. No local branch was created.'
+    )
+    assert.equal(client.starts.length, 1)
   })
 })
