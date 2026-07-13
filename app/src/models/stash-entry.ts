@@ -10,6 +10,12 @@ export interface IStashEntry {
   /** The SHA of the commit object created as a result of stashing. */
   readonly stashSha: string
 
+  /** A user-facing name recorded by Desktop Material, when one was supplied. */
+  readonly displayName?: string | null
+
+  /** The bounded ISO timestamp recorded on the stash commit, when available. */
+  readonly createdAt?: string | null
+
   /** The list of files this stash touches */
   readonly files: StashedFileChanges
 
@@ -43,11 +49,34 @@ export type StashedFileChanges =
 
 export type StashCallback = (stashEntry: IStashEntry) => Promise<void>
 
+export type StashCreateScope = 'all' | 'selected'
+
+/** Reviewed input for Desktop Material's purpose-built stash manager. */
+export interface ICreateManagedStashRequest {
+  readonly displayName: string
+  readonly includeUntracked: boolean
+  readonly scope: StashCreateScope
+  readonly selectedPaths: ReadonlyArray<string>
+}
+
+/** User-reviewed metadata update for one Desktop-managed stash. */
+export interface IUpdateManagedStashRequest {
+  readonly branchName: string
+  readonly displayName: string
+}
+
+/** Return the explicit name, falling back to the compact legacy label. */
+export function stashEntryTitle(stashEntry: IStashEntry): string {
+  const displayName = stashEntry.displayName?.trim()
+  return displayName ? displayName : stashEntryLabel(stashEntry)
+}
+
 /** A compact, stable-enough label for a stash row in the Changes sidebar. */
 export function stashEntryLabel(stashEntry: IStashEntry): string {
   const ordinalMatch = /stash@\{(\d+)\}/.exec(stashEntry.name)
   const ordinal = ordinalMatch === null ? '' : ` ${Number(ordinalMatch[1]) + 1}`
-  const prefix = `Stash${ordinal}`
+  const explicitName = stashEntry.displayName?.trim()
+  const prefix = explicitName ? explicitName : `Stash${ordinal}`
 
   if (stashEntry.files.kind !== StashedChangesLoadStates.Loaded) {
     return `${prefix} · Loading…`
