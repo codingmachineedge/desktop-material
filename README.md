@@ -13,9 +13,12 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
 ## Shipped today
 
 The original M0–M18 product baseline is live on `main`. The guided parity wave
-described below is implementation-complete in the current integration tree and
-still awaits its final production/off-screen acceptance gate and promotion to
-`main`; the roadmap keeps those two states separate.
+described below is implementation-complete and locally accepted at exact app
+source `5e80e678d062b65a82c0991b352e5a861c7469e5`. That source passed the
+reproducible production build and isolated hidden-desktop interaction gate. Its
+later documentation/image merge SHA and final `main` SHA remain publication
+identities, not substitute build identities; CI, Pages, wiki, release, artifact
+purge, and cleanup evidence must still be recorded before M19 is called shipped.
 
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu
@@ -32,7 +35,7 @@ still awaits its final production/off-screen acceptance gate and promotion to
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
 - Browse complete GitHub organization repository lists, filter cloning by organization, and choose an organization when publishing
 - Add GitLab accounts, including self-hosted endpoints, with a personal access token; add Bitbucket accounts with an app password, then browse and clone their repositories from the provider tab
-- Clone a private repository from a generic HTTPS URL without a credential prompt when an eligible signed-in account matches the exact origin. Only authentication or repository-not-found ambiguity can try another exact-origin account; the successful account affinity is retained, while tokenless, missing, SSH, non-authentication, and cross-origin credentials never widen fallback
+- Clone a private repository from a generic HTTPS URL without a credential prompt when an eligible signed-in account matches the exact origin. Only authentication or repository-not-found ambiguity can try another exact-origin account; the successful account affinity is retained, while tokenless or stale tokenless bindings are skipped and missing, SSH, non-authentication, and cross-origin credentials never widen fallback
 - The repository list can hide its automatically maintained Recent group from **Settings → Appearance**
 - Repositories can be pinned from their context menu into a dedicated top group
 
@@ -83,7 +86,8 @@ still awaits its final production/off-screen acceptance gate and promotion to
 **Power-user history, stashes, and windows**
 - Search History by title, message, tag, or hash and toggle a lane graph that visualizes commit ancestry
 - Use the repository-wide Stash Manager to create, inspect, apply, pop, rename, branch from, or delete an exact stash while retaining partial-failure context
-- Pull every repository from the repositories sheet with per-repository results; an ambiguous HTTPS authentication or not-found response can retry other signed-in accounts for that exact origin without displaying an identity or token
+- Pull every repository from the repositories sheet with per-repository results; an ambiguous HTTPS authentication or not-found response can retry every remaining token-bearing signed-in account for that exact origin without displaying an identity or token
+- Deepen or unshallow a repository from History/Repository Tools with the same exact-origin Desktop credential trampoline and bounded signed-in-account recovery when the default credential is rejected
 - Use repository pinning/grouping, branch presets/default-branch controls, and per-repository editor overrides
 - Add, lock, move, rename, repair, remove, or prune worktrees, and open repositories or worktrees in separate windows with isolated per-window selection and persisted tabs
 
@@ -131,30 +135,30 @@ the earlier inventory and proof history remains in the
 | **Done** | Add the first guided repository-function batch | Status summary, repository health, recent-signature audit, maintenance preview/run, reflog recovery, ZIP/TAR export from `HEAD`, full-history bundle export, and read-only bundle verification use fixed safe recipes, purpose-built controls, confirmation, streaming results, exact cancel, native save/reveal, and repository refresh—without a raw command search/editor |
 | **Done** | Complete guarded full-history bundle export, verification, and import | An inspected bundle can create a new local branch without overwriting an existing ref; actual off-screen import completed, and standard bundle advertisements such as the pseudo-ref `HEAD` are ignored rather than rejected or offered as import targets |
 | **Done** | Keep Notifications identities and signed-out state responsive | Long local notification-source identities wrap within the panel, while the GitHub inbox presents a complete `No signed-in accounts` option without clipped or oversized text |
-| **Implementation done; final acceptance pending** | Expand audited Git capabilities as named functions | File history/blame and restore, signature audit, source archives, bundle export/verification/import, shallow clone/deepening, sparse checkout, patch-series exchange, structured commit rewriting, signing, LFS, complete worktree administration, branch visibility, merge-tree conflict preview, guided bisect, the repository-wide Stash Manager, Remote Manager, and Repository Hooks Manager are integrated with focused regressions |
-| **Implementation done; final acceptance pending** | Expand named GitHub and provider functions on hardened transports | Notifications, Issue and pull-request creation, complete pull-request metadata/review/update/merge lifecycle, Actions artifact pagination/download/digest handling, effective branch-rule inspection, Releases/assets, richer GitHub Issues, and provider-neutral GitHub/GitLab/Bitbucket triage are integrated with bounded account/repository-bound request and review state |
+| **Accepted locally; publication pending** | Expand audited Git capabilities as named functions | Exact app source `5e80e678…` was production-built and exercised off-screen across shallow clone/deepening, sparse checkout, Repository Tools, Stash Manager, Remote Manager, and cross-account recovery; final `main` publication evidence remains open |
+| **Accepted locally; publication pending** | Expand named GitHub and provider functions on hardened transports | Exact app source `5e80e678…` was exercised against a synthetic loopback provider across native PR creation, Actions logs/artifacts, Releases, Issues, and provider triage; final `main` publication evidence remains open |
 | **Done** | Complete the official GitKraken Desktop history comparison | Official surviving 0.6–6.0 posts plus 7.x–12.3 release archives were deduplicated into current-app coverage, implementable local gaps, and explicitly separated proprietary/cloud services |
-| **Pending for the current tree** | Build and interactively verify every changed UI off-screen | Prior captures remain historical evidence only. The exact final integration SHA still needs a fresh MCP production build, isolated interaction of the representative guided surfaces and cross-account clone flow, original-resolution screenshot inspection, and cleanup evidence |
-| **Draft reconciled; publication pending** | Refresh README, wiki, Pages, and screenshot evidence | The source documentation now describes the implemented guided waves without promoting them to published `main`. Root must insert the exact accepted screenshot ledger, merge SHA, CI/Pages/wiki/release links, and cleanup result after those checks actually succeed |
+| **Done for accepted app source** | Build and interactively verify representative changed UI off-screen | Exact app source `5e80e678…` passed the MCP production build and final hidden-desktop clone/Pull All/deepen plus Foundation/P0/P1/Later interactions. All 14 clean accepted frames come from that exact build and are recorded in PLAN/HANDOFF |
+| **Local evidence reconciled; publication pending** | Refresh README, wiki, Pages, and screenshot evidence | README/PLAN/HANDOFF identify the accepted app source and 14-image ledger without claiming `main`. Screenshot promotion, canonical wiki/Pages synchronization, final merge SHA, CI/release links, artifact purge, and cleanup must be added only after success |
 
 ### Capability roadmap
 
 | Area | Implemented in the integration tree | Final acceptance still required | Long-tail access |
 |---|---|---|---|
-| **Git** | Core repository/branch/commit/diff workflows plus file history/blame/restore, signature audit, shallow clone/deepening, sparse checkout, archives, bundles, patch series, structured local-commit rewrite, signing, LFS, complete worktree administration, branch visibility, merge-tree conflict paths, guided bisect, Stash Manager, Remote Manager, and Repository Hooks Manager | Exact final production build, representative off-screen interaction, exhaustive tests/lint/typecheck/format/privacy checks, and accepted screenshots for the resulting SHA | Fixed, audited Git recipes power named task controls; there is no raw command search/editor |
-| **GitHub** | Account-scoped Notifications; guided Issue and pull-request creation; complete PR template/metadata/review/update/close/reopen/merge lifecycle; Actions runs/logs/mutations/artifact pagination and bounded download/digest handling; effective branch rules; Releases/assets; and richer Issues | Exact-account fixture exercise, stale-response/cancellation review in the final union, off-screen interaction, and exact-SHA CI/publication evidence | `gh`, REST, and GraphQL may back provider-scoped functions internally; users see purpose-built forms, previews, confirmations, and results |
-| **Providers** | Exact-account GitHub/GitLab/Bitbucket repository triage with bounded Issue/PR projections, filters, attention buckets, safe links, and explicit unsupported/partial/capped/error states | Synthetic multi-provider exercise and final responsive/accessibility inspection; Bitbucket Issues remain explicitly unsupported by the provider | Provider APIs remain adapters behind one neutral task surface; raw payloads, tokens, and repository paths are not retained |
+| **Git** | Core repository/branch/commit/diff workflows plus file history/blame/restore, signature audit, shallow clone/deepening, sparse checkout, archives, bundles, patch series, structured local-commit rewrite, signing, LFS, complete worktree administration, branch visibility, merge-tree conflict paths, guided bisect, Stash Manager, Remote Manager, and Repository Hooks Manager | Local exact-build interaction is accepted at `5e80e678…`; exhaustive final-tree revalidation, screenshot promotion, `main`, and remote publication evidence remain | Fixed, audited Git recipes power named task controls; there is no raw command search/editor |
+| **GitHub** | Account-scoped Notifications; guided Issue and pull-request creation; complete PR template/metadata/review/update/close/reopen/merge lifecycle; Actions runs/logs/mutations/artifact pagination and bounded download/digest handling; effective branch rules; Releases/assets; and richer Issues | The synthetic exact-account fixture and representative off-screen surfaces are accepted at `5e80e678…`; exact-`main` CI/publication/release evidence remains | `gh`, REST, and GraphQL may back provider-scoped functions internally; users see purpose-built forms, previews, confirmations, and results |
+| **Providers** | Exact-account GitHub/GitLab/Bitbucket repository triage with bounded Issue/PR projections, filters, attention buckets, safe links, and explicit unsupported/partial/capped/error states | Synthetic provider-triage interaction is accepted locally; final responsive audit and exact-`main` publication evidence remain. Bitbucket Issues remain explicitly unsupported | Provider APIs remain adapters behind one neutral task surface; raw payloads, tokens, and repository paths are not retained |
 | **GitKraken parity references** | Graph, diff, history/blame, commit/stash/branch/remote/worktree flows, shallow/sparse controls, tabs, provider accounts, themes, search, automation, multi-window work, hooks/signing, richer PR/Issues triage, and conflict preview are represented by native guided functions | Validate the final responsive union and document any future independently selected local capability | Proprietary GitKraken cloud, enterprise, AI, and collaboration services remain reference points, not copied services, branding, or assets |
 
 ### Native parity waves
 
 | Priority | Guided app functions | State |
 |---|---|---|
-| **Delivered foundation** | Repository status/health/maintenance/reflog tools; file history/blame and restore; bounded shallow clone/deepening; sparse checkout; source archives; full bundle export/verify/import; Notifications; and guided Issue creation | **Implementation done** |
-| **P0** | Native pull-request compose plus templates/metadata/review/update/close/reopen/merge; Actions artifact redirect hardening, pagination, bounded download/digest/attestation context; effective branch rules | **Implementation done; final acceptance pending** |
-| **P1** | Patch-series export/import; structured local-commit rewrite; Releases/assets; commit/tag signing; Git LFS; complete worktree lifecycle administration | **Implementation done; final acceptance pending** |
-| **P2** | Persisted branch pin/hide/solo/restore controls | **Implementation done; final acceptance pending** |
-| **Later** | Exact merge-tree conflict preview; guided bisect; complete Stash and Remote Managers; Repository Hooks Manager; richer GitHub Issues; provider-neutral triage | **Implementation done; final acceptance pending** |
+| **Delivered foundation** | Repository status/health/maintenance/reflog tools; file history/blame and restore; bounded shallow clone/deepening; sparse checkout; source archives; full bundle export/verify/import; Notifications; and guided Issue creation | **Accepted locally; publication pending** |
+| **P0** | Native pull-request compose plus templates/metadata/review/update/close/reopen/merge; Actions artifact redirect hardening, pagination, bounded download/digest/attestation context; effective branch rules | **Accepted locally; publication pending** |
+| **P1** | Patch-series export/import; structured local-commit rewrite; Releases/assets; commit/tag signing; Git LFS; complete worktree lifecycle administration | **Accepted locally; publication pending** |
+| **P2** | Persisted branch pin/hide/solo/restore controls | **Implementation done; publication pending** |
+| **Later** | Exact merge-tree conflict preview; guided bisect; complete Stash and Remote Managers; Repository Hooks Manager; richer GitHub Issues; provider-neutral triage | **Accepted locally; publication pending** |
 | **Reference only** | GitKraken Cloud Workspaces/Patches, Team presence, Launchpad sync, Insights, Code Review service, shared AI credits, organization policy, and on-prem commercial services | **Not copied** |
 
 ### Verification roadmap
@@ -165,9 +169,9 @@ the earlier inventory and proof history remains in the
 
 #### Closing evidence checklist
 
-- [ ] Record the final integrated commit and the exhaustive unit, lint, TypeScript, formatting, diff, privacy, and production-build results.
-- [ ] Exercise the exact production bundle on one isolated off-screen desktop, including deterministic cross-account clone recovery and representative P0/P1/P2/Later surfaces.
-- [ ] Inspect every promoted screenshot at original resolution and record its dimensions, bytes, SHA-256, and synthetic fixture identity.
+- [x] Record accepted app source `5e80e678d062b65a82c0991b352e5a861c7469e5` and its successful exact MCP production build; repeat exhaustive repository gates after the documentation/image union is final.
+- [x] Exercise that exact production bundle on one isolated off-screen desktop, including deterministic cross-account clone recovery and representative Foundation/P0/P1/Later surfaces.
+- [x] Inspect all 14 synthetic-only exact-`5e80e678…` capture candidates at original resolution and record dimensions, bytes, and SHA-256; promote only those exact files with the final documentation union.
 - [ ] Merge the accepted tree to `main`, then record exact-SHA CI, Pages, canonical wiki, installer/release, asset/digest, and live-URL evidence.
 - [ ] Verify owned processes, desktops, credentials, fixtures, worktrees, and temporary roots are removed; leave `main` clean and equal to `origin/main`.
 
@@ -185,10 +189,20 @@ the earlier inventory and proof history remains in the
 | **Multi-window** — isolated repository/worktree windows and persisted tabs | **Settings history** — Git-backed timeline, diff, Undo, Redo, restore-to-point |
 | ![Appearance settings at a requested 200% scale auto-fitted to 96%](docs/assets/screenshots/material-scale-200-autofit.png) | ![Responsive regression proof at 1450 by 997 showing the toolbar and Changes controls fully contained with no horizontal overflow](docs/assets/screenshots/material-responsive-overflow-fixed.png) |
 | **200% auto-fit** — minimum-window dark-theme verification with no clipped controls | **Responsive fit** — 1450×997 proof that toolbar and Changes controls fit without horizontal overflow |
-| ![GitHub Actions Windows x64 job log loaded securely in the searchable in-app viewer](docs/assets/screenshots/material-actions-job-log.png) | ![Pull all repositories dialog showing a repository pulled using another signed-in account](docs/assets/screenshots/material-pull-all-account-fallback.png) |
-| **Actions logs** — live 2048×1228 proof of secure redirect handling, credential stripping, safe errors, search, and collapsible groups | **Pull all fallback** — exact-origin signed-in account retry with neutral, token-safe per-repository results |
-| ![Desktop Material workspace after a generic HTTPS repository clone completed through exact-origin signed-in account fallback without displaying a credential prompt](docs/assets/screenshots/material-clone-account-fallback.png) | |
-| **Clone fallback** — generic HTTPS clone completed with exact-origin signed-in account recovery, persisted affinity, and no credential prompt | |
+| ![Shallow-clone controls using a synthetic repository](docs/assets/screenshots/material-shallow-clone-safe.png) | ![Synthetic generic HTTPS clone completed through another exact-origin signed-in account](docs/assets/screenshots/material-clone-account-fallback.png) |
+| **Shallow clone** — bounded depth and submodule controls | **Clone fallback** — token-bearing exact-origin recovery, persisted affinity, no credential prompt |
+| ![Pull all repositories showing a synthetic repository pulled through another signed-in account](docs/assets/screenshots/material-pull-all-account-fallback.png) | ![Cone-mode sparse-checkout review using synthetic paths](docs/assets/screenshots/material-sparse-checkout-safe.png) |
+| **Pull All fallback** — every eligible exact-origin account can be tried without exposing identity | **Sparse checkout** — validated repository-relative directories and explicit review |
+| ![History deepening completed through another signed-in account](docs/assets/screenshots/material-history-deepen.png) | ![Guarded Remote Manager using synthetic remotes](docs/assets/screenshots/material-remote-manager.png) |
+| **History deepening** — deepen/unshallow through the Desktop credential trampoline | **Remote Manager** — reviewed add, rename, update, default, and remove operations |
+| ![Repository-wide Stash Manager using a synthetic repository](docs/assets/screenshots/material-stash-manager.png) | ![Synthetic GitHub Actions job log in the searchable in-app viewer](docs/assets/screenshots/material-actions-job-log.png) |
+| **Stash Manager** — exact-stash create, inspect, apply, pop, branch, rename, and delete | **Actions logs** — safe redirects, search, groups, and stale-response protection |
+| ![Actions artifact with local digest verification](docs/assets/screenshots/material-actions-artifact-download.png) | ![Synthetic GitHub release and asset management](docs/assets/screenshots/material-github-releases.png) |
+| **Actions artifacts** — bounded download, computed digest, and attestation context | **Releases** — reviewed release and arbitrary-asset transfers |
+| ![Synthetic GitHub issue detail and comment](docs/assets/screenshots/material-github-issues.png) | ![Provider-neutral synthetic issue and pull-request triage](docs/assets/screenshots/material-provider-triage.png) |
+| **GitHub Issues** — bounded search, metadata, comments, close, and reopen | **Provider triage** — exact-account GitHub, GitLab, and Bitbucket projections |
+| ![Named guarded Git tools for a synthetic repository](docs/assets/screenshots/material-repository-tools.png) | ![Native pull request created against a synthetic loopback provider](docs/assets/screenshots/material-native-pull-request.png) |
+| **Repository Tools** — named bounded Git workflows without a raw command surface | **Native pull request** — template and metadata review with a synthetic success receipt |
 
 ## Building
 

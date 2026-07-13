@@ -9,17 +9,18 @@ responsive, public documentation, and canonical wiki evidence remains recorded
 below as historical proof for that exact tree.
 
 The later guided Git, GitHub, and provider expansion is now **implementation-
-complete** as M19: all named README P0, P1, P2, and Later functions are in the
-integration tree with focused regression evidence. It is not yet a final
-publication result. Exhaustive post-merge gates, exact production/off-screen
-proof, accepted screenshots, `main` promotion, CI/Pages/wiki/release checks,
-and cleanup must still close before M19 can be called shipped.
+complete and locally accepted** as M19. Exact app source
+`5e80e678d062b65a82c0991b352e5a861c7469e5` passed the reproducible production
+build and isolated hidden-desktop proof. It is not yet a final publication
+result: the documentation/image union, exhaustive final-tree revalidation,
+`main` promotion, CI/Pages/wiki/release checks, artifact purge, and owned-
+resource cleanup must still close before M19 can be called shipped.
 
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Current source checkpoint
-`32b7bb6b955f1b1a58388e12aea5d54810148d4f` contains the
+`codex/guided-final-gate`. Accepted application source
+`5e80e678d062b65a82c0991b352e5a861c7469e5` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
@@ -65,14 +66,17 @@ production `CloningRepositoriesStore` integration that reproduces account A's
 private-repository-style not-found result, automatically succeeds with account
 B, verifies the three-commit clone and B affinity, and keeps both synthetic
 tokens out of arguments, environments, errors, metadata, readiness, and the
-account-class-only ledger. Nothing in this live section claims publication on
-`main`: final integration hardening, off-screen
-interaction, accepted screenshots, documentation/wiki synchronization, CI,
-Pages, installer release, and cleanup remain mandatory gates before this run
-can be closed.
+account-class-only ledger. The final union additionally routes deepen and
+unshallow fetches through the Desktop credential trampoline and bounded
+exact-origin account fallback; matches provider scheme, host, and effective
+port (including IPv6/default-port normalization); and excludes tokenless
+candidates or stale tokenless repository bindings. Nothing in this live section
+claims publication on `main`: final documentation/wiki synchronization,
+exhaustive revalidation, CI, Pages, installer release, artifact purge, and
+cleanup remain mandatory gates before this run can close.
 
-The current source checkpoint makes the Windows full-suite launcher run all
-363 test files in two bounded batches. The closing post-merge run exited zero;
+At earlier checkpoint `32b7bb6b…`, the Windows full-suite launcher ran all 363
+test files in two bounded batches. That closing integration run exited zero;
 its final batch reports 626/626 with no failures, cancellations, skips, or
 todos. Script tests passed 15/15, including all five fixture scenarios;
 application TypeScript, script compilation, repository-wide Prettier, ESLint,
@@ -92,23 +96,34 @@ security/account-routing union at 81/81 after merge.
 The initialized root worktree also reproduced a production-only failure before
 the off-screen gate: the completed renderer exceeded the previous hard-coded
 4 GiB webpack heap. Checkpoint `60ca172f6a` raises only the production compiler
-ceiling to the already-proven 8 GiB value. At exact accepted source
-`32b7bb6b95`, the required low-level MCP HTTP client then ran the identical
-unpackaged production command successfully in 233 seconds: `client_ok: true`,
-return code `0`, and no timeout after webpack, dependency and bundled-Git
-copying, SASS validation, license generation, and the final `out` build.
+ceiling to the already-proven 8 GiB value. After the last account-routing and
+fixture/lifecycle merges, root repeated the required low-level MCP production
+command at exact accepted app source
+`5e80e678d062b65a82c0991b352e5a861c7469e5`. It returned
+`client_ok: true`, return code `0`, and no timeout after webpack, native
+dependencies, bundled-Git copying, Sass validation, license generation, and the
+final unpackaged `out` build. Final exhaustive gates must still be repeated on
+the documentation/image union; the successful app-source build is not relabeled
+as that later merge SHA.
 
 ### Closing evidence placeholders — fill only after success
 
-- [ ] **Final source:** exact accepted feature SHA and exact merged `main` SHA.
-- [ ] **Repository gates:** exhaustive unit total, lint, TypeScript, formatting,
-  diff/conflict/privacy scans, and exact production build.
-- [ ] **Off-screen acceptance:** deterministic cross-account clone ledger,
-  representative Foundation/P0/P1/P2/Later interaction matrix, exact MCP/source
-  SHAs, and owned-resource cleanup result.
-- [ ] **Screenshots:** accepted filenames, dimensions, byte counts, SHA-256
-  digests, source/build SHA, original-resolution inspection, and synthetic-only
-  identity statement.
+- [x] **Accepted app source:**
+  `5e80e678d062b65a82c0991b352e5a861c7469e5`.
+- [ ] **Final publication source:** exact documentation/image merge SHA and
+  exact merged `main` SHA.
+- [ ] **Repository gates:** repeat the exhaustive unit total, lint, TypeScript,
+  formatting, diff/conflict/privacy scans on the final union. The exact
+  production build is already accepted for app source `5e80e678…`.
+- [x] **Off-screen acceptance:** deterministic synthetic cross-account clone
+  ledger and representative Foundation/P0/P1/Later interaction matrix with
+  exact MCP/app-source identity. Owned-resource cleanup remains separate below.
+- [x] **Screenshots:** 14 accepted filenames, dimensions, byte counts, SHA-256
+  digests, exact `5e80e678…` app-source/build provenance,
+  original-resolution inspection, and synthetic-only identity statement
+  recorded below.
+- [ ] **Screenshot promotion:** copy only those exact 14 inspected files into
+  the tracked image set and re-verify every hash in the final union.
 - [ ] **GitHub/publication:** exact-SHA CI, Pages, canonical wiki, installer and
   public release, asset count/size/digests, zero workflow artifacts, and live
   URLs.
@@ -143,6 +158,11 @@ account rejected, fallback account accepted. The neutral renderer result is
 exactly `Pull completed using another signed-in account.` and does not expose
 which account or token succeeded.
 
+The current exact-build rerun at `5e80e678…` broadened that proof to four
+synthetic repositories: `4 pulled, 0 skipped, 0 failed`, with every row showing
+the same neutral message. Its accepted 1452×1001 frame and digest are in the
+M19 ledger below; no account login, selector, credential, or owned path appears.
+
 Secure clone account fallback is also complete. A hosted clone preserves the
 user-selected account for its first attempt. A generic URL clone chooses the
 API-matched token-bearing account, or the first eligible exact-origin account
@@ -159,11 +179,14 @@ its first reviewed `main` baseline is
 The reported cross-account clone failure was traced to an installed `b69`
 runtime built before this fallback existed: its unpacked renderer contains no
 clone-account-fallback module, and the failing runtime event preceded the first
-fallback commit. The current integration then passed all 23 focused
-account-affinity, account-exhaustion, retry-metadata, and credential-trampoline
-regressions. Final acceptance still requires exercising the corrected
-production bundle on the isolated off-screen desktop; the visible installed
-application was not restarted or controlled during diagnosis.
+fallback commit. The current integration passed its focused account-affinity,
+account-exhaustion, retry-metadata, tokenless-ordering, custom-port, and
+credential-trampoline regressions. Exact accepted source `5e80e678…` was then
+exercised on the isolated hidden desktop: `proof-a` returned the synthetic
+private-repository-style not-found response, `proof-b` served the smart-Git
+advertisement and pack, the clone opened cleanly on `main`, and the local
+repository affinity persisted only the synthetic `proof-b` account key. The
+visible installed application was never restarted, focused, or controlled.
 
 ## Guided-function integration
 
@@ -194,20 +217,20 @@ product behavior includes:
 The earlier pull-request routing/REST and Actions artifact redirect gaps are
 closed in this implementation tree, including userinfo/alternate-SSH/cross-
 repository head binding, bounded provider responses, chained-redirect
-credential stripping, pagination, and stale-request rejection. These source
-results do not substitute for the final exact-tree production/off-screen and
-public `main` gates listed above.
+credential stripping, pagination, and stale-request rejection. Exact app source
+`5e80e678…` now has its own production/off-screen evidence; those local results
+do not substitute for the later final-tree revalidation or public `main` gates.
 
 ### Guided parity wave summary
 
 | Wave | State | Integrated capability |
 | --- | --- | --- |
-| **Foundation** | **IMPLEMENTATION COMPLETE** | Repository Tools foundation, file history/blame/restore, shallow clone/deepening, sparse checkout, archives, bundles, Notifications, and guided Issue creation. |
-| **P0** | **IMPLEMENTATION COMPLETE** | Complete pull-request lifecycle; Actions artifact hardening/pagination/download/digest context; effective branch-rule inspection. |
-| **P1** | **IMPLEMENTATION COMPLETE** | Patch series, structured commit rewrite, Releases/assets, signing, LFS, and complete worktree administration. |
+| **Foundation** | **ACCEPTED LOCALLY** | Repository Tools foundation, file history/blame/restore, shallow clone/deepening, sparse checkout, archives, bundles, Notifications, and guided Issue creation. |
+| **P0** | **ACCEPTED LOCALLY** | Complete pull-request lifecycle; Actions artifact hardening/pagination/download/digest context; effective branch-rule inspection. |
+| **P1** | **ACCEPTED LOCALLY** | Patch series, structured commit rewrite, Releases/assets, signing, LFS, and complete worktree administration. |
 | **P2** | **IMPLEMENTATION COMPLETE** | Persisted branch pin/hide/solo/restore visibility controls. |
-| **Later** | **IMPLEMENTATION COMPLETE** | Merge-tree conflict preview, bisect, complete stash/remote/hooks managers, richer GitHub Issues, and provider-neutral triage. |
-| **Final acceptance** | **PENDING** | Exact final union, off-screen proof/screenshots, `main`, CI/Pages/wiki/release publication, and cleanup. |
+| **Later** | **ACCEPTED LOCALLY** | Merge-tree conflict preview, bisect, complete stash/remote/hooks managers, richer GitHub Issues, and provider-neutral triage. |
+| **Closing gate** | **LOCAL APP-SOURCE ACCEPTANCE COMPLETE; PUBLICATION PENDING** | Exact app source/build and representative hidden-desktop proof are recorded. Final documentation/image union, exhaustive revalidation, `main`, CI/Pages/wiki/release publication, artifact purge, and cleanup remain open. |
 
 ### Sanitized squash verification
 
@@ -230,8 +253,9 @@ not part of this branch's ancestry. The integration gate recorded:
   redaction fixture.
 
 The README and PLAN now agree that every named guided wave is implementation-
-complete while final acceptance remains pending. Reference-only proprietary
-cloud/team/AI services remain explicitly outside this roadmap.
+complete, app source `5e80e678…` is accepted locally, and final public `main`
+evidence remains pending. Reference-only proprietary cloud/team/AI services
+remain explicitly outside this roadmap.
 
 ## Completed milestone summary
 
@@ -371,7 +395,7 @@ The later clone hardening tree at implementation commit
 - complete cleanup of every owned application/server process, listener, Temp
   path, and synthetic credential entry.
 
-### Final headless capture ledger
+### Historical M0–M18 headless capture ledger
 
 | Screenshot | Dimensions | Bytes | SHA-256 |
 | --- | ---: | ---: | --- |
@@ -388,6 +412,10 @@ The later clone hardening tree at implementation commit
 | `docs/assets/screenshots/material-actions-job-log.png` | 2048×1228 | 155,579 | `6f8a96a9bff8a9c76f89b44aaf3c84a71574aed11ef994db93d12d2749ca0409` |
 | `docs/assets/screenshots/material-pull-all-account-fallback.png` | 2048×1228 | 114,222 | `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991` |
 | `docs/assets/screenshots/material-clone-account-fallback.png` | 2048×1228 | 140,143 | `89bb755ad37f6d8537815d411526fa6e16aeee9cd16446deabbc17595cb3623c` |
+
+Those three same-name rows are commit-pinned historical values. The M19
+documentation/image union intentionally replaces their current tracked files
+with the accepted M19 PNGs and hashes in the later ledger.
 
 Earlier verified captures, including
 `docs/assets/screenshots/settings-history-manager.png`, remain tracked; that M3
@@ -446,7 +474,13 @@ pattern scanning all pass on the published source-only set.
 - The exact `a346d0a569642e1c1b1180994cac4144890bf037` production build loaded the
   real Windows x64 log on the off-screen desktop. The accepted original-size
   capture is `material-actions-job-log.png`; its dimensions and digest are in
-  the final capture ledger above.
+  the historical capture ledger above.
+- The M19 exact `5e80e678…` build repeated the viewer against a synthetic
+  searchable log and separately downloaded a synthetic artifact through the
+  authenticated loopback endpoint. The artifact panel showed the locally
+  computed digest matching the provider value plus attestation-presence
+  context. The accepted 1452×1001 job-log and artifact frames, with their new
+  digests, are in the M19 ledger below.
 
 ## Secure Pull All account fallback
 
@@ -456,17 +490,21 @@ pattern scanning all pass on the published source-only set.
   failure and HTTPS repository-not-found. SSH remotes and non-authentication
   errors are never retried with other accounts.
 - Only token-bearing signed-in accounts whose configured HTML endpoint has the
-  exact remote origin are candidates. The repository-bound account is preferred
-  among the remaining candidates, then stable account order is preserved.
+  exact remote scheme, host, and effective port are candidates. Tokenless
+  accounts and stale tokenless repository bindings are excluded. The
+  repository-bound eligible account is preferred among the remaining
+  candidates, then stable account order is preserved.
 - The forced account selector is kept in the internal trampoline map, removed
   after the operation, and stripped before spawning Git. It never enters a Git,
   hook, LFS, or other child-process environment and is not emitted to logs.
 - A missing exact-origin selection fails closed for that origin. A cross-origin
   submodule scopes the selector away and follows normal credential resolution.
-- The accepted off-screen proof uses only synthetic loopback and repository
-  labels. It shows `1 pulled, 0 skipped, 0 failed.` and the exact neutral result
-  `Pull completed using another signed-in account.` without exposing an account
-  name or token.
+- The accepted exact-build off-screen proof at `5e80e678…` uses only synthetic
+  loopback and repository labels. It shows `4 pulled, 0 skipped, 0 failed`; all
+  four rows display `Pull completed using another signed-in account.` without
+  exposing an account name, selector, token, or local path. Its promoted target
+  is `material-pull-all-account-fallback.png` (1452×1001, 121,304 bytes,
+  SHA-256 `3a00b1b61e79e8abadb363b8d63ce5f1ebece4d895a476cc9ca4c983a638a5de`).
 
 ## Secure clone account fallback
 
@@ -488,41 +526,78 @@ pattern scanning all pass on the published source-only set.
   persisted before initial API matching. Single clone, batch clone,
   missing-repository recovery, and retry actions therefore keep the account
   that actually succeeded instead of rebinding to the first same-host account.
-- The accepted 2048×1228 light-theme capture is
-  `material-clone-account-fallback.png`. The redacted server ledger proves
-  account A rejected, account B accepted, advertisement served, and pack served;
-  the cloned repository is clean at
-  `c9eee876c4451d380f8cc7628b5971f624f9395f`, and no credentials dialog appears.
+- Refreshed candidate ordering excludes tokenless accounts while retaining an
+  account that gains a token during refresh. A stale tokenless stored affinity
+  is discarded before the generic clone chooses its first eligible identity.
+- The accepted exact-build 1452×1001 light-theme capture target is
+  `material-clone-account-fallback.png` (164,039 bytes, SHA-256
+  `d562616bbcfeb6c7f92dfaa600a58265e5f954dfe80999e9383d615400b444f4`).
+  The redacted `5e80e678…` fixture ledger proves `proof-a` rejected,
+  `proof-b` accepted, advertisement served, and pack served; the clone is clean
+  on `main`, the synthetic successful-account affinity persisted, and no
+  credentials dialog appeared.
 
-## Guided Git and GitHub evidence
+## Secure shallow-history account fallback
 
-On 2026-07-13, a subsequent exact off-screen run verified three named,
-task-specific app functions at **1000×687**. The app presents focused controls
-and state for these
-tasks; it does not expose a searchable list of raw Git/`gh` commands or API
-endpoints.
+- Deepen and unshallow fetches run through the Desktop credential trampoline,
+  so they use the same credential isolation as ordinary hosted Git operations
+  instead of invoking a tokenless raw fetch path.
+- Only an eligible token-bearing account for the remote's exact scheme, host,
+  and effective port can recover an ambiguous HTTPS authentication/not-found
+  failure; SSH, non-authentication, and cross-origin failures remain closed.
+- The accepted exact-build History frame is
+  `material-history-deepen.png` (1452×1001, 106,548 bytes, SHA-256
+  `5e6bdfa9d9a935b9f5fd8d6d3e7cad80dab28cca6f425ef0356b684f74cb8089`).
+  It shows the completed deepen and the neutral result
+  `Fetch completed using another signed-in account.` without revealing an
+  account, token, selector, remote URL, or owned path.
 
-- **GitHub notifications:** the GitHub tab, account selector, inbox filters,
-  refresh guard, and complete no-signed-in-account state fit without clipped
-  labels.
-- **Sparse checkout:** the disabled-state side panel explains cone mode,
-  validates repository-relative directories, and provides an explicit review
-  step before enabling the worktree change.
-- **Shallow clone:** the URL clone form exposes a named toggle and numeric
-  commit-depth field, explains current-branch/submodule scope, and points users
-  to Repository tools for later deepening.
+## M19 guided hidden-desktop evidence
 
-| Screenshot | Dimensions | Bytes | SHA-256 |
-| --- | ---: | ---: | --- |
-| `docs/assets/screenshots/material-github-notifications.png` | 1000×687 | 81,465 | `53f40a94a6ead19b73c6c3302d0eb60b0effd050c7b018b43dd76d4b2072a354` |
+The accepted run used one uniquely named hidden Win32 desktop, one isolated app
+profile, one owned `%TEMP%` root, and a loopback HTTPS fixture. It never called
+`show_headless_desktop`, focused a normal window, or sent global input. The
+low-level MCP client resolved the owned app window at runtime and captured it
+with `client_only: true`. Chromium ignored background messages for some web
+controls, so the run used the documented isolated-app CDP hook for those
+renderer interactions; the native save dialog still used HWND-bound low-level
+controls. Compositor-banded frames were rejected, clean retries were reopened at
+original resolution, and only the accepted PNGs below entered the candidate
+set.
 
-The retained Notifications PNG was reopened at original resolution and matched
-the source capture's SHA-256. Other captures from that run are not included;
-fresh neutral-path captures are required before their guided UI is published.
-No bundle-import or issue-creation screenshot is included in this evidence set.
+The exact `5e80e678…` bundle supplied cross-account clone, Pull All, and
+history-deepening receipts plus representative Foundation, P0, P1, and Later
+surfaces. The P2 branch-visibility controls remain covered by focused model/UI
+regressions; this ledger does not claim a dedicated P2 screenshot. All 14 clean
+accepted frames come from the same exact build.
+
+| M19 accepted capture target | App source/build | Dimensions | Bytes | SHA-256 |
+| --- | --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-shallow-clone-safe.png` | `5e80e678…` | 1452×1001 | 144,543 | `a29b242b08e90b802632226e5af161ed0761ef26bc0ad5e77714b6d2353b87ea` |
+| `docs/assets/screenshots/material-sparse-checkout-safe.png` | `5e80e678…` | 1452×1001 | 120,929 | `cf0fd31bdb470c93b24dd04807443f82a2d4f99e5cccda2fbf345c397c329218` |
+| `docs/assets/screenshots/material-stash-manager.png` | `5e80e678…` | 1452×1001 | 141,437 | `923a7e831ae999c1fcb681e5003108c22eb6632692916915366bdb2ad59c63e9` |
+| `docs/assets/screenshots/material-clone-account-fallback.png` | `5e80e678…` | 1452×1001 | 164,039 | `d562616bbcfeb6c7f92dfaa600a58265e5f954dfe80999e9383d615400b444f4` |
+| `docs/assets/screenshots/material-pull-all-account-fallback.png` | `5e80e678…` | 1452×1001 | 121,304 | `3a00b1b61e79e8abadb363b8d63ce5f1ebece4d895a476cc9ca4c983a638a5de` |
+| `docs/assets/screenshots/material-history-deepen.png` | `5e80e678…` | 1452×1001 | 106,548 | `5e6bdfa9d9a935b9f5fd8d6d3e7cad80dab28cca6f425ef0356b684f74cb8089` |
+| `docs/assets/screenshots/material-remote-manager.png` | `5e80e678…` | 1452×1001 | 160,714 | `97817a1d31a8d592981c997b5c4aecc98cf291450f9f6f34008b7697942213b3` |
+| `docs/assets/screenshots/material-repository-tools.png` | `5e80e678…` | 1452×1001 | 117,713 | `b72ba5a362f6d4fef758183cbc84db7795c41884bdc2eea88deb115b3fe59385` |
+| `docs/assets/screenshots/material-provider-triage.png` | `5e80e678…` | 1452×1001 | 119,639 | `a4acbe0cfa8d7f17deb1e0e36ba7177caf3ff25b5c7c38ae65bc16f0de1f950e` |
+| `docs/assets/screenshots/material-actions-job-log.png` | `5e80e678…` | 1452×1001 | 93,898 | `45a67b15745f413d80d2d3a3a5a47acdac63e1dda942a4d49131b36b2784a064` |
+| `docs/assets/screenshots/material-actions-artifact-download.png` | `5e80e678…` | 1452×1001 | 134,585 | `d263bd5885e67ea52f515970e771eaf266901f51b826e9fa3159d3f9a438a1cf` |
+| `docs/assets/screenshots/material-github-releases.png` | `5e80e678…` | 1452×1001 | 135,021 | `ab6d46d4fe749dd63b34095411562cae82f4ddfc48991474f927e4be9ae5d739` |
+| `docs/assets/screenshots/material-github-issues.png` | `5e80e678…` | 1452×1001 | 123,243 | `423d201a90346548ca9b36cdc472b11e144cf3aff1f79179939e44fb50e606bc` |
+| `docs/assets/screenshots/material-native-pull-request.png` | `5e80e678…` | 1452×1001 | 152,440 | `9fd4c407f74639b58607c1c2c3158c2278f71ac3fe4088bb66bc5e3cf24434cb` |
+
+All visible accounts, repositories, branches, issues, pull requests, workflow
+runs, releases, logs, artifacts, remotes, paths, and credentials in this M19
+proof are synthetic. Public providers were not mutated. The retained evidence
+contains no real login, name, email, token, signed URL, user-profile path,
+credential selector, raw provider payload, or process/window identifier.
+
 Task forms follow a no-page-level-sideways-scroll policy: labels wrap and action
 groups stack when practical, while horizontal scrolling is reserved for spatial
-code, diff, or log content.
+code, diff, or log content. Promotion of the exact files and final hash
+revalidation remain open until the documentation/image union is assembled.
 
 ## Headless verification environment
 
@@ -531,6 +606,8 @@ code, diff, or log content.
 - Required MCP SHA: `beed66ca6ed2503e6170ee1e1158247f1c2f0140`
 - MCP endpoint: `http://127.0.0.1:8765/mcp`
 - Skill and client: `.codex/skills/verify-desktop-material-headless/`
+- Accepted application source/build:
+  `5e80e678d062b65a82c0991b352e5a861c7469e5`
 - Release runtime: Node **24.15.0** from `.tool-versions`; when system Node 26
   is used for tests, disable its experimental web storage global.
 
@@ -548,6 +625,12 @@ The safety contract is mandatory:
    resolution for blank frames, theme, clipping, private data, and dimensions.
 8. Revalidate HWND/PID before close; use exact saved-PID termination only as a
    fallback; close the desktop exactly once; delete only the owned Temp root.
+
+For this active run, capture and interaction are complete but the owned app,
+listener, synthetic credential entries, hidden desktop, temporary roots, and
+worktrees are intentionally not marked cleaned until the screenshot and
+documentation work has finished. The final handoff must replace this sentence
+with verified-absent evidence, not an expectation.
 
 ## Previous root-finalized publication and accessibility evidence
 
