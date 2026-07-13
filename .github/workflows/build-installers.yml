@@ -54,13 +54,16 @@ jobs:
         # Squirrel only offers an update when the feed's newest package version
         # is strictly greater than the installed one. The committed app version
         # is constant across pushes, so append the ever-increasing run number as
-        # a numeric semver-2 pre-release identifier (e.g. 3.6.3-beta3 ->
-        # 3.6.3-beta3.<run_number>). Numeric identifiers compare numerically in
-        # both the JS `semver` lib and Squirrel/NuGet, so each release is newer
-        # than the last. No leading zeros (invalid semver-2 numeric identifier).
+        # a fixed-width SemVer-1-compatible suffix (e.g. 3.6.3-beta3 ->
+        # 3.6.3-beta3-b0000000067). electron-winstaller bundles NuGet 2.8,
+        # which normalizes dotted SemVer-2 prerelease identifiers and causes
+        # script/package.ts to look for a nupkg filename Squirrel never wrote.
+        # The alphanumeric, zero-padded suffix is preserved by NuGet 2.8 and
+        # compares lexically in run order for both JS semver and Squirrel.
         run: |
           base=$(node -p "require('./app/package.json').version")
-          version="${base}.${{ github.run_number }}"
+          printf -v build '%010d' "${{ github.run_number }}"
+          version="${base}-b${build}"
           node -e "const f='./app/package.json';const p=require(f);p.version='${version}';require('fs').writeFileSync(f, JSON.stringify(p, null, 2) + '\n')"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "Fork build version: ${version}"
