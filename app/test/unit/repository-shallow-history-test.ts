@@ -9,6 +9,7 @@ import {
   prepareRepositoryHistoryUnshallow,
   prepareRepositoryShallowStatusInspection,
 } from '../../src/ui/repository-tools'
+import { buildRepositoryShallowHistoryFetchArgs } from '../../src/lib/git/shallow-history'
 
 describe('guided shallow-history recipes', () => {
   it('strictly parses only Git shallow-repository booleans', () => {
@@ -122,5 +123,38 @@ describe('guided shallow-history recipes', () => {
     })
     assert.throws(() => prepareRepositoryHistoryUnshallow('-upstream'))
     assert.throws(() => prepareRepositoryHistoryUnshallow('bad\nremote'))
+  })
+
+  it('rebuilds only fixed authenticated fetch arguments at execution time', () => {
+    assert.deepStrictEqual(
+      buildRepositoryShallowHistoryFetchArgs({
+        action: 'deepen',
+        remote: 'origin',
+        deepenBy: 50,
+      }),
+      [
+        'fetch',
+        '--no-auto-maintenance',
+        '--no-recurse-submodules',
+        '--no-write-fetch-head',
+        '--deepen=50',
+        '--',
+        'origin',
+      ]
+    )
+    assert.throws(() =>
+      buildRepositoryShallowHistoryFetchArgs({
+        action: 'deepen',
+        remote: '--upload-pack=payload',
+        deepenBy: 50,
+      })
+    )
+    assert.throws(() =>
+      buildRepositoryShallowHistoryFetchArgs({
+        action: 'unshallow',
+        remote: 'origin',
+        deepenBy: 1,
+      })
+    )
   })
 })

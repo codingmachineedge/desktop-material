@@ -263,7 +263,9 @@ import {
   IManagedSubmodule,
   IRemoteManagementApplyOptions,
   unstageAll,
+  fetchRepositoryShallowHistory,
 } from '../git'
+import type { IRepositoryShallowHistoryFetchRequest } from '../git'
 import {
   installGlobalLFSFilters,
   installLFSHooks,
@@ -360,6 +362,7 @@ import {
   PullAllFallbackSuccessDetail,
   pullWithAccountFallback,
 } from '../automation/pull-all-account-fallback'
+import { fetchShallowHistoryWithAccountFallback } from '../automation/shallow-history-account-fallback'
 import { BranchPruner } from './helpers/branch-pruner'
 import {
   enableCopilotConflictResolution,
@@ -6706,6 +6709,46 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }))
       this.emitUpdate()
     }
+  }
+
+  public async _fetchRepositoryShallowHistory(
+    repository: Repository,
+    request: IRepositoryShallowHistoryFetchRequest,
+    signal?: AbortSignal
+  ): Promise<{ readonly usedFallbackAccount: boolean }> {
+    if (signal?.aborted) {
+      throw new Error('History fetch cancelled.')
+    }
+    if (this.repositoryStateCache.get(repository).isPushPullFetchInProgress) {
+      throw new Error('Another network operation is already in progress.')
+    }
+
+    let result: { readonly usedFallbackAccount: boolean } | undefined
+    await this.withPushPullFetch(repository, async () => {
+      const remotes = await getRemotes(repository)
+      const remote = remotes.find(
+        candidate => candidate.name === request.remote
+      )
+      if (remote === undefined) {
+        throw new Error('The selected fetch remote changed after review.')
+      }
+
+      result = await fetchShallowHistoryWithAccountFallback(
+        remote.url,
+        this.accounts,
+        repository.accountKey,
+        accountKey =>
+          fetchRepositoryShallowHistory(repository, remote, request, {
+            accountKey,
+            signal,
+          })
+      )
+    })
+
+    if (result === undefined) {
+      throw new Error('Another network operation is already in progress.')
+    }
+    return result
   }
 
   public async _pull(repository: Repository): Promise<void> {

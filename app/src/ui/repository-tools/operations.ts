@@ -1,5 +1,10 @@
 import * as Path from 'path'
 import { GuidedRepositoryToolID } from '../../lib/cli-workbench'
+import {
+  buildRepositoryShallowHistoryFetchArgs,
+  IRepositoryShallowHistoryFetchRequest,
+  RepositoryShallowHistoryAction,
+} from '../../lib/git/shallow-history'
 
 export type RepositoryToolCategory = 'Diagnostics' | 'Maintenance' | 'Recovery'
 
@@ -39,12 +44,10 @@ export interface IRepositoryBundleImportRequest
   readonly createBranchArgs: ReadonlyArray<string>
 }
 
-export type RepositoryShallowHistoryAction = 'deepen' | 'unshallow'
+export type { RepositoryShallowHistoryAction }
 
-export interface IRepositoryShallowHistoryRequest {
-  readonly action: RepositoryShallowHistoryAction
-  readonly remote: string
-  readonly deepenBy: number | null
+export interface IRepositoryShallowHistoryRequest
+  extends IRepositoryShallowHistoryFetchRequest {
   /** Fixed fetch recipe. The UI never accepts an editable refspec or argv. */
   readonly args: ReadonlyArray<string>
 }
@@ -161,23 +164,14 @@ function prepareRepositoryShallowFetch(
   deepenBy: number | null
 ): IRepositoryShallowHistoryRequest {
   const normalizedRemote = normalizeRepositoryFetchRemote(remote)
-  const depthArgument =
-    action === 'deepen' && deepenBy !== null
-      ? `--deepen=${deepenBy}`
-      : '--unshallow'
-  return {
+  const request = {
     action,
     remote: normalizedRemote,
     deepenBy,
-    args: [
-      'fetch',
-      '--no-auto-maintenance',
-      '--no-recurse-submodules',
-      '--no-write-fetch-head',
-      depthArgument,
-      '--',
-      normalizedRemote,
-    ],
+  }
+  return {
+    ...request,
+    args: buildRepositoryShallowHistoryFetchArgs(request),
   }
 }
 

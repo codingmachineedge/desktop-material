@@ -49,6 +49,10 @@ export interface IRepositoryShallowHistoryProps {
   readonly disabled: boolean
   readonly client: IShallowHistoryClient
   readonly onRefreshRepository: () => Promise<void>
+  readonly onFetchHistory?: (
+    request: IRepositoryShallowHistoryRequest,
+    signal: AbortSignal
+  ) => Promise<{ readonly usedFallbackAccount: boolean }>
   readonly onBusyChanged: (busy: boolean) => void
 }
 
@@ -128,6 +132,7 @@ export class RepositoryShallowHistory extends React.Component<
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
   private confirmButton: HTMLButtonElement | null = null
+  private fetchAbortController: AbortController | null = null
 
   public constructor(props: IRepositoryShallowHistoryProps) {
     super(props)
@@ -163,6 +168,7 @@ export class RepositoryShallowHistory extends React.Component<
 
     this.repositoryGeneration++
     this.cancelRun(clientChanged ? prevProps.client : this.props.client)
+    this.cancelAuthenticatedFetch()
     if (clientChanged) {
       this.unsubscribe()
       this.subscribe(this.props.client)
@@ -179,6 +185,7 @@ export class RepositoryShallowHistory extends React.Component<
     this.mutationStarted = false
     this.unsubscribe()
     this.cancelRun()
+    this.cancelAuthenticatedFetch()
   }
 
   private subscribe(client: IShallowHistoryClient) {
@@ -199,6 +206,11 @@ export class RepositoryShallowHistory extends React.Component<
     if (id !== null) {
       void client.cancel(id).catch(() => {})
     }
+  }
+
+  private cancelAuthenticatedFetch() {
+    this.fetchAbortController?.abort()
+    this.fetchAbortController = null
   }
 
   private setBusy(busy: boolean) {
@@ -373,16 +385,20 @@ export class RepositoryShallowHistory extends React.Component<
             )
           }
           this.mutationStarted = true
-          void this.startCommand(
-            'fetching',
-            {
-              kind: 'repository-shallow-fetch',
-              action: request.action,
-              remote: request.remote,
-              deepenBy: request.deepenBy,
-            },
-            true
-          )
+          if (this.props.onFetchHistory === undefined) {
+            void this.startCommand(
+              'fetching',
+              {
+                kind: 'repository-shallow-fetch',
+                action: request.action,
+                remote: request.remote,
+                deepenBy: request.deepenBy,
+              },
+              true
+            )
+          } else {
+            void this.startAuthenticatedFetch(request)
+          }
           return
         }
         case 'fetching': {
@@ -419,6 +435,79 @@ export class RepositoryShallowHistory extends React.Component<
           error instanceof Error
             ? error.message
             : 'The shallow-history action could not continue safely.'
+        )
+      }
+    }
+  }
+
+  private async startAuthenticatedFetch(
+    request: IRepositoryShallowHistoryRequest
+  ): Promise<void> {
+    const fetch = this.props.onFetchHistory
+    if (
+      fetch === undefined ||
+      this.fetchAbortController !== null ||
+      !this.mounted
+    ) {
+      return
+    }
+
+    const controller = new AbortController()
+    const repositoryPath = this.props.repositoryPath
+    const repositoryGeneration = this.repositoryGeneration
+    this.fetchAbortController = controller
+    this.setState(state => ({
+      phase: 'fetching',
+      status: 'Fetching older history through Desktop authentication…',
+      error: null,
+      output: appendVisibleOutput(
+        state.output,
+        '\nFetching older history through Desktop authentication…\n'
+      ),
+    }))
+
+    try {
+      const result = await fetch(request, controller.signal)
+      if (
+        this.fetchAbortController !== controller ||
+        !this.isCurrentRepository(repositoryPath, repositoryGeneration) ||
+        this.state.request !== request
+      ) {
+        return
+      }
+      this.fetchAbortController = null
+      this.setState(state => ({
+        phase: 'refreshing',
+        status: 'Older history fetched. Refreshing repository state…',
+        output: result.usedFallbackAccount
+          ? appendVisibleOutput(
+              state.output,
+              'Fetch completed using another signed-in account.\n'
+            )
+          : state.output,
+      }))
+      void this.finishRefresh(request, repositoryPath, repositoryGeneration)
+    } catch {
+      if (
+        this.fetchAbortController !== controller ||
+        !this.isCurrentRepository(repositoryPath, repositoryGeneration)
+      ) {
+        return
+      }
+      this.fetchAbortController = null
+      if (controller.signal.aborted) {
+        this.mutationStarted = false
+        this.setBusy(false)
+        this.setState({
+          phase: 'cancelled',
+          request: null,
+          status:
+            'History fetch cancelled. Git may have downloaded objects or updated remote-tracking refs; check the repository before retrying.',
+          error: null,
+        })
+      } else {
+        this.fail(
+          'Git could not fetch older history. Check the selected remote, signed-in accounts, and network connection, then review the action again.'
         )
       }
     }
@@ -551,7 +640,11 @@ export class RepositoryShallowHistory extends React.Component<
   }
 
   private onCheck = () => {
-    if (this.props.disabled || this.runId !== null) {
+    if (
+      this.props.disabled ||
+      this.runId !== null ||
+      this.fetchAbortController !== null
+    ) {
       return
     }
     const repositoryPath = this.props.repositoryPath
@@ -581,6 +674,7 @@ export class RepositoryShallowHistory extends React.Component<
     if (
       this.props.disabled ||
       this.runId !== null ||
+      this.fetchAbortController !== null ||
       this.state.phase !== 'ready'
     ) {
       return
@@ -613,6 +707,7 @@ export class RepositoryShallowHistory extends React.Component<
     if (
       this.props.disabled ||
       this.runId !== null ||
+      this.fetchAbortController !== null ||
       this.state.phase !== 'ready'
     ) {
       return
@@ -645,7 +740,8 @@ export class RepositoryShallowHistory extends React.Component<
       this.state.phase !== 'confirmation' ||
       this.state.request === null ||
       this.props.disabled ||
-      this.runId !== null
+      this.runId !== null ||
+      this.fetchAbortController !== null
     ) {
       return
     }
@@ -658,6 +754,16 @@ export class RepositoryShallowHistory extends React.Component<
   }
 
   private onCancel = async () => {
+    const fetchController = this.fetchAbortController
+    if (fetchController !== null) {
+      this.setState({
+        status: 'Cancelling the current history fetch…',
+        error: null,
+      })
+      fetchController.abort()
+      return
+    }
+
     const id = this.runId
     if (id === null) {
       return
@@ -908,7 +1014,8 @@ export class RepositoryShallowHistory extends React.Component<
 
   public render() {
     const hasActivity = this.state.phase !== 'idle'
-    const canCancel = this.runId !== null
+    const authenticatedFetchRunning = this.fetchAbortController !== null
+    const canCancel = this.runId !== null || authenticatedFetchRunning
     const confirmation = this.state.phase === 'confirmation'
     return (
       <section
@@ -929,7 +1036,10 @@ export class RepositoryShallowHistory extends React.Component<
           <div className="repository-tool-controls">
             <Button
               disabled={
-                this.props.disabled || this.runId !== null || confirmation
+                this.props.disabled ||
+                this.runId !== null ||
+                confirmation ||
+                authenticatedFetchRunning
               }
               onClick={this.onCheck}
             >

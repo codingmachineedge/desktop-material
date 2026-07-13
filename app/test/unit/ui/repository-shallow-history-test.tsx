@@ -7,6 +7,7 @@ import {
   ICLICommandStateEvent,
 } from '../../../src/lib/cli-workbench'
 import {
+  IRepositoryShallowHistoryProps,
   prepareRepositoryHistoryDeepen,
   RepositoryShallowHistory,
 } from '../../../src/ui/repository-tools'
@@ -49,7 +50,8 @@ function renderHistory(
   client: FakeShallowHistoryClient,
   repositoryPath = 'C:/repo',
   onRefreshRepository = async () => {},
-  onBusyChanged: (busy: boolean) => void = () => {}
+  onBusyChanged: (busy: boolean) => void = () => {},
+  onFetchHistory?: IRepositoryShallowHistoryProps['onFetchHistory']
 ) {
   return render(
     <RepositoryShallowHistory
@@ -58,6 +60,7 @@ function renderHistory(
       client={client}
       onRefreshRepository={onRefreshRepository}
       onBusyChanged={onBusyChanged}
+      onFetchHistory={onFetchHistory}
     />
   )
 }
@@ -260,6 +263,145 @@ describe('Repository shallow history', () => {
       )
     )
     assert.equal(screen.queryByLabelText('Additional commits'), null)
+  })
+
+  it('uses Desktop authentication for the production fetch boundary', async () => {
+    const client = new FakeShallowHistoryClient()
+    const requests: Array<ReturnType<typeof prepareRepositoryHistoryDeepen>> =
+      []
+    let refreshes = 0
+    renderHistory(
+      client,
+      'C:/repo',
+      async () => {
+        refreshes++
+      },
+      () => {},
+      async request => {
+        requests.push(request)
+        return { usedFallbackAccount: true }
+      }
+    )
+    await inspectShallowRepository(client)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review bounded deepen' })
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Deepen by 50 commits' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 3))
+    emitCompleted(client, 2, 'true\n')
+    await waitFor(() => assert.equal(client.starts.length, 4))
+    emitCompleted(client, 3, 'origin\nupstream\n')
+
+    await waitFor(() => assert.equal(requests.length, 1))
+    assert.deepStrictEqual(
+      requests[0],
+      prepareRepositoryHistoryDeepen('origin', '50')
+    )
+    assert.equal(
+      client.starts.some(
+        start => start.recipe.kind === 'repository-shallow-fetch'
+      ),
+      false
+    )
+    await waitFor(() => assert.equal(refreshes, 1))
+    await waitFor(() => assert.equal(client.starts.length, 5))
+    assert.deepStrictEqual(client.starts[4].recipe, {
+      kind: 'repository-shallow-inspection',
+      operation: 'status',
+    })
+    emitCompleted(client, 4, 'true\n')
+
+    assert.ok(
+      await screen.findByText(
+        'Fetched 50 additional commits of history from origin. The repository still has a shallow boundary.'
+      )
+    )
+    assert.match(
+      screen.getByLabelText('Shallow history details').textContent ?? '',
+      /completed using another signed-in account/i
+    )
+  })
+
+  it('does not expose authenticated fetch failure details', async () => {
+    const client = new FakeShallowHistoryClient()
+    const sensitiveDetail = ['private', 'credential', 'detail'].join('-')
+    renderHistory(
+      client,
+      'C:/repo',
+      async () => {},
+      () => {},
+      async () => {
+        throw new Error(sensitiveDetail)
+      }
+    )
+    await inspectShallowRepository(client)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review bounded deepen' })
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Deepen by 50 commits' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 3))
+    emitCompleted(client, 2, 'true\n')
+    await waitFor(() => assert.equal(client.starts.length, 4))
+    emitCompleted(client, 3, 'origin\n')
+
+    assert.ok(await screen.findByText('The history fetch did not complete.'))
+    assert.match(
+      screen.getByRole('alert').textContent ?? '',
+      /signed-in accounts/i
+    )
+    assert.doesNotMatch(
+      document.body.textContent ?? '',
+      new RegExp(sensitiveDetail)
+    )
+  })
+
+  it('redacts cancellation details and cancels the exact Git request', async () => {
+    const client = new FakeShallowHistoryClient()
+    const sensitiveDetail = ['sensitive', 'credential', 'value'].join('-')
+    const observedSignals: AbortSignal[] = []
+    renderHistory(
+      client,
+      'C:/repo',
+      async () => {},
+      () => {},
+      async (_request, signal) => {
+        observedSignals.push(signal)
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => reject(new Error(sensitiveDetail)),
+            { once: true }
+          )
+        })
+      }
+    )
+    await inspectShallowRepository(client)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review bounded deepen' })
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Deepen by 50 commits' })
+    )
+    await waitFor(() => assert.equal(client.starts.length, 3))
+    emitCompleted(client, 2, 'true\n')
+    await waitFor(() => assert.equal(client.starts.length, 4))
+    emitCompleted(client, 3, 'origin\n')
+    await waitFor(() => assert.equal(observedSignals.length, 1))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cancel history operation' })
+    )
+    await screen.findByText(/History fetch cancelled/)
+    assert.equal(observedSignals[0].aborted, true)
+    assert.doesNotMatch(
+      document.body.textContent ?? '',
+      new RegExp(sensitiveDetail)
+    )
+    assert.equal(client.cancels.length, 0)
   })
 
   it('fails closed when the repository becomes non-shallow after review', async () => {
