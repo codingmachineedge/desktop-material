@@ -316,12 +316,24 @@ list.
 ## Repository power tools
 
 - Open the repositories side sheet and choose **Pull all** to fetch/pull every eligible repository;
-  review the per-repository result instead of assuming the batch succeeded as one unit.
+  review the per-repository result instead of assuming the batch succeeded as one unit. If the
+  normal pull ends in an HTTPS authentication or repository-not-found ambiguity, Desktop Material
+  can try the remaining token-bearing signed-in accounts whose HTML origin exactly matches that
+  remote. A repository-bound identity is preferred within the otherwise stable account order.
 - Pin important repositories from their context menu, hide the automatically maintained Recent
   group if desired, and use grouping to keep large repository lists manageable.
 - Use branch presets/default-branch controls when creating or switching branches.
 - Set a repository-specific external editor when the global editor is not appropriate.
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution.
+
+SSH and non-authentication failures never start account fallback. The selected stable account key
+stays in the app's internal trampoline map; its selector field is removed from the Git options
+before spawn and never enters child, hook, Git LFS, or log environments. A missing same-origin
+selection fails closed, while credential requests from cross-origin submodules retain normal
+account resolution. Successful fallback uses the neutral result **Pull completed using another
+signed-in account.**
+
+![Pull all completing with another signed-in account without exposing its identity](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
 
 ---
 

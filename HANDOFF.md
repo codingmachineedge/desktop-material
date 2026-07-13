@@ -4,7 +4,7 @@
 
 The requested roadmap is implemented: **M0 through M18 are complete and
 shipped on `main`** through final implementation baseline
-`c944eeea05227ef1ddb1c7c71e1062f44f672eb3`. The implementation, integration
+`b2699faccb07728fe9aa2838aa13355d71e172b0`. The implementation, integration
 fixes, exhaustive local validation, production build, hidden-desktop review,
 responsive regression correction, public documentation, and canonical wiki
 publication are complete. There is no remaining queued or in-flight feature
@@ -27,6 +27,17 @@ short-lived signed URL and query. The accepted 2048×1228 hidden-desktop proof
 shows the real **Windows x64** job log loaded in the searchable, collapsible
 viewer with no API error.
 
+Pull All now keeps its normal, unforced credential attempt first. If that
+attempt produces only an HTTPS authentication failure or HTTPS not-found
+ambiguity, it can try the remaining token-bearing signed-in accounts for the
+exact HTML origin. The repository-bound account is preferred, followed by the
+stable account order. The accepted isolated proof advanced cleanly from proof A
+`dd0bbb04b04da50d42fa55245bc89a1426f01488` to proof B
+`1d58935cf4ef9645f08e2fb3aa68e364ab382676`; its redacted sequence was primary
+account rejected, fallback account accepted. The neutral renderer result is
+exactly `Pull completed using another signed-in account.` and does not expose
+which account or token succeeded.
+
 ## Completed milestone summary
 
 | Milestone | Status | Shipped result |
@@ -44,7 +55,7 @@ viewer with no API error.
 | **M10** | **COMPLETE** | GitHub Actions runs, reruns, workflow dispatch, job detail, and searchable logs. |
 | **M11** | **COMPLETE** | Secure localhost MCP/REST agent server, renderer bridge, stdio proxy, CLI, and Preferences UI. |
 | **M12** | **COMPLETE** | Desktop Plus quick-win parity: telemetry off, status/sort controls, Material actions, identity, permanent discard, hide-recent, and accessibility tooltips. |
-| **M13** | **COMPLETE** | Repository metadata/defaults, pinning/grouping, branch pills, Pull all, remotes, and submodules. |
+| **M13** | **COMPLETE** | Repository metadata/defaults, pinning/grouping, branch pills, bounded Pull All with exact-origin account fallback, remotes, and submodules. |
 | **M14** | **COMPLETE** | History metadata/regex search, commit graph, guarded deletion, SVG preview, and branch presets. |
 | **M15** | **COMPLETE** | Multiple stashes per branch and the rebranded Desktop Material CLI. |
 | **M16** | **COMPLETE** | Tab-aware multi-window lifecycle, routing, scoping, and serialized profile mutation. |
@@ -86,6 +97,10 @@ These are the first paths to inspect when maintaining each subsystem:
   `docs/agent-api.md`.
 - **Repository parity:** `app/src/lib/databases/repositories-database.ts`,
   `app/src/ui/repository-settings/`, `app/src/ui/pull-all/`,
+  `app/src/lib/automation/pull-all.ts`,
+  `app/src/lib/automation/pull-all-account-fallback.ts`,
+  `app/src/lib/git/pull.ts`, `app/src/lib/trampoline/find-account.ts`,
+  `app/src/lib/trampoline/trampoline-environment.ts`,
   `app/src/ui/history/`, `app/src/ui/diff/image-diffs/`,
   `app/src/ui/stashing/`, and `app/src/cli/`.
 - **Providers and windows:** `app/src/lib/api.ts`,
@@ -100,17 +115,20 @@ These are the first paths to inspect when maintaining each subsystem:
 ## Final integrated validation evidence
 
 The exhaustive final run on the same application/test tree shipped by
-`c944eeea0522` recorded:
+`b2699faccb07728fe9aa2838aa13355d71e172b0` recorded:
 
-- **243 files and 619 suites** in the validation scope;
-- **1,863 unit tests: 1,862 passed, 0 failed, 1 intentional skip**;
-- `yarn lint`: **passed**;
+- **1,880 unit tests: 1,879 passed, 0 failed, 1 intentional skip**;
+- `yarn lint:src`: **passed**;
+- repository-wide Prettier validation: **passed**;
 - `yarn tsc --noEmit --skipLibCheck`: **passed**;
-- focused version-history tests: **4 of 4 passed**;
 - production unpackaged build: **passed** with
   `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`;
 - build and GUI verification through the exact low-level MCP checkout at
   `beed66ca6ed2503e6170ee1e1158247f1c2f0140`;
+- isolated HTTPS integration proof: clean advance from
+  `dd0bbb04b04da50d42fa55245bc89a1426f01488` to
+  `1d58935cf4ef9645f08e2fb3aa68e364ab382676`, with only the redacted
+  primary-rejected/fallback-accepted sequence retained;
 - the reproducible build emitted `out/`, and Electron was exercised only on a
   uniquely named off-screen Win32 Headless Desktop with isolated fixture and
   user-data paths;
@@ -135,6 +153,7 @@ The exhaustive final run on the same application/test tree shipped by
 | `docs/assets/screenshots/material-workspace-changes.png` | 1443×992 | 123,162 | `3155b321f9aabb73ee6a40000c69f8931f1915920216818a362ec974cc3a4621` |
 | `docs/assets/screenshots/material-responsive-overflow-fixed.png` | 1450×997 | 132,049 | `160c622c6630d96eda26b5ff3be6705c31dbe55d6ffa6d1376575425770278bf` |
 | `docs/assets/screenshots/material-actions-job-log.png` | 2048×1228 | 155,579 | `6f8a96a9bff8a9c76f89b44aaf3c84a71574aed11ef994db93d12d2749ca0409` |
+| `docs/assets/screenshots/material-pull-all-account-fallback.png` | 2048×1228 | 114,222 | `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991` |
 
 Earlier verified captures, including
 `docs/assets/screenshots/settings-history-manager.png`, remain tracked; that M3
@@ -195,6 +214,26 @@ pattern scanning all pass on the published source-only set.
   capture is `material-actions-job-log.png`; its dimensions and digest are in
   the final capture ledger above.
 
+## Secure Pull All account fallback
+
+- The repository's normal credential resolution always runs first, without a
+  forced selector.
+- Retry eligibility is limited to the ambiguity between HTTPS authentication
+  failure and HTTPS repository-not-found. SSH remotes and non-authentication
+  errors are never retried with other accounts.
+- Only token-bearing signed-in accounts whose configured HTML endpoint has the
+  exact remote origin are candidates. The repository-bound account is preferred
+  among the remaining candidates, then stable account order is preserved.
+- The forced account selector is kept in the internal trampoline map, removed
+  after the operation, and stripped before spawning Git. It never enters a Git,
+  hook, LFS, or other child-process environment and is not emitted to logs.
+- A missing exact-origin selection fails closed for that origin. A cross-origin
+  submodule scopes the selector away and follows normal credential resolution.
+- The accepted off-screen proof uses only synthetic loopback and repository
+  labels. It shows `1 pulled, 0 skipped, 0 failed.` and the exact neutral result
+  `Pull completed using another signed-in account.` without exposing an account
+  name or token.
+
 ## Headless verification environment
 
 - Project: `%USERPROFILE%\Documents\GitHub\desktop-material`
@@ -225,32 +264,32 @@ The safety contract is mandatory:
 The closing gate is complete:
 
 - **Code and CI:** final implementation baseline
-  `c944eeea05227ef1ddb1c7c71e1062f44f672eb3` passed all seven jobs in
-  [CI 29223257147](https://github.com/codingmachineedge/desktop-material/actions/runs/29223257147).
+  `b2699faccb07728fe9aa2838aa13355d71e172b0` passed all seven jobs in
+  [CI 29225926836](https://github.com/codingmachineedge/desktop-material/actions/runs/29225926836).
 - **Installer and release:**
-  [Build Installers 29223257140](https://github.com/codingmachineedge/desktop-material/actions/runs/29223257140)
+  [Build Installers 29225926808](https://github.com/codingmachineedge/desktop-material/actions/runs/29225926808)
   succeeded at that exact SHA with zero workflow artifacts. Public, non-draft,
   non-prerelease release
-  [`v3.6.3-beta3-b0000000075`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000075)
+  [`v3.6.3-beta3-b0000000076`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000076)
   has exactly five uploaded, non-empty assets and an exact-SHA lightweight tag.
-  The non-architecture full NUPKG is 307,543,053 bytes; independently streamed
-  SHA-1 `0a33c5534057ef07ace8fab808e40761802c3283` matches `RELEASES`, and SHA-256
-  `d4420dd9500915b704646ec42adf716972d15b9bec056e4c1e02c39eb05da5a2`
-  matches the GitHub asset digest.
+  Both full NUPKG aliases are 307,547,223 bytes with SHA-256
+  `3a4b0bd30668b2480f9820dab62ca7cfa13f2b58e976ce7454c024942029f365`.
 - **Pages and README:** screenshot/site baseline
-  `8a2df4d28166f3c303f8e8e241ee71c23f9b4b05` passed
-  [Pages 29222707562](https://github.com/codingmachineedge/desktop-material/actions/runs/29222707562).
+  `3acb0ba0dc69af6f2cfdd5e2967593158eac448d` passed
+  [Pages 29227302226](https://github.com/codingmachineedge/desktop-material/actions/runs/29227302226).
   The [repository](https://github.com/codingmachineedge/desktop-material) and
   [Pages site](https://codingmachineedge.github.io/desktop-material/) return
-  HTTP 200, reference the responsive and Actions log proofs, and serve all 16
-  distinct README/site screenshot assets byte-for-byte with their tracked
-  SHA-256.
+  HTTP 200. The Pages and raw-main Pull All proof URLs both serve the tracked
+  114,222 bytes with SHA-256
+  `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991`.
 - **Wiki:** the canonical six-file mirror is pushed at
   `6df402780eea3b32987d40e46094fb10e8ce769e`. The live
   [Home](https://github.com/codingmachineedge/desktop-material/wiki) and
   [User Guide](https://github.com/codingmachineedge/desktop-material/wiki/User-Guide)
   return HTTP 200 and render the 1450×997 responsive proof; the final User
   Guide source also embeds the 2048×1228 Actions job-log proof from raw `main`.
+  The canonical source now embeds the 2048×1228 Pull All account-fallback proof
+  through its raw-main URL for the next wiki mirror update.
 - **Accessibility and clipping:** the exact-size hidden-desktop review shows
   every repository/worktree/branch/sync/one-click/build toolbar control, all
   Changes filter/composer controls, and no horizontal scrollbar. The supported
@@ -259,15 +298,16 @@ The closing gate is complete:
   light/dark core contrast pairs meet WCAG AA for normal text.
 - **Privacy:** the sanitized five-file design set and the full tracked tree pass
   targeted personal-identifier and common-secret scans. Public local-path
-  examples use `%USERPROFILE%`.
+  examples use `%USERPROFILE%`; the Pull All proof contains only synthetic
+  loopback/repository labels and no real identity, token, local path, or email.
 - **Git and delegation:** every delegated commit is merged into `main`, every
   delegated branch was pushed, and completed agent worktrees were removed only
   after clean-state, remote-SHA, and ancestry checks.
 
-The final PLAN/HANDOFF closeout is documentation-only, so installer and Pages
-workflows correctly do not apply to it. Its exact pushed `main` SHA and
-successful CI URL are recorded in the final task response because a commit
-cannot include its own hash.
+The final documentation integration is documentation-only, so installer
+production does not apply; CI and Pages remain the applicable publication
+checks. Its exact pushed `main` SHA and successful runs are recorded in the
+final task response because a commit cannot include its own hash.
 
 ## Maintenance constraints
 
@@ -277,6 +317,10 @@ cannot include its own hash.
   updates on the serialized profile queue.
 - Keep secrets out of profile/notification Git repositories, exports, logs,
   screenshots, and agent responses.
+- Keep Pull All fallback limited to HTTPS auth/not-found ambiguity and
+  token-bearing exact-origin accounts, with repository preference plus stable
+  order. Never retry SSH/non-auth failures, expose the selector to Git children,
+  relax same-origin fail-closed behavior, or force it across submodule origins.
 - Keep agent access localhost-only, opt-in, token-gated, origin-checked, and
   response-redacted.
 - Preserve Material token usage when adapting upstream or Desktop Plus code;

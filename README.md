@@ -78,7 +78,8 @@ These features are implemented and live on `main`.
 **Power-user history, stashes, and windows**
 - Search History by title, message, tag, or hash and toggle a lane graph that visualizes commit ancestry
 - Keep multiple named stashes visible in Changes, inspect each stash's files and diffs, then restore or discard the selected entry
-- Pull every repository from the repositories sheet with per-repository results; use repository pinning/grouping, branch presets/default-branch controls, and per-repository editor overrides
+- Pull every repository from the repositories sheet with per-repository results; an ambiguous HTTPS authentication or not-found response can retry other signed-in accounts for that exact origin without displaying an identity or token
+- Use repository pinning/grouping, branch presets/default-branch controls, and per-repository editor overrides
 - Open repositories and worktrees in separate windows with isolated per-window selection and persisted tabs
 
 **Fully Material, everywhere**
@@ -100,8 +101,8 @@ These features are implemented and live on `main`.
 | **Multi-window** — isolated repository/worktree windows and persisted tabs | **Settings history** — Git-backed timeline, diff, Undo, Redo, restore-to-point |
 | ![Appearance settings at a requested 200% scale auto-fitted to 96%](docs/assets/screenshots/material-scale-200-autofit.png) | ![Responsive regression proof at 1450 by 997 showing the toolbar and Changes controls fully contained with no horizontal overflow](docs/assets/screenshots/material-responsive-overflow-fixed.png) |
 | **200% auto-fit** — minimum-window dark-theme verification with no clipped controls | **Responsive fit** — 1450×997 proof that toolbar and Changes controls fit without horizontal overflow |
-| ![GitHub Actions Windows x64 job log loaded securely in the searchable in-app viewer](docs/assets/screenshots/material-actions-job-log.png) | |
-| **Actions logs** — live 2048×1228 proof of secure redirect handling, credential stripping, safe errors, search, and collapsible groups | |
+| ![GitHub Actions Windows x64 job log loaded securely in the searchable in-app viewer](docs/assets/screenshots/material-actions-job-log.png) | ![Pull all repositories dialog showing a repository pulled using another signed-in account](docs/assets/screenshots/material-pull-all-account-fallback.png) |
+| **Actions logs** — live 2048×1228 proof of secure redirect handling, credential stripping, safe errors, search, and collapsible groups | **Pull all fallback** — exact-origin signed-in account retry with neutral, token-safe per-repository results |
 
 ## Building
 
