@@ -21,6 +21,7 @@ import {
   IRepositoryArchiveRequest,
   IRepositoryToolOperation,
   prepareRepositoryArchive,
+  prepareRepositoryBundle,
   RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
@@ -28,7 +29,10 @@ import {
 } from './operations'
 
 const MaxOutputBytes = 4 * 1024 * 1024
-type RepositoryToolResultID = RepositoryToolID | 'archive-export'
+type RepositoryToolResultID =
+  | RepositoryToolID
+  | 'archive-export'
+  | 'bundle-export'
 
 export interface IRepositoryToolsClient {
   readonly getCatalog: () => Promise<ICLIWorkbenchCatalog>
@@ -56,6 +60,9 @@ export interface IRepositoryToolsProps {
   readonly client?: IRepositoryToolsClient
   readonly chooseArchiveDestination?: (
     format: RepositoryArchiveFormat,
+    defaultPath: string
+  ) => Promise<string | null>
+  readonly chooseBundleDestination?: (
     defaultPath: string
   ) => Promise<string | null>
   readonly revealArchive?: (path: string) => Promise<void>
@@ -306,7 +313,49 @@ export class RepositoryTools extends React.Component<
       return
     }
     this.archiveRunDestination = request.destination
-    void this.startCommand('archive-export', request.args, true)
+    void this.startCommand(
+      request.format === 'bundle' ? 'bundle-export' : 'archive-export',
+      request.args,
+      true
+    )
+  }
+
+  private chooseBundleDestination = async () => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+    const defaultPath = Path.join(
+      Path.dirname(this.props.repositoryPath),
+      `${Path.basename(this.props.repositoryPath)}.bundle`
+    )
+    try {
+      const destination = this.props.chooseBundleDestination
+        ? await this.props.chooseBundleDestination(defaultPath)
+        : await showSaveDialog({
+            title: 'Export full-history Git bundle',
+            defaultPath,
+            filters: [{ name: 'Git bundle', extensions: ['bundle'] }],
+          })
+      if (destination === null || !this.mounted) {
+        return
+      }
+      const archiveRequest = prepareRepositoryBundle(
+        this.props.repositoryPath,
+        destination
+      )
+      this.setState({ archiveRequest, error: null }, () =>
+        this.confirmButton?.focus()
+      )
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to prepare the repository bundle.',
+        })
+      }
+    }
   }
 
   private onRevealArchive = () => {
@@ -383,9 +432,11 @@ export class RepositoryTools extends React.Component<
       event.state === 'completed' &&
       completedOperation !== null &&
       completedOperation !== 'archive-export' &&
+      completedOperation !== 'bundle-export' &&
       getRepositoryToolOperation(completedOperation).mutatesRepository
     const archivePath =
-      completedOperation === 'archive-export'
+      completedOperation === 'archive-export' ||
+      completedOperation === 'bundle-export'
         ? this.archiveRunDestination
         : null
     this.archiveRunDestination = null
@@ -399,7 +450,7 @@ export class RepositoryTools extends React.Component<
         event.state === 'completed' && state.output.length === 0
           ? archivePath === null
             ? 'Completed successfully. Git reported no additional details.'
-            : `Archive exported successfully: ${Path.basename(archivePath)}`
+            : `Repository export completed: ${Path.basename(archivePath)}`
           : state.output,
     }))
     if (shouldRefresh) {
@@ -491,10 +542,10 @@ export class RepositoryTools extends React.Component<
         <h2 id="repository-tools-export-title">Export</h2>
         <article className="repository-tool-card repository-archive-card">
           <div>
-            <h3>Export repository archive</h3>
+            <h3>Export repository artifacts</h3>
             <p>
-              Create a source archive from the current HEAD commit. Git metadata
-              and uncommitted working-tree changes are not included.
+              Create a ZIP/TAR source archive from HEAD or a portable Git bundle
+              containing every local ref and its reachable history.
             </p>
           </div>
           <div
@@ -512,6 +563,12 @@ export class RepositoryTools extends React.Component<
               onClick={() => void this.chooseArchiveDestination('tar')}
             >
               Export TAR
+            </Button>
+            <Button
+              disabled={this.isBusy() || !this.state.gitAvailable}
+              onClick={() => void this.chooseBundleDestination()}
+            >
+              Export full-history bundle
             </Button>
           </div>
         </article>
@@ -567,15 +624,18 @@ export class RepositoryTools extends React.Component<
         aria-describedby="repository-archive-confirm-description"
       >
         <strong id="repository-archive-confirm-title">
-          Export {request.format.toUpperCase()} archive from HEAD?
+          {request.format === 'bundle'
+            ? 'Export full-history Git bundle?'
+            : `Export ${request.format.toUpperCase()} archive from HEAD?`}
         </strong>
         <p id="repository-archive-confirm-description">
           Destination:{' '}
           <span title={request.destination}>{request.destination}</span>
         </p>
         <p>
-          The native save picker handles replacement confirmation when the file
-          already exists. Uncommitted changes are not included.
+          {request.format === 'bundle'
+            ? 'The bundle includes all local refs and their reachable history. Working-tree changes and untracked files are not included.'
+            : 'The native save picker handles replacement confirmation when the file already exists. Uncommitted changes are not included.'}
         </p>
         <div className="repository-tool-controls">
           <Button
@@ -583,7 +643,7 @@ export class RepositoryTools extends React.Component<
             onButtonRef={button => (this.confirmButton = button)}
             onClick={this.onConfirmArchive}
           >
-            Export archive
+            {request.format === 'bundle' ? 'Export bundle' : 'Export archive'}
           </Button>
           <Button onClick={() => this.setState({ archiveRequest: null })}>
             Go back
@@ -597,7 +657,8 @@ export class RepositoryTools extends React.Component<
     const operation =
       this.state.resultOperation === null
         ? null
-        : this.state.resultOperation === 'archive-export'
+        : this.state.resultOperation === 'archive-export' ||
+          this.state.resultOperation === 'bundle-export'
         ? null
         : getRepositoryToolOperation(this.state.resultOperation)
     return (
@@ -609,8 +670,11 @@ export class RepositoryTools extends React.Component<
           <div>
             <h2 id="repository-tools-results-title">Results</h2>
             <span>
-              {this.state.resultOperation === 'archive-export'
-                ? 'Export repository archive'
+              {this.state.resultOperation === 'archive-export' ||
+              this.state.resultOperation === 'bundle-export'
+                ? this.state.resultOperation === 'bundle-export'
+                  ? 'Export full-history Git bundle'
+                  : 'Export repository archive'
                 : operation?.title ?? 'Choose a repository tool'}
             </span>
           </div>

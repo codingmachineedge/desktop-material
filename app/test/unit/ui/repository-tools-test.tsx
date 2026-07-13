@@ -74,7 +74,8 @@ function renderTools(
     format: 'zip' | 'tar',
     defaultPath: string
   ) => Promise<string | null>,
-  revealArchive?: (path: string) => Promise<void>
+  revealArchive?: (path: string) => Promise<void>,
+  chooseBundleDestination?: (defaultPath: string) => Promise<string | null>
 ) {
   return render(
     <RepositoryTools
@@ -83,6 +84,7 @@ function renderTools(
       client={client}
       chooseArchiveDestination={chooseArchiveDestination}
       revealArchive={revealArchive}
+      chooseBundleDestination={chooseBundleDestination}
     />
   )
 }
@@ -99,7 +101,7 @@ describe('Repository tools', () => {
     assert.ok(screen.getByText('Preview maintenance needs'))
     assert.ok(screen.getByText('Run repository maintenance'))
     assert.ok(screen.getByText('View recent ref movements'))
-    assert.ok(screen.getByText('Export repository archive'))
+    assert.ok(screen.getByText('Export repository artifacts'))
     assert.equal(screen.queryByRole('searchbox'), null)
     assert.equal(screen.queryByRole('textbox'), null)
     assert.equal(screen.queryByText(/command arguments/i), null)
@@ -259,5 +261,40 @@ describe('Repository tools', () => {
     await waitFor(() =>
       assert.deepStrictEqual(revealed, ['C:\\exports\\repository-source.zip'])
     )
+  })
+
+  it('exports all local refs through a guided full-history bundle flow', async () => {
+    const client = new FakeRepositoryToolsClient()
+    const defaults: string[] = []
+    renderTools(
+      client,
+      async () => {},
+      undefined,
+      undefined,
+      async defaultPath => {
+        defaults.push(defaultPath)
+        return 'C:/exports/all-history'
+      }
+    )
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Export full-history bundle' })
+    )
+    await screen.findByRole('alertdialog')
+    assert.match(defaults[0], /repo\.bundle$/)
+    assert.match(
+      screen.getByText(/Destination:/).textContent ?? '',
+      /all-history\.bundle/
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Export bundle' }))
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].args, [
+      'bundle',
+      'create',
+      'C:\\exports\\all-history.bundle',
+      '--all',
+    ])
+    assert.equal(client.starts[0].confirmed, true)
   })
 })

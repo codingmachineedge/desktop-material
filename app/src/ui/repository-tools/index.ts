@@ -6,6 +6,7 @@ export type {
 export {
   getRepositoryToolOperation,
   prepareRepositoryArchive,
+  prepareRepositoryBundle,
   RepositoryToolOperations,
 } from './operations'
 export type {

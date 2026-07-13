@@ -5,9 +5,42 @@ export type RepositoryToolCategory = 'Diagnostics' | 'Maintenance' | 'Recovery'
 export type RepositoryArchiveFormat = 'zip' | 'tar'
 
 export interface IRepositoryArchiveRequest {
-  readonly format: RepositoryArchiveFormat
+  readonly format: RepositoryArchiveFormat | 'bundle'
   readonly destination: string
   readonly args: ReadonlyArray<string>
+}
+
+function normalizeRepositoryExportDestination(
+  repositoryPath: string,
+  destination: string,
+  extension: string
+): string {
+  const value = destination.trim()
+  if (value.length === 0 || value.includes('\0') || !Path.isAbsolute(value)) {
+    throw new Error('Choose an absolute destination for the repository export.')
+  }
+
+  const normalizedDestination = value.toLowerCase().endsWith(extension)
+    ? value
+    : `${value}${extension}`
+  const resolvedRepository = Path.resolve(repositoryPath)
+  const resolvedDestination = Path.resolve(normalizedDestination)
+  const gitDirectory = Path.join(resolvedRepository, '.git')
+  const relativeToGitDirectory = Path.relative(
+    gitDirectory,
+    resolvedDestination
+  )
+
+  if (
+    relativeToGitDirectory.length === 0 ||
+    (!relativeToGitDirectory.startsWith(`..${Path.sep}`) &&
+      relativeToGitDirectory !== '..' &&
+      !Path.isAbsolute(relativeToGitDirectory))
+  ) {
+    throw new Error('Repository exports cannot be saved inside .git.')
+  }
+
+  return resolvedDestination
 }
 
 export type RepositoryToolID =
@@ -137,33 +170,12 @@ export function prepareRepositoryArchive(
   destination: string,
   format: RepositoryArchiveFormat
 ): IRepositoryArchiveRequest {
-  const value = destination.trim()
-  if (value.length === 0 || value.includes('\0') || !Path.isAbsolute(value)) {
-    throw new Error(
-      'Choose an absolute destination for the repository archive.'
-    )
-  }
-
   const extension = `.${format}`
-  const normalizedDestination = value.toLowerCase().endsWith(extension)
-    ? value
-    : `${value}${extension}`
-  const resolvedRepository = Path.resolve(repositoryPath)
-  const resolvedDestination = Path.resolve(normalizedDestination)
-  const gitDirectory = Path.join(resolvedRepository, '.git')
-  const relativeToGitDirectory = Path.relative(
-    gitDirectory,
-    resolvedDestination
+  const resolvedDestination = normalizeRepositoryExportDestination(
+    repositoryPath,
+    destination,
+    extension
   )
-
-  if (
-    relativeToGitDirectory.length === 0 ||
-    (!relativeToGitDirectory.startsWith(`..${Path.sep}`) &&
-      relativeToGitDirectory !== '..' &&
-      !Path.isAbsolute(relativeToGitDirectory))
-  ) {
-    throw new Error('Repository archives cannot be saved inside .git.')
-  }
 
   return {
     format,
@@ -174,5 +186,22 @@ export function prepareRepositoryArchive(
       `--output=${resolvedDestination}`,
       'HEAD',
     ],
+  }
+}
+
+/** Create one portable bundle containing all local refs and reachable history. */
+export function prepareRepositoryBundle(
+  repositoryPath: string,
+  destination: string
+): IRepositoryArchiveRequest {
+  const resolvedDestination = normalizeRepositoryExportDestination(
+    repositoryPath,
+    destination,
+    '.bundle'
+  )
+  return {
+    format: 'bundle',
+    destination: resolvedDestination,
+    args: ['bundle', 'create', resolvedDestination, '--all'],
   }
 }

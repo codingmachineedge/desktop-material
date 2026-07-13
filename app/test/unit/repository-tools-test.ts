@@ -3,6 +3,7 @@ import assert from 'node:assert'
 import {
   getRepositoryToolOperation,
   prepareRepositoryArchive,
+  prepareRepositoryBundle,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -100,6 +101,23 @@ describe('repository tool recipes', () => {
         'C:\\work\\repo',
         'C:\\work\\repo\\.git\\private.zip',
         'zip'
+      )
+    )
+  })
+
+  it('prepares a contained full-history bundle with no editable ref', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryBundle('C:\\work\\repo', 'C:\\exports\\backup'),
+      {
+        format: 'bundle',
+        destination: 'C:\\exports\\backup.bundle',
+        args: ['bundle', 'create', 'C:\\exports\\backup.bundle', '--all'],
+      }
+    )
+    assert.throws(() =>
+      prepareRepositoryBundle(
+        'C:\\work\\repo',
+        'C:\\work\\repo\\.git\\backup.bundle'
       )
     )
   })
