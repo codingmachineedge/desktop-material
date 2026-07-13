@@ -202,4 +202,77 @@ describe('GitHub API workbench contract', () => {
     assert.equal(preview, 'POST /repos/octo/repo/issues with JSON body')
     assert.equal(preview.includes('private text'), false)
   })
+
+  it('redacts signed URL query credentials while preserving safe diagnostics', async () => {
+    const secrets = {
+      awsCredential: 'aws-credential-secret',
+      awsDate: 'aws-date-secret',
+      awsSignature: 'aws-signature-secret',
+      googleCredential: 'google-credential-secret',
+      googleSignature: 'google-signature-secret',
+      azureVersion: 'azure-version-secret',
+      azurePermission: 'azure-permission-secret',
+      azureExpiry: 'azure-expiry-secret',
+      azureSignature: 'azure-signature-secret',
+      azureIdentifier: 'azure-identifier-secret',
+      azureEncryptionScope: 'azure-encryption-scope-secret',
+      azureAuthorizedObject: 'azure-authorized-object-secret',
+      azureUnauthorizedObject: 'azure-unauthorized-object-secret',
+      azureCorrelation: 'azure-correlation-secret',
+      cloudFrontPolicy: 'cloudfront-policy-secret',
+      cloudFrontSignature: 'cloudfront-signature-secret',
+      cloudFrontKey: 'cloudfront-key-secret',
+      cloudFrontExpiry: 'cloudfront-expiry-secret',
+      genericToken: 'generic-token-secret',
+      genericAccessKey: 'generic-access-key-secret',
+      genericClientSecret: 'generic-client-secret-value',
+      genericPassword: 'generic-password-value',
+      legacyAWSAccessKey: 'legacy-aws-access-key-secret',
+      legacyAWSSignature: 'legacy-aws-signature-secret',
+      legacyAWSExpiry: 'legacy-aws-expiry-secret',
+      textToken: 'text-token-secret',
+    }
+    const response = new Response(
+      JSON.stringify({
+        links: {
+          aws: `https://objects.example.test/file?X-Amz-Credential=${secrets.awsCredential}&X-Amz-Date=${secrets.awsDate}&X-Amz-Signature=${secrets.awsSignature}&safe=visible`,
+          google: `https://storage.example.test/file?X-Goog-Credential=${secrets.googleCredential}&X-Goog-Signature=${secrets.googleSignature}&alt=media`,
+          azure: `https://blob.example.test/file?sv=${secrets.azureVersion}&sp=${secrets.azurePermission}&se=${secrets.azureExpiry}&si=${secrets.azureIdentifier}&ses=${secrets.azureEncryptionScope}&saoid=${secrets.azureAuthorizedObject}&suoid=${secrets.azureUnauthorizedObject}&scid=${secrets.azureCorrelation}&sig=${secrets.azureSignature}&safe=azure-visible`,
+          cloudfront: `https://cdn.example.test/file?Policy=${secrets.cloudFrontPolicy}&Signature=${secrets.cloudFrontSignature}&Key-Pair-Id=${secrets.cloudFrontKey}&Expires=${secrets.cloudFrontExpiry}&download=1`,
+          legacyAws: `https://objects.example.test/file?AWSAccessKeyId=${secrets.legacyAWSAccessKey}&Signature=${secrets.legacyAWSSignature}&Expires=${secrets.legacyAWSExpiry}&response-content-type=text%2Fplain`,
+          generic: `https://api.example.test/file?access_token=${secrets.genericToken}&access-key=${secrets.genericAccessKey}&client_secret=${secrets.genericClientSecret}&password=${secrets.genericPassword}&page=2`,
+          safe: 'https://api.example.test/items?page=2&label=diagnostic',
+        },
+        text: `download https://api.example.test/file?token=${secrets.textToken}&mode=raw`,
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Location: `https://objects.example.test/file?X-Amz-Credential=${secrets.awsCredential}&X-Amz-Signature=${secrets.awsSignature}&safe=visible`,
+        },
+      }
+    )
+
+    const result = await readGitHubAPIWorkbenchResponse(response)
+    const rendered = JSON.stringify(result)
+    for (const secret of Object.values(secrets)) {
+      assert.equal(rendered.includes(secret), false, secret)
+    }
+    assert.match(rendered, /\[redacted\]/)
+    assert.match(rendered, /safe=visible/)
+    assert.match(rendered, /safe=azure-visible/)
+    assert.match(rendered, /page=2/)
+    assert.match(rendered, /label=diagnostic/)
+    assert.match(rendered, /mode=raw/)
+    assert.match(rendered, /response-content-type=text%2Fplain/)
+
+    const rawText = await readGitHubAPIWorkbenchResponse(
+      new Response(
+        'download https://cdn.example.test/file?signature=raw-signature-secret&mode=text',
+        { headers: { 'Content-Type': 'text/plain' } }
+      )
+    )
+    assert.doesNotMatch(String(rawText.body), /raw-signature-secret/)
+    assert.match(String(rawText.body), /mode=text/)
+  })
 })

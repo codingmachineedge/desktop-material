@@ -71,6 +71,104 @@ const credentialTextPatterns = [
   /https?:\/\/[^\s/@:]+:[^\s/@]+@/gi,
 ]
 
+const azureSASCompanionParameters = new Set([
+  'sv',
+  'ss',
+  'srt',
+  'sp',
+  'se',
+  'st',
+  'spr',
+  'sip',
+  'sr',
+  'si',
+  'ses',
+  'saoid',
+  'suoid',
+  'scid',
+  'skoid',
+  'sktid',
+  'skt',
+  'ske',
+  'sks',
+  'skv',
+  'rscc',
+  'rscd',
+  'rsce',
+  'rscl',
+  'rsct',
+])
+
+const normalizeQueryParameterName = (name: string): string => {
+  try {
+    return decodeURIComponent(name)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+  } catch {
+    return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+  }
+}
+
+function redactCredentialQueryValues(value: string): string {
+  const parameterPattern = /[?&]([^=&#\s]+)=([^&#\s]*)/g
+  const parameterNames = new Set<string>()
+  for (const match of value.matchAll(parameterPattern)) {
+    parameterNames.add(normalizeQueryParameterName(match[1]))
+  }
+
+  const isAzureSAS =
+    parameterNames.has('sig') &&
+    [...azureSASCompanionParameters].some(name => parameterNames.has(name))
+  const isCloudFrontSignedURL =
+    parameterNames.has('keypairid') &&
+    (parameterNames.has('signature') || parameterNames.has('policy'))
+  const isLegacyGoogleSignedURL =
+    parameterNames.has('googleaccessid') && parameterNames.has('signature')
+  const isLegacyAWSSignedURL =
+    parameterNames.has('awsaccesskeyid') && parameterNames.has('signature')
+
+  return value.replace(
+    parameterPattern,
+    (match, rawName: string, _rawValue: string) => {
+      const name = normalizeQueryParameterName(rawName)
+      const genericCredential =
+        name === 'sig' ||
+        name === 'signature' ||
+        name === 'token' ||
+        name.endsWith('token') ||
+        name === 'credential' ||
+        name === 'apikey' ||
+        name === 'accesskey' ||
+        name === 'accesskeyid' ||
+        name === 'secretaccesskey' ||
+        name === 'clientsecret' ||
+        name === 'password'
+      const providerCredential =
+        name.startsWith('xamz') ||
+        name.startsWith('xgoog') ||
+        (isAzureSAS &&
+          (name === 'sig' || azureSASCompanionParameters.has(name))) ||
+        (isCloudFrontSignedURL &&
+          (name === 'policy' ||
+            name === 'signature' ||
+            name === 'keypairid' ||
+            name === 'expires')) ||
+        (isLegacyGoogleSignedURL &&
+          (name === 'googleaccessid' ||
+            name === 'expires' ||
+            name === 'signature')) ||
+        (isLegacyAWSSignedURL &&
+          (name === 'awsaccesskeyid' ||
+            name === 'expires' ||
+            name === 'signature'))
+
+      return genericCredential || providerCredential
+        ? match.replace(/=.*/, '=[redacted]')
+        : match
+    }
+  )
+}
+
 const visibleResponseHeaders = new Set([
   'content-type',
   'deprecation',
@@ -296,10 +394,11 @@ export function formatGitHubAPIWorkbenchPreview(
 }
 
 function redactString(value: string): string {
-  return credentialTextPatterns.reduce(
+  const redacted = credentialTextPatterns.reduce(
     (current, pattern) => current.replace(pattern, '[redacted]'),
     value
   )
+  return redactCredentialQueryValues(redacted)
 }
 
 function getVisibleResponseHeaders(
