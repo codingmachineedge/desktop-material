@@ -1,4 +1,3 @@
-import * as Path from 'path'
 import { lstat, open } from 'fs/promises'
 
 import { Repository } from '../../models/repository'
@@ -12,6 +11,10 @@ import {
   normalizeFileHistoryPath,
   parseFileBlamePorcelain,
 } from './file-history-parser'
+import {
+  resolveSafeRepositoryPath,
+  WorktreePathSafetyError,
+} from './worktree-path-guard'
 
 export * from './file-history-parser'
 
@@ -133,9 +136,17 @@ export async function getFileHistory(
 
 async function ensureBlameableWorkingFile(
   repository: Repository,
-  path: string
+  path: string,
+  signal?: AbortSignal
 ): Promise<void> {
-  const resolvedPath = Path.resolve(repository.path, ...path.split('/'))
+  let resolvedPath: string
+  try {
+    resolvedPath = (
+      await resolveSafeRepositoryPath(repository.path, path, signal)
+    ).path
+  } catch (error) {
+    throwFileHistoryPathSafetyError(error)
+  }
   let fileStat
   try {
     fileStat = await lstat(resolvedPath)
@@ -165,6 +176,13 @@ async function ensureBlameableWorkingFile(
     )
   }
 
+  try {
+    resolvedPath = (
+      await resolveSafeRepositoryPath(repository.path, path, signal)
+    ).path
+  } catch (error) {
+    throwFileHistoryPathSafetyError(error)
+  }
   const handle = await open(resolvedPath, 'r')
   try {
     const probe = Buffer.alloc(Math.min(BinaryProbeLength, fileStat.size))
@@ -182,6 +200,25 @@ async function ensureBlameableWorkingFile(
   }
 }
 
+function throwFileHistoryPathSafetyError(error: unknown): never {
+  if (error instanceof WorktreePathSafetyError) {
+    if (error.kind === 'aborted') {
+      throw new FileHistoryUnavailableError('aborted', 'Request cancelled.')
+    }
+    if (error.kind === 'reparse-point' || error.kind === 'path-escape') {
+      throw new FileHistoryUnavailableError(
+        'symbolic-link',
+        'This path crosses a symbolic link or junction, so file contents cannot be read or replaced safely.'
+      )
+    }
+    throw new FileHistoryUnavailableError(
+      'invalid-path',
+      'Desktop could not verify this file inside the physical repository worktree.'
+    )
+  }
+  throw error
+}
+
 /** Load bounded line-level blame for the working-tree version of one file. */
 export async function getFileBlame(
   repository: Repository,
@@ -190,7 +227,7 @@ export async function getFileBlame(
 ): Promise<IFileBlameResult> {
   throwIfAborted(signal)
   const path = normalizeFileHistoryPath(repository.path, value)
-  await ensureBlameableWorkingFile(repository, path)
+  await ensureBlameableWorkingFile(repository, path, signal)
   throwIfAborted(signal)
 
   const tracked = await git(
@@ -210,6 +247,13 @@ export async function getFileBlame(
       'Commit this file before viewing line blame.'
     )
   }
+
+  try {
+    await resolveSafeRepositoryPath(repository.path, path, signal)
+  } catch (error) {
+    throwFileHistoryPathSafetyError(error)
+  }
+  throwIfAborted(signal)
 
   let result
   try {
@@ -254,6 +298,11 @@ export async function restoreFileFromCommit(
       'missing',
       'This commit stores the file under an earlier name, so it cannot replace the current path safely.'
     )
+  }
+  try {
+    await resolveSafeRepositoryPath(repository.path, path)
+  } catch (error) {
+    throwFileHistoryPathSafetyError(error)
   }
   await git(
     ['restore', `--source=${sha}`, '--worktree', '--', path],
