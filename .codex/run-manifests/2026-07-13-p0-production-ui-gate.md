@@ -108,6 +108,13 @@ The 944×1000 Actions and Branch Rules images are intentional original captures 
 - Mobile emulation used 390×844. The document width was 375 and `scrollWidth === clientWidth`; zero visible elements overflowed horizontally. The four P0 gallery cards collapsed to one 259-pixel-wide column with wrapped captions.
 - Original captures `28-pages-desktop.png`, `29-pages-p0-gallery.png`, and `31-pages-mobile-p0.png` were visually inspected. They remained raw run evidence rather than tracked product screenshots.
 
+### Publication checkpoint
+
+- Repository documentation, Pages source, and all four promoted PNGs were committed and pushed to `mega-feature-update` at `949eca9a29f266f9aa21451718c92d71fe0a4701`; local, tracking, and direct remote SHAs matched.
+- The separate wiki was merged with its existing extra guidance rather than overwritten. The four P0 images were copied into its `Images/` directory so publication did not depend on not-yet-main raw URLs.
+- Wiki `master` was committed and pushed at `cf115fec684278f44cceced279651b7f288b2ddd`; local, tracking, and direct remote SHAs matched. Public Home and User Guide renders contained the new named-function content, and all four raw wiki images loaded successfully.
+- Pages source passed the exact desktop/mobile geometry gate above but remains branch-only. Live Pages promotion follows the repository's protected `main` deployment path.
+
 ## Cleanup ledger
 
 - Run id: `dm-p0-ui-20260713-c7e68853`

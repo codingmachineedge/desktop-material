@@ -17,8 +17,8 @@ completion, Issue Hub, and Release Manager listed in the README roadmap.
 
 This handoff does not claim that branch-only Pages assets are already live on
 `main`. Pages remains protected to the normal reviewed `main` promotion path;
-the separate wiki can be updated independently after its existing content is
-merged rather than overwritten.
+the separate wiki was merged rather than overwritten and published at exact
+wiki SHA `cf115fec684278f44cceced279651b7f288b2ddd`.
 
 ## 2026-07-13 P0 production UI gate
 
@@ -105,6 +105,22 @@ Cleanup completed: the exact disposable development-channel credential was
 deleted and read back absent; the app, provider, CDP endpoint, provider port,
 and off-screen desktop were gone; and the containment-checked owned Temp root
 was removed. No normal Desktop profile or public provider state was changed.
+
+### Publication checkpoint
+
+- Main-repository evidence, roadmap, wiki sources, Pages source, and four PNGs
+  were committed and pushed on `mega-feature-update` at
+  `949eca9a29f266f9aa21451718c92d71fe0a4701`; local, tracking, and direct
+  remote SHAs matched.
+- The separate wiki's existing extra guidance was preserved while the P0 Home
+  and User Guide content was merged. Four local `Images/` assets avoid raw-main
+  404s before branch promotion. Wiki `master` was committed and pushed at
+  `cf115fec684278f44cceced279651b7f288b2ddd`; local, tracking, and direct
+  remote SHAs matched.
+- Public Home and User Guide renders showed the current named-function text and
+  all four image links; each raw wiki image returned successfully. Pages source
+  remains branch-only and follows the repository's protected `main` deployment
+  path.
 
 ## Legacy M0-M18 milestone summary
 
