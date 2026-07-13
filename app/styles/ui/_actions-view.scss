@@ -367,6 +367,11 @@
 .actions-details-header {
   margin-bottom: 14px;
 
+  > .button-component {
+    max-width: 100%;
+    flex: 0 0 auto;
+  }
+
   h2 {
     margin: 2px 0 0;
     font-size: 17px;

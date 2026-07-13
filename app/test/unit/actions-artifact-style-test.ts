@@ -58,6 +58,10 @@ describe('Actions artifact responsive styles', () => {
     )
     assert.match(
       source,
+      /\.actions-details-header\s*\{[\s\S]*?> \.button-component\s*\{[\s\S]*?max-width: 100%;[\s\S]*?flex: 0 0 auto;/
+    )
+    assert.match(
+      source,
       /\.actions-artifact-pagination\s*\{[\s\S]*?min-width: 0;[\s\S]*?flex-wrap: wrap;[\s\S]*?overflow-wrap: anywhere;/
     )
     assert.match(
