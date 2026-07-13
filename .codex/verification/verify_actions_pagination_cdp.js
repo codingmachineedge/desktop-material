@@ -166,7 +166,7 @@ async function waitFor(client, expression, label, timeout = 20_000) {
 }
 
 async function seedIsolatedProfile(client) {
-  const reload = await evaluate(
+  return evaluate(
     client,
     `(() => {
       const expected = {
@@ -186,14 +186,6 @@ async function seedIsolatedProfile(client) {
       return changed
     })()`
   )
-  if (reload) {
-    await client.send('Page.reload', { ignoreCache: true })
-    await waitFor(
-      client,
-      `document.readyState === 'complete'`,
-      'isolated profile reload'
-    )
-  }
 }
 
 async function clickButton(client, label) {
@@ -364,7 +356,11 @@ async function interact(client, options) {
     'sentinel-capture'
   )
 
-  await seedIsolatedProfile(client)
+  if (await seedIsolatedProfile(client)) {
+    fail(
+      'Initialized the isolated verification profile; restart the exact app with the same profile before retrying.'
+    )
+  }
   await waitFor(
     client,
     `document.querySelector('#actions-tab') !== null`,
