@@ -5,13 +5,21 @@ export type {
 } from './repository-tools'
 export {
   getRepositoryToolOperation,
+  assertRepositoryBundleSourceUnchanged,
+  normalizeBundleImportBranchName,
+  parseRepositoryBundleHeads,
   prepareRepositoryArchive,
   prepareRepositoryBundle,
+  prepareRepositoryBundleImport,
+  prepareRepositoryBundleInspection,
   prepareRepositoryBundleVerification,
   RepositoryToolOperations,
 } from './operations'
 export type {
   IRepositoryArchiveRequest,
+  IRepositoryBundleImportRequest,
+  IRepositoryBundleInspectionRequest,
+  IRepositoryBundleRef,
   IRepositoryToolOperation,
   RepositoryArchiveFormat,
   RepositoryToolCategory,

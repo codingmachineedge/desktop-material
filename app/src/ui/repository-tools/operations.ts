@@ -10,6 +10,195 @@ export interface IRepositoryArchiveRequest {
   readonly args: ReadonlyArray<string>
 }
 
+export interface IRepositoryBundleRef {
+  readonly oid: string
+  readonly ref: string
+}
+
+export interface IRepositoryBundleInspectionRequest {
+  readonly bundlePath: string
+  readonly verifyArgs: ReadonlyArray<string>
+  readonly listHeadsArgs: ReadonlyArray<string>
+}
+
+export interface IRepositoryBundleImportRequest
+  extends IRepositoryBundleInspectionRequest {
+  readonly source: IRepositoryBundleRef
+  readonly branchName: string
+  readonly destinationRef: string
+  /** Validate the destination with Git again immediately before import. */
+  readonly validateDestinationArgs: ReadonlyArray<string>
+  /** Exit 1 means available; exit 0 means the destination already exists. */
+  readonly checkDestinationArgs: ReadonlyArray<string>
+  /** Import objects without writing FETCH_HEAD or any local ref. */
+  readonly fetchObjectsArgs: ReadonlyArray<string>
+  /** Git branch refuses to replace a ref that appeared after the recheck. */
+  readonly createBranchArgs: ReadonlyArray<string>
+}
+
+const MaximumBundleRefs = 5_000
+
+function normalizeRepositoryBundlePath(bundlePath: string): string {
+  const value = bundlePath.trim()
+  if (
+    value.length === 0 ||
+    value.includes('\0') ||
+    !Path.isAbsolute(value) ||
+    !value.toLowerCase().endsWith('.bundle')
+  ) {
+    throw new Error('Choose an absolute .bundle file.')
+  }
+  return Path.resolve(value)
+}
+
+function isValidFullRefName(ref: string): boolean {
+  if (
+    !ref.startsWith('refs/') ||
+    ref.length > 1_024 ||
+    ref.endsWith('/') ||
+    ref.endsWith('.') ||
+    ref.includes('..') ||
+    ref.includes('//') ||
+    ref.includes('@{') ||
+    /[\x00-\x20\x7f~^:?*\[\\]/.test(ref)
+  ) {
+    return false
+  }
+
+  return ref
+    .split('/')
+    .every(
+      part =>
+        part.length > 0 && !part.startsWith('.') && !part.endsWith('.lock')
+    )
+}
+
+/**
+ * Parse the machine-readable output from `git bundle list-heads`. Any malformed
+ * or conflicting line rejects the whole inspection instead of being hidden.
+ */
+export function parseRepositoryBundleHeads(
+  output: string
+): ReadonlyArray<IRepositoryBundleRef> {
+  if (Buffer.byteLength(output, 'utf8') > 4 * 1024 * 1024) {
+    throw new Error('The bundle advertised-ref list is too large to review.')
+  }
+
+  const refs = new Map<string, IRepositoryBundleRef>()
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (line.length === 0) {
+      continue
+    }
+    const match = /^([0-9a-fA-F]{40}|[0-9a-fA-F]{64}) ([^\s]+)$/.exec(line)
+    if (match === null || !isValidFullRefName(match[2])) {
+      throw new Error('The bundle returned an invalid advertised ref.')
+    }
+
+    const candidate = { oid: match[1].toLowerCase(), ref: match[2] }
+    const existing = refs.get(candidate.ref)
+    if (existing !== undefined && existing.oid !== candidate.oid) {
+      throw new Error('The bundle advertised one ref at multiple object IDs.')
+    }
+    refs.set(candidate.ref, candidate)
+    if (refs.size > MaximumBundleRefs) {
+      throw new Error('The bundle advertises too many refs to review safely.')
+    }
+  }
+
+  if (refs.size === 0) {
+    throw new Error('The bundle does not advertise an importable ref.')
+  }
+  return [...refs.values()]
+}
+
+/** Normalize a local branch name while mirroring Git's ref-format constraints. */
+export function normalizeBundleImportBranchName(branchName: string): string {
+  const value = branchName.trim()
+  const fullRef = `refs/heads/${value}`
+  if (
+    value.length === 0 ||
+    value.length > 1_000 ||
+    value === '@' ||
+    value === 'HEAD' ||
+    value.startsWith('-') ||
+    value.startsWith('/') ||
+    value.endsWith('/') ||
+    !isValidFullRefName(fullRef)
+  ) {
+    throw new Error('Enter a valid new local branch name.')
+  }
+  return value
+}
+
+export function prepareRepositoryBundleInspection(
+  bundlePath: string
+): IRepositoryBundleInspectionRequest {
+  const normalizedPath = normalizeRepositoryBundlePath(bundlePath)
+  return {
+    bundlePath: normalizedPath,
+    verifyArgs: ['bundle', 'verify', normalizedPath],
+    listHeadsArgs: ['bundle', 'list-heads', normalizedPath],
+  }
+}
+
+/**
+ * Build the complete, fixed import recipe from one previously advertised ref.
+ * No shell, refspec, or editable argv is accepted from the UI.
+ */
+export function prepareRepositoryBundleImport(
+  bundlePath: string,
+  source: IRepositoryBundleRef,
+  branchName: string
+): IRepositoryBundleImportRequest {
+  if (
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(source.oid) ||
+    !isValidFullRefName(source.ref)
+  ) {
+    throw new Error('Choose a valid ref advertised by the inspected bundle.')
+  }
+
+  const inspection = prepareRepositoryBundleInspection(bundlePath)
+  const normalizedBranch = normalizeBundleImportBranchName(branchName)
+  const destinationRef = `refs/heads/${normalizedBranch}`
+  return {
+    ...inspection,
+    source: { oid: source.oid, ref: source.ref },
+    branchName: normalizedBranch,
+    destinationRef,
+    validateDestinationArgs: ['check-ref-format', '--branch', normalizedBranch],
+    checkDestinationArgs: ['show-ref', '--verify', '--quiet', destinationRef],
+    fetchObjectsArgs: [
+      'fetch',
+      '--no-write-fetch-head',
+      '--no-tags',
+      '--no-auto-maintenance',
+      inspection.bundlePath,
+      source.ref,
+    ],
+    createBranchArgs: [
+      'branch',
+      '--no-track',
+      '--',
+      normalizedBranch,
+      source.oid,
+    ],
+  }
+}
+
+/** Require the exact selected ref and object ID during the mutation recheck. */
+export function assertRepositoryBundleSourceUnchanged(
+  heads: ReadonlyArray<IRepositoryBundleRef>,
+  expected: IRepositoryBundleRef
+): void {
+  const current = heads.find(head => head.ref === expected.ref)
+  if (current === undefined || current.oid !== expected.oid) {
+    throw new Error(
+      'The bundle changed after review. Inspect it again before importing.'
+    )
+  }
+}
+
 function normalizeRepositoryExportDestination(
   repositoryPath: string,
   destination: string,
@@ -210,14 +399,6 @@ export function prepareRepositoryBundle(
 export function prepareRepositoryBundleVerification(
   bundlePath: string
 ): ReadonlyArray<string> {
-  const value = bundlePath.trim()
-  if (
-    value.length === 0 ||
-    value.includes('\0') ||
-    !Path.isAbsolute(value) ||
-    !value.toLowerCase().endsWith('.bundle')
-  ) {
-    throw new Error('Choose an absolute .bundle file to verify.')
-  }
-  return ['bundle', 'verify', Path.resolve(value)]
+  const normalizedPath = normalizeRepositoryBundlePath(bundlePath)
+  return ['bundle', 'verify', normalizedPath]
 }
