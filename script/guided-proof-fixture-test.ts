@@ -1,6 +1,7 @@
 import assert from 'node:assert'
 import { execFile } from 'node:child_process'
 import { createServer, request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
 import { createServer as createTCPServer } from 'node:net'
 import {
   lstat,
@@ -88,6 +89,7 @@ async function createHarness(): Promise<ITestHarness> {
       await new Promise<void>(resolvePromise =>
         server.close(() => resolvePromise())
       )
+      await fixture.waitForRequests()
       await fixture.flushLedger()
       const safeRoot = resolve(root)
       assert.ok(safeRoot.startsWith(resolve(tmpdir())))
@@ -201,6 +203,24 @@ async function reserveLoopbackPort(): Promise<number> {
   return address.port
 }
 
+async function httpsStatus(url: string, token: string): Promise<number> {
+  return await new Promise<number>((resolvePromise, reject) => {
+    const request = httpsRequest(
+      url,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        rejectUnauthorized: false,
+      },
+      response => {
+        response.resume()
+        response.once('end', () => resolvePromise(response.statusCode ?? 0))
+      }
+    )
+    request.once('error', reject)
+    request.end()
+  })
+}
+
 describe('guided proof fixture script', () => {
   it('accepts tokens only from environment and sanitizes every child environment', () => {
     const parsed = parseGuidedProofCLIArguments(
@@ -271,6 +291,8 @@ describe('guided proof fixture script', () => {
         guided_proof_token_b: tokenB,
         GH_TOKEN: 'unrelated-secret',
         ALIASED_TOKEN: tokenA,
+        GIT_AUTHOR_NAME: 'Caller Identity',
+        GIT_TEMPLATE_DIR: 'caller-template',
         KEEP_ME: 'safe',
       },
       { GIT_PROTOCOL: 'version=2' }
@@ -278,6 +300,8 @@ describe('guided proof fixture script', () => {
     assert.equal(child.KEEP_ME, undefined)
     assert.equal(child.GH_TOKEN, undefined)
     assert.equal(child.ALIASED_TOKEN, undefined)
+    assert.equal(child.GIT_AUTHOR_NAME, undefined)
+    assert.equal(child.GIT_TEMPLATE_DIR, undefined)
     assert.equal(child.GIT_PROTOCOL, 'version=2')
     assert.equal(child.GUIDED_PROOF_TOKEN_A, undefined)
     assert.equal(child.guided_proof_token_b, undefined)
@@ -299,6 +323,9 @@ describe('guided proof fixture script', () => {
     assert.throws(() =>
       createGuidedProofChildEnvironment({}, { GIT_PROTOCOL: tokenA })
     )
+    assert.throws(() =>
+      createGuidedProofChildEnvironment({}, { GIT_TEMPLATE_DIR: 'unsafe' })
+    )
   })
 
   it('creates deterministic bare history without overwriting caller data', async () => {
@@ -308,6 +335,7 @@ describe('guided proof fixture script', () => {
       const second = await createGuidedProofRepository(join(root, 'second'))
       assert.equal(first.commitCount, 3)
       assert.equal(first.headSha, second.headSha)
+      assert.equal(first.headSha, 'e602b6bae7af1dbcd62a4434b6bf4d24bc46c234')
       const occupied = join(root, 'occupied')
       await mkdir(occupied)
       await writeFile(join(occupied, 'caller.txt'), 'preserve\n')
@@ -317,6 +345,147 @@ describe('guided proof fixture script', () => {
         'preserve\n'
       )
     } finally {
+      const safeRoot = resolve(root)
+      assert.ok(safeRoot.startsWith(resolve(tmpdir())))
+      await rm(safeRoot, { recursive: true })
+    }
+  })
+
+  it('starts HTTPS with caller material, publishes token-free readiness, and closes', async context => {
+    const root = await mkdtemp(join(tmpdir(), 'guided-proof-https-test-'))
+    let running: Awaited<ReturnType<typeof startGuidedProofFixture>> | null =
+      null
+    try {
+      const openssl =
+        process.platform === 'win32'
+          ? join(
+              process.env.ProgramFiles ?? 'C:\\Program Files',
+              'Git',
+              'usr',
+              'bin',
+              'openssl.exe'
+            )
+          : 'openssl'
+      try {
+        await execFileAsync(openssl, ['version'], { windowsHide: true })
+      } catch {
+        context.skip('OpenSSL is unavailable in this test environment.')
+        return
+      }
+      const certificatePath = join(root, 'certificate.pem')
+      const keyPath = join(root, 'key.pem')
+      const configPath = join(root, 'openssl.cnf')
+      await writeFile(
+        configPath,
+        [
+          '[req]',
+          'distinguished_name=dn',
+          'x509_extensions=v3',
+          'prompt=no',
+          '[dn]',
+          'CN=127.0.0.1',
+          '[v3]',
+          'subjectAltName=IP:127.0.0.1',
+          'keyUsage=digitalSignature,keyEncipherment',
+          'extendedKeyUsage=serverAuth',
+          '',
+        ].join('\n')
+      )
+      await execFileAsync(
+        openssl,
+        [
+          'req',
+          '-x509',
+          '-newkey',
+          'rsa:2048',
+          '-nodes',
+          '-keyout',
+          keyPath,
+          '-out',
+          certificatePath,
+          '-days',
+          '1',
+          '-config',
+          configPath,
+        ],
+        { windowsHide: true }
+      )
+      const port = await reserveLoopbackPort()
+      running = await startGuidedProofFixture({
+        root: join(root, 'owned-fixture'),
+        certificatePath,
+        keyPath,
+        port,
+        tokenA,
+        tokenB,
+      })
+      assert.equal(
+        await httpsStatus(`${running.ready.endpoint}/user`, tokenB),
+        200
+      )
+      const rejectedDestination = join(root, 'account-a-clone')
+      let rejectedText = ''
+      await assert.rejects(async () => {
+        try {
+          await cloneWithToken(
+            running!.ready.cloneUrl,
+            rejectedDestination,
+            tokenA,
+            certificatePath
+          )
+        } catch (error) {
+          rejectedText =
+            error instanceof Error
+              ? `${error.message}\n${String(
+                  (error as Error & { stderr?: unknown }).stderr ?? ''
+                )}`
+              : String(error)
+          throw error
+        }
+      })
+      assert.doesNotMatch(rejectedText, new RegExp(tokenA))
+      assert.doesNotMatch(rejectedText, new RegExp(tokenB))
+      const acceptedDestination = join(root, 'account-b-clone')
+      await cloneWithToken(
+        running.ready.cloneUrl,
+        acceptedDestination,
+        tokenB,
+        certificatePath
+      )
+      const { stdout: cloneCount } = await execFileAsync(
+        'git',
+        ['rev-list', '--count', 'HEAD'],
+        {
+          cwd: acceptedDestination,
+          env: createGuidedProofChildEnvironment(process.env),
+          windowsHide: true,
+        }
+      )
+      assert.equal(cloneCount.trim(), '3')
+      const readyFile = await readFile(
+        join(root, 'owned-fixture', 'ready.json'),
+        'utf8'
+      )
+      assert.equal(JSON.parse(readyFile).endpoint, running.ready.endpoint)
+      assert.doesNotMatch(readyFile, new RegExp(tokenA))
+      assert.doesNotMatch(readyFile, new RegExp(tokenB))
+      assert.doesNotMatch(readyFile, /"pid"/i)
+      assert.doesNotMatch(readyFile, /"[A-Za-z]:[\\/]|\\Users\\/i)
+      await running.close()
+      const ledger = await readFile(
+        join(root, 'owned-fixture', running.ready.ledger.path),
+        'utf8'
+      )
+      assert.match(ledger, /"route":"git-authentication"/)
+      assert.match(ledger, /"route":"git-upload-pack"/)
+      assert.doesNotMatch(ledger, new RegExp(tokenA))
+      assert.doesNotMatch(ledger, new RegExp(tokenB))
+      running = null
+      await assert.rejects(
+        httpsStatus(`https://127.0.0.1:${port}/api/v3/user`, tokenB)
+      )
+    } finally {
+      await running?.close().catch(() => undefined)
       const safeRoot = resolve(root)
       assert.ok(safeRoot.startsWith(resolve(tmpdir())))
       await rm(safeRoot, { recursive: true })
@@ -402,7 +571,10 @@ describe('guided proof fixture script', () => {
       )
 
       await harness.fixture.flushLedger()
-      const ledger = await readFile(harness.fixture.ready.ledger.path, 'utf8')
+      const ledger = await readFile(
+        join(harness.root, 'owned-fixture', harness.fixture.ready.ledger.path),
+        'utf8'
+      )
       assert.match(ledger, /"route":"git-authentication"/)
       assert.match(ledger, /"route":"git-upload-pack"/)
       assert.doesNotMatch(ledger, new RegExp(tokenA))
@@ -507,7 +679,10 @@ describe('guided proof fixture script', () => {
 
       await fixture.close()
       const ready = await readFile(join(fixtureRoot, 'ready.json'), 'utf8')
-      const ledger = await readFile(fixture.ready.ledger.path, 'utf8')
+      const ledger = await readFile(
+        join(fixtureRoot, fixture.ready.ledger.path),
+        'utf8'
+      )
       for (const output of [ready, ledger, rejectedText]) {
         assert.doesNotMatch(output, new RegExp(tokenA))
         assert.doesNotMatch(output, new RegExp(tokenB))

@@ -271,7 +271,10 @@ describe('guided proof production clone integration', () => {
 
       await fixture.close()
       const ready = await readFile(join(fixtureRoot, 'ready.json'), 'utf8')
-      const ledger = await readFile(fixture.ready.ledger.path, 'utf8')
+      const ledger = await readFile(
+        join(fixtureRoot, fixture.ready.ledger.path),
+        'utf8'
+      )
       const entries = ledgerEntries(ledger)
       const selectedAccounts = entries
         .map(entry => entry.account)

@@ -12,6 +12,7 @@ import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it } from 'node:test'
 import { API, fetchUser } from '../../src/lib/api'
+import { parseWorkflowDispatchInputs } from '../../src/lib/actions-workflow-inputs'
 import {
   createGuidedProofChildEnvironment,
   createGuidedProofHandler,
@@ -89,6 +90,7 @@ async function createHarness(): Promise<IProofHarness> {
       await new Promise<void>(resolvePromise =>
         running.server.close(() => resolvePromise())
       )
+      await fixture.waitForRequests()
       await fixture.flushLedger()
       const safeRoot = resolve(root)
       assert.ok(safeRoot.startsWith(resolve(tmpdir())))
@@ -159,6 +161,7 @@ describe('guided hidden-desktop proof fixture', () => {
       assert.equal(first.commitCount, 3)
       assert.equal(second.commitCount, 3)
       assert.equal(first.headSha, second.headSha)
+      assert.equal(first.headSha, 'e602b6bae7af1dbcd62a4434b6bf4d24bc46c234')
       const { stdout: isBare } = await execFileAsync(
         'git',
         [
@@ -171,6 +174,23 @@ describe('guided hidden-desktop proof fixture', () => {
         { windowsHide: true }
       )
       assert.equal(isBare.trim(), 'true')
+      const { stdout: identities } = await execFileAsync(
+        'git',
+        [
+          '--git-dir',
+          first.bareRepositoryPath,
+          'log',
+          '--format=%an%x00%ae%x00%cn%x00%ce',
+        ],
+        { windowsHide: true }
+      )
+      const expectedIdentity =
+        'Guided Proof\u0000guided-proof@example.invalid\u0000Guided Proof\u0000guided-proof@example.invalid'
+      assert.deepEqual(identities.trim().split(/\r?\n/), [
+        expectedIdentity,
+        expectedIdentity,
+        expectedIdentity,
+      ])
 
       const occupied = join(root, 'occupied')
       await mkdir(occupied)
@@ -280,13 +300,152 @@ describe('guided hidden-desktop proof fixture', () => {
         ).rules.length,
         2
       )
+      await api.setWorkflowEnabled('material-proof', 'guided-proof', 700, false)
+      assert.equal(
+        (await api.fetchWorkflows('material-proof', 'guided-proof'))
+          .workflows[0].state,
+        'disabled_manually'
+      )
+      const workflowSource = await api.fetchWorkflowFileContent(
+        'material-proof',
+        'guided-proof',
+        '.github/workflows/guided-proof.yml',
+        'main'
+      )
+      const workflowDispatch = parseWorkflowDispatchInputs(workflowSource)
+      assert.equal(workflowDispatch.available, true)
+      assert.equal(workflowDispatch.inputs[0].name, 'proof_scope')
+      await api.dispatchWorkflow(
+        'material-proof',
+        'guided-proof',
+        700,
+        'main',
+        { proof_scope: 'guided' }
+      )
+      await api.setWorkflowEnabled('material-proof', 'guided-proof', 700, true)
+
+      const initialPullRequest = await api.inspectPullRequest(
+        'material-proof',
+        'guided-proof',
+        8
+      )
+      assert.equal(
+        initialPullRequest.headSHA,
+        harness.fixture.ready.repository.headSha
+      )
+      const updatedPullRequest = await api.updatePullRequestLifecycle(
+        'material-proof',
+        'guided-proof',
+        8,
+        initialPullRequest.headSHA,
+        {
+          title: 'Finish the bounded guided proof review',
+          body: 'Reviewed through the production lifecycle parser.',
+          base: 'main',
+          metadata: {
+            reviewers: ['proof-a'],
+            assignees: ['proof-b'],
+            labels: ['material-proof'],
+          },
+        }
+      )
+      assert.equal(updatedPullRequest.warnings.length, 0)
+      assert.deepEqual(updatedPullRequest.pullRequest.metadata.reviewers, [
+        'proof-a',
+      ])
+      const reviewReceipt = await api.submitPullRequestReview(
+        'material-proof',
+        'guided-proof',
+        8,
+        initialPullRequest.headSHA,
+        { event: 'COMMENT', body: 'Bounded review submitted.' }
+      )
+      assert.equal(reviewReceipt.state, 'COMMENTED')
+
+      const createdPullRequest = await api.createPullRequest(
+        'material-proof',
+        'guided-proof',
+        'Compose a second guided proof',
+        'Created through the production pull request parser.',
+        'proof-compose',
+        'main',
+        false,
+        { name: null, fullName: 'material-proof/guided-proof' },
+        undefined,
+        {
+          reviewers: ['guided-proof-reviewer'],
+          assignees: ['proof-b'],
+          labels: ['guided-proof'],
+        }
+      )
+      assert.equal(createdPullRequest.number, 9)
+      assert.equal(createdPullRequest.metadataWarnings, undefined)
+      assert.deepEqual(
+        (
+          await api.inspectPullRequest(
+            'material-proof',
+            'guided-proof',
+            createdPullRequest.number
+          )
+        ).metadata.labels,
+        ['guided-proof']
+      )
+      for (const state of ['closed', 'open'] as const) {
+        const stateResponse = await fetch(
+          `${harness.endpoint}/repos/material-proof/guided-proof/pulls/9`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${tokenB}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ state }),
+          }
+        )
+        assert.equal(stateResponse.status, 200)
+        assert.equal((await stateResponse.json()).state, state)
+        assert.equal(
+          (
+            await api.inspectPullRequest(
+              'material-proof',
+              'guided-proof',
+              createdPullRequest.number
+            )
+          ).state,
+          state
+        )
+      }
+      const mergeReceipt = await api.mergePullRequest(
+        'material-proof',
+        'guided-proof',
+        8,
+        initialPullRequest.headSHA,
+        'squash'
+      )
+      assert.equal(mergeReceipt.merged, true)
+      assert.equal(mergeReceipt.sha, initialPullRequest.headSHA)
+
+      const triageIssues = await api.fetchProviderTriageIssues(
+        'material-proof',
+        'guided-proof',
+        50
+      )
+      const triagePullRequests = await api.fetchProviderTriagePullRequests(
+        'material-proof',
+        'guided-proof',
+        50
+      )
+      assert.equal(triageIssues.supported, true)
+      assert.equal(triageIssues.items[0].number, 7)
+      assert.equal(triagePullRequests.supported, true)
+      assert.equal(triagePullRequests.items[0].number, 9)
 
       const triage = await fetch(
         `${harness.endpoint}/repos/material-proof/guided-proof/pulls?state=open&sort=updated&direction=desc&page=1&per_page=50`,
         { headers: { Authorization: `Bearer ${tokenB}` } }
       )
       assert.equal(triage.status, 200)
-      assert.equal((await triage.json())[0].number, 8)
+      assert.equal((await triage.json())[0].number, 9)
 
       const accountAClone = await fetch(
         `${harness.fixture.ready.cloneUrl}/info/refs?service=git-upload-pack`,
@@ -307,7 +466,10 @@ describe('guided hidden-desktop proof fixture', () => {
       assert.equal(cloneCount.trim(), '3')
 
       await harness.fixture.flushLedger()
-      const ledger = await readFile(harness.fixture.ready.ledger.path, 'utf8')
+      const ledger = await readFile(
+        join(harness.fixtureRoot, harness.fixture.ready.ledger.path),
+        'utf8'
+      )
       assert.match(ledger, /"account":"proof-a"/)
       assert.match(ledger, /"account":"proof-b"/)
       assert.doesNotMatch(ledger, new RegExp(tokenA))
@@ -316,6 +478,7 @@ describe('guided hidden-desktop proof fixture', () => {
       assert.doesNotMatch(readyJSON, new RegExp(tokenA))
       assert.doesNotMatch(readyJSON, new RegExp(tokenB))
       assert.doesNotMatch(readyJSON, /"pid"/i)
+      assert.doesNotMatch(readyJSON, /"[A-Za-z]:[\\/]|\\Users\\/i)
     } finally {
       await harness.close()
     }
@@ -359,7 +522,10 @@ describe('guided hidden-desktop proof fixture', () => {
 
       await harness.fixture.flushLedger()
       const ledgerLines = (
-        await readFile(harness.fixture.ready.ledger.path, 'utf8')
+        await readFile(
+          join(harness.fixtureRoot, harness.fixture.ready.ledger.path),
+          'utf8'
+        )
       )
         .trim()
         .split('\n')
