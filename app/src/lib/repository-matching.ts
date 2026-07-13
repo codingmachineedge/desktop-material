@@ -1,7 +1,7 @@
 import * as URL from 'url'
 import * as Path from 'path'
 
-import { Account } from '../models/account'
+import { Account, getAccountKey } from '../models/account'
 import { IRemote } from '../models/remote'
 import { getHTMLURL } from './api'
 import { parseRemote, parseRepositoryIdentifier } from './remote-parsing'
@@ -28,9 +28,15 @@ export interface IMatchedGitHubRepository {
 /** Try to use the list of users and a remote URL to guess a GitHub repository. */
 export function matchGitHubRepository(
   accounts: ReadonlyArray<Account>,
-  remote: string
+  remote: string,
+  accountKey: string | null = null
 ): IMatchedGitHubRepository | null {
-  for (const account of accounts) {
+  const candidateAccounts =
+    accountKey === null
+      ? accounts
+      : accounts.filter(account => getAccountKey(account) === accountKey)
+
+  for (const account of candidateAccounts) {
     const htmlURL = getHTMLURL(account.endpoint)
     const { hostname } = URL.parse(htmlURL)
     const parsedRemote = parseRemote(remote)

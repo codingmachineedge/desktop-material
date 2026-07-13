@@ -48,6 +48,21 @@ describe('RepositoriesStore', () => {
   })
 
   describe('selecting a repository account', () => {
+    it('persists an account binding while adding a cloned repository', async () => {
+      const repoPath = '/some/newly-cloned/path'
+      const accountKey = 'https://api.github.com#42'
+
+      const repository = await repositoriesStore.addRepository(
+        repoPath,
+        join(repoPath, '.git'),
+        { accountKey }
+      )
+      const [reloaded] = await repositoriesStore.getAll()
+
+      assert.equal(repository.accountKey, accountKey)
+      assert.equal(reloaded.accountKey, accountKey)
+    })
+
     it('persists a stable account binding', async () => {
       const repoPath = '/some/account-bound/path'
       const repository = await repositoriesStore.addRepository(

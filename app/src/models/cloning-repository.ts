@@ -11,6 +11,9 @@ let CloningRepositoryID = 1_000_000
 export class CloningRepository {
   public readonly id = CloningRepositoryID++
 
+  /** Account identity that completed the clone, when a forced retry was used. */
+  public accountKey: string | null = null
+
   public constructor(
     public readonly path: string,
     public readonly url: string

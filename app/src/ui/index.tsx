@@ -260,7 +260,6 @@ window.addEventListener('unhandledrejection', ev => {
 const gitHubUserStore = new GitHubUserStore(
   new GitHubUserDatabase('GitHubUserDatabase')
 )
-const cloningRepositoriesStore = new CloningRepositoriesStore()
 const issuesStore = new IssuesStore(new IssuesDatabase('IssuesDatabase'))
 const statsStore = new StatsStore(
   new StatsDatabase('StatsDatabase'),
@@ -268,6 +267,9 @@ const statsStore = new StatsStore(
 )
 
 const accountsStore = new AccountsStore(localStorage, TokenStore)
+const cloningRepositoriesStore = new CloningRepositoriesStore(() =>
+  accountsStore.getAll()
+)
 
 const profileStore = new ProfileStore(accountsStore)
 const repositoryTabsStore = new RepositoryTabsStore(

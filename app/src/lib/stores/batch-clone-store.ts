@@ -137,10 +137,15 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
 
     this.setStatus(item.path, { kind: 'cloning', progress: 0 })
 
+    let successfulAccountKey: string | null = null
+
     const success = await this.cloningRepositoriesStore.clone(
       item.url,
       item.path,
-      { defaultBranch: item.defaultBranch },
+      {
+        defaultBranch: item.defaultBranch,
+        accountKey: item.accountKey,
+      },
       {
         onError: error => {
           this.setStatus(item.path, { kind: 'failed', error })
@@ -155,11 +160,20 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
             })
           }
         },
+        onSuccess: accountKey => {
+          successfulAccountKey = accountKey
+        },
       }
     )
 
     if (success) {
-      this.setStatus(item.path, { kind: 'done', progress: 1 })
+      this.setStatus(item.path, {
+        kind: 'done',
+        progress: 1,
+        ...(successfulAccountKey !== null
+          ? { accountKey: successfulAccountKey }
+          : {}),
+      })
     } else if (this.statuses.get(item.path)?.kind !== 'failed') {
       // clone returned false without invoking onError — treat as failed.
       this.setStatus(item.path, { kind: 'failed' })
