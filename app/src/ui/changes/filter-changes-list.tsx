@@ -85,6 +85,7 @@ import {
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
 import { generateStashListContextMenu } from '../stashing/stash-list-item-context-menu'
+import { createFileHistoryMenuItem } from '../file-history'
 
 export interface IChangesListItem extends IFilterListItem {
   readonly id: string
@@ -863,8 +864,17 @@ export class FilterChangesList extends React.Component<
     }
 
     const enabled = status.kind !== AppFileStatusKind.Deleted
+    items.push({ type: 'separator' })
+    if (paths.length === 1) {
+      items.push(
+        createFileHistoryMenuItem(
+          this.props.dispatcher,
+          this.props.repository,
+          paths[0]
+        )
+      )
+    }
     items.push(
-      { type: 'separator' },
       this.getRevealInFileManagerMenuItem(file),
       this.getOpenInExternalEditorMenuItem(file, enabled),
       {
@@ -899,6 +909,11 @@ export class FilterChangesList extends React.Component<
       this.getCopyPathMenuItem(file),
       this.getCopyRelativePathMenuItem(file),
       { type: 'separator' },
+      createFileHistoryMenuItem(
+        this.props.dispatcher,
+        this.props.repository,
+        file.path
+      ),
       this.getRevealInFileManagerMenuItem(file),
       this.getOpenInExternalEditorMenuItem(file, enabled),
       {

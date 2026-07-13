@@ -18,7 +18,7 @@ export const FileBlameSourceLimit = 1024 * 1024
 export const FileBlameOutputLimit = 8 * 1024 * 1024
 
 /** Avoid mounting an unbounded number of interactive source rows. */
-export const FileBlameLineLimit = 10_000
+export const FileBlameLineLimit = 5_000
 
 const BinaryProbeLength = 8192
 

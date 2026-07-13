@@ -89,6 +89,7 @@ import { UpdateAvailable, renderBanner } from './banners'
 import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
+import { FileHistory } from './file-history'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
@@ -1865,6 +1866,15 @@ export class App extends React.Component<IAppProps, IAppState> {
           <NotificationHistoryDialog
             key="notification-history"
             dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.FileHistory:
+        return (
+          <FileHistory
+            key={`file-history-${popup.repository.id}-${popup.path}`}
+            repository={popup.repository}
+            path={popup.path}
             onDismissed={onPopupDismissedFn}
           />
         )

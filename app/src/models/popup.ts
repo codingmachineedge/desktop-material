@@ -38,6 +38,7 @@ export enum PopupType {
   Preferences = 'Preferences',
   SettingsHistory = 'SettingsHistory',
   NotificationHistory = 'NotificationHistory',
+  FileHistory = 'FileHistory',
   RepositorySettings = 'RepositorySettings',
   AddRepository = 'AddRepository',
   CreateRepository = 'CreateRepository',
@@ -170,6 +171,7 @@ export type PopupDetail =
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
   | { type: PopupType.SettingsHistory }
   | { type: PopupType.NotificationHistory }
+  | { type: PopupType.FileHistory; repository: Repository; path: string }
   | { type: PopupType.MergeAll; repository: Repository; mode: MergeAllMode }
   | { type: PopupType.PullAllRepositories }
   | {
@@ -580,14 +582,15 @@ export type PopupDetail =
 export type Popup = IBasePopup & PopupDetail
 
 /**
- * The Settings and Notification history managers are non-modal side sheets, and
- * the batch clone progress popup is non-modal so the app stays interactive while
- * repositories clone or pull in the background. Every other popup still blocks
- * global actions, even when one of these is stacked above it.
+ * History managers are non-modal side sheets, and the batch clone progress
+ * popup is non-modal so the app stays interactive while repositories clone or
+ * pull in the background. Every other popup still blocks global actions, even
+ * when one of these is stacked above it.
  */
 const nonModalHistoryPopupTypes = new Set<PopupType>([
   PopupType.SettingsHistory,
   PopupType.NotificationHistory,
+  PopupType.FileHistory,
   PopupType.BatchCloneProgress,
   PopupType.ChangeRepositoryGroupName,
   PopupType.PullAllRepositories,
