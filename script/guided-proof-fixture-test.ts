@@ -341,7 +341,7 @@ describe('guided proof fixture script', () => {
         `${harness.fixture.ready.cloneUrl}/info/refs?service=git-upload-pack`,
         { headers: { Authorization: basicAuthorization(tokenA) } }
       )
-      assert.equal(rejectedClone.status, 401)
+      assert.equal(rejectedClone.status, 404)
       const destination = join(harness.root, 'accepted-clone')
       await cloneWithToken(harness.fixture.ready.cloneUrl, destination, tokenB)
       const { stdout } = await execFileAsync(

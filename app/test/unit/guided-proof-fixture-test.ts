@@ -292,7 +292,7 @@ describe('guided hidden-desktop proof fixture', () => {
         `${harness.fixture.ready.cloneUrl}/info/refs?service=git-upload-pack`,
         { headers: { Authorization: basicAuthorization(tokenA) } }
       )
-      assert.equal(accountAClone.status, 401)
+      assert.equal(accountAClone.status, 404)
       const cloneDestination = join(harness.root, 'clone')
       await runGitClone(
         harness.fixture.ready.cloneUrl,

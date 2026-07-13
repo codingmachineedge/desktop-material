@@ -1165,7 +1165,13 @@ async function handleGitRequest(
 ): Promise<void> {
   if (audit.account !== 'proof-b') {
     audit.route = 'git-authentication'
-    sendAuthenticationRequired(response)
+    if (audit.account === 'proof-a') {
+      sendJSON(response, 404, {
+        message: 'Repository not found for this guided proof identity.',
+      })
+    } else {
+      sendAuthenticationRequired(response)
+    }
     return
   }
   const gitProtocol =
