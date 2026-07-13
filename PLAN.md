@@ -16,6 +16,12 @@ an overlapping documentation push from moving a generated tag to newer `main`.
 It also includes bounded Pull All recovery through another signed-in account
 for the exact HTTPS origin. The accepted proof image is committed at
 `3acb0ba0dc69af6f2cfdd5e2967593158eac448d`.
+A later secure clone account-fallback milestone is shipped at implementation
+commit `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`, with first reviewed `main`
+baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`. Clone now preserves the
+selected or successful account affinity, silently tries another token-bearing
+account only for the rejected exact HTTPS origin, and retains a custom origin
+port throughout matching and retry.
 The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF.md).
 
 ## Shipped milestone ledger
@@ -29,7 +35,7 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
 | **M4 — Non-modal dialogs** | **COMPLETE** | Draggable, stackable in-app dialogs and side sheets that leave the main app interactive, with modal behavior retained only where required. | `app/src/ui/dialog/`, `app/src/lib/popup-manager.ts`, `app/src/ui/app.tsx`, `app/styles/ui/_dialog.scss` |
 | **M5 — Notification centre** | **COMPLETE** | Bell and right-side notification panel, unread controls, Git-backed notification log, and reusable notification history. | `app/src/models/notification-centre.ts`, `app/src/lib/stores/notification-centre-store.ts`, `app/src/ui/notifications/` |
 | **M6 — Search and regex builder** | **COMPLETE** | Shared fuzzy, substring, and regex modes; case sensitivity; list filters; full block-based regex builder; and History search. | `app/src/lib/fuzzy-find.ts`, `app/src/ui/lib/filter-mode-control.tsx`, `app/src/ui/lib/regex-builder/`, `app/src/ui/history/` |
-| **M7 — Multi-clone and transfer** | **COMPLETE** | Parallel/sequential multi-clone, batch progress, URL-only repository export, and import-to-auto-clone. | `app/src/models/batch-clone.ts`, `app/src/lib/stores/batch-clone-store.ts`, `app/src/ui/clone-repository/batch-clone-progress.tsx`, `app/src/lib/repo-list-file.ts`, `app/src/ui/repository-list-transfer/` |
+| **M7 — Multi-clone and transfer** | **COMPLETE** | Parallel/sequential multi-clone, batch progress, URL-only repository export/import, and secure exact-origin account fallback with persisted successful-account affinity. | `app/src/models/batch-clone.ts`, `app/src/lib/automation/clone-account-fallback.ts`, `app/src/lib/git/authentication-failure-origin.ts`, `app/src/lib/stores/batch-clone-store.ts`, `app/src/lib/stores/cloning-repositories-store.ts`, `app/src/ui/clone-repository/`, `app/src/lib/repo-list-file.ts`, `app/src/ui/repository-list-transfer/` |
 | **M8 — Scaling and organizations** | **COMPLETE** | 50–200% user scaling, auto-fit, shortcuts, full GitHub organization repository browsing, and organization-aware clone selection. | `app/src/lib/zoom.ts`, `app/src/ui/preferences/appearance.tsx`, `app/src/ui/clone-repository/org-filter-chips.tsx`, `app/src/lib/stores/api-repositories-store.ts` |
 | **M9 — Automation** | **COMPLETE** | One-click commit/push, global and per-repository schedules, safe auto-pull, merge-all for branches/worktrees, Copilot conflict handling, notifications, and summaries. | `app/src/lib/automation/`, `app/src/lib/stores/helpers/automation-scheduler.ts`, `app/src/ui/preferences/automation.tsx`, `app/src/ui/repository-settings/automation-overrides.tsx`, `app/src/ui/merge-all/` |
 | **M10 — Actions panel** | **COMPLETE** | Workflow run filters, rerun actions, workflow dispatch inputs, job/step detail, and searchable in-app logs. | `app/src/lib/stores/actions-store.ts`, `app/src/lib/actions-workflow-inputs.ts`, `app/src/lib/actions-log-parser/`, `app/src/ui/actions/` |
@@ -68,6 +74,13 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
   remaining token-bearing signed-in accounts for that exact HTML origin. A
   repository-bound account is preferred, then the stable account order is
   retained; SSH and non-authentication failures are never retried.
+- Clone preserves a valid hosted-account selection for the first attempt while
+  generic URL clones keep normal credential resolution first. An HTTPS
+  authentication/not-found ambiguity is bound to the origin that rejected it;
+  only remaining token-bearing accounts for that exact scheme, host, and port
+  are eligible. The successful account key is persisted before initial
+  repository matching and is retained by single, batch, missing-repository,
+  and retry-clone paths.
 - Account selection, profile mutation serialization, export rendering,
   provider routing, submodule display, repository tooltips, and other integration
   regressions found during the merge waves were fixed before the final build.
@@ -94,6 +107,11 @@ The closing publication evidence is recorded below and in [`HANDOFF.md`](HANDOFF
     child environment, and is removed after the operation. Missing same-origin
     credentials fail closed; cross-origin submodules use normal credential
     resolution.
+11. Clone account fallback remains HTTPS-auth/not-found-only and is scoped to
+    the origin that rejected the credential, including any non-default port.
+    Account selectors stay internal to the trampoline; the successful stable
+    account key is persisted for later repository matching and retries without
+    exposing a token, login, selector, or credentials dialog.
 
 ## Final integrated validation evidence
 
@@ -119,6 +137,24 @@ The exhaustive final run on the same application/test tree shipped by
   **1443×992**; the final responsive proof is the user's exact **1450×997**
   client size.
 
+### Secure clone account fallback validation
+
+The later clone hardening tree at implementation commit
+`0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`, first reviewed on `main` at
+`3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`, recorded:
+
+- **627 suites and 1,906 tests: 1,905 passed, 0 failed, 1 intentional skip**;
+- full `yarn lint:src`, repository-wide Prettier, and
+  `yarn tsc --noEmit --skipLibCheck`: **passed**;
+- the exact MCP-driven unpackaged production build: **passed**;
+- a synthetic HTTPS smart-Git proof in which account A was rejected and account
+  B was accepted silently, producing a clean clone on `main` at
+  `c9eee876c4451d380f8cc7628b5971f624f9395f`;
+- custom-port exact-origin matching remained intact and no credentials dialog
+  appeared; and
+- every owned proof process, listener, Temp path, and synthetic credential
+  entry was removed after the accepted capture.
+
 | Final capture | Dimensions | Bytes | SHA-256 |
 | --- | ---: | ---: | --- |
 | `material-agent-access.png` | 1443×992 | 110,128 | `644891eaa37c878cb577065822681ee8fd33a018a92e0b89822b43e67393ef93` |
@@ -133,6 +169,7 @@ The exhaustive final run on the same application/test tree shipped by
 | `material-responsive-overflow-fixed.png` | 1450×997 | 132,049 | `160c622c6630d96eda26b5ff3be6705c31dbe55d6ffa6d1376575425770278bf` |
 | `material-actions-job-log.png` | 2048×1228 | 155,579 | `6f8a96a9bff8a9c76f89b44aaf3c84a71574aed11ef994db93d12d2749ca0409` |
 | `material-pull-all-account-fallback.png` | 2048×1228 | 114,222 | `80674cf75511c1238bcf527e6e678ffd3d46e4cc36ee2455ebd4b8cecf1c0991` |
+| `material-clone-account-fallback.png` | 2048×1228 | 140,143 | `89bb755ad37f6d8537815d411526fa6e16aeee9cd16446deabbc17595cb3623c` |
 
 ## Root-finalized publication evidence
 
@@ -167,6 +204,13 @@ The publication gate is closed:
 6. The published design set and the tracked repository pass targeted personal
    identifier and common-secret scans. Account-specific Windows paths use
    `%USERPROFILE%` in public documentation.
+
+The secure clone implementation commit
+`0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d` is present in first reviewed
+`main` baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
+This roadmap-only branch does not claim a closing CI, installer, release, or
+Pages result for its future integration SHA; those rows must be refreshed from
+GitHub only after the branch is integrated.
 
 The final documentation integration changes documentation only, so installer
 production does not apply; CI and Pages remain the applicable publication
