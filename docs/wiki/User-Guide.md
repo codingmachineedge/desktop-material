@@ -12,6 +12,7 @@ focuses on what Desktop Material adds on top.
 - [Settings history](#settings-history)
 - [Non-modal dialogs](#non-modal-dialogs)
 - [Multi-clone](#multi-clone)
+- [Clone account fallback](#clone-account-fallback)
 - [One-click commit & push](#one-click-commit--push)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
@@ -183,6 +184,29 @@ The multi-clone window clones **many repositories in one pass**.
   no credentials.
 - **Import** loads such a list back into the checkbox selection, so you can re-clone the same set on
   another machine or share a curated set with a teammate.
+
+---
+
+## Clone account fallback
+
+When you clone from a hosted repository list, Desktop Material keeps the selected signed-in account
+with the clone request. For a generic HTTPS URL, it prefers the token-bearing signed-in account that
+matches the repository, or the first eligible signed-in account when repository lookup is
+inconclusive. Eligibility always requires the remote's exact HTTPS origin. When an eligible account
+exists, Git receives credentials through the app without opening a manual credential prompt.
+
+If the first attempt ends in HTTPS authentication failure or repository-not-found ambiguity,
+Desktop Material can try the remaining token-bearing accounts for that same origin in stable order.
+SSH failures and non-authentication errors stop immediately. Tokenless accounts are ignored, and a
+selected account that is missing or no longer has credentials cannot silently supply another
+identity inside the credential request. A different-origin submodule keeps its normal credential
+resolution, and its failure cannot unlock account fallback for the repository being cloned.
+
+The account that actually completes the clone is retained with the new repository for later
+operations. Account selection remains inside the app, is removed when the operation ends, and is
+never written to Git child environments or logs.
+
+![Desktop Material workspace after a generic HTTPS repository clone completed through exact-origin signed-in account fallback without displaying a credential prompt](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-clone-account-fallback.png)
 
 ---
 
