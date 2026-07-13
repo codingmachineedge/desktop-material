@@ -51,6 +51,16 @@ describe('clone account fallback', () => {
       ]),
       []
     )
+    for (const remoteUrl of [
+      'http://github.com/owner/repository.git',
+      'https://github.com:8443/owner/repository.git',
+      'https://github.com.evil.example/owner/repository.git',
+    ]) {
+      assert.deepStrictEqual(
+        getCloneAccountKeys(remoteUrl, [first, second]),
+        []
+      )
+    }
   })
 
   it('keeps a successful first attempt unforced and does not load accounts', async () => {

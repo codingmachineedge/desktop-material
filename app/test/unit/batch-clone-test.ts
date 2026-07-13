@@ -63,9 +63,14 @@ describe('batch-clone model', () => {
 
   describe('buildBatchCloneItems', () => {
     it('builds items with derived names and joined paths', () => {
+      const accountKey = 'https://api.github.com#2'
       const items = buildBatchCloneItems(
         [
-          { url: 'https://github.com/o/a.git', defaultBranch: 'main' },
+          {
+            url: 'https://github.com/o/a.git',
+            defaultBranch: 'main',
+            accountKey,
+          },
           { url: 'https://github.com/o/b.git' },
         ],
         '/base'
@@ -74,8 +79,10 @@ describe('batch-clone model', () => {
       assert.equal(items[0].name, 'a')
       assert.equal(items[0].path, Path.join('/base', 'a'))
       assert.equal(items[0].defaultBranch, 'main')
+      assert.equal(items[0].accountKey, accountKey)
       assert.equal(items[1].name, 'b')
       assert.equal(items[1].defaultBranch, undefined)
+      assert.equal(items[1].accountKey, undefined)
     })
 
     it('de-duplicates colliding folder names', () => {

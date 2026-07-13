@@ -108,6 +108,24 @@ export function accountMatchesCloneTab(
   }
 }
 
+/**
+ * Preserve account affinity while allowing Git to resolve an API 404.
+ *
+ * GitHub deliberately uses 404 for private repositories an identity cannot
+ * see. Falling back to the entered URL lets the credential trampoline try the
+ * remaining exact-origin signed-in accounts instead of stopping before clone.
+ */
+export function cloneInfoWithAccountFallback(
+  info: IAPIRepositoryCloneInfo | null,
+  fallbackUrl: string,
+  accountKey?: string
+): IAPIRepositoryCloneInfo {
+  return {
+    ...(info ?? { url: fallbackUrl }),
+    ...(accountKey !== undefined ? { accountKey } : {}),
+  }
+}
+
 interface ICloneRepositoryState {
   /** A copy of the path state field which is set when the component initializes.
    *
@@ -977,10 +995,10 @@ export class CloneRepository extends React.Component<
 
       return api
         .fetchRepositoryCloneInfo(owner, name, protocol)
-        .then(info => (info === null ? null : { ...info, accountKey }))
+        .then(info => cloneInfoWithAccountFallback(info, url, accountKey))
         .catch(err => {
           log.error(`Failed to look up repository clone info for '${url}'`, err)
-          return { url, accountKey }
+          return cloneInfoWithAccountFallback(null, url, accountKey)
         })
     }
 
