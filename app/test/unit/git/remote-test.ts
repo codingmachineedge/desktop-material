@@ -375,6 +375,34 @@ describe('git/remote', () => {
       assert.equal(stored.stdout.trim(), rawUrl)
     })
 
+    it('uses temporary names to safely swap two existing remote names', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'alpha', 'https://example.test/team/alpha.git'],
+        repository.path
+      )
+      await exec(
+        ['remote', 'add', 'beta', 'https://example.test/team/beta.git'],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const drafts = createRemoteDrafts(snapshot)
+      const plan = createRemoteManagementPlan(snapshot, [
+        { ...drafts[0], name: 'beta' },
+        { ...drafts[1], name: 'alpha' },
+      ])
+
+      const updated = await applyRemoteManagementPlan(repository, plan)
+      assert.equal(
+        updated.remotes.find(remote => remote.name === 'alpha')?.fetchUrl,
+        'https://example.test/team/beta.git'
+      )
+      assert.equal(
+        updated.remotes.find(remote => remote.name === 'beta')?.fetchUrl,
+        'https://example.test/team/alpha.git'
+      )
+    })
+
     it('warns about partial state when cancellation crosses the mutation boundary', async t => {
       const repository = await setupEmptyRepository(t)
       await exec(

@@ -341,6 +341,25 @@ function validatePlan(
     [...currentNames].filter(name => !removed.has(name))
   )
   for (const update of plan.updates) {
+    if (update.originalName === null) {
+      continue
+    }
+    const originalName = normalizeRemoteName(update.originalName)
+    if (
+      !currentNames.has(originalName) ||
+      removed.has(originalName) ||
+      originals.has(originalName)
+    ) {
+      throw new RemoteManagementError(
+        'changed',
+        'The reviewed remotes no longer match the repository.'
+      )
+    }
+    originals.add(originalName)
+    finalNames.delete(originalName)
+  }
+
+  for (const update of plan.updates) {
     const name = normalizeRemoteName(update.name)
     if (update.originalName === null) {
       if (update.fetchUrl === undefined) {
@@ -349,20 +368,6 @@ function validatePlan(
           'A new remote review is missing its fetch URL.'
         )
       }
-    } else {
-      const originalName = normalizeRemoteName(update.originalName)
-      if (
-        !currentNames.has(originalName) ||
-        removed.has(originalName) ||
-        originals.has(originalName)
-      ) {
-        throw new RemoteManagementError(
-          'changed',
-          'The reviewed remotes no longer match the repository.'
-        )
-      }
-      originals.add(originalName)
-      finalNames.delete(originalName)
     }
     if (finalNames.has(name)) {
       throw new RemoteManagementError(
