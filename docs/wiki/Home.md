@@ -6,11 +6,10 @@ application shell rebuilt around Material Design 3 — animated light/dark themi
 color tokens, and a browser-like, tabbed workspace — while keeping GitHub Desktop's complete Git
 workflow intact underneath.
 
-On top of that shell, Desktop Material has shipped a first wave of power-user features: multi-account
-sign-in (including several identities per host), per-account repository tabs with rich title styling,
-a Git-backed per-account settings history, and a non-modal dialog framework. A large further
-expansion — automation, a GitHub Actions panel, a notification centre, regex-powered search, and
-multi-clone — is planned and tracked in the project plan.
+On top of that shell, Desktop Material ships multi-provider accounts and organizations, automation,
+GitHub Actions and logs, agent access, searchable graph History, multiple stashes, pull-all,
+multi-window workflows, per-account repository tabs, Git-backed settings and notifications, and a
+non-modal dialog framework.
 
 > **Status:** Desktop Material is in **active development**. Preview builds are published from the
 > project's [GitHub Releases](https://github.com/codingmachineedge/desktop-material/releases).
@@ -25,15 +24,11 @@ multi-clone — is planned and tracked in the project plan.
 
 | Page | What it covers |
 | --- | --- |
-| [User Guide](User-Guide) | Task-oriented walkthrough — sign-in, repository tabs, the MD3 shell, Settings history, and non-modal dialogs (shipped), plus a preview of the planned features. |
-| [Automation](Automation) | **Planned.** Scheduled auto commit & push, auto pull, and merge-all — with the safety rules that will gate each one. |
-| [Regex Guide](Regex-Guide) | **Planned.** How the search bars will work: filter chips, regex mode, and the regex builder. |
-| [Developer Guide](Developer-Guide) | Architecture for contributors — Electron main/renderer, the store/dispatcher state flow, dugite, per-account profile repos, and the SCSS token system. |
-| [Agent API](Agent-API) | **Planned.** The built-in MCP server and local HTTP/CLI fallback for AI-agent control. |
-
-> The **Automation**, **Regex Guide**, and **Agent API** pages describe roadmap features that are
-> **not yet implemented**. They are kept as living design docs; the User Guide is the accurate guide
-> to what ships today.
+| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, organizations, providers, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
+| [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
+| [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
+| [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
+| [Agent API](Agent-API) | Shipped MCP, local REST, stdio proxy, and CLI access for safe AI-agent control. |
 
 ---
 
@@ -47,7 +42,10 @@ multi-clone — is planned and tracked in the project plan.
 - **Browser-like repository tabs** — per-account and bound to repos, with inline rename and
   per-tab title styling (bold/italic/underline, size, color, font family, alignment).
 - **Multi-account** — multiple identities per host; each account carries its own tabs, repos, and
-  settings.
+  settings. GitHub organizations expose their complete repository lists and can be selected when
+  publishing. GitLab endpoints use PAT authentication and Bitbucket uses app passwords; both
+  providers can browse and clone repositories without exposing credentials to the renderer or
+  agent API.
 - **Per-account settings in a local git repo** — every settings or tabs change auto-commits. Open
   **Edit → Settings History…** (`Ctrl+Alt+Z`) for a non-modal timeline with lazy diffs, undo, redo,
   and restore; each history action appends an audit commit.
@@ -58,22 +56,38 @@ multi-clone — is planned and tracked in the project plan.
   come to front on focus. Preferences is an MD3 940×660 dialog with a left rail, an Active chip, and
   a pill footer; the repository and branch pickers are MD3 side sheets.
 
-## On the roadmap (not yet implemented)
+### Automation, CI, and agent control
 
-- **Notification centre** — a bell and side panel backed by its own local git repo; unread badge,
-  mark read/unread, delete.
-- **Regex search everywhere** — filter chips, a regex-mode toggle, and a full regex builder on every
-  search bar.
-- **Multi-clone** — select many repositories with checkboxes, filter by org chips, clone in parallel
-  or one-by-one, and export/import repo lists (URLs only).
-- **Automation** — one-click commit & push (Copilot writes the message), scheduled auto commit &
-  push and auto pull, and merge-all branches/worktrees with Copilot conflict resolution.
-- **GitHub Actions panel** — workflow runs, status/branch/event filters, re-run / re-run-failed, job
-  steps, an in-app log viewer, and a `workflow_dispatch` dialog.
-- **Built-in MCP server** (plus a local HTTP/CLI fallback) for AI-agent control.
-- **Gitignore manager** with template auto-suggest, and **one-click Build & Run**.
-- **GitHub organization support** and **dynamic UI scaling** (50–200% slider plus auto-fit).
-- **Self-hosted GitLab sign-in** (endpoint + personal access token) and GitLab/Bitbucket
-  integration.
-- **Desktop-plus parity** — commit search, commit graph, multiple stashes, repo pinning/grouping,
-  pull-all, and more.
+- **Automation** — schedule guarded commit-and-push and pull at the global level, override either
+  setting per account or repository, run commit-and-push immediately, and merge all branches or
+  worktrees with per-target progress and Copilot-assisted conflict handling.
+- **GitHub Actions** — filter runs by workflow, branch, event, or status; re-run a complete run or
+  failed jobs; inspect jobs and steps; search job logs; and dispatch a workflow with a ref and
+  declared inputs.
+- **Agent access** — opt in from Settings to start a token-gated MCP/REST server on a random
+  loopback-only port. A stdio proxy and command-line client expose the same bounded commands for
+  repositories, tabs, Git operations, automation, and workflow dispatch.
+
+![Automation preferences with global and account overrides](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-automation.png)
+
+![Agent access with loopback and bearer-token controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
+
+### History, stashes, repositories, and windows
+
+- **History power tools** — search commits by title, message, tag, or hash and toggle a commit graph
+  that renders ancestry lanes beside the filtered history.
+- **Multiple stashes** — create and keep multiple entries, select one to inspect its files and diffs,
+  then restore or discard that exact stash.
+- **Repository power tools** — pin and group repositories, pull all with a per-repository result,
+  use branch presets and default-branch controls, set a repository-specific editor, and multi-clone
+  in parallel or sequence with URL-only import/export.
+- **Multi-window workflows** — open a repository or worktree in a separate window; each window keeps
+  its own selected repository and persisted tab state while commands route to the correct window.
+- **Notification centre** — unread state, mark-all/delete controls, and restoreable history backed by
+  a dedicated local git repository.
+
+![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
+
+![Provider accounts for GitLab and Bitbucket](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-provider-accounts.png)
+
+![Open repositories and worktrees in another window](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)

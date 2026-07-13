@@ -11,14 +11,17 @@ focuses on what Desktop Material adds on top.
 - [Repository tabs](#repository-tabs)
 - [Settings history](#settings-history)
 - [Non-modal dialogs](#non-modal-dialogs)
-
-**On the roadmap** (not yet implemented)
-
 - [Multi-clone](#multi-clone)
 - [One-click commit & push](#one-click-commit--push)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
 - [UI scaling](#ui-scaling)
+- [Automation and merge-all](#automation-and-merge-all)
+- [History search and graph](#history-search-and-graph)
+- [Multiple stashes](#multiple-stashes)
+- [Repository power tools](#repository-power-tools)
+- [Multi-window workflows](#multi-window-workflows)
+- [Agent access and CLI](#agent-access-and-cli)
 
 ---
 
@@ -72,6 +75,16 @@ rather than a browser OAuth flow:
 
 > Bitbucket and hosted GitLab integrations follow the same pattern. Tokens are stored with your
 > platform credential store and are **never exposed** through the agent API.
+
+![GitLab and Bitbucket account controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-provider-accounts.png)
+
+### Browse organizations and publish into one
+
+When a GitHub account belongs to organizations, the clone view loads the account's organization
+list and adds filter chips. Select an organization to browse its complete repository list; if one
+organization fails to load, the view reports that error without hiding the repositories already
+available. The publish dialog uses the same organization list, so choose the owner before creating
+the remote repository.
 
 ---
 
@@ -147,15 +160,11 @@ open as MD3 **side sheets** rather than blocking modals.
 
 ---
 
-# On the roadmap
-
-> Everything below this line is **planned and not yet implemented**. It is documented here as a
-> preview of the queued milestones; today it is not available in the app. Track progress in the
-> project's [`PLAN.md`](https://github.com/codingmachineedge/desktop-material/blob/main/PLAN.md).
+# Power workflows
 
 ## Multi-clone
 
-The planned multi-clone window will clone **many repositories in one pass**.
+The multi-clone window clones **many repositories in one pass**.
 
 1. Open **Clone → Multiple repositories** (or the multi-clone entry in the repositories menu).
 2. The list shows every repository available to the active account. Use the **search bar** — with
@@ -204,6 +213,8 @@ own local git repo.
 Because the centre is backed by a git repo, its state is versioned along with the rest of your
 per-account data.
 
+![Git-backed notification centre](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-center.png)
+
 ---
 
 ## GitHub Actions panel
@@ -211,10 +222,10 @@ per-account data.
 The **Actions** panel brings CI into the app:
 
 - **Workflow runs** for the current repository, newest first.
-- **Filters** by **status**, **branch**, and **event**, plus the standard search bar (chips + regex).
+- **Filters** by **workflow**, **status**, **branch**, and **event**.
 - **Re-run** a whole run or **re-run only the failed jobs**.
 - Drill into a run to see its **jobs and steps**, and open the **in-app log viewer** to read output
-  without leaving Desktop Material.
+  without leaving Desktop Material. Search the loaded log to isolate a command, warning, or error.
 - Trigger manual workflows with the **`workflow_dispatch` dialog** — pick the workflow, ref, and
   inputs, and dispatch.
 
@@ -229,6 +240,101 @@ Desktop Material scales its whole interface independently of the OS:
 
 Combined with the animated light/dark theme, this lets you tune the workspace for a laptop panel, a
 4K monitor, or a shared screen without touching system display settings.
+
+---
+
+## Automation and merge-all
+
+Open **Settings → Automation** to configure the two background schedules:
+
+1. Turn on **Automatically commit and push** and/or **Automatically pull**.
+2. Pick an interval for each enabled operation.
+3. Under **Account overrides**, let an identity inherit the global value or override its enabled
+   state and interval.
+4. For one repository, open **Repository settings → Automation** and inherit or override the two
+   schedules again.
+
+Automation targets the selected repository only. Before each run it checks repository state,
+upstream availability, conflicts, in-progress Git operations, and draft commit text. An unsafe
+repository is skipped rather than overwritten. See [Automation](Automation) for the complete guard
+table.
+
+The Branches and Worktrees views also expose **Merge all branches** and **Merge all worktrees**.
+Confirm the target, follow each row's progress, and review any skipped or failed target. When
+Copilot conflict assistance is available, it participates inside the same guarded workflow.
+
+![Automation preferences with global and account overrides](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-automation.png)
+
+![Merge all branches with per-target progress](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-branch-merge-all.png)
+
+---
+
+## History search and graph
+
+Open **History** and use the search field to match a commit's title, message, tag, or hash. The
+results retain the normal commit detail view. Toggle **Show commit graph** to add ancestry lanes and
+merge edges beside the unfiltered list; turn the graph off when a compact list is more useful.
+
+![History search and commit graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
+
+---
+
+## Multiple stashes
+
+Create a stash from the Changes workflow whenever work must be set aside. Desktop Material keeps
+all stash entries instead of treating only the newest one as available:
+
+1. Expand **Stashes** in Changes and select an entry by its label.
+2. Inspect that stash's file list and individual diffs before acting.
+3. Choose **Restore** to pop the selected entry back into the worktree, or use its context menu to
+   discard that exact stash after confirmation.
+
+Switching branches can still offer to stash local work, and the resulting entry appears in the same
+list.
+
+---
+
+## Repository power tools
+
+- Open the repositories side sheet and choose **Pull all** to fetch/pull every eligible repository;
+  review the per-repository result instead of assuming the batch succeeded as one unit.
+- Pin important repositories from their context menu, hide the automatically maintained Recent
+  group if desired, and use grouping to keep large repository lists manageable.
+- Use branch presets/default-branch controls when creating or switching branches.
+- Set a repository-specific external editor when the global editor is not appropriate.
+- Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution.
+
+---
+
+## Multi-window workflows
+
+Right-click a repository and choose **Open in new window**. Worktree context menus offer **Open
+Worktree in New Window** as well. Each window maintains its own selected repository and repository
+tabs, and native/menu/CLI actions route to the correct window. Closing and reopening the app
+restores the persisted window tab state.
+
+![Open a repository or worktree in another window](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)
+
+---
+
+## Agent access and CLI
+
+Open **Settings → Agent access** and turn on **Enable local agent server**. The panel shows the
+random loopback address, MCP URL, and bearer token; reveal/copy the token only for a trusted local
+client, and use **Regenerate token** to disconnect existing clients immediately.
+
+- HTTP-capable MCP clients connect to the displayed `/mcp` URL with an
+  `Authorization: Bearer …` header.
+- Stdio-only clients run `node script/agent/mcp-stdio-proxy.js`.
+- Scripts can start with `node script/agent/desktop-agent.js info` and use the fallback command-line
+  client for the same bounded command contract.
+
+The contract covers account/repository/tab discovery, repository status, single/batch clone,
+commit, fetch/pull/push, branch creation/merge, tab selection, automation status/runs, and Actions
+workflow dispatch. It never returns provider credentials. See [Agent API](Agent-API) for command and
+security details.
+
+![Agent access connection and token controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
 
 ---
 
