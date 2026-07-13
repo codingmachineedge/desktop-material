@@ -143,7 +143,7 @@ describe('repository tool recipes', () => {
     const sha256 = 'b'.repeat(64)
     assert.deepStrictEqual(
       parseRepositoryBundleHeads(
-        `${sha} refs/heads/main\r\n${sha256} refs/tags/v2\n`
+        `${sha} refs/heads/main\r\n${sha} HEAD\n${sha256} refs/tags/v2\n`
       ),
       [
         { oid: sha.toLowerCase(), ref: 'refs/heads/main' },

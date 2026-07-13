@@ -76,8 +76,10 @@ function isValidFullRefName(ref: string): boolean {
 }
 
 /**
- * Parse the machine-readable output from `git bundle list-heads`. Any malformed
- * or conflicting line rejects the whole inspection instead of being hidden.
+ * Parse the machine-readable output from `git bundle list-heads`. Git may add
+ * the pseudo-ref `HEAD` to an otherwise normal bundle; it is not selectable for
+ * import. Any other malformed or conflicting line rejects the whole inspection
+ * instead of being hidden.
  */
 export function parseRepositoryBundleHeads(
   output: string
@@ -93,7 +95,15 @@ export function parseRepositoryBundleHeads(
       continue
     }
     const match = /^([0-9a-fA-F]{40}|[0-9a-fA-F]{64}) ([^\s]+)$/.exec(line)
-    if (match === null || !isValidFullRefName(match[2])) {
+    if (match === null) {
+      throw new Error('The bundle returned an invalid advertised ref.')
+    }
+
+    if (match[2] === 'HEAD') {
+      continue
+    }
+
+    if (!isValidFullRefName(match[2])) {
       throw new Error('The bundle returned an invalid advertised ref.')
     }
 
