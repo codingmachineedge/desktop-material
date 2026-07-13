@@ -374,6 +374,55 @@ export interface IAPIEmail {
   readonly visibility: EmailVisibility
 }
 
+/** A notification subject returned by the authenticated-user inbox API. */
+export interface IAPINotificationSubject {
+  readonly title: string
+  readonly url: string | null
+  readonly latest_comment_url: string | null
+  readonly type: string
+}
+
+/** Repository metadata embedded in a GitHub notification thread. */
+export interface IAPINotificationRepository {
+  readonly id: number
+  readonly name: string
+  readonly full_name: string
+  readonly private: boolean
+  readonly owner: IAPIIdentity
+  readonly html_url: string
+}
+
+/** A thread returned by `GET /notifications`. */
+export interface IAPINotificationThread {
+  readonly id: string
+  readonly repository: IAPINotificationRepository
+  readonly subject: IAPINotificationSubject
+  readonly reason: string
+  readonly unread: boolean
+  readonly updated_at: string
+  readonly last_read_at: string | null
+  readonly url: string
+  readonly subscription_url: string
+}
+
+export interface IAPINotificationsOptions {
+  readonly includeRead: boolean
+  readonly participating: boolean
+  readonly page: number
+  readonly perPage?: number
+  readonly lastModified?: string | null
+  readonly signal?: AbortSignal
+}
+
+/** One bounded page of authenticated-user notification threads. */
+export interface IAPINotificationsPage {
+  readonly notifications: ReadonlyArray<IAPINotificationThread>
+  readonly hasNextPage: boolean
+  readonly notModified: boolean
+  readonly lastModified: string | null
+  readonly pollIntervalSeconds: number | null
+}
+
 /** Information about an issue as returned by the GitHub API. */
 export interface IAPIIssue {
   readonly number: number
@@ -1178,6 +1227,89 @@ export class API {
     } catch (e) {
       log.warn(`fetchEmails: failed with endpoint ${this.endpoint}`, e)
       return []
+    }
+  }
+
+  /** Fetch one bounded page from the authenticated user's GitHub inbox. */
+  public async fetchNotifications(
+    options: IAPINotificationsOptions
+  ): Promise<IAPINotificationsPage> {
+    const page = Math.max(1, Math.trunc(options.page))
+    const perPage = Math.max(1, Math.min(50, options.perPage ?? 50))
+    const path = urlWithQueryString('notifications', {
+      all: String(options.includeRead),
+      participating: String(options.participating),
+      per_page: String(perPage),
+      page: String(page),
+    })
+    const customHeaders = new Headers({
+      Accept: 'application/vnd.github+json',
+    })
+    if (options.lastModified) {
+      customHeaders.set('If-Modified-Since', options.lastModified)
+    }
+
+    const response = await this.ghRequest('GET', path, {
+      customHeaders,
+      signal: options.signal,
+    })
+    const lastModified = response.headers.get('Last-Modified')
+    const rawPollInterval = response.headers.get('X-Poll-Interval')
+    const parsedPollInterval =
+      rawPollInterval === null ? NaN : Number.parseInt(rawPollInterval, 10)
+    const pollIntervalSeconds = Number.isFinite(parsedPollInterval)
+      ? parsedPollInterval
+      : null
+
+    if (response.status === HttpStatusCode.NotModified) {
+      return {
+        notifications: [],
+        hasNextPage: false,
+        notModified: true,
+        lastModified: lastModified ?? options.lastModified ?? null,
+        pollIntervalSeconds,
+      }
+    }
+
+    const notifications = await parsedResponse<
+      ReadonlyArray<IAPINotificationThread>
+    >(response)
+    return {
+      notifications,
+      hasNextPage: getNextPagePathFromLink(response) !== null,
+      notModified: false,
+      lastModified,
+      pollIntervalSeconds,
+    }
+  }
+
+  /** Mark exactly one GitHub notification thread as read. */
+  public async markNotificationThreadRead(
+    threadId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const response = await this.ghRequest(
+      'PATCH',
+      `notifications/threads/${encodeURIComponent(threadId)}`,
+      { signal }
+    )
+    if (!response.ok && response.status !== HttpStatusCode.NotModified) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Mark exactly one GitHub notification thread as done. */
+  public async markNotificationThreadDone(
+    threadId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const response = await this.ghRequest(
+      'DELETE',
+      `notifications/threads/${encodeURIComponent(threadId)}`,
+      { signal }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
     }
   }
 
@@ -2071,6 +2203,7 @@ export class API {
       customHeaders?: HeadersInit
       reloadCache?: boolean
       redirect?: RequestRedirect
+      signal?: AbortSignal
     } = {}
   ): Promise<Response> {
     return await request(
@@ -2081,7 +2214,8 @@ export class API {
       options.body,
       options.customHeaders,
       options.reloadCache,
-      options.redirect
+      options.redirect,
+      options.signal
     )
   }
 
@@ -2097,6 +2231,7 @@ export class API {
       customHeaders?: HeadersInit
       reloadCache?: boolean
       redirect?: RequestRedirect
+      signal?: AbortSignal
     } = {}
   ): Promise<Response> {
     const response = await this.request(this.endpoint, method, path, {

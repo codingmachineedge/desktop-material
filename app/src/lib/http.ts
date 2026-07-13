@@ -2,7 +2,7 @@ import * as appProxy from '../ui/lib/app-proxy'
 import { URL } from 'url'
 
 /** The HTTP methods available. */
-export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'HEAD' | 'DELETE'
+export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'HEAD' | 'DELETE'
 
 /**
  * The structure of error messages returned from the GitHub API.
@@ -157,7 +157,8 @@ export function request(
   jsonBody?: Object,
   customHeaders?: HeadersInit,
   reloadCache: boolean = false,
-  redirect?: RequestRedirect
+  redirect?: RequestRedirect,
+  signal?: AbortSignal
 ): Promise<Response> {
   const url = getAbsoluteUrl(endpoint, path)
 
@@ -169,6 +170,10 @@ export function request(
 
   if (redirect !== undefined) {
     options.redirect = redirect
+  }
+
+  if (signal !== undefined) {
+    options.signal = signal
   }
 
   if (reloadCache) {
