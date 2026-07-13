@@ -5,7 +5,11 @@ import { GitIgnore } from './git-ignore'
 import { BuildRunSettings } from './build-run-settings'
 import { Submodules } from './submodules'
 import { assertNever } from '../../lib/fatal-error'
-import { IRemote, diffRemotes } from '../../models/remote'
+import {
+  IRemote,
+  IRemoteManagementPlan,
+  IRemoteManagementSnapshot,
+} from '../../models/remote'
 import { Dispatcher } from '../dispatcher'
 import { PopupType } from '../../models/popup'
 import {
@@ -13,9 +17,8 @@ import {
   getForkContributionTarget,
   isRepositoryWithForkedGitHubRepository,
 } from '../../models/repository'
-import { Dialog, DialogError, DialogFooter } from '../dialog'
-import { NoRemote } from './no-remote'
-import { getRemotes, readGitIgnoreAtRoot } from '../../lib/git'
+import { Dialog, DialogContent, DialogError, DialogFooter } from '../dialog'
+import { getRemoteManagementSnapshot, readGitIgnoreAtRoot } from '../../lib/git'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { ForkSettings } from './fork-settings'
 import { ForkContributionTarget } from '../../models/workflow-preferences'
@@ -83,11 +86,10 @@ export enum RepositorySettingsTab {
 
 interface IRepositorySettingsState {
   readonly selectedTab: RepositorySettingsTab
-  readonly remote: IRemote | null
-  /** The full list of remotes, as edited by the user in the Remote tab. */
-  readonly remotes: ReadonlyArray<IRemote>
-  /** The remotes as they existed on disk when the dialog was opened. */
-  readonly initialRemotes: ReadonlyArray<IRemote>
+  /** The last bounded, credential-redacted Remote Manager inspection. */
+  readonly remoteSnapshot: IRemoteManagementSnapshot | null
+  readonly remoteManagementDirty: boolean
+  readonly remoteManagementPlan: IRemoteManagementPlan | null
   readonly ignoreText: string | null
   readonly ignoreTextHasChanged: boolean
   readonly disabled: boolean
@@ -119,15 +121,17 @@ export class RepositorySettings extends React.Component<
   IRepositorySettingsProps,
   IRepositorySettingsState
 > {
+  private remoteManagementAbortController = new AbortController()
+
   public constructor(props: IRepositorySettingsProps) {
     super(props)
 
     this.state = {
       selectedTab:
         this.props.initialSelectedTab || RepositorySettingsTab.Remote,
-      remote: props.remote,
-      remotes: props.remote ? [props.remote] : [],
-      initialRemotes: props.remote ? [props.remote] : [],
+      remoteSnapshot: null,
+      remoteManagementDirty: false,
+      remoteManagementPlan: null,
       ignoreText: null,
       ignoreTextHasChanged: false,
       disabled: false,
@@ -168,15 +172,7 @@ export class RepositorySettings extends React.Component<
   }
 
   public async componentWillMount() {
-    try {
-      const remotes = await getRemotes(this.props.repository)
-      this.setState({ remotes, initialRemotes: remotes })
-    } catch (e) {
-      log.error(
-        `RepositorySettings: unable to read remotes for ${this.props.repository.path}`,
-        e
-      )
-    }
+    await this.loadRemoteManagementSnapshot()
 
     try {
       const ignoreText = await readGitIgnoreAtRoot(this.props.repository)
@@ -235,6 +231,46 @@ export class RepositorySettings extends React.Component<
       initialCommitterEmail: localCommitterEmail,
       isLoadingGitConfig: false,
     })
+  }
+
+  public componentWillUnmount() {
+    this.remoteManagementAbortController.abort()
+  }
+
+  public componentDidUpdate(prevProps: IRepositorySettingsProps) {
+    if (prevProps.repository.path !== this.props.repository.path) {
+      this.remoteManagementAbortController.abort()
+      this.props.onDismissed()
+    }
+  }
+
+  private async loadRemoteManagementSnapshot() {
+    try {
+      const remoteSnapshot = await getRemoteManagementSnapshot(
+        this.props.repository,
+        this.remoteManagementAbortController.signal
+      )
+      if (!this.remoteManagementAbortController.signal.aborted) {
+        this.setState({
+          remoteSnapshot,
+          remoteManagementDirty: false,
+          remoteManagementPlan: null,
+        })
+      }
+    } catch (e) {
+      if (this.remoteManagementAbortController.signal.aborted) {
+        return
+      }
+      log.error(
+        `RepositorySettings: unable to read remotes for ${this.props.repository.path}`,
+        e
+      )
+      this.setState({
+        errors: [
+          'Remote Manager could not inspect this repository safely. Close settings, verify the repository, and try again.',
+        ],
+      })
+    }
   }
 
   private renderErrors(): JSX.Element[] | null {
@@ -312,7 +348,11 @@ export class RepositorySettings extends React.Component<
         <DialogFooter>
           <OkCancelButtonGroup
             okButtonText="Save"
-            okButtonDisabled={this.state.saveDisabled}
+            okButtonDisabled={
+              this.state.saveDisabled ||
+              (this.state.remoteManagementDirty &&
+                this.state.remoteManagementPlan === null)
+            }
           />
         </DialogFooter>
       </Dialog>
@@ -323,19 +363,22 @@ export class RepositorySettings extends React.Component<
     const tab = this.state.selectedTab
     switch (tab) {
       case RepositorySettingsTab.Remote: {
+        const snapshot = this.state.remoteSnapshot
         return (
           <>
             {this.renderRepositoryAccountPicker()}
-            {this.state.remotes.length > 0 ? (
-              <Remote
-                remotes={this.state.remotes}
-                defaultRemoteName={this.props.remote?.name ?? null}
-                onRemoteUrlChanged={this.onRemoteUrlChanged}
-                onAddRemote={this.onAddRemote}
-                onRemoveRemote={this.onRemoveRemote}
-              />
+            {snapshot === null ? (
+              <DialogContent>
+                <p role="status">Inspecting bounded remote settings…</p>
+              </DialogContent>
             ) : (
-              <NoRemote onPublish={this.onPublish} />
+              <Remote
+                snapshot={snapshot}
+                preferredRemoteName={this.props.remote?.name ?? null}
+                disabled={this.state.disabled}
+                onReviewStateChanged={this.onRemoteReviewStateChanged}
+                onPublish={this.onPublish}
+              />
             )}
           </>
         )
@@ -490,8 +533,50 @@ export class RepositorySettings extends React.Component<
   }
 
   private onSubmit = async () => {
+    if (
+      this.state.remoteManagementDirty &&
+      this.state.remoteManagementPlan === null
+    ) {
+      this.setState({
+        selectedTab: RepositorySettingsTab.Remote,
+        errors: ['Review and confirm the staged remote changes before Save.'],
+      })
+      return
+    }
+
     this.setState({ disabled: true, errors: undefined })
     const errors = new Array<JSX.Element | string>()
+
+    if (this.state.remoteManagementPlan !== null) {
+      try {
+        const remoteSnapshot =
+          await this.props.dispatcher.applyRemoteManagementPlan(
+            this.props.repository,
+            this.state.remoteManagementPlan,
+            { signal: this.remoteManagementAbortController.signal }
+          )
+        this.setState({
+          remoteSnapshot,
+          remoteManagementDirty: false,
+          remoteManagementPlan: null,
+        })
+      } catch (e) {
+        if (this.remoteManagementAbortController.signal.aborted) {
+          return
+        }
+        log.error('RepositorySettings: guarded remote plan stopped', e)
+        this.setState({
+          disabled: false,
+          selectedTab: RepositorySettingsTab.Remote,
+          errors: [
+            e instanceof Error
+              ? e.message
+              : 'The reviewed remote plan stopped safely. Inspect it again.',
+          ],
+        })
+        return
+      }
+    }
 
     this.props.dispatcher.setRepositoryAutomationOverrides(
       this.props.repository.id,
@@ -503,70 +588,6 @@ export class RepositorySettings extends React.Component<
         this.props.repository,
         this.state.accountKey
       )
-    }
-
-    // Reconcile the edited remotes against what was on disk when the dialog
-    // opened. Removals run first so that re-adding a remote under a name that
-    // was just freed up can't collide.
-    const normalizedRemotes = this.state.remotes.map(r => ({
-      name: r.name,
-      url: r.url.trim(),
-    }))
-    const { added, removed, changed } = diffRemotes(
-      this.state.initialRemotes,
-      normalizedRemotes
-    )
-
-    for (const remote of removed) {
-      // Never remove the account-bound default remote.
-      if (remote.name === this.props.remote?.name) {
-        continue
-      }
-
-      try {
-        await this.props.dispatcher.removeRemote(
-          this.props.repository,
-          remote.name
-        )
-      } catch (e) {
-        log.error(
-          `RepositorySettings: unable to remove remote "${remote.name}" at ${this.props.repository.path}`,
-          e
-        )
-        errors.push(`Failed removing the remote "${remote.name}": ${e}`)
-      }
-    }
-
-    for (const remote of added) {
-      try {
-        await this.props.dispatcher.addRemote(
-          this.props.repository,
-          remote.name,
-          remote.url
-        )
-      } catch (e) {
-        log.error(
-          `RepositorySettings: unable to add remote "${remote.name}" at ${this.props.repository.path}`,
-          e
-        )
-        errors.push(`Failed adding the remote "${remote.name}": ${e}`)
-      }
-    }
-
-    for (const remote of changed) {
-      try {
-        await this.props.dispatcher.setRemoteURL(
-          this.props.repository,
-          remote.name,
-          remote.url
-        )
-      } catch (e) {
-        log.error(
-          `RepositorySettings: unable to set remote URL at ${this.props.repository.path}`,
-          e
-        )
-        errors.push(`Failed setting the "${remote.name}" remote URL: ${e}`)
-      }
     }
 
     if (this.state.ignoreTextHasChanged && this.state.ignoreText !== null) {
@@ -694,34 +715,11 @@ export class RepositorySettings extends React.Component<
     }
   }
 
-  private onRemoteUrlChanged = (name: string, url: string) => {
-    const remotes = this.state.remotes.map(r =>
-      r.name === name ? { ...r, url } : r
-    )
-    const remote =
-      this.state.remote && this.state.remote.name === name
-        ? { ...this.state.remote, url }
-        : this.state.remote
-    this.setState({ remotes, remote })
-  }
-
-  private onAddRemote = (name: string, url: string) => {
-    if (this.state.remotes.some(r => r.name === name)) {
-      return
-    }
-
-    this.setState({ remotes: [...this.state.remotes, { name, url }] })
-  }
-
-  private onRemoveRemote = (name: string) => {
-    // The account-bound default remote is protected and cannot be removed.
-    if (name === this.props.remote?.name) {
-      return
-    }
-
-    this.setState({
-      remotes: this.state.remotes.filter(r => r.name !== name),
-    })
+  private onRemoteReviewStateChanged = (
+    remoteManagementDirty: boolean,
+    remoteManagementPlan: IRemoteManagementPlan | null
+  ) => {
+    this.setState({ remoteManagementDirty, remoteManagementPlan })
   }
 
   private onIgnoreTextChanged = (text: string) => {

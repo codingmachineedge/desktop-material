@@ -15,6 +15,16 @@ import {
 import { findDefaultRemote } from '../../../src/lib/stores/helpers/find-default-remote'
 import { exec } from 'dugite'
 import { setConfigValue } from '../../../src/lib/git'
+import {
+  applyRemoteManagementPlan,
+  getRemoteManagementSnapshot,
+  parseRemoteManagerDefaultBranch,
+  RemoteManagementError,
+} from '../../../src/lib/git/remote-manager'
+import {
+  createRemoteDrafts,
+  createRemoteManagementPlan,
+} from '../../../src/lib/remote-management'
 
 describe('git/remote', () => {
   describe('getRemotes', () => {
@@ -191,6 +201,284 @@ describe('git/remote', () => {
       const remotes = await getRemotes(repository)
       assert.equal(remotes.length, 1)
       assert.equal(remotes[0].url, remoteUrl)
+    })
+  })
+
+  describe('Remote Manager coordination', () => {
+    it('sanitizes oversized default-ref output and aborts snapshot inspection', async t => {
+      assert.throws(
+        () =>
+          parseRemoteManagerDefaultBranch(
+            `refs/remotes/origin/${'sensitive-value'.repeat(100)}`,
+            'origin'
+          ),
+        (error: unknown) =>
+          error instanceof RemoteManagementError &&
+          error.kind === 'too-large' &&
+          !error.message.includes('sensitive-value')
+      )
+
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
+        repository.path
+      )
+      const controller = new AbortController()
+      controller.abort()
+      await assert.rejects(
+        getRemoteManagementSnapshot(repository, controller.signal),
+        (error: unknown) =>
+          error instanceof RemoteManagementError && error.kind === 'aborted'
+      )
+    })
+
+    it('applies reviewed rename, URL, prune, tracking, add, and remove settings', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
+        repository.path
+      )
+      await exec(
+        ['remote', 'add', 'legacy', 'https://example.test/team/legacy.git'],
+        repository.path
+      )
+      await exec(
+        [
+          'symbolic-ref',
+          'refs/remotes/origin/HEAD',
+          'refs/remotes/origin/main',
+        ],
+        repository.path
+      )
+      await exec(['config', 'user.name', 'Remote Test'], repository.path)
+      await exec(
+        ['config', 'user.email', 'remote-test@example.test'],
+        repository.path
+      )
+      await exec(
+        ['commit', '--allow-empty', '-m', 'remote refs'],
+        repository.path
+      )
+      await exec(
+        ['update-ref', 'refs/remotes/origin/stable', 'HEAD'],
+        repository.path
+      )
+      await exec(
+        ['update-ref', 'refs/remotes/upstream/main', 'HEAD'],
+        repository.path
+      )
+
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const drafts = createRemoteDrafts(snapshot)
+      const origin = drafts.find(remote => remote.name === 'origin')!
+      const plan = createRemoteManagementPlan(snapshot, [
+        {
+          ...origin,
+          name: 'primary',
+          fetchUrl: 'https://example.test/team/project-v2.git',
+          pushUrl: 'ssh://git@example.test/team/project.git',
+          prune: 'enabled',
+          defaultBranch: 'stable',
+        },
+        {
+          originalName: null,
+          name: 'upstream',
+          fetchUrl: 'https://example.test/community/project.git',
+          fetchUrlHasCredentials: false,
+          pushUrl: null,
+          pushUrlHasCredentials: false,
+          prune: 'disabled',
+          defaultBranch: 'main',
+        },
+      ])
+
+      const updated = await applyRemoteManagementPlan(repository, plan)
+      assert.deepEqual(
+        updated.remotes.map(remote => remote.name),
+        ['primary', 'upstream']
+      )
+      const primary = updated.remotes[0]
+      assert.equal(primary.fetchUrl, 'https://example.test/team/project-v2.git')
+      assert.equal(primary.pushUrl, 'ssh://git@example.test/team/project.git')
+      assert.equal(primary.prune, 'enabled')
+      assert.equal(primary.defaultBranch, 'stable')
+      assert.equal(updated.remotes[1].prune, 'disabled')
+      assert.equal(updated.remotes[1].defaultBranch, 'main')
+    })
+
+    it('fails closed when remote state changes after review', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const plan = createRemoteManagementPlan(snapshot, [
+        { ...createRemoteDrafts(snapshot)[0], prune: 'enabled' },
+      ])
+      await exec(
+        ['remote', 'add', 'other', 'https://example.test/team/other.git'],
+        repository.path
+      )
+
+      await assert.rejects(
+        applyRemoteManagementPlan(repository, plan),
+        (error: unknown) =>
+          error instanceof RemoteManagementError && error.kind === 'changed'
+      )
+      const prune = await exec(
+        ['config', '--get', 'remote.origin.prune'],
+        repository.path
+      )
+      assert.equal(prune.exitCode, 1)
+    })
+
+    it('redacts stored HTTP userinfo and honors pre-spawn cancellation', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        [
+          'remote',
+          'add',
+          'origin',
+          'https://user:secret@example.test/team/project.git',
+        ],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      assert.equal(
+        snapshot.remotes[0].fetchUrl,
+        'https://example.test/team/project.git'
+      )
+      assert.equal(snapshot.remotes[0].fetchUrlHasCredentials, true)
+      assert.doesNotMatch(JSON.stringify(snapshot), /secret/)
+
+      const plan = createRemoteManagementPlan(snapshot, [
+        { ...createRemoteDrafts(snapshot)[0], prune: 'enabled' },
+      ])
+      const controller = new AbortController()
+      controller.abort()
+      await assert.rejects(
+        applyRemoteManagementPlan(repository, plan, {
+          signal: controller.signal,
+        }),
+        (error: unknown) =>
+          error instanceof RemoteManagementError && error.kind === 'aborted'
+      )
+    })
+
+    it('preserves a raw credentialed URL across rename and metadata edits', async t => {
+      const repository = await setupEmptyRepository(t)
+      const rawUrl =
+        'https://user:credential-value@example.test/team/project.git'
+      await exec(['remote', 'add', 'origin', rawUrl], repository.path)
+      await exec(['config', 'user.name', 'Remote Test'], repository.path)
+      await exec(
+        ['config', 'user.email', 'remote-test@example.test'],
+        repository.path
+      )
+      await exec(
+        ['commit', '--allow-empty', '-m', 'remote refs'],
+        repository.path
+      )
+      await exec(
+        ['update-ref', 'refs/remotes/origin/stable', 'HEAD'],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const plan = createRemoteManagementPlan(snapshot, [
+        {
+          ...createRemoteDrafts(snapshot)[0],
+          name: 'primary',
+          prune: 'enabled',
+          defaultBranch: 'stable',
+        },
+      ])
+      assert.equal(plan.updates[0].fetchUrl, undefined)
+
+      await applyRemoteManagementPlan(repository, plan)
+      const stored = await exec(
+        ['config', '--get', 'remote.primary.url'],
+        repository.path
+      )
+      assert.equal(stored.stdout.trim(), rawUrl)
+    })
+
+    it('uses temporary names to safely swap two existing remote names', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'alpha', 'https://example.test/team/alpha.git'],
+        repository.path
+      )
+      await exec(
+        ['remote', 'add', 'beta', 'https://example.test/team/beta.git'],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const drafts = createRemoteDrafts(snapshot)
+      const plan = createRemoteManagementPlan(snapshot, [
+        { ...drafts[0], name: 'beta' },
+        { ...drafts[1], name: 'alpha' },
+      ])
+
+      const updated = await applyRemoteManagementPlan(repository, plan)
+      assert.equal(
+        updated.remotes.find(remote => remote.name === 'alpha')?.fetchUrl,
+        'https://example.test/team/beta.git'
+      )
+      assert.equal(
+        updated.remotes.find(remote => remote.name === 'beta')?.fetchUrl,
+        'https://example.test/team/alpha.git'
+      )
+    })
+
+    it('warns about partial state when cancellation crosses the mutation boundary', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
+        repository.path
+      )
+      await exec(
+        ['remote', 'add', 'legacy', 'https://example.test/team/legacy.git'],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const plan = createRemoteManagementPlan(snapshot, [
+        { ...createRemoteDrafts(snapshot)[0], prune: 'enabled' },
+      ])
+      const controller = new AbortController()
+      await assert.rejects(
+        applyRemoteManagementPlan(repository, plan, {
+          signal: controller.signal,
+          onMutationApplied: () => controller.abort(),
+        }),
+        (error: unknown) =>
+          error instanceof RemoteManagementError && error.kind === 'partial'
+      )
+    })
+
+    it('rejects a missing exact default-branch tracking ref', async t => {
+      const repository = await setupEmptyRepository(t)
+      await exec(
+        ['remote', 'add', 'origin', 'https://example.test/team/project.git'],
+        repository.path
+      )
+      const snapshot = await getRemoteManagementSnapshot(repository)
+      const plan = createRemoteManagementPlan(snapshot, [
+        {
+          ...createRemoteDrafts(snapshot)[0],
+          defaultBranch: 'not-fetched',
+        },
+      ])
+      await assert.rejects(
+        applyRemoteManagementPlan(repository, plan),
+        (error: unknown) =>
+          error instanceof RemoteManagementError && error.kind === 'changed'
+      )
+      assert.equal(
+        (await getRemoteManagementSnapshot(repository)).remotes[0]
+          .defaultBranch,
+        null
+      )
     })
   })
 })

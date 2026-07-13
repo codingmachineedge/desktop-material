@@ -34,6 +34,8 @@ export interface IActionsTransferRedirectDependencies {
 interface IActionsTransferRedirectOptions {
   readonly location: string
   readonly githubDotCom: boolean
+  /** Override the dotcom host allowlist for another exact transfer service. */
+  readonly githubDotComAllowedHost?: (hostname: string) => boolean
   readonly signal: AbortSignal
   readonly dependencies?: IActionsTransferRedirectDependencies
 }
@@ -107,7 +109,11 @@ export function isPublicActionsTransferAddress(address: string): boolean {
     : false
 }
 
-function validateRedirectURL(value: string, githubDotCom: boolean): URL {
+function validateRedirectURL(
+  value: string,
+  githubDotCom: boolean,
+  githubDotComAllowedHost?: (hostname: string) => boolean
+): URL {
   if (value.length === 0 || value.length > 16_384) {
     throw new ActionsTransferRedirectError('unsafe-redirect')
   }
@@ -129,7 +135,11 @@ function validateRedirectURL(value: string, githubDotCom: boolean): URL {
     hostname.endsWith('.') ||
     hostname === 'localhost' ||
     hostname.endsWith('.localhost') ||
-    (githubDotCom && !GitHubDotComSignedArtifactHost.test(hostname))
+    (githubDotCom &&
+      !(
+        githubDotComAllowedHost ??
+        (host => GitHubDotComSignedArtifactHost.test(host))
+      )(hostname))
   ) {
     throw new ActionsTransferRedirectError('unsafe-redirect')
   }
@@ -270,11 +280,16 @@ const defaultDependencies: IActionsTransferRedirectDependencies = {
 export async function fetchActionsTransferRedirect({
   location,
   githubDotCom,
+  githubDotComAllowedHost,
   signal,
   dependencies = defaultDependencies,
 }: IActionsTransferRedirectOptions): Promise<Response> {
   throwIfAborted(signal)
-  const url = validateRedirectURL(location, githubDotCom)
+  const url = validateRedirectURL(
+    location,
+    githubDotCom,
+    githubDotComAllowedHost
+  )
   const hostname = stripIPv6Brackets(url.hostname).toLowerCase()
   let addresses: ReadonlyArray<IActionsTransferResolvedAddress>
   try {

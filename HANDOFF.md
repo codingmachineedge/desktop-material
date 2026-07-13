@@ -17,21 +17,30 @@ claiming that its remaining README roadmap items are finished.
 ### Guided roadmap completion run — live status
 
 The final guided-roadmap completion is active on
-`codex/guided-final-gate`. Integration checkpoint `6e97a49466` contains the
+`codex/guided-final-gate`. Integration checkpoint `8516bcff0a` contains the
 privacy-safe cross-account clone and Pull All recovery, hardened Actions logs
 and artifact transfer, the complete native pull-request lifecycle, interactive
 artifact pagination, effective branch-rule inspection, patch-series exchange,
 complete worktree lifecycle administration, branch pin/hide/solo/restore,
 exact merge-tree conflict paths, signing and Git LFS administration,
-structured local-commit rewriting, and guided bisect sessions. Each completed
-phase was committed and pushed after its focused security, TypeScript, lint,
-formatting, and privacy gates passed. The bisect integration union also passed
-75 focused Git/model/UI/style/sibling tests before its merge was pushed.
+structured local-commit rewriting, guided bisect sessions, the complete
+repository-wide native stash manager, and reviewed GitHub Releases/assets
+management with secure arbitrary asset transfers, plus the complete guarded
+Remote Manager for every named remote. Each completed phase was
+committed and pushed after its focused security, TypeScript, lint, formatting,
+and privacy gates passed. The bisect integration union passed 75 focused
+Git/model/UI/style/sibling tests; the stash integration passed 46 focused
+Git/UI/style tests; and the Releases branch passed 180 combined affected tests
+before root repeated its focused transfer/API/store/UI gate and TypeScript
+check. Remote Manager passed 30 root-repeated model/Git/UI/style tests after
+its bounded default-ref inspection, exact mutation revalidation, masked URL
+preservation, rename-swap, partial-state, and current hosted-remote warning
+review.
 
-Releases/assets, the complete stash manager, and the complete remote manager
-are in isolated worktrees. Repository hooks, richer Issue workflows, and
-provider-neutral triage follow those integrations. Nothing in this live
-section claims publication on `main`: final production build, off-screen
+Repository hooks and richer Issue workflows remain in isolated worktrees;
+provider-neutral triage is active in its own worktree from the reviewed Remote
+Manager checkpoint. Nothing in this live section claims publication on
+`main`: final production build, off-screen
 interaction, accepted screenshots, documentation/wiki synchronization, CI,
 Pages, installer release, and cleanup remain mandatory gates before this run
 can be closed.
@@ -76,6 +85,15 @@ and remains attached to single, batch, missing-repository, and retry-clone
 flows. The implementation is `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`;
 its first reviewed `main` baseline is
 `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`.
+
+The reported cross-account clone failure was traced to an installed `b69`
+runtime built before this fallback existed: its unpacked renderer contains no
+clone-account-fallback module, and the failing runtime event preceded the first
+fallback commit. The current integration then passed all 23 focused
+account-affinity, account-exhaustion, retry-metadata, and credential-trampoline
+regressions. Final acceptance still requires exercising the corrected
+production bundle on the isolated off-screen desktop; the visible installed
+application was not restarted or controlled during diagnosis.
 
 ## Guided-function integration
 
