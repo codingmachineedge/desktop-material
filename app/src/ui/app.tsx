@@ -19,6 +19,7 @@ import {
   BuildRunStore,
   ActionsStore,
   GitHubReleasesStore,
+  GitHubIssuesStore,
 } from '../lib/stores'
 import { RepositoryTabStrip } from './repository-tabs/repository-tab-strip'
 import { BuildRunToolbarButton } from './build-run/build-run-toolbar-button'
@@ -281,6 +282,7 @@ interface IAppProps {
   readonly buildRunStore: BuildRunStore
   readonly actionsStore: ActionsStore
   readonly releasesStore: GitHubReleasesStore
+  readonly issueWorkflowsStore: GitHubIssuesStore
   readonly startTime: number
 }
 
@@ -4391,6 +4393,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           onUpdateCommitOptions={this.onUpdateCommitOptions}
           actionsStore={this.props.actionsStore}
           releasesStore={this.props.releasesStore}
+          issueWorkflowsStore={this.props.issueWorkflowsStore}
         />
       )
     } else if (selectedState.type === SelectionType.CloningRepository) {

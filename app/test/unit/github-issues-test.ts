@@ -168,6 +168,24 @@ describe('GitHub Issues model', () => {
         'https://github.com'
       )
     )
+
+    const richlyAssigned = parseGitHubIssue(
+      {
+        ...issue(),
+        labels: Array.from({ length: 25 }, (_, index) =>
+          label(index + 1, `label-${index + 1}`)
+        ),
+        assignees: Array.from({ length: 25 }, (_, index) => ({
+          login: `fixture-${index + 1}`,
+        })),
+      },
+      7,
+      'desktop',
+      'material',
+      'https://github.com'
+    )
+    assert.equal(richlyAssigned.labels.length, 25)
+    assert.equal(richlyAssigned.assignees.length, 25)
   })
 
   it('validates comment pages and exact comment anchors', () => {

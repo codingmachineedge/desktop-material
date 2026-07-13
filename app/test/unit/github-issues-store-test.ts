@@ -121,7 +121,7 @@ function fakeAPI(overrides: Partial<IGitHubIssuesAPI> = {}): IGitHubIssuesAPI {
       labelsCapped: false,
       assigneesCapped: false,
       milestonesCapped: false,
-      unsupported: [],
+      unavailable: [],
     }),
     updateIssue: async () => issue,
     setIssueState: async (_owner, _name, _number, state) => ({
@@ -192,6 +192,24 @@ describe('GitHub Issues store', () => {
     assert.equal(requested?.owner, 'desktop')
     assert.equal(requested?.name, 'material')
     assert.ok(requested?.signal instanceof AbortSignal)
+  })
+
+  it('passes through neutral metadata availability without inferring access cause', async () => {
+    const store = await storeWith(new FakeAccountsStore([selected]), () =>
+      fakeAPI({
+        fetchIssueMetadata: async () => ({
+          labels: [],
+          assignees: [],
+          milestones: [],
+          labelsCapped: false,
+          assigneesCapped: false,
+          milestonesCapped: false,
+          unavailable: ['assignees'],
+        }),
+      })
+    )
+    const metadata = await store.metadata(repository)
+    assert.deepEqual(metadata.unavailable, ['assignees'])
   })
 
   it('freezes a repository/account-generation/issue fingerprint review', async () => {

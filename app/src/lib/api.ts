@@ -1685,7 +1685,8 @@ export class API {
   /**
    * Load repository metadata through locally generated pages. Older GHES
    * versions may omit one endpoint; only explicit 404/410 responses are
-   * treated as unsupported.
+   * reported neutrally as unavailable because it may indicate provider version
+   * or repository access changes.
    */
   public async fetchIssueMetadata(
     owner: string,
@@ -1697,7 +1698,7 @@ export class API {
     const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
       safeName
     )}`
-    const unsupported = new Array<'labels' | 'assignees' | 'milestones'>()
+    const unavailable = new Array<'labels' | 'assignees' | 'milestones'>()
 
     const fetchPages = async <T>(
       kind: 'labels' | 'assignees' | 'milestones',
@@ -1731,7 +1732,7 @@ export class API {
           error instanceof APIError &&
           (error.responseStatus === 404 || error.responseStatus === 410)
         ) {
-          unsupported.push(kind)
+          unavailable.push(kind)
           return { items: [], capped: false }
         }
         throw error
@@ -1764,7 +1765,7 @@ export class API {
       labelsCapped: labels.capped,
       assigneesCapped: assignees.capped,
       milestonesCapped: milestones.capped,
-      unsupported,
+      unavailable,
     }
   }
 

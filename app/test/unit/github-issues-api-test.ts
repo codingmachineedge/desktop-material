@@ -119,7 +119,7 @@ describe('GitHub Issues API', () => {
     assert.equal((decoded.match(/is:pr/g) ?? []).length, 1)
   })
 
-  it('fetches metadata through bounded local pages and marks old GHES endpoints unsupported', async () => {
+  it('fetches metadata through bounded local pages and marks ambiguous 404 endpoints unavailable', async () => {
     const api = new API('https://api.github.example/api/v3', 'synthetic-token')
     const requests = new Array<string>()
     Reflect.set(api, 'ghRequest', async (_method: string, path: string) => {
@@ -158,7 +158,7 @@ describe('GitHub Issues API', () => {
       metadata.milestones.map(x => x.number),
       [3]
     )
-    assert.deepEqual(metadata.unsupported, ['assignees'])
+    assert.deepEqual(metadata.unavailable, ['assignees'])
     assert.equal(requests.length, 3)
     assert.match(requests[0], /per_page=100&page=1$/)
   })

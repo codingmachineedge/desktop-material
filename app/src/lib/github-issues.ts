@@ -20,6 +20,8 @@ export const GitHubIssueBodyMaximumLength = 65_536
 export const GitHubIssueCommentMaximumLength = 65_536
 export const GitHubIssueMaximumLabels = 20
 export const GitHubIssueMaximumAssignees = 20
+export const GitHubIssueResponseMaximumLabels = 100
+export const GitHubIssueResponseMaximumAssignees = 100
 
 export type GitHubIssueState = 'open' | 'closed'
 export type GitHubIssueStateFilter = GitHubIssueState | 'all'
@@ -101,8 +103,8 @@ export interface IGitHubIssueMetadata {
   readonly labelsCapped: boolean
   readonly assigneesCapped: boolean
   readonly milestonesCapped: boolean
-  /** GHES editions may not expose every metadata endpoint. */
-  readonly unsupported: ReadonlyArray<'labels' | 'assignees' | 'milestones'>
+  /** Metadata may be unavailable because of provider version or repository access. */
+  readonly unavailable: ReadonlyArray<'labels' | 'assignees' | 'milestones'>
 }
 
 export interface IGitHubIssueUpdate {
@@ -321,13 +323,13 @@ function parseIssue(
   const user = record(input.user, 'issue author')
   if (
     !Array.isArray(input.labels) ||
-    input.labels.length > GitHubIssueMaximumLabels
+    input.labels.length > GitHubIssueResponseMaximumLabels
   ) {
     throw new Error('GitHub returned an invalid issue label list.')
   }
   if (
     !Array.isArray(input.assignees) ||
-    input.assignees.length > GitHubIssueMaximumAssignees
+    input.assignees.length > GitHubIssueResponseMaximumAssignees
   ) {
     throw new Error('GitHub returned an invalid issue assignee list.')
   }
