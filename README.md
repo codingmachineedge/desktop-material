@@ -56,6 +56,7 @@ These features are implemented and live on `main`.
 
 **Dynamic UI scaling**
 - A UI-scale slider (50–200%) in Preferences → Appearance plus auto-fit-to-window that shrinks the interface to fit smaller windows (on by default), composing with `Ctrl` `+` / `-` / `0`
+- At the supported minimum window size, a requested 200% scale safely auto-fits to 96%, keeping the title bar, navigation, Appearance controls, and footer visible without horizontal clipping
 
 **Per-repo `.gitignore` manager**
 - Open **Repository → Manage .gitignore…** for a manager that auto-suggests templates from your repo's contents, a searchable catalog of ~19 templates grouped by category, one-click apply/remove, and a raw editor — all merged into marked, reversible sections
@@ -97,6 +98,8 @@ These features are implemented and live on `main`.
 | **Agent access** — opt-in loopback MCP/REST with bearer-token controls | **Provider accounts** — GitHub, GitLab, Bitbucket, and self-hosted endpoints |
 | ![Open repository and worktree in a new window](docs/assets/screenshots/material-multi-window-menu.png) | ![Live Settings history side sheet](docs/assets/screenshots/settings-history-manager.png) |
 | **Multi-window** — isolated repository/worktree windows and persisted tabs | **Settings history** — Git-backed timeline, diff, Undo, Redo, restore-to-point |
+| ![Appearance settings at a requested 200% scale auto-fitted to 96%](docs/assets/screenshots/material-scale-200-autofit.png) | ![Desktop Material Changes view](docs/assets/screenshots/material-workspace-changes.png) |
+| **200% auto-fit** — minimum-window dark-theme verification with no clipped controls | **Workspace shell** — Material navigation, toolbar, cards, and commit flow |
 
 ## Building
 

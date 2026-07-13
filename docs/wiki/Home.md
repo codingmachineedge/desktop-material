@@ -85,9 +85,14 @@ non-modal dialog framework.
   its own selected repository and persisted tab state while commands route to the correct window.
 - **Notification centre** — unread state, mark-all/delete controls, and restoreable history backed by
   a dedicated local git repository.
+- **Clipping-safe scaling** — choose 50–200% UI scaling; auto-fit caps the effective scale when a
+  small window cannot contain the requested size. At the supported minimum window, 200% safely
+  auto-fits to 96% while preserving every title-bar, navigation, Appearance, and footer control.
 
 ![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
 ![Provider accounts for GitLab and Bitbucket](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-provider-accounts.png)
 
 ![Open repositories and worktrees in another window](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)
+
+![Requested 200 percent UI scale auto-fitted without clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)

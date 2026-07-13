@@ -237,9 +237,15 @@ Desktop Material scales its whole interface independently of the OS:
 
 - Open the **scaling slider** and set anywhere from **50% to 200%**.
 - Or choose **auto-fit to window**, which picks a scale that fits the current window size.
+- Auto-fit treats your slider value as the requested maximum. If the window is too small, it caps
+  the effective scale instead of multiplying the requested scale again. At the supported minimum
+  window size, 200% auto-fits to 96% so the title bar, navigation rail, Appearance cards, value,
+  and footer remain visible without horizontal clipping.
 
 Combined with the animated light/dark theme, this lets you tune the workspace for a laptop panel, a
 4K monitor, or a shared screen without touching system display settings.
+
+![Requested 200 percent UI scale auto-fitted to 96 percent at the minimum window size](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
 
 ---
 
