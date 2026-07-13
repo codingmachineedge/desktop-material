@@ -106,6 +106,37 @@ export function getAbsoluteUrl(endpoint: string, path: string): string {
 }
 
 /**
+ * Build the headers for an HTTP request.
+ *
+ * Callers may provide an explicit Authorization header for trusted flows that
+ * don't use an account token (for example OAuth token revocation and
+ * Bitbucket app-password authentication). When an account token is present it
+ * is always applied last so custom headers cannot replace that credential,
+ * including through differently-cased header names.
+ */
+export function createRequestHeaders(
+  token: string | null,
+  customHeaders?: HeadersInit
+): Headers {
+  const headers = new Headers({
+    Accept: 'application/vnd.github.v3+json, application/json',
+    'Content-Type': 'application/json',
+    'User-Agent': getUserAgent(),
+  })
+
+  if (customHeaders !== undefined) {
+    const custom = new Headers(customHeaders)
+    custom.forEach((value, name) => headers.set(name, value))
+  }
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  return headers
+}
+
+/**
  * Make an API request.
  *
  * @param endpoint      - The API endpoint.
@@ -124,29 +155,14 @@ export function request(
   method: HTTPMethod,
   path: string,
   jsonBody?: Object,
-  customHeaders?: Object,
+  customHeaders?: HeadersInit,
   reloadCache: boolean = false,
   redirect?: RequestRedirect
 ): Promise<Response> {
   const url = getAbsoluteUrl(endpoint, path)
 
-  let headers: any = {
-    Accept: 'application/vnd.github.v3+json, application/json',
-    'Content-Type': 'application/json',
-    'User-Agent': getUserAgent(),
-  }
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  headers = {
-    ...headers,
-    ...customHeaders,
-  }
-
   const options: RequestInit = {
-    headers,
+    headers: createRequestHeaders(token, customHeaders),
     method,
     body: JSON.stringify(jsonBody),
   }
