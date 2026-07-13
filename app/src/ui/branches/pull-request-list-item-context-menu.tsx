@@ -1,6 +1,7 @@
 import { IMenuItem } from '../../lib/menu-item'
 
 interface IPullRequestContextMenuConfig {
+  onManagePullRequest?: () => void
   onViewPullRequestOnGitHub?: () => void
   onCheckoutInNewWorktree?: () => void
 }
@@ -8,8 +9,19 @@ interface IPullRequestContextMenuConfig {
 export function generatePullRequestContextMenuItems(
   config: IPullRequestContextMenuConfig
 ): IMenuItem[] {
-  const { onViewPullRequestOnGitHub, onCheckoutInNewWorktree } = config
+  const {
+    onManagePullRequest,
+    onViewPullRequestOnGitHub,
+    onCheckoutInNewWorktree,
+  } = config
   const items = new Array<IMenuItem>()
+
+  if (onManagePullRequest !== undefined) {
+    items.push({
+      label: 'Manage Pull Request…',
+      action: () => onManagePullRequest(),
+    })
+  }
 
   if (onViewPullRequestOnGitHub !== undefined) {
     items.push({

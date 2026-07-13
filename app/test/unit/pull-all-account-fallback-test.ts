@@ -57,6 +57,21 @@ describe('Pull All account fallback', () => {
     )
   })
 
+  it('excludes the first token-bearing identity rather than a tokenless entry', () => {
+    const tokenless = account(1, getDotComAPIEndpoint(), '')
+    const firstUsable = account(2)
+    const nextUsable = account(3)
+
+    assert.deepStrictEqual(
+      getPullAllFallbackAccountKeys(
+        'https://github.com/owner/repository.git',
+        [tokenless, firstUsable, nextUsable],
+        null
+      ),
+      [getAccountKey(nextUsable)]
+    )
+  })
+
   it('does not offer OAuth accounts to SSH or another origin', () => {
     const first = account(1)
     const second = account(2)

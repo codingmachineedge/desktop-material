@@ -1,23 +1,37 @@
 import * as React from 'react'
 import classNames from 'classnames'
-import { IAPIWorkflowJob, IAPIWorkflowRun } from '../../lib/api'
+import {
+  APICheckConclusion,
+  IAPIWorkflowJob,
+  IAPIWorkflowRun,
+} from '../../lib/api'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
+import { Repository } from '../../models/repository'
+import { ActionsStore } from '../../lib/stores/actions-store'
+import { RunArtifacts } from './run-artifacts'
 
 interface IRunDetailsProps {
+  readonly repository: Repository
+  readonly actionsStore: ActionsStore
   readonly run: IAPIWorkflowRun
   readonly jobs: ReadonlyArray<IAPIWorkflowJob>
   readonly loading: boolean
   readonly error: Error | null
   readonly onClose: () => void
   readonly onViewLogs?: (job: IAPIWorkflowJob) => void
+  readonly busyJobId: number | null
+  readonly onRerunJob: (job: IAPIWorkflowJob) => void
 }
 
 class JobDetails extends React.PureComponent<{
   readonly job: IAPIWorkflowJob
   readonly onViewLogs?: (job: IAPIWorkflowJob) => void
+  readonly busyJobId: number | null
+  readonly onRerunJob: (job: IAPIWorkflowJob) => void
 }> {
   private viewLogs = () => this.props.onViewLogs?.(this.props.job)
+  private rerunJob = () => this.props.onRerunJob(this.props.job)
 
   public render() {
     const { job, onViewLogs } = this.props
@@ -36,6 +50,16 @@ class JobDetails extends React.PureComponent<{
             </span>
           </div>
           <div className="actions-job-links">
+            {job.conclusion === APICheckConclusion.Failure && (
+              <Button
+                size="small"
+                onClick={this.rerunJob}
+                disabled={this.props.busyJobId === job.id}
+                ariaLabel={`Re-run failed job: ${job.name}`}
+              >
+                {this.props.busyJobId === job.id ? 'Requesting…' : 'Re-run job'}
+              </Button>
+            )}
             {onViewLogs && (
               <Button size="small" onClick={this.viewLogs}>
                 View logs
@@ -92,8 +116,15 @@ export class RunDetails extends React.PureComponent<IRunDetailsProps> {
             key={job.id}
             job={job}
             onViewLogs={this.props.onViewLogs}
+            busyJobId={this.props.busyJobId}
+            onRerunJob={this.props.onRerunJob}
           />
         ))}
+        <RunArtifacts
+          repository={this.props.repository}
+          run={run}
+          actionsStore={this.props.actionsStore}
+        />
       </aside>
     )
   }

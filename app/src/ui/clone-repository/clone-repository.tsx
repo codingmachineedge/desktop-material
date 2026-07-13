@@ -48,6 +48,7 @@ import { mergeOrganizationRepositories } from './org-filter-chips'
 import { PopupType } from '../../models/popup'
 import { PreferencesTab } from '../../models/preferences'
 import { getPreferredGenericCloneAccountKey } from '../../lib/automation/clone-account-fallback'
+import { normalizeCloneDepth } from '../../models/clone-options'
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -144,6 +145,12 @@ interface ICloneRepositoryState {
 
   /** The parallel/sequential mode used when cloning multiple repositories. */
   readonly batchMode: BatchCloneMode
+
+  /** Whether a single-repository clone should fetch bounded history. */
+  readonly shallowClone: boolean
+
+  /** User-entered shallow history depth, parsed only at the clone boundary. */
+  readonly cloneDepth: string
 
   /**
    * The persisted state of the CloneGitHubRepository component for
@@ -259,6 +266,8 @@ export class CloneRepository extends React.Component<
       initialPath: defaultDirectory,
       loading: false,
       batchMode: BatchCloneMode.Parallel,
+      shallowClone: false,
+      cloneDepth: '1',
       dotComTabState: {
         kind: 'dotComTabState',
         filterText: '',
@@ -394,7 +403,8 @@ export class CloneRepository extends React.Component<
       path == null ||
       path.length === 0 ||
       loading ||
-      error !== null
+      error !== null ||
+      this.getCloneDepthError() !== null
 
     return disabled
   }
@@ -412,9 +422,62 @@ export class CloneRepository extends React.Component<
 
     return (
       <DialogFooter>
+        <div className="clone-history-options">
+          <label className="clone-shallow-toggle">
+            <input
+              type="checkbox"
+              checked={this.state.shallowClone}
+              onChange={this.onShallowCloneChanged}
+            />
+            <span>
+              <strong>Shallow clone</strong>
+              <small>Current branch and recursive submodules</small>
+            </span>
+          </label>
+          <label className="clone-depth-field">
+            <span>Commit depth</span>
+            <input
+              type="number"
+              min="1"
+              max="2147483647"
+              step="1"
+              inputMode="numeric"
+              value={this.state.cloneDepth}
+              disabled={!this.state.shallowClone}
+              aria-invalid={this.getCloneDepthError() !== null}
+              aria-describedby="clone-depth-guidance"
+              onChange={this.onCloneDepthChanged}
+            />
+          </label>
+          <small id="clone-depth-guidance" role="status">
+            {this.getCloneDepthError() ??
+              (this.state.shallowClone
+                ? 'Fetches less history now; deepen later with Repository tools.'
+                : 'Full history will be cloned.')}
+          </small>
+        </div>
         <OkCancelButtonGroup okButtonText="Clone" okButtonDisabled={disabled} />
       </DialogFooter>
     )
+  }
+
+  private onShallowCloneChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => this.setState({ shallowClone: event.currentTarget.checked })
+
+  private onCloneDepthChanged = (event: React.ChangeEvent<HTMLInputElement>) =>
+    this.setState({ cloneDepth: event.currentTarget.value })
+
+  private getCloneDepthError(): string | null {
+    if (!this.state.shallowClone) {
+      return null
+    }
+    try {
+      normalizeCloneDepth(this.state.cloneDepth)
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Enter a valid depth.'
+    }
   }
 
   private onTabClicked = (tab: CloneRepositoryTab) => {
@@ -1056,9 +1119,15 @@ export class CloneRepository extends React.Component<
     defaultBranch?: string,
     accountKey?: string
   ) {
+    const depth = this.state.shallowClone
+      ? normalizeCloneDepth(this.state.cloneDepth)
+      : undefined
     this.props.dispatcher.clone(url, path, {
       defaultBranch,
       ...(accountKey !== undefined ? { accountKey } : {}),
+      depth,
+      singleBranch: depth !== undefined,
+      shallowSubmodules: depth !== undefined,
     })
     this.props.onDismissed()
 

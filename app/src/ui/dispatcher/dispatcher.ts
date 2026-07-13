@@ -8,6 +8,7 @@ import {
   IAPICheckSuite,
   IAPIRepoRuleset,
   getDotComAPIEndpoint,
+  getHTMLURL,
   IAPICreatePushProtectionBypassResponse,
 } from '../../lib/api'
 import { getAccountForRepository } from '../../lib/get-account-for-repository'
@@ -40,6 +41,8 @@ import {
   getRepositoryType,
   listWorktrees,
   IManagedSubmodule,
+  IRemoteManagementApplyOptions,
+  IRepositoryShallowHistoryFetchRequest,
 } from '../../lib/git'
 import { isGitOnPath } from '../../lib/is-git-on-path'
 import {
@@ -63,6 +66,7 @@ import type {
 } from '../../lib/stores/copilot-store'
 import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
+import { PullRequestLifecycleStore } from '../../lib/stores/pull-request-lifecycle-store'
 import { getTipSha } from '../../lib/tip'
 import type {
   IAutomationSettingsOverrides,
@@ -78,7 +82,7 @@ import { Branch, IAheadBehind } from '../../models/branch'
 import { BranchesTab } from '../../models/branches-tab'
 import { BranchSortOrder } from '../../models/branch-sort-order'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
-import { CloneOptions } from '../../models/clone-options'
+import type { CloneOptions } from '../../models/clone-options'
 import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
 import { CloningRepository } from '../../models/cloning-repository'
 import { Commit, ICommitContext, CommitOneLine } from '../../models/commit'
@@ -86,6 +90,11 @@ import { ICommitMessage } from '../../models/commit-message'
 import { DiffSelection, ImageDiffType, ITextDiff } from '../../models/diff'
 import { FetchType } from '../../models/fetch'
 import { GitHubRepository } from '../../models/github-repository'
+import {
+  IRemote,
+  IRemoteManagementPlan,
+  IRemoteManagementSnapshot,
+} from '../../models/remote'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { Popup, PopupType } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
@@ -124,7 +133,11 @@ import {
 } from '../../lib/stores/commit-status-store'
 import { MergeTreeResult } from '../../models/merge'
 import { UncommittedChangesStrategy } from '../../models/uncommitted-changes-strategy'
-import { IStashEntry } from '../../models/stash-entry'
+import {
+  ICreateManagedStashRequest,
+  IStashEntry,
+  IUpdateManagedStashRequest,
+} from '../../models/stash-entry'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
 import {
   IBuildRunPreferences,
@@ -172,7 +185,31 @@ import {
   IFileResolution,
   ICopilotResolutionSummary,
 } from '../../lib/copilot-conflict-resolution'
-import { WorktreeEntry } from '../../models/worktree'
+import {
+  IWorktreeMaintenancePreview,
+  WorktreeEntry,
+  WorktreeMaintenanceOperation,
+} from '../../models/worktree'
+import { ICreatedGitHubIssue } from '../../lib/github-issue'
+import {
+  GitHubPullRequestContextChangedError,
+  GitHubPullRequestMergeMethod,
+  ICreatedGitHubPullRequest,
+  IGitHubPullRequestDraft,
+  IGitHubPullRequestLifecycle,
+  IGitHubPullRequestMergeReceipt,
+  IGitHubPullRequestMetadata,
+  IGitHubPullRequestMutationReceipt,
+  IGitHubPullRequestReview,
+  IGitHubPullRequestReviewReceipt,
+  IGitHubPullRequestUpdate,
+  validateGitHubPullRequestDraftRouting,
+  validateGitHubPullRequestNumber,
+} from '../../lib/github-pull-request'
+import {
+  IGitHubPullRequestTemplate,
+  loadGitHubPullRequestTemplates,
+} from '../../lib/github-pull-request-templates'
 
 /**
  * An error handler function.
@@ -220,6 +257,7 @@ function parseOverrideCommand(override: string | undefined): ICommand | null {
  */
 export class Dispatcher {
   private readonly errorHandlers = new Array<ErrorHandler>()
+  private readonly pullRequestLifecycleStore = new PullRequestLifecycleStore()
   public incrementMetric: StatsStore['increment']
 
   public constructor(
@@ -668,6 +706,19 @@ export class Dispatcher {
    */
   public refreshRepository(repository: Repository): Promise<void> {
     return this.appStore._refreshOrRecoverRepository(repository)
+  }
+
+  /** Fetch a reviewed shallow-history recipe through Desktop authentication. */
+  public fetchRepositoryShallowHistory(
+    repository: Repository,
+    request: IRepositoryShallowHistoryFetchRequest,
+    signal?: AbortSignal
+  ): Promise<{ readonly usedFallbackAccount: boolean }> {
+    return this.appStore._fetchRepositoryShallowHistory(
+      repository,
+      request,
+      signal
+    )
   }
 
   /**
@@ -1443,6 +1494,37 @@ export class Dispatcher {
     this.appStore._requestDeleteWorktree(repository, worktreePath)
   }
 
+  /** Lock or unlock one exact registered linked worktree. */
+  public async setWorktreeLocked(
+    repository: Repository,
+    worktreePath: string,
+    locked: boolean
+  ): Promise<boolean> {
+    return this.appStore
+      ._setWorktreeLocked(repository, worktreePath, locked)
+      .then(() => true)
+      .catch(error => {
+        this.postError(error)
+        return false
+      })
+  }
+
+  /** Preview one bounded worktree maintenance operation. */
+  public async previewWorktreeMaintenance(
+    repository: Repository,
+    operation: WorktreeMaintenanceOperation
+  ): Promise<IWorktreeMaintenancePreview> {
+    return this.appStore._previewWorktreeMaintenance(repository, operation)
+  }
+
+  /** Execute one explicitly reviewed worktree maintenance operation. */
+  public async runWorktreeMaintenance(
+    repository: Repository,
+    operation: WorktreeMaintenanceOperation
+  ): Promise<IWorktreeMaintenancePreview> {
+    return this.appStore._runWorktreeMaintenance(repository, operation)
+  }
+
   /**
    * Set the width of the Push/Push toolbar button to the given value.
    * This affects the toolbar button and its dropdown element.
@@ -1965,6 +2047,15 @@ export class Dispatcher {
   /** Removes the remote that matches the given name. */
   public removeRemote(repository: Repository, name: string): Promise<void> {
     return this.appStore._removeRemote(repository, name)
+  }
+
+  /** Apply one explicitly confirmed, bounded Remote Manager plan. */
+  public applyRemoteManagementPlan(
+    repository: Repository,
+    plan: IRemoteManagementPlan,
+    options: IRemoteManagementApplyOptions
+  ): Promise<IRemoteManagementSnapshot> {
+    return this.appStore._applyRemoteManagementPlan(repository, plan, options)
   }
 
   /** Open the URL in a browser */
@@ -3170,6 +3261,31 @@ export class Dispatcher {
     return this.appStore._createPullRequest(repository, baseBranch)
   }
 
+  /** Continue the publish/push prerequisite flow in the native PR composer. */
+  public showCreateGitHubPullRequest(
+    repository: Repository,
+    branch: Branch,
+    baseBranch?: Branch
+  ): void {
+    this.appStore._showCreateGitHubPullRequest(repository, branch, baseBranch)
+  }
+
+  /** Open the native inspect/update/review/merge workbench. */
+  public showGitHubPullRequestLifecycle(
+    repository: Repository,
+    pullRequest: PullRequest
+  ): void {
+    this.appStore._showGitHubPullRequestLifecycle(repository, pullRequest)
+  }
+
+  /** Read bounded conventional templates from the exact local worktree. */
+  public loadGitHubPullRequestTemplates(
+    repository: Repository,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<IGitHubPullRequestTemplate>> {
+    return loadGitHubPullRequestTemplates(repository, signal)
+  }
+
   /**
    * Show the current pull request on github.com
    */
@@ -3191,9 +3307,18 @@ export class Dispatcher {
    */
   public openCreatePullRequestInBrowser(
     repository: Repository,
-    branch: Branch
-  ): Promise<void> {
-    return this.appStore._openCreatePullRequestInBrowser(repository, branch)
+    branch: Branch,
+    sourceRemote: IRemote | null,
+    baseBranchName?: string,
+    target?: GitHubRepository
+  ): Promise<boolean> {
+    return this.appStore._openCreatePullRequestInBrowser(
+      repository,
+      branch,
+      sourceRemote,
+      baseBranchName,
+      target
+    )
   }
 
   /**
@@ -3560,14 +3685,79 @@ export class Dispatcher {
     return this.appStore._createStashForCurrentBranch(repository)
   }
 
+  /** Create a named stash from a reviewed all/selected changes scope. */
+  public createManagedStash(
+    repository: Repository,
+    request: ICreateManagedStashRequest,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._createManagedStash(repository, request, signal)
+  }
+
+  /** Apply a stash without consuming its recovery entry. */
+  public applyStashKeepingEntry(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._applyStashKeepingEntry(repository, stashEntry, signal)
+  }
+
+  /** Rename and/or change the branch association of a managed stash. */
+  public updateManagedStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    request: IUpdateManagedStashRequest,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._updateManagedStash(
+      repository,
+      stashEntry,
+      request,
+      signal
+    )
+  }
+
+  /** Create and check out a new local branch from the selected stash. */
+  public createBranchFromManagedStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    branchName: string,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._createBranchFromManagedStash(
+      repository,
+      stashEntry,
+      branchName,
+      signal
+    )
+  }
+
+  /** Clear only the exact Desktop-managed stash identities reviewed by the user. */
+  public clearReviewedManagedStashes(
+    repository: Repository,
+    stashShas: ReadonlyArray<string>,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._clearReviewedManagedStashes(
+      repository,
+      stashShas,
+      signal
+    )
+  }
+
   /** Drops the given stash in the given repository */
   public dropStash(repository: Repository, stashEntry: IStashEntry) {
     return this.appStore._dropStashEntry(repository, stashEntry)
   }
 
   /** Pop the given stash in the given repository */
-  public popStash(repository: Repository, stashEntry: IStashEntry) {
-    return this.appStore._popStashEntry(repository, stashEntry)
+  public popStash(
+    repository: Repository,
+    stashEntry: IStashEntry,
+    signal?: AbortSignal
+  ) {
+    return this.appStore._popStashEntry(repository, stashEntry, signal)
   }
 
   /**
@@ -3631,6 +3821,246 @@ export class Dispatcher {
     } else {
       return false
     }
+  }
+
+  /** Create one issue through the selected repository-scoped GitHub account. */
+  public async createGitHubIssue(
+    repository: Repository,
+    account: Account,
+    title: string,
+    body: string,
+    signal: AbortSignal
+  ): Promise<ICreatedGitHubIssue> {
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new Error('This repository is not connected to GitHub.')
+    }
+
+    const target = getNonForkGitHubRepository(repository)
+    if (
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('No matching authenticated GitHub account is available.')
+    }
+    if (target.isArchived === true) {
+      throw new Error('Archived repositories cannot accept new issues.')
+    }
+    if (target.issuesEnabled === false) {
+      throw new Error('Issues are disabled for this repository.')
+    }
+
+    return API.fromAccount(account).createIssue(
+      target.owner.login,
+      target.name,
+      title,
+      body,
+      signal
+    )
+  }
+
+  /** Whether the repository and checked-out tip still match a PR review. */
+  public isGitHubPullRequestContextCurrent(
+    repository: Repository,
+    contextVersion: string
+  ): boolean {
+    return this.appStore._isGitHubPullRequestContextCurrent(
+      repository,
+      contextVersion
+    )
+  }
+
+  /** Create one reviewed pull request through the selected GitHub account. */
+  public async createGitHubPullRequest(
+    repository: Repository,
+    target: GitHubRepository,
+    account: Account,
+    currentBranch: Branch,
+    sourceRemote: IRemote | null,
+    providerHTMLURL: string,
+    contextVersion: string,
+    draft: IGitHubPullRequestDraft,
+    metadata: IGitHubPullRequestMetadata,
+    signal: AbortSignal
+  ): Promise<ICreatedGitHubPullRequest> {
+    if (
+      !this.appStore._isGitHubPullRequestContextCurrent(
+        repository,
+        contextVersion
+      )
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new Error('This repository is not connected to GitHub.')
+    }
+
+    const source = repository.gitHubRepository
+    if (providerHTMLURL !== getHTMLURL(source.endpoint)) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    const targetIsAllowed =
+      target.hash === source.hash || target.hash === source.parent?.hash
+    if (!targetIsAllowed || target.endpoint !== source.endpoint) {
+      throw new Error(
+        'The pull request target is not valid for this repository.'
+      )
+    }
+    if (target.isArchived === true) {
+      throw new Error('Archived repositories cannot accept pull requests.')
+    }
+    if (
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('No matching authenticated GitHub account is available.')
+    }
+
+    validateGitHubPullRequestDraftRouting(
+      source,
+      target,
+      currentBranch,
+      sourceRemote,
+      providerHTMLURL,
+      draft
+    )
+
+    return API.fromAccount(account).createPullRequest(
+      target.owner.login,
+      target.name,
+      draft.title,
+      draft.body,
+      draft.head,
+      draft.base,
+      draft.draft,
+      draft.headRepository,
+      signal,
+      metadata
+    )
+  }
+
+  private getGitHubPullRequestLifecycleTarget(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    mutation: boolean
+  ): GitHubRepository {
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new Error('This repository is not connected to GitHub.')
+    }
+    const target = pullRequest.base.gitHubRepository
+    validateGitHubPullRequestNumber(pullRequest.pullRequestNumber)
+    if (getNonForkGitHubRepository(repository).hash !== target.hash) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('No matching authenticated GitHub account is available.')
+    }
+    if (mutation && target.isArchived) {
+      throw new Error('Archived repositories cannot update pull requests.')
+    }
+    return target
+  }
+
+  public inspectGitHubPullRequest(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestLifecycle> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      false
+    )
+    return this.pullRequestLifecycleStore.inspect(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      signal
+    )
+  }
+
+  public async updateGitHubPullRequest(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    update: IGitHubPullRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    const receipt = await this.pullRequestLifecycleStore.update(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      update,
+      signal
+    )
+    void this.appStore._refreshPullRequests(repository)
+    return receipt
+  }
+
+  public submitGitHubPullRequestReview(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    review: IGitHubPullRequestReview,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestReviewReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    return this.pullRequestLifecycleStore.review(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      review,
+      signal
+    )
+  }
+
+  public async mergeGitHubPullRequest(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    method: GitHubPullRequestMergeMethod,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMergeReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    const receipt = await this.pullRequestLifecycleStore.merge(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      method,
+      signal
+    )
+    void this.appStore._refreshPullRequests(repository)
+    return receipt
   }
 
   public setRepositoryIndicatorsEnabled(repositoryIndicatorsEnabled: boolean) {

@@ -39,6 +39,7 @@ function createHarness(
   } as unknown as ActionsStore
   const view = new ActionsView({
     repository,
+    currentBranch: null,
     branchNames: [],
     actionsStore,
   })

@@ -10,10 +10,10 @@
  */
 
 /**
- * @typedef {import('@typescript-eslint/typescript-estree').TSESTree.ClassDeclaration} ClassDeclaration
- * @typedef {import('@typescript-eslint/typescript-estree').TSESTree.Node} Node
- * @typedef {import('@typescript-eslint/typescript-estree').TSESTree.Parameter} Parameter
- * @typedef {import("@typescript-eslint/typescript-estree").TSESTree.MethodDefinition} MethodDefinition
+ * @typedef {import('@typescript-eslint/experimental-utils').TSESTree.ClassDeclaration} ClassDeclaration
+ * @typedef {import('@typescript-eslint/experimental-utils').TSESTree.Node} Node
+ * @typedef {import('@typescript-eslint/experimental-utils').TSESTree.Parameter} Parameter
+ * @typedef {import("@typescript-eslint/experimental-utils").TSESTree.MethodDefinition} MethodDefinition
  * @typedef {import('@typescript-eslint/experimental-utils').TSESLint.RuleModule} RuleModule
  */
 

@@ -5,7 +5,10 @@ import * as octicons from '../octicons/octicons.generated'
 import { Repository } from '../../models/repository'
 import { ToolbarDropdown, DropdownState } from './dropdown'
 import { FoldoutType, IConstrainedValue } from '../../lib/app-state'
-import { WorktreeEntry } from '../../models/worktree'
+import {
+  WorktreeEntry,
+  WorktreeMaintenanceOperation,
+} from '../../models/worktree'
 import { WorktreeList } from '../worktrees/worktree-list'
 import { showContextualMenu, IMenuItem } from '../../lib/menu-item'
 import { generateWorktreeContextMenuItems } from '../worktrees/worktree-list-item-context-menu'
@@ -13,6 +16,7 @@ import { openRepositoryInNewWindow } from '../main-process-proxy'
 import { PopupType } from '../../models/popup'
 import { Resizable } from '../resizable'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
+import { WorktreeAdministration } from '../worktrees/worktree-administration'
 
 interface IWorktreeDropdownProps {
   readonly dispatcher: Dispatcher
@@ -58,6 +62,8 @@ export class WorktreeDropdown extends React.Component<
       isLocked: worktree.isLocked,
       onRenameWorktree: this.onRenameWorktree,
       onRemoveWorktree: this.onRemoveWorktree,
+      onLockWorktree: this.onLockWorktree,
+      onUnlockWorktree: this.onUnlockWorktree,
       onOpenInNewWindow: () => this.onOpenWorktreeInNewWindow(worktree.path),
     })
 
@@ -81,6 +87,22 @@ export class WorktreeDropdown extends React.Component<
   private onRemoveWorktree = (path: string) => {
     this.props.dispatcher.closeFoldout(FoldoutType.Worktree)
     this.props.dispatcher.requestDeleteWorktree(this.props.repository, path)
+  }
+
+  private onLockWorktree = (path: string) => {
+    void this.props.dispatcher.setWorktreeLocked(
+      this.props.repository,
+      path,
+      true
+    )
+  }
+
+  private onUnlockWorktree = (path: string) => {
+    void this.props.dispatcher.setWorktreeLocked(
+      this.props.repository,
+      path,
+      false
+    )
   }
 
   private onCreateNewWorktree = () => {
@@ -115,6 +137,8 @@ export class WorktreeDropdown extends React.Component<
       isMainWorktree: isMain,
       isLocked: currentWorktree.isLocked,
       onRemoveWorktree: isMain ? undefined : this.onRemoveWorktree,
+      onLockWorktree: this.onLockWorktree,
+      onUnlockWorktree: this.onUnlockWorktree,
       onOpenInNewWindow: () =>
         this.onOpenWorktreeInNewWindow(currentWorktree.path),
     })
@@ -131,6 +155,26 @@ export class WorktreeDropdown extends React.Component<
     this.setState({ filterText: text })
   }
 
+  private onPreviewMaintenance = (operation: WorktreeMaintenanceOperation) =>
+    this.props.dispatcher.previewWorktreeMaintenance(
+      this.props.repository,
+      operation
+    )
+
+  private onRunMaintenance = (operation: WorktreeMaintenanceOperation) =>
+    this.props.dispatcher.runWorktreeMaintenance(
+      this.props.repository,
+      operation
+    )
+
+  private renderAdministration = () => (
+    <WorktreeAdministration
+      repositoryPath={this.props.repository.path}
+      onPreview={this.onPreviewMaintenance}
+      onRun={this.onRunMaintenance}
+    />
+  )
+
   private renderWorktreeFoldout = (): JSX.Element | null => {
     const { worktrees } = this.props
 
@@ -145,6 +189,7 @@ export class WorktreeDropdown extends React.Component<
         onCreateNewWorktree={this.onCreateNewWorktree}
         onMergeAllWorktrees={this.onMergeAllWorktrees}
         onWorktreeContextMenu={this.onWorktreeContextMenu}
+        renderAdministration={this.renderAdministration}
       />
     )
   }

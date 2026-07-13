@@ -110,8 +110,8 @@
       <!-- ================= Features ================= -->
       <section class="features" id="features">
         <div class="wrap">
-          <span class="eyebrow">Shipped today</span>
-          <h2 class="section-title">A Material Design 3 shell, live now</h2>
+          <span class="eyebrow">Published foundation</span>
+          <h2 class="section-title">A Material Design 3 shell</h2>
           <p class="section-sub">
             Everything below is implemented and on <code>main</code> — the full
             GitHub Desktop workflow, rebuilt around Material Design 3.
@@ -179,22 +179,26 @@
           </div>
 
           <span class="eyebrow" style="margin-top: 3rem">Power features</span>
-          <h2 class="section-title">Shipped for real-world Git work</h2>
+          <h2 class="section-title">Power features for real-world Git work</h2>
           <p class="section-sub">
-            These features are implemented on <code>main</code>. Their design
-            and verification history is tracked in the project's
+            The original M0–M18 foundation is published on <code>main</code>.
+            The guided M19 implementation is integrated in the current source
+            tree and awaits final production/off-screen acceptance and
+            promotion. Its exact status is tracked in the project's
             <a
               href="https://github.com/codingmachineedge/desktop-material/blob/main/PLAN.md"
               >plan</a
-            >.
+            >. Git and GitHub capabilities appear as named, guided workflows—not
+            a searchable dump of commands or API endpoints.
           </p>
           <div class="feature-grid">
             <article class="card">
               <div class="glyph" aria-hidden="true">🔔</div>
               <h3>Notification centre <span class="tag">Shipped</span></h3>
               <p>
-                A bell and side panel backed by its own local git repo — unread
-                badges, mark read/unread, delete, and recoverable history.
+                A Git-backed Local view plus an account-aware GitHub inbox with
+                All, Unread, and participating-only controls and a complete
+                signed-out state.
               </p>
             </article>
 
@@ -231,6 +235,31 @@
             </article>
 
             <article class="card">
+              <div class="glyph" aria-hidden="true">↘</div>
+              <h3>
+                Guided repository functions <span class="tag">Shipped</span>
+              </h3>
+              <p>
+                Shallow-clone with a commit-depth field, then deepen history
+                later from Repository tools; manage cone-mode sparse checkout
+                with validation and an explicit review step.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">⑂</div>
+              <h3>
+                Guided Git administration <span class="tag">Integrated</span>
+              </h3>
+              <p>
+                Review patch series and commit rewrites; configure signing and
+                LFS; administer worktrees, branches, stashes, remotes, hooks,
+                bisect sessions, and exact merge-tree conflict previews through
+                named, bounded workflows.
+              </p>
+            </article>
+
+            <article class="card">
               <div class="glyph" aria-hidden="true">⚡</div>
               <h3>Automation <span class="tag">Shipped</span></h3>
               <p>
@@ -251,6 +280,19 @@
             </article>
 
             <article class="card">
+              <div class="glyph" aria-hidden="true">◫</div>
+              <h3>
+                GitHub lifecycle workspaces <span class="tag">Integrated</span>
+              </h3>
+              <p>
+                Compose and manage pull requests; page and safely download
+                Actions artifacts; inspect effective branch rules; and manage
+                Releases, assets, and richer Issues with exact-account,
+                repository-bound review state.
+              </p>
+            </article>
+
+            <article class="card">
               <div class="glyph" aria-hidden="true">🤖</div>
               <h3>Agent access &amp; CLI <span class="tag">Shipped</span></h3>
               <p>
@@ -267,6 +309,19 @@
                 Use multiple GitHub identities, self-hosted GitLab endpoints
                 with PATs, and Bitbucket app passwords; browse and clone each
                 provider's repositories without exposing credentials.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">⌁</div>
+              <h3>
+                Provider-neutral triage <span class="tag">Integrated</span>
+              </h3>
+              <p>
+                Triage bounded Issue and pull-request summaries for the exact
+                GitHub, GitLab, or Bitbucket account and repository, with safe
+                links and explicit unsupported, partial, capped, and error
+                states.
               </p>
             </article>
 
@@ -300,7 +355,14 @@
         <div class="wrap">
           <span class="eyebrow">Take a look</span>
           <h2 class="section-title">Screenshots</h2>
-          <p class="section-sub">Click any image to open it full size.</p>
+          <p class="section-sub">
+            Click any image to open it full size. Guided task forms wrap text
+            and stack controls as space narrows, avoiding page-level sideways
+            scrolling; spatial code, diff, and log content is the exception. The
+            guided entries use synthetic fixture data. Gallery inclusion does
+            not pre-claim final <code>main</code>, CI, Pages, wiki, installer,
+            release, or cleanup completion.
+          </p>
           <div class="gallery-grid">
             <figure class="shot">
               <a
@@ -405,6 +467,23 @@
 
             <figure class="shot">
               <a
+                href="../docs/assets/screenshots/material-shallow-clone-safe.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-shallow-clone-safe.png"
+                  alt="Reviewed shallow clone with a bounded commit depth"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Shallow clone <span class="tag">Depth · reviewed</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
                 href="../docs/assets/screenshots/material-pull-all-account-fallback.png"
                 target="_blank"
                 rel="noopener"
@@ -441,6 +520,40 @@
 
             <figure class="shot">
               <a
+                href="../docs/assets/screenshots/material-history-deepen.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-history-deepen.png"
+                  alt="Deepen-history result without displaying the signed-in account used"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Deepen history <span class="tag">Bounded · account-safe</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-sparse-checkout-safe.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-sparse-checkout-safe.png"
+                  alt="Validated cone-mode sparse-checkout review"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Sparse checkout <span class="tag">Cone mode · validated</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
                 href="../docs/assets/screenshots/material-automation.png"
                 target="_blank"
                 rel="noopener"
@@ -458,18 +571,18 @@
 
             <figure class="shot">
               <a
-                href="../docs/assets/screenshots/material-notification-center.png"
+                href="../docs/assets/screenshots/material-github-notifications.png"
                 target="_blank"
                 rel="noopener"
               >
                 <img
-                  src="../docs/assets/screenshots/material-notification-center.png"
-                  alt="Git-backed notification centre with unread and history controls"
+                  src="../docs/assets/screenshots/material-github-notifications.png"
+                  alt="GitHub notifications view with account selection, inbox filters, and the no-signed-in-account state"
                   loading="lazy"
                 />
               </a>
               <figcaption>
-                Notifications <span class="tag">Git-backed</span>
+                GitHub notifications <span class="tag">Account-aware</span>
               </figcaption>
             </figure>
 
@@ -609,6 +722,143 @@
                 <span class="tag">Secure redirect · searchable</span>
               </figcaption>
             </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-actions-artifact-download.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-actions-artifact-download.png"
+                  alt="Bounded Actions artifact download with a locally computed digest"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Actions artifact
+                <span class="tag">Digest · bounded transfer</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-repository-tools.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-repository-tools.png"
+                  alt="Named Repository Tools administration hub"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Repository tools <span class="tag">Named · guided</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-stash-manager.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-stash-manager.png"
+                  alt="Repository-wide stash manager with an exact selected entry"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Stash manager <span class="tag">Inspect · exact entry</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-remote-manager.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-remote-manager.png"
+                  alt="Reviewed named-remote administration"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Remote manager <span class="tag">Named · reviewed</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-native-pull-request.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-native-pull-request.png"
+                  alt="Native pull-request creation with bounded metadata"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Pull request <span class="tag">Template · metadata</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-github-releases.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-github-releases.png"
+                  alt="Repository-bound Releases and assets workspace"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Releases <span class="tag">Assets · bounded</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-github-issues.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-github-issues.png"
+                  alt="Issue detail, comments, and reviewed lifecycle controls"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Issues <span class="tag">Detail · comments</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="../docs/assets/screenshots/material-provider-triage.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="../docs/assets/screenshots/material-provider-triage.png"
+                  alt="Account- and repository-bound provider triage with bounded results"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Provider triage <span class="tag">Bounded · exact scope</span>
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -619,9 +869,9 @@
           <div class="cta-card">
             <h2>Build with Desktop Material</h2>
             <p>
-              Clone the repo, follow the wiki, and try the completed M0–M18
-              Material roadmap. Contributions and follow-on refinements are
-              welcome.
+              Clone the repo, follow the wiki, and review the M0–M19 feature and
+              acceptance ledger. The plan distinguishes implementation from
+              exact-tree production, publication, and cleanup evidence.
             </p>
             <div class="hero-cta">
               <a

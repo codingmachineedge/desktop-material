@@ -96,6 +96,20 @@ describe('BranchListItem', () => {
     )
   })
 
+  it('exposes a pinned branch indicator', () => {
+    render(
+      <BranchListItem
+        name="release"
+        isCurrentBranch={false}
+        isPinned={true}
+        matches={noMatches}
+        authorDate={undefined}
+      />
+    )
+
+    assert.equal(screen.getByLabelText('Pinned branch').tagName, 'svg')
+  })
+
   it('drops dragged commits onto the current branch callback', () => {
     let droppedOnCurrentBranch = 0
 

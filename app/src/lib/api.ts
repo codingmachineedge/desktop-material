@@ -28,6 +28,130 @@ import {
 import { HttpStatusCode } from './http-status-code'
 import { CopilotError, parseCopilotPaymentRequiredError } from './copilot-error'
 import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-dialog'
+import {
+  IAPICreatedGitHubIssue,
+  ICreatedGitHubIssue,
+  normalizeGitHubIssueDraft,
+  validateCreatedGitHubIssue,
+  validateGitHubRepositoryPart,
+} from './github-issue'
+import { boundedGitHubIssueResponse } from './github-issue-json'
+import {
+  GitHubIssueCommentMaximumPages,
+  GitHubIssueCommentPageSize,
+  GitHubIssueMetadataMaximumPages,
+  GitHubIssueMetadataPageSize,
+  GitHubIssuePageSize,
+  GitHubIssueState,
+  IGitHubIssue,
+  IGitHubIssueComment,
+  IGitHubIssueCommentList,
+  IGitHubIssueList,
+  IGitHubIssueMetadata,
+  IGitHubIssueQuery,
+  IGitHubIssueUpdate,
+  normalizeGitHubIssueComment,
+  normalizeGitHubIssueQuery,
+  normalizeGitHubIssueUpdate,
+  parseGitHubIssue,
+  parseGitHubIssueAssigneePage,
+  parseGitHubIssueComment,
+  parseGitHubIssueCommentList,
+  parseGitHubIssueLabelPage,
+  parseGitHubIssueList,
+  parseGitHubIssueMilestonePage,
+  validateGitHubIssueNumber,
+  validateGitHubIssueRepositoryPart,
+} from './github-issues'
+import {
+  EmptyGitHubPullRequestMetadata,
+  GitHubPullRequestContextChangedError,
+  IAPICreatedGitHubPullRequest,
+  IAPIGitHubPullRequestLifecycle,
+  ICreatedGitHubPullRequest,
+  IGitHubPullRequestLifecycle,
+  IGitHubPullRequestMergeReceipt,
+  IGitHubPullRequestMetadata,
+  IGitHubPullRequestMutationReceipt,
+  IGitHubPullRequestReview,
+  IGitHubPullRequestReviewReceipt,
+  IGitHubPullRequestUpdate,
+  IGitHubPullRequestHeadRepository,
+  GitHubPullRequestMergeMethod,
+  normalizeGitHubPullRequestDraft,
+  normalizeGitHubPullRequestMetadata,
+  normalizeGitHubPullRequestReview,
+  normalizeGitHubPullRequestUpdate,
+  validateCreatedGitHubPullRequest,
+  validateGitHubPullRequestHeadSHA,
+  validateGitHubPullRequestLifecycle,
+  validateGitHubPullRequestMergeReceipt,
+  validateGitHubPullRequestNumber,
+  validateGitHubPullRequestReviewReceipt,
+} from './github-pull-request'
+import { boundedGitHubPullRequestResponse } from './github-pull-request-json'
+import {
+  ActionsArtifactMaximumPages,
+  ActionsArtifactPageSize,
+  IActionsArtifactList,
+  isSupportedActionsArtifactDigest,
+  parseActionsArtifactAttestationPresence,
+  parseActionsArtifactList,
+  validateActionsArtifactIdentifier,
+} from './actions-artifacts'
+import {
+  ActionsArtifactJSONError,
+  parseBoundedActionsArtifactAPIError,
+  readBoundedActionsArtifactJSON,
+} from './actions-artifact-json'
+import {
+  ActionsBranchRuleMaximumPages,
+  ActionsBranchRulePageSize,
+  IActionsBranchRuleList,
+  parseActionsBranchRulePage,
+  validateActionsBranchName,
+} from './actions-branch-rules'
+import { createGitHubAPIRequestHeaders } from './github-rest-api-version'
+import { boundedGitHubReleaseResponse } from './github-release-json'
+import {
+  IAPIProviderTriagePage,
+  normalizeProviderTriageLimit,
+  validateProviderTriageCoordinate,
+} from './provider-triage'
+import {
+  boundedProviderTriageResponse,
+  parseBitbucketTriagePullRequests,
+  parseGitHubTriageIssues,
+  parseGitHubTriagePullRequests,
+  parseGitLabTriageIssues,
+  parseGitLabTriagePullRequests,
+} from './provider-triage-json'
+import {
+  GitHubReleaseAssetMaximumPages,
+  GitHubReleaseAssetPageSize,
+  GitHubReleaseMaximumPages,
+  GitHubReleasePageSize,
+  IGitHubRelease,
+  IGitHubReleaseAsset,
+  IGitHubReleaseAssetList,
+  IGitHubReleaseDraft,
+  IGitHubReleaseList,
+  IGitHubReleaseUpdate,
+  normalizeGitHubReleaseDraft,
+  normalizeGitHubReleaseUpdate,
+  parseGitHubRelease,
+  parseGitHubReleaseAsset,
+  parseGitHubReleaseAssetList,
+  parseGitHubReleaseList,
+  validateGitHubReleaseIdentifier,
+  validateGitHubReleaseRepositoryPart,
+} from './github-releases'
+export {
+  createGitHubAPIRequestHeaders,
+  getGitHubRESTAPIVersion,
+  GitHubDotComRESTAPIVersion,
+  GitHubRESTAPIVersionHeader,
+} from './github-rest-api-version'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
 const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
@@ -338,6 +462,55 @@ export interface IAPIEmail {
   readonly visibility: EmailVisibility
 }
 
+/** A notification subject returned by the authenticated-user inbox API. */
+export interface IAPINotificationSubject {
+  readonly title: string
+  readonly url: string | null
+  readonly latest_comment_url: string | null
+  readonly type: string
+}
+
+/** Repository metadata embedded in a GitHub notification thread. */
+export interface IAPINotificationRepository {
+  readonly id: number
+  readonly name: string
+  readonly full_name: string
+  readonly private: boolean
+  readonly owner: IAPIIdentity
+  readonly html_url: string
+}
+
+/** A thread returned by `GET /notifications`. */
+export interface IAPINotificationThread {
+  readonly id: string
+  readonly repository: IAPINotificationRepository
+  readonly subject: IAPINotificationSubject
+  readonly reason: string
+  readonly unread: boolean
+  readonly updated_at: string
+  readonly last_read_at: string | null
+  readonly url: string
+  readonly subscription_url: string
+}
+
+export interface IAPINotificationsOptions {
+  readonly includeRead: boolean
+  readonly participating: boolean
+  readonly page: number
+  readonly perPage?: number
+  readonly lastModified?: string | null
+  readonly signal?: AbortSignal
+}
+
+/** One bounded page of authenticated-user notification threads. */
+export interface IAPINotificationsPage {
+  readonly notifications: ReadonlyArray<IAPINotificationThread>
+  readonly hasNextPage: boolean
+  readonly notModified: boolean
+  readonly lastModified: string | null
+  readonly pollIntervalSeconds: number | null
+}
+
 /** Information about an issue as returned by the GitHub API. */
 export interface IAPIIssue {
   readonly number: number
@@ -515,10 +688,6 @@ export interface IAPIWorkflowJobStep {
   readonly started_at: string
   readonly log: string
 }
-
-export const ActionsLogMaximumBytes = 5 * 1024 * 1024
-export const ActionsLogTruncationMarker =
-  '\n\n--- Log truncated after 5 MB by Desktop Material ---\n'
 
 /** Protected branch information returned by the GitHub API */
 export interface IAPIPushControl {
@@ -867,6 +1036,25 @@ export interface IAPICreatePushProtectionBypassResponse {
   token_type: string
 }
 
+async function boundedActionsArtifactResponse(
+  response: Response,
+  signal?: AbortSignal
+): Promise<unknown> {
+  let value: unknown
+  try {
+    value = await readBoundedActionsArtifactJSON(response, signal)
+  } catch (error) {
+    if (!response.ok && error instanceof ActionsArtifactJSONError) {
+      throw new APIError(response, null)
+    }
+    throw error
+  }
+  if (!response.ok) {
+    throw new APIError(response, parseBoundedActionsArtifactAPIError(value))
+  }
+  return value
+}
+
 /**
  * An object for making authenticated requests to the GitHub API
  */
@@ -1145,6 +1333,89 @@ export class API {
     }
   }
 
+  /** Fetch one bounded page from the authenticated user's GitHub inbox. */
+  public async fetchNotifications(
+    options: IAPINotificationsOptions
+  ): Promise<IAPINotificationsPage> {
+    const page = Math.max(1, Math.trunc(options.page))
+    const perPage = Math.max(1, Math.min(50, options.perPage ?? 50))
+    const path = urlWithQueryString('notifications', {
+      all: String(options.includeRead),
+      participating: String(options.participating),
+      per_page: String(perPage),
+      page: String(page),
+    })
+    const customHeaders = new Headers({
+      Accept: 'application/vnd.github+json',
+    })
+    if (options.lastModified) {
+      customHeaders.set('If-Modified-Since', options.lastModified)
+    }
+
+    const response = await this.ghRequest('GET', path, {
+      customHeaders,
+      signal: options.signal,
+    })
+    const lastModified = response.headers.get('Last-Modified')
+    const rawPollInterval = response.headers.get('X-Poll-Interval')
+    const parsedPollInterval =
+      rawPollInterval === null ? NaN : Number.parseInt(rawPollInterval, 10)
+    const pollIntervalSeconds = Number.isFinite(parsedPollInterval)
+      ? parsedPollInterval
+      : null
+
+    if (response.status === HttpStatusCode.NotModified) {
+      return {
+        notifications: [],
+        hasNextPage: false,
+        notModified: true,
+        lastModified: lastModified ?? options.lastModified ?? null,
+        pollIntervalSeconds,
+      }
+    }
+
+    const notifications = await parsedResponse<
+      ReadonlyArray<IAPINotificationThread>
+    >(response)
+    return {
+      notifications,
+      hasNextPage: getNextPagePathFromLink(response) !== null,
+      notModified: false,
+      lastModified,
+      pollIntervalSeconds,
+    }
+  }
+
+  /** Mark exactly one GitHub notification thread as read. */
+  public async markNotificationThreadRead(
+    threadId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const response = await this.ghRequest(
+      'PATCH',
+      `notifications/threads/${encodeURIComponent(threadId)}`,
+      { signal }
+    )
+    if (!response.ok && response.status !== HttpStatusCode.NotModified) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Mark exactly one GitHub notification thread as done. */
+  public async markNotificationThreadDone(
+    threadId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const response = await this.ghRequest(
+      'DELETE',
+      `notifications/threads/${encodeURIComponent(threadId)}`,
+      { signal }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
   /** Fetch all the orgs to which the user belongs. */
   public async fetchOrgs(): Promise<ReadonlyArray<IAPIOrganization>> {
     try {
@@ -1252,11 +1523,847 @@ export class API {
       const issues = await this.fetchAll<IAPIIssue>(url)
 
       // PRs are issues! But we only want Really Seriously Issues.
-      return issues.filter((i: any) => !i.pullRequest)
+      return issues.filter(
+        (i: any) => i.pull_request === undefined && i.pullRequest === undefined
+      )
     } catch (e) {
       log.warn(`fetchIssues: failed for repository ${owner}/${name}`, e)
       throw e
     }
+  }
+
+  /**
+   * Fetch at most one reviewed page of open issues for provider-neutral
+   * triage. Unlike the legacy issue cache, this never walks unbounded pages.
+   */
+  public async fetchProviderTriageIssues(
+    owner: string,
+    name: string,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<IAPIProviderTriagePage> {
+    signal?.throwIfAborted()
+    const safeLimit = normalizeProviderTriageLimit(limit)
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const path = urlWithQueryString(
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues`,
+      {
+        state: 'open',
+        sort: 'updated',
+        direction: 'desc',
+        page: '1',
+        per_page: String(safeLimit),
+      }
+    )
+    const response = await this.ghRequest('GET', path, { signal })
+    const issues = parseGitHubTriageIssues(
+      await boundedProviderTriageResponse(response, signal),
+      safeLimit
+    )
+    return {
+      supported: true,
+      capped:
+        getNextPagePathFromLink(response) !== null ||
+        issues.length === safeLimit,
+      items: issues,
+    }
+  }
+
+  /** Fetch one bounded, cancellable page of open pull requests for triage. */
+  public async fetchProviderTriagePullRequests(
+    owner: string,
+    name: string,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<IAPIProviderTriagePage> {
+    signal?.throwIfAborted()
+    const safeLimit = normalizeProviderTriageLimit(limit)
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const path = urlWithQueryString(
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls`,
+      {
+        state: 'open',
+        sort: 'updated',
+        direction: 'desc',
+        page: '1',
+        per_page: String(safeLimit),
+      }
+    )
+    const response = await this.ghRequest('GET', path, { signal })
+    const values = parseGitHubTriagePullRequests(
+      await boundedProviderTriageResponse(response, signal),
+      safeLimit
+    )
+    return {
+      supported: true,
+      capped:
+        getNextPagePathFromLink(response) !== null ||
+        values.length === safeLimit,
+      items: values,
+    }
+  }
+
+  /**
+   * Create one issue using the bounded fields exposed by the guided Desktop
+   * flow. The response URL is validated against this client's provider before
+   * it is returned to a caller that may offer to open it.
+   */
+  public async createIssue(
+    owner: string,
+    name: string,
+    title: string,
+    body: string,
+    signal?: AbortSignal
+  ): Promise<ICreatedGitHubIssue> {
+    signal?.throwIfAborted()
+
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const draft = normalizeGitHubIssueDraft(title, body)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/issues`
+    const response = await this.ghRequest('POST', path, {
+      body: draft,
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const issue = await parsedResponse<IAPICreatedGitHubIssue>(response)
+
+    return validateCreatedGitHubIssue(
+      issue,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /**
+   * Browse one locally generated, bounded page of repository issues. Search
+   * text is quoted inside the repository-scoped query so it cannot introduce
+   * provider qualifiers or escape the selected repository.
+   */
+  public async fetchIssuePage(
+    owner: string,
+    name: string,
+    query: IGitHubIssueQuery,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueList> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeQuery = normalizeGitHubIssueQuery(query)
+    const parameters = new URL.URLSearchParams()
+    parameters.set('per_page', `${GitHubIssuePageSize}`)
+    parameters.set('page', `${safeQuery.page}`)
+    parameters.set('sort', safeQuery.sort)
+    parameters.set('direction', safeQuery.direction)
+
+    let path: string
+    if (safeQuery.search.length > 0) {
+      const quote = (value: string) => `"${value.replace(/["\\]/g, '\\$&')}"`
+      const qualifiers = [
+        `repo:${safeOwner}/${safeName}`,
+        'is:issue',
+        safeQuery.state === 'all' ? null : `is:${safeQuery.state}`,
+        ...safeQuery.labels.map(label => `label:${quote(label)}`),
+        safeQuery.assignee === null
+          ? null
+          : `assignee:${quote(safeQuery.assignee)}`,
+        safeQuery.milestone === null
+          ? null
+          : `milestone:${safeQuery.milestone}`,
+        `in:title,body ${quote(safeQuery.search)}`,
+      ].filter((item): item is string => item !== null)
+      parameters.set('q', qualifiers.join(' '))
+      parameters.set('order', safeQuery.direction)
+      parameters.delete('direction')
+      path = `search/issues?${parameters.toString()}`
+    } else {
+      parameters.set('state', safeQuery.state)
+      if (safeQuery.labels.length > 0) {
+        parameters.set('labels', safeQuery.labels.join(','))
+      }
+      if (safeQuery.assignee !== null) {
+        parameters.set('assignee', safeQuery.assignee)
+      }
+      if (safeQuery.milestone !== null) {
+        parameters.set('milestone', `${safeQuery.milestone}`)
+      }
+      path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues?${parameters.toString()}`
+    }
+
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubIssueList(
+      await boundedGitHubIssueResponse(response, signal),
+      safeQuery,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Re-fetch one exact issue through the bounded parser before mutation. */
+  public async fetchIssue(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssue> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}`,
+      { signal }
+    )
+    return parseGitHubIssue(
+      await boundedGitHubIssueResponse(response, signal),
+      safeNumber,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Browse one bounded page of comments for an exact issue. */
+  public async fetchIssueCommentPage(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueCommentList> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > GitHubIssueCommentMaximumPages
+    ) {
+      throw new Error(
+        'The requested issue comment page exceeds the app safety limit.'
+      )
+    }
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}/comments?per_page=${GitHubIssueCommentPageSize}&page=${page}`,
+      { signal }
+    )
+    return parseGitHubIssueCommentList(
+      await boundedGitHubIssueResponse(response, signal),
+      page,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /**
+   * Load repository metadata through locally generated pages. Older GHES
+   * versions may omit one endpoint; only explicit 404/410 responses are
+   * reported neutrally as unavailable because it may indicate provider version
+   * or repository access changes.
+   */
+  public async fetchIssueMetadata(
+    owner: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueMetadata> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}`
+    const unavailable = new Array<'labels' | 'assignees' | 'milestones'>()
+
+    const fetchPages = async <T>(
+      kind: 'labels' | 'assignees' | 'milestones',
+      parser: (value: unknown) => ReadonlyArray<T>
+    ): Promise<{
+      readonly items: ReadonlyArray<T>
+      readonly capped: boolean
+    }> => {
+      const items = new Array<T>()
+      try {
+        for (let page = 1; page <= GitHubIssueMetadataMaximumPages; page++) {
+          const state = kind === 'milestones' ? 'state=all&' : ''
+          const response = await this.ghRequest(
+            'GET',
+            `${root}/${kind}?${state}per_page=${GitHubIssueMetadataPageSize}&page=${page}`,
+            { signal }
+          )
+          const parsed = parser(
+            await boundedGitHubIssueResponse(response, signal)
+          )
+          items.push(...parsed)
+          if (parsed.length < GitHubIssueMetadataPageSize) {
+            return { items, capped: false }
+          }
+          if (page === GitHubIssueMetadataMaximumPages) {
+            return { items, capped: true }
+          }
+        }
+      } catch (error) {
+        if (
+          error instanceof APIError &&
+          (error.responseStatus === 404 || error.responseStatus === 410)
+        ) {
+          unavailable.push(kind)
+          return { items: [], capped: false }
+        }
+        throw error
+      }
+      return { items, capped: false }
+    }
+
+    const labels = await fetchPages('labels', parseGitHubIssueLabelPage)
+    const assignees = await fetchPages(
+      'assignees',
+      parseGitHubIssueAssigneePage
+    )
+    const milestones = await fetchPages(
+      'milestones',
+      parseGitHubIssueMilestonePage
+    )
+    if (
+      new Set(labels.items.map(label => label.id)).size !==
+        labels.items.length ||
+      new Set(assignees.items).size !== assignees.items.length ||
+      new Set(milestones.items.map(milestone => milestone.number)).size !==
+        milestones.items.length
+    ) {
+      throw new Error('GitHub returned duplicate issue metadata pages.')
+    }
+    return {
+      labels: labels.items,
+      assignees: assignees.items,
+      milestones: milestones.items,
+      labelsCapped: labels.capped,
+      assigneesCapped: assignees.capped,
+      milestonesCapped: milestones.capped,
+      unavailable,
+    }
+  }
+
+  /** Update the reviewed issue's title, body, and supported metadata. */
+  public async updateIssue(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    update: IGitHubIssueUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssue> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    const safeUpdate = normalizeGitHubIssueUpdate(update)
+    const response = await this.ghRequest(
+      'PATCH',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}`,
+      {
+        body: {
+          title: safeUpdate.title,
+          body: safeUpdate.body,
+          labels: safeUpdate.labels,
+          assignees: safeUpdate.assignees,
+          milestone: safeUpdate.milestone,
+        },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    return parseGitHubIssue(
+      await boundedGitHubIssueResponse(response, signal),
+      safeNumber,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Close or reopen one reviewed issue. */
+  public async setIssueState(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    state: GitHubIssueState,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssue> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    if (state !== 'open' && state !== 'closed') {
+      throw new Error('Choose a supported issue state.')
+    }
+    const response = await this.ghRequest(
+      'PATCH',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}`,
+      {
+        body: { state },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const issue = parseGitHubIssue(
+      await boundedGitHubIssueResponse(response, signal),
+      safeNumber,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint)
+    )
+    if (issue.state !== state) {
+      throw new Error('GitHub did not apply the reviewed issue state.')
+    }
+    return issue
+  }
+
+  /** Append one reviewed comment and validate its provider link. */
+  public async addIssueComment(
+    owner: string,
+    name: string,
+    issueNumber: number,
+    body: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubIssueComment> {
+    const safeOwner = validateGitHubIssueRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubIssueRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubIssueNumber(issueNumber)
+    const safeBody = normalizeGitHubIssueComment(body)
+    const response = await this.ghRequest(
+      'POST',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/issues/${safeNumber}/comments`,
+      {
+        body: { body: safeBody },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    return parseGitHubIssueComment(
+      await boundedGitHubIssueResponse(response, signal),
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /**
+   * Create one pull request using only the reviewed fields exposed by the
+   * guided Desktop flow. The returned browser URL is constrained to this
+   * client's provider and the exact target repository and PR number.
+   */
+  public async createPullRequest(
+    owner: string,
+    name: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string,
+    draft: boolean,
+    headRepository: IGitHubPullRequestHeadRepository,
+    signal?: AbortSignal,
+    metadata: IGitHubPullRequestMetadata = EmptyGitHubPullRequestMetadata
+  ): Promise<ICreatedGitHubPullRequest> {
+    signal?.throwIfAborted()
+
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const pullRequest = normalizeGitHubPullRequestDraft(
+      title,
+      body,
+      head,
+      base,
+      draft,
+      headRepository
+    )
+    const safeMetadata = normalizeGitHubPullRequestMetadata(
+      metadata.reviewers,
+      metadata.assignees,
+      metadata.labels
+    )
+    const requestBody = {
+      title: pullRequest.title,
+      body: pullRequest.body,
+      head: pullRequest.head,
+      ...(pullRequest.headRepository.name === null
+        ? {}
+        : { head_repo: pullRequest.headRepository.name }),
+      base: pullRequest.base,
+      draft: pullRequest.draft,
+    }
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/pulls`
+    const response = await this.ghRequest('POST', path, {
+      body: requestBody,
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const created = (await boundedGitHubPullRequestResponse(
+      response,
+      signal
+    )) as IAPICreatedGitHubPullRequest
+    const validated = validateCreatedGitHubPullRequest(
+      created,
+      safeOwner,
+      safeName,
+      getHTMLURL(this.endpoint),
+      pullRequest
+    )
+    const metadataWarnings = await this.applyCreatedPullRequestMetadata(
+      safeOwner,
+      safeName,
+      validated.number,
+      safeMetadata,
+      signal
+    )
+    return metadataWarnings.length === 0
+      ? validated
+      : { ...validated, metadataWarnings }
+  }
+
+  private async applyCreatedPullRequestMetadata(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    metadata: IGitHubPullRequestMetadata,
+    signal?: AbortSignal
+  ): Promise<ReadonlyArray<string>> {
+    const warnings = new Array<string>()
+    const root = `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      name
+    )}`
+
+    if (metadata.reviewers.length > 0) {
+      try {
+        const response = await this.ghRequest(
+          'POST',
+          `${root}/pulls/${pullRequestNumber}/requested_reviewers`,
+          {
+            body: { reviewers: metadata.reviewers },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await boundedGitHubPullRequestResponse(response, signal)
+      } catch {
+        warnings.push(
+          'The pull request was created, but reviewers were not requested.'
+        )
+      }
+    }
+
+    if (metadata.assignees.length > 0 || metadata.labels.length > 0) {
+      try {
+        const response = await this.ghRequest(
+          'PATCH',
+          `${root}/issues/${pullRequestNumber}`,
+          {
+            body: {
+              assignees: metadata.assignees,
+              labels: metadata.labels,
+            },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await boundedGitHubPullRequestResponse(response, signal)
+      } catch {
+        warnings.push(
+          'The pull request was created, but assignees or labels were not applied.'
+        )
+      }
+    }
+    return warnings
+  }
+
+  /** Load one exact pull request for the native lifecycle workbench. */
+  public async inspectPullRequest(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestLifecycle> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}`,
+      {
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const value = (await boundedGitHubPullRequestResponse(
+      response,
+      signal
+    )) as IAPIGitHubPullRequestLifecycle
+    return validateGitHubPullRequestLifecycle(
+      value,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Update reviewed PR fields and exact metadata lists for one head snapshot. */
+  public async updatePullRequestLifecycle(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    update: IGitHubPullRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    const safeUpdate = normalizeGitHubPullRequestUpdate(
+      update.title,
+      update.body,
+      update.base,
+      update.metadata
+    )
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (current.state !== 'open' || current.merged) {
+      throw new Error('Only an open pull request can be updated.')
+    }
+
+    const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}`
+    const response = await this.ghRequest(
+      'PATCH',
+      `${root}/pulls/${safeNumber}`,
+      {
+        body: {
+          title: safeUpdate.title,
+          body: safeUpdate.body,
+          base: safeUpdate.base,
+        },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const updatedValue = (await boundedGitHubPullRequestResponse(
+      response,
+      signal
+    )) as IAPIGitHubPullRequestLifecycle
+    validateGitHubPullRequestLifecycle(
+      updatedValue,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+
+    const warnings = new Array<string>()
+    const currentReviewerKeys = new Set(
+      current.metadata.reviewers.map(login => login.toLowerCase())
+    )
+    const requestedReviewerKeys = new Set(
+      safeUpdate.metadata.reviewers.map(login => login.toLowerCase())
+    )
+    const reviewersToAdd = safeUpdate.metadata.reviewers.filter(
+      login => !currentReviewerKeys.has(login.toLowerCase())
+    )
+    const reviewersToRemove = current.metadata.reviewers.filter(
+      login => !requestedReviewerKeys.has(login.toLowerCase())
+    )
+    try {
+      if (reviewersToAdd.length > 0) {
+        const addResponse = await this.ghRequest(
+          'POST',
+          `${root}/pulls/${safeNumber}/requested_reviewers`,
+          {
+            body: { reviewers: reviewersToAdd },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await boundedGitHubPullRequestResponse(addResponse, signal)
+      }
+      if (reviewersToRemove.length > 0) {
+        const removeResponse = await this.ghRequest(
+          'DELETE',
+          `${root}/pulls/${safeNumber}/requested_reviewers`,
+          {
+            body: { reviewers: reviewersToRemove },
+            customHeaders: { Accept: 'application/vnd.github+json' },
+            signal,
+          }
+        )
+        await boundedGitHubPullRequestResponse(removeResponse, signal)
+      }
+    } catch {
+      warnings.push('Reviewer requests were not fully updated.')
+    }
+
+    try {
+      const issueResponse = await this.ghRequest(
+        'PATCH',
+        `${root}/issues/${safeNumber}`,
+        {
+          body: {
+            assignees: safeUpdate.metadata.assignees,
+            labels: safeUpdate.metadata.labels,
+          },
+          customHeaders: { Accept: 'application/vnd.github+json' },
+          signal,
+        }
+      )
+      await boundedGitHubPullRequestResponse(issueResponse, signal)
+    } catch {
+      warnings.push('Assignees or labels were not fully updated.')
+    }
+
+    const pullRequest = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (pullRequest.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    return { pullRequest, warnings }
+  }
+
+  /** Submit one bounded top-level review against an unchanged head. */
+  public async submitPullRequestReview(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    review: IGitHubPullRequestReview,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestReviewReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    const safeReview = normalizeGitHubPullRequestReview(
+      review.event,
+      review.body
+    )
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (current.state !== 'open' || current.merged) {
+      throw new Error('Only an open pull request can be reviewed.')
+    }
+    const response = await this.ghRequest(
+      'POST',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}/reviews`,
+      {
+        body: safeReview,
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const value = await boundedGitHubPullRequestResponse(response, signal)
+    return validateGitHubPullRequestReviewReceipt(
+      value,
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+  }
+
+  /** Merge one unchanged, ready pull request with an allowlisted method. */
+  public async mergePullRequest(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    method: GitHubPullRequestMergeMethod,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMergeReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    if (!['merge', 'squash', 'rebase'].includes(method)) {
+      throw new Error('Choose a supported pull request merge method.')
+    }
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (
+      current.state !== 'open' ||
+      current.merged ||
+      current.draft ||
+      current.mergeable === false
+    ) {
+      throw new Error('This pull request is not ready to merge.')
+    }
+    const response = await this.ghRequest(
+      'PUT',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}/merge`,
+      {
+        body: { sha: safeHeadSHA, merge_method: method },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    return validateGitHubPullRequestMergeReceipt(
+      await boundedGitHubPullRequestResponse(response, signal)
+    )
   }
 
   /** Fetch all open pull requests in the given repository. */
@@ -1580,7 +2687,8 @@ export class API {
   public async fetchWorkflowRunJobs(
     owner: string,
     name: string,
-    workflowRunId: number
+    workflowRunId: number,
+    signal?: AbortSignal
   ): Promise<IAPIWorkflowJobs | null> {
     const path = `repos/${owner}/${name}/actions/runs/${workflowRunId}/jobs`
     const customHeaders = {
@@ -1588,6 +2696,7 @@ export class API {
     }
     const response = await this.ghRequest('GET', path, {
       customHeaders,
+      signal,
     })
     try {
       return await parsedResponse<IAPIWorkflowJobs>(response)
@@ -1634,6 +2743,332 @@ export class API {
     return await parsedResponse<IAPIWorkflowRuns>(response)
   }
 
+  /** List the bounded first page of artifacts produced by one workflow run. */
+  public async fetchWorkflowRunArtifacts(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IActionsArtifactList> {
+    const runId = validateActionsArtifactIdentifier(
+      workflowRunId,
+      'workflow run id'
+    )
+    const artifactPage = validateActionsArtifactIdentifier(
+      page,
+      'artifact page'
+    )
+    if (artifactPage > ActionsArtifactMaximumPages) {
+      throw new Error(
+        'The requested artifact page exceeds the app safety limit.'
+      )
+    }
+    const path = `repos/${owner}/${name}/actions/runs/${runId}/artifacts?per_page=${ActionsArtifactPageSize}&page=${artifactPage}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseActionsArtifactList(
+      await boundedActionsArtifactResponse(response, signal),
+      runId,
+      artifactPage
+    )
+  }
+
+  /** List one bounded, locally generated page of repository releases. */
+  public async fetchReleases(
+    owner: string,
+    name: string,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseList> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > GitHubReleaseMaximumPages
+    ) {
+      throw new Error(
+        'The requested release page exceeds the app safety limit.'
+      )
+    }
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases?per_page=${GitHubReleasePageSize}&page=${page}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubReleaseList(
+      await boundedGitHubReleaseResponse(response, signal),
+      page
+    )
+  }
+
+  /** Re-fetch one exact release through the bounded JSON parser before mutation. */
+  public async fetchRelease(
+    owner: string,
+    name: string,
+    releaseId: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeReleaseId}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeReleaseId
+    )
+  }
+
+  /** List one bounded, locally generated page of assets for one release. */
+  public async fetchReleaseAssets(
+    owner: string,
+    name: string,
+    releaseId: number,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseAssetList> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      page > GitHubReleaseAssetMaximumPages
+    ) {
+      throw new Error(
+        'The requested release asset page exceeds the app safety limit.'
+      )
+    }
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeReleaseId}/assets?per_page=${GitHubReleaseAssetPageSize}&page=${page}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubReleaseAssetList(
+      await boundedGitHubReleaseResponse(response, signal),
+      page
+    )
+  }
+
+  /** Re-fetch one exact release asset through the bounded parser before deletion. */
+  public async fetchReleaseAsset(
+    owner: string,
+    name: string,
+    assetId: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseAsset> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeAssetId = validateGitHubReleaseIdentifier(assetId, 'asset id')
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/assets/${safeAssetId}`
+    const response = await this.ghRequest('GET', path, { signal })
+    return parseGitHubReleaseAsset(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeAssetId
+    )
+  }
+
+  /** Create an unpublished release draft. Publishing is a separate review. */
+  public async createReleaseDraft(
+    owner: string,
+    name: string,
+    draft: IGitHubReleaseDraft,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeDraft = normalizeGitHubReleaseDraft(draft)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases`
+    const response = await this.ghRequest('POST', path, {
+      body: {
+        tag_name: safeDraft.tagName,
+        target_commitish: safeDraft.targetCommitish,
+        name: safeDraft.name,
+        body: safeDraft.body,
+        draft: true,
+        prerelease: safeDraft.prerelease,
+      },
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const release = parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal)
+    )
+    if (!release.draft) {
+      throw new Error(
+        'GitHub did not create the release as an unpublished draft.'
+      )
+    }
+    return release
+  }
+
+  /** Update reviewed metadata without changing draft publication state. */
+  public async updateRelease(
+    owner: string,
+    name: string,
+    update: IGitHubReleaseUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeUpdate = normalizeGitHubReleaseUpdate(update)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeUpdate.releaseId}`
+    const response = await this.ghRequest('PATCH', path, {
+      body: {
+        tag_name: safeUpdate.tagName,
+        target_commitish: safeUpdate.targetCommitish,
+        name: safeUpdate.name,
+        body: safeUpdate.body,
+        prerelease: safeUpdate.prerelease,
+      },
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    return parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeUpdate.releaseId
+    )
+  }
+
+  /** Publish one exact draft after the renderer's explicit review step. */
+  public async publishRelease(
+    owner: string,
+    name: string,
+    releaseId: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    const path = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}/releases/${safeReleaseId}`
+    const response = await this.ghRequest('PATCH', path, {
+      body: { draft: false },
+      customHeaders: { Accept: 'application/vnd.github+json' },
+      signal,
+    })
+    const release = parseGitHubRelease(
+      await boundedGitHubReleaseResponse(response, signal),
+      safeReleaseId
+    )
+    if (release.draft) {
+      throw new Error('GitHub did not publish the reviewed release draft.')
+    }
+    return release
+  }
+
+  /** Delete one exact release. Callers must provide the reviewed identifier. */
+  public async deleteRelease(
+    owner: string,
+    name: string,
+    releaseId: number,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeReleaseId = validateGitHubReleaseIdentifier(releaseId)
+    const response = await this.ghRequest(
+      'DELETE',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/releases/${safeReleaseId}`,
+      { customHeaders: { Accept: 'application/vnd.github+json' }, signal }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Delete one exact release asset. */
+  public async deleteReleaseAsset(
+    owner: string,
+    name: string,
+    assetId: number,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubReleaseRepositoryPart(name, 'repository')
+    const safeAssetId = validateGitHubReleaseIdentifier(assetId, 'asset id')
+    const response = await this.ghRequest(
+      'DELETE',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/releases/assets/${safeAssetId}`,
+      { customHeaders: { Accept: 'application/vnd.github+json' }, signal }
+    )
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /**
+   * Inspect active rules that GitHub evaluates for one exact branch. Pages are
+   * generated locally from the account-bound provider path and never followed
+   * from a provider-supplied pagination URL.
+   */
+  public async fetchEffectiveBranchRules(
+    owner: string,
+    name: string,
+    branch: string,
+    signal?: AbortSignal
+  ): Promise<IActionsBranchRuleList> {
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeBranch = validateActionsBranchName(branch)
+    const rules = new Array<IActionsBranchRuleList['rules'][number]>()
+
+    for (let page = 1; page <= ActionsBranchRuleMaximumPages; page++) {
+      const path = `repos/${safeOwner}/${safeName}/rules/branches/${encodeURIComponent(
+        safeBranch
+      )}?per_page=${ActionsBranchRulePageSize}&page=${page}`
+      const response = await this.ghRequest('GET', path, { signal })
+      const hasNextPage = getNextPagePathFromLink(response) !== null
+      rules.push(
+        ...parseActionsBranchRulePage(
+          await boundedActionsArtifactResponse(response, signal)
+        )
+      )
+
+      if (!hasNextPage) {
+        return { branch: safeBranch, rules, capped: false }
+      }
+      if (page === ActionsBranchRuleMaximumPages) {
+        return { branch: safeBranch, rules, capped: true }
+      }
+    }
+
+    return { branch: safeBranch, rules, capped: false }
+  }
+
+  /** Check for a matching attestation record without claiming verification. */
+  public async fetchArtifactAttestationPresence(
+    owner: string,
+    name: string,
+    digest: string,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    if (!isSupportedActionsArtifactDigest(digest)) {
+      throw new Error('Artifact attestation lookup requires a SHA-256 digest.')
+    }
+    const subject = encodeURIComponent(digest.toLowerCase())
+    const response = await this.ghRequest(
+      'GET',
+      `repos/${owner}/${name}/attestations/${subject}?per_page=1`,
+      { signal }
+    )
+    return parseActionsArtifactAttestationPresence(
+      await boundedActionsArtifactResponse(response, signal)
+    )
+  }
+
   /** Re-run every job in a workflow run. */
   public async rerunWorkflowRun(
     owner: string,
@@ -1642,6 +3077,36 @@ export class API {
   ): Promise<void> {
     const path = `repos/${owner}/${name}/actions/runs/${workflowRunId}/rerun`
     const response = await this.ghRequest('POST', path)
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Cancel a workflow run, optionally bypassing normal cancellation hooks. */
+  public async cancelWorkflowRun(
+    owner: string,
+    name: string,
+    workflowRunId: number,
+    force: boolean = false
+  ): Promise<void> {
+    const action = force ? 'force-cancel' : 'cancel'
+    const path = `repos/${owner}/${name}/actions/runs/${workflowRunId}/${action}`
+    const response = await this.ghRequest('POST', path)
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+  }
+
+  /** Enable or disable a repository workflow. */
+  public async setWorkflowEnabled(
+    owner: string,
+    name: string,
+    workflowId: number,
+    enabled: boolean
+  ): Promise<void> {
+    const action = enabled ? 'enable' : 'disable'
+    const path = `repos/${owner}/${name}/actions/workflows/${workflowId}/${action}`
+    const response = await this.ghRequest('PUT', path)
     if (!response.ok) {
       await parsedResponse<unknown>(response)
     }
@@ -1669,51 +3134,22 @@ export class API {
     owner: string,
     name: string,
     path: string,
-    ref?: string
+    ref?: string,
+    signal?: AbortSignal
   ): Promise<string> {
     const query = ref ? `?ref=${encodeURIComponent(ref)}` : ''
     const response = await this.ghRequest(
       'GET',
       `repos/${owner}/${name}/contents/${path}${query}`,
-      { customHeaders: { Accept: 'application/vnd.github.raw+json' } }
+      {
+        customHeaders: { Accept: 'application/vnd.github.raw+json' },
+        signal,
+      }
     )
     if (!response.ok) {
       await parsedResponse<unknown>(response)
     }
     return await response.text()
-  }
-
-  /**
-   * Fetch one job's plaintext log. Electron follows the API redirect so the
-   * main-process same-origin filter can remove the GitHub Authorization header
-   * before the request reaches the signed blob host.
-   */
-  public async fetchWorkflowJobLogs(
-    owner: string,
-    name: string,
-    jobId: number
-  ): Promise<string> {
-    const path = `repos/${owner}/${name}/actions/jobs/${jobId}/logs`
-    const response = await this.ghRequest('GET', path, { redirect: 'follow' })
-
-    if (response.status === 410) {
-      throw new APIError(response, { message: 'Workflow logs have expired.' })
-    }
-
-    if (!response.ok) {
-      // A followed response URL can contain a short-lived signed query. Keep
-      // that credential out of renderer-visible error messages.
-      throw new APIError(response, {
-        message: 'Unable to download workflow logs.',
-      })
-    }
-
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    const truncated = bytes.byteLength > ActionsLogMaximumBytes
-    const content = new TextDecoder().decode(
-      truncated ? bytes.slice(0, ActionsLogMaximumBytes) : bytes
-    )
-    return truncated ? content + ActionsLogTruncationMarker : content
   }
 
   /**
@@ -1998,9 +3434,10 @@ export class API {
     path: string,
     options: {
       body?: Object
-      customHeaders?: Object
+      customHeaders?: HeadersInit
       reloadCache?: boolean
       redirect?: RequestRedirect
+      signal?: AbortSignal
     } = {}
   ): Promise<Response> {
     return await request(
@@ -2011,7 +3448,8 @@ export class API {
       options.body,
       options.customHeaders,
       options.reloadCache,
-      options.redirect
+      options.redirect,
+      options.signal
     )
   }
 
@@ -2024,12 +3462,20 @@ export class API {
     path: string,
     options: {
       body?: Object
-      customHeaders?: Object
+      customHeaders?: HeadersInit
       reloadCache?: boolean
       redirect?: RequestRedirect
+      signal?: AbortSignal
     } = {}
   ): Promise<Response> {
-    const response = await this.request(this.endpoint, method, path, options)
+    const response = await this.request(this.endpoint, method, path, {
+      ...options,
+      customHeaders: createGitHubAPIRequestHeaders(
+        this.endpoint,
+        path,
+        options.customHeaders
+      ),
+    })
 
     // Only consider invalid token when the status is 401 and the response has
     // the X-GitHub-Request-Id header, meaning it comes from GH(E) and not from
@@ -2408,13 +3854,16 @@ export async function deleteToken(account: Account) {
   }
   try {
     const creds = Buffer.from(`${ClientID}:${ClientSecret}`).toString('base64')
+    const path = `applications/${ClientID}/token`
     const response = await request(
       account.endpoint,
       null,
       'DELETE',
-      `applications/${ClientID}/token`,
+      path,
       { access_token: account.token },
-      { Authorization: `Basic ${creds}` }
+      createGitHubAPIRequestHeaders(account.endpoint, path, {
+        Authorization: `Basic ${creds}`,
+      })
     )
 
     return response.status === 204
@@ -2514,6 +3963,22 @@ export function getEndpointForRepository(url: string): string {
 export function getHTMLURL(endpoint: string): string {
   if (envHTMLURL !== undefined) {
     return envHTMLURL
+  }
+
+  if (
+    endpoint.replace(/\/+$/, '') ===
+    getBitbucketAPIEndpoint().replace(/\/+$/, '')
+  ) {
+    return 'https://bitbucket.org'
+  }
+
+  const providerURL = new window.URL(endpoint)
+  const providerPath = providerURL.pathname.replace(/\/+$/, '')
+  if (providerPath.endsWith('/api/v4')) {
+    providerURL.pathname = providerPath.slice(0, -'/api/v4'.length) || '/'
+    providerURL.search = ''
+    providerURL.hash = ''
+    return providerURL.toString().replace(/\/$/, '')
   }
 
   // In the case of GitHub.com, the HTML site lives on the parent domain.
@@ -2785,13 +4250,18 @@ interface IGitLabMergeRequest {
   readonly sha: string
   readonly draft?: boolean
   readonly author: IGitLabIdentity
+  readonly assignees?: ReadonlyArray<IGitLabIdentity>
+  readonly reviewers?: ReadonlyArray<IGitLabIdentity>
 }
 
 interface IGitLabIssue {
   readonly iid: number
   readonly title: string
   readonly state: 'opened' | 'closed'
+  readonly created_at: string
   readonly updated_at: string
+  readonly author: IGitLabIdentity
+  readonly assignees?: ReadonlyArray<IGitLabIdentity>
 }
 
 interface IGitLabPipeline {
@@ -2869,6 +4339,12 @@ interface IBitbucketPullRequest {
   readonly created_on: string
   readonly updated_on: string
   readonly author: IBitbucketIdentity
+  readonly reviewers?: ReadonlyArray<IBitbucketIdentity>
+  readonly participants?: ReadonlyArray<{
+    readonly user: IBitbucketIdentity
+    readonly role?: string
+    readonly approved?: boolean
+  }>
   readonly source: IBitbucketPullRequestRef
   readonly destination: IBitbucketPullRequestRef
   readonly draft?: boolean
@@ -3012,8 +4488,9 @@ abstract class ThirdPartyAPI extends API {
   protected async providerRequest(
     method: HTTPMethod,
     path: string,
-    headers: Object,
-    reloadCache = false
+    headers: HeadersInit,
+    reloadCache = false,
+    signal?: AbortSignal
   ): Promise<Response> {
     return request(
       this.endpoint,
@@ -3022,7 +4499,9 @@ abstract class ThirdPartyAPI extends API {
       path,
       undefined,
       headers,
-      reloadCache
+      reloadCache,
+      undefined,
+      signal
     )
   }
 
@@ -3081,12 +4560,18 @@ export class GitLabAPI extends ThirdPartyAPI {
     super(getGitLabAPIEndpoint(endpoint), token)
   }
 
-  private requestGitLab(method: HTTPMethod, path: string, reloadCache = false) {
+  private requestGitLab(
+    method: HTTPMethod,
+    path: string,
+    reloadCache = false,
+    signal?: AbortSignal
+  ) {
     return this.providerRequest(
       method,
       path,
       { 'PRIVATE-TOKEN': this.token },
-      reloadCache
+      reloadCache,
+      signal
     )
   }
 
@@ -3271,6 +4756,64 @@ export class GitLabAPI extends ThirdPartyAPI {
     )
   }
 
+  public override async fetchProviderTriagePullRequests(
+    owner: string,
+    name: string,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<IAPIProviderTriagePage> {
+    signal?.throwIfAborted()
+    const safeLimit = normalizeProviderTriageLimit(limit)
+    const coordinate = validateProviderTriageCoordinate(owner, name, true)
+    const project = encodeURIComponent(`${coordinate.owner}/${coordinate.name}`)
+    const response = await this.requestGitLab(
+      'GET',
+      `projects/${project}/merge_requests?state=opened&order_by=updated_at&sort=desc&page=1&per_page=${safeLimit}`,
+      false,
+      signal
+    )
+    const values = parseGitLabTriagePullRequests(
+      await boundedProviderTriageResponse(response, signal),
+      safeLimit
+    )
+    return {
+      supported: true,
+      capped:
+        (response.headers.get('x-next-page') ?? '').length > 0 ||
+        values.length === safeLimit,
+      items: values,
+    }
+  }
+
+  public override async fetchProviderTriageIssues(
+    owner: string,
+    name: string,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<IAPIProviderTriagePage> {
+    signal?.throwIfAborted()
+    const safeLimit = normalizeProviderTriageLimit(limit)
+    const coordinate = validateProviderTriageCoordinate(owner, name, true)
+    const project = encodeURIComponent(`${coordinate.owner}/${coordinate.name}`)
+    const response = await this.requestGitLab(
+      'GET',
+      `projects/${project}/issues?scope=all&state=opened&order_by=updated_at&sort=desc&page=1&per_page=${safeLimit}`,
+      false,
+      signal
+    )
+    const values = parseGitLabTriageIssues(
+      await boundedProviderTriageResponse(response, signal),
+      safeLimit
+    )
+    return {
+      supported: true,
+      capped:
+        (response.headers.get('x-next-page') ?? '').length > 0 ||
+        values.length === safeLimit,
+      items: values,
+    }
+  }
+
   public override async fetchIssues(
     owner: string,
     name: string,
@@ -3411,7 +4954,8 @@ export class BitbucketAPI extends ThirdPartyAPI {
   private requestBitbucket(
     method: HTTPMethod,
     path: string,
-    reloadCache = false
+    reloadCache = false,
+    signal?: AbortSignal
   ) {
     const credentials = Buffer.from(
       `${this.username}:${this.appPassword}`
@@ -3420,7 +4964,8 @@ export class BitbucketAPI extends ThirdPartyAPI {
       method,
       path,
       { Authorization: `Basic ${credentials}` },
-      reloadCache
+      reloadCache,
+      signal
     )
   }
 
@@ -3548,6 +5093,48 @@ export class BitbucketAPI extends ThirdPartyAPI {
     return prs
       .filter(pr => Date.parse(pr.updated_on) >= since.getTime())
       .map(bitbucketPullRequest)
+  }
+
+  public override async fetchProviderTriagePullRequests(
+    owner: string,
+    name: string,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<IAPIProviderTriagePage> {
+    signal?.throwIfAborted()
+    const safeLimit = normalizeProviderTriageLimit(limit)
+    const coordinate = validateProviderTriageCoordinate(owner, name, false)
+    const response = await this.requestBitbucket(
+      'GET',
+      `repositories/${encodeURIComponent(
+        coordinate.owner
+      )}/${encodeURIComponent(
+        coordinate.name
+      )}/pullrequests?state=OPEN&sort=-updated_on&page=1&pagelen=${safeLimit}`,
+      false,
+      signal
+    )
+    const page = parseBitbucketTriagePullRequests(
+      await boundedProviderTriageResponse(response, signal),
+      safeLimit
+    )
+    return {
+      supported: true,
+      capped: page.hasNextPage || page.items.length === safeLimit,
+      items: page.items,
+    }
+  }
+
+  public override async fetchProviderTriageIssues(
+    owner: string,
+    name: string,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<IAPIProviderTriagePage> {
+    signal?.throwIfAborted()
+    normalizeProviderTriageLimit(limit)
+    validateProviderTriageCoordinate(owner, name, false)
+    return { supported: false, capped: false, items: [] }
   }
 
   public override async fetchIssues(): Promise<ReadonlyArray<IAPIIssue>> {

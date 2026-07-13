@@ -18,8 +18,10 @@
   pointer-events: none;
 }
 
-.workflow-dispatch-dialog {
+.workflow-dispatch-dialog,
+.actions-confirmation-dialog {
   width: min(580px, 100%);
+  min-width: 0;
   max-height: 100%;
   overflow-y: auto;
   padding: 20px;
@@ -38,7 +40,9 @@
   }
 
   h2 {
+    min-width: 0;
     margin: 2px 0 0;
+    overflow-wrap: anywhere;
   }
 
   > footer {
@@ -53,6 +57,57 @@
       color: var(--md-sys-color-on-primary);
       background: var(--md-sys-color-primary);
     }
+  }
+}
+
+.actions-confirmation-dialog {
+  width: min(520px, 100%);
+
+  > header > div {
+    min-width: 0;
+  }
+
+  > footer {
+    flex-wrap: wrap;
+
+    .button-component.destructive {
+      color: var(--md-sys-color-on-error);
+      background: var(--md-sys-color-error);
+    }
+  }
+}
+
+.actions-confirmation-copy {
+  min-width: 0;
+  margin: 18px 0;
+  overflow-wrap: anywhere;
+
+  p {
+    margin: 0;
+  }
+}
+
+.actions-force-cancel-option {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 14px;
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+
+  input {
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+
+  span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -116,6 +171,7 @@
 }
 
 .workflow-dispatch-dialog:focus-visible,
+.actions-confirmation-dialog:focus-visible,
 .actions-log-viewer:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 45%, transparent);
   outline-offset: -5px;
@@ -291,7 +347,8 @@
     padding: var(--spacing);
   }
 
-  .workflow-dispatch-dialog {
+  .workflow-dispatch-dialog,
+  .actions-confirmation-dialog {
     padding: var(--spacing-double);
 
     > header,

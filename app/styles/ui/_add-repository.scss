@@ -285,6 +285,9 @@ dialog.clone-repository {
   // divider so it floats on the card.
   .dialog-footer {
     border-top: 0;
+    gap: 12px;
+    min-width: 0;
+    overflow-x: hidden;
     padding: 12px 18px 16px;
 
     .button-component {
@@ -306,6 +309,68 @@ dialog.clone-repository {
     }
   }
 
+  .clone-history-options {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+    align-items: center;
+    gap: 8px 14px;
+    padding: 10px 12px;
+    border-radius: var(--md-sys-shape-corner-medium);
+    background: var(--md-sys-color-surface-container);
+
+    > small {
+      min-width: 0;
+      grid-column: 1 / -1;
+      color: var(--md-sys-color-on-surface-variant);
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .clone-shallow-toggle,
+  .clone-depth-field {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+
+    span,
+    strong,
+    small {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .clone-shallow-toggle {
+    cursor: pointer;
+
+    > input {
+      width: 18px;
+      height: 18px;
+      flex: none;
+      margin: 0;
+    }
+
+    > span {
+      display: flex;
+      flex-direction: column;
+    }
+
+    small {
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  .clone-depth-field {
+    justify-content: flex-end;
+
+    input {
+      width: min(112px, 100%);
+      min-width: 0;
+    }
+  }
+
   @media (max-width: 640px) {
     max-width: calc(100vw - var(--spacing-double));
 
@@ -314,15 +379,33 @@ dialog.clone-repository {
     }
 
     .tab-bar {
+      display: flex;
+      flex-wrap: wrap;
       height: auto;
-      overflow-x: auto;
+      overflow-x: hidden;
       padding-inline: var(--spacing);
-      scrollbar-width: thin;
 
       .tab-bar-item {
-        flex: 0 0 auto;
+        flex: 1 1 calc(50% - var(--spacing));
         min-height: 42px;
         padding-inline: var(--spacing);
+      }
+    }
+
+    .clone-history-options {
+      grid-template-columns: minmax(0, 1fr);
+
+      > small {
+        grid-column: 1;
+      }
+    }
+
+    .clone-depth-field {
+      align-items: stretch;
+      flex-direction: column;
+
+      input {
+        width: 100%;
       }
     }
 

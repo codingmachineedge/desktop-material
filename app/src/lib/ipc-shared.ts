@@ -27,6 +27,26 @@ import {
   IAgentCommandEnvelope,
   IAgentServerStatus,
 } from './agent-commands'
+import {
+  ICLICommandOutputEvent,
+  ICLICommandRequest,
+  ICLICommandStateEvent,
+  ICLIWorkbenchCatalog,
+} from './cli-workbench'
+import {
+  ActionsArtifactTransferResult,
+  ActionsJobLogTransferResult,
+  IActionsArtifactTransferRequest,
+  IActionsJobLogTransferRequest,
+  IActionsTransferProgressEvent,
+} from './actions-transfer'
+import {
+  GitHubReleaseAssetDownloadTransferResult,
+  GitHubReleaseAssetUploadTransferResult,
+  IGitHubReleaseAssetDownloadRequest,
+  IGitHubReleaseAssetUploadRequest,
+  IGitHubReleaseTransferProgressEvent,
+} from './github-release-transfer'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -35,6 +55,12 @@ import {
  * the two over the untyped IPC framework.
  */
 export type RequestChannels = {
+  'cancel-actions-transfer': (operationId: string) => void
+  'actions-transfer-progress': (event: IActionsTransferProgressEvent) => void
+  'cancel-github-release-transfer': (operationId: string) => void
+  'github-release-transfer-progress': (
+    event: IGitHubReleaseTransferProgressEvent
+  ) => void
   'agent-command': (command: IAgentCommandEnvelope) => void
   'agent-command-result': (id: string, result: AgentCommandResult) => void
   'agent-server-status': (status: IAgentServerStatus) => void
@@ -110,6 +136,8 @@ export type RequestChannels = {
   'uninstall-windows-cli': () => void
   'build-run-log': (event: IBuildRunLogEvent) => void
   'build-run-state': (event: IBuildRunStateEvent) => void
+  'cli-command-output': (event: ICLICommandOutputEvent) => void
+  'cli-command-state': (event: ICLICommandStateEvent) => void
 }
 
 /**
@@ -121,6 +149,18 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  'download-actions-artifact': (
+    request: IActionsArtifactTransferRequest
+  ) => Promise<ActionsArtifactTransferResult>
+  'fetch-actions-job-log': (
+    request: IActionsJobLogTransferRequest
+  ) => Promise<ActionsJobLogTransferResult>
+  'download-release-asset': (
+    request: IGitHubReleaseAssetDownloadRequest
+  ) => Promise<GitHubReleaseAssetDownloadTransferResult>
+  'upload-release-asset': (
+    request: IGitHubReleaseAssetUploadRequest
+  ) => Promise<GitHubReleaseAssetUploadTransferResult>
   'get-agent-server-status': () => Promise<IAgentServerStatus>
   'regenerate-agent-server-token': () => Promise<IAgentServerStatus>
   'get-path': (path: PathType) => Promise<string>
@@ -148,6 +188,9 @@ export type RequestResponseChannels = {
   'show-open-dialog': (
     options: Electron.OpenDialogOptions
   ) => Promise<string | null>
+  'show-open-dialog-multiple': (
+    options: Electron.OpenDialogOptions
+  ) => Promise<ReadonlyArray<string>>
   'is-window-maximized': () => Promise<boolean>
   'get-apple-action-on-double-click': () => Promise<Electron.AppleActionOnDoubleClickPref>
   'should-use-dark-colors': () => Promise<boolean>
@@ -162,4 +205,11 @@ export type RequestResponseChannels = {
   'request-notifications-permission': () => Promise<boolean>
   'start-build-run': (plan: IBuildRunPlan) => Promise<void>
   'cancel-build-run': (runId: string) => Promise<void>
+  'get-cli-workbench-catalog': () => Promise<ICLIWorkbenchCatalog>
+  'start-cli-command': (request: ICLICommandRequest) => Promise<void>
+  'cancel-cli-command': (id: string) => Promise<boolean>
+  'write-cli-command-input': (
+    id: string,
+    data: string | null
+  ) => Promise<boolean>
 }

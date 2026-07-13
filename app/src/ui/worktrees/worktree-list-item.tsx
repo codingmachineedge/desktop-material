@@ -21,6 +21,17 @@ export class WorktreeListItem extends React.Component<IWorktreeListItemProps> {
     const { worktree, isCurrentWorktree, matches } = this.props
     const name = Path.basename(worktree.path)
     const icon = isCurrentWorktree ? octicons.check : octicons.fileDirectory
+    const refLabel = worktree.branch
+      ? worktree.branch.replace(/^refs\/heads\//, '')
+      : shortenSHA(worktree.head)
+    const stateLabels = [
+      worktree.isLocked ? 'locked' : null,
+      worktree.isPrunable ? 'missing' : null,
+    ].filter((label): label is string => label !== null)
+    const description =
+      stateLabels.length === 0
+        ? refLabel
+        : `${refLabel} · ${stateLabels.join(' · ')}`
     const className = classNames('worktrees-list-item', {
       'current-worktree': isCurrentWorktree,
     })
@@ -39,14 +50,12 @@ export class WorktreeListItem extends React.Component<IWorktreeListItemProps> {
         </TooltippedContent>
         <TooltippedContent
           className="description"
-          tooltip={worktree.branch ?? worktree.head}
+          tooltip={description}
           onlyWhenOverflowed={true}
           tagName="div"
           disabled={enableAccessibleListToolTips()}
         >
-          {worktree.branch
-            ? worktree.branch.replace(/^refs\/heads\//, '')
-            : shortenSHA(worktree.head)}
+          {description}
         </TooltippedContent>
       </div>
     )

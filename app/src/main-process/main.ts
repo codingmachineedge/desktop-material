@@ -58,7 +58,24 @@ import {
 import parseCommandLineArgs from 'minimist'
 import { CLIAction } from '../lib/cli-action'
 import { buildRunner, registerBuildRunIpc } from './build-run'
+import {
+  cliWorkbenchCatalog,
+  cliWorkbenchRunner,
+  registerCLIWorkbenchIpc,
+} from './cli-workbench'
 import { AgentServerController } from './agent-server'
+import {
+  cancelActionsTransfer,
+  handleActionsArtifactTransfer,
+  handleActionsJobLogTransfer,
+  updateActionsTransferAccounts,
+} from './actions-transfer'
+import {
+  cancelGitHubReleaseTransfer,
+  handleGitHubReleaseAssetDownload,
+  handleGitHubReleaseAssetUpload,
+  updateGitHubReleaseTransferAccounts,
+} from './github-release-transfer'
 import {
   findWindowForRepositoryPath as findOwningWindow,
   nextWindowScope,
@@ -145,8 +162,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
-  // Ensure no Build & Run child process (or its tree) outlives the app.
+  // Ensure no owned child process (or its tree) outlives the app.
   buildRunner.killAll()
+  cliWorkbenchCatalog.killAll()
+  cliWorkbenchRunner.killAll()
   agentServerController
     ?.stop()
     .catch(error => log.error('Failed to stop agent server cleanly', error))
@@ -478,6 +497,24 @@ app.on('ready', () => {
   ipcMain.handle('regenerate-agent-server-token', async () =>
     agentServerController!.regenerateToken()
   )
+  ipcMain.handle('download-actions-artifact', (event, request) =>
+    handleActionsArtifactTransfer(event.sender, request)
+  )
+  ipcMain.handle('fetch-actions-job-log', (event, request) =>
+    handleActionsJobLogTransfer(event.sender, request)
+  )
+  ipcMain.on('cancel-actions-transfer', (event, operationId) => {
+    cancelActionsTransfer(event.sender.id, operationId)
+  })
+  ipcMain.handle('download-release-asset', (event, request) =>
+    handleGitHubReleaseAssetDownload(event.sender, request)
+  )
+  ipcMain.handle('upload-release-asset', (event, request) =>
+    handleGitHubReleaseAssetUpload(event.sender, request)
+  )
+  ipcMain.on('cancel-github-release-transfer', (event, operationId) => {
+    cancelGitHubReleaseTransfer(event.sender.id, operationId)
+  })
 
   const orderedWebRequest = new OrderedWebRequest(
     session.defaultSession.webRequest
@@ -504,9 +541,12 @@ app.on('ready', () => {
   )
 
   registerBuildRunIpc()
+  registerCLIWorkbenchIpc()
 
   ipcMain.on('update-accounts', (event, accounts) => {
     updateAccounts(accounts)
+    updateActionsTransferAccounts(accounts)
+    updateGitHubReleaseTransferAccounts(accounts)
     const fingerprint = JSON.stringify(accounts)
     if (fingerprint === accountsFingerprint) {
       return
@@ -899,6 +939,15 @@ app.on('ready', () => {
     'show-open-dialog',
     async (event, options) =>
       getAppWindowFromWebContents(event.sender)?.showOpenDialog(options) ?? null
+  )
+
+  /** An event sent by the renderer asking for a bounded multi-file selection. */
+  ipcMain.handle(
+    'show-open-dialog-multiple',
+    async (event, options) =>
+      getAppWindowFromWebContents(event.sender)?.showOpenDialogMultiple(
+        options
+      ) ?? []
   )
 
   /**

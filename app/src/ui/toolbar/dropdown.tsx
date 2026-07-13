@@ -16,6 +16,7 @@ import { Options as FocusTrapOptions } from 'focus-trap'
 import { TooltipTarget } from '../lib/tooltip'
 import { AriaHasPopupType } from '../lib/aria-types'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
+import { getViewportSafeFoldoutLeft } from './dropdown-geometry'
 
 export type DropdownState = 'open' | 'closed'
 
@@ -352,11 +353,24 @@ export class ToolbarDropdown extends React.Component<
   }
 
   public componentDidMount() {
+    window.addEventListener('resize', this.onWindowResize)
     this.updateClientRectIfNecessary()
+  }
+
+  public componentWillUnmount() {
+    window.removeEventListener('resize', this.onWindowResize)
   }
 
   public componentDidUpdate() {
     this.updateClientRectIfNecessary()
+  }
+
+  private onWindowResize = () => {
+    if (this.props.dropdownState === 'open' && this.rootDiv.current) {
+      this.setState({
+        clientRect: this.rootDiv.current.getBoundingClientRect(),
+      })
+    }
   }
 
   private handleOverlayClick = () => {
@@ -396,10 +410,21 @@ export class ToolbarDropdown extends React.Component<
 
     const overrides: React.CSSProperties =
       this.props.foldoutStyleOverrides ?? {}
+    const numericWidths = [
+      rect.width,
+      typeof overrides.width === 'number' ? overrides.width : 0,
+      typeof overrides.minWidth === 'number' ? overrides.minWidth : 0,
+    ]
+    const requestedWidth = Math.max(...numericWidths)
+    const marginLeft = getViewportSafeFoldoutLeft(
+      rect.left,
+      requestedWidth,
+      window.innerWidth
+    )
 
     return {
       position: 'absolute',
-      marginLeft: rect.left,
+      marginLeft,
       top: 0,
       ...heightStyle,
       ...overrides,

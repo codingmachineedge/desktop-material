@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { getAbsoluteUrl } from '../../src/lib/http'
+import {
+  createRequestHeaders,
+  getAbsoluteUrl,
+  request,
+} from '../../src/lib/http'
 import { getDotComAPIEndpoint } from '../../src/lib/api'
 
 describe('getAbsoluteUrl', () => {
@@ -60,5 +64,54 @@ describe('getAbsoluteUrl', () => {
         `${enterpriseEndpoint}/issues?since=2019-05-10T16%3A00%3A00Z`
       )
     })
+  })
+})
+
+describe('createRequestHeaders', () => {
+  it('keeps an account bearer credential authoritative', () => {
+    const headers = createRequestHeaders('account-token', {
+      authorization: 'Basic untrusted-override',
+      Accept: 'application/vnd.github.raw+json',
+    })
+
+    assert.equal(headers.get('Authorization'), 'Bearer account-token')
+    assert.equal(headers.get('Accept'), 'application/vnd.github.raw+json')
+  })
+
+  it('preserves trusted explicit authorization without an account token', () => {
+    const headers = createRequestHeaders(null, {
+      Authorization: 'Basic trusted-credential',
+    })
+
+    assert.equal(headers.get('Authorization'), 'Basic trusted-credential')
+  })
+})
+
+describe('request cancellation', () => {
+  it('forwards an AbortSignal for PATCH requests', async () => {
+    const originalFetch = globalThis.fetch
+    const controller = new AbortController()
+    let received: RequestInit | undefined
+    globalThis.fetch = async (_url, options) => {
+      received = options
+      return new Response(null, { status: 205 })
+    }
+
+    try {
+      await request(
+        'https://api.github.com',
+        'account-token',
+        'PATCH',
+        'notifications/threads/1',
+        undefined,
+        undefined,
+        false,
+        undefined,
+        controller.signal
+      )
+      assert.equal(received?.signal, controller.signal)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

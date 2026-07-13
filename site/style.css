@@ -445,10 +445,11 @@ h1.hero-title {
 /* ---- Screenshots gallery ---------------------------------------------- */
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: 22px;
 }
 .shot {
+  min-width: 0;
   border-radius: var(--md-sys-shape-large);
   overflow: hidden;
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -473,13 +474,17 @@ h1.hero-title {
   color: var(--md-sys-color-on-surface-variant);
   border-top: 1px solid var(--md-sys-color-outline-variant);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  overflow-wrap: anywhere;
 }
 .shot figcaption .tag {
   margin-left: auto;
+  max-width: 100%;
   font-size: 0.72rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
   padding: 3px 10px;
   border-radius: var(--md-sys-shape-full);
   background: var(--md-sys-color-secondary-container);

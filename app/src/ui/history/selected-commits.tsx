@@ -38,6 +38,7 @@ import { ExpandableCommitSummary } from './expandable-commit-summary'
 import { DiffHeader } from '../diff/diff-header'
 import { Account } from '../../models/account'
 import { Emoji } from '../../lib/emoji'
+import { createFileHistoryMenuItem } from '../file-history'
 
 interface ISelectedCommitsProps {
   readonly repository: Repository
@@ -383,17 +384,6 @@ export class SelectedCommits extends React.Component<
 
     const fullPath = Path.join(repository.path, file.path)
     const fileExistsOnDisk = await pathExists(fullPath)
-    if (!fileExistsOnDisk) {
-      showContextualMenu([
-        {
-          label: __DARWIN__
-            ? 'File Does Not Exist on Disk'
-            : 'File does not exist on disk',
-          enabled: false,
-        },
-      ])
-      return
-    }
 
     const extension = Path.extname(file.path)
 
@@ -403,6 +393,8 @@ export class SelectedCommits extends React.Component<
       : DefaultEditorLabel
 
     const items: IMenuItem[] = [
+      createFileHistoryMenuItem(this.props.dispatcher, repository, file.path),
+      { type: 'separator' },
       {
         label: RevealInFileManagerLabel,
         action: () => revealInFileManager(repository, file.path),

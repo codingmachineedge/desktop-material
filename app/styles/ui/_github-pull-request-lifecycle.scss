@@ -1,0 +1,140 @@
+#github-pull-request-lifecycle {
+  width: min(760px, calc(100vw - var(--spacing-double)));
+  min-width: min(520px, calc(100vw - var(--spacing-double)));
+  max-width: calc(100vw - var(--spacing-double));
+  max-height: calc(100vh - var(--spacing-double));
+  overflow-x: hidden;
+
+  &,
+  * {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .dialog-content {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .dialog-footer .button-group {
+    flex-wrap: wrap;
+    gap: var(--spacing-half);
+
+    button {
+      margin: 0;
+      max-width: 100%;
+      white-space: normal;
+    }
+  }
+}
+
+.github-pull-request-lifecycle-content {
+  display: grid;
+  gap: var(--spacing-double);
+  overflow-wrap: anywhere;
+
+  section {
+    display: grid;
+    gap: var(--spacing);
+    padding: var(--spacing);
+    border: var(--base-border);
+    border-radius: var(--md-sys-shape-corner-medium);
+
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h2 {
+      font-size: var(--font-size-md);
+    }
+  }
+}
+
+.github-pull-request-lifecycle-summary,
+.github-pull-request-lifecycle-confirmation,
+.github-pull-request-lifecycle-status {
+  display: grid;
+  gap: var(--spacing-half);
+  padding: var(--spacing);
+  border: var(--base-border);
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  overflow-wrap: anywhere;
+}
+
+.github-pull-request-lifecycle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing);
+}
+
+.github-pull-request-lifecycle-wide {
+  grid-column: span 2;
+}
+
+.github-pull-request-lifecycle-field {
+  display: grid;
+  gap: var(--spacing-half);
+
+  > span {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  input,
+  select,
+  textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  textarea {
+    resize: vertical;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+.github-pull-request-lifecycle-note,
+.github-pull-request-lifecycle-notice {
+  margin: 0;
+  padding: var(--spacing);
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 680px) {
+  .github-pull-request-lifecycle-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .github-pull-request-lifecycle-wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 440px) {
+  #github-pull-request-lifecycle {
+    width: calc(100vw - var(--spacing));
+    min-width: 0;
+    max-width: calc(100vw - var(--spacing));
+
+    .dialog-header,
+    .dialog-content,
+    .dialog-footer {
+      padding-left: var(--spacing);
+      padding-right: var(--spacing);
+    }
+
+    .dialog-footer .button-group {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+
+      button {
+        width: 100%;
+      }
+    }
+  }
+}

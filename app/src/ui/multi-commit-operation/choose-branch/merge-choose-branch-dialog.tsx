@@ -14,6 +14,7 @@ import {
 } from './base-choose-branch-dialog'
 import { truncateWithEllipsis } from '../../../lib/truncate-with-ellipsis'
 import { formatNumber } from '../../../lib/format-number'
+import { MergeConflictPathPreview } from '../../lib/merge-conflict-path-preview'
 
 interface IMergeChooseBranchDialogState {
   readonly commitCount: number
@@ -167,7 +168,8 @@ export class MergeChooseBranchDialog extends React.Component<
     return this.renderConflictedMergeMessage(
       branch,
       currentBranch,
-      mergeStatus.conflictedFiles
+      mergeStatus.conflictedFiles,
+      mergeStatus.conflictedFilePaths
     )
   }
 
@@ -214,18 +216,22 @@ export class MergeChooseBranchDialog extends React.Component<
   private renderConflictedMergeMessage(
     branch: Branch,
     currentBranch: Branch,
-    count: number
+    count: number,
+    paths: ReadonlyArray<string>
   ) {
     const pluralized = count === 1 ? 'file' : 'files'
     return (
-      <React.Fragment>
-        There will be
-        <strong>{` ${formatNumber(count)} conflicted ${pluralized}`}</strong>
-        {` when merging `}
-        <strong>{branch.name}</strong>
-        {` into `}
-        <strong>{currentBranch.name}</strong>
-      </React.Fragment>
+      <div className="merge-conflict-preview-summary">
+        <p>
+          There will be
+          <strong>{` ${formatNumber(count)} conflicted ${pluralized}`}</strong>
+          {` when merging `}
+          <strong>{branch.name}</strong>
+          {` into `}
+          <strong>{currentBranch.name}</strong>
+        </p>
+        <MergeConflictPathPreview paths={paths} />
+      </div>
     )
   }
 
@@ -236,9 +242,9 @@ export class MergeChooseBranchDialog extends React.Component<
           status={this.state.mergeStatus}
           classNamePrefix="merge-status"
         />
-        <p className="merge-info" id="merge-status-preview">
+        <div className="merge-info" id="merge-status-preview">
           {this.renderStatusPreviewMessage()}
-        </p>
+        </div>
       </>
     )
   }

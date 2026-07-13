@@ -13,8 +13,10 @@
   bottom: 10px;
   display: flex;
   width: min(820px, calc(100vw - 20px));
-  min-width: 680px;
-  min-height: 480px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
+  min-width: min(680px, calc(100vw - 20px));
+  min-height: min(480px, calc(100vh - 20px));
   flex-direction: column;
   overflow: hidden;
   border-radius: 28px;
@@ -121,7 +123,9 @@
 
 .versioned-store-history-actions {
   display: flex;
+  min-width: 0;
   flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 
@@ -529,12 +533,14 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--md-sys-color-surface-container-lowest);
 }
 
 .versioned-store-history-diff {
-  min-width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 100%;
   margin: 0;
   padding: 14px 0;
@@ -542,11 +548,16 @@
   font-family: var(--font-family-monospace);
   font-size: 12px;
   line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 
   > span {
     display: block;
-    min-width: max-content;
+    min-width: 0;
+    max-width: 100%;
     padding: 0 16px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 }
 
@@ -584,11 +595,68 @@
   .versioned-store-history-toolbar {
     align-items: flex-start;
     flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .versioned-store-history-introduction,
+  .versioned-store-history-actions {
+    width: 100%;
+    min-width: 0;
   }
 
   .versioned-store-history-layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(180px, 42%) minmax(0, 1fr);
+  }
+
+  .versioned-store-history-master {
+    border-right: 0;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+}
+
+@media (max-height: 520px) {
+  .versioned-store-history-panel {
+    top: 6px;
+    right: 6px;
+    bottom: 6px;
+    width: min(820px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    min-width: min(680px, calc(100vw - 12px));
+    min-height: 0;
+  }
+
+  .versioned-store-history-header {
+    gap: 8px;
+    padding: 8px 10px 4px 12px;
+  }
+
+  .versioned-store-history-header-icon,
+  .versioned-store-history-close.button-component {
+    width: 32px;
+    height: 32px;
+  }
+
+  .versioned-store-history-toolbar {
+    gap: 6px;
+    min-height: 0;
+    padding: 4px 10px 8px;
+  }
+
+  .versioned-store-history-introduction small {
+    line-height: 1.2;
+  }
+
+  .versioned-store-history-actions .button-component {
+    height: 32px;
+    padding: 0 10px;
+  }
+
+  .versioned-store-history-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(80px, 40%) minmax(0, 1fr);
   }
 
   .versioned-store-history-master {

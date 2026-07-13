@@ -6,6 +6,7 @@ import { Branch } from '../../models/branch'
 import { Dispatcher } from '../dispatcher'
 import { ActionStatusIcon } from '../lib/action-status-icon'
 import { MergeTreeResult } from '../../models/merge'
+import { MergeConflictPathPreview } from '../lib/merge-conflict-path-preview'
 import { ComputedAction } from '../../models/computed-action'
 import {
   DropdownSelectButton,
@@ -240,7 +241,8 @@ export class MergeCallToActionWithConflicts extends React.Component<
       return this.renderConflictedMergeMessage(
         currentBranch,
         comparisonBranch,
-        mergeStatus.conflictedFiles
+        mergeStatus.conflictedFiles,
+        mergeStatus.conflictedFilePaths
       )
     }
     return null
@@ -305,17 +307,21 @@ export class MergeCallToActionWithConflicts extends React.Component<
   private renderConflictedMergeMessage(
     currentBranch: Branch,
     branch: Branch,
-    count: number
+    count: number,
+    paths: ReadonlyArray<string>
   ) {
     const pluralized = count === 1 ? 'file' : 'files'
     return (
       <div className="merge-message">
-        There will be
-        <strong>{` ${count} conflicted ${pluralized}`}</strong>
-        {` when merging `}
-        <strong>{branch.name}</strong>
-        {` into `}
-        <strong>{currentBranch.name}</strong>
+        <p>
+          There will be
+          <strong>{` ${count} conflicted ${pluralized}`}</strong>
+          {` when merging `}
+          <strong>{branch.name}</strong>
+          {` into `}
+          <strong>{currentBranch.name}</strong>
+        </p>
+        <MergeConflictPathPreview paths={paths} />
       </div>
     )
   }

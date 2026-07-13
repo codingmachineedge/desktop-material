@@ -27,6 +27,12 @@ import {
   BranchSortOrder,
   DefaultBranchSortOrder,
 } from '../../models/branch-sort-order'
+import {
+  clearBranchVisibilityState,
+  IBranchVisibilityState,
+  loadBranchVisibilityState,
+  saveBranchVisibilityState,
+} from '../../lib/branch-visibility'
 
 const RowHeight = 30
 
@@ -144,6 +150,7 @@ interface IBranchListProps {
 
 interface IBranchListState {
   readonly commitAuthorDates: ReadonlyMap<string, Date>
+  readonly visibility: IBranchVisibilityState
 }
 
 const commitDateCache = new Map<string, Date>()
@@ -192,7 +199,8 @@ export class BranchList extends React.Component<
       this.props.currentBranch,
       this.props.allBranches,
       this.props.recentBranches,
-      this.props.branchSortOrder ?? DefaultBranchSortOrder
+      this.props.branchSortOrder ?? DefaultBranchSortOrder,
+      this.state.visibility
     )
   }
 
@@ -204,6 +212,7 @@ export class BranchList extends React.Component<
     super(props)
     this.state = {
       commitAuthorDates: new Map<string, Date>(),
+      visibility: loadBranchVisibilityState(props.repository.id),
     }
   }
 
@@ -214,7 +223,19 @@ export class BranchList extends React.Component<
   }
 
   public componentDidUpdate(prevProps: IBranchListProps) {
+    if (prevProps.repository.id !== this.props.repository.id) {
+      this.setState({
+        visibility: loadBranchVisibilityState(this.props.repository.id),
+      })
+    }
     if (prevProps.allBranches !== this.props.allBranches) {
+      const solo = this.state.visibility.solo
+      if (
+        solo !== null &&
+        !this.props.allBranches.some(branch => branch.name === solo)
+      ) {
+        this.persistVisibility({ ...this.state.visibility, solo: null })
+      }
       this.populateCommitDates()
     }
   }
@@ -281,7 +302,7 @@ export class BranchList extends React.Component<
         filterTextBox={this.props.textbox}
         hideFilterRow={this.props.hideFilterRow}
         onFilterListResultsChanged={this.props.onFilterListResultsChanged}
-        renderPreList={this.props.renderPreList}
+        renderPreList={this.renderPreList}
         onItemContextMenu={this.onBranchContextMenu}
         getItemAriaLabel={this.getItemAriaLabel}
         getGroupAriaLabel={this.getGroupAriaLabel}
@@ -298,14 +319,6 @@ export class BranchList extends React.Component<
     const { onRenameBranch, onDeleteBranch, onCheckoutInNewWorktree } =
       this.props
 
-    if (
-      onRenameBranch === undefined &&
-      onDeleteBranch === undefined &&
-      onCheckoutInNewWorktree === undefined
-    ) {
-      return
-    }
-
     const { branch } = item
 
     const items = generateBranchContextMenuItems({
@@ -313,6 +326,14 @@ export class BranchList extends React.Component<
       onRenameBranch,
       onDeleteBranch,
       onCheckoutInNewWorktree,
+      isPinned: this.state.visibility.pinned.includes(branch.name),
+      isSolo: this.state.visibility.solo === branch.name,
+      canHide: this.canHideBranch(branch),
+      hasVisibilityOverrides: this.hasVisibilityOverrides,
+      onTogglePin: this.onTogglePin,
+      onHide: this.onHideBranch,
+      onSolo: this.onSoloBranch,
+      onRestoreVisibility: this.onRestoreVisibility,
     })
 
     showContextualMenu(items)
@@ -364,6 +385,7 @@ export class BranchList extends React.Component<
   private parseHeader(label: string): BranchGroupIdentifier | null {
     switch (label) {
       case 'default':
+      case 'pinned':
       case 'recent':
       case 'other':
         return label
@@ -397,6 +419,8 @@ export class BranchList extends React.Component<
   private getGroupLabel(identifier: BranchGroupIdentifier) {
     if (identifier === 'default') {
       return __DARWIN__ ? 'Default Branch' : 'Default branch'
+    } else if (identifier === 'pinned') {
+      return __DARWIN__ ? 'Pinned Branches' : 'Pinned branches'
     } else if (identifier === 'recent') {
       return __DARWIN__ ? 'Recent Branches' : 'Recent branches'
     } else if (identifier === 'other') {
@@ -404,6 +428,100 @@ export class BranchList extends React.Component<
     } else {
       return assertNever(identifier, `Unknown identifier: ${identifier}`)
     }
+  }
+
+  private get hasVisibilityOverrides() {
+    const { pinned, hidden, solo } = this.state.visibility
+    return pinned.length > 0 || hidden.length > 0 || solo !== null
+  }
+
+  private canHideBranch(branch: Branch) {
+    return (
+      branch.name !== this.props.currentBranch?.name &&
+      branch.name !== this.props.defaultBranch?.name
+    )
+  }
+
+  private persistVisibility(visibility: IBranchVisibilityState) {
+    this.setState({
+      visibility: saveBranchVisibilityState(
+        this.props.repository.id,
+        visibility
+      ),
+    })
+  }
+
+  private onTogglePin = (branch: Branch) => {
+    const pinned = new Set(this.state.visibility.pinned)
+    if (pinned.has(branch.name)) {
+      pinned.delete(branch.name)
+    } else {
+      pinned.add(branch.name)
+    }
+    this.persistVisibility({
+      pinned: [...pinned],
+      hidden: this.state.visibility.hidden.filter(name => name !== branch.name),
+      solo: this.state.visibility.solo,
+    })
+  }
+
+  private onHideBranch = (branch: Branch) => {
+    if (!this.canHideBranch(branch)) {
+      return
+    }
+    const hidden = new Set(this.state.visibility.hidden)
+    hidden.add(branch.name)
+    this.persistVisibility({
+      pinned: this.state.visibility.pinned.filter(name => name !== branch.name),
+      hidden: [...hidden],
+      solo:
+        this.state.visibility.solo === branch.name
+          ? null
+          : this.state.visibility.solo,
+    })
+  }
+
+  private onSoloBranch = (branch: Branch) => {
+    const solo = this.state.visibility.solo === branch.name ? null : branch.name
+    this.persistVisibility({
+      pinned: this.state.visibility.pinned,
+      hidden: this.state.visibility.hidden.filter(name => name !== branch.name),
+      solo,
+    })
+  }
+
+  private onRestoreVisibility = () => {
+    this.setState({
+      visibility: clearBranchVisibilityState(this.props.repository.id),
+    })
+  }
+
+  private renderPreList = () => {
+    const parentContent = this.props.renderPreList?.() ?? null
+    if (!this.hasVisibilityOverrides) {
+      return parentContent
+    }
+
+    const existingBranchNames = new Set(
+      this.props.allBranches.map(branch => branch.name)
+    )
+    const hiddenCount = this.state.visibility.hidden.filter(name =>
+      existingBranchNames.has(name)
+    ).length
+    const summary =
+      this.state.visibility.solo !== null
+        ? `Solo view: ${this.state.visibility.solo}`
+        : `${this.state.visibility.pinned.length} pinned, ${hiddenCount} hidden`
+
+    return (
+      <>
+        <div className="branch-visibility-controls">
+          <span role="status">{summary}</span>
+          <Button onClick={this.onRestoreVisibility}>Restore all</Button>
+        </div>
+        {parentContent}
+      </>
+    )
   }
 
   private onRenderNoItems = () => {

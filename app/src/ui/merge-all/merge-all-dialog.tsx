@@ -65,28 +65,34 @@ export class MergeAllDialog extends React.Component<IMergeAllDialogProps> {
               <Octicon symbol={octicons.copilot} /> {state.copilotProgress}
             </p>
           )}
-          <table className="merge-all-results">
-            <thead>
-              <tr>
-                <th>Branch</th>
-                <th>Result</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(state?.results ?? []).map((result, index) => (
-                <tr key={`${result.branch}-${index}`}>
-                  <td>{result.branch}</td>
-                  <td>
-                    <span className={`merge-result ${result.status}`}>
-                      {result.status}
-                    </span>
-                  </td>
-                  <td>{result.detail}</td>
+          <div
+            className="merge-all-results-scroll"
+            role="region"
+            aria-label="Merge results"
+          >
+            <table className="merge-all-results">
+              <thead>
+                <tr>
+                  <th>Branch</th>
+                  <th>Result</th>
+                  <th>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(state?.results ?? []).map((result, index) => (
+                  <tr key={`${result.branch}-${index}`}>
+                    <td data-label="Branch">{result.branch}</td>
+                    <td data-label="Result">
+                      <span className={`merge-result ${result.status}`}>
+                        {result.status}
+                      </span>
+                    </td>
+                    <td data-label="Details">{result.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {state?.phase === 'complete' && (
             <p className="merge-all-summary" role="status">
               Complete.{' '}

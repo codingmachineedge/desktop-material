@@ -53,4 +53,34 @@ describe('multi-window context actions', () => {
     action.action()
     assert.equal(opened, true)
   })
+
+  it('offers only the valid lock transition for a linked worktree', () => {
+    const transitions = new Array<string>()
+    const unlockedItems = generateWorktreeContextMenuItems({
+      path: 'C:\\repos\\material-feature',
+      isMainWorktree: false,
+      isLocked: false,
+      onLockWorktree: path => transitions.push(`lock:${path}`),
+      onUnlockWorktree: path => transitions.push(`unlock:${path}`),
+    })
+    const lock = unlockedItems.find(item => item.label === 'Lock worktree')
+    assert.ok(lock && 'action' in lock && lock.action)
+    lock.action()
+
+    const lockedItems = generateWorktreeContextMenuItems({
+      path: 'C:\\repos\\material-feature',
+      isMainWorktree: false,
+      isLocked: true,
+      onLockWorktree: path => transitions.push(`lock:${path}`),
+      onUnlockWorktree: path => transitions.push(`unlock:${path}`),
+    })
+    const unlock = lockedItems.find(item => item.label === 'Unlock worktree')
+    assert.ok(unlock && 'action' in unlock && unlock.action)
+    unlock.action()
+
+    assert.deepEqual(transitions, [
+      'lock:C:\\repos\\material-feature',
+      'unlock:C:\\repos\\material-feature',
+    ])
+  })
 })

@@ -30,6 +30,7 @@ interface IWorktreeListProps {
   readonly canCreateNewWorktree: boolean
   readonly onCreateNewWorktree?: () => void
   readonly onMergeAllWorktrees?: () => void
+  readonly renderAdministration?: () => React.ReactNode
   readonly onWorktreeContextMenu?: (
     worktree: WorktreeEntry,
     event: React.MouseEvent<HTMLDivElement>
@@ -95,25 +96,36 @@ export class WorktreeList extends React.Component<IWorktreeListProps> {
   }
 
   private onRenderNewButton = () => {
-    if (!this.props.canCreateNewWorktree || !this.props.onCreateNewWorktree) {
+    if (
+      (!this.props.canCreateNewWorktree ||
+        this.props.onCreateNewWorktree === undefined) &&
+      this.props.renderAdministration === undefined
+    ) {
       return null
     }
     return (
-      <div className="worktree-list-actions">
-        <Button
-          className="new-worktree-button"
-          onClick={this.props.onCreateNewWorktree}
-        >
-          {__DARWIN__ ? 'New Worktree' : 'New worktree'}
-        </Button>
-        {this.props.onMergeAllWorktrees && (
-          <Button
-            className="merge-all-worktrees-button"
-            onClick={this.props.onMergeAllWorktrees}
-          >
-            Merge all worktrees
-          </Button>
-        )}
+      <div className="worktree-list-post-filter">
+        {this.props.canCreateNewWorktree &&
+          this.props.onCreateNewWorktree !== undefined && (
+            <div className="worktree-list-actions">
+              <Button
+                className="new-worktree-button"
+                onClick={this.props.onCreateNewWorktree}
+              >
+                {__DARWIN__ ? 'New Worktree' : 'New worktree'}
+              </Button>
+              {this.props.onMergeAllWorktrees && (
+                <Button
+                  className="merge-all-worktrees-button"
+                  onClick={this.props.onMergeAllWorktrees}
+                >
+                  Merge all worktrees
+                </Button>
+              )}
+            </div>
+          )}
+        {this.props.renderAdministration !== undefined &&
+          this.props.renderAdministration()}
       </div>
     )
   }

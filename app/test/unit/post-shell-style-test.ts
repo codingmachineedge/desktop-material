@@ -9,6 +9,12 @@ const readStyle = (name: string) =>
 const readRootStyle = (name: string) =>
   readFileSync(join(process.cwd(), 'app', 'styles', name), 'utf8')
 
+const readSiteStyle = () =>
+  readFileSync(join(process.cwd(), 'site', 'style.css'), 'utf8')
+
+const readUI = (path: string) =>
+  readFileSync(join(process.cwd(), 'app', 'src', 'ui', path), 'utf8')
+
 describe('post-shell MD3 style contracts', () => {
   it('uses system tokens instead of literal colors in the Actions log viewer', () => {
     const style = readStyle('_actions-log-viewer.scss')
@@ -17,7 +23,21 @@ describe('post-shell MD3 style contracts', () => {
   })
 
   it('keeps Actions and Agent Access responsive on narrow windows', () => {
-    assert.match(readStyle('_actions-view.scss'), /max-width: 620px/)
+    const actions = readStyle('_actions-view.scss')
+    const actionsDialogs = readStyle('_actions-log-viewer.scss')
+    assert.match(actions, /max-width: 620px/)
+    assert.match(
+      actions,
+      /\.actions-workflow-management\s*\{[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/
+    )
+    assert.match(
+      actions,
+      /\.branch-chip\s*\{[\s\S]*?max-width: min\(100%, 220px\);[\s\S]*?text-overflow: ellipsis;/
+    )
+    assert.match(
+      actionsDialogs,
+      /\.actions-confirmation-dialog\s*\{[\s\S]*?width: min\(520px, 100%\);/
+    )
     assert.match(readStyle('_agent-access.scss'), /max-width: 430px/)
   })
 
@@ -33,10 +53,82 @@ describe('post-shell MD3 style contracts', () => {
     )
   })
 
-  it('makes Pull all results horizontally scrollable on narrow windows', () => {
+  it('reflows Pull all results without horizontal scrolling', () => {
     const style = readStyle('_pull-all.scss')
     assert.match(style, /pull-all-results-container/)
-    assert.match(style, /overflow: auto/)
+    assert.match(style, /overflow-x: hidden/)
+    assert.match(
+      style,
+      /grid-template-columns: minmax\(82px, 32%\) minmax\(0, 1fr\)/
+    )
+  })
+
+  it('keeps Merge all content inside its dialog with reachable results', () => {
+    const style = readStyle('_merge-all.scss')
+    const ui = readUI('merge-all/merge-all-dialog.tsx')
+    assert.doesNotMatch(style, /\.dialog-content\s*\{\s*min-width: 680px;/)
+    assert.match(style, /max-width: calc\(100vw - var\(--spacing-quad\)\);/)
+    assert.match(
+      style,
+      /\.merge-all-results-scroll\s*\{[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: hidden;/
+    )
+    assert.match(style, /overflow-wrap: anywhere;/)
+    assert.match(
+      style,
+      /grid-template-columns: minmax\(72px, 30%\) minmax\(0, 1fr\)/
+    )
+    assert.match(
+      ui,
+      /className="merge-all-results-scroll"[\s\S]*?role="region"[\s\S]*?aria-label="Merge results"/
+    )
+    assert.doesNotMatch(
+      ui,
+      /className="merge-all-results-scroll"[\s\S]{0,160}?tabIndex=/
+    )
+  })
+
+  it('keeps every Pages gallery card within a narrow mobile viewport', () => {
+    const style = readSiteStyle()
+    assert.match(
+      style,
+      /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 340px\), 1fr\)\);/
+    )
+    assert.match(style, /\.shot\s*\{[\s\S]*?min-width: 0;/)
+    assert.match(style, /\.shot figcaption\s*\{[\s\S]*?flex-wrap: wrap;/)
+  })
+
+  it('fits Settings History at compact width and height without auto-fit', () => {
+    const style = readStyle('_versioned-store-history.scss')
+    assert.match(style, /max-height: calc\(100vh - 20px\);/)
+    assert.match(style, /min-height: min\(480px, calc\(100vh - 20px\)\);/)
+    assert.match(style, /@media \(max-height: 520px\)/)
+    assert.match(
+      style,
+      /grid-template-rows: minmax\(80px, 40%\) minmax\(0, 1fr\);/
+    )
+  })
+
+  it('shrinks and wraps the Build & Run header controls', () => {
+    const style = readStyle('_material-build-run.scss')
+    assert.match(
+      style,
+      /\.header-title\s*\{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;/
+    )
+    assert.match(style, /\.build-run-panel-header\s*\{[\s\S]*?flex-wrap: wrap;/)
+    assert.match(style, /@media \(max-width: 640px\), \(max-height: 420px\)/)
+  })
+
+  it('bounds shared dialogs and keeps footer actions reachable', () => {
+    const style = readStyle('_dialog-layer.scss')
+    assert.match(style, /max-height: calc\(100vh - 54px\);/)
+    assert.match(
+      style,
+      /\.dialog-content\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-x: hidden;/
+    )
+    assert.match(
+      style,
+      /\.dialog-footer \.button-group\s*\{[\s\S]*?flex-wrap: wrap;/
+    )
   })
 
   it('keeps Repository Settings inside the viewport with a scrollable tab', () => {
@@ -82,6 +174,23 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(
       composer,
       /\.commit-message-component\s*\{[\s\S]*?max-width: calc\(100% - 24px\);[\s\S]*?min-width: 0;/
+    )
+  })
+
+  it('keeps the repository-wide stash manager bounded and responsive', () => {
+    const changes = readStyle('changes/_changes-list.scss')
+
+    assert.match(
+      changes,
+      /\.stash-manager-panel\s*\{[\s\S]*?max-height: min\(62vh, 650px\);[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      changes,
+      /\.stash-manager-action-grid\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(104px, 1fr\)\);/
+    )
+    assert.match(
+      changes,
+      /\.stash-manager-busy\s*\{[\s\S]*?position: sticky;[\s\S]*?flex-wrap: wrap;/
     )
   })
 })

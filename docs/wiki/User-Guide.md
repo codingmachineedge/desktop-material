@@ -4,7 +4,11 @@ A task-oriented tour of Desktop Material's features. It assumes you already know
 Desktop workflow (clone, commit, push, branch, pull request) — that all still works. This guide
 focuses on what Desktop Material adds on top.
 
-**Shipped today**
+**Feature guide**
+
+The original M0–M18 baseline is published on `main`. The guided M19 functions in this guide are
+implementation-complete in the current integration tree; final production/off-screen acceptance,
+`main` promotion, and public evidence remain pending.
 
 - [The shell](#the-shell)
 - [Signing in](#signing-in)
@@ -13,6 +17,8 @@ focuses on what Desktop Material adds on top.
 - [Non-modal dialogs](#non-modal-dialogs)
 - [Multi-clone](#multi-clone)
 - [Clone account fallback](#clone-account-fallback)
+- [Guided Git, GitHub, and provider functions](#guided-git-github-and-provider-functions)
+- [Guided Feature Gallery](Feature-Gallery)
 - [One-click commit & push](#one-click-commit--push)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
@@ -210,6 +216,114 @@ never written to Git child environments or logs.
 
 ---
 
+## Guided Git, GitHub, and provider functions
+
+Desktop Material turns useful Git, GitHub CLI, and GitHub API capabilities into **named,
+task-specific workflows**. You choose an action, complete a focused form, review any destructive
+or worktree-changing step, and receive the result in the app. The product UI is not a searchable
+catalogue of raw commands or API endpoints.
+
+The complete guided implementation described here still needs the final exact-tree production and
+off-screen acceptance gate before publication; earlier screenshots prove only the historical trees
+named in their evidence manifests.
+
+The [Guided Feature Gallery](Feature-Gallery) is the synthetic-data visual manifest for the 14
+guided views. Its presence does not pre-claim the remaining publication gates.
+
+### Shallow clone
+
+Open **File → Clone repository… → URL** when you need only recent history:
+
+1. Enter the repository URL and local path.
+2. Enable **Shallow clone**.
+3. Set **Commit depth** to the number of commits to fetch.
+4. Review the summary, then choose **Clone**.
+
+The form explains that it fetches the current branch and recursive submodules. If you need older
+history later, use the named deepen-history action in **Repository tools**.
+
+![Reviewed shallow clone with a bounded commit depth](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-shallow-clone-safe.png)
+
+![Deepen-history result without displaying the signed-in account used](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepen.png)
+
+### Sparse checkout
+
+Open **Repository → Manage sparse checkout…** to keep selected directories in a large worktree.
+The side panel reports whether sparse checkout is enabled, explains cone mode, and accepts one
+repository-relative directory per line. It normalizes slashes and rejects absolute paths,
+traversal, option-like input, control characters, blanks, and duplicates before the review step.
+
+Choose **Review enable** only after the valid-directory count matches your intent. The disabled
+state leaves all working-tree paths eligible to appear locally.
+
+These forms wrap labels and stack actions as space narrows. Page-level sideways scrolling is not
+part of the workflow; only inherently spatial content such as code, diffs, and logs may scroll
+horizontally when preserving columns is necessary.
+
+![Validated cone-mode sparse-checkout review](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
+
+### Repository Tools administration
+
+Open **Repository → Repository tools…** for the reviewed administration workspaces:
+
+- **Patch series** exports a bounded commit range and imports an inspected series without exposing
+  a free-form shell.
+- **Rewrite local commits** builds an explicit reorder/reword/squash/fixup/drop plan, previews the
+  resulting sequence, and revalidates the reviewed HEAD before starting.
+- **Signing** inspects effective commit/tag signing settings and applies a reviewed configuration;
+  **Git LFS** inspects availability, attributes, tracked patterns, and guarded lifecycle operations.
+- **Guided bisect** reviews exact good/bad commits, resumes an existing session, records good/bad/
+  skip verdicts for the displayed commit, and resets safely when finished.
+- **Repository hooks** reports the effective hooks directory and known client hooks without showing
+  script contents or absolute paths. Create-only and disable/restore actions revalidate the exact
+  reviewed file and configuration before mutation.
+- **Provider triage** binds the selected account and repository to bounded Issue and pull-request
+  summaries for GitHub, GitLab, or Bitbucket. It exposes safe provider links and explicit partial,
+  capped, unsupported, and error states; Bitbucket Issues are explicitly unsupported.
+
+![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
+
+![Account- and repository-bound provider triage with bounded results](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-provider-triage.png)
+
+### Branch, worktree, stash, remote, and conflict controls
+
+- Use a branch context menu to **pin**, **hide**, or **solo** a branch; the filtered-state controls
+  make restoring hidden branches explicit. Merge previews show exact paths from `merge-tree` before
+  the worktree is changed.
+- The Worktrees view supports reviewed add, lock/unlock, move, rename, repair, remove, and prune
+  operations, while preserving the existing open-in-new-window workflow.
+- The repository-wide Stash Manager can create, inspect, apply, pop, rename, branch from, or delete
+  the exact selected stash and keeps partial-success details visible.
+- **Repository settings → Remote** manages every named remote through reviewed add, rename, URL/
+  push-URL update, default selection, and guarded removal operations.
+
+![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
+
+![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
+
+### GitHub lifecycle workspaces
+
+- Pull-request creation loads repository templates and available reviewers, assignees, and labels.
+  The lifecycle dialog then inspects exact details, updates metadata, submits a review, closes or
+  reopens, and merges only the reviewed pull request and head state.
+- The Actions view pages artifacts beyond the first result set, downloads through bounded
+  credential-stripping redirects, records a local digest and attestation-presence context, and
+  shows the effective rules for the current branch.
+- **Releases** pages repository releases and assets, reviews create/update/delete operations, and
+  uses bounded cancelable upload/download transfers that present filenames rather than local paths.
+- **Issues** supports bounded browse/search/filter/sort/pagination, exact detail and comments,
+  metadata edits, new comments, and close/reopen operations tied to the reviewed issue snapshot.
+
+![Native pull-request creation with bounded metadata](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-native-pull-request.png)
+
+![Bounded Actions artifact download with a locally computed digest](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-download.png)
+
+![Repository-bound Releases and assets workspace](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-releases.png)
+
+![Issue detail, comments, and reviewed lifecycle controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-issues.png)
+
+---
+
 ## One-click commit & push
 
 For quick, low-ceremony commits, use **one-click commit & push**:
@@ -227,17 +341,19 @@ see [Automation](Automation).
 
 ## Notification centre
 
-The **bell** in the app chrome opens the **notification centre** side panel, which is backed by its
-own local git repo.
+The **bell** in the app chrome opens the **notification centre** side panel. Its two named views
+keep local app events separate from GitHub inbox items:
 
-- An **unread badge** on the bell shows how many notifications you haven't seen.
-- **Mark read / unread** individually, or clear the badge in bulk.
-- **Delete** notifications you no longer need.
+- **Local** is backed by its own git repo. An unread badge shows how many notifications you have not
+  seen; you can mark items read/unread or delete them.
+- **GitHub** uses an explicit account selector with **All**, **Unread**, and **Participating only**
+  controls. When no account is signed in, the complete **No signed-in accounts** state remains
+  visible and tells you to sign in before refreshing the inbox.
 
-Because the centre is backed by a git repo, its state is versioned along with the rest of your
-per-account data.
+The account, filters, and empty state are part of the guided inbox workflow rather than a `gh`
+command or GitHub API search screen.
 
-![Git-backed notification centre](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-center.png)
+![GitHub notification view with the no-signed-in-account state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
 
 ---
 
@@ -250,6 +366,10 @@ The **Actions** panel brings CI into the app:
 - **Re-run** a whole run or **re-run only the failed jobs**.
 - Drill into a run to see its **jobs and steps**, and open the **in-app log viewer** to read output
   without leaving Desktop Material. Search the loaded log to isolate a command, warning, or error.
+- Page through the run's **artifacts**, review size/expiry/attestation-presence context, and download
+  an exact artifact through the bounded transfer path with a local digest.
+- Inspect the **effective branch rules** applied to the current branch, including partial or
+  unavailable provider states without treating them as an empty rule set.
 - Trigger manual workflows with the **`workflow_dispatch` dialog** — pick the workflow, ref, and
   inputs, and dispatch.
 
@@ -329,8 +449,9 @@ all stash entries instead of treating only the newest one as available:
 
 1. Expand **Stashes** in Changes and select an entry by its label.
 2. Inspect that stash's file list and individual diffs before acting.
-3. Choose **Restore** to pop the selected entry back into the worktree, or use its context menu to
-   discard that exact stash after confirmation.
+3. Choose apply or pop for the exact entry, or review rename, create-branch, and delete actions.
+4. If Git completes only part of an operation, keep the reported state visible and inspect the
+   repository before retrying instead of assuming an all-or-nothing result.
 
 Switching branches can still offer to stash local work, and the resulting entry appears in the same
 list.
@@ -346,8 +467,11 @@ list.
   remote. A repository-bound identity is preferred within the otherwise stable account order.
 - Pin important repositories from their context menu, hide the automatically maintained Recent
   group if desired, and use grouping to keep large repository lists manageable.
-- Use branch presets/default-branch controls when creating or switching branches.
+- Use branch presets/default-branch controls when creating or switching branches; pin, hide, solo,
+  and restore branch visibility from branch context and filtered-state controls.
 - Set a repository-specific external editor when the global editor is not appropriate.
+- Manage every named remote in **Repository settings → Remote**, and administer add/move/rename/
+  lock/repair/remove/prune worktree operations from the Worktrees view.
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution.
 
 SSH and non-authentication failures never start account fallback. The selected stable account key

@@ -39,6 +39,8 @@ import {
   BuildRunStore,
   NotificationCentreStore,
   ActionsStore,
+  GitHubReleasesStore,
+  GitHubIssuesStore,
 } from '../lib/stores'
 import { GitHubUserDatabase } from '../lib/databases'
 import { SelectionType, IAppState } from '../lib/app-state'
@@ -392,6 +394,8 @@ window.addEventListener('beforeunload', () => {
 
 const buildRunStore = new BuildRunStore()
 const actionsStore = new ActionsStore(accountsStore)
+const releasesStore = new GitHubReleasesStore(accountsStore)
+const issueWorkflowsStore = new GitHubIssuesStore(accountsStore)
 
 const dispatcher = new Dispatcher(
   appStore,
@@ -509,6 +513,8 @@ ReactDOM.render(
     repositoryTabsStore={repositoryTabsStore}
     buildRunStore={buildRunStore}
     actionsStore={actionsStore}
+    releasesStore={releasesStore}
+    issueWorkflowsStore={issueWorkflowsStore}
     startTime={startTime}
   />,
   document.getElementById('desktop-app-container')!

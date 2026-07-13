@@ -9,12 +9,17 @@ workflow intact underneath.
 On top of that shell, Desktop Material ships multi-provider accounts and organizations, automation,
 GitHub Actions and logs, agent access, searchable graph History, multiple stashes, pull-all,
 multi-window workflows, per-account repository tabs, Git-backed settings and notifications, and a
-non-modal dialog framework.
+non-modal dialog framework. The current integration tree also contains the complete guided
+P0/P1/P2/Later Git, GitHub, and provider parity wave described below.
 
 > **Status:** Desktop Material is in **active development**. Preview builds are published from the
 > project's [GitHub Releases](https://github.com/codingmachineedge/desktop-material/releases).
 > Feature-parity references come from [desktop-plus](https://github.com/severity1/desktop-plus)
 > (MIT).
+>
+> The guided M19 source implementation is complete, but this documentation does not pre-claim its
+> final production/off-screen acceptance, `main` promotion, CI, Pages/wiki, installer/release, or
+> cleanup evidence. Follow the repository's PLAN and HANDOFF for that closing gate.
 
 ![Desktop Material Changes view with the MD3 shell](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-workspace-changes.png)
 
@@ -24,7 +29,8 @@ non-modal dialog framework.
 
 | Page | What it covers |
 | --- | --- |
-| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, organizations, providers, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
+| [User Guide](User-Guide) | Task-oriented walkthrough for accounts, guided Git/GitHub/provider functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
+| [Guided Feature Gallery](Feature-Gallery) | Synthetic-data visual manifest for clone, pull-all, deepen, sparse checkout, repository administration, GitHub lifecycle, and provider triage. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
@@ -32,7 +38,7 @@ non-modal dialog framework.
 
 ---
 
-## Shipped today
+## Product capabilities
 
 - **Material Design 3 Expressive shell** with animated light/dark theming and M3 color tokens: an
   app bar with an inline pill menu, a left icon navigation rail (Changes with a badge, History,
@@ -79,17 +85,44 @@ non-modal dialog framework.
 - **Multiple stashes** — create and keep multiple entries, select one to inspect its files and diffs,
   then restore or discard that exact stash.
 - **Repository power tools** — pin and group repositories, pull all with a per-repository result,
-  use branch presets and default-branch controls, set a repository-specific editor, and multi-clone
-  in parallel or sequence with URL-only import/export.
+  use branch presets and default-branch controls, set a repository-specific editor, shallow-clone
+  with a commit-depth control, manage cone-mode sparse checkout, and multi-clone in parallel or
+  sequence with URL-only import/export. These are named, validated workflows rather than a raw Git,
+  `gh`, or API-command catalogue.
 - **Multi-window workflows** — open a repository or worktree in a separate window; each window keeps
   its own selected repository and persisted tab state while commands route to the correct window.
-- **Notification centre** — unread state, mark-all/delete controls, and restoreable history backed by
-  a dedicated local git repository.
+- **Notification centre** — a Git-backed Local view plus an account-aware GitHub inbox with
+  All/Unread and participating-only filters, including a complete no-signed-in-account state.
 - **Clipping-safe scaling** — choose 50–200% UI scaling; auto-fit caps the effective scale when a
   small window cannot contain the requested size. At the supported minimum window, 200% safely
   auto-fits to 96% while preserving every title-bar, navigation, Appearance, and footer control.
 - **Responsive overflow guard** — at 1450×997, the toolbar and complete Changes card remain inside
   the viewport, including filter, commit-composer, and action controls, with no horizontal overflow.
+- **No page-level sideways scrolling** — task forms wrap text and stack controls when space narrows.
+  Horizontal scrolling is reserved for spatial content such as code, diffs, and logs when needed.
+
+### Guided M19 parity implementation
+
+The implementation-complete guided wave adds named task surfaces instead of a raw command or API
+catalogue:
+
+- **Git administration** — patch-series exchange, structured local-commit rewrite, commit/tag
+  signing, Git LFS, complete worktree lifecycle, branch pin/hide/solo/restore, exact merge-tree
+  conflict paths, guided bisect, the repository-wide Stash Manager, guarded Remote Manager, and the
+  safe Repository Hooks Manager.
+- **GitHub lifecycle** — pull-request templates/metadata/review/update/close/reopen/merge, paginated
+  Actions artifacts with bounded download/digest context, effective branch rules, Releases/assets,
+  and richer Issue browsing/edit/comment/close/reopen workflows.
+- **Provider-neutral triage** — bounded Issue and pull-request summaries for the exact selected
+  GitHub, GitLab, or Bitbucket account and repository, with safe links and explicit unsupported,
+  partial, capped, and error states. Bitbucket Issues are explicitly unsupported by that provider.
+
+These functions remain marked **integration complete, final acceptance pending** until their exact
+production tree and public promotion evidence is recorded.
+
+The [Guided Feature Gallery](Feature-Gallery) maps the candidate 14-image set to these workflows.
+Its asset list is documentation metadata, not a substitute for the final `main`, CI, public-site,
+wiki, installer, release, or cleanup gates.
 
 ![History search and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
@@ -100,3 +133,5 @@ non-modal dialog framework.
 ![Requested 200 percent UI scale auto-fitted without clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
 
 ![Responsive regression proof at 1450 by 997 with toolbar and Changes controls fully contained and no horizontal overflow](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-responsive-overflow-fixed.png)
+
+![Account-aware GitHub notifications](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)

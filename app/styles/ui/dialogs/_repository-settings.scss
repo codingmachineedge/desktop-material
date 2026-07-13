@@ -1,5 +1,8 @@
 #repository-settings {
+  container-name: repository-settings-dialog;
+  container-type: inline-size;
   max-height: calc(100vh - var(--spacing-quad));
+  max-width: calc(100vw - var(--spacing-double));
   overflow: hidden;
 
   .dialog-header,
@@ -31,10 +34,12 @@
       }
     }
   }
-  width: 600px;
+  width: min(600px, calc(100vw - var(--spacing-double)));
 
   .dialog-content {
-    min-height: 305px;
+    min-width: 0;
+    min-height: min(305px, calc(100vh - 150px));
+    overflow-x: hidden;
   }
 
   .no-remote {
@@ -123,71 +128,127 @@
     min-height: 0;
 
     .active-tab {
+      container-name: repository-settings-pane;
+      container-type: inline-size;
       border-left: var(--base-border);
       flex: 1;
       min-width: 0;
       min-height: 0;
+      overflow-x: hidden;
       overflow-y: auto;
     }
   }
 
-  // MD3 multi-remote manager — list rows + an add-remote input row.
+  // MD3 Remote Manager — reviewable, responsive, and horizontally bounded.
   .remotes-manager {
-    display: flex;
-    flex-direction: column;
+    display: grid;
     gap: var(--spacing-double);
+    min-width: 0;
+    overflow-x: hidden;
+
+    &,
+    * {
+      box-sizing: border-box;
+      min-width: 0;
+    }
+
+    h2,
+    h3,
+    p {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .remote-manager-intro {
+      display: grid;
+      gap: var(--spacing-half);
+
+      p {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: var(--font-size-sm);
+      }
+    }
 
     .remotes-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-half);
+      display: grid;
+      gap: var(--spacing);
     }
 
     .remote-row {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing);
-      padding: var(--spacing-half) var(--spacing);
+      background: var(--md-sys-color-surface-container);
       border: 1px solid var(--md-sys-color-outline-variant);
       border-radius: var(--md-sys-shape-corner-large);
-      background: var(--md-sys-color-surface-container);
+      display: grid;
+      gap: var(--spacing);
+      overflow: hidden;
+      padding: var(--spacing-double);
 
-      .remote-name {
-        display: flex;
+      header {
         align-items: center;
-        gap: var(--spacing-half);
-        flex: 0 0 auto;
-        min-width: 96px;
-        max-width: 140px;
-        font-weight: var(--font-weight-semibold);
-        color: var(--md-sys-color-on-surface);
-        overflow: hidden;
+        display: flex;
+        gap: var(--spacing);
+        justify-content: space-between;
 
-        span {
+        > div {
+          align-items: center;
+          display: flex;
+          gap: var(--spacing-half);
+          overflow: hidden;
+        }
+
+        strong {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
         .remote-icon {
-          flex-shrink: 0;
           color: var(--md-sys-color-on-surface-variant);
+          flex-shrink: 0;
         }
       }
 
-      .remote-badge {
-        flex-shrink: 0;
-        padding: 1px var(--spacing-half);
-        border-radius: 999px;
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-normal);
-        color: var(--md-sys-color-on-secondary-container);
-        background: var(--md-sys-color-secondary-container);
+      .remote-fields {
+        display: grid;
+        gap: var(--spacing);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
 
-      .remote-url {
-        flex: 1;
-        min-width: 0;
+      .remote-fetch-url,
+      .remote-separate-push,
+      .remote-push-url,
+      .remote-masked-note,
+      .remote-default-help {
+        grid-column: 1 / -1;
+      }
+
+      .text-box-component,
+      .select-component {
+        width: 100%;
+      }
+
+      .remote-badge {
+        background: var(--md-sys-color-secondary-container);
+        border-radius: 999px;
+        color: var(--md-sys-color-on-secondary-container);
+        flex-shrink: 0;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-normal);
+        padding: 1px var(--spacing-half);
+      }
+
+      .remote-masked-note,
+      .remote-default-help {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: var(--font-size-sm);
+        line-height: 1.45;
+      }
+
+      .remote-masked-note {
+        background: var(--md-sys-color-tertiary-container);
+        border-radius: var(--md-sys-shape-corner-medium);
+        color: var(--md-sys-color-on-tertiary-container);
+        padding: var(--spacing);
       }
 
       .remote-remove {
@@ -203,51 +264,148 @@
       }
     }
 
-    .add-remote {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing);
+    .remote-empty-state {
+      background: var(--md-sys-color-surface-container);
+      border: 1px dashed var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+      color: var(--md-sys-color-on-surface-variant);
       padding: var(--spacing-double);
+      text-align: center;
+    }
+
+    .add-remote,
+    .remote-review {
+      background: var(--md-sys-color-surface);
       border: 1px solid var(--md-sys-color-outline-variant);
       border-radius: var(--md-sys-shape-corner-large);
-      background: var(--md-sys-color-surface);
+      display: grid;
+      gap: var(--spacing);
+      overflow: hidden;
+      padding: var(--spacing-double);
+    }
+
+    .add-remote {
+      > div:first-child {
+        display: grid;
+        gap: var(--spacing-half);
+
+        p {
+          color: var(--md-sys-color-on-surface-variant);
+          font-size: var(--font-size-sm);
+        }
+      }
 
       .add-remote-fields {
-        display: flex;
+        display: grid;
         gap: var(--spacing);
-
-        .add-remote-name {
-          flex: 0 0 34%;
-          min-width: 0;
-        }
-
-        .add-remote-url {
-          flex: 1;
-          min-width: 0;
-        }
+        grid-template-columns: minmax(120px, 0.34fr) minmax(0, 1fr);
       }
 
-      .add-remote-error {
+      .add-remote-actions,
+      .remote-review-actions {
         display: flex;
-        align-items: center;
-        gap: var(--spacing-half);
-        color: var(--md-sys-color-error);
-        font-size: var(--font-size-sm);
-
-        .octicon {
-          flex-shrink: 0;
-        }
-      }
-
-      .add-remote-actions {
-        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing);
         justify-content: flex-end;
 
-        .add-remote-button {
-          display: inline-flex;
-          align-items: center;
-          gap: var(--spacing-half);
+        .button-component {
+          height: auto;
+          min-height: 32px;
+          white-space: normal;
         }
+      }
+
+      .add-remote-button {
+        align-items: center;
+        display: inline-flex;
+        gap: var(--spacing-half);
+      }
+    }
+
+    .remote-review {
+      background: var(--md-sys-color-tertiary-container);
+      color: var(--md-sys-color-on-tertiary-container);
+
+      ul {
+        display: grid;
+        gap: var(--spacing-half);
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      li {
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        border-radius: var(--md-sys-shape-corner-medium);
+        display: grid;
+        gap: 2px;
+        padding: var(--spacing);
+
+        &.destructive {
+          background: var(--md-sys-color-error-container);
+          color: var(--md-sys-color-on-error-container);
+        }
+
+        span {
+          font-weight: var(--font-weight-semibold);
+          overflow-wrap: anywhere;
+        }
+
+        p {
+          font-size: var(--font-size-sm);
+        }
+      }
+
+      .remote-account-warning {
+        background: var(--md-sys-color-error-container);
+        border-radius: var(--md-sys-shape-corner-medium);
+        color: var(--md-sys-color-on-error-container);
+        font-weight: var(--font-weight-semibold);
+        padding: var(--spacing);
+      }
+
+      .remote-review-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing);
+      }
+    }
+
+    .remote-manager-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing);
+      justify-content: flex-end;
+
+      .remote-confirmed {
+        align-items: center;
+        color: var(--md-sys-color-on-surface);
+        display: inline-flex;
+        font-size: var(--font-size-sm);
+        gap: var(--spacing);
+      }
+    }
+
+    .remote-manager-results {
+      display: grid;
+      gap: var(--spacing-half);
+
+      > p:first-child {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: var(--font-size-sm);
+      }
+    }
+
+    .add-remote-error {
+      align-items: flex-start;
+      color: var(--md-sys-color-error);
+      display: flex;
+      font-size: var(--font-size-sm);
+      gap: var(--spacing-half);
+
+      .octicon {
+        flex-shrink: 0;
       }
     }
   }
@@ -628,6 +786,183 @@
         align-items: center;
         gap: 6px;
       }
+    }
+  }
+
+  // Collapse the vertical label rail into one row of accessible icon buttons.
+  // The text remains in the DOM as each button's accessible name.
+  @container repository-settings-dialog (max-width: 520px) {
+    .tab-container {
+      flex-direction: column;
+
+      > .tab-bar.vertical {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+        width: 100%;
+        padding: 4px 8px;
+        overflow: visible;
+
+        .tab-bar-item {
+          min-width: 40px;
+          min-height: 40px;
+          margin: 0;
+          padding: 8px;
+          justify-content: center;
+          font-size: 0;
+
+          .icon {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+          }
+        }
+      }
+
+      .active-tab {
+        border-top: var(--base-border);
+        border-left: 0;
+      }
+    }
+
+    .dialog-footer {
+      padding: var(--spacing);
+
+      .button-group {
+        width: 100%;
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: var(--spacing-half);
+      }
+
+      button {
+        max-width: 100%;
+        min-width: min(120px, 100%);
+        flex: 1 1 120px;
+        margin: 0;
+      }
+    }
+  }
+
+  // Stack field groups based on the active pane, which is often much narrower
+  // than either the dialog or the application viewport.
+  @container repository-settings-pane (max-width: 500px) {
+    .repository-automation-settings .automation-override-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .repository-account-setting {
+      align-items: stretch;
+      flex-direction: column;
+      margin: var(--spacing);
+      padding: var(--spacing-double);
+
+      p {
+        max-width: none;
+        overflow-wrap: anywhere;
+      }
+
+      .account-picker {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .no-remote {
+      align-items: stretch;
+      flex-direction: column;
+
+      button {
+        width: 100%;
+        align-self: stretch;
+      }
+    }
+
+    .remotes-manager {
+      .remote-row {
+        padding: var(--spacing);
+
+        .remote-fields {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .remote-name-input,
+        .remote-fetch-url,
+        .remote-separate-push,
+        .remote-push-url,
+        .remote-prune,
+        .remote-default-branch,
+        .remote-masked-note,
+        .remote-default-help {
+          grid-column: 1;
+        }
+      }
+
+      .add-remote-fields {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .add-remote-actions,
+      .remote-review-actions,
+      .remote-manager-actions {
+        align-items: stretch;
+        flex-direction: column;
+
+        .button-component {
+          justify-content: center;
+          width: 100%;
+        }
+      }
+    }
+
+    .submodules-settings {
+      .submodules-section-header {
+        align-items: stretch;
+        flex-direction: column;
+
+        .button-component {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+
+      .submodule-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .submodule-row-heading {
+        flex-wrap: wrap;
+      }
+
+      .submodule-row-path {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .submodule-row-url {
+        max-width: 100%;
+      }
+
+      .submodule-row-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+
+        .button-component {
+          flex: 1 1 88px;
+          min-width: min(88px, 100%);
+        }
+      }
+
+      .submodules-add-actions .button-component {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .build-run-section-description code,
+    .submodules-error,
+    .add-remote-error {
+      overflow-wrap: anywhere;
     }
   }
 }

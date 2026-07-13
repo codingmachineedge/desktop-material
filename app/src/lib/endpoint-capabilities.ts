@@ -162,6 +162,16 @@ export const supportsActions = endpointSatisfies({
   es: '>= 3.1.0',
 })
 
+/** Releases and release assets are available across supported GitHub hosts. */
+export const supportsReleases = endpointSatisfies({
+  dotcom: true,
+  es: '>= 3.1.0',
+})
+
 export const supportsAliveSessions = endpointSatisfies({ dotcom: true })
 
-export const supportsRepoRules = endpointSatisfies({ dotcom: true })
+/** Repository rulesets reached GitHub Enterprise Server in the 3.12 series. */
+export const supportsRepoRules = endpointSatisfies({
+  dotcom: true,
+  es: '>= 3.12.0',
+})

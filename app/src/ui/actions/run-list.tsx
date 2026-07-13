@@ -16,7 +16,12 @@ interface IRunListProps {
   readonly onSelect: (run: IAPIWorkflowRun) => void
   readonly onRerun: (run: IAPIWorkflowRun) => void
   readonly onRerunFailed: (run: IAPIWorkflowRun) => void
+  readonly onRequestCancel: (run: IAPIWorkflowRun) => void
 }
+
+export const isWorkflowRunActive = (run: IAPIWorkflowRun) =>
+  run.status === APICheckStatus.Queued ||
+  run.status === APICheckStatus.InProgress
 
 export function getRunTone(run: IAPIWorkflowRun) {
   if (run.status !== APICheckStatus.Completed) {
@@ -56,12 +61,19 @@ class RunListItem extends React.PureComponent<
     event.stopPropagation()
     this.props.onRerunFailed(this.props.run)
   }
+  private requestCancel = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    this.props.onRequestCancel(this.props.run)
+  }
 
   public render() {
     const { run, selectedRunId, busyRunId } = this.props
     const status = getRunTone(run)
     const failed = run.conclusion === APICheckConclusion.Failure
+    const active = isWorkflowRunActive(run)
     const actor = run.actor
+    const title = run.display_title || run.name
+    const branch = run.head_branch ?? 'detached'
 
     return (
       <li>
@@ -80,14 +92,16 @@ class RunListItem extends React.PureComponent<
               {status.label}
             </span>
             <span className="actions-run-summary">
-              <strong>{run.display_title || run.name}</strong>
+              <strong title={title}>{title}</strong>
               <span className="actions-run-meta">
                 <span className="branch-chip">
-                  {run.head_branch ?? 'detached'}
+                  <span className="sr-only">Branch: </span>
+                  {branch}
                 </span>
                 <span>{run.event}</span>
                 {actor && (
                   <span className="actions-actor">
+                    <span className="sr-only">Actor: </span>
                     <img src={actor.avatar_url} alt="" />
                     {actor.login}
                   </span>
@@ -98,22 +112,35 @@ class RunListItem extends React.PureComponent<
             <span className="actions-run-number">#{run.run_number}</span>
           </button>
           <span className="actions-run-buttons">
-            {failed && (
+            {active ? (
               <Button
                 size="small"
                 disabled={busyRunId === run.id}
-                onClick={this.rerunFailed}
+                onClick={this.requestCancel}
+                ariaLabel={`Cancel workflow run ${run.run_number ?? run.id}`}
               >
-                Re-run failed
+                Cancel run
               </Button>
+            ) : (
+              <>
+                {failed && (
+                  <Button
+                    size="small"
+                    disabled={busyRunId === run.id}
+                    onClick={this.rerunFailed}
+                  >
+                    Re-run failed
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  disabled={busyRunId === run.id}
+                  onClick={this.rerun}
+                >
+                  Re-run
+                </Button>
+              </>
             )}
-            <Button
-              size="small"
-              disabled={busyRunId === run.id}
-              onClick={this.rerun}
-            >
-              Re-run
-            </Button>
             <LinkButton uri={run.html_url}>GitHub</LinkButton>
           </span>
         </div>

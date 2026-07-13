@@ -23,6 +23,7 @@ export type MergeTreeSuccess = {
 export type MergeTreeError = {
   readonly kind: ComputedAction.Conflicts
   readonly conflictedFiles: number
+  readonly conflictedFilePaths: ReadonlyArray<string>
 }
 
 export type MergeTreeUnsupported = {

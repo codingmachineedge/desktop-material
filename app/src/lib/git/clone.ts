@@ -1,6 +1,6 @@
 import { git, IGitStringExecutionOptions } from './core'
 import { ICloneProgress } from '../../models/progress'
-import { CloneOptions } from '../../models/clone-options'
+import { CloneOptions, getShallowCloneArgs } from '../../models/clone-options'
 import { CloneProgressParser, executionOptionsWithProgress } from '../progress'
 import { getDefaultBranch } from '../helpers/default-branch'
 import { envForRemoteOperation } from './environment'
@@ -72,6 +72,8 @@ export async function clone(
   if (options.branch) {
     args.push('-b', options.branch)
   }
+
+  args.push(...getShallowCloneArgs(options))
 
   args.push('--', url, path)
 

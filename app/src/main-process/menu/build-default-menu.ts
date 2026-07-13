@@ -212,6 +212,12 @@ export function buildDefaultMenuTemplate({
         click: emit('show-history'),
       },
       {
+        label: __DARWIN__ ? 'Repository Tools' : 'Repository to&ols',
+        id: 'show-repository-tools',
+        accelerator: 'CmdOrCtrl+4',
+        click: emit('show-repository-tools'),
+      },
+      {
         label: __DARWIN__ ? 'Show Repository List' : 'Repository &list',
         id: 'show-repository-list',
         accelerator: 'CmdOrCtrl+T',
@@ -425,6 +431,13 @@ export function buildDefaultMenuTemplate({
         label: __DARWIN__ ? 'Manage .gitignore…' : 'Manage .&gitignore…',
         id: 'manage-gitignore',
         click: emit('manage-gitignore'),
+      },
+      {
+        label: __DARWIN__
+          ? 'Manage Sparse Checkout…'
+          : 'Manage sparse chec&kout…',
+        id: 'manage-sparse-checkout',
+        click: emit('manage-sparse-checkout'),
       },
       separator,
       {

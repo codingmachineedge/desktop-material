@@ -20,6 +20,10 @@ describe('IPC channel contract', () => {
     : never
 
   const expectedRequestChannels = [
+    'cancel-actions-transfer',
+    'actions-transfer-progress',
+    'cancel-github-release-transfer',
+    'github-release-transfer-progress',
     'agent-command',
     'agent-command-result',
     'agent-server-status',
@@ -79,9 +83,15 @@ describe('IPC channel contract', () => {
     'uninstall-windows-cli',
     'build-run-log',
     'build-run-state',
+    'cli-command-output',
+    'cli-command-state',
   ] as const
 
   const expectedResponseChannels = [
+    'download-actions-artifact',
+    'fetch-actions-job-log',
+    'download-release-asset',
+    'upload-release-asset',
     'get-agent-server-status',
     'regenerate-agent-server-token',
     'get-path',
@@ -102,6 +112,7 @@ describe('IPC channel contract', () => {
     'resolve-proxy',
     'show-save-dialog',
     'show-open-dialog',
+    'show-open-dialog-multiple',
     'is-window-maximized',
     'get-apple-action-on-double-click',
     'should-use-dark-colors',
@@ -112,6 +123,10 @@ describe('IPC channel contract', () => {
     'request-notifications-permission',
     'start-build-run',
     'cancel-build-run',
+    'get-cli-workbench-catalog',
+    'start-cli-command',
+    'cancel-cli-command',
+    'write-cli-command-input',
   ] as const
 
   describe('RequestChannels', () => {
@@ -163,6 +178,7 @@ describe('IPC channel contract', () => {
         'open-external',
         'show-save-dialog',
         'show-open-dialog',
+        'show-open-dialog-multiple',
         'should-use-dark-colors',
       ]
       for (const channel of critical) {
@@ -171,6 +187,30 @@ describe('IPC channel contract', () => {
           `Missing critical channel: ${channel}`
         )
       }
+    })
+
+    it('binds start-cli-command to a structured recipe with no raw execution fields', () => {
+      const request: Parameters<
+        RequestResponseChannels['start-cli-command']
+      >[0] = {
+        id: 'ipc-guided-recipe',
+        repositoryPath: 'C:\\work\\repository',
+        recipe: {
+          kind: 'repository-tool',
+          operation: 'status-summary',
+        },
+        confirmed: false,
+      }
+
+      assert.deepStrictEqual(Object.keys(request).sort(), [
+        'confirmed',
+        'id',
+        'recipe',
+        'repositoryPath',
+      ])
+      assert.equal('args' in request, false)
+      assert.equal('cwd' in request, false)
+      assert.equal('tool' in request, false)
     })
   })
 })

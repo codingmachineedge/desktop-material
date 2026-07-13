@@ -10,7 +10,12 @@ interface IPushBranchCommitsProps {
   readonly dispatcher: Dispatcher
   readonly repository: Repository
   readonly branch: Branch
-  readonly onConfirm: (repository: Repository, branch: Branch) => void
+  readonly baseBranch?: Branch
+  readonly onConfirm: (
+    repository: Repository,
+    branch: Branch,
+    baseBranch?: Branch
+  ) => void
   readonly onDismissed: () => void
 
   /**
@@ -158,7 +163,11 @@ export class PushBranchCommits extends React.Component<
     e: React.MouseEvent<HTMLButtonElement>
   ) => {
     e.preventDefault()
-    this.props.onConfirm(this.props.repository, this.props.branch)
+    this.props.onConfirm(
+      this.props.repository,
+      this.props.branch,
+      this.props.baseBranch
+    )
     this.props.onDismissed()
   }
 
@@ -173,7 +182,7 @@ export class PushBranchCommits extends React.Component<
       this.setState({ isPushingOrPublishing: false })
     }
 
-    this.props.onConfirm(repository, branch)
+    this.props.onConfirm(repository, branch, this.props.baseBranch)
     this.props.onDismissed()
   }
 }

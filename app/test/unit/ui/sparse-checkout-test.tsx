@@ -1,0 +1,432 @@
+import assert from 'node:assert'
+import { describe, it, mock } from 'node:test'
+import * as React from 'react'
+
+import { Repository } from '../../../src/models/repository'
+import { parseSparseCheckoutDirectories } from '../../../src/lib/git/sparse-checkout-parser'
+import { DialogStackContext } from '../../../src/ui/dialog'
+import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+
+class TestSparseCheckoutError extends Error {}
+
+mock.module('../../../src/lib/git/sparse-checkout', {
+  namedExports: {
+    disableSparseCheckout: async () => {},
+    getSparseCheckoutState: async () => {
+      throw new Error('Use the injected test client.')
+    },
+    parseSparseCheckoutDirectories,
+    reapplySparseCheckout: async () => {},
+    setSparseCheckoutDirectories: async () => [],
+    SparseCheckoutInputLengthLimit: 256 * 1024,
+    SparseCheckoutUnavailableError: TestSparseCheckoutError,
+  },
+})
+
+const disabledState = {
+  supported: true,
+  enabled: false,
+  coneMode: false,
+  entries: [],
+  isUnborn: false,
+  isSubmodule: false,
+  isLinkedWorktree: false,
+}
+
+describe('SparseCheckoutManager', () => {
+  it('freezes reviewed input, focuses cancellation, and refreshes after exact abort', async () => {
+    const signals = new Array<AbortSignal | undefined>()
+    const inputs = new Array<string>()
+    let refreshes = 0
+    let stateLoads = 0
+    const client = {
+      getState: async () => {
+        stateLoads++
+        return disabledState
+      },
+      setDirectories: async (
+        _repositoryPath: string,
+        input: string,
+        signal?: AbortSignal
+      ) => {
+        inputs.push(input)
+        signals.push(signal)
+        return new Promise<ReadonlyArray<string>>((_, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(new TestSparseCheckoutError('cancelled')),
+            { once: true }
+          )
+        })
+      },
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    let dismissals = 0
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+
+    render(
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={async () => {
+            refreshes++
+          }}
+          onDismissed={() => {
+            dismissals++
+          }}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    fireEvent.change(editor, { target: { value: 'src\\ui/' } })
+    const review = screen.getByRole('button', { name: 'Review enable' })
+    fireEvent.click(review)
+
+    assert.ok(screen.getByRole('alertdialog'))
+    const confirm = screen.getByRole('button', {
+      name: 'Apply directory selection',
+    })
+    await waitFor(() => assert.equal(document.activeElement, confirm))
+    assert.equal((editor as HTMLTextAreaElement).disabled, true)
+    const refresh = screen.getByRole('button', {
+      name: 'Refresh sparse checkout',
+    })
+    assert.equal(refresh.getAttribute('aria-disabled'), 'true')
+
+    // Event-boundary guards keep the exact reviewed value frozen even if a
+    // synthetic event bypasses the disabled DOM controls.
+    fireEvent.change(editor, { target: { value: 'different/path' } })
+    fireEvent.click(refresh)
+    assert.equal(stateLoads, 1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
+    await waitFor(() => assert.equal(document.activeElement, review))
+    assert.equal((editor as HTMLTextAreaElement).value, 'src\\ui/')
+    assert.equal(dismissals, 0)
+
+    fireEvent.click(review)
+    const reviewedConfirm = screen.getByRole('button', {
+      name: 'Apply directory selection',
+    })
+    await waitFor(() => assert.equal(document.activeElement, reviewedConfirm))
+
+    fireEvent.click(reviewedConfirm)
+    const cancel = await screen.findByRole('button', {
+      name: 'Cancel operation',
+    })
+    await waitFor(() => assert.equal(document.activeElement, cancel))
+    assert.deepEqual(inputs, ['src/ui'])
+
+    const closeShortcut = __DARWIN__
+      ? { key: 'w', metaKey: true }
+      : { key: 'w', ctrlKey: true }
+    fireEvent.keyDown(window, closeShortcut)
+    assert.equal(signals[0]?.aborted, false)
+    assert.equal(dismissals, 0)
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => assert.equal(signals[0]?.aborted, true))
+    await screen.findByText('Operation cancelled. Repository state refreshed.')
+    assert.equal(refreshes, 1)
+    assert.ok(stateLoads >= 2)
+  })
+
+  it('owns shortcuts only while topmost and focused, and separates review dismissal from closing', async () => {
+    let dismissals = 0
+    let frontRequests = 0
+    const client = {
+      getState: async () => disabledState,
+      setDirectories: async () => ['src'],
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+    const renderManager = (isTopMost: boolean) => (
+      <>
+        <button type="button">Background action</button>
+        <DialogStackContext.Provider
+          value={{
+            isTopMost,
+            onRequestFront: () => {
+              frontRequests++
+            },
+          }}
+        >
+          <SparseCheckoutManager
+            repository={repository}
+            client={client}
+            onRefreshRepository={async () => {}}
+            onDismissed={() => {
+              dismissals++
+            }}
+          />
+        </DialogStackContext.Provider>
+      </>
+    )
+    const { rerender } = render(renderManager(true))
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    const panel = screen.getByRole('dialog', { name: 'Sparse checkout' })
+    assert.equal(document.activeElement, panel)
+
+    const background = screen.getByRole('button', {
+      name: 'Background action',
+    })
+    background.focus()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.equal(dismissals, 0)
+
+    editor.focus()
+    fireEvent.change(editor, { target: { value: 'src' } })
+    const review = screen.getByRole('button', { name: 'Review enable' })
+    fireEvent.click(review)
+    const confirm = screen.getByRole('button', {
+      name: 'Apply directory selection',
+    })
+    await waitFor(() => assert.equal(document.activeElement, confirm))
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.equal(screen.queryByRole('alertdialog'), null)
+    await waitFor(() => assert.equal(document.activeElement, review))
+    assert.equal(dismissals, 0)
+
+    fireEvent.click(review)
+    const reviewedConfirm = screen.getByRole('button', {
+      name: 'Apply directory selection',
+    })
+    await waitFor(() => assert.equal(document.activeElement, reviewedConfirm))
+    fireEvent.keyDown(
+      window,
+      __DARWIN__ ? { key: 'w', metaKey: true } : { key: 'w', ctrlKey: true }
+    )
+    assert.equal(dismissals, 1)
+    assert.ok(screen.getByRole('alertdialog'))
+
+    rerender(renderManager(false))
+    background.focus()
+    reviewedConfirm.focus()
+    assert.equal(frontRequests, 1)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.ok(screen.getByRole('alertdialog'))
+    assert.equal(dismissals, 1)
+  })
+
+  it('reports cancellation before refresh and does not claim a failed refresh succeeded', async () => {
+    const signals = new Array<AbortSignal | undefined>()
+    let rejectMutation: ((error: Error) => void) | undefined
+    let refreshes = 0
+    const client = {
+      getState: async () => disabledState,
+      setDirectories: async (
+        _repositoryPath: string,
+        _input: string,
+        signal?: AbortSignal
+      ) => {
+        signals.push(signal)
+        return new Promise<ReadonlyArray<string>>((_resolve, reject) => {
+          rejectMutation = reject
+        })
+      },
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+
+    render(
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={async () => {
+            refreshes++
+            throw new Error('refresh failed')
+          }}
+          onDismissed={() => {}}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    fireEvent.change(editor, { target: { value: 'src' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review enable' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply directory selection' })
+    )
+
+    const cancel = await screen.findByRole('button', {
+      name: 'Cancel operation',
+    })
+    fireEvent.click(cancel)
+    assert.equal(signals[0]?.aborted, true)
+    assert.ok(screen.getByText('Cancelling operation…'))
+    assert.equal(
+      screen.queryByText('Cancelling and refreshing the repository…'),
+      null
+    )
+
+    assert.ok(rejectMutation !== undefined)
+    rejectMutation(new TestSparseCheckoutError('cancelled'))
+
+    await screen.findByText('Operation cancelled.')
+    assert.ok(
+      screen.getByText(
+        'The operation was cancelled, but refreshing the repository view failed.'
+      )
+    )
+    assert.equal(
+      screen.queryByText('Operation cancelled. Repository state refreshed.'),
+      null
+    )
+    assert.equal(refreshes, 1)
+  })
+
+  it('ignores a mutation that settles after the repository changes', async () => {
+    const loads = new Array<string>()
+    const signals = new Array<AbortSignal | undefined>()
+    let refreshes = 0
+    let resolveMutation: ((value: ReadonlyArray<string>) => void) | undefined
+    const client = {
+      getState: async (repositoryPath: string) => {
+        loads.push(repositoryPath)
+        return disabledState
+      },
+      setDirectories: async (
+        _repositoryPath: string,
+        _input: string,
+        signal?: AbortSignal
+      ) => {
+        signals.push(signal)
+        return new Promise<ReadonlyArray<string>>(resolve => {
+          resolveMutation = resolve
+        })
+      },
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const firstRepository = new Repository('C:/first', -1, null, false)
+    const secondRepository = new Repository('C:/second', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+    const renderManager = (repository: Repository) => (
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={async () => {
+            refreshes++
+          }}
+          onDismissed={() => {}}
+        />
+      </DialogStackContext.Provider>
+    )
+    const { rerender } = render(renderManager(firstRepository))
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    fireEvent.change(editor, { target: { value: 'src' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review enable' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply directory selection' })
+    )
+    await screen.findByRole('button', { name: 'Cancel operation' })
+
+    rerender(renderManager(secondRepository))
+    await waitFor(() => {
+      assert.equal(signals[0]?.aborted, true)
+      assert.deepEqual(loads, ['C:/first', 'C:/second'])
+    })
+
+    assert.ok(resolveMutation !== undefined)
+    resolveMutation([])
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    assert.equal(refreshes, 0)
+    assert.deepEqual(loads, ['C:/first', 'C:/second'])
+    assert.equal(screen.queryByText('Included directories updated.'), null)
+  })
+
+  it('removes cancellation and keeps dismissal available during refresh', async () => {
+    let dismissals = 0
+    let resolveRefresh: (() => void) | undefined
+    const client = {
+      getState: async () => disabledState,
+      setDirectories: async () => ['src'],
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+    render(
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={() =>
+            new Promise<void>(resolve => {
+              resolveRefresh = resolve
+            })
+          }
+          onDismissed={() => {
+            dismissals++
+          }}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    fireEvent.change(editor, { target: { value: 'src' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review enable' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply directory selection' })
+    )
+
+    await screen.findByText('Refreshing repository and sparse-checkout state…')
+    assert.equal(
+      screen.queryByRole('button', { name: 'Cancel operation' }),
+      null
+    )
+    assert.notEqual(
+      screen
+        .getByRole('button', { name: 'Close sparse checkout' })
+        .getAttribute('aria-disabled'),
+      'true'
+    )
+    await waitFor(() =>
+      assert.equal(
+        document.activeElement,
+        screen.getByRole('button', { name: 'Close sparse checkout' })
+      )
+    )
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    assert.equal(dismissals, 1)
+
+    assert.ok(resolveRefresh !== undefined)
+    resolveRefresh()
+    await screen.findByText('Included directories updated.')
+  })
+})

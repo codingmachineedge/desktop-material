@@ -82,6 +82,7 @@
   width: 384px;
   max-width: calc(100vw - 20px);
   flex-direction: column;
+  overflow-x: hidden;
   overflow: hidden;
   border-radius: 28px;
   background: var(--md-sys-color-surface-container-low);
@@ -94,9 +95,49 @@
 .notification-centre-header {
   display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 18px 14px 8px 20px;
+}
+
+.notification-centre-source-tabs {
+  display: grid;
+  flex-shrink: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px 16px 8px;
+
+  button {
+    min-width: 0;
+    height: 36px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12.5px;
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+
+    &.selected {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline-offset: 1px;
+    }
+  }
+}
+
+.notification-centre-source-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-x: hidden;
 }
 
 .notification-centre-header-icon {
@@ -129,12 +170,14 @@
   }
 
   small {
-    overflow: hidden;
+    display: block;
+    min-width: 0;
     color: var(--md-sys-color-on-surface-variant);
     font-family: var(--font-family-monospace);
     font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 }
 
@@ -207,6 +250,139 @@
   }
 }
 
+.github-notifications-toolbar {
+  display: grid;
+  min-width: 0;
+  flex-shrink: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: end;
+  padding: 4px 16px 8px;
+}
+
+.github-notifications-account {
+  display: flex;
+  min-width: 0;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+
+  select {
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    padding: 0 28px 0 10px;
+    overflow: hidden;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 10px;
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    text-overflow: ellipsis;
+  }
+}
+
+.github-notifications-participating {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.github-notifications-refresh,
+.github-notifications-load-more,
+.github-notifications-error button,
+.github-notification-confirmation-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-size: 11.5px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.github-notifications-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  .octicon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.github-notifications-error {
+  display: grid;
+  min-width: 0;
+  flex-shrink: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  font-size: 11.5px;
+
+  span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+.github-notification-done-confirmation {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 12px 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.github-notification-confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+
+  button.danger {
+    background: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+  }
+}
+
 .notification-centre-list {
   display: flex;
   flex: 1;
@@ -220,6 +396,7 @@
 
 .notification-centre-tabpanel {
   display: flex;
+  min-width: 0;
   min-height: 0;
   flex: 1;
   flex-direction: column;
@@ -228,6 +405,28 @@
     outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
     outline-offset: -3px;
   }
+}
+
+.github-notification-repository {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-notification-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+
+.github-notifications-load-more {
+  flex-shrink: 0;
+  align-self: center;
+  margin: 2px 12px 12px;
 }
 
 .notification-centre-empty {
@@ -338,15 +537,19 @@
 }
 
 .notification-item-title {
+  min-width: 0;
   color: var(--md-sys-color-on-surface);
   font-size: 13px;
   font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
 }
 
 .notification-item-text {
+  min-width: 0;
   color: var(--md-sys-color-on-surface-variant);
   font-size: 11.5px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .notification-item-time {
@@ -391,6 +594,11 @@
     background: var(--md-sys-color-surface-container-highest);
   }
 
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
   &:active {
     transform: scale(0.8);
   }
@@ -399,6 +607,42 @@
     opacity: 1;
     outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
     outline-offset: 1px;
+  }
+}
+
+@media (max-width: 420px) {
+  .notification-centre-header {
+    padding-left: 14px;
+  }
+
+  .notification-centre-header-copy {
+    flex-basis: calc(100% - 104px);
+  }
+
+  .github-notifications-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .github-notifications-refresh {
+    width: 100%;
+  }
+
+  .notification-item {
+    flex-wrap: wrap;
+  }
+
+  .notification-item-activate {
+    flex-basis: calc(100% - 42px);
+  }
+
+  .github-notification-item .notification-item-read-toggle,
+  .github-notification-item .github-notification-done {
+    margin-left: 45px;
+  }
+
+  .github-notification-item .github-notification-done {
+    margin-left: 0;
   }
 }
 

@@ -2,6 +2,10 @@ import { ExecutableMenuItem } from '../models/app-menu'
 import { RequestResponseChannels, RequestChannels } from '../lib/ipc-shared'
 import * as ipcRenderer from '../lib/ipc-renderer'
 import { IBuildRunLogEvent, IBuildRunStateEvent } from '../lib/build-run/types'
+import {
+  ICLICommandOutputEvent,
+  ICLICommandStateEvent,
+} from '../lib/cli-workbench'
 import { stat } from 'fs/promises'
 import { isApplicationBundle } from '../lib/is-application-bundle'
 import { pathExists } from '../lib/path-exists'
@@ -393,6 +397,10 @@ export const showSaveDialog = invokeProxy('show-save-dialog', 1)
  * Tell the main process to show open dialog
  */
 export const showOpenDialog = invokeProxy('show-open-dialog', 1)
+export const showOpenDialogMultiple = invokeProxy(
+  'show-open-dialog-multiple',
+  1
+)
 
 /** Tell the main process read/save the user GUID from/to file */
 export const saveGUID = invokeProxy('save-guid', 1)
@@ -438,4 +446,39 @@ export function onBuildRunState(
   ) => void
 ) {
   ipcRenderer.on('build-run-state', handler)
+}
+
+/** Discover the installed Git and GitHub CLI command catalogs at runtime. */
+export const getCLIWorkbenchCatalog = invokeProxy(
+  'get-cli-workbench-catalog',
+  0
+)
+
+/** Start a validated, argv-only CLI workbench command. */
+export const startCLICommand = invokeProxy('start-cli-command', 1)
+
+/** Cancel the exact workbench run owned by this renderer. */
+export const cancelCLICommand = invokeProxy('cancel-cli-command', 1)
+
+/** Write input to a workbench run; null closes its stdin stream. */
+export const writeCLICommandInput = invokeProxy('write-cli-command-input', 2)
+
+export function onCLICommandOutput(
+  handler: (
+    event: Electron.IpcRendererEvent,
+    output: ICLICommandOutputEvent
+  ) => void
+): () => void {
+  ipcRenderer.on('cli-command-output', handler)
+  return () => ipcRenderer.removeListener('cli-command-output', handler)
+}
+
+export function onCLICommandState(
+  handler: (
+    event: Electron.IpcRendererEvent,
+    state: ICLICommandStateEvent
+  ) => void
+): () => void {
+  ipcRenderer.on('cli-command-state', handler)
+  return () => ipcRenderer.removeListener('cli-command-state', handler)
 }

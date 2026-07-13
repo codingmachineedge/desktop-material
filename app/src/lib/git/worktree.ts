@@ -3,6 +3,16 @@ import type { Repository } from '../../models/repository'
 import type { WorktreeEntry, WorktreeType } from '../../models/worktree'
 import { git } from './core'
 
+const MaximumRepairWorktrees = 1_000
+const MaximumRepairPathBytes = 256 * 1024
+
+function validateWorktreePath(path: string): string {
+  if (path.includes('\0') || !Path.isAbsolute(path)) {
+    throw new Error('Worktree administration requires an absolute path.')
+  }
+  return Path.normalize(path)
+}
+
 export function parseWorktreePorcelainOutput(
   stdout: string
 ): ReadonlyArray<WorktreeEntry> {
@@ -127,4 +137,80 @@ export async function moveWorktree(
     repository.path,
     'moveWorktree'
   )
+}
+
+/** Lock one registered linked worktree so prune, move, and remove leave it alone. */
+export async function lockWorktree(
+  repository: Repository,
+  worktreePath: string
+): Promise<void> {
+  const path = validateWorktreePath(worktreePath)
+  await git(['worktree', 'lock', '--', path], repository.path, 'lockWorktree')
+}
+
+/** Unlock one registered linked worktree. */
+export async function unlockWorktree(
+  repository: Repository,
+  worktreePath: string
+): Promise<void> {
+  const path = validateWorktreePath(worktreePath)
+  await git(
+    ['worktree', 'unlock', '--', path],
+    repository.path,
+    'unlockWorktree'
+  )
+}
+
+function countReportedWorktreeRecords(output: string): number {
+  return Math.min(
+    output.split(/\r?\n/).filter(line => line.trim().length > 0).length,
+    10_000
+  )
+}
+
+/** Preview or prune every missing worktree record using a fixed expiry policy. */
+export async function pruneWorktrees(
+  repository: Repository,
+  dryRun: boolean
+): Promise<number> {
+  const args = ['worktree', 'prune', '--verbose', '--expire=now']
+  if (dryRun) {
+    args.push('--dry-run')
+  }
+  const result = await git(args, repository.path, 'pruneWorktrees')
+  return countReportedWorktreeRecords(`${result.stdout}\n${result.stderr}`)
+}
+
+/** Repair administrative links for an internally generated worktree path set. */
+export async function repairWorktrees(
+  repository: Repository,
+  worktreePaths: ReadonlyArray<string>
+): Promise<void> {
+  const paths = validateWorktreeRepairPaths(worktreePaths)
+  await git(
+    ['worktree', 'repair', '--', ...paths],
+    repository.path,
+    'repairWorktrees'
+  )
+}
+
+export function validateWorktreeRepairPaths(
+  worktreePaths: ReadonlyArray<string>
+): ReadonlyArray<string> {
+  if (
+    worktreePaths.length === 0 ||
+    worktreePaths.length > MaximumRepairWorktrees
+  ) {
+    throw new Error('Choose a bounded set of registered worktrees to repair.')
+  }
+  const paths = worktreePaths.map(validateWorktreePath)
+  if (
+    paths.reduce((total, path) => total + Buffer.byteLength(path, 'utf8'), 0) >
+      MaximumRepairPathBytes ||
+    new Set(paths.map(path => (__WIN32__ ? path.toLowerCase() : path))).size !==
+      paths.length
+  ) {
+    throw new Error('The registered worktree repair set is invalid.')
+  }
+  return paths
 }

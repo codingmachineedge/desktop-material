@@ -94,7 +94,7 @@ describe('Accounts preferences', () => {
     assert.match(markup, /GitLab accounts/)
     assert.match(markup, /GitLab · gitlab\.example\.com/)
     assert.match(markup, /Bitbucket Cloud accounts/)
-    assert.match(markup, /Bitbucket · api\.bitbucket\.org/)
+    assert.match(markup, /Bitbucket · bitbucket\.org/)
     assert.doesNotMatch(markup, /secret-gitlab-token/)
     assert.doesNotMatch(markup, /secret-app-password/)
   })

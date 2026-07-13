@@ -82,11 +82,15 @@
 
       .side-sheet-title {
         flex: 1;
+        min-width: 0;
         margin: 0;
         font-size: 20px;
         font-weight: 600;
         line-height: 1.2;
         color: var(--md-sys-color-on-surface);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .side-sheet-close {
@@ -118,4 +122,13 @@
       }
     }
   }
+}
+
+// The Worktree foldout still uses the anchored dropdown implementation. Keep
+// its configured desktop width, but let it contract rather than creating a
+// sideways-only escape path on compact/high-zoom viewports.
+#foldout-container .foldout:has(.worktree-list) {
+  min-width: min(365px, calc(100vw - 16px)) !important;
+  max-width: calc(100vw - 16px) !important;
+  overflow-x: hidden;
 }

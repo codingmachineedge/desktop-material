@@ -19,6 +19,14 @@ describe('hasModalPopup', () => {
     const pullAll: Popup = { type: PopupType.PullAllRepositories }
     assert.equal(hasModalPopup([pullAll]), false)
   })
+
+  it('keeps sparse checkout non-modal while repository work continues', () => {
+    const sparseCheckout: Popup = {
+      type: PopupType.SparseCheckout,
+      repository: null as never,
+    }
+    assert.equal(hasModalPopup([sparseCheckout]), false)
+  })
 })
 
 describe('PopupManager', () => {

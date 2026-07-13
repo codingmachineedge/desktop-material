@@ -9,6 +9,11 @@ import {
   parseWorktreePorcelainOutput,
   listWorktrees,
   listWorktreesFromGitDir,
+  lockWorktree,
+  pruneWorktrees,
+  repairWorktrees,
+  unlockWorktree,
+  validateWorktreeRepairPaths,
 } from '../../../src/lib/git'
 
 describe('git/worktree', () => {
@@ -321,4 +326,73 @@ describe('git/worktree', () => {
       )
     })
   })
+
+  describe('administration', () => {
+    it('locks, unlocks, and repairs an exact registered worktree', async t => {
+      const repo = await setupEmptyRepository(t, 'main')
+      await makeCommit(repo, {
+        entries: [{ path: 'README', contents: 'hello' }],
+      })
+      await exec(['branch', 'feature-lock'], repo.path)
+      const worktreePath = repo.path + '-wt-lock'
+      await exec(['worktree', 'add', worktreePath, 'feature-lock'], repo.path)
+
+      await lockWorktree(repo, worktreePath)
+      assert.equal(
+        (await listWorktrees(repo)).find(w => w.path === worktreePath)
+          ?.isLocked,
+        true
+      )
+      await unlockWorktree(repo, worktreePath)
+      assert.equal(
+        (await listWorktrees(repo)).find(w => w.path === worktreePath)
+          ?.isLocked,
+        false
+      )
+
+      await repairWorktrees(repo, [repo.path, worktreePath])
+      assert.equal((await listWorktrees(repo)).length, 2)
+    })
+
+    it('previews and prunes only missing worktree records', async t => {
+      const repo = await setupEmptyRepository(t, 'main')
+      await makeCommit(repo, {
+        entries: [{ path: 'README', contents: 'hello' }],
+      })
+      await exec(['branch', 'feature-prune'], repo.path)
+      const worktreePath = repo.path + '-wt-prune'
+      await exec(['worktree', 'add', worktreePath, 'feature-prune'], repo.path)
+      await rm(worktreePath, { recursive: true, force: true })
+
+      assert.equal(await pruneWorktrees(repo, true), 1)
+      assert.equal((await listWorktrees(repo)).length, 2)
+      assert.equal(await pruneWorktrees(repo, false), 1)
+      assert.equal((await listWorktrees(repo)).length, 1)
+    })
+
+    it('rejects unbounded, relative, and duplicate repair path sets', () => {
+      assert.throws(() => validateWorktreeRepairPaths([]), /bounded set/)
+      assert.throws(
+        () => validateWorktreeRepairPaths(['relative-worktree']),
+        /absolute path/
+      )
+      assert.throws(
+        () => validateWorktreeRepairPaths([repoPath('one'), repoPath('one')]),
+        /invalid/
+      )
+      assert.throws(
+        () =>
+          validateWorktreeRepairPaths(
+            Array.from({ length: 1_001 }, (_, index) =>
+              repoPath(`worktree-${index}`)
+            )
+          ),
+        /bounded set/
+      )
+    })
+  })
 })
+
+function repoPath(name: string): string {
+  return Path.resolve(Path.parse(process.cwd()).root, 'worktrees', name)
+}

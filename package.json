@@ -8,6 +8,7 @@
     "cli": "ts-node app/src/cli/main.ts",
     "agent": "node script/agent/desktop-agent.js",
     "agent:mcp": "node script/agent/mcp-stdio-proxy.js",
+    "proof:fixture": "ts-node -P script/tsconfig.json script/guided-proof-fixture.ts",
     "check:eslint": "tsc -P eslint-rules/",
     "test:eslint": "node script/test.mjs eslint-rules",
     "test:script": "node script/test.mjs script",
@@ -27,7 +28,7 @@
     "start": "cross-env NODE_ENV=development ts-node -P script/tsconfig.json script/start.ts",
     "start:prod": "cross-env NODE_ENV=production ts-node -P script/tsconfig.json script/start.ts",
     "compile:dev": "cross-env NODE_ENV=development TS_NODE_PROJECT=script/tsconfig.json webpack --config app/webpack.development.ts",
-    "compile:prod": "cross-env NODE_ENV=production TS_NODE_PROJECT=script/tsconfig.json NODE_OPTIONS='--max_old_space_size=4096' webpack --config app/webpack.production.ts",
+    "compile:prod": "cross-env NODE_ENV=production TS_NODE_PROJECT=script/tsconfig.json NODE_OPTIONS='--max_old_space_size=8192' webpack --config app/webpack.production.ts",
     "build:dev": "yarn compile:dev && cross-env NODE_ENV=development ts-node -P script/tsconfig.json script/build.ts",
     "build:prod": "yarn compile:prod && cross-env NODE_ENV=production ts-node -P script/tsconfig.json script/build.ts",
     "package": "ts-node -P script/tsconfig.json script/package.ts",
@@ -107,7 +108,8 @@
     "webpack-bundle-analyzer": "^4.5.0",
     "webpack-dev-middleware": "^5.3.4",
     "webpack-hot-middleware": "^2.25.1",
-    "webpack-merge": "^6.0.1"
+    "webpack-merge": "^6.0.1",
+    "yaml": "^2.7.0"
   },
   "devDependencies": {
     "@github/markdownlint-github": "^0.1.0",

@@ -286,4 +286,35 @@
       width: 100%;
     }
   }
+
+  // Preferences has its own responsive pane, so adapt to the space actually
+  // available to this tab instead of relying only on the window viewport.
+  @container preferences-pane (max-width: 520px) {
+    .agent-access-heading,
+    .agent-toggle-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .agent-status-chip {
+      align-self: flex-start;
+    }
+
+    .agent-token-row {
+      grid-template-columns: 1fr 1fr;
+
+      input {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .agent-access-card {
+      padding: var(--spacing-double);
+    }
+
+    .agent-tonal-button {
+      justify-content: center;
+      width: 100%;
+    }
+  }
 }

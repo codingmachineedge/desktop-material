@@ -1,6 +1,11 @@
 #merge-all {
+  width: min(760px, calc(100vw - var(--spacing-quad)));
+  max-width: calc(100vw - var(--spacing-quad));
+
   .dialog-content {
-    min-width: 680px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-y: auto;
   }
 
   .merge-all-current,
@@ -8,16 +13,38 @@
   .merge-all-summary {
     display: flex;
     align-items: center;
+    min-width: 0;
+    flex-wrap: wrap;
     gap: var(--spacing);
     padding: var(--spacing);
     border-radius: 12px;
     background: var(--md-sys-color-secondary-container);
     color: var(--md-sys-color-on-secondary-container);
+
+    > * {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .merge-all-results-scroll {
+    width: 100%;
+    max-width: 100%;
+    margin-top: var(--spacing-double);
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-radius: 12px;
+
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 45%, transparent);
+      outline-offset: 2px;
+    }
   }
 
   .merge-all-results {
     width: 100%;
-    margin-top: var(--spacing-double);
+    min-width: 0;
+    margin: 0;
     border-collapse: collapse;
 
     th,
@@ -25,6 +52,12 @@
       padding: var(--spacing);
       border-bottom: 1px solid var(--md-sys-color-outline-variant);
       text-align: left;
+      overflow-wrap: anywhere;
+    }
+
+    th:first-child,
+    td:first-child {
+      max-width: 220px;
     }
   }
 
@@ -48,8 +81,64 @@
   }
 }
 
+@media (max-width: 620px) {
+  #merge-all {
+    .merge-all-results {
+      display: block;
+
+      thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      tbody {
+        display: grid;
+      }
+
+      tr {
+        display: grid;
+        gap: 6px;
+        padding: var(--spacing);
+        border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      }
+
+      td,
+      td:first-child,
+      td:last-child {
+        display: grid;
+        max-width: none;
+        grid-template-columns: minmax(72px, 30%) minmax(0, 1fr);
+        gap: var(--spacing);
+        padding: 0;
+        border: 0;
+        overflow-wrap: anywhere;
+
+        &::before {
+          content: attr(data-label);
+          color: var(--md-sys-color-on-surface-variant);
+          font-weight: var(--font-weight-semibold);
+        }
+      }
+
+      .merge-result {
+        justify-self: start;
+      }
+    }
+  }
+}
+
 .merge-button-row,
 .worktree-list-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing);
+
+  > * {
+    min-width: 0;
+  }
 }

@@ -18,6 +18,10 @@
 @import 'ui/cloning-repository-view';
 @import 'ui/diff';
 @import 'ui/history';
+@import 'ui/file-history';
+@import 'ui/create-github-issue';
+@import 'ui/create-github-pull-request';
+@import 'ui/github-pull-request-lifecycle';
 @import 'ui/repository';
 @import 'ui/resizable';
 @import 'ui/toolbar/toolbar';
@@ -35,8 +39,12 @@
 @import 'ui/material-rail';
 @import 'ui/material-cards';
 @import 'ui/material-build-run';
+@import 'ui/repository-tools';
+@import 'ui/sparse-checkout';
 @import 'ui/actions-view';
 @import 'ui/actions-log-viewer';
+@import 'ui/github-releases';
+@import 'ui/github-issues';
 @import 'ui/panel';
 @import 'ui/popup';
 @import 'ui/progress';

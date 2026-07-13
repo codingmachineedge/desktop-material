@@ -1,5 +1,12 @@
 export type WorktreeType = 'main' | 'linked'
 
+export type WorktreeMaintenanceOperation = 'prune' | 'repair'
+
+export interface IWorktreeMaintenancePreview {
+  readonly operation: WorktreeMaintenanceOperation
+  readonly affectedCount: number
+}
+
 export type WorktreeEntry = {
   readonly path: string
   readonly head: string
