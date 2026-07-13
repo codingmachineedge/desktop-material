@@ -8,7 +8,10 @@ import {
   ICLIWorkbenchCatalog,
 } from '../../../src/lib/cli-workbench'
 import {
+  IRepositoryBundleImportRequest,
   IRepositoryToolsClient,
+  prepareRepositoryBundleImport,
+  RepositoryBundleImport,
   RepositoryTools,
 } from '../../../src/ui/repository-tools'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
@@ -611,6 +614,150 @@ describe('Repository tools', () => {
     assert.equal(
       client.starts.some(start => start.args[0] === 'branch'),
       false
+    )
+  })
+
+  it('drops a delayed bundle picker result after the repository changes', async () => {
+    const client = new FakeRepositoryToolsClient()
+    let resolvePicker: (value: string | null) => void = () => {}
+    let pickerReturned = false
+    const picker = new Promise<string | null>(resolve => {
+      resolvePicker = resolve
+    })
+    const chooseBundleToImport = async () => {
+      const value = await picker
+      pickerReturned = true
+      return value
+    }
+    const renderImport = (repositoryPath: string) => (
+      <RepositoryBundleImport
+        repositoryPath={repositoryPath}
+        disabled={false}
+        client={client}
+        onRefreshRepository={async () => {}}
+        onBusyChanged={() => {}}
+        chooseBundleToImport={chooseBundleToImport}
+      />
+    )
+    const view = render(renderImport('C:/first'))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    view.rerender(renderImport('C:/second'))
+    resolvePicker('C:/exports/repository.bundle')
+
+    await waitFor(() => assert.equal(pickerReturned, true))
+    assert.equal(client.starts.length, 0)
+    assert.ok(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+  })
+
+  it('cancels and resubscribes with the exact client when its identity changes', async () => {
+    const firstClient = new FakeRepositoryToolsClient()
+    const secondClient = new FakeRepositoryToolsClient()
+    const renderImport = (client: FakeRepositoryToolsClient) => (
+      <RepositoryBundleImport
+        repositoryPath="C:/repo"
+        disabled={false}
+        client={client}
+        onRefreshRepository={async () => {}}
+        onBusyChanged={() => {}}
+        chooseBundleToImport={async () => 'C:/exports/repository.bundle'}
+      />
+    )
+    const view = render(renderImport(firstClient))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    await waitFor(() => assert.equal(firstClient.starts.length, 1))
+    const firstRun = firstClient.starts[0].id
+
+    view.rerender(renderImport(secondClient))
+    await waitFor(() => assert.deepStrictEqual(firstClient.cancels, [firstRun]))
+    assert.deepStrictEqual(secondClient.cancels, [])
+    firstClient.emitState({
+      id: firstRun,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    assert.equal(secondClient.starts.length, 0)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    await waitFor(() => assert.equal(secondClient.starts.length, 1))
+  })
+
+  it('keeps refresh completion scoped to its repository and blocks a second picker', async () => {
+    const client = new FakeRepositoryToolsClient()
+    const request: IRepositoryBundleImportRequest =
+      prepareRepositoryBundleImport(
+        'C:/exports/repository.bundle',
+        { oid: 'a'.repeat(40), ref: 'refs/heads/main' },
+        'imported/main'
+      )
+    let resolveRefresh: () => void = () => {}
+    let refreshes = 0
+    const refresh = new Promise<void>(resolve => {
+      resolveRefresh = resolve
+    })
+    const onRefreshRepository = () => {
+      refreshes++
+      return refresh
+    }
+    const component = React.createRef<RepositoryBundleImport>()
+    const renderImport = (repositoryPath: string) => (
+      <RepositoryBundleImport
+        ref={component}
+        repositoryPath={repositoryPath}
+        disabled={false}
+        client={client}
+        onRefreshRepository={onRefreshRepository}
+        onBusyChanged={() => {}}
+        chooseBundleToImport={async () => 'C:/exports/other.bundle'}
+      />
+    )
+    const view = render(renderImport('C:/first'))
+    const mountedComponent = component.current
+    assert.ok(mountedComponent)
+    mountedComponent.setState({
+      phase: 'refreshing',
+      bundlePath: request.bundlePath,
+      request,
+      status: 'Branch created. Refreshing the repository…',
+    })
+    const refreshCompletion = (
+      mountedComponent as unknown as {
+        finishRefresh: (
+          value: IRepositoryBundleImportRequest,
+          repositoryPath: string,
+          repositoryGeneration: number
+        ) => Promise<void>
+      }
+    ).finishRefresh(request, 'C:/first', 0)
+
+    await waitFor(() => assert.equal(refreshes, 1))
+    const chooseButton = screen.getByRole('button', {
+      name: 'Choose another bundle',
+    }) as HTMLButtonElement
+    assert.equal(chooseButton.getAttribute('aria-disabled'), 'true')
+    fireEvent.click(chooseButton)
+    assert.equal(client.starts.length, 0)
+
+    view.rerender(renderImport('C:/second'))
+    resolveRefresh()
+    await refreshCompletion
+
+    assert.ok(
+      screen.getByRole('button', { name: 'Choose and inspect a bundle' })
+    )
+    assert.equal(
+      screen.queryByText('Imported refs/heads/main as imported/main.'),
+      null
     )
   })
 

@@ -124,6 +124,7 @@ export class RepositoryBundleImport extends React.Component<
   private commandStdout = ''
   private commandOutputTruncated = false
   private cancelRequested = false
+  private repositoryGeneration = 0
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
   private confirmButton: HTMLButtonElement | null = null
@@ -154,15 +155,28 @@ export class RepositoryBundleImport extends React.Component<
   }
 
   public componentDidUpdate(prevProps: IRepositoryBundleImportProps) {
-    if (prevProps.repositoryPath !== this.props.repositoryPath) {
-      this.cancelRun()
-      this.props.onBusyChanged(false)
-      this.setState(this.initialState())
+    const repositoryChanged =
+      prevProps.repositoryPath !== this.props.repositoryPath
+    const clientChanged = prevProps.client !== this.props.client
+    if (!repositoryChanged && !clientChanged) {
+      return
     }
+
+    this.repositoryGeneration++
+    this.cancelRun(clientChanged ? prevProps.client : this.props.client)
+    if (clientChanged) {
+      this.unsubscribeOutput?.()
+      this.unsubscribeState?.()
+      this.unsubscribeOutput = this.props.client.onOutput(this.onOutput)
+      this.unsubscribeState = this.props.client.onState(this.onState)
+    }
+    this.props.onBusyChanged(false)
+    this.setState(this.initialState())
   }
 
   public componentWillUnmount() {
     this.mounted = false
+    this.repositoryGeneration++
     this.unsubscribeOutput?.()
     this.unsubscribeState?.()
     this.unsubscribeOutput = null
@@ -170,16 +184,27 @@ export class RepositoryBundleImport extends React.Component<
     this.cancelRun()
   }
 
-  private cancelRun() {
+  private cancelRun(client: IBundleImportClient = this.props.client) {
     const id = this.runId
     this.runId = null
     if (id !== null) {
-      void this.props.client.cancel(id).catch(() => {})
+      void client.cancel(id).catch(() => {})
     }
   }
 
   private setBusy(busy: boolean) {
     this.props.onBusyChanged(busy)
+  }
+
+  private isCurrentRepository(
+    repositoryPath: string,
+    repositoryGeneration: number
+  ) {
+    return (
+      this.mounted &&
+      this.props.repositoryPath === repositoryPath &&
+      this.repositoryGeneration === repositoryGeneration
+    )
   }
 
   private selectedHead(): IRepositoryBundleRef | null {
@@ -200,9 +225,15 @@ export class RepositoryBundleImport extends React.Component<
   }
 
   private chooseBundle = async () => {
-    if (this.props.disabled || this.runId !== null) {
+    if (
+      this.props.disabled ||
+      this.runId !== null ||
+      this.state.phase === 'refreshing'
+    ) {
       return
     }
+    const repositoryPath = this.props.repositoryPath
+    const repositoryGeneration = this.repositoryGeneration
     try {
       const bundlePath = this.props.chooseBundleToImport
         ? await this.props.chooseBundleToImport()
@@ -211,7 +242,10 @@ export class RepositoryBundleImport extends React.Component<
             properties: ['openFile'],
             filters: [{ name: 'Git bundle', extensions: ['bundle'] }],
           })
-      if (bundlePath === null || !this.mounted) {
+      if (
+        bundlePath === null ||
+        !this.isCurrentRepository(repositoryPath, repositoryGeneration)
+      ) {
         return
       }
       const inspection = prepareRepositoryBundleInspection(bundlePath)
@@ -228,15 +262,18 @@ export class RepositoryBundleImport extends React.Component<
           status: 'Verifying bundle integrity…',
           error: null,
         },
-        () =>
-          void this.startCommand(
-            'inspection-verification',
-            inspection.verifyArgs,
-            false
-          )
+        () => {
+          if (this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
+            void this.startCommand(
+              'inspection-verification',
+              inspection.verifyArgs,
+              false
+            )
+          }
+        }
       )
     } catch (error) {
-      if (this.mounted) {
+      if (this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
         this.setState({
           phase: 'failed',
           error:
@@ -518,7 +555,11 @@ export class RepositoryBundleImport extends React.Component<
               `Created ${request.destinationRef} at ${request.source.oid}.\n`
             ),
           })
-          void this.finishRefresh(request)
+          void this.finishRefresh(
+            request,
+            this.props.repositoryPath,
+            this.repositoryGeneration
+          )
           return
         default:
           throw new Error('The bundle import entered an unexpected state.')
@@ -532,10 +573,14 @@ export class RepositoryBundleImport extends React.Component<
     }
   }
 
-  private async finishRefresh(request: IRepositoryBundleImportRequest) {
+  private async finishRefresh(
+    request: IRepositoryBundleImportRequest,
+    repositoryPath: string,
+    repositoryGeneration: number
+  ) {
     try {
       await this.props.onRefreshRepository()
-      if (!this.mounted) {
+      if (!this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
         return
       }
       this.setBusy(false)
@@ -545,7 +590,7 @@ export class RepositoryBundleImport extends React.Component<
         error: null,
       })
     } catch {
-      if (!this.mounted) {
+      if (!this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
         return
       }
       this.setBusy(false)
@@ -827,7 +872,11 @@ export class RepositoryBundleImport extends React.Component<
           </div>
           <div className="repository-tool-controls">
             <Button
-              disabled={this.props.disabled || this.runId !== null}
+              disabled={
+                this.props.disabled ||
+                this.runId !== null ||
+                this.state.phase === 'refreshing'
+              }
               onClick={this.onChooseBundleClicked}
             >
               {this.state.bundlePath === null
