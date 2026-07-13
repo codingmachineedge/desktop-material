@@ -35,6 +35,10 @@ describe('GitHub notification responsive styles', () => {
     )
     assert.match(
       styles,
+      /\.notification-centre-header-copy\s*\{[\s\S]*?min-width: 0;[\s\S]*?small\s*\{[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: normal;/
+    )
+    assert.match(
+      styles,
       /\.notification-item-title\s*\{[\s\S]*?overflow-wrap: anywhere;/
     )
     assert.match(
@@ -52,6 +56,10 @@ describe('GitHub notification responsive styles', () => {
   })
 
   it('stacks the toolbar and wraps notification actions on narrow windows', () => {
+    assert.match(
+      styles,
+      /\.github-notifications-account\s*\{[\s\S]*?min-width: 0;[\s\S]*?grid-column: 1 \/ -1;/
+    )
     assert.match(styles, /@media \(max-width: 420px\)/)
     assert.match(
       styles,

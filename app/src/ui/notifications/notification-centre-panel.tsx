@@ -592,7 +592,7 @@ export class NotificationCentrePanel extends React.Component<
             onChange={this.onAccountChange}
           >
             {accounts.length === 0 ? (
-              <option value="">No signed-in GitHub accounts</option>
+              <option value="">No signed-in accounts</option>
             ) : (
               accounts.map(account => (
                 <option

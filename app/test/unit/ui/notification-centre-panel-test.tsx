@@ -142,6 +142,10 @@ describe('NotificationCentrePanel', () => {
       'Local notification'
     )
     assert.ok(screen.getByRole('button', { name: 'Notification history' }))
+    assert.equal(
+      screen.getByText('userData/notifications.git').textContent,
+      'userData/notifications.git'
+    )
 
     all.focus()
     fireEvent.keyDown(all, { key: 'End' })
@@ -171,9 +175,8 @@ describe('NotificationCentrePanel', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Unread (1)' }))
     fireEvent.click(screen.getByRole('tab', { name: 'GitHub' }))
 
-    assert.ok(
-      screen.getByRole('option', { name: 'No signed-in GitHub accounts' })
-    )
+    assert.ok(screen.getByRole('option', { name: 'No signed-in accounts' }))
+    assert.equal(screen.queryByText('No signed-in GitHub accounts'), null)
     assert.ok(screen.getByText('Sign in to a GitHub account to view its inbox'))
     assert.equal(
       screen.queryByRole('button', { name: 'Notification history' }),

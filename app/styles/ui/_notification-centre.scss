@@ -170,12 +170,14 @@
   }
 
   small {
-    overflow: hidden;
+    display: block;
+    min-width: 0;
     color: var(--md-sys-color-on-surface-variant);
     font-family: var(--font-family-monospace);
     font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 }
 
@@ -261,6 +263,7 @@
 .github-notifications-account {
   display: flex;
   min-width: 0;
+  grid-column: 1 / -1;
   flex-direction: column;
   gap: 4px;
   color: var(--md-sys-color-on-surface-variant);
