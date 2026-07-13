@@ -105,13 +105,16 @@ export function computeAutoFitMultiplier(
     return 1
   }
 
-  // ≤ 1: only ever shrinks, never grows past the user's base.
-  const rawFit = Math.min(
+  // Work in effective-zoom space. A 200% base in a 960-DIP window must
+  // still fit the same design box as 100%, so the window ratio caps the
+  // effective zoom itself (not merely a multiplier applied to the base).
+  const effectiveFit = Math.min(
     dipW / AutoFitTargetWidth,
     dipH / AutoFitTargetHeight,
-    1
+    base
   )
 
-  // Floor keeps base × multiplier ≥ ZoomMin; ceiling keeps it from growing.
-  return clamp(rawFit, ZoomMin / base, 1)
+  // Convert the fitted effective zoom back to a multiplier. The floor keeps
+  // base × multiplier >= ZoomMin; the ceiling never grows past the base.
+  return clamp(effectiveFit / base, ZoomMin / base, 1)
 }

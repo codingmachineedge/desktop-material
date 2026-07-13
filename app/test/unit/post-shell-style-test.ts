@@ -24,7 +24,10 @@ describe('post-shell MD3 style contracts', () => {
       style,
       /\.history-commit-filter-field\s*\{[\s\S]*?flex-direction: row;/
     )
-    assert.match(style, /#history & input\s*\{[\s\S]*?min-height: 0;/)
+    assert.match(
+      style,
+      /&\.text-box-component input\s*\{[\s\S]*?min-height: 0;/
+    )
   })
 
   it('makes Pull all results horizontally scrollable on narrow windows', () => {

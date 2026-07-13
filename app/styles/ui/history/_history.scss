@@ -243,9 +243,10 @@
     }
 
     // The global Material shell input rule is loaded after this stylesheet and
-    // has two attribute selectors, so the extra #history scope is intentional:
-    // keep the native input flush inside this component-owned pill.
-    #history & input {
+    // has two attribute selectors. Combining both component classes gives this
+    // compare-sidebar field enough specificity without relying on #history,
+    // which exists only in the selected-commit detail subtree.
+    &.text-box-component input {
       flex: 1;
       min-width: 0;
       height: 100%;

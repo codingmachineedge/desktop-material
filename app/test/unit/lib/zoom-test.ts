@@ -73,6 +73,14 @@ describe('zoom', () => {
       assert.equal(computeAutoFitMultiplier(5000, 5000, 1), 1)
     })
 
+    it('caps a large user scale at the window fit instead of clipping', () => {
+      const multiplier = computeAutoFitMultiplier(960, 660, 2)
+
+      assert.equal(multiplier, 0.48)
+      assert.equal(2 * multiplier, 0.96)
+      assert.equal(computeAutoFitMultiplier(2000, 1200, 2), 1)
+    })
+
     it('applies the ZoomMin/base floor so effective zoom stays >= ZoomMin', () => {
       // Tiny window would want rawFit 0.1, but floor is ZoomMin/base = 0.5/2 = 0.25
       const m = computeAutoFitMultiplier(100, 100, 2)
