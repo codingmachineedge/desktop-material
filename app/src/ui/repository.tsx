@@ -280,7 +280,7 @@ export class RepositoryView extends React.Component<
           title="Repository tools"
         >
           <span className="rail-pill">
-            <Octicon symbol={octicons.terminal} className="rail-icon" />
+            <Octicon symbol={octicons.tools} className="rail-icon" />
           </span>
           <span className="rail-label">Tools</span>
         </span>
