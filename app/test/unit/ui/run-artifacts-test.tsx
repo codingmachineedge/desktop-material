@@ -62,6 +62,7 @@ const artifact = (
   digest,
   workflowRun: {
     id: 7,
+    runAttempt: 2,
     headBranch: 'feature/artifact-browser',
     headSha: 'b'.repeat(40),
   },

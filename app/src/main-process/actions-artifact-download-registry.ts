@@ -15,6 +15,8 @@ export interface IActionsArtifactDownloadSender {
 export interface ICompletedActionsArtifactDownload {
   readonly downloadId: string
   readonly senderId: number
+  /** Canonical API endpoint retained only in the main process for provenance binding. */
+  readonly endpoint: string
   readonly path: string
   readonly bytes: number
   readonly archiveDigest: string

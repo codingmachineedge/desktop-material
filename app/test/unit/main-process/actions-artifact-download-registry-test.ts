@@ -36,6 +36,7 @@ class TestSender
 
 function retain(sender: TestSender, artifactId: number): string {
   return retainCompletedActionsArtifactDownload(sender, {
+    endpoint: 'https://api.github.com/',
     path: `C:\\Downloads\\artifact-${artifactId}.zip`,
     bytes: artifactId,
     archiveDigest: `sha256:${artifactId.toString(16).padStart(64, '0')}`,
@@ -44,6 +45,7 @@ function retain(sender: TestSender, artifactId: number): string {
     artifactId,
     workflowRun: {
       id: 55,
+      runAttempt: 1,
       headBranch: 'main',
       headSha: 'a'.repeat(40),
     },

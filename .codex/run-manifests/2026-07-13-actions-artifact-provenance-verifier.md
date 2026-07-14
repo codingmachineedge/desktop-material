@@ -36,6 +36,16 @@ The prior metadata suite remains green. The credential-lease slice adds registry
 - The exact selected subject is re-opened, CRC-checked, re-extracted, and rehashed; private canonical bundle JSONL is prepared; only then does the main-only adapter call `TokenStore.getItem(getKeyForEndpoint(endpoint), login)` once with a bounded timeout and no enumeration/fallback. After the owned `gh` tree and streams close, it rereads that same item and requires exact JavaScript-string equality plus a live lease before returning any non-canceled result.
 - The runner strips all ambient `GH_*`/`GITHUB_*` variables. Only a validated GHE.com run receives controlled `GH_TOKEN`; `GH_HOST` is not set, `--hostname` stays fixed, and the token is absent from argv, the new provenance registration/verify/result IPC, provenance result data, errors, logs, Temp JSONL, and configuration files. The production build must emit the binding from the main entrypoint and an off-screen load smoke must pass before this checkpoint is published.
 
+### Selected-account store orchestration run
+
+- Run id: `dm-actions-artifact-provenance-store-20260713`
+- Clean source: `ceafa387ab7b3dec568a92c0809b45df175be9c2` on `mega-feature-update`, aligned with `origin/mega-feature-update`
+- Mode: `publish`; the user has authorized this repository's focused commit and push.
+- Scope: one bounded renderer-store review/verify/dispose transaction, selected-account/account-generation fencing, exact retained-download/policy binding, explicit completed-download lifecycle release, focused tests, this manifest, and the README roadmap.
+- Expected UI state: unchanged. This checkpoint deliberately adds no dialog, button, React review state, screenshot, wiki, or Pages claim.
+- Allowed background interactions: no Electron launch is required before the later modal checkpoint; all source edits, tests, build checks, and Git operations use the fixed Administrator low-level MCP HTTP server.
+- Required checks: selected-account store and lifecycle suites, artifact/transfer/service regression, TypeScript, scoped lint/format, production bundle check, diff/secret scan, local/tracking/direct-remote SHA verification.
+
 ## App-native product contract
 
 The artifact card gains one purpose-built **Verify provenance** function after a download completes. Users never receive a terminal, raw `gh` invocation, executable field, argument editor, REST method/path field, GraphQL editor, raw bundle/output viewer, or searchable command/API catalogue.

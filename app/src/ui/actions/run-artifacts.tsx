@@ -9,6 +9,7 @@ import {
   mergeActionsArtifactPage,
 } from '../../lib/actions-artifacts'
 import { IActionsArtifactDownloadProgress } from '../../lib/actions-artifact-download'
+import { releaseActionsArtifactDownloadThroughMainProcess } from '../../lib/actions-artifact-subject-client'
 import {
   ActionsStore,
   getActionsRepositoryKey,
@@ -26,6 +27,7 @@ type AttestationCheck =
 
 interface ICompletedArtifactDownload {
   readonly artifactId: number
+  readonly downloadId: string
   readonly path: string
   readonly localDigest: string
   readonly matchesGitHubDigest: boolean | null
@@ -40,6 +42,7 @@ interface IRunArtifactsProps {
     defaultFileName: string
   ) => Promise<string | null>
   readonly reveal?: (path: string) => Promise<void>
+  readonly releaseDownload?: (downloadId: string) => void
 }
 
 interface IRunArtifactsState {
@@ -99,6 +102,7 @@ export class RunArtifacts extends React.Component<
   private downloadController: AbortController | null = null
   private destinationGeneration = 0
   private lastProgressUpdate = 0
+  private readonly releasedDownloadIds = new Set<string>()
 
   public constructor(props: IRunArtifactsProps) {
     super(props)
@@ -136,13 +140,33 @@ export class RunArtifacts extends React.Component<
     this.attestationControllers.clear()
     this.downloadController?.abort()
     this.downloadController = null
+    this.releaseCompletedDownload()
+  }
+
+  private releaseCompletedDownload() {
+    const completed = this.state.completedDownload
+    if (
+      completed === null ||
+      this.releasedDownloadIds.has(completed.downloadId)
+    ) {
+      return
+    }
+    this.releasedDownloadIds.add(completed.downloadId)
+    ;(this.props.releaseDownload ??
+      releaseActionsArtifactDownloadThroughMainProcess)(completed.downloadId)
   }
 
   private loadArtifacts = () => {
     this.loadController?.abort()
+    this.releaseCompletedDownload()
     const controller = new AbortController()
     this.loadController = controller
-    this.setState({ loading: true, loadingMore: false, error: null })
+    this.setState({
+      loading: true,
+      loadingMore: false,
+      error: null,
+      completedDownload: null,
+    })
     void this.props.actionsStore
       .fetchArtifacts(
         this.props.repository,
@@ -304,6 +328,7 @@ export class RunArtifacts extends React.Component<
     }
 
     const generation = ++this.destinationGeneration
+    this.releaseCompletedDownload()
     const defaultFileName = getActionsArtifactDefaultFileName(artifact.name)
     this.setState({
       choosingArtifactId: artifact.id,
@@ -433,11 +458,15 @@ export class RunArtifacts extends React.Component<
           operationMessage: `Downloaded ${artifact.name}. ${digestMessage}`,
           completedDownload: {
             artifactId: artifact.id,
+            downloadId: result.downloadId,
             path: result.path,
             localDigest: result.localDigest,
             matchesGitHubDigest: result.matchesGitHubDigest,
           },
         })
+      } else {
+        ;(this.props.releaseDownload ??
+          releaseActionsArtifactDownloadThroughMainProcess)(result.downloadId)
       }
     } catch (error) {
       if (

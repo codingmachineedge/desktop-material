@@ -12,6 +12,12 @@ export const ActionsArtifactMaximumDownloadBytes = 5 * 1024 * 1024 * 1024
 
 export interface IActionsArtifactWorkflowRun {
   readonly id: number
+  /**
+   * Exact workflow-run attempt that produced this artifact. Older provider
+   * responses may omit it; provenance verification then remains unavailable
+   * rather than silently binding the artifact to the latest attempt.
+   */
+  readonly runAttempt: number | null
   readonly headBranch: string | null
   readonly headSha: string
 }
@@ -160,7 +166,11 @@ function parseWorkflowRun(
   if (!gitObjectId.test(headSha)) {
     throw new Error('GitHub returned an invalid artifact workflow run commit.')
   }
-  return { id, headBranch, headSha }
+  const runAttempt =
+    input.run_attempt === null || input.run_attempt === undefined
+      ? null
+      : safeInteger(input.run_attempt, 'artifact workflow run attempt', 1)
+  return { id, runAttempt, headBranch, headSha }
 }
 
 /**

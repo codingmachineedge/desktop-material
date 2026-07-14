@@ -140,6 +140,7 @@ async function withArchive(
   const other = new TestSender(402)
   await writeFile(path, bytes)
   const downloadId = retainCompletedActionsArtifactDownload(sender, {
+    endpoint: 'https://api.github.com/',
     path,
     bytes: bytes.length,
     archiveDigest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,

@@ -180,6 +180,10 @@ function artifactPath(request: IActionsArtifactTransferRequest): {
     if (
       typeof workflowRun !== 'object' ||
       validateIdentifier(workflowRun.id) !== workflowRun.id ||
+      (workflowRun.runAttempt !== null &&
+        (typeof workflowRun.runAttempt !== 'number' ||
+          validateIdentifier(workflowRun.runAttempt) !==
+            workflowRun.runAttempt)) ||
       (workflowRun.headBranch !== null &&
         (typeof workflowRun.headBranch !== 'string' ||
           workflowRun.headBranch.length === 0 ||
@@ -611,6 +615,7 @@ export async function handleActionsArtifactTransfer(
         },
       })
       const downloadId = retainCompletedActionsArtifactDownload(sender, {
+        endpoint: validated.endpoint.toString(),
         path: result.path,
         bytes: result.bytes,
         archiveDigest: result.localDigest,

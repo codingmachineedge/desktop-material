@@ -16,7 +16,11 @@ import {
   normalizeActionsArtifactVerificationPolicy,
   parseActionsArtifactAttestationBundles,
 } from '../lib/actions-artifact-provenance'
-import { IActionsArtifactDownloadSender } from './actions-artifact-download-registry'
+import {
+  getCompletedActionsArtifactDownload,
+  IActionsArtifactDownloadSender,
+  ICompletedActionsArtifactDownload,
+} from './actions-artifact-download-registry'
 import { ActionsArtifactSubjectError } from '../lib/actions-artifact-subjects'
 import {
   IRevalidatedActionsArtifactSubject,
@@ -62,6 +66,11 @@ type WithRevalidatedSubject = <T>(
   ) => Promise<T>
 ) => Promise<T>
 
+type GetCompletedDownload = (
+  senderId: number,
+  downloadId: unknown
+) => ICompletedActionsArtifactDownload | null
+
 export interface IActionsArtifactProvenanceVerifierFiles {
   readonly bundlePath: string
   readonly workingDirectory: string
@@ -101,9 +110,40 @@ export interface IActionsArtifactProvenanceServiceDependencies {
   readonly cancelAllSubjects?: () => void
   readonly cancelAllSubjectsAndWait?: () => Promise<void>
   readonly withVerifierFiles?: WithVerifierFiles
+  readonly getCompletedDownload?: GetCompletedDownload
   readonly maximumConcurrency?: number
   readonly credentialLeases?: ICredentialLeaseRegistry
   readonly credentialSource?: IActionsArtifactProvenanceCredentialSource
+}
+
+/**
+ * Bind the renderer-supplied policy to the sender-owned artifact record before
+ * any subject extraction, temporary-file, credential, or verifier work. The
+ * record is retained by the transfer layer and never crosses the provenance
+ * IPC boundary, so a review cannot pair one downloaded archive with another
+ * repository/run/attempt policy.
+ */
+function policyMatchesCompletedDownload(
+  download: ICompletedActionsArtifactDownload,
+  policy: IActionsArtifactVerificationPolicy
+): boolean {
+  const workflowRun = download.workflowRun
+  if (workflowRun === null || workflowRun.runAttempt === null) {
+    return false
+  }
+  let webHost: string
+  try {
+    webHost = getActionsArtifactProvenanceWebHost(download.endpoint)
+  } catch {
+    return false
+  }
+  return (
+    policy.sourceRepositoryURI ===
+      `https://${webHost}/${download.owner}/${download.repository}` &&
+    policy.runId === workflowRun.id &&
+    policy.runAttempt === workflowRun.runAttempt &&
+    policy.sourceDigest === workflowRun.headSha.toLowerCase()
+  )
 }
 
 function requestRecord(value: unknown): Record<string, unknown> {
@@ -421,6 +461,7 @@ export class ActionsArtifactProvenanceService {
   private readonly cancelAllSubjects: () => void
   private readonly cancelAllSubjectsAndWait: () => Promise<void>
   private readonly withVerifierFiles: WithVerifierFiles
+  private readonly getCompletedDownload: GetCompletedDownload
   private readonly maximumConcurrency: number
   private readonly credentialLeases: ICredentialLeaseRegistry
   private readonly credentialSource: IActionsArtifactProvenanceCredentialSource
@@ -443,6 +484,8 @@ export class ActionsArtifactProvenanceService {
       cancelAllActionsArtifactSubjectOperationsAndWait
     this.withVerifierFiles =
       dependencies.withVerifierFiles ?? withPrivateVerifierFiles
+    this.getCompletedDownload =
+      dependencies.getCompletedDownload ?? getCompletedActionsArtifactDownload
     this.credentialLeases =
       dependencies.credentialLeases ??
       actionsArtifactProvenanceCredentialLeaseRegistry
@@ -476,6 +519,14 @@ export class ActionsArtifactProvenanceService {
       )
     } catch {
       return { ok: false, reason: 'unsupported-host' }
+    }
+
+    const download = this.getCompletedDownload(sender.id, request.downloadId)
+    if (download === null) {
+      return { ok: false, reason: 'entry-unavailable' }
+    }
+    if (!policyMatchesCompletedDownload(download, request.policy)) {
+      return { ok: false, reason: 'invalid-request' }
     }
 
     let credentialLease: IActionsArtifactProvenanceCredentialLease | null = null
