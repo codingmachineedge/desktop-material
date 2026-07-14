@@ -8,6 +8,7 @@ export type FileHistoryUnavailableKind =
   | 'binary'
   | 'directory'
   | 'invalid-path'
+  | 'invalid-revision'
   | 'malformed-output'
   | 'missing'
   | 'symbolic-link'
@@ -93,6 +94,18 @@ export function normalizeFileHistoryPath(
   }
 
   return relative.split(Path.sep).join('/')
+}
+
+/** Accept only an exact Git object id before using it as a restore source. */
+export function normalizeFileHistoryCommitSHA(value: string): string {
+  const sha = value.trim().toLowerCase()
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sha)) {
+    throw new FileHistoryUnavailableError(
+      'invalid-revision',
+      'Choose a complete commit id from this file’s history.'
+    )
+  }
+  return sha
 }
 
 interface IMutableBlameLine {

@@ -116,10 +116,7 @@ describe('CLI workbench runner helpers', () => {
   it('caps combined output and preserves split UTF-8 code points', () => {
     const utf8 = new CLICommandOutputLimiter(10)
     assert.equal(utf8.write('stdout', Buffer.from([0xe2])).data, '')
-    assert.equal(
-      utf8.write('stdout', Buffer.from([0x82, 0xac])).data,
-      '€'
-    )
+    assert.equal(utf8.write('stdout', Buffer.from([0x82, 0xac])).data, '€')
 
     const bounded = new CLICommandOutputLimiter(4)
     assert.deepEqual(bounded.write('stdout', Buffer.from('abc')), {

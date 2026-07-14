@@ -40,7 +40,8 @@ describe('CLI workbench command contract', () => {
     assert.equal(assessCLICommand('git', ['status']).risk, 'read')
     assert.equal(assessCLICommand('git', ['commit', '-m', 'ok']).risk, 'write')
     assert.equal(
-      assessCLICommand('git', ['push', '--force-with-lease']).requiresConfirmation,
+      assessCLICommand('git', ['push', '--force-with-lease'])
+        .requiresConfirmation,
       true
     )
     assert.equal(

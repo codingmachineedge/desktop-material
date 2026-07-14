@@ -27,9 +27,7 @@ interface IWorkflowStateControlProps {
 }
 
 /** State summary and confirmation entry point for the selected workflow. */
-export class WorkflowStateControl extends React.PureComponent<
-  IWorkflowStateControlProps
-> {
+export class WorkflowStateControl extends React.PureComponent<IWorkflowStateControlProps> {
   private requestChange = () => {
     const { workflow } = this.props
     if (workflow === null) {

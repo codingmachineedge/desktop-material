@@ -76,11 +76,7 @@ export class CLIWorkbenchCatalogService {
       return this.unavailable(tool)
     }
 
-    const versionResult = await this.capture(
-      executable,
-      ['--version'],
-      toolEnv
-    )
+    const versionResult = await this.capture(executable, ['--version'], toolEnv)
     if (versionResult.spawnFailed || versionResult.exitCode !== 0) {
       return this.unavailable(tool)
     }

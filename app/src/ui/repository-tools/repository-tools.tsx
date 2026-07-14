@@ -13,6 +13,7 @@ import {
   onCLICommandOutput,
   onCLICommandState,
   showItemInFolder,
+  showOpenDialog,
   showSaveDialog,
   startCLICommand,
 } from '../main-process-proxy'
@@ -22,6 +23,7 @@ import {
   IRepositoryToolOperation,
   prepareRepositoryArchive,
   prepareRepositoryBundle,
+  prepareRepositoryBundleVerification,
   RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
@@ -33,6 +35,7 @@ type RepositoryToolResultID =
   | RepositoryToolID
   | 'archive-export'
   | 'bundle-export'
+  | 'bundle-verify'
 
 export interface IRepositoryToolsClient {
   readonly getCatalog: () => Promise<ICLIWorkbenchCatalog>
@@ -65,6 +68,7 @@ export interface IRepositoryToolsProps {
   readonly chooseBundleDestination?: (
     defaultPath: string
   ) => Promise<string | null>
+  readonly chooseBundleToVerify?: () => Promise<string | null>
   readonly revealArchive?: (path: string) => Promise<void>
 }
 
@@ -358,6 +362,38 @@ export class RepositoryTools extends React.Component<
     }
   }
 
+  private chooseBundleToVerify = async () => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+    try {
+      const bundlePath = this.props.chooseBundleToVerify
+        ? await this.props.chooseBundleToVerify()
+        : await showOpenDialog({
+            title: 'Verify Git bundle',
+            properties: ['openFile'],
+            filters: [{ name: 'Git bundle', extensions: ['bundle'] }],
+          })
+      if (bundlePath === null || !this.mounted) {
+        return
+      }
+      await this.startCommand(
+        'bundle-verify',
+        prepareRepositoryBundleVerification(bundlePath),
+        false
+      )
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to prepare bundle verification.',
+        })
+      }
+    }
+  }
+
   private onRevealArchive = () => {
     const path = this.state.completedArchivePath
     if (path === null) {
@@ -433,6 +469,7 @@ export class RepositoryTools extends React.Component<
       completedOperation !== null &&
       completedOperation !== 'archive-export' &&
       completedOperation !== 'bundle-export' &&
+      completedOperation !== 'bundle-verify' &&
       getRepositoryToolOperation(completedOperation).mutatesRepository
     const archivePath =
       completedOperation === 'archive-export' ||
@@ -570,6 +607,12 @@ export class RepositoryTools extends React.Component<
             >
               Export full-history bundle
             </Button>
+            <Button
+              disabled={this.isBusy() || !this.state.gitAvailable}
+              onClick={() => void this.chooseBundleToVerify()}
+            >
+              Verify a bundle
+            </Button>
           </div>
         </article>
       </section>
@@ -658,7 +701,8 @@ export class RepositoryTools extends React.Component<
       this.state.resultOperation === null
         ? null
         : this.state.resultOperation === 'archive-export' ||
-          this.state.resultOperation === 'bundle-export'
+          this.state.resultOperation === 'bundle-export' ||
+          this.state.resultOperation === 'bundle-verify'
         ? null
         : getRepositoryToolOperation(this.state.resultOperation)
     return (
@@ -671,8 +715,11 @@ export class RepositoryTools extends React.Component<
             <h2 id="repository-tools-results-title">Results</h2>
             <span>
               {this.state.resultOperation === 'archive-export' ||
-              this.state.resultOperation === 'bundle-export'
-                ? this.state.resultOperation === 'bundle-export'
+              this.state.resultOperation === 'bundle-export' ||
+              this.state.resultOperation === 'bundle-verify'
+                ? this.state.resultOperation === 'bundle-verify'
+                  ? 'Verify Git bundle'
+                  : this.state.resultOperation === 'bundle-export'
                   ? 'Export full-history Git bundle'
                   : 'Export repository archive'
                 : operation?.title ?? 'Choose a repository tool'}

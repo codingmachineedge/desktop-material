@@ -4,11 +4,6 @@ export type CloneOptions = {
   readonly branch?: string
   /** The default branch name in case we're cloning an empty repository. */
   readonly defaultBranch?: string
-  /**
-   * Stable signed-in account identity preferred for the first HTTPS attempt.
-   * This selector is resolved only inside Desktop's credential trampoline.
-   */
-  readonly accountKey?: string
   /** Limit fetched history to this many commits. */
   readonly depth?: number
   /** Fetch only the selected/default branch when cloning shallow history. */

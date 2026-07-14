@@ -30,9 +30,7 @@ describe('floating surface layout contracts', () => {
   })
 
   it('keeps Regex Builder controls reachable and reuses dialog clamping', () => {
-    const component = read(
-      'app/src/ui/lib/regex-builder/regex-builder.tsx'
-    )
+    const component = read('app/src/ui/lib/regex-builder/regex-builder.tsx')
     const style = read('app/styles/ui/_regex-builder.scss')
 
     assert.match(component, /clampDialogOffset\(/)

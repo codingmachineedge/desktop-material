@@ -40,9 +40,6 @@ describe('compact settings style contracts', () => {
       style,
       /@container repository-settings-pane \(max-width: 500px\)[\s\S]*?\.remote-row\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 40px;/
     )
-    assert.match(
-      style,
-      /\.submodule-row\s*\{[\s\S]*?flex-direction: column;/
-    )
+    assert.match(style, /\.submodule-row\s*\{[\s\S]*?flex-direction: column;/)
   })
 })

@@ -18,6 +18,7 @@
 ## Verification ledger
 
 - `2026-07-12`, root `302208c45e26e771532261df1541d33dc5695077`: full TypeScript check passed; guided Repository tools and CLI safety suites passed 32/32; GitHub transport and safe-response suites passed 35/35.
+- `2026-07-13`, root `2af00f2d1118f244911672bd32c3642b81a1304e`: guided bounded-history clone parser/argument/UI/responsive contracts passed 5/5 and the full TypeScript check passed. The pre-existing Git clone integration suite was attempted but cannot load through the shared dependency tree because `keytar.node` is absent; this is the same native-addon build blocker recorded below, not a product-test assertion failure.
 - Exact production build command: `node vendor/yarn-1.21.1.js build:prod`.
 - Current build result: JavaScript/TypeScript compilation starts successfully, but renderer/main linking stops because the reusable lockfile-matched dependency tree was installed with lifecycle scripts disabled and therefore has no `desktop-notifications.node`, `registry.node`, `fs_admin.node`, or `keytar.node`. The local `desktop-trampoline` and `windows-argv-parser` packages also have not run their normal compile/install steps.
 - The pinned Electron 42.0.1 archive was present in the local Electron cache and its ignored runtime was extracted without a network fetch. This does not replace the four missing native addons.

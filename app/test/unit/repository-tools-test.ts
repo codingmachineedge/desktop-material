@@ -4,6 +4,7 @@ import {
   getRepositoryToolOperation,
   prepareRepositoryArchive,
   prepareRepositoryBundle,
+  prepareRepositoryBundleVerification,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -120,6 +121,16 @@ describe('repository tool recipes', () => {
         'C:\\work\\repo\\.git\\backup.bundle'
       )
     )
+  })
+
+  it('prepares only an absolute bundle for read-only verification', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryBundleVerification('C:\\exports\\backup.bundle'),
+      ['bundle', 'verify', 'C:\\exports\\backup.bundle']
+    )
+    for (const path of ['backup.bundle', 'C:\\exports\\backup.zip', '']) {
+      assert.throws(() => prepareRepositoryBundleVerification(path))
+    }
   })
 })
 

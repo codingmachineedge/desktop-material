@@ -47,7 +47,6 @@ import {
 import { mergeOrganizationRepositories } from './org-filter-chips'
 import { PopupType } from '../../models/popup'
 import { PreferencesTab } from '../../models/preferences'
-import { getPreferredGenericCloneAccountKey } from '../../lib/automation/clone-account-fallback'
 import { normalizeCloneDepth } from '../../models/clone-options'
 
 interface ICloneRepositoryProps {
@@ -1113,18 +1112,12 @@ export class CloneRepository extends React.Component<
     }
   }
 
-  private cloneImpl(
-    url: string,
-    path: string,
-    defaultBranch?: string,
-    accountKey?: string
-  ) {
+  private cloneImpl(url: string, path: string, defaultBranch?: string) {
     const depth = this.state.shallowClone
       ? normalizeCloneDepth(this.state.cloneDepth)
       : undefined
     this.props.dispatcher.clone(url, path, {
       defaultBranch,
-      ...(accountKey !== undefined ? { accountKey } : {}),
       depth,
       singleBranch: depth !== undefined,
       shallowSubmodules: depth !== undefined,

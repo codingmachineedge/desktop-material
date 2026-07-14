@@ -121,8 +121,8 @@ export class CLIWorkbenchRunner {
       const state = run.cancelled
         ? 'cancelled'
         : code === 0
-          ? 'completed'
-          : 'failed'
+        ? 'completed'
+        : 'failed'
       this.finish(run, {
         id: request.id,
         state,
@@ -247,10 +247,7 @@ export class CLIWorkbenchRunner {
     }
   }
 
-  private finish(
-    run: IActiveCLICommand,
-    event: ICLICommandStateEvent
-  ): void {
+  private finish(run: IActiveCLICommand, event: ICLICommandStateEvent): void {
     if (run.finished) {
       return
     }

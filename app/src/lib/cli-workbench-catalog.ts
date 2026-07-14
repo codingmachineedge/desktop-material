@@ -1,7 +1,4 @@
-import type {
-  CLIWorkbenchTool,
-  ICLICommandCatalogEntry,
-} from './cli-workbench'
+import type { CLIWorkbenchTool, ICLICommandCatalogEntry } from './cli-workbench'
 
 function cleanSummary(summary: string | undefined): string {
   return summary?.trim().replace(/\s+/g, ' ') ?? ''
@@ -150,9 +147,7 @@ export function parseGitHubHelpCatalog(
   for (const rawLine of output.split(/\r?\n/)) {
     const heading = /^([A-Z][A-Z ]+COMMANDS)$/.exec(rawLine.trim())
     if (heading !== null) {
-      category = titleCase(
-        heading[1].replace(/ COMMANDS$/, '').toLowerCase()
-      )
+      category = titleCase(heading[1].replace(/ COMMANDS$/, '').toLowerCase())
       continue
     }
 

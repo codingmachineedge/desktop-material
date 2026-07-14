@@ -461,10 +461,7 @@ export const startCLICommand = invokeProxy('start-cli-command', 1)
 export const cancelCLICommand = invokeProxy('cancel-cli-command', 1)
 
 /** Write input to a workbench run; null closes its stdin stream. */
-export const writeCLICommandInput = invokeProxy(
-  'write-cli-command-input',
-  2
-)
+export const writeCLICommandInput = invokeProxy('write-cli-command-input', 2)
 
 export function onCLICommandOutput(
   handler: (

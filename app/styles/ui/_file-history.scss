@@ -310,6 +310,66 @@
   overflow-wrap: anywhere;
 }
 
+.file-history-restore-controls,
+.file-history-restore-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  .button-component {
+    height: auto;
+    min-height: 36px;
+    white-space: normal;
+  }
+}
+
+.file-history-restore-controls {
+  margin-top: 18px;
+
+  span {
+    min-width: min(220px, 100%);
+    flex: 1;
+    color: var(--md-sys-color-on-surface-variant);
+    overflow-wrap: anywhere;
+  }
+}
+
+.file-history-restore-confirmation {
+  min-width: 0;
+  margin-top: 14px;
+  padding: 14px;
+  overflow-x: hidden;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+
+  strong,
+  p,
+  span,
+  code {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  p {
+    margin: 7px 0 12px;
+    line-height: 1.5;
+  }
+}
+
+.file-history-restore-message,
+.file-history-restore-error {
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.file-history-restore-error {
+  color: var(--md-sys-color-error);
+}
+
 .file-history-message.error {
   color: var(--md-sys-color-error);
 }
@@ -457,6 +517,15 @@
 }
 
 @container file-history-panel (max-width: 460px) {
+  .file-history-restore-controls,
+  .file-history-restore-actions {
+    align-items: stretch;
+    flex-direction: column;
+
+    .button-component {
+      width: 100%;
+    }
+  }
   .file-history-header {
     flex-wrap: wrap;
   }

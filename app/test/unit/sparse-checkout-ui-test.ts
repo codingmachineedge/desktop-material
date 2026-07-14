@@ -60,7 +60,7 @@ describe('Sparse checkout native UI contracts', () => {
     assert.match(styles, /\.sparse-checkout-content[\s\S]*overflow-x: hidden/)
     assert.match(
       styles,
-      /\.sparse-checkout-editor[\s\S]*overflow: auto[\s\S]*white-space: pre/
+      /\.sparse-checkout-editor[\s\S]*overflow-x: hidden[\s\S]*overflow-wrap: anywhere[\s\S]*white-space: pre-wrap/
     )
     assert.match(
       styles,

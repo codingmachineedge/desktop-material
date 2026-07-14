@@ -9,6 +9,7 @@ import {
   IFileBlameResult,
   IFileHistoryEntry,
   IFileHistoryResult,
+  restoreFileFromCommit,
 } from '../../lib/git/file-history'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
@@ -23,6 +24,7 @@ interface IFileHistoryProps {
   readonly repository: Repository
   readonly path: string
   readonly onDismissed: () => void
+  readonly onRefreshRepository: () => Promise<void>
 }
 
 interface IFileHistoryState {
@@ -35,6 +37,10 @@ interface IFileHistoryState {
   readonly blameLoading: boolean
   readonly blameError: string | null
   readonly selectedBlameLine: number | null
+  readonly restoreConfirmationSha: string | null
+  readonly restoring: boolean
+  readonly restoreMessage: string | null
+  readonly restoreError: string | null
 }
 
 const HistoryTabId = 'file-history-tab'
@@ -59,6 +65,7 @@ export class FileHistory extends React.Component<
   private mounted = false
   private historyController: AbortController | null = null
   private blameController: AbortController | null = null
+  private restoreConfirmButton: HTMLButtonElement | null = null
 
   public constructor(props: IFileHistoryProps) {
     super(props)
@@ -72,6 +79,10 @@ export class FileHistory extends React.Component<
       blameLoading: false,
       blameError: null,
       selectedBlameLine: null,
+      restoreConfirmationSha: null,
+      restoring: false,
+      restoreMessage: null,
+      restoreError: null,
     }
   }
 
@@ -217,7 +228,12 @@ export class FileHistory extends React.Component<
   ) => {
     const sha = event.currentTarget.dataset.sha
     if (sha !== undefined) {
-      this.setState({ selectedHistorySha: sha })
+      this.setState({
+        selectedHistorySha: sha,
+        restoreConfirmationSha: null,
+        restoreMessage: null,
+        restoreError: null,
+      })
     }
   }
 
@@ -241,7 +257,12 @@ export class FileHistory extends React.Component<
     event.preventDefault()
     const entry = entries[next]
     if (entry !== undefined) {
-      this.setState({ selectedHistorySha: entry.sha })
+      this.setState({
+        selectedHistorySha: entry.sha,
+        restoreConfirmationSha: null,
+        restoreMessage: null,
+        restoreError: null,
+      })
       document
         .querySelector<HTMLButtonElement>(
           `.file-history-list [data-history-index="${next}"]`
@@ -427,6 +448,100 @@ export class FileHistory extends React.Component<
     )
   }
 
+  private requestRestore = (entry: IFileHistoryEntry) => {
+    if (this.state.restoring) {
+      return
+    }
+    this.setState(
+      {
+        restoreConfirmationSha: entry.sha,
+        restoreMessage: null,
+        restoreError: null,
+      },
+      () => this.restoreConfirmButton?.focus()
+    )
+  }
+
+  private confirmRestore = async () => {
+    const sha = this.state.restoreConfirmationSha
+    if (sha === null || this.state.restoring) {
+      return
+    }
+    this.setState({ restoring: true, restoreError: null })
+    try {
+      const path = await restoreFileFromCommit(
+        this.props.repository,
+        this.props.path,
+        sha
+      )
+      await this.props.onRefreshRepository()
+      if (this.mounted) {
+        this.setState({
+          restoring: false,
+          restoreConfirmationSha: null,
+          restoreMessage: `Restored ${path} to the working tree. Review the change before committing.`,
+          restoreError: null,
+        })
+      }
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          restoring: false,
+          restoreError:
+            error instanceof FileHistoryUnavailableError
+              ? error.message
+              : 'Unable to restore this file version. The working tree was refreshed; review its current state before retrying.',
+        })
+        void this.props.onRefreshRepository().catch(() => undefined)
+      }
+    }
+  }
+
+  private renderRestoreConfirmation(entry: IFileHistoryEntry) {
+    if (this.state.restoreConfirmationSha !== entry.sha) {
+      return null
+    }
+    return (
+      <div
+        className="file-history-restore-confirmation"
+        role="alertdialog"
+        aria-labelledby="file-history-restore-title"
+        aria-describedby="file-history-restore-description"
+      >
+        <strong id="file-history-restore-title">
+          Restore this file version?
+        </strong>
+        <p id="file-history-restore-description">
+          <span title={this.props.path}>{this.props.path}</span> will be
+          replaced in the working tree with commit{' '}
+          <code title={entry.sha}>{entry.shortSha}</code>. Existing commits and
+          the staging area remain unchanged, but current unstaged content at
+          this path can be lost.
+        </p>
+        <div className="file-history-restore-actions">
+          <Button
+            onButtonRef={button => (this.restoreConfirmButton = button)}
+            disabled={this.state.restoring}
+            onClick={() => void this.confirmRestore()}
+          >
+            {this.state.restoring ? 'Restoring…' : 'Restore to working tree'}
+          </Button>
+          <Button
+            disabled={this.state.restoring}
+            onClick={() =>
+              this.setState({
+                restoreConfirmationSha: null,
+                restoreError: null,
+              })
+            }
+          >
+            Go back
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   private renderHistoryDetails(entry: IFileHistoryEntry | null) {
     if (entry === null) {
       return (
@@ -460,6 +575,29 @@ export class FileHistory extends React.Component<
             </dd>
           </div>
         </dl>
+        <div className="file-history-restore-controls">
+          <Button
+            disabled={this.state.restoring}
+            onClick={() => this.requestRestore(entry)}
+          >
+            Restore this version
+          </Button>
+          <span>
+            Restores only this path to the working tree; it does not create a
+            commit.
+          </span>
+        </div>
+        {this.renderRestoreConfirmation(entry)}
+        {this.state.restoreMessage !== null && (
+          <p className="file-history-restore-message" role="status">
+            {this.state.restoreMessage}
+          </p>
+        )}
+        {this.state.restoreError !== null && (
+          <p className="file-history-restore-error" role="alert">
+            {this.state.restoreError}
+          </p>
+        )}
       </article>
     )
   }

@@ -90,9 +90,7 @@ describe('Actions parity controls', () => {
 
     view.rerender(
       <RunList
-        runs={[
-          createRun(APICheckStatus.Completed, APICheckConclusion.Failure),
-        ]}
+        runs={[createRun(APICheckStatus.Completed, APICheckConclusion.Failure)]}
         selectedRunId={null}
         busyRunId={null}
         onSelect={() => {}}
@@ -158,7 +156,9 @@ describe('Actions parity controls', () => {
     )
 
     assert.ok(screen.getByRole('alertdialog'))
-    fireEvent.click(screen.getByRole('checkbox', { name: /Force cancellation/ }))
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /Force cancellation/ })
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Force cancel run' }))
     assert.equal(force, true)
   })

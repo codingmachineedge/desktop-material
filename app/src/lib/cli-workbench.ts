@@ -70,120 +70,121 @@ export interface ICLIWorkbenchQuickAction {
  * supported by the installed Git and GitHub CLI versions and discovers their
  * complete command catalogs at runtime.
  */
-export const CLIWorkbenchQuickActions: ReadonlyArray<ICLIWorkbenchQuickAction> = [
-  {
-    id: 'git-status',
-    tool: 'git',
-    label: 'Repository status',
-    description: 'Show staged, modified, and untracked files.',
-    args: ['status', '--short', '--branch'],
-    category: 'Inspect',
-  },
-  {
-    id: 'git-log',
-    tool: 'git',
-    label: 'Commit graph',
-    description: 'Inspect the decorated all-branch history graph.',
-    args: ['log', '--graph', '--decorate', '--oneline', '--all', '-50'],
-    category: 'Inspect',
-  },
-  {
-    id: 'git-reflog',
-    tool: 'git',
-    label: 'Reflog',
-    description: 'Find recent ref movements for recovery and auditing.',
-    args: ['reflog', 'show', '--date=local', '-30'],
-    category: 'Recover',
-  },
-  {
-    id: 'git-worktrees',
-    tool: 'git',
-    label: 'Worktrees',
-    description: 'List linked worktrees with machine-readable details.',
-    args: ['worktree', 'list', '--porcelain'],
-    category: 'Branches',
-  },
-  {
-    id: 'git-remotes',
-    tool: 'git',
-    label: 'Remote details',
-    description: 'Inspect fetch and push URLs for every remote.',
-    args: ['remote', '-v'],
-    category: 'Remote',
-  },
-  {
-    id: 'git-submodules',
-    tool: 'git',
-    label: 'Submodule status',
-    description: 'Inspect recursive submodule revisions and state.',
-    args: ['submodule', 'status', '--recursive'],
-    category: 'Remote',
-  },
-  {
-    id: 'git-fsck',
-    tool: 'git',
-    label: 'Verify objects',
-    description: 'Check object connectivity and validity.',
-    args: ['fsck', '--full'],
-    category: 'Maintain',
-  },
-  {
-    id: 'gh-status',
-    tool: 'gh',
-    label: 'GitHub status',
-    description: 'Show relevant pull requests, issues, and notifications.',
-    args: ['status'],
-    category: 'Overview',
-  },
-  {
-    id: 'gh-pr-list',
-    tool: 'gh',
-    label: 'Pull requests',
-    description: 'List open pull requests for this repository.',
-    args: ['pr', 'list', '--limit', '30'],
-    category: 'Collaborate',
-  },
-  {
-    id: 'gh-issue-list',
-    tool: 'gh',
-    label: 'Issues',
-    description: 'List open issues for this repository.',
-    args: ['issue', 'list', '--limit', '30'],
-    category: 'Collaborate',
-  },
-  {
-    id: 'gh-workflow-list',
-    tool: 'gh',
-    label: 'Workflows',
-    description: 'List repository Actions workflows and their states.',
-    args: ['workflow', 'list', '--all'],
-    category: 'Actions',
-  },
-  {
-    id: 'gh-run-list',
-    tool: 'gh',
-    label: 'Workflow runs',
-    description: 'List recent GitHub Actions runs.',
-    args: ['run', 'list', '--limit', '30'],
-    category: 'Actions',
-  },
-  {
-    id: 'gh-release-list',
-    tool: 'gh',
-    label: 'Releases',
-    description: 'List published and draft releases.',
-    args: ['release', 'list', '--limit', '30'],
-    category: 'Publish',
-  },
-  {
-    id: 'gh-rulesets',
-    tool: 'gh',
-    label: 'Repository rules',
-    description: 'Inspect rulesets that apply to the repository.',
-    args: ['ruleset', 'list'],
-    category: 'Secure',
-  },
-]
+export const CLIWorkbenchQuickActions: ReadonlyArray<ICLIWorkbenchQuickAction> =
+  [
+    {
+      id: 'git-status',
+      tool: 'git',
+      label: 'Repository status',
+      description: 'Show staged, modified, and untracked files.',
+      args: ['status', '--short', '--branch'],
+      category: 'Inspect',
+    },
+    {
+      id: 'git-log',
+      tool: 'git',
+      label: 'Commit graph',
+      description: 'Inspect the decorated all-branch history graph.',
+      args: ['log', '--graph', '--decorate', '--oneline', '--all', '-50'],
+      category: 'Inspect',
+    },
+    {
+      id: 'git-reflog',
+      tool: 'git',
+      label: 'Reflog',
+      description: 'Find recent ref movements for recovery and auditing.',
+      args: ['reflog', 'show', '--date=local', '-30'],
+      category: 'Recover',
+    },
+    {
+      id: 'git-worktrees',
+      tool: 'git',
+      label: 'Worktrees',
+      description: 'List linked worktrees with machine-readable details.',
+      args: ['worktree', 'list', '--porcelain'],
+      category: 'Branches',
+    },
+    {
+      id: 'git-remotes',
+      tool: 'git',
+      label: 'Remote details',
+      description: 'Inspect fetch and push URLs for every remote.',
+      args: ['remote', '-v'],
+      category: 'Remote',
+    },
+    {
+      id: 'git-submodules',
+      tool: 'git',
+      label: 'Submodule status',
+      description: 'Inspect recursive submodule revisions and state.',
+      args: ['submodule', 'status', '--recursive'],
+      category: 'Remote',
+    },
+    {
+      id: 'git-fsck',
+      tool: 'git',
+      label: 'Verify objects',
+      description: 'Check object connectivity and validity.',
+      args: ['fsck', '--full'],
+      category: 'Maintain',
+    },
+    {
+      id: 'gh-status',
+      tool: 'gh',
+      label: 'GitHub status',
+      description: 'Show relevant pull requests, issues, and notifications.',
+      args: ['status'],
+      category: 'Overview',
+    },
+    {
+      id: 'gh-pr-list',
+      tool: 'gh',
+      label: 'Pull requests',
+      description: 'List open pull requests for this repository.',
+      args: ['pr', 'list', '--limit', '30'],
+      category: 'Collaborate',
+    },
+    {
+      id: 'gh-issue-list',
+      tool: 'gh',
+      label: 'Issues',
+      description: 'List open issues for this repository.',
+      args: ['issue', 'list', '--limit', '30'],
+      category: 'Collaborate',
+    },
+    {
+      id: 'gh-workflow-list',
+      tool: 'gh',
+      label: 'Workflows',
+      description: 'List repository Actions workflows and their states.',
+      args: ['workflow', 'list', '--all'],
+      category: 'Actions',
+    },
+    {
+      id: 'gh-run-list',
+      tool: 'gh',
+      label: 'Workflow runs',
+      description: 'List recent GitHub Actions runs.',
+      args: ['run', 'list', '--limit', '30'],
+      category: 'Actions',
+    },
+    {
+      id: 'gh-release-list',
+      tool: 'gh',
+      label: 'Releases',
+      description: 'List published and draft releases.',
+      args: ['release', 'list', '--limit', '30'],
+      category: 'Publish',
+    },
+    {
+      id: 'gh-rulesets',
+      tool: 'gh',
+      label: 'Repository rules',
+      description: 'Inspect rulesets that apply to the repository.',
+      args: ['ruleset', 'list'],
+      category: 'Secure',
+    },
+  ]
 
 /** Parse a command argument field without ever invoking a shell. */
 export function parseCLIArguments(input: string): ReadonlyArray<string> {
@@ -345,7 +346,13 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   }
   if (
     command === 'push' &&
-    includesAny(rest, ['--delete', '--force', '--force-with-lease', '--mirror', '-f'])
+    includesAny(rest, [
+      '--delete',
+      '--force',
+      '--force-with-lease',
+      '--mirror',
+      '-f',
+    ])
   ) {
     return destructive('This push can delete or rewrite remote refs.')
   }
@@ -364,10 +371,7 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   if (command === 'stash' && ['clear', 'drop'].includes(rest[0])) {
     return destructive('This command permanently removes stash entries.')
   }
-  if (
-    command === 'reflog' &&
-    ['delete', 'drop', 'expire'].includes(rest[0])
-  ) {
+  if (command === 'reflog' && ['delete', 'drop', 'expire'].includes(rest[0])) {
     return destructive('This command expires or deletes reflog recovery data.')
   }
   if (command === 'worktree' && ['prune', 'remove'].includes(rest[0])) {
@@ -379,7 +383,9 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
     )
   }
   if (command === 'submodule' && rest[0] === 'deinit') {
-    return destructive('This command unregisters submodules and removes their worktrees.')
+    return destructive(
+      'This command unregisters submodules and removes their worktrees.'
+    )
   }
   if (gitWriteCommands.has(command)) {
     return write(`git ${command} can modify local or remote repository state.`)
@@ -451,7 +457,9 @@ function assessGitHub(args: ReadonlyArray<string>): ICLICommandAssessment {
   const words = args.filter(arg => !arg.startsWith('-'))
   const pair = words.slice(0, 2).join(' ')
   if (ghDestructivePairs.has(pair)) {
-    return destructive(`gh ${pair} permanently removes or disables GitHub state.`)
+    return destructive(
+      `gh ${pair} permanently removes or disables GitHub state.`
+    )
   }
   if (args[0] === 'api') {
     const mutating =
@@ -476,7 +484,9 @@ function assessGitHub(args: ReadonlyArray<string>): ICLICommandAssessment {
       requiresConfirmation: false,
     }
   }
-  return write('This GitHub CLI command can modify GitHub state or local configuration.')
+  return write(
+    'This GitHub CLI command can modify GitHub state or local configuration.'
+  )
 }
 
 /** Classify an invocation before execution so the UI can gate destructive work. */

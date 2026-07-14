@@ -28,10 +28,7 @@ describe('compact shell style contracts', () => {
     const style = read('app/styles/_material-shell.scss')
     const component = read('app/src/ui/toolbar/button.tsx')
 
-    assert.match(
-      style,
-      /@media \(max-width: 760px\), \(max-height: 420px\)/
-    )
+    assert.match(style, /@media \(max-width: 760px\), \(max-height: 420px\)/)
     assert.match(
       style,
       /\.toolbar-button\s*\{[\s\S]*?width: 48px !important;[\s\S]*?min-width: 40px !important;/

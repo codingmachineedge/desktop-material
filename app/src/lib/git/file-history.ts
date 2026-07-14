@@ -8,6 +8,7 @@ import {
   FileHistoryUnavailableError,
   IFileBlameResult,
   IFileHistoryResult,
+  normalizeFileHistoryCommitSHA,
   normalizeFileHistoryPath,
   parseFileBlamePorcelain,
 } from './file-history-parser'
@@ -228,4 +229,36 @@ export async function getFileBlame(
   throwIfAborted(signal)
 
   return { path, lines: parseFileBlamePorcelain(result.stdout, path) }
+}
+
+/**
+ * Restore one committed file version into the working tree only. The index and
+ * existing commits remain untouched; callers must explicitly confirm because
+ * current working-tree content at this path can be replaced.
+ */
+export async function restoreFileFromCommit(
+  repository: Repository,
+  value: string,
+  commitSHA: string
+): Promise<string> {
+  const path = normalizeFileHistoryPath(repository.path, value)
+  const sha = normalizeFileHistoryCommitSHA(commitSHA)
+  const existsAtCurrentPath = await git(
+    ['cat-file', '-e', `${sha}:${path}`],
+    repository.path,
+    'checkFileAtRestoreCommit',
+    { successExitCodes: new Set([0, 1, 128]) }
+  )
+  if (existsAtCurrentPath.exitCode !== 0) {
+    throw new FileHistoryUnavailableError(
+      'missing',
+      'This commit stores the file under an earlier name, so it cannot replace the current path safely.'
+    )
+  }
+  await git(
+    ['restore', `--source=${sha}`, '--worktree', '--', path],
+    repository.path,
+    'restoreFileFromCommit'
+  )
+  return path
 }

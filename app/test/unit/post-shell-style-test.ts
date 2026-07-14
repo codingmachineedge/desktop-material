@@ -54,7 +54,10 @@ describe('post-shell MD3 style contracts', () => {
     const style = readStyle('_pull-all.scss')
     assert.match(style, /pull-all-results-container/)
     assert.match(style, /overflow-x: hidden/)
-    assert.match(style, /grid-template-columns: minmax\(82px, 32%\) minmax\(0, 1fr\)/)
+    assert.match(
+      style,
+      /grid-template-columns: minmax\(82px, 32%\) minmax\(0, 1fr\)/
+    )
   })
 
   it('keeps Merge all content inside its dialog with reachable results', () => {
@@ -85,10 +88,7 @@ describe('post-shell MD3 style contracts', () => {
   it('fits Settings History at compact width and height without auto-fit', () => {
     const style = readStyle('_versioned-store-history.scss')
     assert.match(style, /max-height: calc\(100vh - 20px\);/)
-    assert.match(
-      style,
-      /min-height: min\(480px, calc\(100vh - 20px\)\);/
-    )
+    assert.match(style, /min-height: min\(480px, calc\(100vh - 20px\)\);/)
     assert.match(style, /@media \(max-height: 520px\)/)
     assert.match(
       style,
@@ -102,10 +102,7 @@ describe('post-shell MD3 style contracts', () => {
       style,
       /\.header-title\s*\{[\s\S]*?min-width: 0;[\s\S]*?text-overflow: ellipsis;/
     )
-    assert.match(
-      style,
-      /\.build-run-panel-header\s*\{[\s\S]*?flex-wrap: wrap;/
-    )
+    assert.match(style, /\.build-run-panel-header\s*\{[\s\S]*?flex-wrap: wrap;/)
     assert.match(style, /@media \(max-width: 640px\), \(max-height: 420px\)/)
   })
 

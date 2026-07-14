@@ -100,12 +100,15 @@ ALIAS COMMANDS
   deploy:        Alias for "api -H token:secret"
 `)
 
-    assert.deepEqual(entries.map(x => [x.command, x.category]), [
-      ['auth', 'Core'],
-      ['pr', 'Core'],
-      ['workflow', 'Github actions'],
-      ['deploy', 'Alias'],
-    ])
+    assert.deepEqual(
+      entries.map(x => [x.command, x.category]),
+      [
+        ['auth', 'Core'],
+        ['pr', 'Core'],
+        ['workflow', 'Github actions'],
+        ['deploy', 'Alias'],
+      ]
+    )
     assert.equal(entries.find(x => x.command === 'deploy')?.summary, '')
   })
 

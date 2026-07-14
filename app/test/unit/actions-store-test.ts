@@ -102,19 +102,17 @@ describe('ActionsStore helpers', () => {
 
   it('explains permission and Enterprise capability failures', () => {
     const denied = actionsMutationError(
-      new APIError(
-        new Response(null, { status: 403 }),
-        { message: 'Forbidden' }
-      ),
+      new APIError(new Response(null, { status: 403 }), {
+        message: 'Forbidden',
+      }),
       'disable-workflow'
     )
     assert.match(denied.message, /Actions write access/)
 
     const unavailable = actionsMutationError(
-      new APIError(
-        new Response(null, { status: 404 }),
-        { message: 'Not Found' }
-      ),
+      new APIError(new Response(null, { status: 404 }), {
+        message: 'Not Found',
+      }),
       'enable-workflow'
     )
     assert.match(unavailable.message, /GitHub Enterprise version/)

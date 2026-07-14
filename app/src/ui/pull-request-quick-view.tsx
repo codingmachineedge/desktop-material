@@ -227,10 +227,7 @@ export class PullRequestQuickView extends React.Component<
           {this.renderHeader()}
           {this.renderPR()}
         </div>
-        <div
-          className="pull-request-pointer"
-          style={{ top: pointerTop }}
-        ></div>
+        <div className="pull-request-pointer" style={{ top: pointerTop }}></div>
       </div>,
       portalHost
     )

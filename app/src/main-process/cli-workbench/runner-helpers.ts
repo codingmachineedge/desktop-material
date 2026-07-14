@@ -112,10 +112,7 @@ export class CLICommandOutputLimiter {
     this.remaining = cap
   }
 
-  public write(
-    stream: 'stdout' | 'stderr',
-    chunk: Buffer
-  ): ILimitedCLIOutput {
+  public write(stream: 'stdout' | 'stderr', chunk: Buffer): ILimitedCLIOutput {
     const accepted = chunk.subarray(0, this.remaining)
     this.remaining -= accepted.length
     const wasTruncated = accepted.length < chunk.length
