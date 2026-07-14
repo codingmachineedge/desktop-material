@@ -432,6 +432,97 @@ export class ActionsView extends React.Component<
   }
 
   private async performRunAction(run: IAPIWorkflowRun, failedOnly: boolean) {
+    const repository = this.props.repository.gitHubRepository
+    if (confirmation?.kind !== 'cancel-run' || repository === null) {
+      return
+    }
+    this.setState({
+      busyRunId: confirmation.run.id,
+      actionError: null,
+      actionMessage: null,
+    })
+    try {
+      await this.props.actionsStore.cancelRun(
+        repository,
+        confirmation.run.id,
+        force
+      )
+      this.setState({
+        actionMessage: force
+          ? 'Force cancellation requested.'
+          : 'Workflow cancellation requested.',
+      })
+    } catch (error) {
+      this.setState({
+        actionError: error instanceof Error ? error : new Error(String(error)),
+      })
+    } finally {
+      this.setState({ busyRunId: null, confirmation: null })
+    }
+  }
+
+  private confirmWorkflowStateChange = async () => {
+    const confirmation = this.state.confirmation
+    const repository = this.props.repository.gitHubRepository
+    if (confirmation?.kind !== 'workflow-state' || repository === null) {
+      return
+    }
+    this.setState({
+      busyWorkflowId: confirmation.workflow.id,
+      actionError: null,
+      actionMessage: null,
+    })
+    try {
+      await this.props.actionsStore.setWorkflowEnabled(
+        repository,
+        confirmation.workflow.id,
+        confirmation.enabled
+      )
+      this.setState({
+        actionMessage: confirmation.enabled
+          ? `Enabled ${confirmation.workflow.name}.`
+          : `Disabled ${confirmation.workflow.name}.`,
+      })
+    } catch (error) {
+      this.setState({
+        actionError: error instanceof Error ? error : new Error(String(error)),
+      })
+    } finally {
+      this.setState({ busyWorkflowId: null, confirmation: null })
+    }
+  }
+
+  private rerunJob = async (job: IAPIWorkflowJob) => {
+    const repository = this.props.repository.gitHubRepository
+    const selectedRun = this.state.selectedRun
+    if (repository === null || selectedRun === null) {
+      return
+    }
+    this.setState({
+      busyJobId: job.id,
+      actionError: null,
+      actionMessage: null,
+    })
+    try {
+      await this.props.actionsStore.rerunJob(repository, job.id)
+      const jobs = await this.props.actionsStore.fetchJobs(
+        repository,
+        selectedRun.id
+      )
+      this.setState({
+        jobs,
+        actionMessage: `Re-run requested for ${job.name}.`,
+      })
+    } catch (error) {
+      this.setState({
+        actionError: error instanceof Error ? error : new Error(String(error)),
+      })
+    } finally {
+      this.setState({ busyJobId: null })
+    }
+  }
+
+  private async performRunAction(run: IAPIWorkflowRun, failedOnly: boolean) {
     const repository = this.props.repository
     const repositoryGeneration = this.repositoryGeneration
     const operationGeneration = this.operationGeneration

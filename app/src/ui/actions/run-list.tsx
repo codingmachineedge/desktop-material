@@ -94,14 +94,12 @@ class RunListItem extends React.PureComponent<
             <span className="actions-run-summary">
               <strong title={title}>{title}</strong>
               <span className="actions-run-meta">
-                <span className="branch-chip">
-                  <span className="sr-only">Branch: </span>
+                <span className="branch-chip" title={branch}>
                   {branch}
                 </span>
                 <span>{run.event}</span>
                 {actor && (
-                  <span className="actions-actor">
-                    <span className="sr-only">Actor: </span>
+                  <span className="actions-actor" title={actor.login}>
                     <img src={actor.avatar_url} alt="" />
                     {actor.login}
                   </span>

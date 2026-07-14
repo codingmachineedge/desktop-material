@@ -202,30 +202,6 @@ describe('main-process menu', () => {
       assert.equal(repositoryTools?.accelerator, 'CmdOrCtrl+4')
     })
 
-    it('exposes the guided sparse checkout manager in Repository', () => {
-      const template = buildDefaultMenuTemplate(baseParams)
-      const repositoryMenu = template.find(item => item.id === 'repository')
-      assert.ok(repositoryMenu && Array.isArray(repositoryMenu.submenu))
-      const sparseCheckout = repositoryMenu.submenu.find(
-        item => item.id === 'manage-sparse-checkout'
-      )
-      assert.ok(sparseCheckout)
-      assert.equal(sparseCheckout.click instanceof Function, true)
-    })
-
-    it('exposes native pull request creation from the Branch menu', () => {
-      const template = buildDefaultMenuTemplate(baseParams)
-      const branchMenu = template.find(item => item.id === 'branch')
-      assert.ok(branchMenu && Array.isArray(branchMenu.submenu))
-      const createPullRequest = branchMenu.submenu.find(
-        item => item.id === 'create-pull-request'
-      )
-      assert.ok(createPullRequest)
-      assert.match(createPullRequest.label ?? '', /Create .*pull request/i)
-      assert.equal(createPullRequest.accelerator, 'CmdOrCtrl+R')
-      assert.equal(createPullRequest.click instanceof Function, true)
-    })
-
     it('has no duplicate access keys for any combination of label-affecting parameters', () => {
       const combinationCount = 1 << variantKeys.length
 

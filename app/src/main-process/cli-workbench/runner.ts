@@ -44,11 +44,8 @@ export class CLIWorkbenchRunner {
     }
 
     let executable: string
-    let toolEnv: Record<string, string | undefined>
     try {
-      const resolved = resolveCLIWorkbenchTool(request.tool)
-      executable = resolved.executable
-      toolEnv = resolved.env
+      executable = resolveCLIWorkbenchTool(request.tool)
     } catch {
       throw new Error(`Unable to start ${request.tool}.`)
     }
@@ -56,7 +53,7 @@ export class CLIWorkbenchRunner {
     try {
       child = spawn(executable, [...request.args], {
         cwd: request.cwd,
-        env: toolEnv,
+        env: process.env,
         shell: false,
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],

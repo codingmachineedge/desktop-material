@@ -3804,9 +3804,6 @@ export class AppStore extends TypedBaseStore<IAppState> {
       })
     } else if (
       selectedSection !== RepositorySectionTab.Actions &&
-      selectedSection !== RepositorySectionTab.Releases &&
-      selectedSection !== RepositorySectionTab.Issues &&
-      selectedSection !== RepositorySectionTab.Triage &&
       selectedSection !== RepositorySectionTab.RepositoryTools
     ) {
       return assertNever(selectedSection, `Unknown section: ${selectedSection}`)
@@ -4577,9 +4574,6 @@ export class AppStore extends TypedBaseStore<IAppState> {
       })
     } else if (
       section === RepositorySectionTab.Actions ||
-      section === RepositorySectionTab.Releases ||
-      section === RepositorySectionTab.Issues ||
-      section === RepositorySectionTab.Triage ||
       section === RepositorySectionTab.RepositoryTools
     ) {
       refreshSectionPromise = Promise.resolve()

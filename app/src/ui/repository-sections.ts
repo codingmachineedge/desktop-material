@@ -2,34 +2,25 @@ import { RepositorySectionTab } from '../lib/app-state'
 
 /** Repository rail order, kept independent from the enum's stable values. */
 export function getRepositorySections(
-  supportsGitHubActions: boolean,
-  supportsGitHubReleases: boolean = false,
-  supportsGitHubIssues: boolean = false
+  supportsGitHubActions: boolean
 ): ReadonlyArray<RepositorySectionTab> {
-  const sections = [RepositorySectionTab.Changes, RepositorySectionTab.History]
-  if (supportsGitHubActions) {
-    sections.push(RepositorySectionTab.Actions)
-  }
-  if (supportsGitHubReleases) {
-    sections.push(RepositorySectionTab.Releases)
-  }
-  if (supportsGitHubIssues) {
-    sections.push(RepositorySectionTab.Issues)
-  }
-  sections.push(RepositorySectionTab.Triage)
-  sections.push(RepositorySectionTab.RepositoryTools)
-  return sections
+  return supportsGitHubActions
+    ? [
+        RepositorySectionTab.Changes,
+        RepositorySectionTab.History,
+        RepositorySectionTab.Actions,
+        RepositorySectionTab.RepositoryTools,
+      ]
+    : [
+        RepositorySectionTab.Changes,
+        RepositorySectionTab.History,
+        RepositorySectionTab.RepositoryTools,
+      ]
 }
 
 export function getRepositorySectionVisualIndex(
   section: RepositorySectionTab,
-  supportsGitHubActions: boolean,
-  supportsGitHubReleases: boolean = false,
-  supportsGitHubIssues: boolean = false
+  supportsGitHubActions: boolean
 ): number {
-  return getRepositorySections(
-    supportsGitHubActions,
-    supportsGitHubReleases,
-    supportsGitHubIssues
-  ).indexOf(section)
+  return getRepositorySections(supportsGitHubActions).indexOf(section)
 }
