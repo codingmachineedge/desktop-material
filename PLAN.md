@@ -2,20 +2,17 @@
 
 ## Current status
 
-Milestones **M0 through M19 are shipped on `main`**. The exact M19 application
-source `5e80e678d062b65a82c0991b352e5a861c7469e5` passed the required MCP
-production build and isolated hidden-desktop interaction. The documentation and
-accepted 14-image union reached `main` at
-`a890ab579c63651e5089ee433b259f0fc9198fbf`; final code/release baseline
-`a0c2f19433631d577979c8c8a88a5151f5ab0656` passed all seven jobs in
-[CI 29274841990](https://github.com/codingmachineedge/desktop-material/actions/runs/29274841990)
-and [Build Installers 29274842059](https://github.com/codingmachineedge/desktop-material/actions/runs/29274842059).
+Milestones **M0 through M19 are shipped on `main`**. The latest M19
+implementation and headless evidence slice is source `e282eb2fce`; the current
+README/wiki/Pages documentation map is published at `581fbb9b08`. Its cache
+manager and pagination receipt is recorded in
+`2026-07-14-actions-artifact-provenance-result-ui.md` and the matching
+`HANDOFF.md` section.
 
 The shipped tree includes the bounded Windows full-suite launcher and reviewed
-exact-origin clone, Pull All, and history-deepening recovery fixes. Pages run
-`29272714314`, wiki commit `9f9c8010c8…`, release
-`v3.6.3-beta3-b0000000083`, downloaded asset digests, privacy, artifact purge,
-and owned-resource cleanup are all verified below.
+exact-origin clone, Pull All, and history-deepening recovery fixes. Historical
+CI, Pages, wiki, release, privacy, artifact-purge, and owned-resource receipts
+remain below; current documentation changes are pushed directly to `main`.
 
 The M0–M18 baseline includes the responsive-shell correction prompted by the final
 1450×997 review, its exact-size headless regression capture, the public
@@ -61,7 +58,7 @@ end of this plan and must be filled only after each check actually succeeds.
 | **M16 — Multi-window** | **COMPLETE** | Tab-aware window creation/routing, scoped selected repositories and tabs, safe shared-profile serialization, and multi-window menu/context actions. | `app/src/main-process/window-routing.ts`, `app/src/main-process/app-window.ts`, `app/src/main-process/main.ts`, `app/src/lib/window-scope.ts`, `app/test/unit/window-routing-test.ts` |
 | **M17 — GitLab, Bitbucket, and self-hosted GitLab** | **COMPLETE** | Provider API foundation, GitLab PAT and Bitbucket sign-in, self-hosted endpoint support, provider clone browsing, cross-host PR/status routing, credential isolation, and provider documentation. | `app/src/lib/api.ts`, `app/src/lib/stores/accounts-store.ts`, `app/src/ui/preferences/accounts.tsx`, `app/src/ui/clone-repository/`, `docs/integrations/gitlab.md`, `docs/integrations/bitbucket.md` |
 | **M18 — Final Material alignment** | **COMPLETE** | Full MD3 shell, tokens, motion, navigation rail, floating workspace cards, dialogs/sheets, de-stocked controls, final post-shell polish, accessibility coverage, and clipping/layout fixes across milestone surfaces. | `app/styles/_material.scss`, `app/styles/_material-shell.scss`, `app/styles/ui/`, `app/src/ui/app.tsx`, `app/test/unit/post-shell-style-test.ts`, `app/test/unit/ui/` |
-| **M19 — Guided Git, GitHub, and provider parity** | **COMPLETE** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. Exact app source `5e80e678…` is built and accepted off-screen; exact `main` publication evidence is complete. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
+| **M19 — Guided Git, GitHub, and provider parity** | **COMPLETE** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. Exact app source `e282eb2fce` is built and accepted off-screen; current `main` documentation and screenshot evidence are complete. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
 
 ## M19 guided parity implementation ledger
 

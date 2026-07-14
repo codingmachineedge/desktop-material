@@ -12,17 +12,11 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
 
 ## Shipped today
 
-The complete M0–M19 roadmap is live on `main`. Exact app source
-`5e80e678d062b65a82c0991b352e5a861c7469e5` passed the reproducible production
-build and isolated hidden-desktop interaction gate. Documentation and the exact
-14-image acceptance set were published in `main` union
-`a890ab579c63651e5089ee433b259f0fc9198fbf`; final code/release baseline
-`a0c2f19433631d577979c8c8a88a5151f5ab0656` passed all seven jobs in
-[CI 29274841990](https://github.com/codingmachineedge/desktop-material/actions/runs/29274841990)
-and published the verified public
-[b0000000083 release](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000083).
-The corresponding Pages deployment, canonical wiki, screenshot hashes,
-privacy scan, artifact purge, and owned-resource cleanup are complete.
+The complete M0–M19 roadmap is live on `main`. The latest implementation and
+headless evidence slice is source `e282eb2fce`, and the current documentation
+map is published at `581fbb9b08`. The corresponding cache/pagination receipt,
+screenshot hashes, privacy scan, artifact purge, and owned-resource cleanup are
+recorded in [`HANDOFF.md`](HANDOFF.md) and the linked run manifest.
 
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu
@@ -117,7 +111,7 @@ This is a compact status map; detailed receipts stay in the linked run manifests
 
 Last updated: **July 14, 2026**.
 
-| State | Wave | Current proof or next gate |
+| State | Wave | Shipped proof |
 |---|---|---|
 | **Done** | M0–M19 guided Git, GitHub, provider parity, and Material shell | Implementation ledger and closing acceptance are recorded in [`PLAN.md`](PLAN.md); prior P0, pagination, and run-inspector receipts remain in `.codex/run-manifests/`. |
 | **Done** | Actions provenance foundation and selected-account orchestration | Fixed policy, exact run-attempt binding, safe ZIP subject inventory, opaque IPC, verifier runtime, credential lease, and renderer/store review lifecycle are shipped. The compact implementation receipt is [`2026-07-14-actions-artifact-provenance-result-ui.md`](.codex/run-manifests/2026-07-14-actions-artifact-provenance-result-ui.md). |

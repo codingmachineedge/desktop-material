@@ -2,10 +2,9 @@
 
 ## Outcome
 
-The legacy **M0 through M18** Material foundation remains shipped on `main`.
-The newer Git, GitHub CLI, GitHub API, and GitKraken-parity roadmap is active on
-`main`; it deliberately turns audited capabilities into named,
-interactive app functions instead of exposing a searchable command/API list.
+The complete **M0 through M19** Material and guided Git/GitHub roadmap is shipped
+on `main`; it deliberately turns audited capabilities into named, interactive
+app functions instead of exposing a searchable command/API list.
 
 The first four-function P0 wave is implemented, pushed, and production-UI
 verified at exact source SHA `9e946fd527e5843b2fdba5de675a5476b0c80445`:
@@ -21,10 +20,10 @@ attestation review/result UI, Actions cache manager, bounded Pull Request
 Center, Release Manager, Issue Hub, and the named Git functions are all shipped
 as the accepted M19 parity wave.
 
-This handoff does not claim that branch-only Pages assets are already live on
-`main`. Pages remains protected to the normal reviewed `main` promotion path;
-the separate wiki was merged rather than overwritten and published at exact
-wiki SHA `2585cf7977b14d5792a1addb8b9a7c9f944e1e84`.
+The current Pages source, README, and in-repository wiki sources are on `main`.
+Pages deployment remains subject to the protected reviewed `main` promotion
+path; historical branch-only publication receipts below are retained as
+provenance rather than current status.
 
 ## 2026-07-13 P0 production UI gate
 
@@ -413,14 +412,12 @@ removal; local `main` was synchronized with `origin/main`.
   HTTP 200; every asset was streamed independently, and computed bytes/SHA-256
   matched the release metadata:
 
-For the legacy M0-M18 foundation, final public verification still follows that
-gate. The newer function-first parity roadmap is intentionally active: the P0
-four-function slice, typed operation boundary, and Actions run/artifact
-pagination are production-verified. Attempt/job/log/re-run, deployment-review,
-and fork-approval functions have now passed their production UI gate as well.
-Cryptographic artifact attestation review/result UI, Actions cache management,
-bounded PR/Release and Issue waves, and the named Git functions are shipped;
-the complete M19 ledger remains the source of truth for that acceptance.
+The complete function-first parity roadmap is now shipped: the P0 four-function
+slice, typed operation boundary, Actions run/artifact pagination,
+attempt/job/log/re-run, deployment review, fork approval, cryptographic artifact
+attestation review/result UI, Actions cache management, bounded PR/Release and
+Issue waves, and the named Git functions are all accepted. The complete M19
+ledger remains the source of truth for that acceptance.
 
 ## 2026-07-13 Actions run inspector production UI gate
 

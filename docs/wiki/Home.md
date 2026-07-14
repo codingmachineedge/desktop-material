@@ -9,14 +9,14 @@ workflow intact underneath.
 On top of that shell, Desktop Material ships multi-provider accounts and organizations, automation,
 GitHub Actions and logs, agent access, searchable graph History, multiple stashes, pull-all,
 multi-window workflows, per-account repository tabs, Git-backed settings and notifications, and a
-non-modal dialog framework. The active parity roadmap turns audited Git, `gh`, REST, and GraphQL
+non-modal dialog framework. The completed parity roadmap turns audited Git, `gh`, REST, and GraphQL
 capabilities into named app functions rather than a searchable command or endpoint catalogue.
 
-> **Status:** Desktop Material is in **active development**. Preview builds are published from the
-> project's [GitHub Releases](https://github.com/codingmachineedge/desktop-material/releases).
-> Feature-parity references come from [desktop-plus](https://github.com/severity1/desktop-plus)
-> (MIT). The current P0 function wave passed its exact off-screen production UI gate at
-> `9e946fd527` on `mega-feature-update` and promotes through the normal reviewed `main` path.
+> **Status:** Desktop Material is in **active development**, with the complete M0–M19 roadmap
+> published on `main`. Preview builds are published from the project's
+> [GitHub Releases](https://github.com/codingmachineedge/desktop-material/releases). The latest
+> cache/pagination evidence slice is source [`e282eb2fce`](https://github.com/codingmachineedge/desktop-material/commit/e282eb2fce),
+> with the current documentation map at [`581fbb9b08`](https://github.com/codingmachineedge/desktop-material/commit/581fbb9b08).
 
 ![Desktop Material Changes view with the MD3 shell](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-workspace-changes.png)
 
@@ -31,7 +31,7 @@ capabilities into named app functions rather than a searchable command or endpoi
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
 | [Agent API](Agent-API) | Shipped MCP, local REST, stdio proxy, and CLI access for safe AI-agent control. |
-| [Living parity roadmap](https://github.com/codingmachineedge/desktop-material/blob/mega-feature-update/README.md#roadmaps) | Current named-function delivery waves, production UI gates, and the no-raw-command/API-browser product contract. |
+| [Living parity roadmap](https://github.com/codingmachineedge/desktop-material/blob/main/README.md#roadmaps) | Completed named-function delivery waves, production UI gates, and the no-raw-command/API-browser product contract. |
 
 ---
 
