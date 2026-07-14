@@ -417,6 +417,75 @@ describe('API', () => {
       )
     })
 
+    it('follows job log redirects without forwarding request options', async () => {
+      const api = new API('https://api.github.com', 'secret')
+      Reflect.set(
+        api,
+        'ghRequest',
+        async () =>
+          new Response(null, {
+            status: 302,
+            headers: { Location: 'https://blob.example.test/job.txt' },
+          })
+      )
+      const originalFetch = globalThis.fetch
+      let receivedOptions: RequestInit | undefined
+      globalThis.fetch = async (_input, options) => {
+        receivedOptions = options
+        return new Response('hello from the job')
+      }
+
+      assert.equal(await api.rerunJob('owner', 'repo', 17), true)
+      await api.cancelWorkflowRun('owner', 'repo', 23)
+      await api.cancelWorkflowRun('owner', 'repo', 24, true)
+      await api.setWorkflowEnabled('owner', 'repo', 31, true)
+      await api.setWorkflowEnabled('owner', 'repo', 32, false)
+
+      assert.deepEqual(requests, [
+        {
+          method: 'POST',
+          path: '/repos/owner/repo/actions/jobs/17/rerun',
+        },
+        {
+          method: 'POST',
+          path: 'repos/owner/repo/actions/runs/23/cancel',
+        },
+        {
+          method: 'POST',
+          path: 'repos/owner/repo/actions/runs/24/force-cancel',
+        },
+        {
+          method: 'PUT',
+          path: 'repos/owner/repo/actions/workflows/31/enable',
+        },
+        {
+          method: 'PUT',
+          path: 'repos/owner/repo/actions/workflows/32/disable',
+        },
+      ])
+    })
+
+    it('preserves structured errors for workflow state changes', async () => {
+      const api = new API('https://api.github.com', 'token')
+      Reflect.set(
+        api,
+        'ghRequest',
+        async () =>
+          new Response(JSON.stringify({ message: 'Resource not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+
+      await assert.rejects(
+        api.setWorkflowEnabled('owner', 'repo', 31, true),
+        error =>
+          error instanceof APIError &&
+          error.responseStatus === 404 &&
+          error.message === 'Resource not found'
+      )
+    })
+
     it('propagates the exact signal for account-bound Actions reads', async () => {
       const api = new API('https://api.github.com', 'token')
       const controller = new AbortController()

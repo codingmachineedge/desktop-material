@@ -215,6 +215,54 @@ export function actionsBranchRulesError(error: unknown): Error {
   )
 }
 
+export type ActionsMutation =
+  | 'rerun-job'
+  | 'cancel-run'
+  | 'force-cancel-run'
+  | 'enable-workflow'
+  | 'disable-workflow'
+
+const mutationLabels: Readonly<Record<ActionsMutation, string>> = {
+  'rerun-job': 're-run this job',
+  'cancel-run': 'cancel this workflow run',
+  'force-cancel-run': 'force-cancel this workflow run',
+  'enable-workflow': 'enable this workflow',
+  'disable-workflow': 'disable this workflow',
+}
+
+/** Turn API failures into actionable, capability-aware Actions messages. */
+export function actionsMutationError(
+  error: unknown,
+  mutation: ActionsMutation
+): Error {
+  if (!(error instanceof APIError)) {
+    return error instanceof Error ? error : new Error(String(error))
+  }
+
+  const action = mutationLabels[mutation]
+  if (error.responseStatus === 403) {
+    if (error.rateLimitReset !== null) {
+      return new Error(
+        `GitHub cannot ${action} until the API rate limit resets at ${error.rateLimitReset.toLocaleTimeString()}.`
+      )
+    }
+    return new Error(
+      `GitHub denied permission to ${action}. Check that the selected account has Actions write access to this repository.`
+    )
+  }
+  if (error.responseStatus === 404) {
+    return new Error(
+      `GitHub could not ${action}. The run or workflow may no longer exist, or this GitHub Enterprise version may not support the operation.`
+    )
+  }
+  if (error.responseStatus === 409 || error.responseStatus === 422) {
+    return new Error(
+      `GitHub could not ${action} in its current state. Refresh Actions and try again.`
+    )
+  }
+  return error
+}
+
 export interface IActionsState {
   readonly workflows: ReadonlyArray<IAPIWorkflow>
   readonly runs: ReadonlyArray<IAPIWorkflowRun>
@@ -435,62 +483,12 @@ export class ActionsStore {
     if (gitHubRepository === null) {
       throw new Error('This repository is not connected to GitHub Actions.')
     }
-    return gitHubRepository
-  }
-
-  private accountFor(repository: Repository): Account {
-    const gitHubRepository = this.gitHubFor(repository)
-    const account = getActionsAccount(repository, this.accounts)
-    if (account === null) {
-      throw new Error(
-        repository.accountKey === null
-          ? `Sign in to ${gitHubRepository.endpoint} to use Actions.`
-          : 'Sign in with the account selected for this repository to use Actions.'
-      )
-    }
-    if (!supportsActions(gitHubRepository.endpoint)) {
+    if (!supportsActions(repository.endpoint)) {
       throw new Error(
         'GitHub Actions is not available on this GitHub Enterprise version.'
       )
     }
-    return account
-  }
-
-  private apiFor(repository: Repository): API {
-    const account = this.accountFor(repository)
     return API.fromAccount(account)
-  }
-
-  private async runAccountBound<T>(
-    signal: AbortSignal | undefined,
-    work: (signal: AbortSignal) => Promise<T>,
-    completedResultIsAuthoritative: boolean = false
-  ): Promise<T> {
-    const accountsGeneration = this.accountsGeneration
-    const controller = new AbortController()
-    const cancel = () => controller.abort()
-    signal?.addEventListener('abort', cancel, { once: true })
-    this.activeAccountControllers.add(controller)
-    try {
-      if (signal?.aborted) {
-        controller.abort()
-      }
-      if (controller.signal.aborted) {
-        throw canceledAccountRequest()
-      }
-      const result = await work(controller.signal)
-      if (
-        !completedResultIsAuthoritative &&
-        (controller.signal.aborted ||
-          accountsGeneration !== this.accountsGeneration)
-      ) {
-        throw canceledAccountRequest()
-      }
-      return result
-    } finally {
-      signal?.removeEventListener('abort', cancel)
-      this.activeAccountControllers.delete(controller)
-    }
   }
 
   private async mutate(
@@ -620,12 +618,11 @@ export class ActionsStore {
     await this.refresh(repository, true)
   }
 
-  public async rerunJob(repository: Repository, jobId: number) {
-    const gitHubRepository = this.gitHubFor(repository)
+  public async rerunJob(repository: GitHubRepository, jobId: number) {
     await this.mutate('rerun-job', async () => {
       const succeeded = await this.apiFor(repository).rerunJob(
-        gitHubRepository.owner.login,
-        gitHubRepository.name,
+        repository.owner.login,
+        repository.name,
         jobId
       )
       if (!succeeded) {
@@ -633,6 +630,50 @@ export class ActionsStore {
       }
     })
     await this.refresh(repository, true)
+  }
+
+  public async cancelRun(
+    repository: GitHubRepository,
+    runId: number,
+    force: boolean
+  ) {
+    await this.mutate(force ? 'force-cancel-run' : 'cancel-run', () =>
+      this.apiFor(repository).cancelWorkflowRun(
+        repository.owner.login,
+        repository.name,
+        runId,
+        force
+      )
+    )
+    await this.refresh(repository, true)
+  }
+
+  public async setWorkflowEnabled(
+    repository: GitHubRepository,
+    workflowId: number,
+    enabled: boolean
+  ) {
+    await this.mutate(enabled ? 'enable-workflow' : 'disable-workflow', () =>
+      this.apiFor(repository).setWorkflowEnabled(
+        repository.owner.login,
+        repository.name,
+        workflowId,
+        enabled
+      )
+    )
+    await this.refresh(repository, true)
+  }
+
+  public async fetchJobs(
+    repository: GitHubRepository,
+    runId: number
+  ): Promise<ReadonlyArray<IAPIWorkflowJob>> {
+    const result = await this.apiFor(repository).fetchWorkflowRunJobs(
+      repository.owner.login,
+      repository.name,
+      runId
+    )
+    return result?.jobs ?? []
   }
 
   public async cancelRun(

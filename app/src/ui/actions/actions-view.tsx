@@ -22,7 +22,6 @@ import { WorkflowDispatchDialog } from './workflow-dispatch-dialog'
 import { JobLogViewer } from './job-log-viewer'
 import { ActionsConfirmationDialog } from './actions-confirmation-dialog'
 import { WorkflowStateControl } from './workflow-state-control'
-import { BranchRules } from './branch-rules'
 
 type ActionsConfirmation =
   | { readonly kind: 'cancel-run'; readonly run: IAPIWorkflowRun }
@@ -121,9 +120,28 @@ export class ActionsView extends React.Component<
 
   public constructor(props: IActionsViewProps) {
     super(props)
-    this.state = initialActionsViewState(
-      getActionsViewRepositoryKey(props.repository)
-    )
+    this.state = {
+      actions: InitialActionsState,
+      workflow: 'all',
+      branch: 'all',
+      event: 'all',
+      status: 'all',
+      selectedRun: null,
+      jobs: [],
+      jobsLoading: false,
+      jobsError: null,
+      busyRunId: null,
+      busyJobId: null,
+      busyWorkflowId: null,
+      actionMessage: null,
+      actionError: null,
+      dispatchOpen: false,
+      logJob: null,
+      log: '',
+      logLoading: false,
+      logError: null,
+      confirmation: null,
+    }
   }
 
   public componentDidMount() {
@@ -152,78 +170,7 @@ export class ActionsView extends React.Component<
     this.logController?.abort()
   }
 
-  private subscribeToRepository() {
-    const repository = this.props.repository
-    const generation = this.repositoryGeneration
-    if (repository.gitHubRepository !== null) {
-      this.subscription = this.props.actionsStore.subscribe(
-        repository,
-        actions => {
-          if (this.isCurrentRepository(repository, generation)) {
-            this.onActionsState(actions)
-          }
-        }
-      )
-    }
-  }
-
-  private isCurrentRepository(
-    repository: Repository,
-    generation: number
-  ): boolean {
-    return (
-      generation === this.repositoryGeneration &&
-      getActionsViewRepositoryKey(repository) ===
-        getActionsViewRepositoryKey(this.props.repository)
-    )
-  }
-
-  private isCurrentOperation(
-    repository: Repository,
-    repositoryGeneration: number,
-    operationGeneration: number
-  ): boolean {
-    return (
-      operationGeneration === this.operationGeneration &&
-      this.isCurrentRepository(repository, repositoryGeneration)
-    )
-  }
-
-  private onActionsState = (actions: IActionsState) => {
-    const authorizationInvalidated =
-      actions.error instanceof APIError &&
-      (actions.error.responseStatus === 401 ||
-        actions.error.responseStatus === 403)
-    const invalidated =
-      actions.workflows.length === 0 &&
-      actions.runs.length === 0 &&
-      (actions.lastUpdated === null || authorizationInvalidated)
-    if (invalidated) {
-      this.operationGeneration++
-      this.logController?.abort()
-      this.logController = null
-      this.setState({
-        actions,
-        workflow: 'all',
-        selectedRun: null,
-        jobs: [],
-        jobsLoading: false,
-        jobsError: null,
-        busyRunId: null,
-        busyJobId: null,
-        busyWorkflowId: null,
-        actionMessage: null,
-        actionError: null,
-        dispatchOpen: false,
-        logJob: null,
-        log: '',
-        logLoading: false,
-        logError: null,
-        confirmation: null,
-      })
-      return
-    }
-
+  private onActionsState = (actions: IActionsState) =>
     this.setState(state => ({
       actions,
       selectedRun:
@@ -232,7 +179,6 @@ export class ActionsView extends React.Component<
           : actions.runs.find(run => run.id === state.selectedRun?.id) ??
             state.selectedRun,
     }))
-  }
 
   private onFilterChange = (event: React.FormEvent<HTMLSelectElement>) => {
     const element = event.currentTarget
@@ -395,13 +341,8 @@ export class ActionsView extends React.Component<
 
   private confirmCancelRun = async (force: boolean) => {
     const confirmation = this.state.confirmation
-    const repository = this.props.repository
-    const repositoryGeneration = this.repositoryGeneration
-    const operationGeneration = this.operationGeneration
-    if (
-      confirmation?.kind !== 'cancel-run' ||
-      repository.gitHubRepository === null
-    ) {
+    const repository = this.props.repository.gitHubRepository
+    if (confirmation?.kind !== 'cancel-run' || repository === null) {
       return
     }
     this.setState({
@@ -415,54 +356,24 @@ export class ActionsView extends React.Component<
         confirmation.run.id,
         force
       )
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({
-          actionMessage: force
-            ? 'Force cancellation requested.'
-            : 'Workflow cancellation requested.',
-        })
-      }
+      this.setState({
+        actionMessage: force
+          ? 'Force cancellation requested.'
+          : 'Workflow cancellation requested.',
+      })
     } catch (error) {
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({
-          actionError:
-            error instanceof Error ? error : new Error(String(error)),
-        })
-      }
+      this.setState({
+        actionError: error instanceof Error ? error : new Error(String(error)),
+      })
     } finally {
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({ busyRunId: null, confirmation: null })
-      }
+      this.setState({ busyRunId: null, confirmation: null })
     }
   }
 
   private confirmWorkflowStateChange = async () => {
     const confirmation = this.state.confirmation
-    const repository = this.props.repository
-    const repositoryGeneration = this.repositoryGeneration
-    const operationGeneration = this.operationGeneration
-    if (
-      confirmation?.kind !== 'workflow-state' ||
-      repository.gitHubRepository === null
-    ) {
+    const repository = this.props.repository.gitHubRepository
+    if (confirmation?.kind !== 'workflow-state' || repository === null) {
       return
     }
     this.setState({
@@ -476,51 +387,24 @@ export class ActionsView extends React.Component<
         confirmation.workflow.id,
         confirmation.enabled
       )
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({
-          actionMessage: confirmation.enabled
-            ? `Enabled ${confirmation.workflow.name}.`
-            : `Disabled ${confirmation.workflow.name}.`,
-        })
-      }
+      this.setState({
+        actionMessage: confirmation.enabled
+          ? `Enabled ${confirmation.workflow.name}.`
+          : `Disabled ${confirmation.workflow.name}.`,
+      })
     } catch (error) {
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({
-          actionError:
-            error instanceof Error ? error : new Error(String(error)),
-        })
-      }
+      this.setState({
+        actionError: error instanceof Error ? error : new Error(String(error)),
+      })
     } finally {
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({ busyWorkflowId: null, confirmation: null })
-      }
+      this.setState({ busyWorkflowId: null, confirmation: null })
     }
   }
 
   private rerunJob = async (job: IAPIWorkflowJob) => {
+    const repository = this.props.repository.gitHubRepository
     const selectedRun = this.state.selectedRun
-    const repository = this.props.repository
-    const repositoryGeneration = this.repositoryGeneration
-    const operationGeneration = this.operationGeneration
-    if (repository.gitHubRepository === null || selectedRun === null) {
+    if (repository === null || selectedRun === null) {
       return
     }
     this.setState({
@@ -530,54 +414,20 @@ export class ActionsView extends React.Component<
     })
     try {
       await this.props.actionsStore.rerunJob(repository, job.id)
-      if (
-        !this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        return
-      }
       const jobs = await this.props.actionsStore.fetchJobs(
         repository,
         selectedRun.id
       )
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({
-          jobs,
-          actionMessage: `Re-run requested for ${job.name}.`,
-        })
-      }
+      this.setState({
+        jobs,
+        actionMessage: `Re-run requested for ${job.name}.`,
+      })
     } catch (error) {
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({
-          actionError:
-            error instanceof Error ? error : new Error(String(error)),
-        })
-      }
+      this.setState({
+        actionError: error instanceof Error ? error : new Error(String(error)),
+      })
     } finally {
-      if (
-        this.isCurrentOperation(
-          repository,
-          repositoryGeneration,
-          operationGeneration
-        )
-      ) {
-        this.setState({ busyJobId: null })
-      }
+      this.setState({ busyJobId: null })
     }
   }
 
@@ -721,7 +571,11 @@ export class ActionsView extends React.Component<
           </div>
         )}
         {this.state.actionError && (
-          <div className="actions-banner error" role="alert" aria-atomic="true">
+          <div
+            className="actions-banner error"
+            role="alert"
+            aria-atomic="true"
+          >
             {this.state.actionError.message}
           </div>
         )}
@@ -787,11 +641,6 @@ export class ActionsView extends React.Component<
             <option value="failure">Failure</option>
           </Select>
         </section>
-        <BranchRules
-          repository={this.props.repository}
-          currentBranch={this.props.currentBranch}
-          actionsStore={this.props.actionsStore}
-        />
         <WorkflowStateControl
           workflow={selectedWorkflow}
           busyWorkflowId={this.state.busyWorkflowId}
@@ -867,7 +716,9 @@ export class ActionsView extends React.Component<
             confirmLabel="Cancel run"
             forceConfirmLabel="Force cancel run"
             showForceCancelOption={true}
-            submitting={this.state.busyRunId === this.state.confirmation.run.id}
+            submitting={
+              this.state.busyRunId === this.state.confirmation.run.id
+            }
             onConfirm={this.confirmCancelRun}
             onDismissed={this.closeConfirmation}
           />
@@ -881,8 +732,8 @@ export class ActionsView extends React.Component<
             description={
               <p>
                 {this.state.confirmation.enabled ? 'Enable' : 'Disable'}{' '}
-                <strong>{this.state.confirmation.workflow.name}</strong> for
-                this repository?
+                <strong>{this.state.confirmation.workflow.name}</strong> for this
+                repository?
               </p>
             }
             confirmLabel={
@@ -891,7 +742,8 @@ export class ActionsView extends React.Component<
                 : 'Disable workflow'
             }
             submitting={
-              this.state.busyWorkflowId === this.state.confirmation.workflow.id
+              this.state.busyWorkflowId ===
+              this.state.confirmation.workflow.id
             }
             onConfirm={this.confirmWorkflowStateChange}
             onDismissed={this.closeConfirmation}

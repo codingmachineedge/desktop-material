@@ -16,27 +16,6 @@ import {
   WorkflowStateControl,
 } from '../../../src/ui/actions/workflow-state-control'
 import { fireEvent, render, screen } from '../../helpers/ui/render'
-import { GitHubRepository } from '../../../src/models/github-repository'
-import { Owner } from '../../../src/models/owner'
-import { ActionsStore } from '../../../src/lib/stores/actions-store'
-import { Repository } from '../../../src/models/repository'
-
-const gitHubRepository = new GitHubRepository(
-  'repo',
-  new Owner('owner', 'https://api.github.com', 1),
-  1
-)
-const repository = new Repository('C:/repo', 1, gitHubRepository, false)
-const actionsStore = {
-  fetchArtifacts: async () => ({
-    totalCount: 0,
-    artifacts: [],
-    page: 1,
-    nextPage: null,
-    truncated: false,
-    capped: false,
-  }),
-} as unknown as ActionsStore
 
 const createRun = (
   status: APICheckStatus,
@@ -111,7 +90,9 @@ describe('Actions parity controls', () => {
 
     view.rerender(
       <RunList
-        runs={[createRun(APICheckStatus.Completed, APICheckConclusion.Failure)]}
+        runs={[
+          createRun(APICheckStatus.Completed, APICheckConclusion.Failure),
+        ]}
         selectedRunId={null}
         busyRunId={null}
         onSelect={() => {}}
@@ -127,43 +108,6 @@ describe('Actions parity controls', () => {
     assert.ok(screen.getByRole('button', { name: 'Re-run' }))
   })
 
-  it('describes truncated branch and actor metadata without title attributes', () => {
-    const run: IAPIWorkflowRun = {
-      ...createRun(APICheckStatus.Completed, APICheckConclusion.Success),
-      actor: {
-        id: 12,
-        login: 'octocat',
-        avatar_url: 'https://avatars.example.invalid/octocat.png',
-        html_url: 'https://example.invalid/octocat',
-        type: 'User',
-      },
-    }
-    render(
-      <RunList
-        runs={[run]}
-        selectedRunId={null}
-        busyRunId={null}
-        onSelect={() => {}}
-        onRerun={() => {}}
-        onRerunFailed={() => {}}
-        onRequestCancel={() => {}}
-      />
-    )
-
-    assert.ok(screen.getByText('Branch:'))
-    assert.ok(screen.getByText('Actor:'))
-    assert.ok(
-      screen.getByRole('button', {
-        name: /Branch: feature\/actions-parity.*Actor: octocat/,
-      })
-    )
-    assert.equal(
-      screen.getByText('feature/actions-parity').getAttribute('title'),
-      null
-    )
-    assert.equal(screen.getByText('octocat').getAttribute('title'), null)
-  })
-
   it('re-runs only an individual failed job', () => {
     const failed = createJob(
       11,
@@ -174,8 +118,6 @@ describe('Actions parity controls', () => {
     let requested: IAPIWorkflowJob | null = null
     render(
       <RunDetails
-        repository={repository}
-        actionsStore={actionsStore}
         run={createRun(APICheckStatus.Completed, APICheckConclusion.Failure)}
         jobs={[failed, succeeded]}
         loading={false}
@@ -216,9 +158,7 @@ describe('Actions parity controls', () => {
     )
 
     assert.ok(screen.getByRole('alertdialog'))
-    fireEvent.click(
-      screen.getByRole('checkbox', { name: /Force cancellation/ })
-    )
+    fireEvent.click(screen.getByRole('checkbox', { name: /Force cancellation/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Force cancel run' }))
     assert.equal(force, true)
   })
