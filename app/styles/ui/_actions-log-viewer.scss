@@ -21,8 +21,8 @@
 
 .workflow-dispatch-dialog,
 .actions-confirmation-dialog,
-.actions-deployment-review-dialog,
-.actions-artifact-provenance-dialog {
+.actions-artifact-provenance-dialog,
+.actions-deployment-review-dialog {
   width: min(580px, 100%);
   min-width: 0;
   max-height: 100%;

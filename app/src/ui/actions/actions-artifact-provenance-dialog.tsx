@@ -120,11 +120,9 @@ export class ActionsArtifactProvenanceDialog extends React.Component<
     this.dialog?.focus()
   }
 
-  public componentDidUpdate(
-    previousProps: IActionsArtifactProvenanceDialogProps
-  ) {
+  public componentDidUpdate(prevProps: IActionsArtifactProvenanceDialogProps) {
     if (
-      previousProps.review?.reviewId !== this.props.review?.reviewId &&
+      prevProps.review?.reviewId !== this.props.review?.reviewId &&
       this.props.review !== null
     ) {
       this.setState({
@@ -152,6 +150,16 @@ export class ActionsArtifactProvenanceDialog extends React.Component<
       event.preventDefault()
       this.props.onDismissed()
     }
+  }
+
+  private onEntryChange = (event: React.FormEvent<HTMLSelectElement>) => {
+    this.setState({ entryId: event.currentTarget.value })
+  }
+
+  private onSignerCandidateChange = (
+    event: React.FormEvent<HTMLSelectElement>
+  ) => {
+    this.setState({ signerCandidateId: event.currentTarget.value })
   }
 
   private submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -265,9 +273,7 @@ export class ActionsArtifactProvenanceDialog extends React.Component<
             label="ZIP member"
             value={this.state.entryId}
             disabled={this.props.verifying}
-            onChange={event =>
-              this.setState({ entryId: event.currentTarget.value })
-            }
+            onChange={this.onEntryChange}
           >
             {review.entries.map(entry => (
               <option key={entry.entryId} value={entry.entryId}>
@@ -279,9 +285,7 @@ export class ActionsArtifactProvenanceDialog extends React.Component<
             label="Signer scope"
             value={this.state.signerCandidateId}
             disabled={this.props.verifying}
-            onChange={event =>
-              this.setState({ signerCandidateId: event.currentTarget.value })
-            }
+            onChange={this.onSignerCandidateChange}
           >
             {review.signerCandidates.map(signer => (
               <option key={signer.candidateId} value={signer.candidateId}>
