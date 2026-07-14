@@ -32,34 +32,49 @@ const policy: IActionsArtifactVerificationPolicy = {
   signerDigest: sha,
   repositoryVisibility: 'public',
 }
+const ghePolicy: IActionsArtifactVerificationPolicy = {
+  ...policy,
+  sourceRepositoryURI: 'https://octocorp.ghe.com/actions/attest',
+  signerIdentity:
+    'https://octocorp.ghe.com/actions/attest/.github/workflows/prober.yml@refs/heads/main',
+}
 
-const projected = () => [
-  {
-    subject: [{ name: 'artifact', digest: { sha256: subjectHex } }],
-    predicateType: 'https://slsa.dev/provenance/v1',
-    certificate: {
-      certificateIssuer: 'CN=sigstore-intermediate,O=sigstore.dev',
-      subjectAlternativeName: signerIdentity,
-      buildSignerURI: signerIdentity,
-      buildSignerDigest: sha,
-      issuer: 'https://token.actions.githubusercontent.com',
-      runnerEnvironment: 'github-hosted',
-      sourceRepositoryURI: 'https://github.com/actions/attest',
-      sourceRepositoryDigest: sha,
-      sourceRepositoryRef: 'refs/heads/main',
-      sourceRepositoryVisibilityAtSigning: 'public',
-      runInvocationURI:
-        'https://github.com/actions/attest/actions/runs/29283111640/attempts/1',
-    },
-    timestamps: [
-      {
-        type: 'Tlog',
-        timestamp: '2026-07-13T20:37:25Z',
-        uri: 'https://rekor.sigstore.dev',
+const projected = (
+  selectedPolicy: IActionsArtifactVerificationPolicy = policy
+) => {
+  const source = new URL(selectedPolicy.sourceRepositoryURI)
+  const host = source.hostname
+  return [
+    {
+      subject: [{ name: 'artifact', digest: { sha256: subjectHex } }],
+      predicateType: 'https://slsa.dev/provenance/v1',
+      certificate: {
+        certificateIssuer: 'CN=sigstore-intermediate,O=sigstore.dev',
+        subjectAlternativeName: selectedPolicy.signerIdentity,
+        buildSignerURI: selectedPolicy.signerIdentity,
+        buildSignerDigest: selectedPolicy.signerDigest,
+        issuer:
+          host === 'github.com'
+            ? 'https://token.actions.githubusercontent.com'
+            : `https://token.actions.${host}`,
+        runnerEnvironment: 'github-hosted',
+        sourceRepositoryURI: selectedPolicy.sourceRepositoryURI,
+        sourceRepositoryDigest: selectedPolicy.sourceDigest,
+        sourceRepositoryRef: selectedPolicy.sourceRef,
+        sourceRepositoryVisibilityAtSigning:
+          selectedPolicy.repositoryVisibility,
+        runInvocationURI: `${selectedPolicy.sourceRepositoryURI}/actions/runs/${selectedPolicy.runId}/attempts/${selectedPolicy.runAttempt}`,
       },
-    ],
-  },
-]
+      timestamps: [
+        {
+          type: 'Tlog',
+          timestamp: '2026-07-13T20:37:25Z',
+          uri: 'https://rekor.sigstore.dev',
+        },
+      ],
+    },
+  ]
+}
 
 class FakeChild extends EventEmitter {
   public readonly stdin = new PassThrough()
@@ -85,7 +100,10 @@ class FakeChild extends EventEmitter {
   }
 }
 
-const input = (signal: AbortSignal): IActionsArtifactProvenanceRunnerInput => ({
+const input = (
+  signal: AbortSignal,
+  overrides: Partial<IActionsArtifactProvenanceRunnerInput> = {}
+): IActionsArtifactProvenanceRunnerInput => ({
   subjectPath: resolve('private-operation', 'subject.bin'),
   subjectDigest: `sha256:${subjectHex}`,
   bundlePath: resolve('private-operation', 'bundles.jsonl'),
@@ -95,7 +113,9 @@ const input = (signal: AbortSignal): IActionsArtifactProvenanceRunnerInput => ({
   stateDirectory: resolve('private-operation', 'state'),
   dataDirectory: resolve('private-operation', 'data'),
   policy,
+  credential: null,
   signal,
+  ...overrides,
 })
 
 type SpawnCapture = {
@@ -201,6 +221,55 @@ describe('Actions artifact provenance runner', () => {
     assert.equal(env.XDG_STATE_HOME, resolve('private-operation', 'state'))
     assert.equal(env.XDG_DATA_HOME, resolve('private-operation', 'data'))
     assert.equal(capture.child?.stdin.writableEnded, true)
+  })
+
+  it('injects only a validated GHE.com credential and never a host override or token argv', async () => {
+    const capture: SpawnCapture = {}
+    const runner = runnerWithChild(capture, child => {
+      child.stdout.write(JSON.stringify(projected(ghePolicy)))
+      child.close(0)
+    })
+    const result = await runner.verify(
+      input(new AbortController().signal, {
+        policy: ghePolicy,
+        credential: 'selected-ghe-token',
+      })
+    )
+    assert.equal(result.ok, true)
+    const env = capture.options?.env ?? {}
+    assert.equal(env.GH_TOKEN, 'selected-ghe-token')
+    assert.equal(env.GH_HOST, undefined)
+    assert.equal(env.GITHUB_TOKEN, undefined)
+    assert.equal(capture.args?.includes('selected-ghe-token'), false)
+    assert.equal(capture.args?.includes('GH_TOKEN'), false)
+    assert.ok(capture.args?.includes('octocorp.ghe.com'))
+  })
+
+  it('does not spawn when credential presence disagrees with the fixed policy host', async () => {
+    let spawned = false
+    const runner = new ActionsArtifactProvenanceRunner({
+      resolveExecutable: () => resolve('trusted-bin', 'gh.exe'),
+      spawn: () => {
+        spawned = true
+        return new FakeChild() as unknown as ChildProcessWithoutNullStreams
+      },
+    })
+    assert.deepEqual(
+      await runner.verify(
+        input(new AbortController().signal, { credential: 'dotcom-token' })
+      ),
+      { ok: false, reason: 'verifier-unavailable' }
+    )
+    assert.deepEqual(
+      await runner.verify(
+        input(new AbortController().signal, {
+          policy: ghePolicy,
+          credential: null,
+        })
+      ),
+      { ok: false, reason: 'verifier-unavailable' }
+    )
+    assert.equal(spawned, false)
   })
 
   it('rejects relative and empty PATH entries instead of spawning a local gh', async () => {

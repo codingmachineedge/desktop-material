@@ -21,6 +21,8 @@ describe('IPC channel contract', () => {
 
   const expectedRequestChannels = [
     'cancel-actions-artifact-provenance',
+    'release-actions-artifact-provenance-credential-lease',
+    'invalidate-actions-artifact-provenance-credential-lease-generation',
     'cancel-actions-artifact-subject-operation',
     'release-actions-artifact-download',
     'cancel-actions-transfer',
@@ -89,6 +91,7 @@ describe('IPC channel contract', () => {
   ] as const
 
   const expectedResponseChannels = [
+    'register-actions-artifact-provenance-credential-lease',
     'verify-actions-artifact-provenance',
     'inspect-actions-artifact-subjects',
     'prepare-actions-artifact-subject',

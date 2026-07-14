@@ -81,11 +81,24 @@ export interface IActionsArtifactVerificationPolicy {
 }
 
 /**
+ * Safe selected-account identity passed only to the main-process lease broker.
+ * It intentionally has no token, account list, API endpoint editor, or client.
+ */
+export interface IActionsArtifactProvenanceCredentialRegistration {
+  readonly accountKey: string
+  readonly endpoint: string
+  readonly login: string
+  readonly accountsGeneration: number
+}
+
+/**
  * Opaque renderer-to-main request for the fixed verifier. Filesystem paths,
  * credentials, endpoints, executables, and argv are deliberately absent.
  */
 export interface IActionsArtifactProvenanceVerifyRequest {
   readonly operationId: string
+  /** Null for GitHub.com and zero-bundle checks; opaque and one-use for GHE.com. */
+  readonly accountHandle: string | null
   readonly downloadId: string
   readonly inventoryId: string
   readonly entryId: string

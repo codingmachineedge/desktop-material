@@ -15,6 +15,7 @@ import {
   ActionsArtifactProvenanceService,
   IActionsArtifactProvenanceVerifierFiles,
 } from '../../../src/main-process/actions-artifact-provenance'
+import { ActionsArtifactProvenanceCredentialLeaseRegistry } from '../../../src/main-process/actions-artifact-provenance-credential-lease'
 
 const sha = '7d3af28c422bf02197a99f195b689b34377e11a2'
 const subjectDigest =
@@ -30,6 +31,12 @@ const policy: IActionsArtifactVerificationPolicy = {
   signerIdentity,
   signerDigest: sha,
   repositoryVisibility: 'public',
+}
+const ghePolicy: IActionsArtifactVerificationPolicy = {
+  ...policy,
+  sourceRepositoryURI: 'https://octocorp.ghe.com/actions/attest',
+  signerIdentity:
+    'https://octocorp.ghe.com/actions/attest/.github/workflows/prober.yml@refs/heads/main',
 }
 const bundle = JSON.stringify({
   mediaType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
@@ -72,11 +79,26 @@ const sender: IActionsArtifactDownloadSender = {
   isDestroyed: () => false,
 }
 
+function registerGHELease(
+  registry: ActionsArtifactProvenanceCredentialLeaseRegistry
+): string {
+  const handle = registry.register(sender, {
+    accountKey: 'https://api.octocorp.ghe.com/#42',
+    endpoint: 'https://api.octocorp.ghe.com/',
+    login: 'octocat',
+    accountsGeneration: 1,
+  })
+  assert.ok(handle)
+  return handle
+}
+
 const request = (
   bundles: ReadonlyArray<string> = [bundle],
-  selectedPolicy: IActionsArtifactVerificationPolicy = policy
+  selectedPolicy: IActionsArtifactVerificationPolicy = policy,
+  accountHandle: string | null = null
 ): IActionsArtifactProvenanceVerifyRequest => ({
   operationId: 'a'.repeat(32),
+  accountHandle,
   downloadId: 'b'.repeat(32),
   inventoryId: 'c'.repeat(32),
   entryId: 'd'.repeat(32),
@@ -135,6 +157,7 @@ describe('Actions artifact provenance service', () => {
           assert.equal(await readFile(input.bundlePath, 'utf8'), `${bundle}\n`)
           assert.equal(input.subjectPath, lease.filePath)
           assert.equal(input.subjectDigest, subjectDigest)
+          assert.equal(input.credential, null)
           assert.deepEqual(input.policy, policy)
           for (const path of [
             input.configDirectory,
@@ -167,7 +190,7 @@ describe('Actions artifact provenance service', () => {
     assert.equal(JSON.stringify(result).includes(lease.filePath), false)
   })
 
-  it('rehashes the subject before returning not-attested and before rejecting GHE without credentials', async () => {
+  it('rehashes zero-bundle requests and rejects GHE bundles without an opaque lease', async () => {
     let subjectUses = 0
     let runnerUses = 0
     const countedSubject: typeof withSubject = async (...args) => {
@@ -189,12 +212,6 @@ describe('Actions artifact provenance service', () => {
       ok: false,
       reason: 'not-attested',
     })
-    const ghePolicy: IActionsArtifactVerificationPolicy = {
-      ...policy,
-      sourceRepositoryURI: 'https://octocorp.ghe.com/actions/attest',
-      signerIdentity:
-        'https://octocorp.ghe.com/actions/attest/.github/workflows/prober.yml@refs/heads/main',
-    }
     assert.deepEqual(
       await service.verify(sender, request([bundle], ghePolicy)),
       {
@@ -202,8 +219,174 @@ describe('Actions artifact provenance service', () => {
         reason: 'verifier-unavailable',
       }
     )
-    assert.equal(subjectUses, 2)
+    assert.equal(subjectUses, 1)
     assert.equal(runnerUses, 0)
+  })
+
+  it('claims GHE credentials before awaits, then reads only after rehash and bundle preparation', async () => {
+    const registry = new ActionsArtifactProvenanceCredentialLeaseRegistry()
+    const handle = registerGHELease(registry)
+    let rehashed = false
+    let bundlesPrepared = false
+    let credentialReads = 0
+    let runnerUses = 0
+    const service = new ActionsArtifactProvenanceService({
+      credentialLeases: registry,
+      credentialSource: {
+        read: async (credentialLease, signal) => {
+          assert.equal(rehashed, true)
+          assert.equal(bundlesPrepared, true)
+          assert.equal(signal.aborted, false)
+          assert.equal(
+            credentialLease.endpoint,
+            'https://api.octocorp.ghe.com/'
+          )
+          credentialReads++
+          return 'selected-ghe-token'
+        },
+      },
+      withSubject: async (...args) => {
+        // A second claim loses synchronously before the subject callback starts.
+        assert.equal(registry.claim(sender.id, handle, 'f'.repeat(32)), null)
+        rehashed = true
+        return await withSubject(...args)
+      },
+      withVerifierFiles: async (_bundles, use) => {
+        bundlesPrepared = true
+        return await use({
+          bundlePath: resolve('private', 'bundles.jsonl'),
+          workingDirectory: resolve('private'),
+          configDirectory: resolve('private', 'config'),
+          cacheDirectory: resolve('private', 'cache'),
+          stateDirectory: resolve('private', 'state'),
+          dataDirectory: resolve('private', 'data'),
+        })
+      },
+      runner: {
+        verify: async input => {
+          runnerUses++
+          assert.equal(input.credential, 'selected-ghe-token')
+          assert.equal(input.signal.aborted, false)
+          return { ok: true, evidence }
+        },
+        killAll: async () => undefined,
+      },
+    })
+    try {
+      assert.equal(
+        (await service.verify(sender, request([bundle], ghePolicy, handle))).ok,
+        true
+      )
+      assert.equal(credentialReads, 2)
+      assert.equal(runnerUses, 1)
+      assert.equal(registry.size, 0)
+    } finally {
+      registry.releaseAll()
+    }
+  })
+
+  it('refuses a cross-tenant handle before subject, keychain, or verifier work', async () => {
+    const registry = new ActionsArtifactProvenanceCredentialLeaseRegistry()
+    const handle = registerGHELease(registry)
+    const otherTenant: IActionsArtifactVerificationPolicy = {
+      ...ghePolicy,
+      sourceRepositoryURI: 'https://other.ghe.com/actions/attest',
+      signerIdentity:
+        'https://other.ghe.com/actions/attest/.github/workflows/prober.yml@refs/heads/main',
+    }
+    let subjects = 0
+    let reads = 0
+    const service = new ActionsArtifactProvenanceService({
+      credentialLeases: registry,
+      credentialSource: {
+        read: async () => {
+          reads++
+          return 'selected-ghe-token'
+        },
+      },
+      withSubject: async (...args) => {
+        subjects++
+        return await withSubject(...args)
+      },
+      runner: {
+        verify: async () => ({ ok: true, evidence }),
+        killAll: async () => undefined,
+      },
+    })
+    try {
+      assert.deepEqual(
+        await service.verify(sender, request([bundle], otherTenant, handle)),
+        { ok: false, reason: 'verifier-unavailable' }
+      )
+      assert.equal(subjects, 0)
+      assert.equal(reads, 0)
+      assert.equal(registry.size, 0)
+    } finally {
+      registry.releaseAll()
+    }
+  })
+
+  it('suppresses a GHE result when the exact keychain credential rotates or is revoked', async () => {
+    const rotatedRegistry =
+      new ActionsArtifactProvenanceCredentialLeaseRegistry()
+    const rotatedHandle = registerGHELease(rotatedRegistry)
+    let reads = 0
+    const rotated = new ActionsArtifactProvenanceService({
+      credentialLeases: rotatedRegistry,
+      credentialSource: {
+        // Buffer.from encodes both of these distinct JS strings as U+FFFD in
+        // UTF-8. The service must still reject this exact-token rotation.
+        read: async () => (reads++ === 0 ? 'token-\uD800' : 'token-\uFFFD'),
+      },
+      withSubject,
+      runner: {
+        verify: async input => {
+          assert.equal(input.credential, 'token-\uD800')
+          return { ok: true, evidence }
+        },
+        killAll: async () => undefined,
+      },
+    })
+    try {
+      assert.deepEqual(
+        await rotated.verify(
+          sender,
+          request([bundle], ghePolicy, rotatedHandle)
+        ),
+        { ok: false, reason: 'verifier-unavailable' }
+      )
+    } finally {
+      rotatedRegistry.releaseAll()
+    }
+
+    const revokedRegistry =
+      new ActionsArtifactProvenanceCredentialLeaseRegistry()
+    const revokedHandle = registerGHELease(revokedRegistry)
+    const revoked = new ActionsArtifactProvenanceService({
+      credentialLeases: revokedRegistry,
+      credentialSource: { read: async () => 'selected-ghe-token' },
+      withSubject,
+      runner: {
+        verify: async input => {
+          assert.equal(input.credential, 'selected-ghe-token')
+          assert.equal(revokedRegistry.release(sender.id, revokedHandle), true)
+          assert.equal(input.signal.aborted, true)
+          return { ok: true, evidence }
+        },
+        killAll: async () => undefined,
+      },
+    })
+    try {
+      assert.deepEqual(
+        await revoked.verify(
+          sender,
+          request([bundle], ghePolicy, revokedHandle)
+        ),
+        { ok: false, reason: 'canceled' }
+      )
+    } finally {
+      revokedRegistry.releaseAll()
+    }
   })
 
   it('rejects extra fields, noncanonical bundles, limits, and changed subjects before spawn', async () => {

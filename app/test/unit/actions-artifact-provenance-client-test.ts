@@ -1,15 +1,12 @@
 import assert from 'node:assert'
 import { describe, it, mock } from 'node:test'
-import {
-  ActionsArtifactProvenanceResult,
-  IActionsArtifactVerificationPolicy,
-} from '../../src/lib/actions-artifact-provenance'
+import { IActionsArtifactVerificationPolicy } from '../../src/lib/actions-artifact-provenance'
 
 let invokes = 0
 let payload: unknown
 const sends = new Array<{ readonly channel: string; readonly value: unknown }>()
 let onInvoke: () => void = () => undefined
-let invokeResult: ActionsArtifactProvenanceResult = {
+let invokeResult: unknown = {
   ok: false,
   reason: 'not-attested',
 }
@@ -38,6 +35,7 @@ const policy: IActionsArtifactVerificationPolicy = {
   repositoryVisibility: 'public',
 }
 const request = {
+  accountHandle: null,
   downloadId: 'c'.repeat(32),
   inventoryId: 'd'.repeat(32),
   entryId: 'e'.repeat(32),
@@ -50,6 +48,13 @@ const request = {
     }),
   ],
   policy,
+}
+
+const registration = {
+  accountKey: 'https://api.octocorp.ghe.com/#42',
+  endpoint: 'https://api.octocorp.ghe.com/',
+  login: 'octocat',
+  accountsGeneration: 7,
 }
 
 function reset(): void {
@@ -148,6 +153,7 @@ describe('Actions artifact provenance renderer client', () => {
     assert.equal(invokes, 1)
     const value = payload as Record<string, unknown>
     assert.deepEqual(Object.keys(value).sort(), [
+      'accountHandle',
       'bundles',
       'downloadId',
       'entryId',
@@ -165,6 +171,40 @@ describe('Actions artifact provenance renderer client', () => {
       'executable',
       'argv',
     ]) {
+      assert.equal(serialized.includes(forbidden), false, forbidden)
+    }
+  })
+
+  it('registers and releases only the safe selected-account identity', async () => {
+    reset()
+    const handle = 'a'.repeat(32)
+    invokeResult = handle
+    const {
+      invalidateActionsArtifactProvenanceCredentialLeaseGeneration,
+      registerActionsArtifactProvenanceCredentialLease,
+      releaseActionsArtifactProvenanceCredentialLease,
+    } = await import('../../src/lib/actions-artifact-provenance-client')
+    assert.equal(
+      await registerActionsArtifactProvenanceCredentialLease(registration),
+      handle
+    )
+    assert.equal(invokes, 1)
+    assert.deepEqual(payload, registration)
+    releaseActionsArtifactProvenanceCredentialLease(handle)
+    invalidateActionsArtifactProvenanceCredentialLeaseGeneration(8)
+    assert.deepEqual(sends, [
+      {
+        channel: 'release-actions-artifact-provenance-credential-lease',
+        value: handle,
+      },
+      {
+        channel:
+          'invalidate-actions-artifact-provenance-credential-lease-generation',
+        value: 8,
+      },
+    ])
+    const serialized = JSON.stringify(payload)
+    for (const forbidden of ['token', 'authorization', 'password']) {
       assert.equal(serialized.includes(forbidden), false, forbidden)
     }
   })

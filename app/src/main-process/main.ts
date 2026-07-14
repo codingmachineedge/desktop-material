@@ -84,6 +84,12 @@ import {
   killAllActionsArtifactProvenanceVerifications,
   verifyActionsArtifactProvenance,
 } from './actions-artifact-provenance'
+import {
+  invalidateActionsArtifactProvenanceCredentialLeaseGeneration,
+  registerActionsArtifactProvenanceCredentialLease,
+  releaseActionsArtifactProvenanceCredentialLease,
+  releaseAllActionsArtifactProvenanceCredentialLeases,
+} from './actions-artifact-provenance-credential-lease'
 import { ActionsArtifactProvenanceShutdownBarrier } from './actions-artifact-provenance-shutdown'
 import {
   findWindowForRepositoryPath as findOwningWindow,
@@ -186,6 +192,7 @@ app.on('will-quit', () => {
   cliWorkbenchCatalog.killAll()
   cliWorkbenchRunner.killAll()
   cancelAllActionsArtifactSubjectOperations()
+  releaseAllActionsArtifactProvenanceCredentialLeases()
   releaseAllCompletedActionsArtifactDownloads()
   agentServerController
     ?.stop()
@@ -530,6 +537,29 @@ app.on('ready', () => {
   ipcMain.handle('verify-actions-artifact-provenance', (event, request) =>
     verifyActionsArtifactProvenance(event.sender, request)
   )
+  ipcMain.handle(
+    'register-actions-artifact-provenance-credential-lease',
+    async (event, request) =>
+      registerActionsArtifactProvenanceCredentialLease(event.sender, request)
+  )
+  ipcMain.on(
+    'release-actions-artifact-provenance-credential-lease',
+    (event, accountHandle) => {
+      releaseActionsArtifactProvenanceCredentialLease(
+        event.sender.id,
+        accountHandle
+      )
+    }
+  )
+  ipcMain.on(
+    'invalidate-actions-artifact-provenance-credential-lease-generation',
+    (event, accountsGeneration) => {
+      invalidateActionsArtifactProvenanceCredentialLeaseGeneration(
+        event.sender,
+        accountsGeneration
+      )
+    }
+  )
   ipcMain.on('cancel-actions-artifact-provenance', (event, operationId) => {
     cancelActionsArtifactProvenance(event.sender.id, operationId)
   })
@@ -578,6 +608,11 @@ app.on('ready', () => {
 
   ipcMain.on('update-accounts', (event, accounts) => {
     updateAccounts(accounts)
+    // EndpointToken deliberately omits login and account id. Every account
+    // refresh therefore revokes a provenance lease before the fingerprint
+    // shortcut: a credential rotation, removal, or login-only change in any
+    // window cannot leave an owned GHE verifier process authorized.
+    releaseAllActionsArtifactProvenanceCredentialLeases()
     const fingerprint = JSON.stringify(accounts)
     if (fingerprint === accountsFingerprint) {
       return

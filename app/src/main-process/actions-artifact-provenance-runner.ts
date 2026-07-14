@@ -35,6 +35,8 @@ export interface IActionsArtifactProvenanceRunnerInput {
   readonly stateDirectory: string
   readonly dataDirectory: string
   readonly policy: IActionsArtifactVerificationPolicy
+  /** Main-process-only GHE.com credential; never part of argv, IPC, or output. */
+  readonly credential: string | null
   readonly signal: AbortSignal
 }
 
@@ -76,7 +78,8 @@ function verifierEnvironment(
     IActionsArtifactProvenanceRunnerInput,
     'cacheDirectory' | 'configDirectory' | 'dataDirectory' | 'stateDirectory'
   >,
-  environment: NodeJS.ProcessEnv
+  environment: NodeJS.ProcessEnv,
+  credential: string | null
 ): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {}
   for (const [key, value] of Object.entries(environment)) {
@@ -102,7 +105,21 @@ function verifierEnvironment(
   result.DO_NOT_TRACK = '1'
   result.NO_COLOR = '1'
   result.CLICOLOR = '0'
+  if (credential !== null) {
+    // The source/lease gate has already proved this is a GHE.com credential.
+    // Do not set GH_HOST: fixed --hostname remains the only host selector.
+    result.GH_TOKEN = credential
+  }
   return result
+}
+
+function isUsableCredential(value: string | null): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 4096 &&
+    !/[\u0000-\u001f\u007f-\u009f]/.test(value)
+  )
 }
 
 function resolveExecutableOnTrustedPath(
@@ -151,6 +168,7 @@ export function buildActionsArtifactProvenanceVerifierArgs(
     IActionsArtifactProvenanceRunnerInput,
     | 'cacheDirectory'
     | 'configDirectory'
+    | 'credential'
     | 'dataDirectory'
     | 'signal'
     | 'stateDirectory'
@@ -254,10 +272,20 @@ export class ActionsArtifactProvenanceRunner {
 
     let executable: string
     let args: ReadonlyArray<string>
+    let webHost: string
     try {
       executable = this.resolveExecutable()
       args = buildActionsArtifactProvenanceVerifierArgs(input)
+      webHost = getActionsArtifactProvenanceWebHost(
+        new URL(input.policy.sourceRepositoryURI).origin
+      )
     } catch {
+      return { ok: false, reason: 'verifier-unavailable' }
+    }
+    if (
+      (webHost === 'github.com' && input.credential !== null) ||
+      (webHost !== 'github.com' && !isUsableCredential(input.credential))
+    ) {
       return { ok: false, reason: 'verifier-unavailable' }
     }
     if (input.signal.aborted) {
@@ -267,7 +295,7 @@ export class ActionsArtifactProvenanceRunner {
     let child: ChildProcessWithoutNullStreams
     try {
       child = this.spawnVerifier(executable, args, {
-        env: verifierEnvironment(input, this.environment),
+        env: verifierEnvironment(input, this.environment, input.credential),
         cwd: input.workingDirectory,
         shell: false,
         windowsHide: true,

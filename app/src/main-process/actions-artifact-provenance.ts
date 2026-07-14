@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import { mkdir, mkdtemp, open, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -30,6 +31,14 @@ import {
   IActionsArtifactProvenanceRunnerInput,
   actionsArtifactProvenanceRunner,
 } from './actions-artifact-provenance-runner'
+import {
+  IActionsArtifactProvenanceCredentialLease,
+  actionsArtifactProvenanceCredentialLeaseRegistry,
+} from './actions-artifact-provenance-credential-lease'
+import {
+  IActionsArtifactProvenanceCredentialSource,
+  actionsArtifactProvenanceCredentialSource,
+} from './actions-artifact-provenance-credential-source'
 
 const opaqueIdPattern = /^[a-f0-9]{32}$/
 export const ActionsArtifactProvenanceServiceMaximumConcurrency = 2
@@ -74,6 +83,17 @@ interface IProvenanceRunner {
   killAll(): Promise<void>
 }
 
+interface ICredentialLeaseRegistry {
+  claim(
+    senderId: number,
+    handle: unknown,
+    operationId: string
+  ): IActionsArtifactProvenanceCredentialLease | null
+  complete(senderId: number, handle: unknown): boolean
+  cancelOperation(senderId: number, operationId: unknown): boolean
+  releaseAll(): void
+}
+
 export interface IActionsArtifactProvenanceServiceDependencies {
   readonly runner?: IProvenanceRunner
   readonly withSubject?: WithRevalidatedSubject
@@ -82,6 +102,8 @@ export interface IActionsArtifactProvenanceServiceDependencies {
   readonly cancelAllSubjectsAndWait?: () => Promise<void>
   readonly withVerifierFiles?: WithVerifierFiles
   readonly maximumConcurrency?: number
+  readonly credentialLeases?: ICredentialLeaseRegistry
+  readonly credentialSource?: IActionsArtifactProvenanceCredentialSource
 }
 
 function requestRecord(value: unknown): Record<string, unknown> {
@@ -98,6 +120,7 @@ function requestRecord(value: unknown): Record<string, unknown> {
   }
   const result = value as Record<string, unknown>
   const expected = [
+    'accountHandle',
     'bundles',
     'downloadId',
     'entryId',
@@ -117,6 +140,19 @@ function requestRecord(value: unknown): Record<string, unknown> {
     )
   }
   return result
+}
+
+function accountHandle(value: unknown): string | null {
+  if (value === null) {
+    return null
+  }
+  if (typeof value !== 'string' || !opaqueIdPattern.test(value)) {
+    throw new ActionsArtifactProvenanceServiceError(
+      'invalid-request',
+      'The selected account handle is invalid.'
+    )
+  }
+  return value
 }
 
 function opaqueId(value: unknown): string {
@@ -231,6 +267,7 @@ function normalizeRequest(
       operationId: normalizeActionsArtifactProvenanceOperationId(
         request.operationId
       ),
+      accountHandle: accountHandle(request.accountHandle),
       downloadId: opaqueId(request.downloadId),
       inventoryId: opaqueId(request.inventoryId),
       entryId: opaqueId(request.entryId),
@@ -248,6 +285,41 @@ function normalizeRequest(
       'invalid-request',
       'The artifact provenance request is invalid.'
     )
+  }
+}
+
+function credentialsEqual(left: string, right: string | null): boolean {
+  // Buffer.from replaces an unpaired UTF-16 surrogate with U+FFFD. Check the
+  // original JavaScript strings first so distinct keychain values cannot be
+  // treated as equal merely because their UTF-8 replacement bytes collide.
+  if (right === null || left !== right) {
+    return false
+  }
+  const leftBytes = Buffer.from(left, 'utf8')
+  const rightBytes = Buffer.from(right, 'utf8')
+  return (
+    leftBytes.byteLength === rightBytes.byteLength &&
+    timingSafeEqual(leftBytes, rightBytes)
+  )
+}
+
+function combineAbortSignals(
+  first: AbortSignal,
+  second: AbortSignal
+): { readonly signal: AbortSignal; readonly dispose: () => void } {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  first.addEventListener('abort', abort, { once: true })
+  second.addEventListener('abort', abort, { once: true })
+  if (first.aborted || second.aborted) {
+    abort()
+  }
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      first.removeEventListener('abort', abort)
+      second.removeEventListener('abort', abort)
+    },
   }
 }
 
@@ -350,6 +422,8 @@ export class ActionsArtifactProvenanceService {
   private readonly cancelAllSubjectsAndWait: () => Promise<void>
   private readonly withVerifierFiles: WithVerifierFiles
   private readonly maximumConcurrency: number
+  private readonly credentialLeases: ICredentialLeaseRegistry
+  private readonly credentialSource: IActionsArtifactProvenanceCredentialSource
   private readonly active = new Set<Promise<void>>()
   private accepting = true
 
@@ -369,6 +443,11 @@ export class ActionsArtifactProvenanceService {
       cancelAllActionsArtifactSubjectOperationsAndWait
     this.withVerifierFiles =
       dependencies.withVerifierFiles ?? withPrivateVerifierFiles
+    this.credentialLeases =
+      dependencies.credentialLeases ??
+      actionsArtifactProvenanceCredentialLeaseRegistry
+    this.credentialSource =
+      dependencies.credentialSource ?? actionsArtifactProvenanceCredentialSource
     this.maximumConcurrency =
       dependencies.maximumConcurrency ??
       ActionsArtifactProvenanceServiceMaximumConcurrency
@@ -389,6 +468,45 @@ export class ActionsArtifactProvenanceService {
     }
     if (!this.accepting || this.active.size >= this.maximumConcurrency) {
       return { ok: false, reason: 'verifier-unavailable' }
+    }
+    let webHost: string
+    try {
+      webHost = getActionsArtifactProvenanceWebHost(
+        new URL(request.policy.sourceRepositoryURI).origin
+      )
+    } catch {
+      return { ok: false, reason: 'unsupported-host' }
+    }
+
+    let credentialLease: IActionsArtifactProvenanceCredentialLease | null = null
+    if (request.bundles.length === 0) {
+      // Empty-bundle checks are a local rehash/not-attested path. They never
+      // consume a credential, even when the selected source is GHE.com.
+      if (request.accountHandle !== null) {
+        return { ok: false, reason: 'invalid-request' }
+      }
+    } else if (webHost === 'github.com') {
+      // GitHub.com bundle verification uses no selected-account credential.
+      if (request.accountHandle !== null) {
+        return { ok: false, reason: 'invalid-request' }
+      }
+    } else {
+      // Consume the GHE.com handle synchronously, before the first archive,
+      // Temp-file, keychain, or verifier await.
+      if (request.accountHandle === null) {
+        return { ok: false, reason: 'verifier-unavailable' }
+      }
+      credentialLease = this.credentialLeases.claim(
+        sender.id,
+        request.accountHandle,
+        request.operationId
+      )
+      if (credentialLease === null || credentialLease.webHost !== webHost) {
+        if (credentialLease !== null) {
+          this.credentialLeases.complete(sender.id, request.accountHandle)
+        }
+        return { ok: false, reason: 'verifier-unavailable' }
+      }
     }
     let finish!: () => void
     const done = new Promise<void>(resolveDone => {
@@ -418,46 +536,97 @@ export class ActionsArtifactProvenanceService {
           if (request.bundles.length === 0) {
             return { ok: false, reason: 'not-attested' }
           }
-          // gh 2.96 performs a GHE.com trust-domain API lookup even for local
-          // bundles. The selected account credential is intentionally absent
-          // from renderer IPC and will be injected by the next store checkpoint.
-          if (
-            getActionsArtifactProvenanceWebHost(
-              new URL(request.policy.sourceRepositoryURI).origin
-            ) !== 'github.com'
-          ) {
-            return { ok: false, reason: 'verifier-unavailable' }
-          }
-
           return await this.withVerifierFiles(request.bundles, async files => {
-            const result = await this.runner.verify({
-              subjectPath: leased.filePath,
-              subjectDigest: leased.digest,
-              ...files,
-              policy: request.policy,
-              signal,
-            })
-            return result.ok
-              ? { ok: true, subject, evidence: result.evidence }
-              : result
+            const leaseSignal =
+              credentialLease?.signal ?? new AbortController().signal
+            const operation = combineAbortSignals(signal, leaseSignal)
+            try {
+              if (operation.signal.aborted) {
+                return { ok: false, reason: 'canceled' }
+              }
+              // withSubject has fully re-opened/revalidated/rehashed the exact
+              // selected bytes, and withVerifierFiles has written the bounded
+              // canonical JSONL before this first main-only keychain read.
+              const credential =
+                credentialLease === null
+                  ? null
+                  : await this.credentialSource.read(
+                      credentialLease,
+                      operation.signal
+                    )
+              if (
+                operation.signal.aborted ||
+                (credentialLease !== null && !credentialLease.isLive())
+              ) {
+                return { ok: false, reason: 'canceled' }
+              }
+              if (credentialLease !== null && credential === null) {
+                return { ok: false, reason: 'verifier-unavailable' }
+              }
+
+              const result = await this.runner.verify({
+                subjectPath: leased.filePath,
+                subjectDigest: leased.digest,
+                ...files,
+                policy: request.policy,
+                credential,
+                signal: operation.signal,
+              })
+              if (credentialLease === null) {
+                return result.ok
+                  ? { ok: true, subject, evidence: result.evidence }
+                  : result
+              }
+              // runner.verify resolves only after the owned gh process tree and
+              // streams have closed. Re-read the exact keyring item then reject
+              // any rotated, removed, expired, or revoked credential before a
+              // verifier result can reach the renderer.
+              if (operation.signal.aborted || !credentialLease.isLive()) {
+                return { ok: false, reason: 'canceled' }
+              }
+              const currentCredential = await this.credentialSource.read(
+                credentialLease,
+                operation.signal
+              )
+              if (operation.signal.aborted || !credentialLease.isLive()) {
+                return { ok: false, reason: 'canceled' }
+              }
+              if (!credentialsEqual(credential!, currentCredential)) {
+                return { ok: false, reason: 'verifier-unavailable' }
+              }
+              return result.ok
+                ? { ok: true, subject, evidence: result.evidence }
+                : result
+            } finally {
+              operation.dispose()
+            }
           })
         }
       )
     } catch (error) {
       return mapFailure(error)
     } finally {
+      if (credentialLease !== null && request.accountHandle !== null) {
+        this.credentialLeases.complete(sender.id, request.accountHandle)
+      }
       finish()
       this.active.delete(done)
     }
   }
 
   public cancel(senderId: number, operationId: unknown): boolean {
-    return this.cancelSubject(senderId, operationId)
+    const canceledSubject = this.cancelSubject(senderId, operationId)
+    const canceledLease = this.credentialLeases.cancelOperation(
+      senderId,
+      operationId
+    )
+    return canceledSubject || canceledLease
   }
 
   public async killAll(): Promise<void> {
     this.accepting = false
     const active = [...this.active]
+    this.credentialLeases.releaseAll()
     this.cancelAllSubjects()
     await Promise.all([
       this.runner.killAll(),
@@ -469,6 +638,15 @@ export class ActionsArtifactProvenanceService {
 
 export const actionsArtifactProvenanceService =
   new ActionsArtifactProvenanceService()
+
+// Sender navigation, destruction, explicit release, TTL, and account-generation
+// invalidation revoke a credential lease. Tie that revocation to the exact
+// subject operation so a stale selected account cannot keep rehashing bytes.
+actionsArtifactProvenanceCredentialLeaseRegistry.onRevoked(
+  (senderId, operationId) => {
+    actionsArtifactProvenanceService.cancel(senderId, operationId)
+  }
+)
 
 export const verifyActionsArtifactProvenance = (
   sender: IActionsArtifactDownloadSender,

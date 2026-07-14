@@ -48,6 +48,7 @@ import {
 } from './actions-artifact-subjects'
 import {
   ActionsArtifactProvenanceResult,
+  IActionsArtifactProvenanceCredentialRegistration,
   IActionsArtifactProvenanceVerifyRequest,
 } from './actions-artifact-provenance'
 
@@ -59,6 +60,12 @@ import {
  */
 export type RequestChannels = {
   'cancel-actions-artifact-provenance': (operationId: string) => void
+  'release-actions-artifact-provenance-credential-lease': (
+    accountHandle: string
+  ) => void
+  'invalidate-actions-artifact-provenance-credential-lease-generation': (
+    accountsGeneration: number
+  ) => void
   'cancel-actions-artifact-subject-operation': (operationId: string) => void
   'release-actions-artifact-download': (downloadId: string) => void
   'cancel-actions-transfer': (operationId: string) => void
@@ -151,6 +158,9 @@ export type RequestChannels = {
  * Return signatures must be promises
  */
 export type RequestResponseChannels = {
+  'register-actions-artifact-provenance-credential-lease': (
+    request: IActionsArtifactProvenanceCredentialRegistration
+  ) => Promise<string | null>
   'verify-actions-artifact-provenance': (
     request: IActionsArtifactProvenanceVerifyRequest
   ) => Promise<ActionsArtifactProvenanceResult>
