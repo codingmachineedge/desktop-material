@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import {
   FileBlameLineLimit,
@@ -36,6 +38,9 @@ filename src/engine.ts
 	console.log(engine)
 `
 
+const repositoryPath = join(tmpdir(), 'desktop-file-history', 'repo')
+const outsidePath = join(tmpdir(), 'desktop-file-history', 'secret.txt')
+
 describe('git/file-history-parser', () => {
   it('accepts only complete SHA-1 and SHA-256 restore sources', () => {
     assert.equal(
@@ -54,13 +59,13 @@ describe('git/file-history-parser', () => {
   })
   it('contains repository-relative paths before invoking Git', () => {
     assert.equal(
-      normalizeFileHistoryPath('C:\\repo', 'src\\feature/file.ts'),
+      normalizeFileHistoryPath(repositoryPath, 'src\\feature/file.ts'),
       'src/feature/file.ts'
     )
 
-    for (const path of ['', '..\\secret', 'C:\\secret.txt', 'src/../../x']) {
+    for (const path of ['', '..\\secret', outsidePath, 'src/../../x']) {
       assert.throws(
-        () => normalizeFileHistoryPath('C:\\repo', path),
+        () => normalizeFileHistoryPath(repositoryPath, path),
         (error: unknown) =>
           error instanceof FileHistoryUnavailableError &&
           error.kind === 'invalid-path'

@@ -92,7 +92,9 @@ describe('Actions artifact archive download', () => {
 
   it('adds the archive extension and requires an absolute destination', () => {
     assert.ok(
-      normalizeActionsArtifactDestination('C:\\safe\\package').endsWith('.zip')
+      normalizeActionsArtifactDestination(
+        join(tmpdir(), 'desktop-artifact-safe', 'package')
+      ).endsWith('.zip')
     )
     assert.throws(() => normalizeActionsArtifactDestination('package.zip'), {
       name: 'ActionsArtifactDownloadError',
