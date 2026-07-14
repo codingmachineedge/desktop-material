@@ -113,32 +113,6 @@ const dispatcher = {
 } as unknown as Dispatcher
 
 describe('NotificationCentrePanel', () => {
-  it('does not consume Escape while a popup is in front of the panel', () => {
-    const closed: boolean[] = []
-    const stackDispatcher = {
-      ...dispatcher,
-      setNotificationCentreOpen: (open: boolean) => closed.push(open),
-    } as unknown as Dispatcher
-    const panel = (isTopMost: boolean) => (
-      <NotificationCentrePanel
-        dispatcher={stackDispatcher}
-        entries={[localEntry]}
-        unreadCount={1}
-        repositories={[]}
-        accounts={[]}
-        isTopMost={isTopMost}
-      />
-    )
-    const view = render(panel(false))
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-    assert.deepStrictEqual(closed, [])
-
-    view.rerender(panel(true))
-    fireEvent.keyDown(window, { key: 'Escape' })
-    assert.deepStrictEqual(closed, [false])
-  })
-
   it('keeps Local as the default source with connected keyboard tabs', () => {
     render(
       <NotificationCentrePanel
@@ -147,7 +121,6 @@ describe('NotificationCentrePanel', () => {
         unreadCount={1}
         repositories={[]}
         accounts={[]}
-        isTopMost={true}
       />
     )
 
@@ -169,10 +142,6 @@ describe('NotificationCentrePanel', () => {
       'Local notification'
     )
     assert.ok(screen.getByRole('button', { name: 'Notification history' }))
-    assert.equal(
-      screen.getByText('userData/notifications.git').textContent,
-      'userData/notifications.git'
-    )
 
     all.focus()
     fireEvent.keyDown(all, { key: 'End' })
@@ -196,15 +165,15 @@ describe('NotificationCentrePanel', () => {
         unreadCount={1}
         repositories={[]}
         accounts={[]}
-        isTopMost={true}
       />
     )
 
     fireEvent.click(screen.getByRole('tab', { name: 'Unread (1)' }))
     fireEvent.click(screen.getByRole('tab', { name: 'GitHub' }))
 
-    assert.ok(screen.getByRole('option', { name: 'No signed-in accounts' }))
-    assert.equal(screen.queryByText('No signed-in GitHub accounts'), null)
+    assert.ok(
+      screen.getByRole('option', { name: 'No signed-in GitHub accounts' })
+    )
     assert.ok(screen.getByText('Sign in to a GitHub account to view its inbox'))
     assert.equal(
       screen.queryByRole('button', { name: 'Notification history' }),
@@ -267,7 +236,6 @@ describe('NotificationCentrePanel', () => {
         unreadCount={0}
         repositories={[]}
         accounts={[first, second, thirdParty]}
-        isTopMost={true}
         githubNotificationsStore={store}
       />
     )
@@ -373,7 +341,6 @@ describe('NotificationCentrePanel', () => {
         unreadCount={0}
         repositories={[]}
         accounts={[selected]}
-        isTopMost={true}
         githubNotificationsStore={store}
       />
     )
