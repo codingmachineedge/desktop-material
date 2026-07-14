@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { describe, it } from 'node:test'
+import { describe, it, TestContext } from 'node:test'
 import * as React from 'react'
 
 import {
@@ -25,6 +25,36 @@ function createDeferred<T>(): {
   }
 
   return { promise, resolve: resolveValue }
+}
+
+/**
+ * Keep the history viewer tests deterministic without replacing the jsdom
+ * Storage object. global-jsdom exposes localStorage through a read-only global
+ * accessor, so assigning a test double would throw in the Node 26 runner.
+ */
+function useEmptyLocalStorage(t: TestContext) {
+  const storage = globalThis.localStorage
+  const previousEntries = new Map<string, string>()
+
+  for (let index = 0; index < storage.length; index++) {
+    const key = storage.key(index)
+    if (key === null) {
+      continue
+    }
+
+    const value = storage.getItem(key)
+    if (value !== null) {
+      previousEntries.set(key, value)
+    }
+  }
+
+  storage.clear()
+  t.after(() => {
+    storage.clear()
+    for (const [key, value] of previousEntries) {
+      storage.setItem(key, value)
+    }
+  })
 }
 
 function historyEntry(sha: string, summary: string): IVersionHistoryEntry {
@@ -74,17 +104,8 @@ describe('versioned store history', () => {
     assert.equal(classifyVersionHistoryDiffLine(' unchanged'), 'context')
   })
 
-  it('ignores an old pagination response after undo reloads history', async () => {
-    Object.assign(globalThis, {
-      localStorage: {
-        length: 0,
-        clear: () => {},
-        getItem: () => null,
-        key: () => null,
-        removeItem: () => {},
-        setItem: () => {},
-      } as Storage,
-    })
+  it('ignores an old pagination response after undo reloads history', async t => {
+    useEmptyLocalStorage(t)
 
     const initialEntry = historyEntry('11111111', 'Initial snapshot')
     const staleEntry = historyEntry('22222222', 'Stale older snapshot')
@@ -141,17 +162,8 @@ describe('versioned store history', () => {
     assert.equal(screen.getAllByText('Undo snapshot').length, 2)
   })
 
-  it('loads file metadata only for the selected entry', async () => {
-    Object.assign(globalThis, {
-      localStorage: {
-        length: 0,
-        clear: () => {},
-        getItem: () => null,
-        key: () => null,
-        removeItem: () => {},
-        setItem: () => {},
-      } as Storage,
-    })
+  it('loads file metadata only for the selected entry', async t => {
+    useEmptyLocalStorage(t)
 
     const first = historyEntry('11111111', 'First snapshot')
     const second = historyEntry('22222222', 'Second snapshot')
