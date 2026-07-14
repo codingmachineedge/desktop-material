@@ -21,7 +21,8 @@
 
 .workflow-dispatch-dialog,
 .actions-confirmation-dialog,
-.actions-deployment-review-dialog {
+.actions-deployment-review-dialog,
+.actions-artifact-provenance-dialog {
   width: min(580px, 100%);
   min-width: 0;
   max-height: 100%;
@@ -64,6 +65,244 @@
       color: var(--md-sys-color-on-primary);
       background: var(--md-sys-color-primary);
     }
+  }
+}
+
+.actions-artifact-provenance-dialog {
+  width: min(780px, 100%);
+
+  > header {
+    align-items: flex-start;
+
+    > div {
+      min-width: 0;
+    }
+
+    .button-component {
+      flex: 0 0 auto;
+      white-space: normal;
+    }
+  }
+
+  > footer {
+    flex-wrap: wrap;
+  }
+}
+
+.actions-provenance-intro,
+.actions-provenance-guidance {
+  min-width: 0;
+  margin: 14px 0;
+  color: var(--md-sys-color-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+.actions-provenance-summary-grid,
+.actions-provenance-select-grid,
+.actions-provenance-metadata,
+.actions-provenance-evidence {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.actions-provenance-summary-grid,
+.actions-provenance-select-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.actions-provenance-digest,
+.actions-provenance-section,
+.actions-provenance-selection,
+.actions-provenance-result {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  background: var(--md-sys-color-surface-container);
+}
+
+.actions-provenance-digest {
+  > span,
+  > small {
+    display: block;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+
+  > code {
+    display: block;
+    min-width: 0;
+    margin-top: 5px;
+    font-size: 10px;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+
+  > p,
+  > small {
+    margin: 5px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}
+
+.actions-provenance-section,
+.actions-provenance-selection,
+.actions-provenance-result {
+  margin-top: 10px;
+}
+
+.actions-provenance-section-heading,
+.actions-provenance-selection-heading,
+.actions-provenance-result > header {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  > div {
+    min-width: 0;
+  }
+
+  h3 {
+    min-width: 0;
+    margin: 2px 0 0;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+
+  > small {
+    max-width: 100%;
+    color: var(--md-sys-color-on-surface-variant);
+    overflow-wrap: anywhere;
+  }
+}
+
+.actions-provenance-metadata,
+.actions-provenance-evidence {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  margin: 12px 0 0;
+
+  > div {
+    min-width: 0;
+  }
+
+  dt,
+  dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  dt {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  dd {
+    margin: 3px 0 0;
+    font-size: 12px;
+  }
+
+  code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+}
+
+.actions-provenance-select-grid {
+  margin-top: 12px;
+
+  .select-component {
+    min-width: 0;
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    select {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+}
+
+.actions-provenance-selection-details {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+
+  > div {
+    min-width: 0;
+    padding: 9px;
+    border-radius: 10px;
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  span,
+  code {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  span {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  code {
+    margin-top: 4px;
+    font-size: 11px;
+    white-space: normal;
+  }
+}
+
+.actions-provenance-result {
+  border-color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary-container);
+
+  > p {
+    min-width: 0;
+    margin: 10px 0 0;
+    overflow-wrap: anywhere;
+  }
+
+  .actions-provenance-result-reason {
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+  }
+
+  &.failure {
+    border-color: var(--md-sys-color-error);
+    background: var(--md-sys-color-error-container);
+  }
+
+  &.warning {
+    border-color: var(--md-sys-color-tertiary);
+    background: var(--md-sys-color-tertiary-container);
   }
 }
 
@@ -249,6 +488,7 @@
 .workflow-dispatch-dialog:focus-visible,
 .actions-confirmation-dialog:focus-visible,
 .actions-deployment-review-dialog:focus-visible,
+.actions-artifact-provenance-dialog:focus-visible,
 .actions-log-viewer:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 45%, transparent);
   outline-offset: -5px;
@@ -442,13 +682,28 @@
 
   .workflow-dispatch-dialog,
   .actions-confirmation-dialog,
-  .actions-deployment-review-dialog {
+  .actions-deployment-review-dialog,
+  .actions-artifact-provenance-dialog {
     padding: var(--spacing-double);
 
     > header,
     > footer {
       align-items: stretch;
       flex-wrap: wrap;
+    }
+  }
+
+  .actions-artifact-provenance-dialog {
+    .actions-provenance-summary-grid,
+    .actions-provenance-select-grid,
+    .actions-provenance-selection-details {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    > footer {
+      .button-component {
+        width: 100%;
+      }
     }
   }
 

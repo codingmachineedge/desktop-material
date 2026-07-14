@@ -10,14 +10,18 @@ import {
 } from '../../lib/actions-artifacts'
 import { IActionsArtifactDownloadProgress } from '../../lib/actions-artifact-download'
 import { releaseActionsArtifactDownloadThroughMainProcess } from '../../lib/actions-artifact-subject-client'
+import { ActionsArtifactProvenanceResult } from '../../lib/actions-artifact-provenance'
 import {
   ActionsStore,
   getActionsRepositoryKey,
+  IActionsArtifactProvenanceReview,
+  IActionsArtifactProvenanceVerificationSelection,
 } from '../../lib/stores/actions-store'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
 import { formatBytes } from '../lib/bytes'
 import { showItemInFolder, showSaveDialog } from '../main-process-proxy'
+import { ActionsArtifactProvenanceDialog } from './actions-artifact-provenance-dialog'
 
 type AttestationCheck =
   | { readonly status: 'loading' }
@@ -29,6 +33,7 @@ interface ICompletedArtifactDownload {
   readonly artifactId: number
   readonly downloadId: string
   readonly path: string
+  readonly bytes: number
   readonly localDigest: string
   readonly matchesGitHubDigest: boolean | null
 }
@@ -57,6 +62,12 @@ interface IRunArtifactsState {
   readonly operationMessage: string | null
   readonly operationError: string | null
   readonly completedDownload: ICompletedArtifactDownload | null
+  readonly provenanceOpen: boolean
+  readonly provenanceLoading: boolean
+  readonly provenanceVerifying: boolean
+  readonly provenanceReview: IActionsArtifactProvenanceReview | null
+  readonly provenanceResult: ActionsArtifactProvenanceResult | null
+  readonly provenanceError: Error | null
 }
 
 const initialState = (): IRunArtifactsState => ({
@@ -71,6 +82,12 @@ const initialState = (): IRunArtifactsState => ({
   operationMessage: null,
   operationError: null,
   completedDownload: null,
+  provenanceOpen: false,
+  provenanceLoading: false,
+  provenanceVerifying: false,
+  provenanceReview: null,
+  provenanceResult: null,
+  provenanceError: null,
 })
 
 function readableBytes(bytes: number): string {
@@ -100,6 +117,8 @@ export class RunArtifacts extends React.Component<
   private loadController: AbortController | null = null
   private readonly attestationControllers = new Map<number, AbortController>()
   private downloadController: AbortController | null = null
+  private provenanceController: AbortController | null = null
+  private provenanceVerificationController: AbortController | null = null
   private destinationGeneration = 0
   private lastProgressUpdate = 0
   private readonly releasedDownloadIds = new Set<string>()
@@ -140,6 +159,11 @@ export class RunArtifacts extends React.Component<
     this.attestationControllers.clear()
     this.downloadController?.abort()
     this.downloadController = null
+    this.provenanceController?.abort()
+    this.provenanceController = null
+    this.provenanceVerificationController?.abort()
+    this.provenanceVerificationController = null
+    this.props.actionsStore.disposeArtifactProvenanceReview?.()
     this.releaseCompletedDownload()
   }
 
@@ -462,6 +486,7 @@ export class RunArtifacts extends React.Component<
             artifactId: artifact.id,
             downloadId: result.downloadId,
             path: result.path,
+            bytes: result.bytes,
             localDigest: result.localDigest,
             matchesGitHubDigest: result.matchesGitHubDigest,
           },
@@ -527,6 +552,178 @@ export class RunArtifacts extends React.Component<
     }
   }
 
+  private startProvenanceReview = (artifact: IActionsArtifact) => {
+    const completed = this.state.completedDownload
+    if (
+      completed === null ||
+      completed.artifactId !== artifact.id ||
+      completed.matchesGitHubDigest !== true
+    ) {
+      return
+    }
+    this.provenanceController?.abort()
+    this.provenanceController = new AbortController()
+    const controller = this.provenanceController
+    this.setState({
+      provenanceOpen: true,
+      provenanceLoading: true,
+      provenanceVerifying: false,
+      provenanceReview: null,
+      provenanceResult: null,
+      provenanceError: null,
+    })
+    void this.props.actionsStore
+      .startArtifactProvenanceReview(
+        this.props.repository,
+        {
+          runId: this.props.run.id,
+          runAttempt: this.props.run.run_attempt,
+          artifact,
+          download: completed,
+        },
+        controller.signal
+      )
+      .then(review => {
+        if (this.mounted && this.provenanceController === controller) {
+          this.setState({
+            provenanceLoading: false,
+            provenanceReview: review,
+            provenanceError: null,
+          })
+        }
+      })
+      .catch(error => {
+        if (
+          this.mounted &&
+          this.provenanceController === controller &&
+          (error as Error)?.name !== 'AbortError'
+        ) {
+          this.setState({
+            provenanceLoading: false,
+            provenanceError:
+              error instanceof Error
+                ? error
+                : new Error('Unable to prepare provenance review.'),
+          })
+        }
+      })
+      .finally(() => {
+        if (this.provenanceController === controller) {
+          this.provenanceController = null
+        }
+      })
+  }
+
+  private openProvenanceFromButton = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const artifact = this.artifactFromButton(event, 'verify-artifact-')
+    if (artifact !== null) {
+      this.startProvenanceReview(artifact)
+    }
+  }
+
+  private retryProvenance = () => {
+    const completed = this.state.completedDownload
+    const artifact =
+      completed === null
+        ? null
+        : this.state.list?.artifacts.find(
+            candidate => candidate.id === completed.artifactId
+          ) ?? null
+    if (artifact === null) {
+      this.setState({
+        provenanceError: new Error(
+          'Refresh the artifact list and download the archive again before reviewing provenance.'
+        ),
+      })
+      return
+    }
+    this.startProvenanceReview(artifact)
+  }
+
+  private closeProvenance = () => {
+    this.provenanceController?.abort()
+    this.provenanceController = null
+    this.provenanceVerificationController?.abort()
+    this.provenanceVerificationController = null
+    this.props.actionsStore.disposeArtifactProvenanceReview?.()
+    this.releaseCompletedDownload()
+    this.setState({
+      provenanceOpen: false,
+      provenanceLoading: false,
+      provenanceVerifying: false,
+      provenanceReview: null,
+      provenanceResult: null,
+      provenanceError: null,
+      completedDownload: null,
+    })
+  }
+
+  private cancelProvenanceVerification = () => {
+    this.provenanceVerificationController?.abort()
+    this.provenanceVerificationController = null
+    this.setState({
+      provenanceVerifying: false,
+      provenanceResult: { ok: false, reason: 'canceled' },
+    })
+  }
+
+  private verifyProvenance = (
+    selection: IActionsArtifactProvenanceVerificationSelection
+  ) => {
+    const review = this.state.provenanceReview
+    if (review === null || this.state.provenanceVerifying) {
+      return
+    }
+    this.provenanceVerificationController?.abort()
+    const controller = new AbortController()
+    this.provenanceVerificationController = controller
+    this.setState({
+      provenanceVerifying: true,
+      provenanceResult: null,
+      provenanceError: null,
+    })
+    void this.props.actionsStore
+      .verifyArtifactProvenanceReview(
+        this.props.repository,
+        review.reviewId,
+        selection,
+        controller.signal
+      )
+      .then(result => {
+        if (
+          this.mounted &&
+          this.provenanceVerificationController === controller
+        ) {
+          this.setState({
+            provenanceVerifying: false,
+            provenanceResult: result,
+          })
+        }
+      })
+      .catch(error => {
+        if (
+          this.mounted &&
+          this.provenanceVerificationController === controller &&
+          (error as Error)?.name !== 'AbortError'
+        ) {
+          this.setState({
+            provenanceVerifying: false,
+            provenanceError:
+              error instanceof Error
+                ? error
+                : new Error('Unable to verify the selected subject.'),
+          })
+        }
+      })
+      .finally(() => {
+        if (this.provenanceVerificationController === controller) {
+          this.provenanceVerificationController = null
+        }
+      })
+  }
+
   private renderAttestationState(artifact: IActionsArtifact) {
     const check = this.state.checks[artifact.id]
     if (check === undefined) {
@@ -559,7 +756,8 @@ export class RunArtifacts extends React.Component<
     const tooLarge = artifact.sizeInBytes > ActionsArtifactMaximumDownloadBytes
     const busy =
       this.state.choosingArtifactId !== null ||
-      this.state.downloadingArtifactId !== null
+      this.state.downloadingArtifactId !== null ||
+      this.state.provenanceOpen
     const checking = this.state.checks[artifact.id]?.status === 'loading'
     const anyAttestationCheck = Object.values(this.state.checks).some(
       check => check.status === 'loading'
@@ -680,6 +878,18 @@ export class RunArtifacts extends React.Component<
               Show in folder
             </Button>
           )}
+          {completed?.matchesGitHubDigest === true && (
+            <Button
+              id={`verify-artifact-${artifact.id}`}
+              size="small"
+              className="button-component-primary"
+              onClick={this.openProvenanceFromButton}
+              disabled={this.state.provenanceOpen}
+              ariaLabel={`Verify provenance: ${artifact.name}`}
+            >
+              Verify provenance
+            </Button>
+          )}
         </div>
 
         {this.state.downloadingArtifactId === artifact.id &&
@@ -721,10 +931,11 @@ export class RunArtifacts extends React.Component<
   public render() {
     const { list } = this.state
     return (
-      <section
-        className="actions-artifacts"
-        aria-labelledby="actions-artifacts-heading"
-      >
+      <>
+        <section
+          className="actions-artifacts"
+          aria-labelledby="actions-artifacts-heading"
+        >
         <header className="actions-artifacts-header">
           <div>
             <span className="eyebrow">Run outputs</span>
@@ -737,7 +948,8 @@ export class RunArtifacts extends React.Component<
               this.state.loading ||
               this.state.loadingMore ||
               this.state.choosingArtifactId !== null ||
-              this.state.downloadingArtifactId !== null
+              this.state.downloadingArtifactId !== null ||
+              this.state.provenanceOpen
             }
           >
             Refresh artifacts
@@ -815,7 +1027,21 @@ export class RunArtifacts extends React.Component<
         >
           {list?.artifacts.map(artifact => this.renderArtifact(artifact))}
         </div>
-      </section>
+        </section>
+        {this.state.provenanceOpen && (
+          <ActionsArtifactProvenanceDialog
+            review={this.state.provenanceReview}
+            loading={this.state.provenanceLoading}
+            verifying={this.state.provenanceVerifying}
+            result={this.state.provenanceResult}
+            error={this.state.provenanceError}
+            onVerify={this.verifyProvenance}
+            onCancelVerification={this.cancelProvenanceVerification}
+            onRetry={this.retryProvenance}
+            onDismissed={this.closeProvenance}
+          />
+        )}
+      </>
     )
   }
 }
