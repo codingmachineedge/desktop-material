@@ -29,6 +29,7 @@ import {
   RepositoryToolID,
   RepositoryToolOperations,
 } from './operations'
+import { RepositoryBundleImport } from './bundle-import'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -69,6 +70,7 @@ export interface IRepositoryToolsProps {
     defaultPath: string
   ) => Promise<string | null>
   readonly chooseBundleToVerify?: () => Promise<string | null>
+  readonly chooseBundleToImport?: () => Promise<string | null>
   readonly revealArchive?: (path: string) => Promise<void>
 }
 
@@ -94,6 +96,7 @@ interface IRepositoryToolsState {
   readonly status: OperationStatus
   readonly output: string
   readonly error: string | null
+  readonly bundleImportBusy: boolean
 }
 
 let nextOperationSequence = 0
@@ -124,6 +127,7 @@ export class RepositoryTools extends React.Component<
       status: 'idle',
       output: '',
       error: null,
+      bundleImportBusy: false,
     }
   }
 
@@ -150,6 +154,7 @@ export class RepositoryTools extends React.Component<
         status: 'idle',
         output: '',
         error: null,
+        bundleImportBusy: false,
       })
     }
   }
@@ -198,7 +203,13 @@ export class RepositoryTools extends React.Component<
   }
 
   private isBusy() {
-    return this.runId !== null
+    return this.runId !== null || this.state.bundleImportBusy
+  }
+
+  private onBundleImportBusyChanged = (bundleImportBusy: boolean) => {
+    if (this.state.bundleImportBusy !== bundleImportBusy) {
+      this.setState({ bundleImportBusy })
+    }
   }
 
   private onOperationRequested = (operation: IRepositoryToolOperation) => {
@@ -619,6 +630,19 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderImport() {
+    return (
+      <RepositoryBundleImport
+        repositoryPath={this.props.repositoryPath}
+        disabled={this.runId !== null || !this.state.gitAvailable}
+        client={this.client}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onBundleImportBusyChanged}
+        chooseBundleToImport={this.props.chooseBundleToImport}
+      />
+    )
+  }
+
   private renderConfirmation() {
     const id = this.state.confirmationOperation
     if (id === null) {
@@ -792,6 +816,7 @@ export class RepositoryTools extends React.Component<
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}
             {this.renderExport()}
+            {this.renderImport()}
           </div>
           <aside className="repository-tools-results-column">
             {this.renderConfirmation()}

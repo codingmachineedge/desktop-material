@@ -1,8 +1,5 @@
 import * as React from 'react'
 import {
-  CLICommandRecipe,
-  GuidedBundleImportOperation,
-  GuidedBundleInspectionOperation,
   ICLICommandOutputEvent,
   ICLICommandRequest,
   ICLICommandStateEvent,
@@ -79,26 +76,6 @@ function appendBoundedOutput(current: string, value: string): string {
   return `${current}${value}`.slice(-MaxImportOutput)
 }
 
-function bundleInspectionRecipe(
-  operation: GuidedBundleInspectionOperation,
-  bundlePath: string
-): CLICommandRecipe {
-  return { kind: 'repository-bundle-inspection', operation, bundlePath }
-}
-
-function bundleImportRecipe(
-  operation: GuidedBundleImportOperation,
-  request: IRepositoryBundleImportRequest
-): CLICommandRecipe {
-  return {
-    kind: 'repository-bundle-import',
-    operation,
-    bundlePath: request.bundlePath,
-    source: request.source,
-    branchName: request.branchName,
-  }
-}
-
 function stepTitle(phase: BundleImportPhase): string {
   switch (phase) {
     case 'inspection-verification':
@@ -147,7 +124,6 @@ export class RepositoryBundleImport extends React.Component<
   private commandStdout = ''
   private commandOutputTruncated = false
   private cancelRequested = false
-  private repositoryGeneration = 0
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
   private confirmButton: HTMLButtonElement | null = null
@@ -178,28 +154,15 @@ export class RepositoryBundleImport extends React.Component<
   }
 
   public componentDidUpdate(prevProps: IRepositoryBundleImportProps) {
-    const repositoryChanged =
-      prevProps.repositoryPath !== this.props.repositoryPath
-    const clientChanged = prevProps.client !== this.props.client
-    if (!repositoryChanged && !clientChanged) {
-      return
+    if (prevProps.repositoryPath !== this.props.repositoryPath) {
+      this.cancelRun()
+      this.props.onBusyChanged(false)
+      this.setState(this.initialState())
     }
-
-    this.repositoryGeneration++
-    this.cancelRun(clientChanged ? prevProps.client : this.props.client)
-    if (clientChanged) {
-      this.unsubscribeOutput?.()
-      this.unsubscribeState?.()
-      this.unsubscribeOutput = this.props.client.onOutput(this.onOutput)
-      this.unsubscribeState = this.props.client.onState(this.onState)
-    }
-    this.props.onBusyChanged(false)
-    this.setState(this.initialState())
   }
 
   public componentWillUnmount() {
     this.mounted = false
-    this.repositoryGeneration++
     this.unsubscribeOutput?.()
     this.unsubscribeState?.()
     this.unsubscribeOutput = null
@@ -207,27 +170,16 @@ export class RepositoryBundleImport extends React.Component<
     this.cancelRun()
   }
 
-  private cancelRun(client: IBundleImportClient = this.props.client) {
+  private cancelRun() {
     const id = this.runId
     this.runId = null
     if (id !== null) {
-      void client.cancel(id).catch(() => {})
+      void this.props.client.cancel(id).catch(() => {})
     }
   }
 
   private setBusy(busy: boolean) {
     this.props.onBusyChanged(busy)
-  }
-
-  private isCurrentRepository(
-    repositoryPath: string,
-    repositoryGeneration: number
-  ) {
-    return (
-      this.mounted &&
-      this.props.repositoryPath === repositoryPath &&
-      this.repositoryGeneration === repositoryGeneration
-    )
   }
 
   private selectedHead(): IRepositoryBundleRef | null {
@@ -248,15 +200,9 @@ export class RepositoryBundleImport extends React.Component<
   }
 
   private chooseBundle = async () => {
-    if (
-      this.props.disabled ||
-      this.runId !== null ||
-      this.state.phase === 'refreshing'
-    ) {
+    if (this.props.disabled || this.runId !== null) {
       return
     }
-    const repositoryPath = this.props.repositoryPath
-    const repositoryGeneration = this.repositoryGeneration
     try {
       const bundlePath = this.props.chooseBundleToImport
         ? await this.props.chooseBundleToImport()
@@ -265,10 +211,7 @@ export class RepositoryBundleImport extends React.Component<
             properties: ['openFile'],
             filters: [{ name: 'Git bundle', extensions: ['bundle'] }],
           })
-      if (
-        bundlePath === null ||
-        !this.isCurrentRepository(repositoryPath, repositoryGeneration)
-      ) {
+      if (bundlePath === null || !this.mounted) {
         return
       }
       const inspection = prepareRepositoryBundleInspection(bundlePath)
@@ -285,18 +228,15 @@ export class RepositoryBundleImport extends React.Component<
           status: 'Verifying bundle integrity…',
           error: null,
         },
-        () => {
-          if (this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
-            void this.startCommand(
-              'inspection-verification',
-              bundleInspectionRecipe('verify', inspection.bundlePath),
-              false
-            )
-          }
-        }
+        () =>
+          void this.startCommand(
+            'inspection-verification',
+            inspection.verifyArgs,
+            false
+          )
       )
     } catch (error) {
-      if (this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
+      if (this.mounted) {
         this.setState({
           phase: 'failed',
           error:
@@ -311,7 +251,7 @@ export class RepositoryBundleImport extends React.Component<
 
   private async startCommand(
     phase: BundleImportPhase,
-    recipe: CLICommandRecipe,
+    args: ReadonlyArray<string>,
     confirmed: boolean
   ) {
     if (this.runId !== null || !this.mounted) {
@@ -332,8 +272,9 @@ export class RepositoryBundleImport extends React.Component<
     try {
       await this.props.client.start({
         id,
-        repositoryPath: this.props.repositoryPath,
-        recipe,
+        tool: 'git',
+        args,
+        cwd: this.props.repositoryPath,
         confirmed,
       })
     } catch (error) {
@@ -435,11 +376,7 @@ export class RepositoryBundleImport extends React.Component<
           () => this.confirmButton?.focus()
         )
       } else {
-        void this.startCommand(
-          'fetching',
-          bundleImportRecipe('fetch-objects', request),
-          true
-        )
+        void this.startCommand('fetching', request.fetchObjectsArgs, true)
       }
       return
     }
@@ -475,7 +412,7 @@ export class RepositoryBundleImport extends React.Component<
           const inspection = prepareRepositoryBundleInspection(bundlePath)
           void this.startCommand(
             'inspection-listing',
-            bundleInspectionRecipe('list-heads', inspection.bundlePath),
+            inspection.listHeadsArgs,
             false
           )
           return
@@ -504,7 +441,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'review-destination',
-            bundleImportRecipe('check-destination', request),
+            request.checkDestinationArgs,
             false
           )
           return
@@ -516,7 +453,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'recheck-listing',
-            bundleInspectionRecipe('list-heads', request.bundlePath),
+            request.listHeadsArgs,
             false
           )
           return
@@ -530,7 +467,7 @@ export class RepositoryBundleImport extends React.Component<
           assertRepositoryBundleSourceUnchanged(currentHeads, request.source)
           void this.startCommand(
             'recheck-validation',
-            bundleImportRecipe('validate-destination', request),
+            request.validateDestinationArgs,
             false
           )
           return
@@ -543,7 +480,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'recheck-destination',
-            bundleImportRecipe('check-destination', request),
+            request.checkDestinationArgs,
             false
           )
           return
@@ -555,7 +492,7 @@ export class RepositoryBundleImport extends React.Component<
           }
           void this.startCommand(
             'validating-commit',
-            bundleImportRecipe('validate-commit', request),
+            request.validateCommitArgs,
             false
           )
           return
@@ -565,11 +502,7 @@ export class RepositoryBundleImport extends React.Component<
               'The prepared bundle import is no longer available.'
             )
           }
-          void this.startCommand(
-            'creating',
-            bundleImportRecipe('create-branch', request),
-            true
-          )
+          void this.startCommand('creating', request.createBranchArgs, true)
           return
         case 'creating':
           if (request === null) {
@@ -585,11 +518,7 @@ export class RepositoryBundleImport extends React.Component<
               `Created ${request.destinationRef} at ${request.source.oid}.\n`
             ),
           })
-          void this.finishRefresh(
-            request,
-            this.props.repositoryPath,
-            this.repositoryGeneration
-          )
+          void this.finishRefresh(request)
           return
         default:
           throw new Error('The bundle import entered an unexpected state.')
@@ -603,14 +532,10 @@ export class RepositoryBundleImport extends React.Component<
     }
   }
 
-  private async finishRefresh(
-    request: IRepositoryBundleImportRequest,
-    repositoryPath: string,
-    repositoryGeneration: number
-  ) {
+  private async finishRefresh(request: IRepositoryBundleImportRequest) {
     try {
       await this.props.onRefreshRepository()
-      if (!this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
+      if (!this.mounted) {
         return
       }
       this.setBusy(false)
@@ -620,7 +545,7 @@ export class RepositoryBundleImport extends React.Component<
         error: null,
       })
     } catch {
-      if (!this.isCurrentRepository(repositoryPath, repositoryGeneration)) {
+      if (!this.mounted) {
         return
       }
       this.setBusy(false)
@@ -666,7 +591,7 @@ export class RepositoryBundleImport extends React.Component<
         () =>
           void this.startCommand(
             'review-validation',
-            bundleImportRecipe('validate-destination', request),
+            request.validateDestinationArgs,
             false
           )
       )
@@ -691,11 +616,7 @@ export class RepositoryBundleImport extends React.Component<
       return
     }
     this.setBusy(true)
-    void this.startCommand(
-      'recheck-verification',
-      bundleInspectionRecipe('verify', request.bundlePath),
-      false
-    )
+    void this.startCommand('recheck-verification', request.verifyArgs, false)
   }
 
   private onCancel = async () => {
@@ -906,11 +827,7 @@ export class RepositoryBundleImport extends React.Component<
           </div>
           <div className="repository-tool-controls">
             <Button
-              disabled={
-                this.props.disabled ||
-                this.runId !== null ||
-                this.state.phase === 'refreshing'
-              }
+              disabled={this.props.disabled || this.runId !== null}
               onClick={this.onChooseBundleClicked}
             >
               {this.state.bundlePath === null

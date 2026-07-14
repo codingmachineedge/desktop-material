@@ -1,9 +1,14 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
+  assertRepositoryBundleSourceUnchanged,
   getRepositoryToolOperation,
+  normalizeBundleImportBranchName,
+  parseRepositoryBundleHeads,
   prepareRepositoryArchive,
   prepareRepositoryBundle,
+  prepareRepositoryBundleImport,
+  prepareRepositoryBundleInspection,
   prepareRepositoryBundleVerification,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
@@ -131,6 +136,121 @@ describe('repository tool recipes', () => {
     for (const path of ['backup.bundle', 'C:\\exports\\backup.zip', '']) {
       assert.throws(() => prepareRepositoryBundleVerification(path))
     }
+  })
+
+  it('strictly parses bounded advertised bundle refs', () => {
+    const sha = 'A'.repeat(40)
+    const sha256 = 'b'.repeat(64)
+    assert.deepStrictEqual(
+      parseRepositoryBundleHeads(
+        `${sha} refs/heads/main\r\n${sha256} refs/tags/v2\n`
+      ),
+      [
+        { oid: sha.toLowerCase(), ref: 'refs/heads/main' },
+        { oid: sha256, ref: 'refs/tags/v2' },
+      ]
+    )
+    for (const output of [
+      '',
+      `${sha} HEAD\n`,
+      `${sha} refs/heads/bad ref\n`,
+      `not-an-oid refs/heads/main\n`,
+      `${sha} refs/heads/main\n${'b'.repeat(40)} refs/heads/main\n`,
+    ]) {
+      assert.throws(() => parseRepositoryBundleHeads(output))
+    }
+  })
+
+  it('validates local branch destinations without accepting refspecs', () => {
+    assert.equal(
+      normalizeBundleImportBranchName(' feature/from-bundle '),
+      'feature/from-bundle'
+    )
+    for (const branch of [
+      '',
+      '-force',
+      'HEAD',
+      'refs/heads/main:refs/heads/other',
+      'bad..branch',
+      'bad@{branch',
+      'bad\\branch',
+      '.hidden/main',
+      'topic.lock',
+    ]) {
+      assert.throws(() => normalizeBundleImportBranchName(branch))
+    }
+  })
+
+  it('prepares a fixed import recipe that cannot overwrite a branch', () => {
+    const source = {
+      oid: 'a'.repeat(40),
+      ref: 'refs/heads/release',
+    }
+    const request = prepareRepositoryBundleImport(
+      'C:\\exports\\backup.bundle',
+      source,
+      'restored/release'
+    )
+    assert.deepStrictEqual(request, {
+      bundlePath: 'C:\\exports\\backup.bundle',
+      verifyArgs: ['bundle', 'verify', 'C:\\exports\\backup.bundle'],
+      listHeadsArgs: ['bundle', 'list-heads', 'C:\\exports\\backup.bundle'],
+      source,
+      branchName: 'restored/release',
+      destinationRef: 'refs/heads/restored/release',
+      validateDestinationArgs: [
+        'check-ref-format',
+        '--branch',
+        'restored/release',
+      ],
+      checkDestinationArgs: [
+        'show-ref',
+        '--verify',
+        '--quiet',
+        'refs/heads/restored/release',
+      ],
+      fetchObjectsArgs: [
+        'fetch',
+        '--no-write-fetch-head',
+        '--no-tags',
+        '--no-auto-maintenance',
+        'C:\\exports\\backup.bundle',
+        'refs/heads/release',
+      ],
+      validateCommitArgs: ['cat-file', '-e', `${'a'.repeat(40)}^{commit}`],
+      createBranchArgs: [
+        'branch',
+        '--no-track',
+        '--',
+        'restored/release',
+        'a'.repeat(40),
+      ],
+    })
+    assert.ok(
+      request.createBranchArgs.every(argument => !argument.includes(':'))
+    )
+    assert.deepStrictEqual(
+      prepareRepositoryBundleInspection('C:\\exports\\backup.bundle'),
+      {
+        bundlePath: 'C:\\exports\\backup.bundle',
+        verifyArgs: ['bundle', 'verify', 'C:\\exports\\backup.bundle'],
+        listHeadsArgs: ['bundle', 'list-heads', 'C:\\exports\\backup.bundle'],
+      }
+    )
+  })
+
+  it('fails closed if the selected advertised source changes', () => {
+    const source = { oid: 'a'.repeat(40), ref: 'refs/heads/main' }
+    assert.doesNotThrow(() =>
+      assertRepositoryBundleSourceUnchanged([source], source)
+    )
+    assert.throws(() =>
+      assertRepositoryBundleSourceUnchanged(
+        [{ oid: 'b'.repeat(40), ref: source.ref }],
+        source
+      )
+    )
+    assert.throws(() => assertRepositoryBundleSourceUnchanged([], source))
   })
 })
 
