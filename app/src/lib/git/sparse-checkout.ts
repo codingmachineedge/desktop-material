@@ -8,10 +8,6 @@ import {
   parseSparseCheckoutDirectories,
   parseSparseCheckoutList,
 } from './sparse-checkout-parser'
-import {
-  assertSafeWorktreeMutation,
-  WorktreePathSafetyError,
-} from './worktree-path-guard'
 
 export * from './sparse-checkout-parser'
 
@@ -82,18 +78,6 @@ function asSparseCheckoutError(error: unknown, operation: string): never {
     throw new SparseCheckoutUnavailableError(
       'too-large',
       `${operation} produced too much output to display safely.`
-    )
-  }
-  throw error
-}
-
-function asSparseWorktreeSafetyError(error: unknown): never {
-  if (error instanceof WorktreePathSafetyError) {
-    throw new SparseCheckoutUnavailableError(
-      error.kind === 'aborted' ? 'aborted' : 'unsafe-state',
-      error.kind === 'aborted'
-        ? 'Request cancelled.'
-        : `Sparse checkout stopped before changing files. ${error.message}`
     )
   }
   throw error
@@ -276,13 +260,6 @@ async function runSparseCheckoutMutation(
   throwIfAborted(signal)
   const state = await getSparseCheckoutState(repositoryPath, signal)
   assertMutableState(state, mutation)
-  throwIfAborted(signal)
-
-  try {
-    await assertSafeWorktreeMutation(repositoryPath, signal)
-  } catch (error) {
-    return asSparseWorktreeSafetyError(error)
-  }
   throwIfAborted(signal)
 
   try {

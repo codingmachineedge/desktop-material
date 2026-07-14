@@ -15,3 +15,13 @@
 - Publication authorization: the user explicitly requested continuous commits and pushes from all agents
 - Cleanup ledger: before any GUI phase, record the run id, resolved owned paths, headless desktop name, create state, launch PID, and runtime-resolved HWND; pair each created resource with finally-path cleanup
 - Scope exclusions: do not edit CLI Workbench, GitHub API Workbench, or their tests; avoid `app/src/ui/repository.tsx`; do not add an endpoint/command search list as a substitute for the native workflow
+
+## Verification outcome
+
+- Exact MCP endpoint preflight: passed with `startup_status.ok=true`; the installed task is running as `LowLevelComputerUseMCP`
+- Runtime task action: `C:\Users\Administrator\Documents\GitHub\lowlevel-computer-use-mcp\.venv\Scripts\python.exe -m lowlevel_computer_use_mcp.server --http --host 127.0.0.1 --port 8765`, working directory `C:\Users\Administrator\Documents\GitHub\lowlevel-computer-use-mcp`
+- MCP checkout SHA: `806d9ba85e4afbc2af58d7499496babfa7c68891`
+- Reproducible build gate: blocked before compilation because the MCP service environment has no installed `yarn` command; the required no-download command returned `spawn yarn ENOENT`
+- GUI/evidence cleanup ledger: no fixture, user-data path, headless desktop, Electron process, HWND, or screenshot was created because the build prerequisite failed
+- Focused checks: dependency-free parser and UI/style contract tests passed; TypeScript `--noEmit`, Prettier, and diff checks passed
+- Existing environment limitation: the Git fixture integration suite cannot initialize because the pre-existing dependency tree lacks `keytar.node`; no dependency was downloaded or rebuilt

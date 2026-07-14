@@ -5,10 +5,14 @@ export type {
 } from './repository-tools'
 export {
   getRepositoryToolOperation,
+  prepareRepositoryArchive,
+  prepareRepositoryBundle,
   RepositoryToolOperations,
 } from './operations'
 export type {
+  IRepositoryArchiveRequest,
   IRepositoryToolOperation,
+  RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
 } from './operations'

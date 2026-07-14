@@ -202,6 +202,17 @@ describe('main-process menu', () => {
       assert.equal(repositoryTools?.accelerator, 'CmdOrCtrl+4')
     })
 
+    it('exposes the guided sparse checkout manager in Repository', () => {
+      const template = buildDefaultMenuTemplate(baseParams)
+      const repositoryMenu = template.find(item => item.id === 'repository')
+      assert.ok(repositoryMenu && Array.isArray(repositoryMenu.submenu))
+      const sparseCheckout = repositoryMenu.submenu.find(
+        item => item.id === 'manage-sparse-checkout'
+      )
+      assert.ok(sparseCheckout)
+      assert.equal(sparseCheckout.click instanceof Function, true)
+    })
+
     it('has no duplicate access keys for any combination of label-affecting parameters', () => {
       const combinationCount = 1 << variantKeys.length
 

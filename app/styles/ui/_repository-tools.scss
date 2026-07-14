@@ -225,10 +225,12 @@
   color: var(--md-sys-color-on-tertiary-container);
 
   strong,
-  p {
+  p,
+  span {
     display: block;
     margin: 0;
     overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   p {

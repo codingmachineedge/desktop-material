@@ -1,4 +1,47 @@
+import * as Path from 'path'
+
 export type RepositoryToolCategory = 'Diagnostics' | 'Maintenance' | 'Recovery'
+
+export type RepositoryArchiveFormat = 'zip' | 'tar'
+
+export interface IRepositoryArchiveRequest {
+  readonly format: RepositoryArchiveFormat | 'bundle'
+  readonly destination: string
+  readonly args: ReadonlyArray<string>
+}
+
+function normalizeRepositoryExportDestination(
+  repositoryPath: string,
+  destination: string,
+  extension: string
+): string {
+  const value = destination.trim()
+  if (value.length === 0 || value.includes('\0') || !Path.isAbsolute(value)) {
+    throw new Error('Choose an absolute destination for the repository export.')
+  }
+
+  const normalizedDestination = value.toLowerCase().endsWith(extension)
+    ? value
+    : `${value}${extension}`
+  const resolvedRepository = Path.resolve(repositoryPath)
+  const resolvedDestination = Path.resolve(normalizedDestination)
+  const gitDirectory = Path.join(resolvedRepository, '.git')
+  const relativeToGitDirectory = Path.relative(
+    gitDirectory,
+    resolvedDestination
+  )
+
+  if (
+    relativeToGitDirectory.length === 0 ||
+    (!relativeToGitDirectory.startsWith(`..${Path.sep}`) &&
+      relativeToGitDirectory !== '..' &&
+      !Path.isAbsolute(relativeToGitDirectory))
+  ) {
+    throw new Error('Repository exports cannot be saved inside .git.')
+  }
+
+  return resolvedDestination
+}
 
 export type RepositoryToolID =
   | 'status-summary'
@@ -6,6 +49,7 @@ export type RepositoryToolID =
   | 'maintenance-preview'
   | 'maintenance-run'
   | 'reflog-view'
+  | 'signature-audit'
 
 export interface IRepositoryToolOperation {
   readonly id: RepositoryToolID
@@ -45,6 +89,26 @@ export const RepositoryToolOperations: ReadonlyArray<IRepositoryToolOperation> =
       args: ['fsck', '--full'],
       mutatesRepository: false,
       requiresConfirmation: false,
+    },
+    {
+      id: 'signature-audit',
+      title: 'Audit recent commit signatures',
+      description:
+        'Inspect signature status, signer identity, and subject for the latest 50 commits.',
+      category: 'Diagnostics',
+      args: [
+        'log',
+        '--format=%h%x09%G?%x09%GS%x09%s',
+        '--show-signature',
+        '-50',
+      ],
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'G = good, U = good with unknown trust, B = bad, N = unsigned.',
+        'Also reports expired, revoked, and missing-key signature states.',
+        'Does not change signing keys, trust, commits, or Git configuration.',
+      ],
     },
     {
       id: 'maintenance-preview',
@@ -95,4 +159,49 @@ export function getRepositoryToolOperation(
     throw new Error(`Unknown repository tool: ${id}`)
   }
   return operation
+}
+
+/**
+ * Contain and normalize the only user-selected value accepted by the archive
+ * function. The source ref and Git arguments remain fixed and reviewed.
+ */
+export function prepareRepositoryArchive(
+  repositoryPath: string,
+  destination: string,
+  format: RepositoryArchiveFormat
+): IRepositoryArchiveRequest {
+  const extension = `.${format}`
+  const resolvedDestination = normalizeRepositoryExportDestination(
+    repositoryPath,
+    destination,
+    extension
+  )
+
+  return {
+    format,
+    destination: resolvedDestination,
+    args: [
+      'archive',
+      `--format=${format}`,
+      `--output=${resolvedDestination}`,
+      'HEAD',
+    ],
+  }
+}
+
+/** Create one portable bundle containing all local refs and reachable history. */
+export function prepareRepositoryBundle(
+  repositoryPath: string,
+  destination: string
+): IRepositoryArchiveRequest {
+  const resolvedDestination = normalizeRepositoryExportDestination(
+    repositoryPath,
+    destination,
+    '.bundle'
+  )
+  return {
+    format: 'bundle',
+    destination: resolvedDestination,
+    args: ['bundle', 'create', resolvedDestination, '--all'],
+  }
 }

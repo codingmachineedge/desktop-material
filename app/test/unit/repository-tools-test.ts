@@ -2,6 +2,8 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   getRepositoryToolOperation,
+  prepareRepositoryArchive,
+  prepareRepositoryBundle,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -17,6 +19,7 @@ describe('repository tool recipes', () => {
       [
         'status-summary',
         'repository-health',
+        'signature-audit',
         'maintenance-preview',
         'maintenance-run',
         'reflog-view',
@@ -39,6 +42,7 @@ describe('repository tool recipes', () => {
     for (const id of [
       'status-summary',
       'repository-health',
+      'signature-audit',
       'maintenance-preview',
       'reflog-view',
     ] as const) {
@@ -52,6 +56,12 @@ describe('repository tool recipes', () => {
       '--date=local',
       '-50',
     ])
+    assert.deepStrictEqual(getRepositoryToolOperation('signature-audit').args, [
+      'log',
+      '--format=%h%x09%G?%x09%GS%x09%s',
+      '--show-signature',
+      '-50',
+    ])
   })
 
   it('requires confirmation for repository maintenance', () => {
@@ -61,6 +71,54 @@ describe('repository tool recipes', () => {
     assert.match(
       maintenance.confirmationDescription ?? '',
       /rewrite object packs/i
+    )
+  })
+
+  it('prepares only contained ZIP and TAR exports from HEAD', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryArchive('C:\\work\\repo', 'C:\\exports\\repo', 'zip'),
+      {
+        format: 'zip',
+        destination: 'C:\\exports\\repo.zip',
+        args: [
+          'archive',
+          '--format=zip',
+          '--output=C:\\exports\\repo.zip',
+          'HEAD',
+        ],
+      }
+    )
+    assert.equal(
+      prepareRepositoryArchive('C:\\work\\repo', 'C:\\exports\\repo.TAR', 'tar')
+        .destination,
+      'C:\\exports\\repo.TAR'
+    )
+    assert.throws(() =>
+      prepareRepositoryArchive('C:\\work\\repo', 'relative.zip', 'zip')
+    )
+    assert.throws(() =>
+      prepareRepositoryArchive(
+        'C:\\work\\repo',
+        'C:\\work\\repo\\.git\\private.zip',
+        'zip'
+      )
+    )
+  })
+
+  it('prepares a contained full-history bundle with no editable ref', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryBundle('C:\\work\\repo', 'C:\\exports\\backup'),
+      {
+        format: 'bundle',
+        destination: 'C:\\exports\\backup.bundle',
+        args: ['bundle', 'create', 'C:\\exports\\backup.bundle', '--all'],
+      }
+    )
+    assert.throws(() =>
+      prepareRepositoryBundle(
+        'C:\\work\\repo',
+        'C:\\work\\repo\\.git\\backup.bundle'
+      )
     )
   })
 })
