@@ -33,20 +33,6 @@ import {
   ICLICommandStateEvent,
   ICLIWorkbenchCatalog,
 } from './cli-workbench'
-import {
-  ActionsArtifactTransferResult,
-  ActionsJobLogTransferResult,
-  IActionsArtifactTransferRequest,
-  IActionsJobLogTransferRequest,
-  IActionsTransferProgressEvent,
-} from './actions-transfer'
-import {
-  GitHubReleaseAssetDownloadTransferResult,
-  GitHubReleaseAssetUploadTransferResult,
-  IGitHubReleaseAssetDownloadRequest,
-  IGitHubReleaseAssetUploadRequest,
-  IGitHubReleaseTransferProgressEvent,
-} from './github-release-transfer'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer

@@ -16,6 +16,8 @@ export interface ICLICommandRequest {
   readonly tool: CLIWorkbenchTool
   readonly args: ReadonlyArray<string>
   readonly cwd: string
+  /** Set only after the user confirms a destructive command assessment. */
+  readonly confirmed?: boolean
 }
 
 export interface ICLICommandOutputEvent {
@@ -37,6 +39,21 @@ export interface ICLICommandCatalogEntry {
   readonly command: string
   readonly summary: string
   readonly category: string
+}
+
+/** Runtime availability and command discovery for one supported executable. */
+export interface ICLIWorkbenchToolCatalog {
+  readonly tool: CLIWorkbenchTool
+  readonly available: boolean
+  readonly version: string | null
+  readonly error: string | null
+  readonly entries: ReadonlyArray<ICLICommandCatalogEntry>
+}
+
+/** Complete runtime catalog returned to the workbench renderer. */
+export interface ICLIWorkbenchCatalog {
+  readonly tools: ReadonlyArray<ICLIWorkbenchToolCatalog>
+  readonly entries: ReadonlyArray<ICLICommandCatalogEntry>
 }
 
 export interface ICLIWorkbenchQuickAction {
@@ -223,7 +240,12 @@ function includesAny(
   )
 }
 
-function gitCommand(args: ReadonlyArray<string>): string | null {
+interface IGitCommandLocation {
+  readonly name: string
+  readonly index: number
+}
+
+function gitCommand(args: ReadonlyArray<string>): IGitCommandLocation | null {
   const optionsWithValues = new Set([
     '-C',
     '-c',
@@ -243,7 +265,7 @@ function gitCommand(args: ReadonlyArray<string>): string | null {
       continue
     }
     if (!arg.startsWith('-')) {
-      return arg
+      return { name: arg, index }
     }
   }
   return null
@@ -307,11 +329,15 @@ const gitAlwaysDestructive = new Set([
 ])
 
 function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
-  const command = gitCommand(args)
-  if (command === null) {
-    return { risk: 'read', reason: 'Displays Git help or version information.', requiresConfirmation: false }
+  const location = gitCommand(args)
+  if (location === null) {
+    return {
+      risk: 'read',
+      reason: 'Displays Git help or version information.',
+      requiresConfirmation: false,
+    }
   }
-  const commandIndex = args.indexOf(command)
+  const { name: command, index: commandIndex } = location
   const rest = args.slice(commandIndex + 1)
 
   if (gitAlwaysDestructive.has(command)) {
@@ -323,11 +349,17 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   ) {
     return destructive('This push can delete or rewrite remote refs.')
   }
-  if (command === 'branch' && includesAny(rest, ['--delete', '-d', '-D'])) {
-    return destructive('This command deletes one or more branches.')
+  if (
+    command === 'branch' &&
+    includesAny(rest, ['--delete', '--force', '-d', '-D', '-f'])
+  ) {
+    return destructive('This command deletes or rewrites one or more branches.')
   }
-  if (command === 'tag' && includesAny(rest, ['--delete', '-d'])) {
-    return destructive('This command deletes one or more tags.')
+  if (
+    command === 'tag' &&
+    includesAny(rest, ['--delete', '--force', '-d', '-f'])
+  ) {
+    return destructive('This command deletes or rewrites one or more tags.')
   }
   if (command === 'stash' && ['clear', 'drop'].includes(rest[0])) {
     return destructive('This command permanently removes stash entries.')
@@ -341,8 +373,10 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   if (command === 'worktree' && ['prune', 'remove'].includes(rest[0])) {
     return destructive('This command removes worktree metadata or files.')
   }
-  if (command === 'remote' && ['remove', 'rm'].includes(rest[0])) {
-    return destructive('This command removes a configured remote.')
+  if (command === 'remote' && ['prune', 'remove', 'rm'].includes(rest[0])) {
+    return destructive(
+      'This command removes a configured remote or remote-tracking refs.'
+    )
   }
   if (command === 'submodule' && rest[0] === 'deinit') {
     return destructive('This command unregisters submodules and removes their worktrees.')
@@ -350,7 +384,11 @@ function assessGit(args: ReadonlyArray<string>): ICLICommandAssessment {
   if (gitWriteCommands.has(command)) {
     return write(`git ${command} can modify local or remote repository state.`)
   }
-  return { risk: 'read', reason: `git ${command} is treated as an inspection command.`, requiresConfirmation: false }
+  return {
+    risk: 'read',
+    reason: `git ${command} is treated as an inspection command.`,
+    requiresConfirmation: false,
+  }
 }
 
 const ghDestructivePairs = new Set([
@@ -421,14 +459,22 @@ function assessGitHub(args: ReadonlyArray<string>): ICLICommandAssessment {
       args.some(arg => /^(POST|PUT|PATCH|DELETE)$/i.test(arg))
     return mutating
       ? write('This GitHub API request can modify remote state.')
-      : { risk: 'read', reason: 'This is a read-only GitHub API request by default.', requiresConfirmation: false }
+      : {
+          risk: 'read',
+          reason: 'This is a read-only GitHub API request by default.',
+          requiresConfirmation: false,
+        }
   }
   if (
     args.length === 0 ||
     ['browse', 'licenses', 'search', 'status'].includes(args[0]) ||
     ghReadSubcommands.has(pair)
   ) {
-    return { risk: 'read', reason: 'This GitHub CLI command inspects or opens remote state.', requiresConfirmation: false }
+    return {
+      risk: 'read',
+      reason: 'This GitHub CLI command inspects or opens remote state.',
+      requiresConfirmation: false,
+    }
   }
   return write('This GitHub CLI command can modify GitHub state or local configuration.')
 }
@@ -439,4 +485,42 @@ export function assessCLICommand(
   args: ReadonlyArray<string>
 ): ICLICommandAssessment {
   return tool === 'git' ? assessGit(args) : assessGitHub(args)
+}
+
+/**
+ * Commands whose purpose is to print a credential are never exposed through
+ * the workbench. Authentication flows may still use browser or stdin input.
+ */
+export function getCLICommandBlockReason(
+  tool: CLIWorkbenchTool,
+  args: ReadonlyArray<string>
+): string | null {
+  if (tool === 'git') {
+    const location = gitCommand(args)
+    if (location === null) {
+      return null
+    }
+    const { name: command, index: commandIndex } = location
+    const rest = args.slice(commandIndex + 1)
+    if (
+      (command === 'credential' && rest[0] === 'fill') ||
+      (command.startsWith('credential-') && rest[0] === 'get')
+    ) {
+      return 'The workbench cannot display stored authentication credentials.'
+    }
+    return null
+  }
+  if (args[0] !== 'auth') {
+    return null
+  }
+  if (args[1] === 'token') {
+    return 'The workbench cannot display stored authentication tokens.'
+  }
+  if (
+    args[1] === 'status' &&
+    includesAny(args.slice(2), ['--show-token', '-t'])
+  ) {
+    return 'The workbench cannot display stored authentication tokens.'
+  }
+  return null
 }
