@@ -48,17 +48,40 @@ export function installAuthenticatedImageFilter(
   })
 
   return (accounts: ReadonlyArray<EndpointToken>) => {
-    originTokens = new Map(
-      accounts.map(({ endpoint, token }) => [new URL(endpoint).origin, token])
-    )
-
-    // If we have a token for api.github.com, add another entry in our
-    // tokens-by-origin map with the same token for github.com. This is
-    // necessary for private image URLs.
-    const dotComAPIEndpoint = getDotComAPIEndpoint()
-    const dotComAPIToken = originTokens.get(dotComAPIEndpoint)
-    if (dotComAPIToken) {
-      originTokens.set(getHTMLURL(dotComAPIEndpoint), dotComAPIToken)
-    }
+    originTokens = getAuthenticatedImageOriginTokens(accounts)
   }
+}
+
+/**
+ * Build the origin-to-token map used by the main-process image filter.
+ *
+ * GitHub.com/private asset URLs are served from the HTML host while account
+ * tokens are registered against the API host. Keep both keys as normalized
+ * origins so this remains correct for a configured development endpoint too.
+ */
+export function getAuthenticatedImageOriginTokens(
+  accounts: ReadonlyArray<EndpointToken>,
+  dotComAPIEndpoint = getDotComAPIEndpoint()
+) {
+  const originTokens = new Map(
+    accounts.map(({ endpoint, token }) => [
+      new globalThis.URL(endpoint).origin,
+      token,
+    ])
+  )
+
+  // If we have a token for api.github.com, add another entry in our
+  // tokens-by-origin map with the same token for github.com. This is
+  // necessary for private image URLs.
+  const dotComAPIToken = originTokens.get(
+    new globalThis.URL(dotComAPIEndpoint).origin
+  )
+  if (dotComAPIToken) {
+    originTokens.set(
+      new globalThis.URL(getHTMLURL(dotComAPIEndpoint)).origin,
+      dotComAPIToken
+    )
+  }
+
+  return originTokens
 }

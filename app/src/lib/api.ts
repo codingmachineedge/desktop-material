@@ -3660,7 +3660,10 @@ export function getHTMLURL(endpoint: string): string {
     return 'https://github.com'
   } else {
     if (isGHE(endpoint)) {
-      const url = new window.URL(endpoint)
+      // This helper is also used by Electron's main process, where there is
+      // no renderer `window` object. `globalThis.URL` is available in both
+      // the renderer and Node/Electron main runtimes.
+      const url = new globalThis.URL(endpoint)
 
       url.pathname = '/'
 
