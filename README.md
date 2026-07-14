@@ -121,9 +121,9 @@ Last updated: **July 14, 2026**.
 |---|---|---|
 | **Done** | M0–M19 guided Git, GitHub, provider parity, and Material shell | Implementation ledger and closing acceptance are recorded in [`PLAN.md`](PLAN.md); prior P0, pagination, and run-inspector receipts remain in `.codex/run-manifests/`. |
 | **Done** | Actions provenance foundation and selected-account orchestration | Fixed policy, exact run-attempt binding, safe ZIP subject inventory, opaque IPC, verifier runtime, credential lease, and renderer/store review lifecycle are shipped. The compact implementation receipt is [`2026-07-14-actions-artifact-provenance-result-ui.md`](.codex/run-manifests/2026-07-14-actions-artifact-provenance-result-ui.md). |
-| **Done** | Actions provenance review/result UI and Actions cache manager | The cache manager now loads through the selected repository account, preserves cache state across run refreshes, exposes bounded usage/list/delete workflows, and has headless geometry evidence in the current screenshot set. |
-| **Next** | Pull Request Center and Release Manager | The bounded read/review surfaces are the next named GitHub wave; no item is promoted until its tests, headless evidence, docs, and push are complete. |
-| **Next** | Issue Hub read wave and remaining named Git functions | Issue browsing/read state follows PR/Release verification. The remaining Git queue is patch-series exchange, structured commit rewriting, signing, LFS, complete worktree/remote/stash administration, and reflog recovery. |
+| **Done** | Actions provenance review/result UI and Actions cache manager | The cache manager loads through the selected repository account, preserves cache state across run refreshes, exposes bounded usage/list/delete workflows, and has headless geometry evidence in the current screenshot set. |
+| **Done** | Pull Request Center, Release Manager, and Issue Hub | M19’s bounded PR lifecycle/read-review, Releases/assets, and richer Issues surfaces are implemented, tested, documented, and represented in the accepted screenshot gallery. |
+| **Done** | Remaining named Git functions | Patch-series exchange, structured commit rewriting, signing, LFS, worktree/remote/stash administration, reflog recovery, merge-tree conflict preview, and guided bisect are recorded as complete in [`PLAN.md`](PLAN.md). |
 
 #### Current delivery rule
 
@@ -131,12 +131,12 @@ Each UI slice gets a focused test receipt, a low-level MCP/headless-desktop capt
 
 ### Capability map
 
-| Area | Shipped | Next bounded wave |
+| Area | Shipped proof |
 |---|---|---|
-| **Git** | Core repository, history, branch, commit, stash, remote, worktree, merge/rebase, fetch/pull/push, automation, typed Repository Tools, shallow-history recovery, sparse checkout, archives, and bundle verify/import | Patch-series exchange, structured commit rewriting, signing, LFS, richer worktree/remote/stash administration, and reflog recovery |
-| **GitHub** | Account-bound Issues/PRs, Releases, Notifications, Actions runs/artifacts/jobs/logs/reviews, artifact provenance review, cache inventory/deletion, branch rules, clone/fork/publish, and organization browsing | PR/Issue read/review centers, repository administration, delivery/security/projects/discussions, Codespaces, gists, and account keys |
-| **Material shell** | Responsive M3 surfaces, themes, scaling, keyboard focus, multi-window routing, repository tabs, search, automation, and non-modal dialogs | Continue named workflows with the same bounded form, confirmation, progress, result, and recovery contract |
-| **Reference** | GitKraken comparisons remain internal planning evidence | Proprietary cloud, enterprise, AI, and collaboration services are not copied |
+| **Git** | Core repository, history, branch, commit, stash, remote, worktree, merge/rebase, fetch/pull/push, automation, Repository Tools, patch series, structured rewrite, signing, LFS, shallow-history recovery, sparse checkout, archives, bundles, merge-tree preview, bisect, reflog, and recovery workflows. |
+| **GitHub** | Account-bound Issues/PRs, Releases/assets, Notifications, Actions runs/artifacts/jobs/logs/reviews, artifact provenance review, cache inventory/deletion, branch rules, clone/fork/publish, organization browsing, repository administration, and provider-neutral triage. |
+| **Material shell** | Responsive M3 surfaces, themes, scaling, keyboard focus, multi-window routing, repository tabs, search, automation, non-modal dialogs, and the current screenshot/documentation evidence gate. |
+| **Reference** | GitKraken comparisons remain internal planning evidence; proprietary cloud, enterprise, AI, and collaboration services are not copied. |
 
 The REST/GraphQL and Git command inventories are audit inputs only. Users get named workflows, never a raw command, endpoint, or GraphQL editor.
 

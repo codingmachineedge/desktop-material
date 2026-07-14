@@ -17,9 +17,9 @@ pagination then passed its exact production UI gate at
 exact job logs/re-runs, pending deployment reviews, and fork-run approval now
 pass their production UI gate at
 `2f40d8949aaa7ae4ce5418cd949c28c643da0a37`. Cryptographic artifact
-attestation review/result UI and the smaller Actions cache manager are now
-shipped; bounded Pull Request Center and Release Manager read/review waves are
-next, followed by the Issue Hub wave.
+attestation review/result UI, Actions cache manager, bounded Pull Request
+Center, Release Manager, Issue Hub, and the named Git functions are all shipped
+as the accepted M19 parity wave.
 
 This handoff does not claim that branch-only Pages assets are already live on
 `main`. Pages remains protected to the normal reviewed `main` promotion path;
@@ -418,8 +418,9 @@ gate. The newer function-first parity roadmap is intentionally active: the P0
 four-function slice, typed operation boundary, and Actions run/artifact
 pagination are production-verified. Attempt/job/log/re-run, deployment-review,
 and fork-approval functions have now passed their production UI gate as well.
-Cryptographic artifact attestation review/result UI and Actions cache
-management are now shipped, followed by bounded PR/Release and Issue waves.
+Cryptographic artifact attestation review/result UI, Actions cache management,
+bounded PR/Release and Issue waves, and the named Git functions are shipped;
+the complete M19 ledger remains the source of truth for that acceptance.
 
 ## 2026-07-13 Actions run inspector production UI gate
 
