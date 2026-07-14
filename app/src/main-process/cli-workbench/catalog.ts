@@ -67,20 +67,27 @@ export class CLIWorkbenchCatalogService {
     tool: CLIWorkbenchTool
   ): Promise<ICLIWorkbenchToolCatalog> {
     let executable: string
+    let toolEnv: Record<string, string | undefined>
     try {
-      executable = resolveCLIWorkbenchTool(tool)
+      const resolved = resolveCLIWorkbenchTool(tool)
+      executable = resolved.executable
+      toolEnv = resolved.env
     } catch {
       return this.unavailable(tool)
     }
 
-    const versionResult = await this.capture(executable, ['--version'])
+    const versionResult = await this.capture(
+      executable,
+      ['--version'],
+      toolEnv
+    )
     if (versionResult.spawnFailed || versionResult.exitCode !== 0) {
       return this.unavailable(tool)
     }
 
     const version = parseCLIWorkbenchVersion(tool, versionResult.stdout)
     if (tool === 'git') {
-      const help = await this.capture(executable, ['help', '-a'])
+      const help = await this.capture(executable, ['help', '-a'], toolEnv)
       if (help.exitCode !== 0 || help.truncated || help.timedOut) {
         return this.catalogFailure(tool, version)
       }
@@ -91,8 +98,8 @@ export class CLIWorkbenchCatalogService {
     }
 
     const [reference, help] = await Promise.all([
-      this.capture(executable, ['help', 'reference']),
-      this.capture(executable, ['help']),
+      this.capture(executable, ['help', 'reference'], toolEnv),
+      this.capture(executable, ['help'], toolEnv),
     ])
     let entries =
       reference.exitCode === 0 && !reference.truncated && !reference.timedOut
@@ -141,7 +148,8 @@ export class CLIWorkbenchCatalogService {
 
   private capture(
     executable: string,
-    args: ReadonlyArray<string>
+    args: ReadonlyArray<string>,
+    toolEnv: Record<string, string | undefined>
   ): Promise<ICapturedCommand> {
     return new Promise(resolve => {
       let child: ChildProcessWithoutNullStreams
@@ -149,7 +157,7 @@ export class CLIWorkbenchCatalogService {
         child = spawn(executable, [...args], {
           cwd: dirname(process.execPath),
           env: {
-            ...process.env,
+            ...toolEnv,
             GH_PAGER: 'cat',
             GIT_PAGER: 'cat',
             LANG: 'C',

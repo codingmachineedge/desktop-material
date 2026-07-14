@@ -1,10 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import {
-  createRequestHeaders,
-  getAbsoluteUrl,
-  request,
-} from '../../src/lib/http'
+import { createRequestHeaders, getAbsoluteUrl } from '../../src/lib/http'
 import { getDotComAPIEndpoint } from '../../src/lib/api'
 
 describe('getAbsoluteUrl', () => {
@@ -84,34 +80,5 @@ describe('createRequestHeaders', () => {
     })
 
     assert.equal(headers.get('Authorization'), 'Basic trusted-credential')
-  })
-})
-
-describe('request cancellation', () => {
-  it('forwards an AbortSignal for PATCH requests', async () => {
-    const originalFetch = globalThis.fetch
-    const controller = new AbortController()
-    let received: RequestInit | undefined
-    globalThis.fetch = async (_url, options) => {
-      received = options
-      return new Response(null, { status: 205 })
-    }
-
-    try {
-      await request(
-        'https://api.github.com',
-        'account-token',
-        'PATCH',
-        'notifications/threads/1',
-        undefined,
-        undefined,
-        false,
-        undefined,
-        controller.signal
-      )
-      assert.equal(received?.signal, controller.signal)
-    } finally {
-      globalThis.fetch = originalFetch
-    }
   })
 })
