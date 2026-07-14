@@ -50,33 +50,6 @@ describe('File History native UI contracts', () => {
     assert.match(ui, /aria-selected=/)
     assert.match(ui, /aria-live="polite"/)
     assert.match(ui, /controller\.signal/)
-    assert.match(ui, /onPointerDown=\{this\.onPanelPointerDown\}/)
-    assert.match(ui, /Author email:/)
-    assert.match(ui, /className="sr-only">\{`Commit \$\{line\.sha\}`\}/)
     assert.match(ui, />\s*Retry/)
-  })
-
-  it('restores a reviewed commit version without exposing raw Git input', () => {
-    const ui = read('app/src/ui/file-history/file-history.tsx')
-    const git = read('app/src/lib/git/file-history.ts')
-    const style = read('app/styles/ui/_file-history.scss')
-
-    assert.match(ui, />\s*Restore this version/)
-    assert.match(ui, /role="alertdialog"/)
-    assert.match(ui, /restoreFileFromCommit\(/)
-    assert.match(ui, /onRefreshRepository\(\)/)
-    assert.match(ui, /onButtonRef=\{this\.onRestoreConfirmButtonRef\}/)
-    assert.match(ui, /onClick=\{this\.onConfirmRestoreClick\}/)
-    assert.match(ui, /onClick=\{this\.onRestoreGoBack\}/)
-    assert.match(ui, /onClick=\{this\.onRequestRestore\}/)
-    assert.match(
-      git,
-      /\['restore', `--source=\$\{sha\}`, '--worktree', '--', path\]/
-    )
-    assert.match(
-      style,
-      /\.file-history-restore-confirmation[\s\S]*overflow-x: hidden/
-    )
-    assert.doesNotMatch(ui, /command arguments|role="searchbox"/i)
   })
 })

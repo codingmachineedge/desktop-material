@@ -45,6 +45,22 @@ export type ValidatedGitHubAPIWorkbenchRequest =
 export const GitHubAPIWorkbenchInputCap = 1024 * 1024
 export const GitHubAPIWorkbenchResponseCap = 2 * 1024 * 1024
 
+export interface IGitHubAPIWorkbenchExecution {
+  readonly method: GitHubAPIWorkbenchMethod
+  readonly path: string
+  readonly body?: unknown
+}
+
+export interface IGitHubAPIWorkbenchResponse {
+  readonly status: number
+  readonly statusText: string
+  readonly headers: Readonly<Record<string, string>>
+  readonly body: unknown
+  readonly contentType: string
+  readonly displayedBytes: number
+  readonly truncated: boolean
+}
+
 const credentialKey =
   /authorization|cookie|credential|password|private.?key|secret|signature|token/i
 const credentialTextPatterns = [
@@ -54,6 +70,26 @@ const credentialTextPatterns = [
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   /https?:\/\/[^\s/@:]+:[^\s/@]+@/gi,
 ]
+
+const visibleResponseHeaders = new Set([
+  'content-type',
+  'deprecation',
+  'link',
+  'location',
+  'retry-after',
+  'sunset',
+  'x-accepted-github-permissions',
+  'x-accepted-oauth-scopes',
+  'x-github-api-version-selected',
+  'x-github-enterprise-version',
+  'x-github-request-id',
+  'x-oauth-scopes',
+  'x-ratelimit-limit',
+  'x-ratelimit-remaining',
+  'x-ratelimit-reset',
+  'x-ratelimit-resource',
+  'x-ratelimit-used',
+])
 
 function inputBytes(value: string): number {
   return new TextEncoder().encode(value).length
@@ -203,6 +239,42 @@ export function assessGitHubAPIWorkbenchRequest(
   }
 }
 
+/**
+ * Convert validated form state into the one exact GitHub request the API
+ * layer may execute. Mutations never cross this boundary without an explicit
+ * confirmation from the interactive surface.
+ */
+export function prepareGitHubAPIWorkbenchExecution(
+  request: GitHubAPIWorkbenchRequest,
+  confirmed: boolean = false
+): IGitHubAPIWorkbenchExecution {
+  const assessment = assessGitHubAPIWorkbenchRequest(request)
+  if (assessment.requiresConfirmation && !confirmed) {
+    throw new Error('Confirm this GitHub API mutation before running it.')
+  }
+
+  const validated = validateGitHubAPIWorkbenchRequest(request)
+  if (validated.mode === 'rest') {
+    return {
+      method: validated.method,
+      path: validated.path,
+      body: validated.body === undefined ? undefined : validated.body,
+    }
+  }
+
+  return {
+    method: 'POST',
+    path: 'graphql',
+    body: {
+      query: validated.query,
+      variables: validated.variables,
+      ...(validated.operationName === undefined
+        ? {}
+        : { operationName: validated.operationName }),
+    },
+  }
+}
+
 export function formatGitHubAPIWorkbenchPreview(
   request: GitHubAPIWorkbenchRequest
 ): string {
@@ -228,6 +300,115 @@ function redactString(value: string): string {
     (current, pattern) => current.replace(pattern, '[redacted]'),
     value
   )
+}
+
+function getVisibleResponseHeaders(
+  headers: Headers
+): Readonly<Record<string, string>> {
+  const result: Record<string, string> = {}
+  headers.forEach((value, name) => {
+    const normalizedName = name.toLowerCase()
+    if (visibleResponseHeaders.has(normalizedName)) {
+      result[normalizedName] = redactString(value)
+    }
+  })
+  return result
+}
+
+async function readBoundedResponseBytes(
+  response: Response,
+  cap: number
+): Promise<{ readonly bytes: Uint8Array; readonly truncated: boolean }> {
+  if (response.body === null) {
+    return { bytes: new Uint8Array(), truncated: false }
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Array<Uint8Array> = []
+  let displayedBytes = 0
+  let truncated = false
+
+  try {
+    while (displayedBytes < cap) {
+      const next = await reader.read()
+      if (next.done) {
+        break
+      }
+
+      const remaining = cap - displayedBytes
+      if (next.value.byteLength > remaining) {
+        chunks.push(next.value.slice(0, remaining))
+        displayedBytes += remaining
+        truncated = true
+        break
+      }
+
+      chunks.push(next.value)
+      displayedBytes += next.value.byteLength
+    }
+
+    if (!truncated && displayedBytes === cap) {
+      const next = await reader.read()
+      truncated = !next.done
+    }
+  } finally {
+    if (truncated) {
+      await reader.cancel().catch(() => undefined)
+    } else {
+      reader.releaseLock()
+    }
+  }
+
+  const bytes = new Uint8Array(displayedBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return { bytes, truncated }
+}
+
+/**
+ * Read only the bounded, safe-to-display portion of a GitHub response. The
+ * result contains an allowlist of diagnostic/rate-limit headers and a deeply
+ * redacted JSON or text body; authentication headers never enter UI state.
+ */
+export async function readGitHubAPIWorkbenchResponse(
+  response: Response,
+  cap: number = GitHubAPIWorkbenchResponseCap
+): Promise<IGitHubAPIWorkbenchResponse> {
+  if (
+    !Number.isSafeInteger(cap) ||
+    cap < 1 ||
+    cap > GitHubAPIWorkbenchResponseCap
+  ) {
+    throw new Error(
+      `GitHub API response limits must be between 1 byte and ${GitHubAPIWorkbenchResponseCap} bytes.`
+    )
+  }
+
+  const { bytes, truncated } = await readBoundedResponseBytes(response, cap)
+  const contentType = response.headers.get('content-type') ?? ''
+  const text = new TextDecoder().decode(bytes)
+  let body: unknown = text
+
+  if (/\bjson\b|\+json\b/i.test(contentType) && text.length > 0) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      // A truncated JSON document is intentionally displayed as bounded text.
+    }
+  }
+
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    headers: getVisibleResponseHeaders(response.headers),
+    body: redactGitHubAPIWorkbenchValue(body),
+    contentType,
+    displayedBytes: bytes.byteLength,
+    truncated,
+  }
 }
 
 /** Remove credential-shaped values before a response reaches UI or logs. */

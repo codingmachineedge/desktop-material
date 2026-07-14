@@ -92,11 +92,6 @@ import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
 import { FileHistory } from './file-history'
-import { SparseCheckoutManager } from './sparse-checkout'
-import { CreateGitHubIssueDialog } from './create-github-issue'
-import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
-import { GitHubPullRequestLifecycleDialog } from './github-pull-request-lifecycle'
-import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
@@ -1914,74 +1909,6 @@ export class App extends React.Component<IAppProps, IAppState> {
             key={`file-history-${popup.repository.id}-${popup.path}`}
             repository={popup.repository}
             path={popup.path}
-            onRefreshRepository={this.getOnRefreshRepositoryFn(
-              popup.repository
-            )}
-            onDismissed={onPopupDismissedFn}
-          />
-        )
-      case PopupType.CreateGitHubIssue:
-        return (
-          <CreateGitHubIssueDialog
-            key={`create-github-issue-${popup.repository.id}`}
-            repository={popup.repository}
-            accounts={this.state.accounts}
-            dispatcher={this.props.dispatcher}
-            onDismissed={onPopupDismissedFn}
-          />
-        )
-      case PopupType.CreateGitHubPullRequest: {
-        const selection = this.state.selectedState
-        const repositoryContextCurrent =
-          selection !== null &&
-          selection.type === SelectionType.Repository &&
-          selection.repository.id === popup.repository.id &&
-          selection.repository.hash === popup.repository.hash &&
-          selection.state.branchesState.tip.kind === TipState.Valid &&
-          getGitHubPullRequestContextVersion(
-            selection.repository,
-            selection.state.branchesState.tip.branch,
-            selection.state.remote
-          ) === popup.contextVersion
-
-        return (
-          <CreateGitHubPullRequestDialog
-            key={`create-github-pull-request-${popup.repository.id}`}
-            repository={popup.repository}
-            currentBranch={popup.currentBranch}
-            sourceRemote={popup.sourceRemote}
-            providerHTMLURL={popup.providerHTMLURL}
-            targets={popup.targets}
-            initialTargetHash={popup.initialTargetHash}
-            initialBaseBranchName={popup.initialBaseBranchName}
-            contextVersion={popup.contextVersion}
-            repositoryContextCurrent={repositoryContextCurrent}
-            accounts={this.state.accounts}
-            dispatcher={this.props.dispatcher}
-            onDismissed={onPopupDismissedFn}
-          />
-        )
-      }
-      case PopupType.GitHubPullRequestLifecycle:
-        return (
-          <GitHubPullRequestLifecycleDialog
-            key={`github-pull-request-lifecycle-${popup.repository.id}-${popup.pullRequest.pullRequestNumber}`}
-            repository={popup.repository}
-            pullRequest={popup.pullRequest}
-            baseBranchNames={popup.baseBranchNames}
-            accounts={this.state.accounts}
-            dispatcher={this.props.dispatcher}
-            onDismissed={onPopupDismissedFn}
-          />
-        )
-      case PopupType.SparseCheckout:
-        return (
-          <SparseCheckoutManager
-            key={`sparse-checkout-${popup.repository.id}`}
-            repository={popup.repository}
-            onRefreshRepository={this.getOnRefreshRepositoryFn(
-              popup.repository
-            )}
             onDismissed={onPopupDismissedFn}
           />
         )

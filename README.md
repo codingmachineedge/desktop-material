@@ -113,71 +113,40 @@ privacy scan, artifact purge, and owned-resource cleanup are complete.
 
 ## Roadmaps
 
-These are living delivery roadmaps for Desktop Material. **Implementation done**
-means the named source, focused regressions, and review fixes are committed and
-pushed. **Acceptance done** is a separate closing state that additionally
-requires the exact production build, off-screen interaction, inspected
-identity-safe screenshots, exhaustive repository gates, and published `main`
-evidence.
+These are living delivery roadmaps for the active `mega-feature-update` branch. An item moves to **Done** only after its implementation and focused checks are committed and pushed. UI milestones additionally require an off-screen production build, interactive exercise, and inspected screenshots before the evidence and documentation tasks can be marked done.
 
-Last updated: **July 13, 2026**. The current closing checklist is the
-[guided final-gate run manifest](.codex/run-manifests/2026-07-13-guided-final-gate.md);
-the earlier inventory and proof history remains in the
-[Git, GitHub, and GitKraken parity manifest](.codex/run-manifests/2026-07-12-git-gh-interactive-audit.md).
+Last updated: **July 12, 2026**. The detailed, reproducible evidence ledger is the [Git, GitHub, and GitKraken parity run manifest](.codex/run-manifests/2026-07-12-git-gh-interactive-audit.md).
 
 ### Delivery roadmap
 
 | Status | Milestone | Completion evidence |
 |---|---|---|
-| **Done** | Inventory the installed Git 2.55 and GitHub CLI 2.96 command trees | Complete command catalogs are parsed internally for coverage tracking rather than presented as a command-search product |
-| **Done** | Inventory the official GitHub REST and GraphQL surfaces | REST baseline: 790 paths, 1,196 operations, and 51 categories; GraphQL baseline: 252 current mutations, plus 16 deprecated mutations retained only for coverage accounting |
-| **Done** | Add a bounded recipe-execution foundation for guided functions | Internal `git`/`gh` execution only, no shell, repository-bound working directory, output/input limits, cancellation, ownership cleanup, credential-command blocking, and no raw command/API search surface in the app |
-| **Done** | Run repository functions through the bundled Git runtime | The production app resolves and executes bundled Git 2.53.0.windows.3, including Repository Tools, instead of depending on a separately installed system Git |
-| **Done** | Add safe GitHub feature request/response contracts | Selected-host relative paths, traversal rejection, mutation confirmation, bounded streamed responses, safe-header allowlisting, and deep credential redaction |
+| **Done** | Inventory the installed Git 2.55 and GitHub CLI 2.96 command trees | Complete command catalogs are parsed at runtime rather than maintained as a stale hard-coded list |
+| **Done** | Inventory the official GitHub REST and GraphQL surfaces | REST baseline: 790 paths, 1,196 operations, and 51 categories; GraphQL baseline: 32 query fields and 268 mutation fields |
+| **Done** | Add a bounded CLI execution foundation | `git`/`gh` only, no shell, repository-bound working directory, output/input limits, cancellation, ownership cleanup, credential-command blocking, and bundled-Git environment support |
+| **Done** | Add safe request contracts for a GitHub API workbench | Selected-host relative paths, traversal rejection, mutation confirmation, bounded streamed responses, safe-header allowlisting, and deep credential redaction |
 | **Done** | Extend native Actions controls | Run/job reruns, normal and force cancellation, workflow enable/disable, confirmations, and responsive long-metadata containment |
-| **Done** | Harden responsive containment on audited app surfaces | Settings, floating surfaces, the repository rail and toolbar, repository-function buttons, Merge All, Pull All, Build & Run, Actions, and the screenshot gallery wrap, stack, clamp, or vertically scroll instead of widening their page shells |
-| **Done** | Add the first guided repository-function batch | Status summary, repository health, recent-signature audit, maintenance preview/run, reflog recovery, ZIP/TAR export from `HEAD`, full-history bundle export, and read-only bundle verification use fixed safe recipes, purpose-built controls, confirmation, streaming results, exact cancel, native save/reveal, and repository refresh—without a raw command search/editor |
-| **Done** | Complete guarded full-history bundle export, verification, and import | An inspected bundle can create a new local branch without overwriting an existing ref; actual off-screen import completed, and standard bundle advertisements such as the pseudo-ref `HEAD` are ignored rather than rejected or offered as import targets |
-| **Done** | Keep Notifications identities and signed-out state responsive | Long local notification-source identities wrap within the panel, while the GitHub inbox presents a complete `No signed-in accounts` option without clipped or oversized text |
-| **Shipped** | Expand audited Git capabilities as named functions | Exact app source `5e80e678…` was production-built and exercised off-screen across shallow clone/deepening, sparse checkout, Repository Tools, Stash Manager, Remote Manager, and cross-account recovery; final `a0c2f194…` CI/release evidence is green |
-| **Shipped** | Expand named GitHub and provider functions on hardened transports | Exact app source `5e80e678…` was exercised against a synthetic loopback provider across native PR creation, Actions logs/artifacts, Releases, Issues, and provider triage; the exact public evidence is recorded in `HANDOFF.md` |
-| **Done** | Complete the official GitKraken Desktop history comparison | Official surviving 0.6–6.0 posts plus 7.x–12.3 release archives were deduplicated into current-app coverage, implementable local gaps, and explicitly separated proprietary/cloud services |
-| **Done** | Build and interactively verify representative changed UI off-screen | Exact app source `5e80e678…` passed the MCP production build and final hidden-desktop clone/Pull All/deepen plus Foundation/P0/P1/Later interactions. All 14 clean accepted frames come from that exact build and are recorded in PLAN/HANDOFF |
-| **Published** | Refresh README, wiki, Pages, and screenshot evidence | Union `a890ab579c…`, Pages run `29272714314`, wiki commit `9f9c8010c8…`, and all 40 raw-main/Pages PNG comparisons are verified; final code/release evidence is `a0c2f19433…` |
+| **Done** | Remove known compact-layout sideways overflow | Settings, floating surfaces, repository rail, toolbar, Merge All, Pull All, Build & Run, Actions, and screenshot gallery now wrap, stack, clamp, or vertically scroll at compact sizes |
+| **Active** | Expose the CLI foundation through an interactive Workbench | Searchable live catalog, safe previews, risk labels, destructive confirmation, streaming output, input, cancel, keyboard access, and repository refresh |
+| **Active** | Harden GitHub transport and expose the API foundation interactively | Current GitHub.com API versioning, credential/header precedence, REST operation picker, GraphQL document mode, permissions/rate limits, pagination, cancellation, and destructive confirmation |
+| **Active** | Complete the official GitKraken Desktop history comparison | Deduplicated 0.x–12.x feature matrix, current-app coverage, implementable local features, and clearly separated proprietary/cloud services |
+| **Blocked — environment** | Build and interactively verify every changed UI off-screen | The exact headless verifier passes preflight, but this checkout has no installed root dependencies or `cross-env`; the mandated no-download gate therefore refuses to launch an unbuilt app |
+| **Queued after build** | Refresh README, wiki, Pages, and screenshot evidence | Capture at desktop and compact widths, inspect original pixels for clipping/overlap/oversized text, record hashes, then publish the same verified state |
 
 ### Capability roadmap
 
-| Area | Implemented in the integration tree | Final acceptance evidence | Long-tail access |
+| Area | Available now | Next native interactive milestones | Long-tail access |
 |---|---|---|---|
-| **Git** | Core repository/branch/commit/diff workflows plus file history/blame/restore, signature audit, shallow clone/deepening, sparse checkout, archives, bundles, patch series, structured local-commit rewrite, signing, LFS, complete worktree administration, branch visibility, merge-tree conflict paths, guided bisect, Stash Manager, Remote Manager, and Repository Hooks Manager | Exact-build interaction at `5e80e678…`; final Windows/macOS CI and release at `a0c2f194…` | Fixed, audited Git recipes power named task controls; there is no raw command search/editor |
-| **GitHub** | Account-scoped Notifications; guided Issue and pull-request creation; complete PR template/metadata/review/update/close/reopen/merge lifecycle; Actions runs/logs/mutations/artifact pagination and bounded download/digest handling; effective branch rules; Releases/assets; and richer Issues | Synthetic exact-account interaction at `5e80e678…`; exact-`main` CI/release at `a0c2f194…` | `gh`, REST, and GraphQL may back provider-scoped functions internally; users see purpose-built forms, previews, confirmations, and results |
-| **Providers** | Exact-account GitHub/GitLab/Bitbucket repository triage with bounded Issue/PR projections, filters, attention buckets, safe links, and explicit unsupported/partial/capped/error states | Synthetic provider-triage interaction plus published responsive screenshots and exact-`main` gates are complete. Bitbucket Issues remain explicitly unsupported | Provider APIs remain adapters behind one neutral task surface; raw payloads, tokens, and repository paths are not retained |
-| **GitKraken parity references** | Graph, diff, history/blame, commit/stash/branch/remote/worktree flows, shallow/sparse controls, tabs, provider accounts, themes, search, automation, multi-window work, hooks/signing, richer PR/Issues triage, and conflict preview are represented by native guided functions | Validate the final responsive union and document any future independently selected local capability | Proprietary GitKraken cloud, enterprise, AI, and collaboration services remain reference points, not copied services, branding, or assets |
-
-### Native parity waves
-
-| Priority | Guided app functions | State |
-|---|---|---|
-| **Delivered foundation** | Repository status/health/maintenance/reflog tools; file history/blame and restore; bounded shallow clone/deepening; sparse checkout; source archives; full bundle export/verify/import; Notifications; and guided Issue creation | **SHIPPED** |
-| **P0** | Native pull-request compose plus templates/metadata/review/update/close/reopen/merge; Actions artifact redirect hardening, pagination, bounded download/digest/attestation context; effective branch rules | **SHIPPED** |
-| **P1** | Patch-series export/import; structured local-commit rewrite; Releases/assets; commit/tag signing; Git LFS; complete worktree lifecycle administration | **SHIPPED** |
-| **P2** | Persisted branch pin/hide/solo/restore controls | **SHIPPED** |
-| **Later** | Exact merge-tree conflict preview; guided bisect; complete Stash and Remote Managers; Repository Hooks Manager; richer GitHub Issues; provider-neutral triage | **SHIPPED** |
-| **Reference only** | GitKraken Cloud Workspaces/Patches, Team presence, Launchpad sync, Insights, Code Review service, shared AI credits, organization policy, and on-prem commercial services | **Not copied** |
+| **Git** | Core repository, branch, commit, diff, history, stash, remote, worktree, merge, rebase, fetch/pull/push, automation, and guarded cleanup workflows | Archive/bundle and patch exchange; richer blame/file history; signature verification; reflog recovery and repository health; complete remote/worktree/stash administration; bisect, sparse/shallow, range-diff, notes, grep, and config tools | The repository-bound CLI Workbench keeps the full installed `git` catalog reachable with explicit argv and risk review |
+| **GitHub CLI** | Native repository, pull-request reading, Actions browsing/logs/dispatch/rerun/cancel, account, organization, clone, fork, and publish foundations | Notifications; complete issue and PR authoring/review/merge; releases/assets; labels/milestones; rulesets/settings/collaborators; Actions artifacts/caches/runners/secrets/variables/environments; Projects and Discussions | The CLI Workbench keeps the full installed `gh` catalog reachable while blocking credential-revealing commands |
+| **GitHub REST and GraphQL** | Account-scoped API layer plus safe Workbench request/confirmation/redaction contracts | Version and permission awareness; schema-driven REST; parsed GraphQL queries/mutations; rate limits; bounded pagination; security, deployment, Pages, organization, team, and administration surfaces | The API Workbench will cover supported operations without arbitrary hosts, token fields, shell execution, or unrestricted headers |
+| **GitKraken parity references** | Graph, diff, commit/stash/branch/remote/worktree flows, repository tabs, provider accounts, themes, search, automation, multi-window work, and many Material-native productivity tools | Evaluate blame/history, editor and terminal workflows, undo/redo breadth, shallow/sparse controls, branch pin/filter/activity, Gitflow/hooks/signing, richer PR/issues/Launchpad-style triage, conflict prevention, and agent-session worktrees | Proprietary GitKraken cloud, enterprise, AI, and collaboration services remain reference points, not copied services, branding, or assets |
 
 ### Verification roadmap
 
-- Do not require sideways scrolling in page or dialog shells wherever responsive wrapping or stacking can preserve usability. Horizontal scrolling is reserved for intrinsically spatial code, diff, and log surfaces.
+- Keep page and dialog shells free of horizontal scrolling wherever responsive wrapping or stacking can preserve usability; only bounded code, diff, log, and JSON panes may scroll sideways.
 - Verify desktop and minimum supported windows, 50–200% UI scaling, light/dark themes, long repository/branch/host names, destructive confirmations, keyboard focus, and screen-reader labels.
 - Commit and push each coherent milestone. Documentation and screenshots must name the exact verified commit and must never claim an unbuilt state was exercised.
-
-#### Closing evidence checklist
-
-- [x] Record accepted app source `5e80e678d062b65a82c0991b352e5a861c7469e5` and its successful exact MCP production build; repeat exhaustive repository gates after the documentation/image union is final.
-- [x] Exercise that exact production bundle on one isolated off-screen desktop, including deterministic cross-account clone recovery and representative Foundation/P0/P1/Later surfaces.
-- [x] Inspect all 14 synthetic-only exact-`5e80e678…` capture candidates at original resolution and record dimensions, bytes, and SHA-256; promote only those exact files with the final documentation union.
-- [x] Merge the accepted tree to `main`; verify CI `29274841990`, Pages `29272714314`, wiki `9f9c8010c8…`, installer `29274842059`, public release `v3.6.3-beta3-b0000000083`, and every downloaded asset digest.
-- [x] Verify owned processes, desktops, credentials, fixtures, worktrees, and temporary roots are removed; leave `main` clean and equal to `origin/main`, Actions enabled, and the artifact inventory empty.
 
 ## Screenshots
 

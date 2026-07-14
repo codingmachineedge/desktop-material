@@ -83,6 +83,7 @@ import {
 } from '../lib/filter-list-mode'
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
+import { generateStashListContextMenu } from '../stashing/stash-list-item-context-menu'
 import { createFileHistoryMenuItem } from '../file-history'
 
 export interface IChangesListItem extends IFilterListItem {

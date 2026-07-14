@@ -19,7 +19,7 @@
 ## Verification outcome
 
 - Exact MCP endpoint preflight: passed with `startup_status.ok=true`; the installed task is running as `LowLevelComputerUseMCP`
-- Runtime task action: `%USERPROFILE%\Documents\GitHub\lowlevel-computer-use-mcp\.venv\Scripts\python.exe -m lowlevel_computer_use_mcp.server --http --host 127.0.0.1 --port 8765`, working directory `%USERPROFILE%\Documents\GitHub\lowlevel-computer-use-mcp`
+- Runtime task action: `C:\Users\Administrator\Documents\GitHub\lowlevel-computer-use-mcp\.venv\Scripts\python.exe -m lowlevel_computer_use_mcp.server --http --host 127.0.0.1 --port 8765`, working directory `C:\Users\Administrator\Documents\GitHub\lowlevel-computer-use-mcp`
 - MCP checkout SHA: `806d9ba85e4afbc2af58d7499496babfa7c68891`
 - Reproducible build gate: blocked before compilation because the MCP service environment has no installed `yarn` command; the required no-download command returned `spawn yarn ENOENT`
 - GUI/evidence cleanup ledger: no fixture, user-data path, headless desktop, Electron process, HWND, or screenshot was created because the build prerequisite failed

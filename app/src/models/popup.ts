@@ -40,10 +40,6 @@ export enum PopupType {
   SettingsHistory = 'SettingsHistory',
   NotificationHistory = 'NotificationHistory',
   FileHistory = 'FileHistory',
-  CreateGitHubIssue = 'CreateGitHubIssue',
-  CreateGitHubPullRequest = 'CreateGitHubPullRequest',
-  GitHubPullRequestLifecycle = 'GitHubPullRequestLifecycle',
-  SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
   AddRepository = 'AddRepository',
   CreateRepository = 'CreateRepository',
@@ -177,25 +173,6 @@ export type PopupDetail =
   | { type: PopupType.SettingsHistory }
   | { type: PopupType.NotificationHistory }
   | { type: PopupType.FileHistory; repository: Repository; path: string }
-  | { type: PopupType.CreateGitHubIssue; repository: Repository }
-  | {
-      type: PopupType.CreateGitHubPullRequest
-      repository: RepositoryWithGitHubRepository
-      currentBranch: Branch
-      sourceRemote: IRemote | null
-      providerHTMLURL: string
-      targets: ReadonlyArray<IGitHubPullRequestTarget>
-      initialTargetHash: string
-      initialBaseBranchName: string | null
-      contextVersion: string
-    }
-  | {
-      type: PopupType.GitHubPullRequestLifecycle
-      repository: RepositoryWithGitHubRepository
-      pullRequest: PullRequest
-      baseBranchNames: ReadonlyArray<string>
-    }
-  | { type: PopupType.SparseCheckout; repository: Repository }
   | { type: PopupType.MergeAll; repository: Repository; mode: MergeAllMode }
   | { type: PopupType.PullAllRepositories }
   | {
@@ -607,16 +584,15 @@ export type PopupDetail =
 export type Popup = IBasePopup & PopupDetail
 
 /**
- * History managers and repository utility sheets are non-modal, and background
- * progress popups stay interactive while repository work continues. Every
- * other popup still blocks global actions, even when one of these is stacked
- * above it.
+ * History managers are non-modal side sheets, and the batch clone progress
+ * popup is non-modal so the app stays interactive while repositories clone or
+ * pull in the background. Every other popup still blocks global actions, even
+ * when one of these is stacked above it.
  */
 const nonModalHistoryPopupTypes = new Set<PopupType>([
   PopupType.SettingsHistory,
   PopupType.NotificationHistory,
   PopupType.FileHistory,
-  PopupType.SparseCheckout,
   PopupType.BatchCloneProgress,
   PopupType.ChangeRepositoryGroupName,
   PopupType.PullAllRepositories,

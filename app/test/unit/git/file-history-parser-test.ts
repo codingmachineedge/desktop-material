@@ -1,12 +1,10 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import { resolve } from 'node:path'
 
 import {
   FileBlameLineLimit,
   FileHistoryUnavailableError,
   normalizeFileHistoryPath,
-  normalizeFileHistoryCommitSHA,
   parseFileBlamePorcelain,
 } from '../../../src/lib/git/file-history-parser'
 
@@ -38,39 +36,15 @@ filename src/engine.ts
 `
 
 describe('git/file-history-parser', () => {
-  it('accepts only complete SHA-1 and SHA-256 restore sources', () => {
-    assert.equal(
-      normalizeFileHistoryCommitSHA('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'),
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    )
-    assert.equal(normalizeFileHistoryCommitSHA('b'.repeat(64)), 'b'.repeat(64))
-    for (const revision of ['HEAD', 'abc123', 'a'.repeat(39), 'g'.repeat(40)]) {
-      assert.throws(
-        () => normalizeFileHistoryCommitSHA(revision),
-        (error: unknown) =>
-          error instanceof FileHistoryUnavailableError &&
-          error.kind === 'invalid-revision'
-      )
-    }
-  })
   it('contains repository-relative paths before invoking Git', () => {
-    const repositoryPath = resolve('file-history-fixtures', 'repository')
-    for (const path of ['src\\feature/file.ts', 'src/feature/file.ts']) {
-      assert.equal(
-        normalizeFileHistoryPath(repositoryPath, path),
-        'src/feature/file.ts'
-      )
-    }
+    assert.equal(
+      normalizeFileHistoryPath('C:\\repo', 'src\\feature/file.ts'),
+      'src/feature/file.ts'
+    )
 
-    for (const path of [
-      '',
-      '..\\secret',
-      '../secret',
-      resolve(repositoryPath, '..', 'secret.txt'),
-      'src/../../x',
-    ]) {
+    for (const path of ['', '..\\secret', 'C:\\secret.txt', 'src/../../x']) {
       assert.throws(
-        () => normalizeFileHistoryPath(repositoryPath, path),
+        () => normalizeFileHistoryPath('C:\\repo', path),
         (error: unknown) =>
           error instanceof FileHistoryUnavailableError &&
           error.kind === 'invalid-path'
