@@ -33,7 +33,24 @@ runs:
 
     - name: Install and build dependencies
       shell: bash
-      run: yarn
+      run: |
+        # Native packages such as dugite download platform archives during
+        # postinstall. Hosted runners can occasionally lose that connection;
+        # retry the complete install a small, bounded number of times.
+        max_attempts=3
+        for attempt in $(seq 1 "$max_attempts"); do
+          if yarn; then
+            exit 0
+          fi
+
+          if [ "$attempt" -lt "$max_attempts" ]; then
+            delay=$((attempt * 15))
+            echo "Dependency installation failed; retrying in ${delay}s (attempt $((attempt + 1))/${max_attempts})..."
+            sleep "$delay"
+          fi
+        done
+
+        exit 1
       env:
         npm_config_arch: ${{ inputs.arch }}
         TARGET_ARCH: ${{ inputs.arch }}
