@@ -19,6 +19,13 @@ describe('Repository tools responsive styles', () => {
     assert.match(styles, /\.repository-tools-output[\s\S]*overflow-x: hidden/)
   })
 
+  it('overrides the Material card frame with an owned vertical scroll region', () => {
+    assert.match(
+      styles,
+      /#repository\s*>\s*\.repository-tools\s*\{[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;[\s\S]*?overscroll-behavior: contain;[\s\S]*?scrollbar-gutter: stable;/
+    )
+  })
+
   it('stacks results and controls at compact and zoomed widths', () => {
     assert.match(styles, /@media \(max-width: 1120px\)/)
     assert.match(

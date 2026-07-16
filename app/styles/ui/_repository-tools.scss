@@ -558,6 +558,16 @@
   padding: 20px;
 }
 
+// The Material card frame applies `overflow: hidden` to every direct repository
+// pane with an ID-qualified selector. Repository tools is a long document, so it
+// must explicitly win that cascade and own the vertical scroll region.
+#repository > .repository-tools {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .repository-tools-header {
   align-items: flex-start;
   display: flex;
