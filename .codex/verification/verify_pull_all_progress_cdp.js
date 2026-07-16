@@ -198,7 +198,9 @@ async function main() {
   const page = await getRenderer(browser)
 
   if (options.action === 'skip-onboarding') {
-    const skip = page.getByRole('button', { name: 'Skip this step' })
+    const skip = page.getByRole('button', {
+      name: 'Continue without signing in',
+    })
     if (await skip.isVisible()) {
       await skip.click()
     }
