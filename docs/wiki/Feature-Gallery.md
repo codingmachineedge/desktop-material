@@ -7,7 +7,8 @@ metadata; no personal path, credential, or account identifier belongs in the ima
 > **Publication status:** The gallery includes the July 14, 2026 Actions cache and headless
 > pagination evidence, the Pages accessibility/clipping gate, and seven inspected July 16 adaptive
 > customization captures. Exact build, interaction, and privacy receipts are retained in
-> `HANDOFF.md`; main, CI, Pages, and wiki publication are verified against the promoted commit.
+> `HANDOFF.md`; all current roadmap maintenance is complete, and main, CI, Pages, and the
+> seven-page wiki are verified against the promoted release.
 
 The verified adaptive customization maintenance release adds guarded tab
 close/arrange, Actions cancellation, reviewed rebase, repository-account

@@ -34,6 +34,15 @@ repository-account propagation, bounded OAuth scopes, and compact-surface
 corrections. Its detailed acceptance receipt and seven inspected captures are
 recorded below.
 
+The final feature-completeness audit closes every current roadmap maintenance
+item. Detailed Pull All progress passed its production/headless/a11y gate at
+`1bc8a226de`; exact shipped commit `36197bf6dd` then passed CI run
+`29490902486` and installer run `29490902407`. Pages run `29489043545`
+deployed the current 51-image gallery, and the public seven-page wiki carries
+the same inspected release documentation. A final focused checkout pass added
+37/37 green registration, Pull All, checkbox, compact-style, and Pages-gallery
+tests to those repository-wide and off-screen receipts.
+
 ## 2026-07-13 P0 production UI gate
 
 The exact unpackaged production build passed with:

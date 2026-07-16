@@ -35,3 +35,30 @@
 - Git publication: direct `origin/main` is authorized. Reject divergence, push
   without force, verify remote SHA and CI/Pages, then delete only branches
   proven merged and remove only worktrees tied to those merged branches.
+
+## Completion receipt
+
+- The registered-surface inventory is enforced by
+  `app/test/unit/feature-registration-completeness-test.ts`: every `PopupType`,
+  Preferences tab, repository section, public agent command, and M0–M19
+  implementation path is registered and reachable.
+- The detailed Pull All gate at `1bc8a226de` passed 1,041 unit tests, 15 script
+  tests, focused progress/style/checkbox coverage, TypeScript, formatting,
+  lint, the exact production build, and an inspected 1000×688 renderer with no
+  unnamed repository checkboxes or horizontal overflow. The live result region
+  and final action remained reachable.
+- The July 16 release gate tested exact application source `c5205838df` through
+  the production build and isolated off-screen interaction. The only later
+  application-tree change through `36197bf6dd` was a portable-path correction
+  in a tab-action test; the shipped renderer source did not change.
+- Exact commit `36197bf6dd` passed CI run `29490902486` (lint, production
+  builds/packages, unit and script tests, and Windows/macOS end-to-end smoke)
+  and installer run `29490902407`. Pages run `29489043545` successfully
+  deployed the current site and screenshot payload.
+- A final focused checkout pass ran 37 feature-registration, Pull All,
+  checkbox-accessibility, compact-style, and Pages-gallery tests with 37
+  passing. The public Pages and seven-page wiki expose the inspected 51-image
+  synthetic gallery.
+- The remaining roadmap edits are documentation-only. No application source,
+  screenshots, credentials, provider data, or user-specific paths change in
+  the closure commit.

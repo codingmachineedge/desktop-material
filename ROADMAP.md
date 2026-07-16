@@ -31,9 +31,9 @@ receipts stay in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 | **M18** | **Complete** | Material Design 3 shell, responsive layouts, keyboard focus, accessibility, and clipping coverage. |
 | **M19** | **Complete** | Guided Git/GitHub/provider parity: PR lifecycle, Releases, Issues, rules, patch series, commit rewrite, signing, LFS, worktrees, remotes, hooks, bisect, and triage. |
 
-No feature wave is marked unfinished. New work is maintenance: it must close a
-specific issue, pass the acceptance gates below, and be documented before it is
-described as shipped.
+No feature wave or current maintenance item is unfinished. New work must close
+a specific issue, pass the acceptance gates below, and be documented before it
+is described as shipped.
 
 ## Current maintenance acceptance
 
@@ -47,8 +47,8 @@ described as shipped.
 | Reviewed current-branch rebase | **Complete** | Verified target search, current→target and ahead/behind context, bounded commit preview, fresh dirty/conflict/operation guards, exact ref/SHA revalidation, cancel-before-start, conflict continue/abort routing, protected-branch guidance, and no automatic force push. |
 | Provider account binding and OAuth scope alignment | **Complete** | Verified repository-settings binding propagation without reopening, unique-match auto-binding, explicit multiple-account choice, no-match/stale/permission/SSO recovery, generation safety, no silent replacement of a valid binding, and the bounded `repo user workflow notifications read:org` sign-in scope set. |
 | Compact Repository Tools, Remote Manager, and Regex Builder | **Complete** | Verified vertical reachability at short heights; readable remote name/URL/control columns before a stacked fallback; reflowed Regex Builder categories/tokens with a scrollable body and reachable footer; named controls, focus, zoom, and no page-level horizontal overflow. |
-| Detailed Pull All progress | **In verification** | Live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window clipping review, screenshot, tests, and push to `main`. |
-| Repository-wide feature revalidation | **In progress** | Registered-surface inventory, implementation/test/doc mapping, full tests, production build, headless UI exercise, CI, and Pages. |
+| Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on `main`. |
+| Repository-wide feature revalidation | **Complete** | Verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and the 51-image documentation gallery. |
 | Documentation gallery expansion | **Complete** | Seven inspected, privacy-safe adaptive-customization captures are referenced from README, wiki, Pages, and tutorial; the guided gallery now contains 51 images. |
 
 ## Acceptance gates

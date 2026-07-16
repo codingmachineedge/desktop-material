@@ -20,7 +20,8 @@ The post-M19 adaptive customization maintenance release described below is
 shipped on `main`. Its exact production build, off-screen interaction review,
 compact and zoomed layout checks, safety boundaries, and seven privacy-safe
 captures are recorded in [`HANDOFF.md`](HANDOFF.md); the existing M0–M19
-receipts remain historical evidence for their original releases.
+receipts remain historical evidence for their original releases. All current
+maintenance acceptance items are complete.
 
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu
@@ -127,7 +128,7 @@ receipts remain historical evidence for their original releases.
 
 ## Roadmap
 
-The complete M0–M19 status, current maintenance work, and acceptance rules now
+The complete M0–M19 status, completed maintenance work, and acceptance rules now
 live in [`ROADMAP.md`](ROADMAP.md). Detailed implementation and verification
 receipts remain in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 
