@@ -71,17 +71,21 @@ body {
   // their own independent widths, so this does not affect dropdown placement.
   // The app-bar chips are not user-resizable in the MD3 design — hide handles.
   .sidebar-section {
-    flex: 1 1 180px;
+    flex: 1 1 var(--toolbar-item-preferred-width);
     max-width: 280px;
     min-width: 0;
     width: auto !important;
   }
 
   .resizable-component {
-    flex: 1 1 180px;
+    flex: 1 1 auto;
     max-width: 280px !important;
     min-width: 0 !important;
     width: auto !important;
+  }
+
+  & > .toolbar-item.can-grow {
+    max-width: 280px;
   }
 
   // Keep dropdown buttons within the responsive wrapper. The foldout keeps
@@ -100,20 +104,20 @@ body {
   // Push the sync pill (the element wrapping the push/pull/fetch button) to the
   // right edge, leaving repo + branch grouped on the left.
   & > *:has(.push-pull-button) {
-    flex: 0 1 230px;
+    flex: 0 1 var(--toolbar-item-preferred-width);
     margin-left: auto;
     min-width: 130px !important;
   }
 
-  // Secondary actions keep their complete hit targets while their labels
-  // ellipsize under pressure. This prevents either action from becoming the
-  // toolbar's intrinsic-width escape hatch.
+  // Secondary actions share the live measured width set by Toolbar. When
+  // their copy would ellipsize, Build & Run and then Commit & Push move into
+  // More instead of becoming the app bar's intrinsic-width escape hatch.
   & > .toolbar-item:has(> .one-click-commit-push-button) {
-    flex: 0 1 180px;
+    flex: 0 1 var(--toolbar-item-preferred-width);
   }
 
   & > .toolbar-item:has(> .build-run-toolbar-button) {
-    flex: 0 1 210px;
+    flex: 0 1 var(--toolbar-item-preferred-width);
     min-width: 0;
 
     .build-run-primary {
@@ -455,10 +459,26 @@ body[data-dm-toolbar-density='compact'] #desktop-app-toolbar {
 body[data-dm-toolbar-labels='icons'] #desktop-app-toolbar {
   & > .toolbar-item.sidebar-section,
   & > .toolbar-item:has(> .resizable-component),
+  & > .toolbar-item:has(.push-pull-button),
   & > .toolbar-item:has(> .one-click-commit-push-button),
   & > .toolbar-item:has(> .build-run-toolbar-button) {
     flex: 0 1 92px;
     max-width: 92px !important;
+    min-width: 48px !important;
+  }
+
+  & > .toolbar-item:has(.push-pull-button) {
+    .ahead-behind {
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      padding: 0;
+      position: absolute;
+      white-space: nowrap;
+      width: 1px;
+    }
   }
 
   & > .toolbar-item .toolbar-button > button .text {
@@ -576,7 +596,15 @@ body[data-dm-toolbar-labels='icons'] #desktop-app-toolbar {
   }
 
   & > .toolbar-item .push-pull-button .ahead-behind {
-    display: none;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
   }
 
   & > .toolbar-item .build-run-toolbar-button {

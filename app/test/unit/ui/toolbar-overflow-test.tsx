@@ -40,6 +40,9 @@ class MountProbe extends React.Component {
 
 const originalWindowResizeObserver = (window as any).ResizeObserver
 const originalGlobalResizeObserver = globalThis.ResizeObserver
+let originalToolbarLabels: string | null = null
+let originalToolbarDensity: string | null = null
+let originalUIFont: string | null = null
 
 beforeEach(() => {
   ControlledResizeObserver.instances = []
@@ -47,11 +50,35 @@ beforeEach(() => {
   MountProbe.unmounts = 0
   ;(window as any).ResizeObserver = ControlledResizeObserver
   ;(globalThis as any).ResizeObserver = ControlledResizeObserver
+  originalToolbarLabels = document.body.getAttribute('data-dm-toolbar-labels')
+  originalToolbarDensity = document.body.getAttribute('data-dm-toolbar-density')
+  originalUIFont = document.body.getAttribute('data-dm-ui-font')
+  document.body.removeAttribute('data-dm-toolbar-labels')
+  document.body.removeAttribute('data-dm-toolbar-density')
+  document.body.removeAttribute('data-dm-ui-font')
 })
 
 afterEach(() => {
   ;(window as any).ResizeObserver = originalWindowResizeObserver
   ;(globalThis as any).ResizeObserver = originalGlobalResizeObserver
+  if (originalToolbarLabels === null) {
+    document.body.removeAttribute('data-dm-toolbar-labels')
+  } else {
+    document.body.setAttribute('data-dm-toolbar-labels', originalToolbarLabels)
+  }
+  if (originalToolbarDensity === null) {
+    document.body.removeAttribute('data-dm-toolbar-density')
+  } else {
+    document.body.setAttribute(
+      'data-dm-toolbar-density',
+      originalToolbarDensity
+    )
+  }
+  if (originalUIFont === null) {
+    document.body.removeAttribute('data-dm-ui-font')
+  } else {
+    document.body.setAttribute('data-dm-ui-font', originalUIFont)
+  }
 })
 
 function renderResponsiveToolbar(onBuild = () => {}) {
@@ -59,7 +86,22 @@ function renderResponsiveToolbar(onBuild = () => {}) {
   const view = render(
     <Toolbar id="test-toolbar" ariaLabel="Repository controls">
       <ToolbarItem id="repository" preferredWidth={100}>
-        <button type="button">Repository</button>
+        <div className="toolbar-button">
+          <button type="button">
+            <span className="text">
+              <span
+                className="title"
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Repository
+              </span>
+            </span>
+          </button>
+        </div>
       </ToolbarItem>
       <ToolbarItem
         id="one-click-commit-push"
@@ -107,6 +149,97 @@ function renderResponsiveToolbar(onBuild = () => {}) {
 }
 
 describe('responsive toolbar overflow', () => {
+  it('moves an optional action when a live label starts clipping', async () => {
+    const view = renderResponsiveToolbar()
+    const repositoryItem = view.container.querySelector<HTMLDivElement>(
+      '[data-toolbar-item-id="repository"]'
+    )!
+    const repositoryTitle = repositoryItem.querySelector<HTMLElement>(
+      '.toolbar-button .title'
+    )!
+    let scrollWidth = 90
+
+    Object.defineProperty(repositoryItem, 'clientWidth', {
+      configurable: true,
+      get: () => 100,
+    })
+    Object.defineProperty(repositoryTitle, 'clientWidth', {
+      configurable: true,
+      get: () => 60,
+    })
+    Object.defineProperty(repositoryTitle, 'scrollWidth', {
+      configurable: true,
+      get: () => scrollWidth,
+    })
+    view.setWidth(290)
+    await screen.findByRole('button', {
+      name: 'More toolbar actions (1)',
+    })
+
+    // A wider lane restores the exact same live control without remounting it.
+    view.setWidth(330)
+    await waitFor(() =>
+      assert.equal(
+        screen.queryByRole('button', { name: /More toolbar actions/ }),
+        null
+      )
+    )
+
+    // Presentation changes invalidate the retained measurement. Compact
+    // density can therefore reclaim room immediately.
+    view.setWidth(290)
+    await screen.findByRole('button', {
+      name: 'More toolbar actions (1)',
+    })
+    scrollWidth = 60
+    document.body.setAttribute('data-dm-toolbar-density', 'compact')
+    await waitFor(() =>
+      assert.equal(
+        screen.queryByRole('button', { name: /More toolbar actions/ }),
+        null
+      )
+    )
+
+    // Dynamic status/name copy is observed without a wrapper resize.
+    scrollWidth = 90
+    repositoryTitle.textContent = 'Repository updated'
+    await screen.findByRole('button', {
+      name: 'More toolbar actions (1)',
+    })
+
+    // Font changes are presentation changes too and may restore an action.
+    scrollWidth = 60
+    document.body.setAttribute('data-dm-ui-font', 'system')
+    await waitFor(() =>
+      assert.equal(
+        screen.queryByRole('button', { name: /More toolbar actions/ }),
+        null
+      )
+    )
+  })
+
+  it('uses the actual compact footprint for Icons only', async () => {
+    const view = renderResponsiveToolbar()
+    view.setWidth(285)
+    await screen.findByRole('button', {
+      name: 'More toolbar actions (1)',
+    })
+
+    document.body.setAttribute('data-dm-toolbar-labels', 'icons')
+    await waitFor(() =>
+      assert.equal(
+        screen.queryByRole('button', { name: /More toolbar actions/ }),
+        null
+      )
+    )
+    assert.equal(
+      screen
+        .getByRole('toolbar', { name: 'Repository controls' })
+        .classList.contains('toolbar-overflow-exhausted'),
+      false
+    )
+  })
+
   it('overflows in priority order, restores on widening, and keeps originals mounted', async () => {
     const view = renderResponsiveToolbar()
 

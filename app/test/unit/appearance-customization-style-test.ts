@@ -3,7 +3,8 @@ import assert from 'node:assert'
 import { readFile } from 'fs/promises'
 import * as Path from 'path'
 
-const styles = Path.resolve(__dirname, '../../styles')
+const app = Path.resolve(__dirname, '../..')
+const styles = Path.join(app, 'styles')
 
 describe('appearance customization style contracts', () => {
   it('defines curated light and dark accent role bundles', async () => {
@@ -34,5 +35,26 @@ describe('appearance customization style contracts', () => {
     assert.match(tabs, /data-dm-tab-density='compact'/)
     assert.match(tabs, /data-dm-tab-width='wide'/)
     assert.match(tabs, /data-dm-tab-close-buttons='always'/)
+  })
+
+  it('explains app and repository appearance scope in a Material tonal note', async () => {
+    const [appearance, preferences] = await Promise.all([
+      readFile(Path.join(app, 'src/ui/preferences/appearance.tsx'), 'utf8'),
+      readFile(Path.join(styles, 'ui/_preferences.scss'), 'utf8'),
+    ])
+
+    assert.match(appearance, /className="appearance-scope-note"/)
+    assert.match(appearance, /role="note"/)
+    assert.match(appearance, /active profile&apos;s local Git/)
+    assert.match(appearance, /Repository Settings/)
+
+    assert.match(
+      preferences,
+      /\.appearance-scope-note\s*\{[\s\S]*?var\(--md-sys-color-secondary-container\)/
+    )
+    assert.match(
+      preferences,
+      /\.appearance-scope-note-icon\s*\{[\s\S]*?var\(--md-sys-color-primary-container\)/
+    )
   })
 })

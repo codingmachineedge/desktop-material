@@ -47,6 +47,10 @@ describe('compact shell style contracts', () => {
       /> button\s*\{[\s\S]*?min-height: 40px;[\s\S]*?\.text\s*\{[\s\S]*?clip-path: inset\(50%\);/
     )
     assert.match(style, /#desktop-app-toolbar\.toolbar-overflow-exhausted/)
+    assert.match(
+      style,
+      /data-dm-toolbar-labels='icons'[\s\S]*?\.toolbar-item:has\(\.push-pull-button\)[\s\S]*?\.ahead-behind\s*\{[\s\S]*?clip-path: inset\(50%\);[\s\S]*?position: absolute;/
+    )
     assert.doesNotMatch(style, /#desktop-app-toolbar\s*\{\s*flex-wrap: wrap;/)
     assert.match(style, /\.toolbar-overflow-popover\s*\{/)
     assert.match(

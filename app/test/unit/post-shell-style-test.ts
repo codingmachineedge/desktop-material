@@ -148,21 +148,25 @@ describe('post-shell MD3 style contracts', () => {
     )
   })
 
-  it('keeps every app-bar control inside 1443x992 and 1450x997 viewports', () => {
+  it('lets measured app-bar controls yield to More before they clip', () => {
     const style = readRootStyle('_material-shell.scss')
 
     assert.match(style, /& > \* \{\s*min-width: 0;/)
     assert.match(
       style,
-      /\.resizable-component\s*\{[\s\S]*?flex: 1 1 180px;[\s\S]*?max-width: 280px !important;[\s\S]*?min-width: 0 !important;/
+      /\.resizable-component\s*\{[\s\S]*?flex: 1 1 auto;[\s\S]*?max-width: 280px !important;[\s\S]*?min-width: 0 !important;/
     )
     assert.match(
       style,
-      /& > \*:has\(\.push-pull-button\)\s*\{[\s\S]*?flex: 0 1 230px;[\s\S]*?min-width: 130px !important;/
+      /& > \*:has\(\.push-pull-button\)\s*\{[\s\S]*?flex: 0 1 var\(--toolbar-item-preferred-width\);[\s\S]*?min-width: 130px !important;/
     )
     assert.match(
       style,
-      /& > \.toolbar-item:has\(> \.build-run-toolbar-button\)\s*\{[\s\S]*?flex: 0 1 210px;[\s\S]*?min-width: 0;/
+      /& > \.toolbar-item:has\(> \.build-run-toolbar-button\)\s*\{[\s\S]*?flex: 0 1 var\(--toolbar-item-preferred-width\);[\s\S]*?min-width: 0;/
+    )
+    assert.match(
+      style,
+      /data-dm-toolbar-labels='icons'[\s\S]*?\.toolbar-item:has\(\.push-pull-button\)[\s\S]*?min-width: 48px !important;/
     )
   })
 

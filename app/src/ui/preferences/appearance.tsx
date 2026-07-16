@@ -26,6 +26,8 @@ import { assertNever } from '../../lib/fatal-error'
 import { BranchSortOrder } from '../../models/branch-sort-order'
 import { ShowBranchNameInRepoListSetting } from '../../models/show-branch-name-in-repo-list'
 import { IAppearanceCustomization } from '../../models/appearance-customization'
+import { Octicon } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 
 interface IAppearanceProps {
   readonly selectedTheme: ApplicationTheme
@@ -605,6 +607,23 @@ export class Appearance extends React.Component<
   public render() {
     return (
       <DialogContent>
+        <aside
+          className="appearance-scope-note"
+          role="note"
+          aria-labelledby="appearance-scope-note-title"
+        >
+          <span className="appearance-scope-note-icon">
+            <Octicon symbol={octicons.history} height={20} />
+          </span>
+          <div>
+            <h2 id="appearance-scope-note-title">App defaults</h2>
+            <p>
+              Changes here are saved in your active profile&apos;s local Git
+              history. For repository-only overrides, open{' '}
+              <strong>Repository Settings → Appearance</strong>.
+            </p>
+          </div>
+        </aside>
         {this.renderScaling()}
         {this.renderSelectedTheme()}
         {this.renderColorAndSurfaces()}

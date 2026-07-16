@@ -17,13 +17,21 @@ import {
 } from './toolbar-overflow-layout'
 
 const OverflowButtonWidth = 48
+const CompactToolbarItemWidth = 92
+const CompactToolbarMediaQuery = '(max-width: 760px), (max-height: 420px)'
+const MaximumMeasuredToolbarItemWidth = 320
+const MaximumGrowingToolbarItemWidth = 280
 
 // These descriptor props are read by Toolbar before React mounts ToolbarItem.
 /* eslint-disable react/no-unused-prop-types */
 export interface IToolbarItemProps {
   readonly children?: React.ReactNode
   readonly id: string
-  /** Width at which this control keeps its complete app-bar presentation. */
+  /**
+   * Fallback width for this control's complete app-bar presentation. Live
+   * ellipsis measurements can raise this value when dynamic labels need more
+   * room.
+   */
   readonly preferredWidth: number
   /** Lower values move into overflow first. Omit to pin the control. */
   readonly overflowPriority?: number
@@ -55,6 +63,12 @@ interface IToolbarState {
   readonly overflowedItemIds: ReadonlyArray<string>
   readonly overflowExhausted: boolean
   readonly overflowOpen: boolean
+  readonly itemPreferredWidths: Readonly<Record<string, number>>
+}
+
+interface IToolbarItemMeasurement {
+  readonly signature: string
+  readonly preferredWidth: number
 }
 
 interface IResolvedToolbarItem {
@@ -72,7 +86,9 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
     string,
     (element: HTMLDivElement | null) => void
   >()
+  private readonly itemMeasurements = new Map<string, IToolbarItemMeasurement>()
   private resizeObserver: ResizeObserver | null = null
+  private mutationObserver: MutationObserver | null = null
   private layoutFrame: number | null = null
   private readonly overflowHeadingId = createUniqueId(
     'toolbar-overflow-heading'
@@ -87,6 +103,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
       overflowedItemIds: [],
       overflowExhausted: false,
       overflowOpen: false,
+      itemPreferredWidths: {},
     }
   }
 
@@ -105,12 +122,26 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
       }
     }
 
+    const MutationObserverClass: typeof MutationObserver | undefined = (
+      window as any
+    ).MutationObserver
+    if (MutationObserverClass !== undefined) {
+      this.mutationObserver = new MutationObserverClass(this.scheduleLayout)
+      this.observeMutations()
+    }
+
     window.addEventListener('resize', this.scheduleLayout)
     this.scheduleLayout()
   }
 
-  public componentDidUpdate(prevProps: IToolbarProps) {
-    if (prevProps.children !== this.props.children) {
+  public componentDidUpdate(
+    prevProps: IToolbarProps,
+    prevState: IToolbarState
+  ) {
+    if (
+      prevProps.children !== this.props.children ||
+      prevState.overflowExhausted !== this.state.overflowExhausted
+    ) {
       this.scheduleLayout()
     }
   }
@@ -126,6 +157,8 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
     }
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    this.mutationObserver?.disconnect()
+    this.mutationObserver = null
     window.removeEventListener('resize', this.scheduleLayout)
     releaseUniqueId(this.overflowHeadingId)
     releaseUniqueId(this.overflowContentId)
@@ -154,6 +187,31 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
     if (element !== null) {
       this.resizeObserver?.observe(element)
     }
+    this.observeMutations()
+  }
+
+  private observeMutations() {
+    const observer = this.mutationObserver
+    if (observer === null) {
+      return
+    }
+
+    observer.disconnect()
+    if (this.toolbarElement !== null) {
+      observer.observe(this.toolbarElement, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      })
+    }
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: [
+        'data-dm-toolbar-labels',
+        'data-dm-toolbar-density',
+        'data-dm-ui-font',
+      ],
+    })
   }
 
   private getItemRef(id: string) {
@@ -196,6 +254,84 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
     })
   }
 
+  private usesCompactItemWidths() {
+    if (document.body.getAttribute('data-dm-toolbar-labels') === 'icons') {
+      return true
+    }
+
+    return (
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia(CompactToolbarMediaQuery).matches
+    )
+  }
+
+  /**
+   * Measure only labels which use real ellipsis. Wrapped status copy is a
+   * valid complete presentation and must not push actions into More.
+   * Measurements are retained for the same visible copy so hiding one action
+   * cannot immediately make another look roomy and cause resize oscillation.
+   */
+  private measureItemPreferredWidth(
+    item: IResolvedToolbarItem,
+    element: HTMLDivElement,
+    useCompactWidths: boolean
+  ): number {
+    const fallbackWidth = useCompactWidths
+      ? Math.min(item.element.props.preferredWidth, CompactToolbarItemWidth)
+      : item.element.props.preferredWidth
+    const labelElements = useCompactWidths
+      ? []
+      : Array.from(
+          element.querySelectorAll<HTMLElement>(
+            '.toolbar-button > button .title, .toolbar-button > button .description'
+          )
+        ).filter(label => {
+          const style = window.getComputedStyle(label)
+          return style.display !== 'none' && style.textOverflow === 'ellipsis'
+        })
+    const signature = `${
+      document.body.getAttribute('data-dm-toolbar-labels') ?? 'auto'
+    }\u001f${
+      document.body.getAttribute('data-dm-toolbar-density') ?? 'comfortable'
+    }\u001f${
+      document.body.getAttribute('data-dm-ui-font') ?? 'material'
+    }\u001f${useCompactWidths ? 'compact' : 'labels'}\u001f${labelElements
+      .map(label => label.textContent ?? '')
+      .join('\u001f')}`
+    const previous = this.itemMeasurements.get(item.id)
+
+    if (useCompactWidths) {
+      this.itemMeasurements.set(item.id, {
+        signature,
+        preferredWidth: fallbackWidth,
+      })
+      return fallbackWidth
+    }
+
+    const overflowDelta = this.state.overflowExhausted
+      ? 0
+      : labelElements.reduce(
+          (largest, label) =>
+            Math.max(largest, label.scrollWidth - label.clientWidth),
+          0
+        )
+    const allocatedWidth = element.clientWidth || fallbackWidth
+    const maximumWidth = item.element.props.canGrow
+      ? MaximumGrowingToolbarItemWidth
+      : MaximumMeasuredToolbarItemWidth
+    const measuredWidth =
+      overflowDelta > 1
+        ? Math.min(maximumWidth, Math.ceil(allocatedWidth + overflowDelta + 2))
+        : fallbackWidth
+    const preferredWidth =
+      previous?.signature === signature
+        ? Math.max(fallbackWidth, previous.preferredWidth, measuredWidth)
+        : Math.max(fallbackWidth, measuredWidth)
+
+    this.itemMeasurements.set(item.id, { signature, preferredWidth })
+    return preferredWidth
+  }
+
   private updateLayout() {
     const toolbar = this.toolbarElement
     if (toolbar === null || toolbar.clientWidth <= 0) {
@@ -214,12 +350,29 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
       const element = this.itemElements.get(item.id)
       return element !== undefined && element.childElementCount > 0
     })
+    const activeItemIds = new Set(activeItems.map(item => item.id))
+    for (const id of this.itemMeasurements.keys()) {
+      if (!activeItemIds.has(id)) {
+        this.itemMeasurements.delete(id)
+      }
+    }
+    const useCompactWidths = this.usesCompactItemWidths()
     const layoutItems: ReadonlyArray<IToolbarOverflowLayoutItem> =
-      activeItems.map(item => ({
-        id: item.id,
-        preferredWidth: item.element.props.preferredWidth,
-        overflowPriority: item.element.props.overflowPriority,
-      }))
+      activeItems.map(item => {
+        const element = this.itemElements.get(item.id)!
+        return {
+          id: item.id,
+          preferredWidth: this.measureItemPreferredWidth(
+            item,
+            element,
+            useCompactWidths
+          ),
+          overflowPriority: item.element.props.overflowPriority,
+        }
+      })
+    const nextItemPreferredWidths = Object.fromEntries(
+      layoutItems.map(item => [item.id, item.preferredWidth])
+    )
     const layout = calculateToolbarOverflow(
       availableWidth,
       gap,
@@ -241,7 +394,11 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
 
     if (
       !arraysEqual(nextOverflowedIds, this.state.overflowedItemIds) ||
-      layout.exhausted !== this.state.overflowExhausted
+      layout.exhausted !== this.state.overflowExhausted ||
+      !numberRecordsEqual(
+        nextItemPreferredWidths,
+        this.state.itemPreferredWidths
+      )
     ) {
       const activeElement = document.activeElement
       const shouldFocusOverflow = nextOverflowedIds.some(id =>
@@ -261,6 +418,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
           overflowExhausted: layout.exhausted,
           overflowOpen:
             nextOverflowedIds.length === 0 ? false : this.state.overflowOpen,
+          itemPreferredWidths: nextItemPreferredWidths,
         },
         () => {
           if (shouldFocusOverflow) {
@@ -319,9 +477,10 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
     const { element, id } = item
     const { className, style, preferredWidth, canGrow } = element.props
     const isOverflowed = this.state.overflowedItemIds.includes(id)
+    const layoutWidth = this.state.itemPreferredWidths[id] ?? preferredWidth
     const itemStyle = {
       ...style,
-      '--toolbar-item-preferred-width': `${preferredWidth}px`,
+      '--toolbar-item-preferred-width': `${layoutWidth}px`,
     } as React.CSSProperties
 
     return (
@@ -452,5 +611,17 @@ function arraysEqual(
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
+  )
+}
+
+function numberRecordsEqual(
+  left: Readonly<Record<string, number>>,
+  right: Readonly<Record<string, number>>
+) {
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(key => left[key] === right[key])
   )
 }
