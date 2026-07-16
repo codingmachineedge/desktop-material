@@ -7,7 +7,7 @@
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  min-height: 44px;
+  min-height: var(--dm-tab-strip-height, 44px);
   padding: 6px 16px 0 12px;
   background: var(--md-sys-color-surface-container-low);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
@@ -34,9 +34,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 132px;
-  max-width: 240px;
-  height: 38px;
+  min-width: var(--dm-tab-min-width, 132px);
+  max-width: var(--dm-tab-max-width, 240px);
+  height: var(--dm-tab-height, 38px);
   padding: 0 8px 0 12px;
   border-radius: 14px 14px 5px 5px;
   color: var(--md-sys-color-on-surface-variant);
@@ -146,6 +146,34 @@
   }
 }
 
+body[data-dm-tab-density='compact'] {
+  --dm-tab-strip-height: 38px;
+  --dm-tab-height: 32px;
+
+  .repository-tab {
+    padding-inline: 8px 6px;
+  }
+}
+
+body[data-dm-tab-width='compact'] {
+  --dm-tab-min-width: 104px;
+  --dm-tab-max-width: 184px;
+}
+
+body[data-dm-tab-width='wide'] {
+  --dm-tab-min-width: 168px;
+  --dm-tab-max-width: 320px;
+}
+
+body[data-dm-tab-close-buttons='always'] .repository-tab-close,
+body[data-dm-tab-close-buttons='active'] .repository-tab.active .repository-tab-close {
+  opacity: 0.75;
+}
+
+body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .repository-tab-close {
+  opacity: 0;
+}
+
 .repository-tab-new {
   // Design-spec-shell §3: 34×34 radius-12; square→pill border-radius morph to
   // 999px on hover (spring), press scale(.85) rotate(90deg).
@@ -178,7 +206,8 @@
   // Design-spec-shell §3 / overlays §8 tab-format popover: 288px surface with
   // 40×40 radius-12 toggles, mono size value, a Word-style searchable font
   // dropdown, and a wrapping palette of 26px color swatch circles (2.5px ring)
-  // plus a native custom-color picker and a persisted "recent" row.
+  // for tab text/background, plus a native custom-color picker and a persisted
+  // shared "recent" row.
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -476,10 +505,59 @@
       justify-content: space-between;
     }
 
+    .tab-style-color-targets {
+      display: inline-flex;
+      gap: 2px;
+      padding: 2px;
+      border-radius: 999px;
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    .tab-style-color-target {
+      padding: 5px 9px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      cursor: pointer;
+      transition: background-color 200ms var(--emph), color 200ms var(--emph);
+
+      &.active {
+        background: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+      }
+    }
+
     .tab-style-colors-label {
       font-size: 12px;
       font-weight: var(--font-weight-semibold);
       color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .tab-style-colors-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tab-style-color-default {
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--md-sys-color-primary);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      cursor: pointer;
+      transition: background-color 200ms var(--emph), color 200ms var(--emph);
+
+      &:hover,
+      &.active {
+        background: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+      }
     }
 
     .tab-style-color-custom {

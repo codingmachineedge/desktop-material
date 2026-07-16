@@ -39,6 +39,10 @@ import {
   BranchSortOrder,
   DefaultBranchSortOrder,
 } from '../../models/branch-sort-order'
+import {
+  IAppearanceCustomization,
+  IRepositoryAppearanceOverrides,
+} from '../../models/appearance-customization'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import type { CloneOptions } from '../../models/clone-options'
 import { CloningRepository } from '../../models/cloning-repository'
@@ -520,6 +524,12 @@ import {
   WorktreeMaintenanceOperation,
 } from '../../models/worktree'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
+import {
+  getAppearanceCustomization,
+  getRepositoryAppearanceOverrides,
+  setAppearanceCustomization,
+  setRepositoryAppearanceOverrides,
+} from '../appearance-customization'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -793,6 +803,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private selectedBranchesTab = BranchesTab.Branches
   private selectedTheme = ApplicationTheme.System
   private currentTheme: ApplicableTheme = ApplicationTheme.Light
+  private appearanceCustomization = getAppearanceCustomization()
+  private repositoryAppearanceOverrides: IRepositoryAppearanceOverrides = {}
   private selectedTabSize = tabSizeDefault
   private showRecentRepositories = true
   private showBranchNameInRepoList = defaultShowBranchNameInRepoListSetting
@@ -1541,6 +1553,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       selectedBranchesTab: this.selectedBranchesTab,
       selectedTheme: this.selectedTheme,
       currentTheme: this.currentTheme,
+      appearanceCustomization: this.appearanceCustomization,
+      repositoryAppearanceOverrides: this.repositoryAppearanceOverrides,
       selectedTabSize: this.selectedTabSize,
       showRecentRepositories: this.showRecentRepositories,
       showBranchNameInRepoList: this.showBranchNameInRepoList,
@@ -2383,6 +2397,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     this.selectedRepository = repository
+    // Never display the previous workspace's appearance while the newly
+    // selected repository's local config is loading.
+    this.repositoryAppearanceOverrides = {}
 
     this.emitUpdate()
     this.stopBackgroundFetching()
@@ -2417,6 +2434,24 @@ export class AppStore extends TypedBaseStore<IAppState> {
       // wrong location if the user then relocates the `.git` folder elsewhere
       this.gitStoreCache.remove(repository)
       return Promise.resolve(null)
+    }
+
+    try {
+      const overrides = await getRepositoryAppearanceOverrides(
+        refreshedRepository
+      )
+      // Repository selection is re-entrant. Discard an async config result if
+      // the user moved to another repository while Git was reading it.
+      if (this.selectedRepository !== repository) {
+        return null
+      }
+      this.repositoryAppearanceOverrides = overrides
+      this.emitUpdate()
+    } catch (error) {
+      log.warn(
+        `Unable to load appearance customization for ${refreshedRepository.path}`,
+        error
+      )
     }
 
     // This is now purely for metrics collection for `commitsToRepositoryWithBranchProtections`
@@ -10637,7 +10672,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.selectedTheme = getPersistedThemeName()
     setPersistedTheme(this.selectedTheme)
     this.currentTheme = await getCurrentlyAppliedTheme()
+    this.appearanceCustomization = getAppearanceCustomization()
     this.selectedTabSize = getNumber(tabSizeKey, tabSizeDefault)
+    this.zoomBaseFactor = clampZoom(getFloatNumber('zoom-factor', 1))
+    this.autoFitZoomEnabled = getBoolean('zoom-auto-fit-enabled', true)
+    this.recomputeAutoFit()
+    this.showRecentRepositories = getBoolean(showRecentRepositoriesKey) ?? true
+    this.showBranchNameInRepoList =
+      getEnum(showBranchNameInRepoListKey, ShowBranchNameInRepoListSetting) ??
+      defaultShowBranchNameInRepoListSetting
+    this.branchSortOrder =
+      getEnum(branchSortOrderKey, BranchSortOrder) ?? DefaultBranchSortOrder
+    this.preferAbsoluteDates = getPreferAbsoluteDates()
 
     const repositoryIndicatorsEnabled =
       getBoolean(repositoryIndicatorsEnabledKey) ?? true
@@ -10723,6 +10769,28 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.emitUpdate()
 
     return Promise.resolve()
+  }
+
+  /** Set the application-wide appearance customization. */
+  public _setAppearanceCustomization(customization: IAppearanceCustomization) {
+    this.appearanceCustomization = setAppearanceCustomization(customization)
+    this.emitUpdate()
+    return Promise.resolve()
+  }
+
+  /** Persist appearance overrides in a repository's local Git config. */
+  public async _setRepositoryAppearanceOverrides(
+    repository: Repository,
+    overrides: IRepositoryAppearanceOverrides
+  ): Promise<void> {
+    const normalized = await setRepositoryAppearanceOverrides(
+      repository,
+      overrides
+    )
+    if (this.selectedRepository === repository) {
+      this.repositoryAppearanceOverrides = normalized
+      this.emitUpdate()
+    }
   }
 
   /**

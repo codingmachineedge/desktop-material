@@ -14,6 +14,10 @@ import { IDiff, ImageDiffType } from '../models/diff'
 import { Repository, ILocalRepositoryState } from '../models/repository'
 import { Branch, IAheadBehind } from '../models/branch'
 import { BranchSortOrder } from '../models/branch-sort-order'
+import type {
+  IAppearanceCustomization,
+  IRepositoryAppearanceOverrides,
+} from '../models/appearance-customization'
 import { ShowBranchNameInRepoListSetting } from '../models/show-branch-name-in-repo-list'
 import { Tip } from '../models/tip'
 import { Commit } from '../models/commit'
@@ -337,6 +341,12 @@ export interface IAppState {
 
   /** The currently applied appearance (aka theme) */
   readonly currentTheme: ApplicableTheme
+
+  /** The application-wide appearance customization stored in the profile. */
+  readonly appearanceCustomization: IAppearanceCustomization
+
+  /** Overrides read from the selected repository's local Git config. */
+  readonly repositoryAppearanceOverrides: IRepositoryAppearanceOverrides
 
   /** The selected tab size preference */
   readonly selectedTabSize: number

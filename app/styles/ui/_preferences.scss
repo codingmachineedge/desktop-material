@@ -687,6 +687,24 @@
     }
   }
 
+  .appearance-customization-section {
+    .row-component {
+      align-items: end;
+      gap: var(--spacing);
+
+      > .select-component {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+    }
+
+    .appearance-customization-caption {
+      margin: var(--spacing-half) 0 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: var(--font-size-sm);
+    }
+  }
+
   .no-options-found {
     label {
       margin-bottom: 0;

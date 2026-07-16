@@ -159,6 +159,23 @@
   }
 }
 
+body[data-dm-repository-list-density='compact'] #foldout-container .repository-list {
+  .filter-list-group-header {
+    padding-block: 8px 4px;
+  }
+
+  .repository-list-item {
+    padding-block: 5px;
+
+    .icon-for-repository {
+      width: 28px;
+      height: 28px;
+      margin-right: 9px;
+      border-radius: 9px;
+    }
+  }
+}
+
 // Commit 13 — Repository side-sheet content (FoldoutType.Repository).
 // Scoped under `#foldout-container` so the id gives us enough specificity to win
 // over the shell override layer without `!important`, and so the styling only

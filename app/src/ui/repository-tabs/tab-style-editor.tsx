@@ -32,7 +32,11 @@ interface ITabStyleEditorState {
   readonly fontQuery: string
   /** Recently picked colors, most-recent first, persisted across sessions. */
   readonly recentColors: ReadonlyArray<string>
+  /** Which part of the tab the shared color palette currently edits. */
+  readonly colorTarget: TabColorTarget
 }
+
+type TabColorTarget = 'color' | 'backgroundColor'
 
 /** localStorage key backing the "recent colors" row. */
 const RecentColorsKey = 'tab-style-recent-colors'
@@ -72,7 +76,7 @@ const paletteColors: ReadonlyArray<string> = [
 /** The color shown in the native picker / used as a fallback selection. */
 const DefaultPickerColor = '#006493'
 
-/** The "Tab text style" popover for customizing a tab's title appearance. */
+/** The "Tab appearance" popover for customizing a tab's title appearance. */
 export class TabStyleEditor extends React.Component<
   ITabStyleEditorProps,
   ITabStyleEditorState
@@ -83,6 +87,7 @@ export class TabStyleEditor extends React.Component<
       fontMenuOpen: false,
       fontQuery: '',
       recentColors: getStringArray(RecentColorsKey).filter(isValidTabColor),
+      colorTarget: 'color',
     }
   }
 
@@ -131,11 +136,11 @@ export class TabStyleEditor extends React.Component<
     this.setState({ fontMenuOpen: false, fontQuery: '' })
   }
 
-  private applyColor(color: string) {
+  private applyColor(target: TabColorTarget, color: string) {
     if (!isValidTabColor(color)) {
       return
     }
-    this.update({ color })
+    this.update(target === 'color' ? { color } : { backgroundColor: color })
     this.rememberColor(color)
   }
 
@@ -150,11 +155,28 @@ export class TabStyleEditor extends React.Component<
   }
 
   private onColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    this.applyColor(event.currentTarget.value)
+    this.applyColor(this.state.colorTarget, event.currentTarget.value)
   }
 
   private onColorInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    this.applyColor(event.currentTarget.value)
+    this.applyColor(this.state.colorTarget, event.currentTarget.value)
+  }
+
+  private onColorTargetClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    switch (event.currentTarget.value) {
+      case 'color':
+      case 'backgroundColor':
+        this.setState({ colorTarget: event.currentTarget.value })
+        break
+    }
+  }
+
+  private onUseDefaultColor = () => {
+    const next: {
+      -readonly [Key in keyof ITabTitleStyle]: ITabTitleStyle[Key]
+    } = { ...this.style }
+    delete next[this.state.colorTarget]
+    this.props.onStyleChange(next)
   }
 
   private onSizeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -289,16 +311,19 @@ export class TabStyleEditor extends React.Component<
   }
 
   private renderSwatch(color: string, keyPrefix: string) {
+    const { colorTarget } = this.state
+    const targetLabel =
+      colorTarget === 'color' ? 'Text color' : 'Background color'
     const active =
-      this.style.color !== undefined &&
-      this.style.color.toLowerCase() === color.toLowerCase()
+      this.style[colorTarget] !== undefined &&
+      this.style[colorTarget]?.toLowerCase() === color.toLowerCase()
     return (
       <button
         key={`${keyPrefix}-${color}`}
         className={active ? 'tab-style-swatch active' : 'tab-style-swatch'}
         value={color}
         style={{ backgroundColor: color }}
-        aria-label={`Color ${color}`}
+        aria-label={`${targetLabel} ${color}`}
         aria-pressed={active}
         onClick={this.onColorClick}
       />
@@ -306,16 +331,72 @@ export class TabStyleEditor extends React.Component<
   }
 
   private renderColors() {
-    const current = this.style.color
+    const { colorTarget } = this.state
+    const current = this.style[colorTarget]
+    const targetLabel =
+      colorTarget === 'color' ? 'text color' : 'background color'
     const pickerValue =
       current !== undefined && /^#[0-9a-f]{6}$/i.test(current)
         ? current
         : DefaultPickerColor
 
     return (
-      <div className="tab-style-row tab-style-colors">
+      <div
+        className="tab-style-row tab-style-colors"
+        role="group"
+        aria-labelledby="tab-style-colors-label"
+      >
         <div className="tab-style-colors-head">
-          <span className="tab-style-colors-label">Color</span>
+          <span className="tab-style-colors-label" id="tab-style-colors-label">
+            Color
+          </span>
+          <div
+            className="tab-style-color-targets"
+            role="group"
+            aria-label="Color applies to"
+          >
+            <button
+              type="button"
+              className={
+                colorTarget === 'color'
+                  ? 'tab-style-color-target active'
+                  : 'tab-style-color-target'
+              }
+              value="color"
+              aria-pressed={colorTarget === 'color'}
+              onClick={this.onColorTargetClick}
+            >
+              Text
+            </button>
+            <button
+              type="button"
+              className={
+                colorTarget === 'backgroundColor'
+                  ? 'tab-style-color-target active'
+                  : 'tab-style-color-target'
+              }
+              value="backgroundColor"
+              aria-pressed={colorTarget === 'backgroundColor'}
+              onClick={this.onColorTargetClick}
+            >
+              Background
+            </button>
+          </div>
+        </div>
+        <div className="tab-style-colors-actions">
+          <button
+            type="button"
+            className={
+              current === undefined
+                ? 'tab-style-color-default active'
+                : 'tab-style-color-default'
+            }
+            aria-label={`Use default ${targetLabel}`}
+            aria-pressed={current === undefined}
+            onClick={this.onUseDefaultColor}
+          >
+            Default
+          </button>
           <label className="tab-style-color-custom">
             <span
               className="tab-style-color-custom-swatch"
@@ -325,7 +406,7 @@ export class TabStyleEditor extends React.Component<
             <input
               type="color"
               value={pickerValue}
-              aria-label="Custom color"
+              aria-label={`Custom ${targetLabel}`}
               onChange={this.onColorInput}
             />
           </label>
@@ -360,7 +441,7 @@ export class TabStyleEditor extends React.Component<
       >
         <div className="tab-style-editor">
           <div className="tab-style-header">
-            <h3 id="tab-style-editor-title">Tab text style</h3>
+            <h3 id="tab-style-editor-title">Tab appearance</h3>
             <button
               className="tab-style-reset"
               onClick={this.props.onReset}

@@ -81,6 +81,10 @@ import { Author, UnknownAuthor } from '../../models/author'
 import { Branch, IAheadBehind } from '../../models/branch'
 import { BranchesTab } from '../../models/branches-tab'
 import { BranchSortOrder } from '../../models/branch-sort-order'
+import type {
+  IAppearanceCustomization,
+  IRepositoryAppearanceOverrides,
+} from '../../models/appearance-customization'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import type { CloneOptions } from '../../models/clone-options'
 import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
@@ -3492,6 +3496,20 @@ export class Dispatcher {
    */
   public setSelectedTheme(theme: ApplicationTheme) {
     return this.appStore._setSelectedTheme(theme)
+  }
+
+  public setAppearanceCustomization(customization: IAppearanceCustomization) {
+    return this.appStore._setAppearanceCustomization(customization)
+  }
+
+  public setRepositoryAppearanceOverrides(
+    repository: Repository,
+    overrides: IRepositoryAppearanceOverrides
+  ) {
+    return this.appStore._setRepositoryAppearanceOverrides(
+      repository,
+      overrides
+    )
   }
 
   /** Step the UI scale up one notch on the zoom ladder. */

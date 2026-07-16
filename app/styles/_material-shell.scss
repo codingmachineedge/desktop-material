@@ -345,6 +345,57 @@ body {
   }
 }
 
+body[data-dm-toolbar-density='compact'] #desktop-app-toolbar {
+  min-height: 58px;
+  padding: 4px 12px 8px;
+
+  .toolbar-button > button {
+    gap: 8px;
+    height: 44px;
+    padding-inline: 10px 12px;
+
+    .icon {
+      height: 30px;
+      padding: 6px;
+      width: 30px;
+    }
+  }
+}
+
+body[data-dm-toolbar-labels='icons'] #desktop-app-toolbar {
+  & > .sidebar-section,
+  & > .resizable-component,
+  & > .one-click-commit-push-button,
+  & > .build-run-toolbar-button {
+    flex: 0 1 92px;
+    max-width: 92px !important;
+  }
+
+  .toolbar-button > button .text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .toolbar-button > button {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1100px) {
+  body[data-dm-toolbar-labels='auto'] #desktop-app-toolbar {
+    .toolbar-button > button .description {
+      display: none;
+    }
+  }
+}
+
 // Compact/high-zoom app bar. Preserve whole action targets and their DOM text
 // while prioritising the icons; only wrap complete controls when one row truly
 // cannot fit. This avoids the previous zero-width flex collapse.
@@ -763,6 +814,17 @@ hr,
   *::before,
   *::after {
     scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+body[data-dm-motion='reduced'] *,
+body[data-dm-motion='reduced'] *::before,
+body[data-dm-motion='reduced'] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0.01ms !important;
 }

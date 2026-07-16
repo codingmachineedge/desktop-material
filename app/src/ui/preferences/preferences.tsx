@@ -20,6 +20,7 @@ import {
   InvalidGitAuthorNameMessage,
 } from '../lib/identifier-rules'
 import { Appearance } from './appearance'
+import { IAppearanceCustomization } from '../../models/appearance-customization'
 import { ApplicationTheme } from '../lib/application-theme'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { Integrations } from './integrations'
@@ -114,6 +115,7 @@ interface IPreferencesProps {
   readonly selectedExternalEditor: string | null
   readonly selectedShell: Shell
   readonly selectedTheme: ApplicationTheme
+  readonly appearanceCustomization: IAppearanceCustomization
   readonly zoomBaseFactor: number
   readonly autoFitZoomEnabled: boolean
   readonly windowZoomFactor: number
@@ -187,6 +189,7 @@ interface IPreferencesState {
   readonly repositoryIndicatorsEnabled: boolean
 
   readonly initiallySelectedTheme: ApplicationTheme
+  readonly initiallySelectedAppearanceCustomization: IAppearanceCustomization
   readonly initiallySelectedTabSize: number
 
   readonly isLoadingGitConfig: boolean
@@ -279,6 +282,8 @@ export class Preferences extends React.Component<
       showCommitAuthorInfo: getShowCommitAuthorInfo(),
       repositoryIndicatorsEnabled: this.props.repositoryIndicatorsEnabled,
       initiallySelectedTheme: this.props.selectedTheme,
+      initiallySelectedAppearanceCustomization:
+        this.props.appearanceCustomization,
       initiallySelectedTabSize: this.props.selectedTabSize,
       isLoadingGitConfig: true,
       underlineLinks: this.props.underlineLinks,
@@ -380,6 +385,14 @@ export class Preferences extends React.Component<
     }
     if (this.state.initiallySelectedTabSize !== this.props.selectedTabSize) {
       this.onSelectedTabSizeChanged(this.state.initiallySelectedTabSize)
+    }
+    if (
+      this.state.initiallySelectedAppearanceCustomization !==
+      this.props.appearanceCustomization
+    ) {
+      this.onAppearanceCustomizationChanged(
+        this.state.initiallySelectedAppearanceCustomization
+      )
     }
 
     this.props.onDismissed()
@@ -697,6 +710,10 @@ export class Preferences extends React.Component<
           <Appearance
             selectedTheme={this.props.selectedTheme}
             onSelectedThemeChanged={this.onSelectedThemeChanged}
+            appearanceCustomization={this.props.appearanceCustomization}
+            onAppearanceCustomizationChanged={
+              this.onAppearanceCustomizationChanged
+            }
             zoomBaseFactor={this.props.zoomBaseFactor}
             onZoomBaseFactorChanged={this.onZoomBaseFactorChanged}
             autoFitZoomEnabled={this.props.autoFitZoomEnabled}
@@ -1023,6 +1040,12 @@ export class Preferences extends React.Component<
 
   private onSelectedThemeChanged = (theme: ApplicationTheme) => {
     this.props.dispatcher.setSelectedTheme(theme)
+  }
+
+  private onAppearanceCustomizationChanged = (
+    customization: IAppearanceCustomization
+  ) => {
+    this.props.dispatcher.setAppearanceCustomization(customization)
   }
 
   private onZoomBaseFactorChanged = (factor: number) => {

@@ -25,10 +25,15 @@ import { formatNumber } from '../../lib/format-number'
 import { assertNever } from '../../lib/fatal-error'
 import { BranchSortOrder } from '../../models/branch-sort-order'
 import { ShowBranchNameInRepoListSetting } from '../../models/show-branch-name-in-repo-list'
+import { IAppearanceCustomization } from '../../models/appearance-customization'
 
 interface IAppearanceProps {
   readonly selectedTheme: ApplicationTheme
   readonly onSelectedThemeChanged: (theme: ApplicationTheme) => void
+  readonly appearanceCustomization: IAppearanceCustomization
+  readonly onAppearanceCustomizationChanged: (
+    customization: IAppearanceCustomization
+  ) => void
   readonly zoomBaseFactor: number
   readonly onZoomBaseFactorChanged: (factor: number) => void
   readonly autoFitZoomEnabled: boolean
@@ -78,6 +83,40 @@ export class Appearance extends React.Component<
     if (!usePropTheme) {
       this.initializeSelectedTheme()
     }
+  }
+
+  private onCustomizationChanged = (
+    event: React.FormEvent<HTMLSelectElement>
+  ) => {
+    const key = event.currentTarget.name as Exclude<
+      keyof IAppearanceCustomization,
+      'version'
+    >
+    this.props.onAppearanceCustomizationChanged({
+      ...this.props.appearanceCustomization,
+      [key]: event.currentTarget.value,
+    })
+  }
+
+  private renderCustomizationSelect(
+    key: Exclude<keyof IAppearanceCustomization, 'version'>,
+    label: string,
+    options: ReadonlyArray<{ readonly value: string; readonly label: string }>
+  ) {
+    return (
+      <Select
+        name={key}
+        label={label}
+        value={this.props.appearanceCustomization[key]}
+        onChange={this.onCustomizationChanged}
+      >
+        {options.map(option => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+    )
   }
 
   public async componentDidUpdate(prevProps: IAppearanceProps) {
@@ -317,6 +356,120 @@ export class Appearance extends React.Component<
     )
   }
 
+  private renderColorAndSurfaces() {
+    return (
+      <div className="appearance-section appearance-customization-section">
+        <h2>Color and surfaces</h2>
+        <Row>
+          {this.renderCustomizationSelect('accentPalette', 'Accent color', [
+            { value: 'blue', label: 'Blue' },
+            { value: 'violet', label: 'Violet' },
+            { value: 'teal', label: 'Teal' },
+            { value: 'green', label: 'Green' },
+            { value: 'amber', label: 'Amber' },
+            { value: 'rose', label: 'Rose' },
+          ])}
+          {this.renderCustomizationSelect('surfacePalette', 'Surface color', [
+            { value: 'tonal', label: 'Tonal' },
+            { value: 'neutral', label: 'Neutral' },
+          ])}
+        </Row>
+        {this.renderCustomizationSelect('elevation', 'Surface depth', [
+          { value: 'standard', label: 'Standard' },
+          { value: 'subtle', label: 'Subtle' },
+          { value: 'flat', label: 'Flat' },
+        ])}
+      </div>
+    )
+  }
+
+  private renderTypography() {
+    return (
+      <div className="appearance-section appearance-customization-section">
+        <h2>Typography</h2>
+        <Row>
+          {this.renderCustomizationSelect('uiFont', 'Interface font', [
+            { value: 'material', label: 'Material (Roboto)' },
+            { value: 'system', label: 'System' },
+          ])}
+          {this.renderCustomizationSelect(
+            'monospaceFont',
+            'Code and diff font',
+            [
+              { value: 'platform', label: 'Platform default' },
+              { value: 'consolas', label: 'Consolas' },
+              { value: 'sf-mono', label: 'SF Mono' },
+            ]
+          )}
+        </Row>
+      </div>
+    )
+  }
+
+  private renderToolbarAndTabs() {
+    return (
+      <div className="appearance-section appearance-customization-section">
+        <h2>Toolbar and tabs</h2>
+        <Row>
+          {this.renderCustomizationSelect('toolbarLabels', 'Toolbar labels', [
+            { value: 'auto', label: 'Automatic' },
+            { value: 'labels', label: 'Prefer labels' },
+            { value: 'icons', label: 'Icons only' },
+          ])}
+          {this.renderCustomizationSelect('toolbarDensity', 'Toolbar density', [
+            { value: 'comfortable', label: 'Comfortable' },
+            { value: 'compact', label: 'Compact' },
+          ])}
+        </Row>
+        <Row>
+          {this.renderCustomizationSelect(
+            'repositoryListDensity',
+            'Repository list density',
+            [
+              { value: 'comfortable', label: 'Comfortable' },
+              { value: 'compact', label: 'Compact' },
+            ]
+          )}
+          {this.renderCustomizationSelect('tabDensity', 'Tab density', [
+            { value: 'comfortable', label: 'Comfortable' },
+            { value: 'compact', label: 'Compact' },
+          ])}
+        </Row>
+        <Row>
+          {this.renderCustomizationSelect('tabWidth', 'Tab width', [
+            { value: 'compact', label: 'Compact' },
+            { value: 'standard', label: 'Standard' },
+            { value: 'wide', label: 'Wide' },
+          ])}
+          {this.renderCustomizationSelect(
+            'tabCloseButtons',
+            'Tab close buttons',
+            [
+              { value: 'hover', label: 'On hover' },
+              { value: 'always', label: 'Always' },
+              { value: 'active', label: 'Active tab only' },
+            ]
+          )}
+        </Row>
+      </div>
+    )
+  }
+
+  private renderMotion() {
+    return (
+      <div className="appearance-section appearance-customization-section">
+        <h2>Motion</h2>
+        {this.renderCustomizationSelect('motion', 'Animation', [
+          { value: 'system', label: 'Follow system setting' },
+          { value: 'reduced', label: 'Reduce motion' },
+        ])}
+        <p className="appearance-customization-caption">
+          Reduced motion can be enabled here or by your operating system.
+        </p>
+      </div>
+    )
+  }
+
   private renderFormatting() {
     if (!enableFormattingPreferences()) {
       return null
@@ -454,6 +607,10 @@ export class Appearance extends React.Component<
       <DialogContent>
         {this.renderScaling()}
         {this.renderSelectedTheme()}
+        {this.renderColorAndSurfaces()}
+        {this.renderTypography()}
+        {this.renderToolbarAndTabs()}
+        {this.renderMotion()}
         {this.renderRepositoryList()}
         {this.renderBranchSorting()}
         {this.renderFormatting()}

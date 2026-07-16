@@ -171,3 +171,152 @@ body.theme-dark {
   --tab-bar-hover-background-color: var(--md-sys-color-surface-container-high);
   --tab-bar-active-color: var(--md-sys-color-primary-container);
 }
+
+// Curated, contrast-paired accent palettes. Keeping these as fixed semantic
+// role bundles avoids accepting arbitrary CSS while preserving readable
+// on-primary and container content in both themes.
+body[data-dm-accent='violet'] {
+  --md-sys-color-primary: #6f43c0;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ebddff;
+  --md-sys-color-on-primary-container: #25005a;
+  --md-sys-color-secondary-container: #e8def8;
+  --md-sys-color-on-secondary-container: #1d192b;
+  --button-hover-background: #7d53cc;
+}
+
+body.theme-dark[data-dm-accent='violet'] {
+  --md-sys-color-primary: #d2baff;
+  --md-sys-color-on-primary: #3d0877;
+  --md-sys-color-primary-container: #56259e;
+  --md-sys-color-on-primary-container: #ebddff;
+  --md-sys-color-secondary-container: #49454f;
+  --md-sys-color-on-secondary-container: #e8def8;
+  --button-hover-background: #dec8ff;
+}
+
+body[data-dm-accent='teal'] {
+  --md-sys-color-primary: #006a60;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #74f8e5;
+  --md-sys-color-on-primary-container: #00201c;
+  --md-sys-color-secondary-container: #cce8e2;
+  --md-sys-color-on-secondary-container: #08201c;
+  --button-hover-background: #08796e;
+}
+
+body.theme-dark[data-dm-accent='teal'] {
+  --md-sys-color-primary: #53dbc8;
+  --md-sys-color-on-primary: #003731;
+  --md-sys-color-primary-container: #005048;
+  --md-sys-color-on-primary-container: #74f8e5;
+  --md-sys-color-secondary-container: #334b47;
+  --md-sys-color-on-secondary-container: #cce8e2;
+  --button-hover-background: #76e8d6;
+}
+
+body[data-dm-accent='green'] {
+  --md-sys-color-primary: #3a6a00;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #b8f475;
+  --md-sys-color-on-primary-container: #0f2000;
+  --md-sys-color-secondary-container: #dce8ca;
+  --md-sys-color-on-secondary-container: #151e0d;
+  --button-hover-background: #497900;
+}
+
+body.theme-dark[data-dm-accent='green'] {
+  --md-sys-color-primary: #9cd75d;
+  --md-sys-color-on-primary: #1d3700;
+  --md-sys-color-primary-container: #2c5000;
+  --md-sys-color-on-primary-container: #b8f475;
+  --md-sys-color-secondary-container: #404a35;
+  --md-sys-color-on-secondary-container: #dce8ca;
+  --button-hover-background: #afe66f;
+}
+
+body[data-dm-accent='amber'] {
+  --md-sys-color-primary: #7c5800;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ffdea1;
+  --md-sys-color-on-primary-container: #271900;
+  --md-sys-color-secondary-container: #f0e1c3;
+  --md-sys-color-on-secondary-container: #211b0e;
+  --button-hover-background: #8c6500;
+}
+
+body.theme-dark[data-dm-accent='amber'] {
+  --md-sys-color-primary: #f9bd46;
+  --md-sys-color-on-primary: #412d00;
+  --md-sys-color-primary-container: #5e4200;
+  --md-sys-color-on-primary-container: #ffdea1;
+  --md-sys-color-secondary-container: #4e4634;
+  --md-sys-color-on-secondary-container: #f0e1c3;
+  --button-hover-background: #ffca63;
+}
+
+body[data-dm-accent='rose'] {
+  --md-sys-color-primary: #a93a5b;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ffd9e2;
+  --md-sys-color-on-primary-container: #3f001b;
+  --md-sys-color-secondary-container: #f3dce1;
+  --md-sys-color-on-secondary-container: #25191c;
+  --button-hover-background: #b94868;
+}
+
+body.theme-dark[data-dm-accent='rose'] {
+  --md-sys-color-primary: #ffb1c4;
+  --md-sys-color-on-primary: #65002e;
+  --md-sys-color-primary-container: #8a1f43;
+  --md-sys-color-on-primary-container: #ffd9e2;
+  --md-sys-color-secondary-container: #514347;
+  --md-sys-color-on-secondary-container: #f3dce1;
+  --button-hover-background: #ffc2d0;
+}
+
+body[data-dm-surface='neutral'] {
+  --md-sys-color-surface: #f9f9fc;
+  --md-sys-color-surface-dim: #dadadd;
+  --md-sys-color-surface-bright: #f9f9fc;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f3f3f6;
+  --md-sys-color-surface-container: #ededf0;
+  --md-sys-color-surface-container-high: #e7e7ea;
+  --md-sys-color-surface-container-highest: #e1e1e4;
+}
+
+body.theme-dark[data-dm-surface='neutral'] {
+  --md-sys-color-surface: #131315;
+  --md-sys-color-surface-dim: #131315;
+  --md-sys-color-surface-bright: #39393b;
+  --md-sys-color-surface-container-lowest: #0e0e10;
+  --md-sys-color-surface-container-low: #1b1b1d;
+  --md-sys-color-surface-container: #1f1f21;
+  --md-sys-color-surface-container-high: #2a2a2c;
+  --md-sys-color-surface-container-highest: #353537;
+}
+
+body[data-dm-elevation='subtle'] {
+  --md-sys-elevation-level1: 0 1px 2px rgba(0, 0, 0, 0.16);
+  --md-sys-elevation-level2: 0 2px 5px rgba(0, 0, 0, 0.18);
+  --md-sys-elevation-level3: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+body[data-dm-elevation='flat'] {
+  --md-sys-elevation-level1: none;
+  --md-sys-elevation-level2: none;
+  --md-sys-elevation-level3: none;
+}
+
+body[data-dm-ui-font='system'] {
+  --font-family-sans-serif: system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+}
+
+body[data-dm-monospace-font='consolas'] {
+  --font-family-monospace: Consolas, 'Liberation Mono', monospace;
+}
+
+body[data-dm-monospace-font='sf-mono'] {
+  --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}

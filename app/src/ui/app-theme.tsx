@@ -5,10 +5,27 @@ import {
   getCurrentlyAppliedTheme,
 } from './lib/application-theme'
 import * as ipcRenderer from '../lib/ipc-renderer'
+import { IAppearanceCustomization } from '../models/appearance-customization'
 
 interface IAppThemeProps {
   readonly theme: ApplicationTheme
+  readonly appearance: IAppearanceCustomization
 }
+
+const appearanceAttributes = [
+  'data-dm-accent',
+  'data-dm-surface',
+  'data-dm-elevation',
+  'data-dm-ui-font',
+  'data-dm-monospace-font',
+  'data-dm-motion',
+  'data-dm-toolbar-labels',
+  'data-dm-toolbar-density',
+  'data-dm-repository-list-density',
+  'data-dm-tab-density',
+  'data-dm-tab-width',
+  'data-dm-tab-close-buttons',
+] as const
 
 /**
  * A pseudo-component responsible for adding the applicable CSS
@@ -23,30 +40,98 @@ interface IAppThemeProps {
  * body class list.
  */
 export class AppTheme extends React.PureComponent<IAppThemeProps> {
+  private themeRequestId = 0
+
   public componentDidMount() {
-    this.ensureTheme()
+    this.applyAppearance()
+    this.ensureTheme(true)
   }
 
-  public componentDidUpdate() {
-    this.ensureTheme()
+  public componentDidUpdate(prevProps: IAppThemeProps) {
+    const appearanceChanged = !this.appearanceEquals(
+      prevProps.appearance,
+      this.props.appearance
+    )
+
+    if (appearanceChanged) {
+      this.applyAppearance()
+    }
+
+    if (prevProps.theme !== this.props.theme) {
+      this.ensureTheme(true)
+    } else if (appearanceChanged) {
+      this.updateColorScheme()
+    }
   }
 
   public componentWillUnmount() {
+    this.themeRequestId++
     this.clearThemes()
+    this.clearAppearance()
   }
 
-  private async ensureTheme() {
+  private applyAppearance() {
+    const body = document.body
+    const appearance = this.props.appearance
+    body.setAttribute('data-dm-accent', appearance.accentPalette)
+    body.setAttribute('data-dm-surface', appearance.surfacePalette)
+    body.setAttribute('data-dm-elevation', appearance.elevation)
+    body.setAttribute('data-dm-ui-font', appearance.uiFont)
+    body.setAttribute('data-dm-monospace-font', appearance.monospaceFont)
+    body.setAttribute('data-dm-motion', appearance.motion)
+    body.setAttribute('data-dm-toolbar-labels', appearance.toolbarLabels)
+    body.setAttribute('data-dm-toolbar-density', appearance.toolbarDensity)
+    body.setAttribute(
+      'data-dm-repository-list-density',
+      appearance.repositoryListDensity
+    )
+    body.setAttribute('data-dm-tab-density', appearance.tabDensity)
+    body.setAttribute('data-dm-tab-width', appearance.tabWidth)
+    body.setAttribute('data-dm-tab-close-buttons', appearance.tabCloseButtons)
+  }
+
+  private appearanceEquals(
+    left: IAppearanceCustomization,
+    right: IAppearanceCustomization
+  ): boolean {
+    return (
+      left.accentPalette === right.accentPalette &&
+      left.surfacePalette === right.surfacePalette &&
+      left.elevation === right.elevation &&
+      left.uiFont === right.uiFont &&
+      left.monospaceFont === right.monospaceFont &&
+      left.motion === right.motion &&
+      left.toolbarLabels === right.toolbarLabels &&
+      left.toolbarDensity === right.toolbarDensity &&
+      left.repositoryListDensity === right.repositoryListDensity &&
+      left.tabDensity === right.tabDensity &&
+      left.tabWidth === right.tabWidth &&
+      left.tabCloseButtons === right.tabCloseButtons
+    )
+  }
+
+  private async ensureTheme(updateWindowBackground = false) {
+    const requestId = ++this.themeRequestId
     let themeToDisplay = this.props.theme
 
     if (this.props.theme === ApplicationTheme.System) {
       themeToDisplay = await getCurrentlyAppliedTheme()
     }
 
+    if (requestId !== this.themeRequestId) {
+      return
+    }
+
     const newThemeClassName = `theme-${getThemeName(themeToDisplay)}`
+    let themeChanged = false
 
     if (!document.body.classList.contains(newThemeClassName)) {
       this.clearThemes()
       document.body.classList.add(newThemeClassName)
+      themeChanged = true
+    }
+
+    if (themeChanged || updateWindowBackground) {
       this.updateColorScheme()
     }
   }
@@ -78,6 +163,12 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
       if (className.startsWith('theme-')) {
         body.classList.remove(className)
       }
+    }
+  }
+
+  private clearAppearance() {
+    for (const attribute of appearanceAttributes) {
+      document.body.removeAttribute(attribute)
     }
   }
 

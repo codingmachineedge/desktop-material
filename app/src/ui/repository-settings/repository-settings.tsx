@@ -56,6 +56,9 @@ import {
   EditorOverride,
   getEditorOverrideHash,
 } from '../../models/editor-override'
+import { IRepositoryAppearanceOverrides } from '../../models/appearance-customization'
+import { getRepositoryAppearanceOverrides } from '../../lib/appearance-customization'
+import { RepositoryAppearance } from './appearance'
 
 interface IRepositorySettingsProps {
   readonly initialSelectedTab?: RepositorySettingsTab
@@ -81,6 +84,7 @@ export enum RepositorySettingsTab {
   Submodules,
   Automation,
   Metadata,
+  Appearance,
   ForkSettings,
 }
 
@@ -109,6 +113,9 @@ interface IRepositorySettingsState {
   readonly buildRunPreferences: IBuildRunPreferences
   readonly buildRunPreferencesHaveChanged: boolean
   readonly automationOverrides: IAutomationSettingsOverrides
+  readonly appearanceOverrides: IRepositoryAppearanceOverrides
+  readonly appearanceOverridesHaveChanged: boolean
+  readonly isLoadingAppearanceOverrides: boolean
   readonly defaultBranch: string
   readonly availableEditors: ReadonlyArray<string>
   readonly useDefaultEditor: boolean
@@ -157,6 +164,9 @@ export class RepositorySettings extends React.Component<
       automationOverrides: loadRepositoryAutomationOverrides(
         props.repository.id
       ),
+      appearanceOverrides: {},
+      appearanceOverridesHaveChanged: false,
+      isLoadingAppearanceOverrides: true,
       defaultBranch: props.repository.defaultBranch ?? '',
       availableEditors: [],
       useDefaultEditor: props.repository.customEditorOverride === null,
@@ -173,6 +183,23 @@ export class RepositorySettings extends React.Component<
 
   public async componentWillMount() {
     await this.loadRemoteManagementSnapshot()
+
+    try {
+      const appearanceOverrides = await getRepositoryAppearanceOverrides(
+        this.props.repository
+      )
+      this.setState({
+        appearanceOverrides,
+        appearanceOverridesHaveChanged: false,
+        isLoadingAppearanceOverrides: false,
+      })
+    } catch (e) {
+      log.warn(
+        `RepositorySettings: unable to read appearance config for ${this.props.repository.path}`,
+        e
+      )
+      this.setState({ isLoadingAppearanceOverrides: false })
+    }
 
     try {
       const ignoreText = await readGitIgnoreAtRoot(this.props.repository)
@@ -335,6 +362,10 @@ export class RepositorySettings extends React.Component<
               <Octicon className="icon" symbol={octicons.gear} />
               Metadata
             </span>
+            <span>
+              <Octicon className="icon" symbol={octicons.paintbrush} />
+              Appearance
+            </span>
             {showForkSettings && (
               <span>
                 <Octicon className="icon" symbol={octicons.repoForked} />
@@ -432,6 +463,15 @@ export class RepositorySettings extends React.Component<
             onSelectedEditorChanged={this.onSelectedEditorChanged}
             onUseCustomEditorChanged={this.onUseCustomEditorChanged}
             onCustomEditorChanged={this.onCustomEditorChanged}
+          />
+        )
+      }
+      case RepositorySettingsTab.Appearance: {
+        return (
+          <RepositoryAppearance
+            overrides={this.state.appearanceOverrides}
+            isLoading={this.state.isLoadingAppearanceOverrides}
+            onChanged={this.onAppearanceOverridesChanged}
           />
         )
       }
@@ -582,6 +622,21 @@ export class RepositorySettings extends React.Component<
       this.props.repository.id,
       this.state.automationOverrides
     )
+
+    if (this.state.appearanceOverridesHaveChanged) {
+      try {
+        await this.props.dispatcher.setRepositoryAppearanceOverrides(
+          this.props.repository,
+          this.state.appearanceOverrides
+        )
+      } catch (e) {
+        log.error(
+          `RepositorySettings: unable to save appearance config for ${this.props.repository.path}`,
+          e
+        )
+        errors.push(`Failed saving the repository appearance: ${e}`)
+      }
+    }
 
     if (this.state.accountKey !== this.props.repository.accountKey) {
       await this.props.dispatcher.updateRepositoryAccount(
@@ -739,6 +794,15 @@ export class RepositorySettings extends React.Component<
     automationOverrides: IAutomationSettingsOverrides
   ) => {
     this.setState({ automationOverrides })
+  }
+
+  private onAppearanceOverridesChanged = (
+    appearanceOverrides: IRepositoryAppearanceOverrides
+  ) => {
+    this.setState({
+      appearanceOverrides,
+      appearanceOverridesHaveChanged: true,
+    })
   }
 
   private onTabClicked = (index: number) => {

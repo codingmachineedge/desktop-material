@@ -54,6 +54,23 @@ export const profileSettingsRegistry: ReadonlyArray<IProfileSettingEntry> = [
 
   // Diff and appearance preferences
   { key: 'theme', label: 'appearance' },
+  {
+    key: 'appearance-customization-v1',
+    label: 'appearance customization',
+  },
+  { key: 'zoom-factor', label: 'interface scale' },
+  { key: 'zoom-auto-fit-enabled', label: 'automatic interface scaling' },
+  { key: 'show-recent-repositories', label: 'recent repository visibility' },
+  {
+    key: 'show-branch-name-in-repo-list',
+    label: 'repository branch-name visibility',
+  },
+  { key: 'branch-sort-order', label: 'branch sort order' },
+  { key: 'dateFormat', label: 'date format' },
+  { key: 'timeFormat', label: 'time format' },
+  { key: 'numberFormat', label: 'number format' },
+  { key: 'preferAbsoluteDates', label: 'absolute date preference' },
+  { key: 'tab-style-recent-colors', label: 'recent tab colors' },
   { key: 'image-diff-type', label: 'image diff type' },
   {
     key: 'hide-whitespace-in-changes-diff',

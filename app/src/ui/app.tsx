@@ -53,6 +53,7 @@ import { Account, isDotComAccount } from '../models/account'
 import { TipState } from '../models/tip'
 import { CloneRepositoryTab } from '../models/clone-repository-tab'
 import { CloningRepository } from '../models/cloning-repository'
+import { resolveAppearanceCustomization } from '../models/appearance-customization'
 
 import { TitleBar, ZoomInfo, FullScreenInfo } from './window'
 
@@ -1926,6 +1927,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
             selectedShell={this.state.selectedShell}
             selectedTheme={this.state.selectedTheme}
+            appearanceCustomization={this.state.appearanceCustomization}
             zoomBaseFactor={this.state.zoomBaseFactor}
             autoFitZoomEnabled={this.state.autoFitZoomEnabled}
             windowZoomFactor={this.state.windowZoomFactor}
@@ -4593,6 +4595,10 @@ export class App extends React.Component<IAppProps, IAppState> {
       : this.state.currentTheme
 
     const currentTabSize = this.state.selectedTabSize
+    const appearance = resolveAppearanceCustomization(
+      this.state.appearanceCustomization,
+      this.state.repositoryAppearanceOverrides
+    )
 
     return (
       <div
@@ -4600,7 +4606,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         className={className}
         style={{ tabSize: currentTabSize }}
       >
-        <AppTheme theme={currentTheme} />
+        <AppTheme theme={currentTheme} appearance={appearance} />
         {this.renderTitlebar()}
         {this.state.showWelcomeFlow
           ? this.renderWelcomeFlow()

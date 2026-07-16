@@ -4,6 +4,7 @@ import * as React from 'react'
 
 import { AppTheme } from '../../../src/ui/app-theme'
 import { ApplicationTheme } from '../../../src/ui/lib/application-theme'
+import { DefaultAppearanceCustomization } from '../../../src/models/appearance-customization'
 import { fireEvent, render } from '../../helpers/ui/render'
 
 type TUnlinkBehavior = (path: string) => Promise<void>
@@ -25,6 +26,11 @@ afterEach(async () => {
   unlinkBehavior = async () => {}
   document.body.className = ''
   document.body.style.removeProperty('--background-color')
+  for (const attribute of [...document.body.attributes]) {
+    if (attribute.name.startsWith('data-dm-')) {
+      document.body.removeAttribute(attribute.name)
+    }
+  }
   document.documentElement.style.colorScheme = ''
 })
 
@@ -41,7 +47,12 @@ describe('helper side-effect surfaces', () => {
     try {
       document.body.style.setProperty('--background-color', 'rgb(1, 2, 3)')
 
-      const view = render(<AppTheme theme={ApplicationTheme.Dark} />)
+      const view = render(
+        <AppTheme
+          theme={ApplicationTheme.Dark}
+          appearance={DefaultAppearanceCustomization}
+        />
+      )
 
       assert.ok(document.body.classList.contains('theme-dark'))
       assert.equal(document.documentElement.style.colorScheme, 'dark')
@@ -49,10 +60,21 @@ describe('helper side-effect surfaces', () => {
         ['update-window-background-color', 'rgb(1, 2, 3)'],
       ])
 
-      view.rerender(<AppTheme theme={ApplicationTheme.Light} />)
+      view.rerender(
+        <AppTheme
+          theme={ApplicationTheme.Light}
+          appearance={{
+            ...DefaultAppearanceCustomization,
+            accentPalette: 'violet',
+            motion: 'reduced',
+          }}
+        />
+      )
 
       assert.equal(document.body.classList.contains('theme-dark'), false)
       assert.ok(document.body.classList.contains('theme-light'))
+      assert.equal(document.body.getAttribute('data-dm-accent'), 'violet')
+      assert.equal(document.body.getAttribute('data-dm-motion'), 'reduced')
       assert.equal(document.documentElement.style.colorScheme, 'light')
       assert.deepEqual(sends.at(-1), [
         'update-window-background-color',
@@ -62,6 +84,7 @@ describe('helper side-effect surfaces', () => {
       view.unmount()
 
       assert.equal(document.body.classList.contains('theme-light'), false)
+      assert.equal(document.body.hasAttribute('data-dm-accent'), false)
     } finally {
       electron.ipcRenderer.send = previousSend
     }
