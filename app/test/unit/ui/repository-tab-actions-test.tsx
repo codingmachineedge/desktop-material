@@ -96,15 +96,10 @@ function ArrangeHarness(props: IArrangeHarnessProps) {
 
 describe('CloseTabsContainingPopover compatibility', () => {
   it('keeps the existing regex action and protects matching pinned tabs', async () => {
-    const pinnedRepository = new Repository('C:\\work\\pinned', 1, null, false)
-    const closableRepository = new Repository(
-      'C:\\work\\closable',
-      2,
-      null,
-      false
-    )
+    const pinnedRepository = new Repository('/work/pinned', 1, null, false)
+    const closableRepository = new Repository('/work/closable', 2, null, false)
     const untouchedRepository = new Repository(
-      'C:\\work\\untouched',
+      '/work/untouched',
       3,
       null,
       false
@@ -159,15 +154,15 @@ describe('CloseTabsContainingPopover compatibility', () => {
 describe('CloseTabsExceptContainingPopover', () => {
   it('previews literal alias matches, pinned protection, and safe counts', async () => {
     const material = new Repository(
-      'C:\\work\\desktop-material',
+      '/work/desktop-material',
       1,
       null,
       false,
       'Material Alias'
     )
-    const api = new Repository('C:\\work\\api', 2, null, false)
+    const api = new Repository('/work/api', 2, null, false)
     const protectedRepository = new Repository(
-      'C:\\work\\protected',
+      '/work/protected',
       3,
       null,
       false
@@ -227,8 +222,8 @@ describe('CloseTabsExceptContainingPopover', () => {
   })
 
   it('blocks blank/zero-match Enter and supports Escape dismissal', async () => {
-    const alpha = new Repository('C:\\work\\alpha', 1, null, false)
-    const beta = new Repository('C:\\work\\beta', 2, null, false)
+    const alpha = new Repository('/work/alpha', 1, null, false)
+    const beta = new Repository('/work/beta', 2, null, false)
     const store = await createStore([makeTab('a', alpha), makeTab('b', beta)])
     let dismissals = 0
     render(
@@ -256,9 +251,9 @@ describe('CloseTabsExceptContainingPopover', () => {
 
 describe('ArrangeTabsPopover', () => {
   it('pins and moves tabs with labelled group-constrained controls', async () => {
-    const zed = new Repository('C:\\work\\zed', 1, null, false)
-    const beta = new Repository('C:\\work\\beta', 2, null, false)
-    const alpha = new Repository('C:\\work\\alpha', 3, null, false)
+    const zed = new Repository('/work/zed', 1, null, false)
+    const beta = new Repository('/work/beta', 2, null, false)
+    const alpha = new Repository('/work/alpha', 3, null, false)
     const store = await createStore([
       makeTab('zed', zed, { isPinned: true }),
       makeTab('beta', beta),
@@ -292,9 +287,9 @@ describe('ArrangeTabsPopover', () => {
   })
 
   it('applies stable one-shot label, opened, and status arrangements', async () => {
-    const beta = new Repository('C:\\work\\beta', 1, null, false)
-    const alpha = new Repository('C:\\work\\alpha', 2, null, false)
-    const clean = new Repository('C:\\work\\clean', 3, null, false)
+    const beta = new Repository('/work/beta', 1, null, false)
+    const alpha = new Repository('/work/alpha', 2, null, false)
+    const clean = new Repository('/work/clean', 3, null, false)
     const store = await createStore([
       makeTab('beta', beta, { openedAt: 200 }),
       makeTab('alpha', alpha, { openedAt: 100 }),
@@ -337,9 +332,9 @@ describe('ArrangeTabsPopover', () => {
 
 describe('RepositoryTabStrip drag arrangement', () => {
   it('reorders by drag within a pin group and rejects crossing the boundary', async () => {
-    const pinned = new Repository('C:\\work\\pinned', 1, null, false)
-    const alpha = new Repository('C:\\work\\alpha', 2, null, false)
-    const beta = new Repository('C:\\work\\beta', 3, null, false)
+    const pinned = new Repository('/work/pinned', 1, null, false)
+    const alpha = new Repository('/work/alpha', 2, null, false)
+    const beta = new Repository('/work/beta', 3, null, false)
     const store = await createStore([
       makeTab('pinned', pinned, { isPinned: true }),
       makeTab('alpha', alpha),
@@ -412,7 +407,7 @@ describe('RepositoryTabStrip drag arrangement', () => {
 })
 
 describe('repositoryTabStatusRank', () => {
-  const repository = new Repository('C:\\work\\ranked', 1, null, false)
+  const repository = new Repository('/work/ranked', 1, null, false)
   const rankFor = (overrides: object) =>
     repositoryTabStatusRank(repository, {
       get: () => ({
@@ -429,14 +424,14 @@ describe('repositoryTabStatusRank', () => {
   it('ranks unavailable, conflicts, changes, sync delta, then clean', () => {
     assert.equal(
       repositoryTabStatusRank(
-        new CloningRepository('C:\\tmp\\clone', 'https://example/repo.git'),
+        new CloningRepository('/tmp/clone', 'https://example/repo.git'),
         {} as unknown as RepositoryStateCache
       ),
       0
     )
     assert.equal(
       repositoryTabStatusRank(
-        new Repository('C:\\work\\missing', 2, null, true),
+        new Repository('/work/missing', 2, null, true),
         {} as unknown as RepositoryStateCache
       ),
       0
