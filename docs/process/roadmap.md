@@ -1,6 +1,9 @@
-# Roadmap
+# Upstream historical roadmap
 
-The following are the larger areas of upcoming work the GitHub Desktop team intends to explore and has recently shipped. This is not inclusive of everything we're working on (see existing open pull requests for that), and it's not written in stone. We'll attempt to update this intermittently as priorities evolve, but can't guarantee that it stays up to date over time.
+This page preserves the historical GitHub Desktop release themes inherited by
+Desktop Material. It is not the current Desktop Material plan. For the active
+M0–M19 status and acceptance rules, see [`ROADMAP.md`](../../ROADMAP.md) and
+[`PLAN.md`](../../PLAN.md).
 
 ## Major features shipped in previous releases
 

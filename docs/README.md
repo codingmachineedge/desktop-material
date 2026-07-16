@@ -23,7 +23,8 @@ resources to get familiar with how things work:
 
 Details about how the team is organizing and shipping GitHub Desktop:
 
- - **[Roadmap](process/roadmap.md)** - the future as planned so far
+ - **[Desktop Material roadmap](../ROADMAP.md)** - completed milestones, current maintenance, and acceptance gates
+ - **[Upstream historical roadmap](process/roadmap.md)** - shipped GitHub Desktop release themes inherited by the fork
  - **[Release Planning](process/release-planning.md)** - how we plan and execute
     releases
  - **[Issue Triage](process/issue-triage.md)** - how we address issues reported

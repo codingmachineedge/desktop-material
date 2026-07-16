@@ -33,7 +33,7 @@ Please report unacceptable behavior to [opensource+desktop@github.com](mailto:op
 
 ### The Roadmap
 
-We are working on a roadmap you can read [here](https://github.com/desktop/desktop/blob/development/docs/process/roadmap.md).
+See the project's root [`ROADMAP.md`](../ROADMAP.md).
 The immediate milestones are more detailed, and the latter milestones are more
 fuzzy and subject to change.
 

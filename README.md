@@ -12,11 +12,9 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
 
 ## Shipped today
 
-The complete M0–M19 roadmap is live on `main`. The latest implementation and
-headless evidence slice is source `e282eb2fce`, and the current documentation
-map is published at `581fbb9b08`. The corresponding cache/pagination receipt,
-screenshot hashes, privacy scan, artifact purge, and owned-resource cleanup are
-recorded in [`HANDOFF.md`](HANDOFF.md) and the linked run manifest.
+The complete M0–M19 roadmap is shipped on `main`. The compact status summary is
+below; the implementation ledger is in [`PLAN.md`](PLAN.md), and detailed
+acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
 
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu
@@ -33,6 +31,7 @@ recorded in [`HANDOFF.md`](HANDOFF.md) and the linked run manifest.
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
 - Browse complete GitHub organization repository lists, filter cloning by organization, and choose an organization when publishing
 - Add GitLab accounts, including self-hosted endpoints, with a personal access token; add Bitbucket accounts with an app password, then browse and clone their repositories from the provider tab
+- Select all repositories with a mixed-state checkbox, or opt in to automatically clone newly discovered repositories while the clone dialog remains open
 - Clone a private repository from a generic HTTPS URL without a credential prompt when an eligible signed-in account matches the exact origin. Only authentication or repository-not-found ambiguity can try another exact-origin account; the successful account affinity is retained, while tokenless or stale tokenless bindings are skipped and missing, SSH, non-authentication, and cross-origin credentials never widen fallback
 - The repository list can hide its automatically maintained Recent group from **Settings → Appearance**
 - Repositories can be pinned from their context menu into a dedicated top group
@@ -106,135 +105,45 @@ recorded in [`HANDOFF.md`](HANDOFF.md) and the linked run manifest.
 
 **Also shipped:** multi-clone with organization chips, parallel/sequential modes and URL-only import/export; one-click commit and push with a generated message; self-update checks against Desktop Material releases; SVG diff hardening and display controls; safer undo/reset/tag deletion confirmations; and responsive, keyboard-accessible MD3 surfaces throughout the app.
 
-## Roadmaps
+## Roadmap
 
-This is a compact status map; detailed receipts stay in the linked run manifests and [`HANDOFF.md`](HANDOFF.md). A roadmap item is **Done** only after implementation, focused checks, an exact low-level MCP/headless-desktop gate for UI work, inspected screenshots, documentation updates, and a push to `main`.
-
-Last updated: **July 14, 2026**.
-
-| State | Wave | Shipped proof |
-|---|---|---|
-| **Done** | M0–M19 guided Git, GitHub, provider parity, and Material shell | Implementation ledger and closing acceptance are recorded in [`PLAN.md`](PLAN.md); prior P0, pagination, and run-inspector receipts remain in `.codex/run-manifests/`. |
-| **Done** | Actions provenance foundation and selected-account orchestration | Fixed policy, exact run-attempt binding, safe ZIP subject inventory, opaque IPC, verifier runtime, credential lease, and renderer/store review lifecycle are shipped. The compact implementation receipt is [`2026-07-14-actions-artifact-provenance-result-ui.md`](.codex/run-manifests/2026-07-14-actions-artifact-provenance-result-ui.md). |
-| **Done** | Actions provenance review/result UI and Actions cache manager | The cache manager loads through the selected repository account, preserves cache state across run refreshes, exposes bounded usage/list/delete workflows, and has headless geometry evidence in the current screenshot set. |
-| **Done** | Pull Request Center, Release Manager, and Issue Hub | M19’s bounded PR lifecycle/read-review, Releases/assets, and richer Issues surfaces are implemented, tested, documented, and represented in the accepted screenshot gallery. |
-| **Done** | Remaining named Git functions | Patch-series exchange, structured commit rewriting, signing, LFS, worktree/remote/stash administration, reflog recovery, merge-tree conflict preview, and guided bisect are recorded as complete in [`PLAN.md`](PLAN.md). |
-
-#### Current delivery rule
-
-Each UI slice gets a focused test receipt, a low-level MCP/headless-desktop capture set, and privacy-safe screenshots in [`docs/assets/screenshots/`](docs/assets/screenshots/). The same captures are referenced from README, the wiki gallery/user guide, and the Pages gallery before the slice is pushed to `main`. The full provenance contract and adversarial test inventory remain in the [provenance manifest](.codex/run-manifests/2026-07-14-actions-artifact-provenance-result-ui.md), rather than being duplicated here.
-
-### Capability map
-
-| Area | Shipped proof |
-|---|---|---|
-| **Git** | Core repository, history, branch, commit, stash, remote, worktree, merge/rebase, fetch/pull/push, automation, Repository Tools, patch series, structured rewrite, signing, LFS, shallow-history recovery, sparse checkout, archives, bundles, merge-tree preview, bisect, reflog, and recovery workflows. |
-| **GitHub** | Account-bound Issues/PRs, Releases/assets, Notifications, Actions runs/artifacts/jobs/logs/reviews, artifact provenance review, cache inventory/deletion, branch rules, clone/fork/publish, organization browsing, repository administration, and provider-neutral triage. |
-| **Material shell** | Responsive M3 surfaces, themes, scaling, keyboard focus, multi-window routing, repository tabs, search, automation, non-modal dialogs, and the current screenshot/documentation evidence gate. |
-| **Reference** | GitKraken comparisons remain internal planning evidence; proprietary cloud, enterprise, AI, and collaboration services are not copied. |
-
-The REST/GraphQL and Git command inventories are audit inputs only. Users get named workflows, never a raw command, endpoint, or GraphQL editor.
-
-### Verification roadmap
-
-- Do not require sideways scrolling in page or dialog shells wherever responsive wrapping or stacking can preserve usability. Horizontal scrolling is reserved for intrinsically spatial code, diff, and log surfaces.
-- Verify desktop and minimum supported windows, 50–200% UI scaling, light/dark themes, long repository/branch/host names, destructive confirmations, keyboard focus, and screen-reader labels.
-- The Pages source passes headless accessibility and clipping checks at 960×660 and 390×844: zero axe violations, matching document/body widths, and no horizontally outside elements.
-- Commit and push each coherent milestone. Documentation and screenshots must name the exact verified commit and must never claim an unbuilt state was exercised.
+The complete M0–M19 status, current maintenance work, and acceptance rules now
+live in [`ROADMAP.md`](ROADMAP.md). Detailed implementation and verification
+receipts remain in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 
 ## Screenshots
 
-### P0 named Git and GitHub functions
+The compact selection below keeps this README scannable. The
+[guided feature gallery](docs/wiki/Feature-Gallery.md) and
+[task-oriented tutorial](docs/wiki/User-Guide.md) contain the full annotated
+set.
 
-![Repository Tools showing the final full-history state after a verified deepen](docs/assets/screenshots/material-history-deepening.png)
+| Repository workflows | GitHub workflows | Accessibility and shell |
+| --- | --- | --- |
+| <img src="docs/assets/screenshots/material-repository-tools.png" alt="Repository Tools administration hub" width="420"><br><sub>Repository Tools</sub> | <img src="docs/assets/screenshots/material-actions-cache-manager.png" alt="Actions cache manager" width="420"><br><sub>Actions caches</sub> | <img src="docs/assets/screenshots/material-scale-200-autofit.png" alt="Two hundred percent scale auto-fit without clipping" width="420"><br><sub>200% auto-fit</sub> |
+| <img src="docs/assets/screenshots/material-pull-all-account-fallback.png" alt="Pull All results for several repositories" width="420"><br><sub>Pull All</sub> | <img src="docs/assets/screenshots/material-native-pull-request.png" alt="Native pull request creation" width="420"><br><sub>Pull requests</sub> | <img src="docs/assets/screenshots/material-workspace-changes.png" alt="Desktop Material Changes workspace" width="420"><br><sub>Material workspace</sub> |
+| <img src="docs/assets/screenshots/material-stash-manager.png" alt="Repository-wide stash manager" width="420"><br><sub>Stash manager</sub> | <img src="docs/assets/screenshots/material-github-issues.png" alt="GitHub issue detail and lifecycle controls" width="420"><br><sub>Issues</sub> | <img src="docs/assets/screenshots/material-responsive-overflow-fixed.png" alt="Responsive workspace without horizontal clipping" width="420"><br><sub>Responsive clipping gate</sub> |
 
-**History deepening** — the guided function reports a complete repository after the deterministic shallow fixture expanded from 3 to 15 commits.
+<details>
+<summary><strong>Open 30 more verified screenshots</strong></summary>
 
-![Native pull-request creation success with wrapped title and description](docs/assets/screenshots/material-create-pull-request.png)
+| Clone and checkout | Repository administration | Accounts and automation |
+| --- | --- | --- |
+| <img src="docs/assets/screenshots/material-clone-account-fallback.png" alt="Exact-origin account fallback clone" width="360"><br><sub>Account-aware clone</sub> | <img src="docs/assets/screenshots/material-remote-manager.png" alt="Named remote manager" width="360"><br><sub>Remote manager</sub> | <img src="docs/assets/screenshots/material-provider-accounts.png" alt="GitLab and Bitbucket account settings" width="360"><br><sub>Provider accounts</sub> |
+| <img src="docs/assets/screenshots/material-shallow-clone-safe.png" alt="Reviewed shallow clone" width="360"><br><sub>Shallow clone</sub> | <img src="docs/assets/screenshots/material-gitignore-manager.png" alt="Gitignore template manager" width="360"><br><sub>Gitignore manager</sub> | <img src="docs/assets/screenshots/material-automation.png" alt="Automation settings" width="360"><br><sub>Automation</sub> |
+| <img src="docs/assets/screenshots/material-sparse-checkout-safe.png" alt="Reviewed sparse checkout" width="360"><br><sub>Sparse checkout</sub> | <img src="docs/assets/screenshots/material-history-deepening.png" alt="Full history after deepening" width="360"><br><sub>History deepening</sub> | <img src="docs/assets/screenshots/material-agent-access.png" alt="Local agent access settings" width="360"><br><sub>Agent access</sub> |
+| <img src="docs/assets/screenshots/material-branches-sheet.png" alt="Branches side sheet" width="360"><br><sub>Branches</sub> | <img src="docs/assets/screenshots/material-repositories-sheet.png" alt="Repositories side sheet" width="360"><br><sub>Repositories</sub> | <img src="docs/assets/screenshots/material-multi-window-menu.png" alt="Open repository in a new window" width="360"><br><sub>Multi-window</sub> |
+| <img src="docs/assets/screenshots/material-history-power-tools.png" alt="History search and graph" width="360"><br><sub>History search</sub> | <img src="docs/assets/screenshots/material-branch-merge-all.png" alt="Merge all progress" width="360"><br><sub>Merge All</sub> | <img src="docs/assets/screenshots/material-notification-center.png" alt="Notification centre" width="360"><br><sub>Notifications</sub> |
+| <img src="docs/assets/screenshots/regex-builder.png" alt="Block-based regular expression builder" width="360"><br><sub>Regex builder</sub> | <img src="docs/assets/screenshots/settings-history-manager.png" alt="Settings history side sheet" width="360"><br><sub>Settings history</sub> | <img src="docs/assets/screenshots/material-settings.png" alt="Material settings dialog" width="360"><br><sub>Settings</sub> |
 
-**Create pull request** — purpose-built base/head, title, description, draft, review, and submit states; no command or API editor.
+| Pull requests and rules | Actions | Releases, issues, and providers |
+| --- | --- | --- |
+| <img src="docs/assets/screenshots/material-create-pull-request.png" alt="Create pull request success" width="360"><br><sub>Create pull request</sub> | <img src="docs/assets/screenshots/material-actions-job-log.png" alt="Searchable Actions job log" width="360"><br><sub>Job log</sub> | <img src="docs/assets/screenshots/material-github-releases.png" alt="GitHub Releases workspace" width="360"><br><sub>Releases</sub> |
+| <img src="docs/assets/screenshots/material-effective-branch-rules.png" alt="Effective branch rules" width="360"><br><sub>Branch rules</sub> | <img src="docs/assets/screenshots/material-actions-artifact-download.png" alt="Actions artifact download and digest" width="360"><br><sub>Artifact download</sub> | <img src="docs/assets/screenshots/material-provider-triage.png" alt="Provider-neutral triage" width="360"><br><sub>Provider triage</sub> |
+| <img src="docs/assets/screenshots/material-actions-pending-deployments.png" alt="Pending deployment review" width="360"><br><sub>Deployment review</sub> | <img src="docs/assets/screenshots/material-actions-pagination.png" alt="Actions run pagination" width="360"><br><sub>Run pagination</sub> | <img src="docs/assets/screenshots/material-github-notifications.png" alt="GitHub notifications" width="360"><br><sub>GitHub notifications</sub> |
+| <img src="docs/assets/screenshots/material-actions-jobs-pagination.png" alt="Attempt-aware Actions jobs" width="360"><br><sub>Attempt-aware jobs</sub> | <img src="docs/assets/screenshots/material-actions-artifact-page-two.png" alt="Actions artifact page two" width="360"><br><sub>Artifact pagination</sub> | <img src="docs/assets/screenshots/material-actions-artifacts.png" alt="Actions artifact provenance details" width="360"><br><sub>Artifact provenance</sub> |
 
-![Actions artifact details with download, digest match, and attestation-presence context](docs/assets/screenshots/material-actions-artifacts.png)
-
-**Actions artifacts** — bounded run artifact browsing, native save, local SHA-256 comparison, reveal, and explicit presence-only attestation language.
-
-![Actions cache manager with bounded usage, cache keys, refs, dates, and delete controls](docs/assets/screenshots/material-actions-cache-manager.png)
-
-**Actions cache manager** — the selected-account repository view reports 3 caches using 836.8 MiB, wraps long keys and refs, and keeps single-cache and delete-by-key actions visible without horizontal scrolling.
-
-![Headless Actions pagination evidence after the deterministic page-two run sentinel](docs/assets/screenshots/material-actions-pagination-headless.png)
-
-![Headless Actions artifact inventory with bounded pagination and cache manager context](docs/assets/screenshots/material-actions-artifacts-headless.png)
-
-![Headless Actions page-two sentinel evidence with wrapped content and no clipping](docs/assets/screenshots/material-actions-sentinel-headless.png)
-
-![Actions run pagination after loading the deterministic page-two sentinel](docs/assets/screenshots/material-actions-pagination.png)
-
-**Actions run pagination** — provider-side filters and a named load-more control retain 51 successful runs across Refresh without a command or endpoint editor.
-
-![Actions page-two artifact with a long wrapping sentinel name](docs/assets/screenshots/material-actions-artifact-page-two.png)
-
-**Actions artifact pagination** — 31 artifacts load in two bounded pages; the page-two long name wraps without overlap, clipping, or sideways page scrolling.
-
-![Attempt-aware Actions job pagination with the recovered page-two job selected](docs/assets/screenshots/material-actions-jobs-pagination.png)
-
-**Actions job pagination** — the current or a historical attempt loads through bounded 50-job pages; the retained 503→200 retry keeps page one and exact job log/re-run actions without widening the page.
-
-![Pending Actions deployment environments with long reviewer and protection details](docs/assets/screenshots/material-actions-pending-deployments.png)
-
-**Pending deployments** — purpose-built environment selection, review history, bounded approve/reject comments, locked-state guidance, and separate fork approval remain inside a vertically scrollable run-detail surface.
-
-![Effective branch rules with review, checks, merge queue, history, and operation policy](docs/assets/screenshots/material-effective-branch-rules.png)
-
-**Effective branch rules** — account-aware protection and ruleset state with long checks and deployments wrapped inside a vertically scrollable sheet.
-
-### Post-merge production launch
-
-![Post-merge production build welcome surface](docs/assets/screenshots/material-post-merge-welcome.png)
-
-**Production launch** — the rebuilt `b6e78eecf3` source opens to the privacy-safe welcome surface in the isolated off-screen verification profile; the original 960×660 capture was inspected before promotion.
-
-### Additional Material workflows
-
-![Automation preferences with global and account-level schedules](docs/assets/screenshots/material-automation.png)
-
-**Automation** — guarded commit/push and pull schedules with layered overrides.
-
-![Git-backed notification centre](docs/assets/screenshots/material-notification-center.png)
-
-**Notifications** — unread state, history, restore, and cleanup.
-
-![History search and commit graph](docs/assets/screenshots/material-history-power-tools.png)
-
-**History power tools** — commit search, filters, and ancestry graph.
-
-![Merge all branches dialog](docs/assets/screenshots/material-branch-merge-all.png)
-
-**Merge all** — branches/worktrees with per-target progress.
-
-![Agent access preferences](docs/assets/screenshots/material-agent-access.png)
-
-**Agent access** — opt-in loopback MCP/REST with bearer-token controls.
-
-![GitLab and Bitbucket provider accounts](docs/assets/screenshots/material-provider-accounts.png)
-
-**Provider accounts** — GitHub, GitLab, Bitbucket, and self-hosted endpoints.
-
-![Open repository and worktree in a new window](docs/assets/screenshots/material-multi-window-menu.png)
-
-**Multi-window** — isolated repository/worktree windows and persisted tabs.
-
-![Live Settings history side sheet](docs/assets/screenshots/settings-history-manager.png)
-
-**Settings history** — Git-backed timeline, diff, Undo, Redo, restore-to-point.
-
-![Appearance settings at a requested 200% scale auto-fitted to 96%](docs/assets/screenshots/material-scale-200-autofit.png)
-
-**200% auto-fit** — minimum-window dark-theme verification with no clipped controls.
-
-![Desktop Material Changes view](docs/assets/screenshots/material-workspace-changes.png)
-
-**Workspace shell** — Material navigation, toolbar, cards, and commit flow.
+</details>
 
 ## Building
 

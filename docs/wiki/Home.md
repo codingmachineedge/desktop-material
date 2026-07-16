@@ -13,10 +13,9 @@ non-modal dialog framework. The completed parity roadmap turns audited Git, `gh`
 capabilities into named app functions rather than a searchable command or endpoint catalogue.
 
 > **Status:** Desktop Material is in **active development**, with the complete M0–M19 roadmap
-> published on `main`. Preview builds are published from the project's
-> [GitHub Releases](https://github.com/codingmachineedge/desktop-material/releases). The latest
-> cache/pagination evidence slice is source [`e282eb2fce`](https://github.com/codingmachineedge/desktop-material/commit/e282eb2fce),
-> with the current documentation map at [`581fbb9b08`](https://github.com/codingmachineedge/desktop-material/commit/581fbb9b08).
+> published on `main`. The implementation ledger and acceptance receipts are maintained in
+> [`PLAN.md`](https://github.com/codingmachineedge/desktop-material/blob/main/PLAN.md) and
+> [`HANDOFF.md`](https://github.com/codingmachineedge/desktop-material/blob/main/HANDOFF.md).
 
 ![Desktop Material Changes view with the MD3 shell](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-workspace-changes.png)
 
@@ -31,7 +30,7 @@ capabilities into named app functions rather than a searchable command or endpoi
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
 | [Agent API](Agent-API) | Shipped MCP, local REST, stdio proxy, and CLI access for safe AI-agent control. |
-| [Living parity roadmap](https://github.com/codingmachineedge/desktop-material/blob/main/README.md#roadmaps) | Completed named-function delivery waves, production UI gates, and the no-raw-command/API-browser product contract. |
+| [Living parity roadmap](https://github.com/codingmachineedge/desktop-material/blob/main/ROADMAP.md) | Completed named-function delivery waves, current maintenance, and production acceptance gates. |
 
 ---
 

@@ -94,6 +94,13 @@ const geometryExpression = `(() => {
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
   }))
+  const galleryFigures = [...document.querySelectorAll('figure.shot')]
+  const invalidGalleryCards = galleryFigures
+    .map((figure, index) => ({
+      index,
+      imageCount: figure.querySelectorAll('img').length,
+    }))
+    .filter(figure => figure.imageCount !== 1)
   return {
     innerWidth,
     innerHeight,
@@ -102,7 +109,9 @@ const geometryExpression = `(() => {
     bodyClientWidth: document.body.clientWidth,
     bodyScrollWidth: document.body.scrollWidth,
     imageCount: images.length,
-    figureCount: document.querySelectorAll('figure.shot').length,
+    figureCount: galleryFigures.length,
+    galleryImageCount: document.querySelectorAll('figure.shot img').length,
+    invalidGalleryCards,
     brokenImages: images.filter(image =>
       !image.complete || image.naturalWidth === 0 || image.naturalHeight === 0
     ),
@@ -137,9 +146,12 @@ function assertReceipt(receipt, label) {
   if (receipt.bodyClientWidth !== receipt.bodyScrollWidth) {
     fail(`${label} body has horizontal overflow: ${JSON.stringify(receipt)}`)
   }
+  // The gallery grows over time, so verify its structure instead of a fixed size.
   if (
-    receipt.imageCount !== 25 ||
-    receipt.figureCount !== 24 ||
+    receipt.imageCount < 1 ||
+    receipt.figureCount < 1 ||
+    receipt.galleryImageCount !== receipt.figureCount ||
+    receipt.invalidGalleryCards.length > 0 ||
     receipt.brokenImages.length > 0 ||
     !exactMilestoneImages ||
     receipt.overflow.length > 0 ||

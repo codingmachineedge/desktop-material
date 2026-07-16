@@ -2,38 +2,12 @@
 
 ## Current status
 
-Milestones **M0 through M19 are shipped on `main`**. The latest M19
-implementation and headless evidence slice is source `e282eb2fce`; the current
-README/wiki/Pages documentation map is published at `581fbb9b08`. Its cache
-manager and pagination receipt is recorded in
-`2026-07-14-actions-artifact-provenance-result-ui.md` and the matching
-`HANDOFF.md` section.
-
-The shipped tree includes the bounded Windows full-suite launcher and reviewed
-exact-origin clone, Pull All, and history-deepening recovery fixes. Historical
-CI, Pages, wiki, release, privacy, artifact-purge, and owned-resource receipts
-remain below; current documentation changes are pushed directly to `main`.
-
-The M0–M18 baseline includes the responsive-shell correction prompted by the final
-1450×997 review, its exact-size headless regression capture, the public
-README/Pages/wiki propagation, the shared Node/jsdom UI-test storage fix, and
-secure GitHub Actions log downloads with stale-response protection.
-Installer release creation is pinned to the triggering `github.sha`, preventing
-an overlapping documentation push from moving a generated tag to newer `main`.
-It also includes bounded Pull All recovery through another signed-in account
-for the exact HTTPS origin. The accepted proof image is committed at
-`3acb0ba0dc69af6f2cfdd5e2967593158eac448d`.
-A later secure clone account-fallback milestone is shipped at implementation
-commit `0b4f25cc8e91eb62634e70f90e24f1a44d00dc9d`, with first reviewed `main`
-baseline `3dc1ecc4d8daff6150980e47a13db4f3a61ec37a`. Clone now preserves the
-hosted selection and proactively chooses the API-matched token-bearing account
-for a generic URL, or the first eligible exact-origin account when lookup is
-inconclusive. It remains unforced only when no eligible identity exists, then
-silently retries another account only after an authentication/not-found failure
-from that exact HTTPS origin while retaining any custom origin port.
-Historical publication evidence is recorded below and in
-[`HANDOFF.md`](HANDOFF.md). The closing M19 evidence checklist appears at the
-end of this plan and must be filled only after each check actually succeeds.
+Milestones **M0 through M19 are shipped on `main`**. The concise public status
+and current maintenance gates live in [`ROADMAP.md`](ROADMAP.md); this document
+keeps the detailed implementation ledger, architecture contracts, and
+historical acceptance evidence. Build, screenshot, CI, Pages, wiki, privacy,
+and cleanup receipts remain in [`HANDOFF.md`](HANDOFF.md) and the publish-mode
+[run manifests](.codex/run-manifests/).
 
 ## Product milestone ledger
 
@@ -50,7 +24,7 @@ end of this plan and must be filled only after each check actually succeeds.
 | **M8 — Scaling and organizations** | **COMPLETE** | 50–200% user scaling, auto-fit, shortcuts, full GitHub organization repository browsing, and organization-aware clone selection. | `app/src/lib/zoom.ts`, `app/src/ui/preferences/appearance.tsx`, `app/src/ui/clone-repository/org-filter-chips.tsx`, `app/src/lib/stores/api-repositories-store.ts` |
 | **M9 — Automation** | **COMPLETE** | One-click commit/push, global and per-repository schedules, safe auto-pull, merge-all for branches/worktrees, Copilot conflict handling, notifications, and summaries. | `app/src/lib/automation/`, `app/src/lib/stores/helpers/automation-scheduler.ts`, `app/src/ui/preferences/automation.tsx`, `app/src/ui/repository-settings/automation-overrides.tsx`, `app/src/ui/merge-all/` |
 | **M10 — Actions panel** | **COMPLETE** | Workflow run filters, rerun actions, workflow dispatch inputs, job/step detail, and searchable in-app logs. | `app/src/lib/stores/actions-store.ts`, `app/src/lib/actions-workflow-inputs.ts`, `app/src/lib/actions-log-parser/`, `app/src/ui/actions/` |
-| **M11 — Agent access** | **COMPLETE** | Localhost-only token-gated MCP and REST server, one shared redacted command contract, renderer execution bridge, stdio proxy, CLI, and Preferences controls. | `app/src/lib/agent-commands.ts`, `app/src/main-process/agent-server/`, `app/src/lib/agent-command-executor.ts`, `app/src/ui/preferences/agent-access.tsx`, `script/agent/`, `docs/agent-api.md` |
+| **M11 — Agent access** | **COMPLETE** | Localhost-only token-gated MCP and REST server, one shared redacted command contract, renderer execution bridge, stdio proxy, CLI, and Preferences controls. | `app/src/lib/agent-commands.ts`, `app/src/main-process/agent-server/`, `app/src/lib/agent-command-executor.ts`, `app/src/ui/preferences/agent-access.tsx`, `script/agent/`, `docs/wiki/Agent-API.md` |
 | **M12 — Desktop Plus quick wins** | **COMPLETE** | Telemetry disabled, Material destructive actions/icons, date and merge-commit styling, branch status/sort controls, hide-recent, permanent discard, Git identity, accessibility tooltips, and related parity controls. | `app/src/ui/changes/`, `app/src/ui/branches/`, `app/src/ui/repositories-list/`, `app/src/ui/preferences/`, `app/styles/ui/` |
 | **M13 — Repository metadata and Pull All** | **COMPLETE** | Pinning, custom groups, branch pills, repository-specific defaults/editor override, bounded Pull All with exact-origin signed-in account fallback, multi-remote management, and full submodule management. | `app/src/lib/databases/repositories-database.ts`, `app/src/ui/repository-settings/`, `app/src/ui/pull-all/`, `app/src/lib/automation/pull-all.ts`, `app/src/lib/automation/pull-all-account-fallback.ts`, `app/src/lib/git/pull.ts`, `app/src/lib/trampoline/find-account.ts`, `app/src/lib/trampoline/trampoline-environment.ts` |
 | **M14 — History power tools** | **COMPLETE** | Metadata-aware title/message/tag/hash search, shared fuzzy/regex timeline search, Material commit graph, guarded pushed-history deletion, sanitized SVG code/preview modes, and branch-name preset scripts/shortcuts. | `app/src/ui/history/`, `app/src/ui/diff/image-diffs/`, `app/src/ui/create-branch/`, `app/src/lib/git/` |

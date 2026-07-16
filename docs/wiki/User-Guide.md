@@ -163,6 +163,10 @@ open as MD3 **side sheets** rather than blocking modals.
 
 ![Preferences as an MD3 dialog](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-settings.png)
 
+![Repository navigation side sheet](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repositories-sheet.png)
+
+![Branch navigation and status side sheet](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-branches-sheet.png)
+
 ---
 
 # Power workflows
@@ -181,6 +185,8 @@ The multi-clone window clones **many repositories in one pass**.
    - **Parallel** — clone all selected repos at once (fast; heavier on network/disk).
    - **One-by-one** — clone sequentially (gentler; easier to watch progress and spot failures).
 6. Start the clone. Progress is shown per repository.
+
+![Block-based regex builder with live repository-name testing](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/regex-builder.png)
 
 ### Export / import repo lists
 
@@ -449,6 +455,8 @@ all stash entries instead of treating only the newest one as available:
 Switching branches can still offer to stash local work, and the resulting entry appears in the same
 list.
 
+![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
+
 ---
 
 ## Repository power tools
@@ -475,6 +483,12 @@ account resolution. Successful fallback uses the neutral result **Pull completed
 signed-in account.**
 
 ![Pull all completing with another signed-in account without exposing its identity](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
+
+![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
+
+![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
+
+![Reviewed gitignore template catalogue](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-gitignore-manager.png)
 
 ---
 
