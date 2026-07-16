@@ -31,13 +31,24 @@ describe('Remote Manager integration styles', () => {
     assert.match(styles, /\.remotes-manager[\s\S]*overflow-x: hidden/)
     assert.match(
       styles,
-      /\.remote-fields[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/
+      /\.remote-fields[\s\S]*grid-template-columns: repeat\([\s\S]*minmax\(min\(100%, 180px\), 1fr\)/
     )
     assert.match(
       styles,
       /\.remote-name-input,[\s\S]*\.remote-default-help[\s\S]*grid-column: 1/
     )
-    assert.match(styles, /overflow-wrap: anywhere/)
+    assert.match(
+      styles,
+      /@container repository-settings-pane \(max-width: 620px\)[\s\S]*\.remote-row[\s\S]*grid-template-columns: minmax\(0, 1fr\)[\s\S]*\.remote-fields[\s\S]*grid-template-columns: minmax\(0, 1fr\)/
+    )
+    assert.match(
+      styles,
+      /\.remote-name-input,[\s\S]*\.remote-fetch-url,[\s\S]*\.remote-push-url[\s\S]*overflow-wrap: anywhere;[\s\S]*word-break: normal;/
+    )
+    assert.doesNotMatch(
+      styles,
+      /\.remote-row[\s\S]*grid-template-columns: minmax\(0, 1fr\) 40px/
+    )
   })
 
   it('gates Save on confirmation and uses the coordinated guarded plan', () => {
