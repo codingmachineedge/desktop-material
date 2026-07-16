@@ -73,7 +73,10 @@ import type {
   IAutomationSettingsState,
 } from '../../lib/automation/automation-settings'
 import type { MergeAllMode } from '../../lib/automation/merge-all'
-import type { IPullAllResult } from '../../lib/automation/pull-all'
+import type {
+  PullAllProgressListener,
+  IPullAllResult,
+} from '../../lib/automation/pull-all'
 
 import { Account } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
@@ -1090,8 +1093,10 @@ export class Dispatcher {
     return this.appStore._pull(repository)
   }
 
-  public pullAllRepositories(): Promise<ReadonlyArray<IPullAllResult>> {
-    return this.appStore._pullAllRepositories()
+  public pullAllRepositories(
+    onProgress?: PullAllProgressListener
+  ): Promise<ReadonlyArray<IPullAllResult>> {
+    return this.appStore._pullAllRepositories(onProgress)
   }
 
   /** Fetch a specific refspec for the repository. */

@@ -52,6 +52,8 @@ describe('post-shell MD3 style contracts', () => {
 
   it('reflows Pull all results without horizontal scrolling', () => {
     const style = readStyle('_pull-all.scss')
+    assert.match(style, /\.pull-all-progress-heading/)
+    assert.match(style, /\.pull-all-progress-track/)
     assert.match(style, /pull-all-results-container/)
     assert.match(style, /overflow-x: hidden/)
     assert.match(
@@ -181,7 +183,38 @@ describe('post-shell MD3 style contracts', () => {
     )
     assert.match(
       composer,
-      /\.commit-message-component\s*\{[\s\S]*?max-width: calc\(100% - 24px\);[\s\S]*?min-width: 0;/
+      /\.commit-message-component\s*\{[\s\S]*?max-width: calc\(100% - 16px\);[\s\S]*?min-width: 0;/
+    )
+  })
+
+  it('uses compact Material density in Changes without shrinking primary targets', () => {
+    const changes = readStyle('changes/_changes-list.scss')
+    const composer = readStyle('changes/_commit-message.scss')
+
+    assert.match(
+      changes,
+      /\.changes-panel-header\s*\{[\s\S]*?padding: 10px 12px 5px;/
+    )
+    assert.match(
+      changes,
+      /\.filter-list-filter-field\s*\{[\s\S]*?input\s*\{[\s\S]*?height: 40px;[\s\S]*?min-height: 40px;/
+    )
+    assert.match(
+      changes,
+      /\.filter-button\s*\{[\s\S]*?min-width: 40px;[\s\S]*?height: 40px;/
+    )
+    assert.match(changes, /\.status\s*\{[\s\S]*?padding: 2px;/)
+    assert.match(
+      composer,
+      /max-width: calc\(100% - 16px\);[\s\S]*?margin: 0 8px 8px;[\s\S]*?padding: 9px;/
+    )
+    assert.match(
+      composer,
+      /\.commit-button\s*\{[\s\S]*?height: 40px;[\s\S]*?min-height: 40px;/
+    )
+    assert.match(
+      composer,
+      /\.description-field textarea\s*\{[\s\S]*?height: 46px;/
     )
   })
 

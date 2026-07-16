@@ -357,7 +357,11 @@ import {
   selectBranchCandidates,
   selectWorktreeCandidates,
 } from '../automation/merge-all'
-import { IPullAllResult, runBoundedPullAll } from '../automation/pull-all'
+import {
+  IPullAllResult,
+  PullAllProgressListener,
+  runBoundedPullAll,
+} from '../automation/pull-all'
 import {
   PullAllFallbackSuccessDetail,
   pullWithAccountFallback,
@@ -6758,7 +6762,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /** Pull every available repository with bounded network concurrency. */
-  public async _pullAllRepositories(): Promise<ReadonlyArray<IPullAllResult>> {
+  public async _pullAllRepositories(
+    onProgress?: PullAllProgressListener
+  ): Promise<ReadonlyArray<IPullAllResult>> {
     const repositories = await this.repositoriesStore.getAll()
     const repositoriesById = new Map(repositories.map(repo => [repo.id, repo]))
 
@@ -6767,22 +6773,29 @@ export class AppStore extends TypedBaseStore<IAppState> {
         id: repository.id,
         name: repository.name,
       })),
-      async candidate => {
+      async (candidate, reportProgress) => {
         const repository = repositoriesById.get(candidate.id)
         if (repository === undefined) {
           return { status: 'skipped', detail: 'Repository was removed.' }
         }
-        return this.performPullAllRepository(repository)
-      }
+        return this.performPullAllRepository(repository, reportProgress)
+      },
+      3,
+      onProgress
     )
   }
 
-  private async performPullAllRepository(repository: Repository) {
+  private async performPullAllRepository(
+    repository: Repository,
+    reportProgress: (detail: string) => void
+  ) {
     if (repository.missing) {
       return { status: 'skipped' as const, detail: 'Repository is missing.' }
     }
 
+    reportProgress('Refreshing repository state.')
     await this._refreshRepository(repository)
+    reportProgress('Checking the pull remote and active branch.')
     const gitStore = this.gitStoreCache.get(repository)
     const remote = gitStore.currentRemote
     if (remote === null) {
@@ -6815,6 +6828,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     let usedFallbackAccount = false
+    reportProgress(
+      `Pulling ${tip.branch.name} from ${remote.name} and checking for updates.`
+    )
     await this.withPushPullFetch(repository, async () => {
       const result = await pullWithAccountFallback(
         remote.url,
@@ -6823,9 +6839,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
         accountKey => pullRepo(repository, remote, { accountKey })
       )
       usedFallbackAccount = result.usedFallbackAccount
+      reportProgress(`Updating ${remote.name} remote HEAD metadata.`)
       await updateRemoteHEAD(repository, remote, false).catch(error =>
         log.error('Failed updating remote HEAD after Pull all', error)
       )
+      reportProgress('Refreshing the final repository state.')
       await this._refreshRepository(repository)
     })
 

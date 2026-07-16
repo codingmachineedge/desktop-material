@@ -376,25 +376,25 @@
 .commit-message-component {
   // Floating radius-20 surface-container-low card that hugs the panel bottom.
   box-sizing: border-box;
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - 16px);
   min-width: 0;
-  margin: 0 12px 12px 12px;
-  padding: 14px;
-  gap: 10px;
+  margin: 0 8px 8px;
+  padding: 9px;
+  gap: 6px;
   border-top: 0;
-  border-radius: 20px;
+  border-radius: 16px;
   background-color: var(--md-sys-color-surface-container-low);
   animation: dmUp calc(600ms * var(--mdur, 1)) var(--spring) 200ms backwards;
 
-  // 34px round primary-container avatar (spec §7). Overrides the shared
+  // Compact round primary-container avatar. Overrides the shared
   // _commit-message-avatar.scss sizing via the extra composer-scoped class.
   .commit-message-avatar-component {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
 
     .avatar-button {
-      width: 34px;
-      height: 34px;
+      width: 30px;
+      height: 30px;
       border-radius: 999px;
       background-color: var(--md-sys-color-primary-container);
       color: var(--md-sys-color-on-primary-container);
@@ -415,20 +415,20 @@
     }
   }
 
-  // Summary row: avatar + 46px radius-14 surface field with 2px focus border.
+  // Summary row: avatar + compact surface field with a 2px focus border.
   .summary {
     align-items: center;
-    column-gap: 10px;
+    column-gap: 7px;
 
     .summary-field {
       margin-bottom: 0;
 
       input {
         width: 100%;
-        height: 46px;
-        padding: 0 12px;
+        height: 40px;
+        padding: 0 10px;
         border: 2px solid var(--md-sys-color-outline-variant);
-        border-radius: 14px;
+        border-radius: 12px;
         background-color: var(--md-sys-color-surface);
         color: var(--md-sys-color-on-surface);
         font-size: 13.5px;
@@ -453,12 +453,12 @@
       padding-right: 36px;
     }
 
-    // Amber "great summaries are < 50 chars" glyph inside the 46px field.
+    // Amber "great summaries are < 50 chars" glyph inside the 40px field.
     .length-hint {
       top: 0;
       right: 0;
       width: 30px;
-      height: 46px;
+      height: 40px;
       margin-right: 4px;
 
       .warning-icon,
@@ -471,7 +471,7 @@
   // Description textarea card + toolbar row.
   .description-focus-container {
     border: 2px solid var(--md-sys-color-outline-variant);
-    border-radius: 14px;
+    border-radius: 12px;
     background-color: var(--md-sys-color-surface);
     transition: border-color 200ms var(--emph);
 
@@ -481,11 +481,11 @@
     }
 
     textarea {
-      padding: 8px 12px;
+      padding: 4px 10px;
       background: transparent;
       color: var(--md-sys-color-on-surface);
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.4;
 
       &::placeholder {
         color: var(--md-sys-color-on-surface-variant);
@@ -496,11 +496,11 @@
     .action-bar {
       gap: 2px;
       align-items: center;
-      padding: 4px 8px 8px;
-      margin-top: 4px;
+      padding: 2px 4px 4px;
+      margin-top: 2px;
       background: transparent;
-      border-bottom-left-radius: 14px;
-      border-bottom-right-radius: 14px;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
 
       &.disabled {
         background: transparent;
@@ -587,30 +587,30 @@
     }
   }
 
-  // Commit button: 48px filled pill, hover morphs to radius-18 + level2 lift,
+  // Commit button: 40px filled pill, hover morphs to radius-16 + level2 lift,
   // dmSpin spinner while committing. Keeps the .commit-button JS/a11y hook.
   .commit-button {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 9px;
+    gap: 7px;
     width: 100%;
     max-width: 100%;
-    height: 48px;
-    min-height: 48px;
+    height: 40px;
+    min-height: 40px;
     margin-top: 2px;
-    padding: 0 16px;
+    padding: 0 12px;
     border: 0;
     border-radius: 999px;
     background-color: var(--md-sys-color-primary);
     color: var(--md-sys-color-on-primary);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.01em;
     transition: border-radius 260ms var(--spring), box-shadow 200ms var(--emph), transform 200ms var(--spring-fast), background-color 200ms var(--emph), color 200ms var(--emph);
 
     &:not(:disabled):hover {
-      border-radius: 18px;
+      border-radius: 16px;
       box-shadow: var(--md-sys-elevation-level2);
       background-color: var(--md-sys-color-primary);
       color: var(--md-sys-color-on-primary);
@@ -660,7 +660,7 @@
 // how the built composer ended up ~150px tall and eating the vertical space that
 // should go to the changed-files list. So instead of a floor we pin the collapsed
 // height deterministically to two rows (8px block padding + 2×~19.5px line boxes
-// ≈ 56px, box-sizing: border-box). An EMPTY description is now a tidy ~2-row box;
+// ≈ 46px, box-sizing: border-box). An EMPTY description is now a tidy ~2-row box;
 // typing past two rows scrolls the textarea, so the `.with-overflow` scroll-fade
 // still works. Covers both selectors for the textarea (`.description-field` is the
 // autocompletion wrapper, `.description-focus-container` the focus wrapper) and
@@ -670,6 +670,6 @@
   .description-focus-container textarea,
   .description-field textarea {
     min-height: 0;
-    height: 56px;
+    height: 46px;
   }
 }

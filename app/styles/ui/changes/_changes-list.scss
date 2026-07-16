@@ -773,13 +773,13 @@
   .changes-panel-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex: 0 0 auto;
-    padding: 18px 18px 10px 18px;
+    padding: 10px 12px 5px;
 
     .changes-panel-title {
       margin: 0;
-      font-size: 21px;
+      font-size: 18px;
       font-weight: 600;
       line-height: 1.1;
       letter-spacing: -0.01em;
@@ -791,12 +791,12 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      height: 24px;
-      padding: 0 10px;
+      height: 20px;
+      padding: 0 7px;
       border-radius: 999px;
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
-      font-size: 12.5px;
+      font-size: 11.5px;
       font-weight: 700;
       line-height: 1;
       animation: dmBounce 500ms var(--spring-fast) backwards;
@@ -817,12 +817,12 @@
   // defined higher up in this file (`.filtered-changes-list .header
   // .filter-box-container …`) and wins on source order.
   .header .filter-box-container {
-    gap: 6px;
+    gap: 4px;
     align-items: center;
     max-width: 100%;
     min-width: 0;
 
-    // Search field becomes a 46px pill (§6.2). Sits left, flex-grows; the
+    // Search field becomes a compact 40px pill (§6.2). Sits left, flex-grows; the
     // filter (tune) button is pushed to the right via order.
     .filter-list-filter-field {
       order: 0;
@@ -834,10 +834,10 @@
       &::before {
         content: '';
         position: absolute;
-        left: 15px;
+        left: 13px;
         top: 50%;
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
         transform: translateY(-50%);
         pointer-events: none;
         z-index: 1;
@@ -848,13 +848,13 @@
       }
 
       input {
-        height: 46px;
-        min-height: 46px;
+        height: 40px;
+        min-height: 40px;
         border-radius: 999px;
         background: var(--md-sys-color-surface-container-high);
         border: 2px solid transparent;
-        padding: 0 14px 0 42px;
-        font-size: 13.5px;
+        padding: 0 12px 0 36px;
+        font-size: 13px;
         box-shadow: none;
         transition: border-color 160ms var(--emph), background-color 200ms var(--emph);
 
@@ -871,8 +871,8 @@
 
       // TextBox's own clear button → round tonal affordance.
       .clear-button {
-        width: 30px;
-        height: 30px;
+        width: 28px;
+        height: 28px;
         border-radius: 999px;
         display: grid;
         place-items: center;
@@ -894,9 +894,9 @@
     .filter-button {
       order: 1;
       flex: 0 0 auto;
-      min-width: 38px;
-      width: 38px;
-      height: 38px;
+      min-width: 40px;
+      width: 40px;
+      height: 40px;
       padding: 0;
       display: inline-grid;
       grid-auto-flow: column;
@@ -953,20 +953,20 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    margin-top: 8px;
+    gap: 4px;
+    margin-top: 5px;
     animation: dmUp 340ms var(--spring) backwards;
 
     .changes-filter-chip,
     .changes-regex-builder-chip {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      height: 30px;
-      padding: 0 12px;
+      gap: 5px;
+      height: 28px;
+      padding: 0 9px;
       border: 0;
       border-radius: 999px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 700;
       line-height: 1;
       cursor: pointer;
@@ -1110,12 +1110,12 @@
 #changes-list {
   .list-item {
     border-bottom: 0;
-    // Start at the large-file-row radius (14) and morph to 18 on hover (§6.5).
-    border-radius: 14px;
+    // Start at radius 10 and morph to 12 on hover (§6.5).
+    border-radius: 10px;
     transition: background-color 140ms var(--emph), border-radius 260ms var(--spring), transform 180ms var(--spring-fast);
 
     &:not(.not-selectable):hover {
-      border-radius: 18px;
+      border-radius: 12px;
     }
 
     &:active {
@@ -1124,12 +1124,12 @@
   }
 
   .file {
-    // The status octicon renders as a 24×24 tonal chip (16px glyph + 4px pad),
+    // The status octicon renders as a 20×20 tonal chip (16px glyph + 2px pad),
     // wider than the 16px the base row padding assumes. Reserve room on the
     // right so the chip clears the panel edge, and let the filename column
     // shrink + ellipsize so the chip never overlaps the name (verified at the
     // 372px panel width).
-    padding-right: 14px;
+    padding-right: 10px;
 
     .path-label-component {
       flex: 1 1 auto;
@@ -1137,16 +1137,16 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      margin-right: 8px;
+      margin-right: 6px;
     }
 
-    // Status octicon → 24×24 radius-8 tonal chip. `content-box` keeps the
-    // ~16px glyph and adds 4px padding around it inside the coloured box.
+    // Status octicon → 20×20 tonal chip. `content-box` keeps the ~16px glyph
+    // and adds 2px padding around it inside the coloured box.
     .status {
       box-sizing: content-box;
       width: 16px;
       height: 16px;
-      padding: 4px;
+      padding: 2px;
       border-radius: var(--md-sys-shape-corner-small);
       vertical-align: middle;
       transition: transform 200ms var(--spring-fast);
