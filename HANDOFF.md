@@ -706,6 +706,60 @@ Seven privacy-safe captures were inspected at original resolution:
 | `docs/assets/screenshots/material-actions-cancel.png` | 1440×960 | 133,083 | `6dceb918e322b2f30ee574a51e815e32f5d4b272f250811b20202a409bec731c` |
 | `docs/assets/screenshots/material-rebase-review.png` | 1440×960 | 153,207 | `145c5b54320116ce41bdc0b17eb9e726a8cb0dbaf0988886011a862d8cc189de` |
 
+## 2026-07-16 profile identity and portable tab workspace
+
+The exact implementation commit is
+`4e797f52b9ecb4d77f40bfa1e11629fb2f8e3b95`. It adds a persistent,
+profile-backed **App identity** editor with a shared live/title-bar brand,
+validated built-in or custom logos, geometry, borders, shadows, colors, and
+Word-style name typography. Font, width, weight, case, size, spacing, opacity,
+bold, italic, underline, strikethrough, small caps, highlight, and fixed text
+effects restore across restart without changing the signed executable or
+operating-system icon. Migration retains unknown newer identity and tab-style
+keys while validating every known field before persistence or CSS use.
+
+Repository tabs now support favorites, favorites-first/last stable one-shot
+sorting inside pin groups, local repository-folder drop to add/open/switch, and
+bounded JSON export/import of the current order, active tab, aliases, pins,
+favorites, and appearance. Runtime ids and credentials are excluded; malformed,
+oversized, relative-only, duplicate, and missing-path entries fail or skip
+safely, and a replace import never destroys a usable session when no repository
+can be resolved. Appropriate shell, title, tab, and repository surfaces expose
+right-click customization plus the exact profile-history or repository Git
+ownership path; editable and specialized context menus retain priority.
+
+The complete runner passed 1,218/1,218 tests across 420 files and 306 suites.
+TypeScript, scoped ESLint/Prettier, staged diff and secret scans, focused
+accessibility/context/session tests, and the exact MCP production build passed.
+The build used the fixed low-level service and returned successfully in 170.5
+seconds without downloading dependencies.
+
+All interaction stayed on off-screen desktop
+`DesktopMaterialScreenshotRefresh2026071601`. Because native hidden-HWND resize
+was unavailable, the approved CDP viewport fallback verified all 38 unique
+identity controls at a 645×645 renderer viewport. Document, body, preference
+pane, and identity surfaces had matching client/scroll widths; no required
+control clipped horizontally. Restart restoration, the eight arrange actions,
+favorite state, export/import dialogs, and folder-drop overlay passed their
+bounded geometry gates. This native-width limitation is explicit; the renderer
+gate did not claim a second native resize mechanism.
+
+The freshly rebuilt MCP screenshot
+`docs/assets/screenshots/material-app-identity-workspace.png` is 1443×992,
+166,398 bytes, SHA-256
+`45504266edf337f36a5a6bde0932e1b7ab740d33009e7d8c04a866979e506533`.
+README, Pages, and wiki sources share the asset. Fifty-five distinct published
+screenshot references resolve locally with none missing; Pages presents 54
+unique gallery images and the guided wiki table catalogs 53. The screenshot was
+inspected at original resolution and contains synthetic state only.
+
+Exact owned PID/HWND pairs `11388`/`315884768` and `2148`/`54920934` were
+gracefully stopped, the hidden desktop reached zero windows and closed once,
+and the containment-checked Temp root was removed. The visible desktop and
+unrelated Electron processes were untouched. The foreign OAuth-scope manifest
+remained untracked and byte-identical; the detached release worktree was not
+modified.
+
 ## Maintenance constraints
 
 - Keep account identity on `endpoint#id`; never collapse provider accounts by
