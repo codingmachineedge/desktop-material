@@ -351,7 +351,13 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     style: ITabTitleStyle | null
   ): Promise<void> {
     const tabs = this.state.tabs.map(t =>
-      t.id === id ? { ...t, titleStyle: style } : t
+      t.id === id
+        ? {
+            ...t,
+            titleStyle:
+              style === null ? null : { ...(t.titleStyle ?? {}), ...style },
+          }
+        : t
     )
     await this.persist({ ...this.state, tabs }, 'Update tab appearance')
   }

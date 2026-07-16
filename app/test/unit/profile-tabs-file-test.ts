@@ -7,6 +7,7 @@ import {
 import {
   IProfileTabsState,
   IRepositoryTab,
+  ITabTitleStyle,
 } from '../../src/models/repository-tab'
 
 const tab = (id: string): IRepositoryTab => ({
@@ -59,5 +60,24 @@ describe('profile tabs file window scopes', () => {
       ),
       null
     )
+  })
+
+  it('preserves unknown newer tab-appearance keys across merge and read', () => {
+    const futureStyle = {
+      bold: true,
+      futurePaletteMode: 'theme',
+      futurePaletteTokens: ['primary', 'secondary'],
+    } as unknown as ITabTitleStyle
+    const futureState: IProfileTabsState = {
+      tabs: [{ ...tab('z'), titleStyle: futureStyle }],
+      activeTabId: 'z',
+    }
+
+    const persisted = JSON.parse(
+      JSON.stringify(mergeWindowTabsState({}, 'primary', futureState, 2))
+    )
+    const restored = readWindowTabsState(persisted, 'primary')
+
+    assert.deepEqual(restored, futureState)
   })
 })

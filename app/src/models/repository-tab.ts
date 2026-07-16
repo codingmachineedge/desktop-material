@@ -20,6 +20,16 @@ export interface ITabTitleStyle {
   readonly bold?: boolean
   readonly italic?: boolean
   readonly underline?: boolean
+  /** Draw a line through the title text. */
+  readonly strikeThrough?: boolean
+  /** Render lower-case letters as small capitals. */
+  readonly smallCaps?: boolean
+  /** Apply a constrained CSS case transformation. */
+  readonly textCase?: 'normal' | 'uppercase' | 'lowercase' | 'capitalize'
+  /** Extra spacing between characters in px. */
+  readonly characterSpacing?: number
+  /** A curated, injection-safe title text effect. */
+  readonly textEffect?: 'none' | 'soft-shadow' | 'strong-shadow'
   readonly textAlign?: 'left' | 'center' | 'right'
 }
 
@@ -197,6 +207,13 @@ export const MaxTabFontSize = 32
 /** The tab title font size assumed when a tab has no explicit override. */
 export const DefaultTabFontSize = 13
 
+/** Allowed character-spacing range (px) for a tab title. */
+export const MinTabCharacterSpacing = -1
+export const MaxTabCharacterSpacing = 4
+
+/** The tab title character spacing assumed without an explicit override. */
+export const DefaultTabCharacterSpacing = 0
+
 /** The tab strip's base tab height (px) at the default font size. */
 const BaseTabHeight = 38
 
@@ -209,6 +226,18 @@ const MaxTabMinWidth = 240
 /** Clamp a requested tab font size into the supported range. */
 export function clampTabFontSize(size: number): number {
   return Math.min(MaxTabFontSize, Math.max(MinTabFontSize, Math.round(size)))
+}
+
+/** Clamp character spacing and snap it to quarter-pixel increments. */
+export function clampTabCharacterSpacing(spacing: number): number {
+  if (!Number.isFinite(spacing)) {
+    return DefaultTabCharacterSpacing
+  }
+  const snapped = Math.round(spacing * 4) / 4
+  return Math.min(
+    MaxTabCharacterSpacing,
+    Math.max(MinTabCharacterSpacing, snapped)
+  )
 }
 
 const hexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i
@@ -258,8 +287,45 @@ export function tabTitleStyleToCss(
   if (style.italic) {
     css.fontStyle = 'italic'
   }
-  if (style.underline) {
-    css.textDecoration = 'underline'
+  const decorationLines: string[] = []
+  if (style.underline === true) {
+    decorationLines.push('underline')
+  }
+  if (style.strikeThrough === true) {
+    decorationLines.push('line-through')
+  }
+  if (decorationLines.length > 0) {
+    css.textDecoration = decorationLines.join(' ')
+  }
+  if (style.smallCaps === true) {
+    css.fontVariant = 'small-caps'
+  }
+  switch (style.textCase) {
+    case 'normal':
+      css.textTransform = 'none'
+      break
+    case 'uppercase':
+    case 'lowercase':
+    case 'capitalize':
+      css.textTransform = style.textCase
+      break
+  }
+  if (
+    style.characterSpacing !== undefined &&
+    Number.isFinite(style.characterSpacing)
+  ) {
+    css.letterSpacing = `${clampTabCharacterSpacing(style.characterSpacing)}px`
+  }
+  switch (style.textEffect) {
+    case 'soft-shadow':
+      css.textShadow = '0 1px 2px rgb(0 0 0 / 35%)'
+      break
+    case 'strong-shadow':
+      css.textShadow = '1px 2px 3px rgb(0 0 0 / 55%)'
+      break
+    case 'none':
+      css.textShadow = 'none'
+      break
   }
   if (style.textAlign !== undefined) {
     css.textAlign = style.textAlign

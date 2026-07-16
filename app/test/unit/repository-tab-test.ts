@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   clampTabFontSize,
+  clampTabCharacterSpacing,
   isValidTabColor,
   isValidFontFamily,
   tabTitleStyleToCss,
@@ -9,8 +10,12 @@ import {
   tabFontStack,
   MinTabFontSize,
   MaxTabFontSize,
+  MinTabCharacterSpacing,
+  MaxTabCharacterSpacing,
+  DefaultTabCharacterSpacing,
   IRepositoryTab,
   IProfileTabsState,
+  ITabTitleStyle,
 } from '../../src/models/repository-tab'
 import { Repository } from '../../src/models/repository'
 import { ProfileStore } from '../../src/lib/stores/profile-store'
@@ -29,6 +34,25 @@ describe('clampTabFontSize', () => {
   it('rounds values within range', () => {
     assert.equal(clampTabFontSize(12.4), 12)
     assert.equal(clampTabFontSize(12.6), 13)
+  })
+})
+
+describe('clampTabCharacterSpacing', () => {
+  it('clamps and snaps to quarter-pixel increments', () => {
+    assert.equal(clampTabCharacterSpacing(-10), MinTabCharacterSpacing)
+    assert.equal(clampTabCharacterSpacing(20), MaxTabCharacterSpacing)
+    assert.equal(clampTabCharacterSpacing(1.13), 1.25)
+  })
+
+  it('falls back safely for non-finite persisted values', () => {
+    assert.equal(
+      clampTabCharacterSpacing(Number.NaN),
+      DefaultTabCharacterSpacing
+    )
+    assert.equal(
+      clampTabCharacterSpacing(Number.POSITIVE_INFINITY),
+      DefaultTabCharacterSpacing
+    )
   })
 })
 
@@ -62,15 +86,74 @@ describe('tabTitleStyleToCss', () => {
     assert.equal(css.color, '#123456')
   })
 
-  it('applies bold, italic, and underline', () => {
+  it('applies bold, italic, underline, and strikethrough together', () => {
     const css = tabTitleStyleToCss({
       bold: true,
       italic: true,
       underline: true,
+      strikeThrough: true,
     })
     assert.equal(css.fontWeight, 'bold')
     assert.equal(css.fontStyle, 'italic')
-    assert.equal(css.textDecoration, 'underline')
+    assert.equal(css.textDecoration, 'underline line-through')
+  })
+
+  it('applies small caps and only supported case transforms', () => {
+    const css = tabTitleStyleToCss({
+      smallCaps: true,
+      textCase: 'uppercase',
+    })
+    assert.equal(css.fontVariant, 'small-caps')
+    assert.equal(css.textTransform, 'uppercase')
+
+    const malformed = tabTitleStyleToCss({
+      textCase: 'rotate(90deg)',
+    } as unknown as ITabTitleStyle)
+    assert.equal(malformed.textTransform, undefined)
+  })
+
+  it('clamps character spacing and drops non-finite values', () => {
+    assert.equal(
+      tabTitleStyleToCss({ characterSpacing: 9 }).letterSpacing,
+      '4px'
+    )
+    assert.equal(
+      tabTitleStyleToCss({ characterSpacing: 0.62 }).letterSpacing,
+      '0.5px'
+    )
+    assert.equal(
+      tabTitleStyleToCss({ characterSpacing: Number.NaN }).letterSpacing,
+      undefined
+    )
+  })
+
+  it('maps only curated text effects to fixed CSS', () => {
+    assert.equal(
+      tabTitleStyleToCss({ textEffect: 'soft-shadow' }).textShadow,
+      '0 1px 2px rgb(0 0 0 / 35%)'
+    )
+    assert.equal(
+      tabTitleStyleToCss({ textEffect: 'strong-shadow' }).textShadow,
+      '1px 2px 3px rgb(0 0 0 / 55%)'
+    )
+    assert.equal(tabTitleStyleToCss({ textEffect: 'none' }).textShadow, 'none')
+    assert.equal(
+      tabTitleStyleToCss({
+        textEffect: 'url(javascript:alert(1))',
+      } as unknown as ITabTitleStyle).textShadow,
+      undefined
+    )
+  })
+
+  it('uses a validated background color as a text highlight', () => {
+    assert.equal(
+      tabTitleStyleToCss({ backgroundColor: '#ffff00' }).backgroundColor,
+      '#ffff00'
+    )
+    assert.equal(
+      tabTitleStyleToCss({ backgroundColor: 'url(x)' }).backgroundColor,
+      undefined
+    )
   })
 
   it('clamps the font size', () => {
@@ -192,6 +275,66 @@ describe('RepositoryTabsStore', () => {
     assert.deepEqual(active?.titleStyle, { bold: true })
     assert.equal(store.getState().tabs.length, 1)
     assert.equal(writes, 0)
+  })
+
+  it('patches tab styles without deleting unknown newer appearance keys', async () => {
+    const futureStyle = {
+      color: '#123456',
+      futurePaletteMode: 'theme',
+      futureRecentColors: ['#abcdef'],
+    } as unknown as ITabTitleStyle
+    const restored: IProfileTabsState = {
+      tabs: [
+        {
+          id: 'future-tab',
+          repositoryId: 41,
+          repositoryPath: 'C:\\work\\desktop-material',
+          customLabel: null,
+          titleStyle: futureStyle,
+        },
+      ],
+      activeTabId: 'future-tab',
+    }
+    const profileStore = {
+      readTabs: () => Promise.resolve(restored),
+      writeTabs: () => Promise.resolve(),
+    } as unknown as ProfileStore
+    const store = new RepositoryTabsStore(profileStore)
+    await store.initialize()
+
+    await store.setTabStyle('future-tab', { bold: true })
+
+    assert.deepEqual(store.getActiveTab()?.titleStyle, {
+      color: '#123456',
+      futurePaletteMode: 'theme',
+      futureRecentColors: ['#abcdef'],
+      bold: true,
+    })
+  })
+
+  it('still clears every style key when clear formatting is requested', async () => {
+    const restored: IProfileTabsState = {
+      tabs: [
+        {
+          id: 'styled-tab',
+          repositoryId: 41,
+          repositoryPath: 'C:\\work\\desktop-material',
+          customLabel: null,
+          titleStyle: { bold: true, strikeThrough: true },
+        },
+      ],
+      activeTabId: 'styled-tab',
+    }
+    const profileStore = {
+      readTabs: () => Promise.resolve(restored),
+      writeTabs: () => Promise.resolve(),
+    } as unknown as ProfileStore
+    const store = new RepositoryTabsStore(profileStore)
+    await store.initialize()
+
+    await store.setTabStyle('styled-tab', null)
+
+    assert.equal(store.getActiveTab()?.titleStyle, null)
   })
 })
 

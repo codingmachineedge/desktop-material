@@ -12,8 +12,12 @@ import {
   MinTabFontSize,
   MaxTabFontSize,
   DefaultTabFontSize,
+  MinTabCharacterSpacing,
+  MaxTabCharacterSpacing,
+  DefaultTabCharacterSpacing,
   isValidTabColor,
   tabFontOptions,
+  tabTitleStyleToCss,
 } from '../../models/repository-tab'
 import { getStringArray, setStringArray } from '../../lib/local-storage'
 
@@ -32,14 +36,17 @@ interface ITabStyleEditorState {
   readonly fontQuery: string
   /** Recently picked colors, most-recent first, persisted across sessions. */
   readonly recentColors: ReadonlyArray<string>
-  /** Which part of the tab the shared color palette currently edits. */
-  readonly colorTarget: TabColorTarget
+  /** Recently picked highlight colors, kept separate from text colors. */
+  readonly recentHighlightColors: ReadonlyArray<string>
 }
 
 type TabColorTarget = 'color' | 'backgroundColor'
 
 /** localStorage key backing the "recent colors" row. */
 const RecentColorsKey = 'tab-style-recent-colors'
+
+/** localStorage key backing the independent highlight-color history. */
+const RecentHighlightColorsKey = 'tab-style-recent-highlight-colors'
 
 /** How many recent colors to keep. */
 const RecentColorLimit = 8
@@ -76,18 +83,26 @@ const paletteColors: ReadonlyArray<string> = [
 /** The color shown in the native picker / used as a fallback selection. */
 const DefaultPickerColor = '#006493'
 
-/** The "Tab appearance" popover for customizing a tab's title appearance. */
+type TabTextCase = NonNullable<ITabTitleStyle['textCase']>
+type TabTextEffect = NonNullable<ITabTitleStyle['textEffect']>
+
+/** The Word-style popover for customizing a tab's title appearance. */
 export class TabStyleEditor extends React.Component<
   ITabStyleEditorProps,
   ITabStyleEditorState
 > {
   public constructor(props: ITabStyleEditorProps) {
     super(props)
+    const recentColors = getStringArray(RecentColorsKey).filter(isValidTabColor)
+    const storedHighlightColors = getStringArray(
+      RecentHighlightColorsKey
+    ).filter(isValidTabColor)
     this.state = {
       fontMenuOpen: false,
       fontQuery: '',
-      recentColors: getStringArray(RecentColorsKey).filter(isValidTabColor),
-      colorTarget: 'color',
+      recentColors,
+      recentHighlightColors:
+        storedHighlightColors.length > 0 ? storedHighlightColors : recentColors,
     }
   }
 
@@ -109,6 +124,12 @@ export class TabStyleEditor extends React.Component<
         break
       case 'underline':
         this.update({ underline: this.style.underline !== true })
+        break
+      case 'strikeThrough':
+        this.update({ strikeThrough: this.style.strikeThrough !== true })
+        break
+      case 'smallCaps':
+        this.update({ smallCaps: this.style.smallCaps !== true })
         break
     }
   }
@@ -136,46 +157,60 @@ export class TabStyleEditor extends React.Component<
     this.setState({ fontMenuOpen: false, fontQuery: '' })
   }
 
-  private applyColor(target: TabColorTarget, color: string) {
+  private applyColor(color: string, target: TabColorTarget) {
     if (!isValidTabColor(color)) {
       return
     }
     this.update(target === 'color' ? { color } : { backgroundColor: color })
-    this.rememberColor(color)
+    this.rememberColor(color, target)
   }
 
-  private rememberColor(color: string) {
+  private rememberColor(color: string, target: TabColorTarget) {
     const lower = color.toLowerCase()
+    const recent =
+      target === 'color'
+        ? this.state.recentColors
+        : this.state.recentHighlightColors
     const next = [
       lower,
-      ...this.state.recentColors.filter(c => c.toLowerCase() !== lower),
+      ...recent.filter(c => c.toLowerCase() !== lower),
     ].slice(0, RecentColorLimit)
-    this.setState({ recentColors: next })
-    setStringArray(RecentColorsKey, next)
-  }
-
-  private onColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    this.applyColor(this.state.colorTarget, event.currentTarget.value)
-  }
-
-  private onColorInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    this.applyColor(this.state.colorTarget, event.currentTarget.value)
-  }
-
-  private onColorTargetClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    switch (event.currentTarget.value) {
-      case 'color':
-      case 'backgroundColor':
-        this.setState({ colorTarget: event.currentTarget.value })
-        break
+    if (target === 'color') {
+      this.setState({ recentColors: next })
+      setStringArray(RecentColorsKey, next)
+    } else {
+      this.setState({ recentHighlightColors: next })
+      setStringArray(RecentHighlightColorsKey, next)
     }
   }
 
-  private onUseDefaultColor = () => {
+  private onColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    this.applyColor(
+      event.currentTarget.value,
+      event.currentTarget.dataset.target === 'backgroundColor'
+        ? 'backgroundColor'
+        : 'color'
+    )
+  }
+
+  private onColorInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.applyColor(
+      event.currentTarget.value,
+      event.currentTarget.dataset.target === 'backgroundColor'
+        ? 'backgroundColor'
+        : 'color'
+    )
+  }
+
+  private onUseDefaultColor = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const target: TabColorTarget =
+      event.currentTarget.dataset.target === 'backgroundColor'
+        ? 'backgroundColor'
+        : 'color'
     const next: {
       -readonly [Key in keyof ITabTitleStyle]: ITabTitleStyle[Key]
     } = { ...this.style }
-    delete next[this.state.colorTarget]
+    delete next[target]
     this.props.onStyleChange(next)
   }
 
@@ -183,14 +218,43 @@ export class TabStyleEditor extends React.Component<
     this.update({ fontSize: event.currentTarget.valueAsNumber })
   }
 
+  private onCharacterSpacingChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.update({ characterSpacing: event.currentTarget.valueAsNumber })
+  }
+
+  private onCaseClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    switch (event.currentTarget.value) {
+      case 'normal':
+      case 'uppercase':
+      case 'lowercase':
+      case 'capitalize':
+        this.update({ textCase: event.currentTarget.value })
+        break
+    }
+  }
+
+  private onEffectClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    switch (event.currentTarget.value) {
+      case 'none':
+      case 'soft-shadow':
+      case 'strong-shadow':
+        this.update({ textEffect: event.currentTarget.value })
+        break
+    }
+  }
+
   private renderToggle(
-    key: 'bold' | 'italic' | 'underline',
-    label: string,
-    className: string
+    key: 'bold' | 'italic' | 'underline' | 'strikeThrough' | 'smallCaps',
+    label: React.ReactNode,
+    className: string,
+    ariaLabel: string
   ) {
     const active = this.style[key] === true
     return (
       <button
+        type="button"
         className={
           active
             ? `tab-style-toggle ${className} active`
@@ -198,7 +262,7 @@ export class TabStyleEditor extends React.Component<
         }
         value={key}
         aria-pressed={active}
-        aria-label={key}
+        aria-label={ariaLabel}
         onClick={this.onToggleClick}
       >
         {label}
@@ -210,6 +274,7 @@ export class TabStyleEditor extends React.Component<
     const active = this.style.textAlign === direction
     return (
       <button
+        type="button"
         className={active ? 'tab-style-align active' : 'tab-style-align'}
         value={direction}
         aria-pressed={active}
@@ -250,6 +315,7 @@ export class TabStyleEditor extends React.Component<
         </span>
         <div className="tab-style-font-picker">
           <button
+            type="button"
             className="tab-style-font-select"
             style={{ fontFamily: stack }}
             aria-haspopup="listbox"
@@ -278,6 +344,7 @@ export class TabStyleEditor extends React.Component<
                   const selected = o.family === current
                   return (
                     <button
+                      type="button"
                       key={o.family}
                       className={
                         selected
@@ -310,18 +377,22 @@ export class TabStyleEditor extends React.Component<
     )
   }
 
-  private renderSwatch(color: string, keyPrefix: string) {
-    const { colorTarget } = this.state
-    const targetLabel =
-      colorTarget === 'color' ? 'Text color' : 'Background color'
+  private renderSwatch(
+    color: string,
+    keyPrefix: string,
+    target: TabColorTarget
+  ) {
+    const current = this.style[target]
     const active =
-      this.style[colorTarget] !== undefined &&
-      this.style[colorTarget]?.toLowerCase() === color.toLowerCase()
+      current !== undefined && current.toLowerCase() === color.toLowerCase()
+    const targetLabel = target === 'color' ? 'Text color' : 'Highlight color'
     return (
       <button
-        key={`${keyPrefix}-${color}`}
+        type="button"
+        key={`${keyPrefix}-${target}-${color}`}
         className={active ? 'tab-style-swatch active' : 'tab-style-swatch'}
         value={color}
+        data-target={target}
         style={{ backgroundColor: color }}
         aria-label={`${targetLabel} ${color}`}
         aria-pressed={active}
@@ -330,11 +401,16 @@ export class TabStyleEditor extends React.Component<
     )
   }
 
-  private renderColors() {
-    const { colorTarget } = this.state
-    const current = this.style[colorTarget]
-    const targetLabel =
-      colorTarget === 'color' ? 'text color' : 'background color'
+  private renderColors(target: TabColorTarget) {
+    const current = this.style[target]
+    const isHighlight = target === 'backgroundColor'
+    const label = isHighlight ? 'Highlight' : 'Text color'
+    const labelId = isHighlight
+      ? 'tab-style-highlight-colors-label'
+      : 'tab-style-text-colors-label'
+    const recent = isHighlight
+      ? this.state.recentHighlightColors
+      : this.state.recentColors
     const pickerValue =
       current !== undefined && /^#[0-9a-f]{6}$/i.test(current)
         ? current
@@ -344,83 +420,59 @@ export class TabStyleEditor extends React.Component<
       <div
         className="tab-style-row tab-style-colors"
         role="group"
-        aria-labelledby="tab-style-colors-label"
+        aria-labelledby={labelId}
       >
         <div className="tab-style-colors-head">
-          <span className="tab-style-colors-label" id="tab-style-colors-label">
-            Color
+          <span className="tab-style-colors-label" id={labelId}>
+            {label}
           </span>
-          <div
-            className="tab-style-color-targets"
-            role="group"
-            aria-label="Color applies to"
-          >
+          <div className="tab-style-color-actions">
             <button
               type="button"
               className={
-                colorTarget === 'color'
-                  ? 'tab-style-color-target active'
-                  : 'tab-style-color-target'
+                current === undefined
+                  ? 'tab-style-clear-color active'
+                  : 'tab-style-clear-color'
               }
-              value="color"
-              aria-pressed={colorTarget === 'color'}
-              onClick={this.onColorTargetClick}
-            >
-              Text
-            </button>
-            <button
-              type="button"
-              className={
-                colorTarget === 'backgroundColor'
-                  ? 'tab-style-color-target active'
-                  : 'tab-style-color-target'
+              data-target={target}
+              aria-label={
+                isHighlight
+                  ? 'Use default background color'
+                  : 'Use default text color'
               }
-              value="backgroundColor"
-              aria-pressed={colorTarget === 'backgroundColor'}
-              onClick={this.onColorTargetClick}
+              aria-pressed={current === undefined}
+              onClick={this.onUseDefaultColor}
             >
-              Background
+              {isHighlight ? 'No highlight' : 'Default'}
             </button>
+            <label className="tab-style-color-custom">
+              <span
+                className="tab-style-color-custom-swatch"
+                style={{ backgroundColor: pickerValue }}
+              />
+              <span className="tab-style-color-custom-label">Custom…</span>
+              <input
+                type="color"
+                value={pickerValue}
+                data-target={target}
+                aria-label={
+                  isHighlight ? 'Custom highlight color' : 'Custom text color'
+                }
+                onChange={this.onColorInput}
+              />
+            </label>
           </div>
         </div>
-        <div className="tab-style-colors-actions">
-          <button
-            type="button"
-            className={
-              current === undefined
-                ? 'tab-style-color-default active'
-                : 'tab-style-color-default'
-            }
-            aria-label={`Use default ${targetLabel}`}
-            aria-pressed={current === undefined}
-            onClick={this.onUseDefaultColor}
-          >
-            Default
-          </button>
-          <label className="tab-style-color-custom">
-            <span
-              className="tab-style-color-custom-swatch"
-              style={{ backgroundColor: pickerValue }}
-            />
-            <span className="tab-style-color-custom-label">Custom…</span>
-            <input
-              type="color"
-              value={pickerValue}
-              aria-label={`Custom ${targetLabel}`}
-              onChange={this.onColorInput}
-            />
-          </label>
-        </div>
         <div className="tab-style-swatches">
-          {paletteColors.map(color => this.renderSwatch(color, 'palette'))}
+          {paletteColors.map(color =>
+            this.renderSwatch(color, 'palette', target)
+          )}
         </div>
-        {this.state.recentColors.length > 0 && (
+        {recent.length > 0 && (
           <div className="tab-style-recent">
             <span className="tab-style-recent-label">Recent</span>
             <div className="tab-style-swatches">
-              {this.state.recentColors.map(color =>
-                this.renderSwatch(color, 'recent')
-              )}
+              {recent.map(color => this.renderSwatch(color, 'recent', target))}
             </div>
           </div>
         )}
@@ -428,8 +480,74 @@ export class TabStyleEditor extends React.Component<
     )
   }
 
+  private renderCaseChoice(
+    value: TabTextCase,
+    label: string,
+    ariaLabel: string
+  ) {
+    const active = (this.style.textCase ?? 'normal') === value
+    return (
+      <button
+        type="button"
+        className={active ? 'tab-style-choice active' : 'tab-style-choice'}
+        value={value}
+        aria-label={ariaLabel}
+        aria-pressed={active}
+        onClick={this.onCaseClick}
+      >
+        {label}
+      </button>
+    )
+  }
+
+  private renderEffectChoice(
+    value: TabTextEffect,
+    label: string,
+    ariaLabel: string
+  ) {
+    const active = (this.style.textEffect ?? 'none') === value
+    return (
+      <button
+        type="button"
+        className={active ? 'tab-style-choice active' : 'tab-style-choice'}
+        value={value}
+        aria-label={ariaLabel}
+        aria-pressed={active}
+        onClick={this.onEffectClick}
+      >
+        {label}
+      </button>
+    )
+  }
+
+  private renderPreview() {
+    const title =
+      this.props.tab.customLabel ??
+      this.props.tab.repositoryPath.split(/[\\/]/).filter(Boolean).pop() ??
+      'Repository tab'
+    const css = tabTitleStyleToCss(this.style)
+    const textAlign = css.textAlign ?? 'left'
+    const textCss = { ...css, textAlign: undefined }
+
+    return (
+      <section className="tab-style-preview" aria-label="Live tab preview">
+        <span className="tab-style-preview-label">Preview</span>
+        <div className="tab-style-preview-surface" style={{ textAlign }}>
+          <span className="tab-style-preview-text" style={textCss}>
+            {title}
+          </span>
+        </div>
+      </section>
+    )
+  }
+
   public render() {
     const size = this.style.fontSize ?? DefaultTabFontSize
+    const configuredSpacing = this.style.characterSpacing
+    const characterSpacing =
+      configuredSpacing !== undefined && Number.isFinite(configuredSpacing)
+        ? configuredSpacing
+        : DefaultTabCharacterSpacing
 
     return (
       <Popover
@@ -443,18 +561,32 @@ export class TabStyleEditor extends React.Component<
           <div className="tab-style-header">
             <h3 id="tab-style-editor-title">Tab appearance</h3>
             <button
+              type="button"
               className="tab-style-reset"
               onClick={this.props.onReset}
-              aria-label="Reset tab style"
+              aria-label="Clear tab formatting"
             >
-              Reset
+              Clear
             </button>
           </div>
 
+          {this.renderPreview()}
+
           <div className="tab-style-row tab-style-buttons">
-            {this.renderToggle('bold', 'B', 'style-bold')}
-            {this.renderToggle('italic', 'I', 'style-italic')}
-            {this.renderToggle('underline', 'U', 'style-underline')}
+            {this.renderToggle('bold', 'B', 'style-bold', 'Bold')}
+            {this.renderToggle('italic', 'I', 'style-italic', 'Italic')}
+            {this.renderToggle(
+              'underline',
+              'U',
+              'style-underline',
+              'Underline'
+            )}
+            {this.renderToggle(
+              'strikeThrough',
+              <Octicon symbol={octicons.strikethrough} />,
+              'style-strike',
+              'Strikethrough'
+            )}
             <span className="tab-style-divider" />
             {this.renderAlign('left')}
             {this.renderAlign('center')}
@@ -477,7 +609,60 @@ export class TabStyleEditor extends React.Component<
             <span className="tab-style-size-value">{size}px</span>
           </div>
 
-          {this.renderColors()}
+          <fieldset className="tab-style-control-group">
+            <legend>Letter case</legend>
+            <div className="tab-style-choice-row">
+              {this.renderCaseChoice('normal', 'Aa', 'Normal case')}
+              {this.renderCaseChoice('uppercase', 'AA', 'Uppercase')}
+              {this.renderCaseChoice('lowercase', 'aa', 'Lowercase')}
+              {this.renderCaseChoice('capitalize', 'Ab', 'Capitalize words')}
+              {this.renderToggle(
+                'smallCaps',
+                'SC',
+                'style-small-caps',
+                'Small caps'
+              )}
+            </div>
+          </fieldset>
+
+          <div className="tab-style-row tab-style-size tab-style-spacing">
+            <label htmlFor="tab-style-spacing-input">Spacing</label>
+            <input
+              id="tab-style-spacing-input"
+              type="range"
+              min={MinTabCharacterSpacing}
+              max={MaxTabCharacterSpacing}
+              step={0.25}
+              value={characterSpacing}
+              onChange={this.onCharacterSpacingChange}
+            />
+            <output
+              className="tab-style-size-value"
+              htmlFor="tab-style-spacing-input"
+            >
+              {characterSpacing}px
+            </output>
+          </div>
+
+          <fieldset className="tab-style-control-group">
+            <legend>Text effect</legend>
+            <div className="tab-style-choice-row tab-style-effect-row">
+              {this.renderEffectChoice('none', 'None', 'No text effect')}
+              {this.renderEffectChoice(
+                'soft-shadow',
+                'Soft',
+                'Soft text shadow'
+              )}
+              {this.renderEffectChoice(
+                'strong-shadow',
+                'Strong',
+                'Strong text shadow'
+              )}
+            </div>
+          </fieldset>
+
+          {this.renderColors('color')}
+          {this.renderColors('backgroundColor')}
         </div>
       </Popover>
     )

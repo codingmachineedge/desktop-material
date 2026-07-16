@@ -167,8 +167,8 @@ export class Popover extends React.Component<IPopoverProps, IPopoverState> {
         apply({ availableHeight, availableWidth }) {
           const newMaxHeight =
             maxHeight === undefined
-              ? `${availableHeight}px`
-              : `${Math.min(availableHeight, maxHeight)}px`
+              ? availableHeight
+              : Math.min(availableHeight, maxHeight)
 
           contentDiv.style.setProperty(
             '--available-height',

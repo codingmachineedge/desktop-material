@@ -250,4 +250,36 @@ describe('post-shell MD3 style contracts', () => {
       /\.stash-manager-busy\s*\{[\s\S]*?position: sticky;[\s\S]*?flex-wrap: wrap;/
     )
   })
+
+  it('keeps the expanded tab appearance editor reachable without clipping', () => {
+    const style = readStyle('_repository-tabs.scss')
+
+    assert.match(
+      style,
+      /\.tab-style-editor\s*\{[\s\S]*?max-width: calc\(100vw - 52px\);[\s\S]*?max-height: min\([\s\S]*?var\(--available-height, 100vh\)[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(style, /\.tab-style-buttons\s*\{[\s\S]*?flex-wrap: wrap;/)
+    assert.match(
+      style,
+      /\.tab-style-choice,[\s\S]*?\.tab-style-toggle\s*\{[\s\S]*?min-width: 40px;[\s\S]*?height: 40px;/
+    )
+    assert.match(style, /@media \(max-width: 420px\), \(max-height: 560px\)/)
+    assert.match(style, /&:focus-visible\s*\{[\s\S]*?outline: 2px solid/)
+  })
+
+  it('publishes a valid floating-popover available-height token', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'app', 'src', 'ui', 'lib', 'popover.tsx'),
+      'utf8'
+    )
+
+    assert.match(
+      source,
+      /const newMaxHeight\s*=\s*maxHeight === undefined\s*\? availableHeight\s*:\s*Math\.min\(availableHeight, maxHeight\)/
+    )
+    assert.match(
+      source,
+      /setProperty\(\s*'--available-height',\s*`\$\{newMaxHeight\}px`\s*\)/
+    )
+  })
 })

@@ -203,16 +203,20 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 }
 
 .tab-style-editor {
-  // Design-spec-shell §3 / overlays §8 tab-format popover: 288px surface with
-  // 40×40 radius-12 toggles, mono size value, a Word-style searchable font
-  // dropdown, and a wrapping palette of 26px color swatch circles (2.5px ring)
-  // for tab text/background, plus a native custom-color picker and a persisted
-  // shared "recent" row.
+  // Design-spec-shell §3 / overlays §8 tab-format popover: a bounded,
+  // scrollable Word-style surface with 40×40 controls, live preview, searchable
+  // font picker, and independent text/highlight palettes.
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 288px;
-  max-width: 100%;
+  width: 352px;
+  max-width: calc(100vw - 52px);
+  max-height: min(680px, calc(var(--available-height, 100vh) - 32px));
+  padding-right: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   color: var(--md-sys-color-on-surface);
 
   .tab-style-header {
@@ -227,7 +231,8 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
 
     .tab-style-reset {
-      padding: 4px 10px;
+      min-height: 36px;
+      padding: 4px 12px;
       border: none;
       border-radius: 999px;
       background: transparent;
@@ -247,6 +252,44 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .tab-style-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border-radius: 16px;
+    background: var(--md-sys-color-surface-container);
+
+    .tab-style-preview-label {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .tab-style-preview-surface {
+      width: 100%;
+      min-width: 0;
+      min-height: 34px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    .tab-style-preview-text {
+      display: inline-block;
+      max-width: 100%;
+      padding: 1px 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .tab-style-buttons {
+    flex-wrap: wrap;
   }
 
   .tab-style-toggle,
@@ -281,6 +324,17 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   }
   .style-underline {
     text-decoration: underline;
+  }
+  .style-strike {
+    .octicon {
+      width: 17px;
+      height: 17px;
+    }
+  }
+  .style-small-caps {
+    font-size: 11px;
+    font-variant: small-caps;
+    font-weight: var(--font-weight-semibold);
   }
 
   .tab-style-divider {
@@ -338,7 +392,7 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
 
     .tab-style-size-value {
-      width: 44px;
+      width: 52px;
       text-align: right;
       font-family: var(--font-family-monospace);
       font-size: 12px;
@@ -346,10 +400,67 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
   }
 
+  .tab-style-spacing label {
+    width: 52px;
+  }
+
+  .tab-style-control-group {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+      margin-bottom: 6px;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .tab-style-choice-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tab-style-choice,
+    .tab-style-toggle {
+      flex: 1 1 48px;
+      min-width: 40px;
+      height: 40px;
+    }
+
+    .tab-style-choice {
+      padding: 0 10px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+      cursor: pointer;
+      transition: background-color 200ms var(--emph), color 200ms var(--emph), transform 200ms var(--spring-fast);
+
+      &:active {
+        transform: scale(0.9);
+      }
+
+      &.active {
+        background: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+      }
+    }
+
+    .tab-style-effect-row .tab-style-choice {
+      flex-basis: 82px;
+    }
+  }
+
   .tab-style-font {
     gap: 8px;
 
-    > label {
+    > .tab-style-label {
       width: 32px;
       font-size: 12px;
       font-weight: var(--font-weight-semibold);
@@ -503,31 +614,14 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
     }
 
-    .tab-style-color-targets {
-      display: inline-flex;
-      gap: 2px;
-      padding: 2px;
-      border-radius: 999px;
-      background: var(--md-sys-color-surface-container-high);
-    }
-
-    .tab-style-color-target {
-      padding: 5px 9px;
-      border: 0;
-      border-radius: 999px;
-      background: transparent;
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: 11px;
-      font-weight: var(--font-weight-semibold);
-      cursor: pointer;
-      transition: background-color 200ms var(--emph), color 200ms var(--emph);
-
-      &.active {
-        background: var(--md-sys-color-secondary-container);
-        color: var(--md-sys-color-on-secondary-container);
-      }
+    .tab-style-color-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
     }
 
     .tab-style-colors-label {
@@ -536,28 +630,28 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
       color: var(--md-sys-color-on-surface-variant);
     }
 
-    .tab-style-colors-actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .tab-style-color-default {
-      padding: 6px 10px;
+    .tab-style-color-default,
+    .tab-style-clear-color {
+      min-height: 32px;
+      padding: 4px 10px;
       border: 0;
       border-radius: 999px;
       background: transparent;
       color: var(--md-sys-color-primary);
+      font-family: inherit;
       font-size: 11px;
       font-weight: var(--font-weight-semibold);
       cursor: pointer;
       transition: background-color 200ms var(--emph), color 200ms var(--emph);
 
-      &:hover,
-      &.active {
-        background: var(--md-sys-color-secondary-container);
-        color: var(--md-sys-color-on-secondary-container);
+      &:hover {
+        background: var(--md-sys-color-surface-container-high);
       }
+    }
+
+    .tab-style-color-default.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
     }
 
     .tab-style-color-custom {
@@ -638,6 +732,22 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
       }
     }
   }
+
+  .tab-style-reset,
+  .tab-style-toggle,
+  .tab-style-align,
+  .tab-style-choice,
+  .tab-style-font-select,
+  .tab-style-font-option,
+  .tab-style-color-default,
+  .tab-style-clear-color,
+  .tab-style-swatch,
+  .tab-style-color-custom {
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
 }
 
 // Tab-format popover container (overlays §8): radius 22, level3 over the shared
@@ -648,8 +758,27 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   box-shadow: var(--md-sys-elevation-level3);
 
   .popover-content {
+    max-width: calc(100vw - 20px);
+    max-height: var(--available-height, calc(100vh - 20px));
     border-radius: 22px;
     padding: 16px;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 420px), (max-height: 560px) {
+  .tab-style-editor {
+    gap: 10px;
+    max-width: calc(100vw - 36px);
+    max-height: calc(var(--available-height, 100vh) - 20px);
+
+    .tab-style-preview {
+      padding: 8px;
+    }
+  }
+
+  .popover-component:has(.tab-style-editor) .popover-content {
+    padding: 10px;
   }
 }
 
