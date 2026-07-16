@@ -10,27 +10,57 @@ import {
   canStartOperation,
 } from './base-choose-branch-dialog'
 import { truncateWithEllipsis } from '../../../lib/truncate-with-ellipsis'
+import { shortenSHA } from '../../../models/commit'
 
 interface IRebaseChooseBranchDialogState {
   readonly rebasePreview: RebasePreview | null
   readonly selectedBranch: Branch | null
+  readonly isStarting: boolean
+  readonly startError: string | null
 }
 
 export class RebaseChooseBranchDialog extends React.Component<
   IBaseChooseBranchDialogProps,
   IRebaseChooseBranchDialogState
 > {
+  private previewGeneration = 0
+  private startAbortController: AbortController | null = null
+  private preflightAdvanced = false
+  private isMounted = false
+
   public constructor(props: IBaseChooseBranchDialogProps) {
     super(props)
 
     this.state = {
       selectedBranch: null,
       rebasePreview: null,
+      isStarting: false,
+      startError: null,
     }
   }
 
-  private start = () => {
-    if (!this.canStart()) {
+  public componentDidMount(): void {
+    this.isMounted = true
+  }
+
+  public componentWillUnmount(): void {
+    this.isMounted = false
+    this.previewGeneration++
+    if (
+      this.startAbortController !== null &&
+      this.preflightAdvanced === false
+    ) {
+      // A repository/window switch can unmount this chooser while status or
+      // remote inspection is still pending. Only an accepted step transition
+      // is allowed to outlive the chooser.
+      this.startAbortController.abort()
+    }
+  }
+
+  private start = async () => {
+    // setState is asynchronous, so the controller is the synchronous guard
+    // against a double click or two Enter key submissions in one render turn.
+    if (this.startAbortController !== null || !this.canStart()) {
       return
     }
 
@@ -46,38 +76,81 @@ export class RebaseChooseBranchDialog extends React.Component<
       return
     }
 
-    dispatcher.startRebase(
-      repository,
-      selectedBranch,
-      currentBranch,
-      rebasePreview.commitsAhead
-    )
+    const abortController = new AbortController()
+    this.startAbortController = abortController
+    this.preflightAdvanced = false
+    this.setState({ isStarting: true, startError: null })
+    try {
+      await dispatcher.startRebase(
+        repository,
+        selectedBranch,
+        currentBranch,
+        rebasePreview.commitsAhead,
+        {
+          signal: abortController.signal,
+          onPreflightAccepted: () => {
+            if (this.startAbortController === abortController) {
+              this.preflightAdvanced = true
+            }
+          },
+        }
+      )
+    } catch (error) {
+      if (abortController.signal.aborted || !this.isMounted) {
+        return
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to start the rebase. Refresh and try again.'
+      this.preflightAdvanced = false
+      this.setState({ isStarting: false, startError: message })
+    } finally {
+      if (this.startAbortController === abortController) {
+        this.startAbortController = null
+      }
+    }
+  }
+
+  private onDismissed = () => {
+    this.startAbortController?.abort()
+    this.props.onDismissed()
   }
 
   private canStart = (): boolean => {
     const { currentBranch } = this.props
-    const { selectedBranch, rebasePreview } = this.state
+    const { selectedBranch, rebasePreview, isStarting } = this.state
     const commitCount =
       rebasePreview?.kind === ComputedAction.Clean
         ? rebasePreview.commitsBehind.length
         : undefined
-    return canStartOperation(
-      selectedBranch,
-      currentBranch,
-      commitCount,
-      rebasePreview?.kind
+    return (
+      !isStarting &&
+      canStartOperation(
+        selectedBranch,
+        currentBranch,
+        commitCount,
+        rebasePreview?.kind
+      )
     )
   }
 
   private onSelectionChanged = (selectedBranch: Branch | null) => {
-    this.setState({ selectedBranch })
+    // Keep the branch shown in the progress review identical to the snapshot
+    // being revalidated. Cancellation remains available while preflight runs.
+    if (this.startAbortController !== null) {
+      return
+    }
+
+    const generation = ++this.previewGeneration
+    this.setState({ selectedBranch, startError: null })
 
     if (selectedBranch === null) {
       this.setState({ rebasePreview: null })
       return
     }
 
-    this.updateStatus(selectedBranch)
+    this.updateStatus(selectedBranch, generation)
   }
 
   private getSubmitButtonToolTip = () => {
@@ -96,6 +169,8 @@ export class RebaseChooseBranchDialog extends React.Component<
 
     return selectedBranchIsCurrentBranch
       ? 'You are not able to rebase this branch onto itself.'
+      : this.state.isStarting
+      ? 'Refreshing repository state before the rebase starts.'
       : !currentBranchIsBehindSelectedBranch
       ? 'The current branch is already up to date with the selected branch.'
       : undefined
@@ -108,16 +183,91 @@ export class RebaseChooseBranchDialog extends React.Component<
     )
     return (
       <>
-        Rebase <strong>{truncatedName}</strong>
+        Rebase current branch <strong>{truncatedName}</strong>
       </>
     )
   }
 
-  private updateStatus = async (baseBranch: Branch) => {
+  private updateStatus = async (baseBranch: Branch, generation: number) => {
     const { currentBranch: targetBranch, repository } = this.props
     updateRebasePreview(baseBranch, targetBranch, repository, rebasePreview => {
-      this.setState({ rebasePreview })
+      if (
+        generation === this.previewGeneration &&
+        this.state.selectedBranch?.ref === baseBranch.ref &&
+        this.props.currentBranch.tip.sha === targetBranch.tip.sha
+      ) {
+        this.setState({ rebasePreview })
+      }
     })
+  }
+
+  private renderRoute(): JSX.Element | null {
+    const { selectedBranch } = this.state
+    if (selectedBranch === null) {
+      return null
+    }
+    return (
+      <div
+        className="rebase-route"
+        role="group"
+        aria-label={`Rebase ${this.props.currentBranch.name} onto ${selectedBranch.name}`}
+      >
+        <strong>{this.props.currentBranch.name}</strong>
+        <span aria-hidden="true">→</span>
+        <strong>{selectedBranch.name}</strong>
+      </div>
+    )
+  }
+
+  private renderCommitPreview(): JSX.Element | null {
+    const { rebasePreview } = this.state
+    if (
+      rebasePreview === null ||
+      rebasePreview.kind !== ComputedAction.Clean ||
+      rebasePreview.commitsAhead.length === 0
+    ) {
+      return null
+    }
+    const visible = rebasePreview.commitsAhead.slice(0, 5)
+    const remaining = rebasePreview.commitsAhead.length - visible.length
+    return (
+      <div className="rebase-commit-preview">
+        <strong>Commits to replay</strong>
+        <ol aria-label="Commits to replay during rebase">
+          {visible.map(commit => (
+            <li key={commit.sha}>
+              <code>{shortenSHA(commit.sha)}</code>
+              <span>{commit.summary}</span>
+            </li>
+          ))}
+        </ol>
+        {remaining > 0 ? <p>And {remaining} more…</p> : null}
+      </div>
+    )
+  }
+
+  private renderAheadBehind(): JSX.Element | null {
+    const { rebasePreview } = this.state
+    if (rebasePreview?.kind !== ComputedAction.Clean) {
+      return null
+    }
+
+    const ahead = rebasePreview.commitsAhead.length
+    const behind = rebasePreview.commitsBehind.length
+    return (
+      <div
+        className="rebase-ahead-behind"
+        role="group"
+        aria-label={`Current branch is ${ahead} commits ahead and ${behind} commits behind the selected base`}
+      >
+        <span>
+          <strong>{ahead}</strong> ahead
+        </span>
+        <span>
+          <strong>{behind}</strong> behind
+        </span>
+      </div>
+    )
   }
 
   private renderStatusPreviewMessage(): JSX.Element | null {
@@ -201,15 +351,34 @@ export class RebaseChooseBranchDialog extends React.Component<
 
   private renderStatusPreview() {
     return (
-      <>
+      <div className="rebase-review" aria-live="polite" aria-atomic="true">
+        {this.renderRoute()}
+        {this.props.currentBranchProtected === true ? (
+          <p className="rebase-protected-guidance">
+            This branch is protected. Repository rules may reject the rewritten
+            history; Desktop will never force-push it automatically.
+          </p>
+        ) : null}
         <ActionStatusIcon
           status={this.state.rebasePreview}
           classNamePrefix="merge-status"
         />
-        <p className="merge-info" id="merge-status-preview">
+        {this.renderAheadBehind()}
+        <div className="merge-info" id="merge-status-preview">
           {this.renderStatusPreviewMessage()}
-        </p>
-      </>
+        </div>
+        {this.renderCommitPreview()}
+        {this.state.startError !== null ? (
+          <p className="rebase-start-error" role="alert">
+            {this.state.startError}
+          </p>
+        ) : null}
+        {this.state.isStarting ? (
+          <p className="rebase-start-progress" role="status">
+            Refreshing branches and safety checks…
+          </p>
+        ) : null}
+      </div>
     )
   }
 
@@ -223,6 +392,7 @@ export class RebaseChooseBranchDialog extends React.Component<
         dialogTitle={this.getDialogTitle()}
         submitButtonTooltip={this.getSubmitButtonToolTip()}
         onSelectionChanged={this.onSelectionChanged}
+        onDismissed={this.onDismissed}
       >
         {this.renderStatusPreview()}
       </ChooseBranchDialog>

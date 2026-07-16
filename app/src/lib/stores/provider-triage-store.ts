@@ -2,6 +2,7 @@ import { Account, getAccountKey } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { createHash } from 'crypto'
 import { API, getHTMLURL } from '../api'
+import { APIError } from '../http'
 import {
   IAPIProviderTriagePage,
   IProviderTriageItem,
@@ -33,6 +34,24 @@ export type ProviderTriageStatus =
   | 'unavailable'
   | 'error'
 
+export type ProviderTriageAccountStatus =
+  | 'none'
+  | 'ready'
+  | 'associating'
+  | 'signed-out'
+  | 'selection-required'
+  | 'binding-invalid'
+  | 'binding-mismatch'
+  | 'authentication'
+  | 'permission'
+  | 'sso'
+
+export interface IProviderTriageAccountOption {
+  readonly accountKey: string
+  readonly label: string
+  readonly provider: Account['provider']
+}
+
 export interface IProviderTriageState {
   readonly status: ProviderTriageStatus
   readonly repositoryKey: string | null
@@ -40,6 +59,8 @@ export interface IProviderTriageState {
   readonly accountKey: string | null
   readonly accountLogin: string | null
   readonly provider: Account['provider'] | null
+  readonly accountStatus: ProviderTriageAccountStatus
+  readonly accountOptions: ReadonlyArray<IProviderTriageAccountOption>
   readonly items: ReadonlyArray<IProviderTriageItem>
   readonly issues: IProviderTriageChannelState
   readonly pullRequests: IProviderTriageChannelState
@@ -93,6 +114,8 @@ const initialState: IProviderTriageState = {
   accountKey: null,
   accountLogin: null,
   provider: null,
+  accountStatus: 'none',
+  accountOptions: [],
   items: [],
   issues: idleChannel,
   pullRequests: idleChannel,
@@ -105,6 +128,103 @@ interface IResolvedProviderTriageTarget {
   readonly owner: string
   readonly name: string
   readonly repositoryKey: string
+  readonly shouldAssociate: boolean
+}
+
+interface IUnavailableProviderTriageTarget {
+  readonly message: string
+  readonly accountStatus: ProviderTriageAccountStatus
+  readonly accountOptions: ReadonlyArray<IProviderTriageAccountOption>
+  readonly accountKey: string | null
+}
+
+type ProviderTriageTarget =
+  | IResolvedProviderTriageTarget
+  | IUnavailableProviderTriageTarget
+
+export type AssociateProviderTriageAccount = (
+  repository: Repository,
+  accountKey: string
+) => Promise<Repository>
+
+function normalizeProviderEndpoint(value: string): string | null {
+  try {
+    const url = new URL(value.trim())
+    if (
+      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+      url.username !== '' ||
+      url.password !== ''
+    ) {
+      return null
+    }
+    url.search = ''
+    url.hash = ''
+    url.pathname = url.pathname.replace(/\/+$/, '')
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    return null
+  }
+}
+
+function normalizedAccountKey(value: string): string | null {
+  const separator = value.lastIndexOf('#')
+  if (separator <= 0) {
+    return null
+  }
+  const endpoint = normalizeProviderEndpoint(value.slice(0, separator))
+  const idText = value.slice(separator + 1).trim()
+  const id = Number(idText)
+  return endpoint === null || !/^\d+$/.test(idText) || !Number.isSafeInteger(id)
+    ? null
+    : `${endpoint}#${id}`
+}
+
+function accountKeysEqual(left: string, right: string): boolean {
+  const normalizedLeft = normalizedAccountKey(left)
+  const normalizedRight = normalizedAccountKey(right)
+  return (
+    normalizedLeft !== null &&
+    normalizedRight !== null &&
+    normalizedLeft === normalizedRight
+  )
+}
+
+function endpointProvider(endpoint: string): Account['provider'] | null {
+  const normalized = normalizeProviderEndpoint(endpoint)
+  if (normalized === null) {
+    return null
+  }
+  const url = new URL(normalized)
+  if (
+    url.hostname === 'api.bitbucket.org' &&
+    url.pathname.replace(/\/+$/, '') === '/2.0'
+  ) {
+    return 'bitbucket'
+  }
+  if (url.pathname.replace(/\/+$/, '').endsWith('/api/v4')) {
+    return 'gitlab'
+  }
+  return 'github'
+}
+
+function isUsableAccount(account: Account): boolean {
+  return (
+    Number.isSafeInteger(account.id) &&
+    account.id >= 0 &&
+    account.login.trim() !== '' &&
+    account.token.trim() !== '' &&
+    normalizeProviderEndpoint(account.endpoint) !== null
+  )
+}
+
+function accountOption(account: Account): IProviderTriageAccountOption {
+  return {
+    accountKey: getAccountKey(account),
+    label: `${providerTriageProviderLabel(account.provider)} · ${
+      account.login
+    }`,
+    provider: account.provider,
+  }
 }
 
 function repositoryStateKey(
@@ -122,7 +242,9 @@ function repositoryStateKey(
         remote.endpoint,
         remote.owner.login,
         remote.name,
-        accountKey,
+        accountKey === null
+          ? null
+          : normalizedAccountKey(accountKey) ?? accountKey,
       ])
     )
     .digest('hex')
@@ -145,68 +267,201 @@ function accountSnapshotFingerprint(account: Account): string {
 function unavailableState(
   repositoryKey: string | null,
   repositoryName: string | null,
-  message: string
+  message: string,
+  accountStatus: ProviderTriageAccountStatus,
+  accountOptions: ReadonlyArray<IProviderTriageAccountOption> = [],
+  accountKey: string | null = null
 ): IProviderTriageState {
   return {
     ...initialState,
     status: 'unavailable',
     repositoryKey,
     repositoryName,
+    accountKey,
+    accountStatus,
+    accountOptions,
     message,
   }
 }
 
 function resolveTarget(
   repository: Repository,
-  accounts: ReadonlyArray<Account>
-): IResolvedProviderTriageTarget | string {
+  accounts: ReadonlyArray<Account>,
+  requestedAccountKey: string | null = null
+): ProviderTriageTarget {
   const remote = repository.gitHubRepository
   if (remote === null) {
-    return 'Triage needs a hosted repository association.'
+    return {
+      message: 'Triage needs a hosted repository association.',
+      accountStatus: 'binding-invalid',
+      accountOptions: [],
+      accountKey: repository.accountKey,
+    }
+  }
+
+  const remoteEndpoint = normalizeProviderEndpoint(remote.endpoint)
+  const remoteProvider = endpointProvider(remote.endpoint)
+  if (remoteEndpoint === null || remoteProvider === null) {
+    return {
+      message: 'This repository has an invalid provider association.',
+      accountStatus: 'binding-invalid',
+      accountOptions: [],
+      accountKey: repository.accountKey,
+    }
   }
 
   let account: Account | undefined
+  let shouldAssociate = false
   if (repository.accountKey !== null) {
-    account = accounts.find(
-      candidate => getAccountKey(candidate) === repository.accountKey
+    account = accounts.find(candidate =>
+      accountKeysEqual(getAccountKey(candidate), repository.accountKey!)
     )
     if (account === undefined) {
-      return 'The account selected for this repository is no longer signed in.'
+      return {
+        message:
+          'The account selected for this repository is no longer signed in. Sign in again or manage accounts without replacing the saved repository binding.',
+        accountStatus: 'authentication',
+        accountOptions: [],
+        accountKey: repository.accountKey,
+      }
+    }
+    if (!isUsableAccount(account)) {
+      return {
+        message:
+          'The account selected for this repository needs to sign in again.',
+        accountStatus: 'authentication',
+        accountOptions: [],
+        accountKey: repository.accountKey,
+      }
     }
   } else {
     const endpointMatches = accounts.filter(
-      candidate => candidate.endpoint === remote.endpoint
+      candidate =>
+        isUsableAccount(candidate) &&
+        candidate.provider === remoteProvider &&
+        normalizeProviderEndpoint(candidate.endpoint) === remoteEndpoint
     )
-    if (endpointMatches.length !== 1) {
-      return endpointMatches.length === 0
-        ? 'Sign in to the repository provider before loading triage.'
-        : 'Choose an exact account for this repository before loading triage.'
+    if (endpointMatches.length === 0) {
+      return {
+        message:
+          'Sign in to the repository provider or manage accounts before loading triage.',
+        accountStatus: 'signed-out',
+        accountOptions: [],
+        accountKey: null,
+      }
     }
-    account = endpointMatches[0]
+    if (requestedAccountKey !== null) {
+      account = endpointMatches.find(candidate =>
+        accountKeysEqual(getAccountKey(candidate), requestedAccountKey)
+      )
+      if (account === undefined) {
+        return {
+          message:
+            'The selected account changed before it could be saved. Choose the repository account again.',
+          accountStatus: 'selection-required',
+          accountOptions: endpointMatches.map(accountOption),
+          accountKey: null,
+        }
+      }
+      shouldAssociate = true
+    } else if (endpointMatches.length > 1) {
+      return {
+        message:
+          "You're signed in, but this repository isn't assigned to an account yet. Choose an exact account to bind before loading triage.",
+        accountStatus: 'selection-required',
+        accountOptions: endpointMatches.map(accountOption),
+        accountKey: null,
+      }
+    } else {
+      shouldAssociate = true
+      account = endpointMatches[0]
+    }
   }
 
-  if (account.endpoint !== remote.endpoint) {
-    return 'The selected account does not match this repository provider.'
+  if (
+    account.provider !== remoteProvider ||
+    normalizeProviderEndpoint(account.endpoint) !== remoteEndpoint
+  ) {
+    return {
+      message:
+        'The saved repository account does not match this repository provider. Choose a repository account without replacing the valid saved binding automatically.',
+      accountStatus: 'binding-mismatch',
+      accountOptions: [],
+      accountKey: repository.accountKey,
+    }
   }
   return {
     account,
     owner: remote.owner.login,
     name: remote.name,
     repositoryKey: repositoryStateKey(repository, getAccountKey(account))!,
+    shouldAssociate,
   }
+}
+
+type ProviderTriageAuthorizationFailure =
+  | 'authentication'
+  | 'permission'
+  | 'sso'
+
+function authorizationFailure(
+  error: unknown
+): ProviderTriageAuthorizationFailure | null {
+  if (!(error instanceof APIError)) {
+    return null
+  }
+  if (error.responseStatus === 401) {
+    return 'authentication'
+  }
+  if (
+    error.responseStatus === 403 &&
+    error.rateLimitReset === null &&
+    /(?:saml|single[ -]sign[ -]on|\bsso\b)/i.test(error.apiError?.message ?? '')
+  ) {
+    return 'sso'
+  }
+  if (
+    (error.responseStatus === 403 && error.rateLimitReset === null) ||
+    error.responseStatus === 404
+  ) {
+    return 'permission'
+  }
+  return null
 }
 
 function channelError(
   provider: Account['provider'],
-  kind: ProviderTriageKind
+  kind: ProviderTriageKind,
+  failure: ProviderTriageAuthorizationFailure | null = null
 ): IProviderTriageChannelState {
   const noun = kind === 'issue' ? 'Issues' : 'Pull requests'
+  const providerLabel = providerTriageProviderLabel(provider)
   return {
     status: 'error',
     capped: false,
-    message: `${noun} could not be loaded safely from ${providerTriageProviderLabel(
-      provider
-    )}.`,
+    message:
+      failure === 'authentication'
+        ? `${noun} need the selected ${providerLabel} account to sign in again.`
+        : failure === 'sso'
+        ? `${noun} need organization SSO authorization for the selected ${providerLabel} account.`
+        : failure === 'permission'
+        ? `${noun} are not accessible to the selected ${providerLabel} account.`
+        : `${noun} could not be loaded safely from ${providerLabel}.`,
+  }
+}
+
+function authorizationMessage(
+  provider: Account['provider'],
+  failure: ProviderTriageAuthorizationFailure
+): string {
+  const providerLabel = providerTriageProviderLabel(provider)
+  switch (failure) {
+    case 'authentication':
+      return `The repository-bound ${providerLabel} account needs to sign in again before triage can refresh.`
+    case 'permission':
+      return `The repository-bound ${providerLabel} account does not have permission to load all triage data. Check repository access or re-authenticate that account.`
+    case 'sso':
+      return `The repository-bound ${providerLabel} account needs organization SSO authorization before triage can refresh.`
   }
 }
 
@@ -247,6 +502,7 @@ export class ProviderTriageStore extends BaseStore {
   private state: IProviderTriageState = initialState
   private generation = 0
   private controller: AbortController | null = null
+  private repositoryFingerprint: string | null = null
   private selectedAccountKey: string | null = null
   private selectedAccountFingerprint: string | null = null
 
@@ -265,7 +521,9 @@ export class ProviderTriageStore extends BaseStore {
     const current =
       selected === null
         ? undefined
-        : accounts.find(account => getAccountKey(account) === selected)
+        : accounts.find(account =>
+            accountKeysEqual(getAccountKey(account), selected)
+          )
     if (selected !== null && current === undefined) {
       this.cancelCurrent(false)
       this.selectedAccountKey = null
@@ -273,7 +531,10 @@ export class ProviderTriageStore extends BaseStore {
       this.state = unavailableState(
         this.state.repositoryKey,
         this.state.repositoryName,
-        'The account selected for this repository was signed out. Sign in or choose another account.'
+        'The account selected for this repository was signed out. Sign in again or manage accounts without replacing the saved repository binding.',
+        'authentication',
+        [],
+        selected
       )
       this.emitUpdate()
       return
@@ -323,22 +584,131 @@ export class ProviderTriageStore extends BaseStore {
   public async load(
     repository: Repository,
     accounts: ReadonlyArray<Account>,
-    externalSignal?: AbortSignal
+    externalSignal?: AbortSignal,
+    associateAccount?: AssociateProviderTriageAccount,
+    requestedAccountKey: string | null = null
   ): Promise<void> {
     this.cancelCurrent(false)
     const generation = this.generation
-    const remote = repository.gitHubRepository
-    const provisionalKey = repositoryStateKey(repository, null)
-    const resolved = resolveTarget(repository, accounts)
-    if (typeof resolved === 'string') {
+    let effectiveRepository = repository
+    let remote = effectiveRepository.gitHubRepository
+    const provisionalKey = repositoryStateKey(
+      effectiveRepository,
+      effectiveRepository.accountKey
+    )
+    let resolved = resolveTarget(
+      effectiveRepository,
+      accounts,
+      requestedAccountKey
+    )
+    if ('message' in resolved) {
       this.selectedAccountKey = null
+      this.selectedAccountFingerprint = null
+      this.repositoryFingerprint = effectiveRepository.hash
       this.state = unavailableState(
         provisionalKey,
-        remote?.fullName ?? repository.name,
-        resolved
+        remote?.fullName ?? effectiveRepository.name,
+        resolved.message,
+        resolved.accountStatus,
+        resolved.accountOptions,
+        resolved.accountKey
       )
       this.emitUpdate()
       return
+    }
+
+    if (resolved.shouldAssociate) {
+      const associationAccount = resolved.account
+      const accountKey = getAccountKey(associationAccount)
+      if (associateAccount === undefined) {
+        this.selectedAccountKey = null
+        this.selectedAccountFingerprint = null
+        this.repositoryFingerprint = effectiveRepository.hash
+        this.state = unavailableState(
+          provisionalKey,
+          remote?.fullName ?? effectiveRepository.name,
+          "You're signed in, but this repository isn't assigned to an account yet. Confirm the exact account to save before loading triage.",
+          'selection-required',
+          [accountOption(associationAccount)]
+        )
+        this.emitUpdate()
+        return
+      }
+
+      this.repositoryFingerprint = effectiveRepository.hash
+      this.selectedAccountKey = accountKey
+      this.selectedAccountFingerprint =
+        accountSnapshotFingerprint(associationAccount)
+      this.state = {
+        ...initialState,
+        status: 'loading',
+        repositoryKey: resolved.repositoryKey,
+        repositoryName: `${resolved.owner}/${resolved.name}`,
+        accountKey,
+        accountLogin: associationAccount.login,
+        provider: associationAccount.provider,
+        accountStatus: 'associating',
+        message: `Saving ${associationAccount.login} as this repository's account…`,
+      }
+      this.emitUpdate()
+
+      try {
+        const associated = await associateAccount(
+          effectiveRepository,
+          accountKey
+        )
+        if (generation !== this.generation) {
+          return
+        }
+        if (
+          associated.id !== effectiveRepository.id ||
+          associated.gitHubRepository?.hash !==
+            effectiveRepository.gitHubRepository?.hash ||
+          associated.accountKey === null ||
+          !accountKeysEqual(associated.accountKey, accountKey)
+        ) {
+          this.state = unavailableState(
+            provisionalKey,
+            remote?.fullName ?? effectiveRepository.name,
+            'The repository account changed before it could be saved. Refresh and choose the account again.',
+            'selection-required',
+            [accountOption(associationAccount)]
+          )
+          this.emitUpdate()
+          return
+        }
+        effectiveRepository = associated
+        remote = associated.gitHubRepository
+        resolved = resolveTarget(effectiveRepository, accounts)
+        if ('message' in resolved || resolved.shouldAssociate) {
+          this.state = unavailableState(
+            repositoryStateKey(
+              effectiveRepository,
+              effectiveRepository.accountKey
+            ),
+            remote?.fullName ?? effectiveRepository.name,
+            'The saved repository account could not be revalidated. Refresh and choose the account again.',
+            'binding-invalid',
+            [],
+            effectiveRepository.accountKey
+          )
+          this.emitUpdate()
+          return
+        }
+      } catch {
+        if (generation !== this.generation) {
+          return
+        }
+        this.state = unavailableState(
+          provisionalKey,
+          remote?.fullName ?? effectiveRepository.name,
+          'Desktop could not save the repository account. Retry or open Repository settings.',
+          'selection-required',
+          [accountOption(associationAccount)]
+        )
+        this.emitUpdate()
+        return
+      }
     }
 
     const controller = new AbortController()
@@ -351,6 +721,7 @@ export class ProviderTriageStore extends BaseStore {
 
     const { account, owner, name, repositoryKey } = resolved
     const accountKey = getAccountKey(account)
+    this.repositoryFingerprint = effectiveRepository.hash
     this.selectedAccountKey = accountKey
     this.selectedAccountFingerprint = accountSnapshotFingerprint(account)
     this.state = {
@@ -360,6 +731,8 @@ export class ProviderTriageStore extends BaseStore {
       accountKey,
       accountLogin: account.login,
       provider: account.provider,
+      accountStatus: 'ready',
+      accountOptions: [],
       items: [],
       issues: loadingChannel,
       pullRequests: loadingChannel,
@@ -370,6 +743,13 @@ export class ProviderTriageStore extends BaseStore {
 
     try {
       const api = this.dependencies.apiFor(account)
+      if (
+        generation !== this.generation ||
+        this.repositoryFingerprint !== effectiveRepository.hash ||
+        this.selectedAccountFingerprint !== accountSnapshotFingerprint(account)
+      ) {
+        return
+      }
       const [issuesResult, pullRequestsResult] = await Promise.allSettled([
         api.fetchProviderTriageIssues(
           owner,
@@ -387,7 +767,9 @@ export class ProviderTriageStore extends BaseStore {
       if (
         controller.signal.aborted ||
         generation !== this.generation ||
-        this.state.repositoryKey !== repositoryKey
+        this.state.repositoryKey !== repositoryKey ||
+        this.repositoryFingerprint !== effectiveRepository.hash ||
+        this.selectedAccountFingerprint !== accountSnapshotFingerprint(account)
       ) {
         if (
           controller.signal.aborted &&
@@ -412,6 +794,9 @@ export class ProviderTriageStore extends BaseStore {
       let pullRequests = new Array<IProviderTriageItem>()
       let issuesState: IProviderTriageChannelState
       let pullRequestsState: IProviderTriageChannelState
+      let issuesAuthorization: ProviderTriageAuthorizationFailure | null = null
+      let pullRequestsAuthorization: ProviderTriageAuthorizationFailure | null =
+        null
 
       if (issuesResult.status === 'fulfilled') {
         try {
@@ -437,7 +822,12 @@ export class ProviderTriageStore extends BaseStore {
           issuesState = channelError(account.provider, 'issue')
         }
       } else {
-        issuesState = channelError(account.provider, 'issue')
+        issuesAuthorization = authorizationFailure(issuesResult.reason)
+        issuesState = channelError(
+          account.provider,
+          'issue',
+          issuesAuthorization
+        )
       }
 
       if (pullRequestsResult.status === 'fulfilled') {
@@ -464,7 +854,14 @@ export class ProviderTriageStore extends BaseStore {
           pullRequestsState = channelError(account.provider, 'pull-request')
         }
       } else {
-        pullRequestsState = channelError(account.provider, 'pull-request')
+        pullRequestsAuthorization = authorizationFailure(
+          pullRequestsResult.reason
+        )
+        pullRequestsState = channelError(
+          account.provider,
+          'pull-request',
+          pullRequestsAuthorization
+        )
       }
 
       const failedChannels = [issuesState, pullRequestsState].filter(
@@ -474,6 +871,17 @@ export class ProviderTriageStore extends BaseStore {
         channel =>
           channel.status === 'ready' || channel.status === 'unsupported'
       ).length
+      const authorization = [issuesAuthorization, pullRequestsAuthorization]
+        .filter(
+          (failure): failure is ProviderTriageAuthorizationFailure =>
+            failure !== null
+        )
+        .sort((left, right) => {
+          const priority: Readonly<
+            Record<ProviderTriageAuthorizationFailure, number>
+          > = { sso: 0, authentication: 1, permission: 2 }
+          return priority[left] - priority[right]
+        })[0]
       this.state = {
         ...this.state,
         status:
@@ -485,8 +893,11 @@ export class ProviderTriageStore extends BaseStore {
         items: [...issues, ...pullRequests],
         issues: issuesState,
         pullRequests: pullRequestsState,
+        accountStatus: authorization ?? 'ready',
         message:
-          failedChannels === 0
+          authorization !== undefined
+            ? authorizationMessage(account.provider, authorization)
+            : failedChannels === 0
             ? null
             : failedChannels === 1
             ? 'Some triage data could not be loaded. The available results are still shown.'
@@ -510,6 +921,7 @@ export class ProviderTriageStore extends BaseStore {
         items: [],
         issues: channelError(account.provider, 'issue'),
         pullRequests: channelError(account.provider, 'pull-request'),
+        accountStatus: 'ready',
         message: `${providerTriageProviderLabel(
           account.provider
         )} triage could not be loaded safely. Retry in a moment.`,

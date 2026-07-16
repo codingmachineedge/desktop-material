@@ -19,6 +19,11 @@ describe('provider triage responsive Material styles', () => {
     assert.match(styles, /:focus-visible/)
     assert.match(styles, /@media \(max-width: 700px\)/)
     assert.match(styles, /grid-template-columns:\s*minmax\(0, 1fr\)/)
+    assert.match(styles, /\.provider-triage-account-guidance/)
+    assert.match(
+      styles,
+      /\.provider-triage-account-actions[\s\S]*?flex-direction:\s*column/
+    )
   })
 
   it('uses semantic Material tokens for states and attention', () => {

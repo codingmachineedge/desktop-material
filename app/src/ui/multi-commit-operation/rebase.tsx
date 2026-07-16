@@ -10,7 +10,10 @@ export abstract class Rebase extends BaseRebase {
   protected conflictDialogOperationPrefix = 'rebasing'
   protected rebaseKind = MultiCommitOperationKind.Rebase
 
-  protected onBeginOperation = () => {
+  protected onBeginOperation = (
+    signal?: AbortSignal,
+    onPreflightAccepted?: () => void
+  ) => {
     const { repository, dispatcher, state } = this.props
     const { operationDetail, targetBranch } = state
 
@@ -31,7 +34,7 @@ export abstract class Rebase extends BaseRebase {
       sourceBranch,
       targetBranch,
       commits,
-      { continueWithForcePush: true }
+      { continueWithForcePush: true, signal, onPreflightAccepted }
     )
   }
 
@@ -50,6 +53,7 @@ export abstract class Rebase extends BaseRebase {
       allBranches,
       recentBranches,
       initialBranch,
+      currentBranchProtected,
     } = step
 
     return (
@@ -62,6 +66,7 @@ export abstract class Rebase extends BaseRebase {
         recentBranches={recentBranches}
         currentBranch={currentBranch}
         initialBranch={initialBranch}
+        currentBranchProtected={currentBranchProtected}
         operation={MultiCommitOperationKind.Rebase}
         onDismissed={this.onFlowEnded}
       />

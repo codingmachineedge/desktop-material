@@ -12,6 +12,10 @@ import {
   IAPIProviderTriageItem,
   IAPIProviderTriagePage,
 } from '../../src/lib/provider-triage'
+import { APIError } from '../../src/lib/http'
+import { RepositoriesStore } from '../../src/lib/stores/repositories-store'
+import { TestRepositoriesDatabase } from '../helpers/databases'
+import { IAPIFullRepository } from '../../src/lib/api'
 
 const endpoint = 'https://gitlab.example/api/v4'
 const selected = new Account(
@@ -118,6 +122,27 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+function nextRepositoryUpdate(
+  store: RepositoriesStore,
+  predicate: (repository: Repository) => boolean
+): Promise<Repository> {
+  return new Promise(resolve => {
+    let dispose = () => {}
+    const subscription = store.onDidUpdate(repositories => {
+      const updated = repositories.find(predicate)
+      if (updated !== undefined) {
+        dispose()
+        resolve(updated)
+      }
+    })
+    dispose = () => subscription.dispose()
+  })
+}
+
+function apiError(status: number, message: string): APIError {
+  return new APIError(new Response(null, { status }), { message })
+}
+
 describe('provider triage store', () => {
   it('routes through only the exact repository-bound account', async () => {
     const routed = new Array<Account>()
@@ -145,7 +170,222 @@ describe('provider triage store', () => {
     await store.load(repository(1, 'material', null), [other, selected])
     assert.equal(calls, 0)
     assert.equal(store.getState().status, 'unavailable')
-    assert.match(store.getState().message ?? '', /Choose an exact account/)
+    assert.match(
+      store.getState().message ?? '',
+      /You're signed in.*isn't assigned.*Choose an exact account/
+    )
+    assert.equal(store.getState().accountStatus, 'selection-required')
+    assert.deepEqual(
+      store.getState().accountOptions.map(option => option.accountKey),
+      [getAccountKey(other), getAccountKey(selected)]
+    )
+  })
+
+  it('normalizes a persisted exact account key without replacing the explicit binding', async () => {
+    const routed = new Array<Account>()
+    const store = new ProviderTriageStore(
+      dependencies(account => {
+        routed.push(account)
+        return api()
+      })
+    )
+    const persistedKey = 'https://GITLAB.example/api/v4/#0001'
+
+    await store.load(repository(1, 'material', persistedKey), [selected])
+
+    assert.deepEqual(routed, [selected])
+    assert.equal(store.getState().status, 'ready')
+    assert.equal(store.getState().accountKey, getAccountKey(selected))
+  })
+
+  it('loads and refreshes the exact account key persisted by repository settings', async () => {
+    const database = new TestRepositoriesDatabase()
+    await database.reset()
+    try {
+      const repositories = new RepositoriesStore(database)
+      const addedUpdate = nextRepositoryUpdate(
+        repositories,
+        repository => repository.path === 'C:\\fixture\\persisted-material'
+      )
+      const local = await repositories.addRepository(
+        'C:\\fixture\\persisted-material',
+        'C:\\fixture\\persisted-material\\.git'
+      )
+      await addedUpdate
+      const apiRepository: IAPIFullRepository = {
+        clone_url: 'https://gitlab.example/group/material.git',
+        ssh_url: 'git@gitlab.example:group/material.git',
+        html_url: 'https://gitlab.example/group/material',
+        name: 'material',
+        owner: {
+          id: 10,
+          html_url: 'https://gitlab.example/group',
+          login: 'group',
+          avatar_url: '',
+          type: 'Organization',
+        },
+        private: true,
+        fork: false,
+        default_branch: 'main',
+        pushed_at: '2026-07-15T00:00:00Z',
+        has_issues: true,
+        archived: false,
+        permissions: { pull: true, push: true, admin: false },
+        parent: undefined,
+      }
+      const hostedUpdate = nextRepositoryUpdate(
+        repositories,
+        repository => repository.gitHubRepository?.name === 'material'
+      )
+      const hosted = await repositories.setGitHubRepository(
+        local,
+        await repositories.upsertGitHubRepository(endpoint, apiRepository)
+      )
+      await hostedUpdate
+      const accountUpdate = nextRepositoryUpdate(
+        repositories,
+        repository => repository.accountKey === getAccountKey(selected)
+      )
+      const saved = await repositories.updateRepositoryAccount(
+        hosted,
+        getAccountKey(selected)
+      )
+      const subscribed = await accountUpdate
+      const [persisted] = await repositories.getAll()
+      const routed = new Array<string>()
+      const triage = new ProviderTriageStore(
+        dependencies(account => {
+          routed.push(getAccountKey(account))
+          return api()
+        })
+      )
+
+      await triage.load(persisted, [selected])
+      await triage.load(persisted, [selected])
+
+      assert.notEqual(saved.hash, hosted.hash)
+      assert.equal(subscribed.hash, saved.hash)
+      assert.equal(persisted.accountKey, getAccountKey(selected))
+      assert.deepEqual(routed, [
+        getAccountKey(selected),
+        getAccountKey(selected),
+      ])
+      assert.equal(triage.getState().status, 'ready')
+    } finally {
+      database.close()
+    }
+  })
+
+  it('auto-binds the only valid provider account before loading', async () => {
+    const persisted = new Array<string>()
+    const routed = new Array<Account>()
+    const store = new ProviderTriageStore(
+      dependencies(account => {
+        routed.push(account)
+        return api()
+      })
+    )
+    const unbound = repository(1, 'material', null)
+
+    await store.load(
+      unbound,
+      [selected],
+      undefined,
+      async (repo, accountKey) => {
+        persisted.push(accountKey)
+        return repository(repo.id, 'material', accountKey)
+      }
+    )
+
+    assert.deepEqual(persisted, [getAccountKey(selected)])
+    assert.deepEqual(routed, [selected])
+    assert.equal(store.getState().status, 'ready')
+    assert.equal(store.getState().accountStatus, 'ready')
+  })
+
+  it('persists a labelled multiple-account choice before routing', async () => {
+    const persisted = new Array<string>()
+    const routed = new Array<Account>()
+    const store = new ProviderTriageStore(
+      dependencies(account => {
+        routed.push(account)
+        return api()
+      })
+    )
+    const unbound = repository(1, 'material', null)
+
+    await store.load(
+      unbound,
+      [other, selected],
+      undefined,
+      async (repo, accountKey) => {
+        persisted.push(accountKey)
+        return repository(repo.id, 'material', accountKey)
+      },
+      getAccountKey(other)
+    )
+
+    assert.deepEqual(persisted, [getAccountKey(other)])
+    assert.deepEqual(routed, [other])
+    assert.equal(store.getState().accountKey, getAccountKey(other))
+  })
+
+  it('distinguishes no provider account from a stale explicit binding', async () => {
+    const store = new ProviderTriageStore(dependencies(() => api()))
+
+    await store.load(repository(1, 'material', null), [])
+    assert.equal(store.getState().accountStatus, 'signed-out')
+    assert.match(store.getState().message ?? '', /Sign in.*manage accounts/i)
+
+    await store.load(repository(1, 'material', getAccountKey(selected)), [])
+    assert.equal(store.getState().accountStatus, 'authentication')
+    assert.equal(store.getState().accountKey, getAccountKey(selected))
+    assert.match(store.getState().message ?? '', /saved repository binding/)
+  })
+
+  it('drops a stale account-association generation before provider load', async () => {
+    const association = deferred<Repository>()
+    const routed = new Array<string>()
+    const store = new ProviderTriageStore(
+      dependencies(account => {
+        routed.push(account.login)
+        return api()
+      })
+    )
+    const firstLoad = store.load(
+      repository(1, 'first', null),
+      [selected],
+      undefined,
+      async () => association.promise
+    )
+
+    await store.load(repository(2, 'second'), [selected])
+    association.resolve(repository(1, 'first'))
+    await firstLoad
+
+    assert.deepEqual(routed, ['selected'])
+    assert.equal(store.getState().repositoryName, 'group/second')
+  })
+
+  it('classifies permission and SSO failures without provider payload text', async () => {
+    const store = new ProviderTriageStore(
+      dependencies(() =>
+        api({
+          fetchProviderTriageIssues: async () => {
+            throw apiError(403, 'resource protected by SAML SSO secret-body')
+          },
+          fetchProviderTriagePullRequests: async () => {
+            throw apiError(403, 'forbidden secret-body')
+          },
+        })
+      )
+    )
+
+    await store.load(repository(1, 'material'), [selected])
+
+    assert.equal(store.getState().accountStatus, 'sso')
+    assert.match(store.getState().message ?? '', /SSO authorization/)
+    assert.doesNotMatch(JSON.stringify(store.getState()), /secret-body/)
   })
 
   it('keeps successful results when one provider channel fails', async () => {

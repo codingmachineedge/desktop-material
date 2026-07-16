@@ -58,6 +58,7 @@ import { GitHubReleasesView } from './github-releases'
 import { GitHubIssuesView } from './github-issues'
 import { RepositoryTools } from './repository-tools'
 import { RepositoryProviderTriage } from './repository-tools/provider-triage'
+import { RepositorySettingsTab } from './repository-settings/repository-settings'
 import {
   getRepositorySections,
   getRepositorySectionVisualIndex,
@@ -362,6 +363,19 @@ export class RepositoryView extends React.Component<
       initialSelectedTab: PreferencesTab.Accounts,
     })
   }
+
+  private onShowRepositoryAccount = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.RepositorySettings,
+      repository: this.props.repository,
+      initialSelectedTab: RepositorySettingsTab.Remote,
+    })
+  }
+
+  private onAssociateProviderTriageAccount = (
+    repository: Repository,
+    accountKey: string
+  ) => this.props.dispatcher.updateRepositoryAccount(repository, accountKey)
 
   private renderAvatarContent(): JSX.Element | string {
     const account = this.props.accounts[0]
@@ -889,6 +903,11 @@ export class RepositoryView extends React.Component<
         <RepositoryProviderTriage
           repository={this.props.repository}
           accounts={this.props.accounts}
+          onAssociateAccount={this.onAssociateProviderTriageAccount}
+          onSignIn={this.onShowAccounts}
+          onManageAccounts={this.onShowAccounts}
+          onChooseRepositoryAccount={this.onShowRepositoryAccount}
+          onReauthenticateAccount={this.onShowAccounts}
         />
       )
     } else if (selectedSection === RepositorySectionTab.RepositoryTools) {

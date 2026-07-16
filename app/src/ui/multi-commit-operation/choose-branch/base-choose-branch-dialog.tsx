@@ -22,6 +22,7 @@ import { assertNever } from '../../../lib/fatal-error'
 import { getMergeOptions } from '../../lib/update-branch'
 import { getDefaultAriaLabelForBranch } from '../../branches/branch-renderer'
 import { ComputedAction } from '../../../models/computed-action'
+import { Button } from '../../lib/button'
 
 export function canStartOperation(
   selectedBranch: Branch | null,
@@ -67,6 +68,10 @@ export interface IBaseChooseBranchDialogProps {
    * The currently checked out branch
    */
   readonly currentBranch: Branch
+
+  /** Whether the current branch is protected and may reject rewritten history. */
+  // eslint-disable-next-line react/no-unused-prop-types
+  readonly currentBranchProtected?: boolean
 
   /**
    * The branch to select when dialog it is opened
@@ -237,6 +242,11 @@ export class ChooseBranchDialog extends React.Component<
     return (
       <Dialog
         id="choose-branch"
+        className={
+          operation === MultiCommitOperationKind.Rebase
+            ? 'rebase-choose-branch-dialog'
+            : undefined
+        }
         onDismissed={this.props.onDismissed}
         onSubmit={start}
         title={dialogTitle}
@@ -260,15 +270,25 @@ export class ChooseBranchDialog extends React.Component<
         </DialogContent>
         <DialogFooter>
           {this.renderStatusPreview()}
-          <DropdownSelectButton
-            checkedOption={operation}
-            options={getMergeOptions()}
-            disabled={!canStartOperation}
-            ariaDescribedBy="merge-status-preview"
-            dropdownAriaLabel="Merge options"
-            tooltip={submitButtonTooltip}
-            onCheckedOptionChange={this.onOperationChange}
-          />
+          <div className="choose-branch-actions">
+            {operation === MultiCommitOperationKind.Rebase ? (
+              <Button
+                className="rebase-cancel-before-start"
+                onClick={this.props.onDismissed}
+              >
+                Cancel
+              </Button>
+            ) : null}
+            <DropdownSelectButton
+              checkedOption={operation}
+              options={getMergeOptions()}
+              disabled={!canStartOperation}
+              ariaDescribedBy="merge-status-preview"
+              dropdownAriaLabel="Merge options"
+              tooltip={submitButtonTooltip}
+              onCheckedOptionChange={this.onOperationChange}
+            />
+          </div>
         </DialogFooter>
       </Dialog>
     )

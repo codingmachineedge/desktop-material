@@ -433,15 +433,18 @@ dialog {
 
     &#choose-branch {
       .dialog-content {
-        overflow-y: unset;
+        min-width: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
         max-height: calc(100vh - 194px);
       }
       .filter-list-container {
+        min-width: 0;
         overflow-y: auto;
         max-height: calc(100vh - 230px);
       }
       .branches-list {
-        height: calc(100vh - 194px);
+        height: min(300px, calc(100vh - 194px));
       }
     }
 

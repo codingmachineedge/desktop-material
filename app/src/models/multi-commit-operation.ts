@@ -128,6 +128,8 @@ export type ChooseBranchStep = {
   readonly allBranches: ReadonlyArray<Branch>
   readonly recentBranches: ReadonlyArray<Branch>
   readonly initialBranch?: Branch
+  /** Provider-neutral guidance for operations that rewrite a protected tip. */
+  readonly currentBranchProtected?: boolean
 }
 
 export type WarnForcePushStep = {

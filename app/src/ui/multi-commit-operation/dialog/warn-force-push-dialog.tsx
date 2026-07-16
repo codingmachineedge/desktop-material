@@ -17,28 +17,53 @@ interface IWarnForcePushProps {
   readonly operation: string
   readonly dispatcher: Dispatcher
   readonly askForConfirmationOnForcePush: boolean
-  readonly onBegin: () => void
+  readonly onBegin: (
+    signal?: AbortSignal,
+    onPreflightAccepted?: () => void
+  ) => void | Promise<void>
   readonly onDismissed: () => void
 }
 
 interface IWarnForcePushState {
   readonly askForConfirmationOnForcePush: boolean
+  readonly isStarting: boolean
+  readonly startError: string | null
 }
 
 export class WarnForcePushDialog extends React.Component<
   IWarnForcePushProps,
   IWarnForcePushState
 > {
+  private startAbortController: AbortController | null = null
+  private preflightAdvanced = false
+  private isMounted = false
+
   public constructor(props: IWarnForcePushProps) {
     super(props)
 
     this.state = {
       askForConfirmationOnForcePush: props.askForConfirmationOnForcePush,
+      isStarting: false,
+      startError: null,
+    }
+  }
+
+  public componentDidMount(): void {
+    this.isMounted = true
+  }
+
+  public componentWillUnmount(): void {
+    this.isMounted = false
+    if (
+      this.startAbortController !== null &&
+      this.preflightAdvanced === false
+    ) {
+      this.startAbortController.abort()
     }
   }
 
   public render() {
-    const { operation, onDismissed } = this.props
+    const { operation } = this.props
 
     const title = __DARWIN__
       ? `${operation} Will Require Force Push`
@@ -46,8 +71,9 @@ export class WarnForcePushDialog extends React.Component<
 
     return (
       <Dialog
+        className="multi-commit-force-push-warning"
         title={title}
-        onDismissed={onDismissed}
+        onDismissed={this.onDismissed}
         onSubmit={this.onBegin}
         backdropDismissable={false}
         type="warning"
@@ -67,6 +93,7 @@ export class WarnForcePushDialog extends React.Component<
           <div>
             <Checkbox
               label="Do not show this message again"
+              disabled={this.state.isStarting}
               value={
                 this.state.askForConfirmationOnForcePush
                   ? CheckboxValue.Off
@@ -75,13 +102,24 @@ export class WarnForcePushDialog extends React.Component<
               onChange={this.onAskForConfirmationOnForcePushChanged}
             />
           </div>
+          {this.state.isStarting ? (
+            <p className="rebase-start-progress" role="status">
+              Refreshing branches and safety checks…
+            </p>
+          ) : null}
+          {this.state.startError !== null ? (
+            <p className="rebase-start-error" role="alert">
+              {this.state.startError}
+            </p>
+          ) : null}
         </DialogContent>
         <DialogFooter>
           <OkCancelButtonGroup
             okButtonText={`Begin ${
               __DARWIN__ ? operation : operation.toLowerCase()
             }`}
-            onCancelButtonClick={this.props.onDismissed}
+            okButtonDisabled={this.state.isStarting}
+            onCancelButtonClick={this.onDismissed}
           />
         </DialogFooter>
       </Dialog>
@@ -96,11 +134,47 @@ export class WarnForcePushDialog extends React.Component<
     this.setState({ askForConfirmationOnForcePush: value })
   }
 
+  private onDismissed = () => {
+    this.startAbortController?.abort()
+    this.props.onDismissed()
+  }
+
   private onBegin = async () => {
+    if (this.startAbortController !== null) {
+      return
+    }
+
+    const abortController = new AbortController()
+    this.startAbortController = abortController
+    this.preflightAdvanced = false
+    this.setState({ isStarting: true, startError: null })
+
     this.props.dispatcher.setConfirmForcePushSetting(
       this.state.askForConfirmationOnForcePush
     )
 
-    this.props.onBegin()
+    try {
+      await this.props.onBegin(abortController.signal, () => {
+        if (this.startAbortController === abortController) {
+          this.preflightAdvanced = true
+        }
+      })
+    } catch (error) {
+      if (abortController.signal.aborted || !this.isMounted) {
+        return
+      }
+      this.preflightAdvanced = false
+      this.setState({
+        isStarting: false,
+        startError:
+          error instanceof Error
+            ? error.message
+            : 'Unable to start the operation. Refresh and try again.',
+      })
+    } finally {
+      if (this.startAbortController === abortController) {
+        this.startAbortController = null
+      }
+    }
   }
 }

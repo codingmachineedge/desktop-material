@@ -140,6 +140,7 @@ describe('multi-commit-operation', () => {
           allBranches: [currentBranch, defaultBranch],
           recentBranches: [currentBranch],
         },
+        changesState: { currentBranchProtected: true },
       } as any
 
       const step = getMultiCommitOperationChooseBranchStep(state)
@@ -148,6 +149,7 @@ describe('multi-commit-operation', () => {
       assert.equal(step.currentBranch, currentBranch)
       assert.equal(step.defaultBranch, defaultBranch)
       assert.equal(step.allBranches.length, 2)
+      assert.equal(step.currentBranchProtected, true)
     })
   })
 })

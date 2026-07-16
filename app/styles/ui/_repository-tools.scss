@@ -81,6 +81,54 @@
   }
 }
 
+.provider-triage-account-guidance {
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 12px 0;
+  max-width: 100%;
+  padding: 12px;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  select {
+    background: var(--md-sys-color-surface);
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 8px;
+    color: var(--md-sys-color-on-surface);
+    font: inherit;
+    min-height: 36px;
+    padding: 7px 9px;
+    width: 100%;
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.provider-triage-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+
+  .button-component {
+    height: auto;
+    max-width: 100%;
+    min-height: 32px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
 .provider-triage-channels,
 .provider-triage-list,
 .provider-triage-attention {
@@ -241,6 +289,15 @@
 
   .provider-triage-actions .button-component {
     width: 100%;
+  }
+
+  .provider-triage-account-actions {
+    align-items: stretch;
+    flex-direction: column;
+
+    .button-component {
+      width: 100%;
+    }
   }
 }
 

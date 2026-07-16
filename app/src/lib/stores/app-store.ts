@@ -9731,8 +9731,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
   public async _updateRepositoryAccount(
     repository: Repository,
     accountKey: string | null
-  ): Promise<void> {
-    await this.repositoriesStore.updateRepositoryAccount(repository, accountKey)
+  ): Promise<Repository> {
+    return this.repositoriesStore.updateRepositoryAccount(
+      repository,
+      accountKey
+    )
   }
 
   /**

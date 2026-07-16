@@ -34,6 +34,7 @@ export function getMultiCommitOperationChooseBranchStep(
     allBranches,
     recentBranches,
     initialBranch: initialBranch !== null ? initialBranch : undefined,
+    currentBranchProtected: state.changesState.currentBranchProtected,
   }
 }
 

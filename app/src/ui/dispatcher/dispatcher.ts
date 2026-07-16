@@ -176,6 +176,10 @@ import {
   MultiCommitOperationStepKind,
 } from '../../models/multi-commit-operation'
 import { getMultiCommitOperationChooseBranchStep } from '../../lib/multi-commit-operation'
+import {
+  getRebaseLaunchBlockingReason,
+  getRebaseStartBlockingReason,
+} from '../../lib/rebase'
 import { ICombinedRefCheck, IRefCheck } from '../../lib/ci-checks/ci-checks'
 import { ValidNotificationPullRequestReviewState } from '../../lib/valid-notification-pull-request-review'
 import { UnreachableCommitsTab } from '../history/unreachable-commits-dialog'
@@ -836,7 +840,26 @@ export class Dispatcher {
     repository: Repository,
     initialBranch?: Branch | null
   ) {
+    try {
+      await this.appStore._loadStatus(repository)
+    } catch (error) {
+      log.error(
+        'Unable to refresh repository state before rebase review',
+        error
+      )
+      await this.presentError(
+        new Error(
+          'Desktop could not refresh this repository before the rebase review. Check the repository and try again.'
+        )
+      )
+      return
+    }
     const repositoryState = this.repositoryStateManager.get(repository)
+    const blockingReason = getRebaseLaunchBlockingReason(repositoryState)
+    if (blockingReason !== null) {
+      await this.presentError(new Error(blockingReason))
+      return
+    }
     const initialStep = getMultiCommitOperationChooseBranchStep(
       repositoryState,
       initialBranch
@@ -880,47 +903,124 @@ export class Dispatcher {
     baseBranch: Branch,
     targetBranch: Branch,
     commits: ReadonlyArray<CommitOneLine>,
-    options?: { continueWithForcePush: boolean }
+    options?: {
+      readonly continueWithForcePush?: boolean
+      readonly signal?: AbortSignal
+      /** Called at the final reviewed boundary before the flow advances. */
+      readonly onPreflightAccepted?: () => void
+    }
   ): Promise<void> {
+    // The branch list and preview are snapshots. Refresh and revalidate the
+    // exact repository/current/base identities immediately before any Git
+    // mutation so a branch switch or ref update cannot race confirmation.
+    try {
+      await this.appStore._loadStatus(repository)
+    } catch (error) {
+      log.error(
+        'Unable to refresh repository state before starting rebase',
+        error
+      )
+      throw new Error(
+        'Desktop could not refresh this repository before starting the rebase. Check the repository and try again.'
+      )
+    }
+    const getValidatedState = () => {
+      options?.signal?.throwIfAborted()
+      const state = this.repositoryStateManager.get(repository)
+      const blockingReason = getRebaseStartBlockingReason(
+        state,
+        targetBranch,
+        baseBranch
+      )
+      if (blockingReason !== null) {
+        throw new Error(blockingReason)
+      }
+      return state
+    }
+
+    let currentState = getValidatedState()
+
     const { askForConfirmationOnForcePush } = this.appStore.getState()
 
-    const hasOverriddenForcePushCheck =
-      options !== undefined && options.continueWithForcePush
+    const hasOverriddenForcePushCheck = options?.continueWithForcePush === true
+    let showForcePushWarning = false
 
-    const { branchesState } = this.repositoryStateManager.get(repository)
-    const originalBranchTip = getTipSha(branchesState.tip)
+    if (askForConfirmationOnForcePush && !hasOverriddenForcePushCheck) {
+      try {
+        // The branch being rewritten is the current/target branch. Its
+        // upstream, not the selected base branch's upstream, determines
+        // whether the reviewed operation will require force-with-lease.
+        showForcePushWarning = await this.warnAboutRemoteCommits(
+          repository,
+          targetBranch,
+          baseBranch.tip.sha
+        )
+      } catch (error) {
+        log.error(
+          'Unable to inspect remote commits before starting rebase',
+          error
+        )
+        throw new Error(
+          'Desktop could not verify whether this rebase rewrites remote commits. Refresh branches and try again.'
+        )
+      }
+
+      // The remote-commit probe is asynchronous. Revalidate all mutable
+      // identities and safety state from a fresh status again after it,
+      // immediately before the operation is initialized or Git can be invoked.
+      options?.signal?.throwIfAborted()
+      try {
+        await this.appStore._loadStatus(repository)
+      } catch (error) {
+        log.error(
+          'Unable to refresh repository state after remote rebase inspection',
+          error
+        )
+        throw new Error(
+          'Desktop could not refresh this repository after checking remote commits. Refresh branches and try again.'
+        )
+      }
+      currentState = getValidatedState()
+    }
+
+    const originalBranchTip = getTipSha(currentState.branchesState.tip)
+    const operationDetail = {
+      kind: MultiCommitOperationKind.Rebase as const,
+      commits,
+      currentTip: baseBranch.tip.sha,
+      sourceBranch: baseBranch,
+    }
+
+    options?.signal?.throwIfAborted()
+    options?.onPreflightAccepted?.()
+
+    if (showForcePushWarning) {
+      // Seed the reviewed operation without briefly rendering ShowProgress;
+      // the warning step is the first state observers should see.
+      this.appStore._initializeMultiCommitOperation(
+        repository,
+        operationDetail,
+        targetBranch,
+        commits,
+        originalBranchTip,
+        false
+      )
+      this.setMultiCommitOperationStep(repository, {
+        kind: MultiCommitOperationStepKind.WarnForcePush,
+        targetBranch,
+        baseBranch,
+        commits,
+      })
+      return
+    }
 
     this.appStore._initializeMultiCommitOperation(
       repository,
-      {
-        kind: MultiCommitOperationKind.Rebase,
-        commits,
-        currentTip: baseBranch.tip.sha,
-        sourceBranch: baseBranch,
-      },
+      operationDetail,
       targetBranch,
       commits,
       originalBranchTip
     )
-
-    if (askForConfirmationOnForcePush && !hasOverriddenForcePushCheck) {
-      const showWarning = await this.warnAboutRemoteCommits(
-        repository,
-        baseBranch,
-        targetBranch.tip.sha
-      )
-
-      if (showWarning) {
-        this.setMultiCommitOperationStep(repository, {
-          kind: MultiCommitOperationStepKind.WarnForcePush,
-          targetBranch,
-          baseBranch,
-          commits,
-        })
-        return
-      }
-    }
-
     await this.rebase(repository, baseBranch, targetBranch)
   }
 
@@ -2632,8 +2732,8 @@ export class Dispatcher {
   public async updateRepositoryAccount(
     repository: Repository,
     accountKey: string | null
-  ) {
-    await this.appStore._updateRepositoryAccount(repository, accountKey)
+  ): Promise<Repository> {
+    return this.appStore._updateRepositoryAccount(repository, accountKey)
   }
 
   public async setAppFocusState(isFocused: boolean): Promise<void> {

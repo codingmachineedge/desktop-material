@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Disposable } from 'event-kit'
-import { Account } from '../../models/account'
+import { Account, getAccountKey } from '../../models/account'
 import { Repository } from '../../models/repository'
 import {
   filterProviderTriageItems,
@@ -12,6 +12,7 @@ import {
   IProviderTriageChannelState,
   IProviderTriageState,
   ProviderTriageStore,
+  AssociateProviderTriageAccount,
 } from '../../lib/stores/provider-triage-store'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
@@ -20,18 +21,41 @@ export interface IRepositoryProviderTriageProps {
   readonly repository: Repository
   readonly accounts: ReadonlyArray<Account>
   readonly store?: ProviderTriageStore
+  readonly onAssociateAccount?: AssociateProviderTriageAccount
+  readonly onSignIn?: () => void
+  readonly onManageAccounts?: () => void
+  readonly onChooseRepositoryAccount?: () => void
+  readonly onReauthenticateAccount?: (accountKey: string | null) => void
 }
 
 interface IRepositoryProviderTriageState {
   readonly triage: IProviderTriageState
   readonly filters: IProviderTriageFilters
+  readonly selectedAccountKey: string | null
 }
 
 function repositoryViewKey(repository: Repository): string {
   const remote = repository.gitHubRepository
-  return `${repository.id}:${remote?.endpoint ?? ''}:${
+  return `${repository.hash}:${repository.id}:${remote?.endpoint ?? ''}:${
     remote?.owner.login ?? ''
   }:${remote?.name ?? ''}:${repository.accountKey ?? ''}`
+}
+
+function accountsEqual(
+  left: ReadonlyArray<Account>,
+  right: ReadonlyArray<Account>
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (account, index) =>
+        getAccountKey(account) === getAccountKey(right[index]) &&
+        account.provider === right[index].provider &&
+        account.endpoint === right[index].endpoint &&
+        account.login === right[index].login &&
+        account.token === right[index].token
+    )
+  )
 }
 
 function channelLabel(channel: IProviderTriageChannelState): string {
@@ -75,6 +99,7 @@ export class RepositoryProviderTriage extends React.Component<
 > {
   private readonly store: ProviderTriageStore
   private subscription: Disposable | null = null
+  private associationGeneration = 0
 
   public constructor(props: IRepositoryProviderTriageProps) {
     super(props)
@@ -87,45 +112,117 @@ export class RepositoryProviderTriage extends React.Component<
         bucket: 'all',
         sort: 'updated-descending',
       },
+      selectedAccountKey: null,
     }
   }
 
   public componentDidMount() {
     this.subscription = this.store.onDidUpdate(this.onStoreUpdate)
     this.store.updateAccounts(this.props.accounts)
-    void this.store.load(this.props.repository, this.props.accounts)
+    this.load()
   }
 
   public componentDidUpdate(prevProps: IRepositoryProviderTriageProps) {
     const repositoryChanged =
       repositoryViewKey(prevProps.repository) !==
       repositoryViewKey(this.props.repository)
-    const accountsChanged = prevProps.accounts !== this.props.accounts
+    const accountsChanged = !accountsEqual(
+      prevProps.accounts,
+      this.props.accounts
+    )
     if (accountsChanged) {
       this.store.updateAccounts(this.props.accounts)
     }
     if (repositoryChanged || accountsChanged) {
-      void this.store.load(this.props.repository, this.props.accounts)
+      this.load()
     }
   }
 
   public componentWillUnmount() {
     this.subscription?.dispose()
     this.subscription = null
+    this.associationGeneration++
     this.store.cancel()
   }
 
   private onStoreUpdate = () => {
-    this.setState({ triage: this.store.getState() })
+    const triage = this.store.getState()
+    this.setState(state => ({
+      triage,
+      selectedAccountKey:
+        state.selectedAccountKey !== null &&
+        triage.accountOptions.some(
+          option => option.accountKey === state.selectedAccountKey
+        )
+          ? state.selectedAccountKey
+          : triage.accountOptions[0]?.accountKey ?? null,
+    }))
+  }
+
+  private associateAccount: AssociateProviderTriageAccount = async (
+    repository,
+    accountKey
+  ) => {
+    const generation = this.associationGeneration
+    const viewKey = repositoryViewKey(this.props.repository)
+    if (
+      repositoryViewKey(repository) !== viewKey ||
+      !this.props.accounts.some(
+        account => getAccountKey(account) === accountKey
+      ) ||
+      this.props.onAssociateAccount === undefined
+    ) {
+      throw new Error('The repository or account selection changed.')
+    }
+    const associated = await this.props.onAssociateAccount(
+      repository,
+      accountKey
+    )
+    if (
+      generation !== this.associationGeneration ||
+      repositoryViewKey(this.props.repository) !== viewKey
+    ) {
+      throw new Error('The repository or account selection changed.')
+    }
+    return associated
+  }
+
+  private load = (requestedAccountKey: string | null = null) => {
+    this.associationGeneration++
+    void this.store.load(
+      this.props.repository,
+      this.props.accounts,
+      undefined,
+      this.props.onAssociateAccount === undefined
+        ? undefined
+        : this.associateAccount,
+      requestedAccountKey
+    )
   }
 
   private refresh = () => {
     this.store.updateAccounts(this.props.accounts)
-    void this.store.load(this.props.repository, this.props.accounts)
+    this.load()
   }
 
   private cancel = () => {
     this.store.cancel()
+  }
+
+  private onSelectedAccountChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    this.setState({ selectedAccountKey: event.currentTarget.value })
+  }
+
+  private useSelectedAccount = () => {
+    if (this.state.selectedAccountKey !== null) {
+      this.load(this.state.selectedAccountKey)
+    }
+  }
+
+  private reauthenticate = () => {
+    this.props.onReauthenticateAccount?.(this.state.triage.accountKey)
   }
 
   private onQueryChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,6 +312,116 @@ export class RepositoryProviderTriage extends React.Component<
     )
   }
 
+  private renderAccountGuidance() {
+    const { triage, selectedAccountKey } = this.state
+    if (triage.accountStatus === 'selection-required') {
+      return (
+        <div
+          className="provider-triage-account-guidance"
+          role="group"
+          aria-label="Repository account selection"
+        >
+          <label htmlFor="provider-triage-account">Repository account</label>
+          <select
+            id="provider-triage-account"
+            value={selectedAccountKey ?? ''}
+            onChange={this.onSelectedAccountChange}
+          >
+            {triage.accountOptions.map(option => (
+              <option key={option.accountKey} value={option.accountKey}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="provider-triage-account-actions">
+            <Button
+              onClick={this.useSelectedAccount}
+              disabled={
+                selectedAccountKey === null ||
+                this.props.onAssociateAccount === undefined
+              }
+            >
+              Use this account
+            </Button>
+            {this.props.onChooseRepositoryAccount !== undefined && (
+              <Button onClick={this.props.onChooseRepositoryAccount}>
+                Repository settings
+              </Button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    if (triage.accountStatus === 'signed-out') {
+      return (
+        <div className="provider-triage-account-actions">
+          {this.props.onSignIn !== undefined && (
+            <Button onClick={this.props.onSignIn}>Sign in</Button>
+          )}
+          {this.props.onManageAccounts !== undefined && (
+            <Button onClick={this.props.onManageAccounts}>
+              Manage accounts
+            </Button>
+          )}
+        </div>
+      )
+    }
+
+    if (
+      triage.accountStatus === 'authentication' ||
+      triage.accountStatus === 'permission' ||
+      triage.accountStatus === 'sso'
+    ) {
+      const actionLabel =
+        triage.accountStatus === 'sso'
+          ? 'Authorize SSO'
+          : triage.accountStatus === 'permission'
+          ? 'Re-authenticate'
+          : 'Sign in again'
+      return (
+        <div className="provider-triage-account-actions">
+          {this.props.onReauthenticateAccount !== undefined && (
+            <Button onClick={this.reauthenticate}>{actionLabel}</Button>
+          )}
+          {this.props.onManageAccounts !== undefined && (
+            <Button onClick={this.props.onManageAccounts}>
+              Manage accounts
+            </Button>
+          )}
+          {triage.accountStatus === 'permission' &&
+            this.props.onChooseRepositoryAccount !== undefined && (
+              <Button onClick={this.props.onChooseRepositoryAccount}>
+                Repository settings
+              </Button>
+            )}
+        </div>
+      )
+    }
+
+    if (
+      triage.accountStatus === 'binding-invalid' ||
+      triage.accountStatus === 'binding-mismatch'
+    ) {
+      return (
+        <div className="provider-triage-account-actions">
+          {this.props.onChooseRepositoryAccount !== undefined && (
+            <Button onClick={this.props.onChooseRepositoryAccount}>
+              Repository settings
+            </Button>
+          )}
+          {this.props.onManageAccounts !== undefined && (
+            <Button onClick={this.props.onManageAccounts}>
+              Manage accounts
+            </Button>
+          )}
+        </div>
+      )
+    }
+
+    return null
+  }
+
   public render() {
     const { triage, filters } = this.state
     const items = filterProviderTriageItems(triage.items, filters)
@@ -273,6 +480,8 @@ export class RepositoryProviderTriage extends React.Component<
               {triage.message}
             </p>
           )}
+
+          {this.renderAccountGuidance()}
 
           <div className="provider-triage-filters" role="search">
             <label>
