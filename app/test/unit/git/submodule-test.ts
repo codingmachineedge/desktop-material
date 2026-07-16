@@ -1,11 +1,13 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import * as path from 'path'
-import { readFile, writeFile } from 'fs/promises'
+import { mkdir, readFile, writeFile } from 'fs/promises'
 
 import { Repository } from '../../../src/models/repository'
 import {
   listSubmodules,
+  addSubmodule,
+  validateSubmoduleAddPath,
   resetSubmodulePaths,
   parseGitModules,
   parseSubmoduleStatus,
@@ -15,6 +17,51 @@ import { checkoutBranch, getBranches } from '../../../src/lib/git'
 import { setupFixtureRepository } from '../../helpers/repositories'
 
 describe('git/submodule', () => {
+  describe('addSubmodule', () => {
+    it('honors cancellation before inspecting or spawning Git', async () => {
+      const repository = new Repository(
+        'C:/missing/superproject',
+        -1,
+        null,
+        false
+      )
+      const controller = new AbortController()
+      controller.abort()
+
+      await assert.rejects(
+        addSubmodule(
+          repository,
+          'https://example.invalid/shared.git',
+          'vendor/shared',
+          null,
+          { signal: controller.signal }
+        ),
+        (error: Error) =>
+          error.name === 'AbortError' && /cancelled/.test(error.message)
+      )
+    })
+
+    it('rejects live duplicate and occupied checkout paths', async t => {
+      const testRepoPath = await setupFixtureRepository(
+        t,
+        'submodule-basic-setup'
+      )
+      const repository = new Repository(testRepoPath, -1, null, false)
+      const occupiedPath = path.join(testRepoPath, 'vendor', 'occupied')
+      await mkdir(occupiedPath, { recursive: true })
+      await writeFile(path.join(occupiedPath, 'README.md'), 'occupied\n')
+
+      assert.match(
+        (await validateSubmoduleAddPath(repository, 'foo/submodule')) ?? '',
+        /already uses this path/
+      )
+      assert.match(
+        (await validateSubmoduleAddPath(repository, 'vendor/occupied')) ?? '',
+        /contains files/
+      )
+    })
+  })
+
   describe('listSubmodules', () => {
     it('returns the submodule entry', async t => {
       const testRepoPath = await setupFixtureRepository(

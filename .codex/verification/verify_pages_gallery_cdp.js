@@ -117,7 +117,8 @@ const geometryExpression = `(() => {
     ),
     milestoneImages: images.filter(image =>
       image.src?.includes('material-actions-jobs-pagination') ||
-      image.src?.includes('material-actions-pending-deployments')
+      image.src?.includes('material-actions-pending-deployments') ||
+      image.src?.includes('add-submodule-dialog')
     ),
     overflow,
     outsideControls,
@@ -131,13 +132,19 @@ function assertReceipt(receipt, label) {
   const deploymentImages = receipt.milestoneImages.filter(image =>
     image.src?.includes('material-actions-pending-deployments.png')
   )
+  const addSubmoduleImages = receipt.milestoneImages.filter(image =>
+    image.src?.includes('add-submodule-dialog.png')
+  )
   const exactMilestoneImages =
     jobImages.length === 1 &&
     jobImages[0].naturalWidth === 960 &&
     jobImages[0].naturalHeight === 660 &&
     deploymentImages.length === 1 &&
     deploymentImages[0].naturalWidth === 944 &&
-    deploymentImages[0].naturalHeight === 808
+    deploymentImages[0].naturalHeight === 808 &&
+    addSubmoduleImages.length === 1 &&
+    addSubmoduleImages[0].naturalWidth === 1500 &&
+    addSubmoduleImages[0].naturalHeight === 1032
   if (receipt.documentClientWidth !== receipt.documentScrollWidth) {
     fail(
       `${label} document has horizontal overflow: ${JSON.stringify(receipt)}`

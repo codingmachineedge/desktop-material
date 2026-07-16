@@ -138,6 +138,10 @@ the tonal workspace preview hides when a compact window needs the space.
   heights; Remote Manager protects readable name/URL/control widths before stacking; Regex Builder
   reflows its category/token grid and scrolls its body while keeping the tester and footer
   reachable, without page-level horizontal clipping.
+- **Clone-style Add Submodule** — open **Repository settings → Submodules → Add submodule…** to use
+  the same GitHub.com, Enterprise, URL, and GitLab/Bitbucket selection model as Clone, then review a
+  safe repository-relative path and optional branch with exact-account routing, bounded progress,
+  cancellation, and managed-list refresh.
 
 ![Word-style tab appearance editor with typography, alignment, and independent text and background palettes](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-appearance-word.png)
 
@@ -146,6 +150,8 @@ the tonal workspace preview hides when a compact window needs the space.
 ![Material workflow-run cancellation review naming the exact run, ref, actor, and commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-cancel.png)
 
 ![Reviewed current-branch rebase with ahead and behind counts and a bounded commit preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-rebase-review.png)
+
+![Clone-style Add Submodule review with a synthetic URL, checkout path, and tracked branch](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
 
 ### Production-verified M0–M19 native Git and GitHub functions
 

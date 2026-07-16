@@ -94,6 +94,11 @@ interface ICloneableRepositoryFilterListProps {
     urls: ReadonlyArray<string>,
     checked: boolean
   ) => void
+
+  /** Accessible identity for reuse outside the Clone dialog. */
+  readonly filterListId?: string
+  readonly filterListLabel?: string
+  readonly placeholderText?: string
 }
 
 const RowHeight = 31
@@ -249,8 +254,8 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
       <SectionFilterList<ICloneableRepositoryListItem>
         className={'clone-github-repo'}
         rowHeight={RowHeight}
-        filterListId="clone-repositories"
-        filterListLabel="Clone"
+        filterListId={this.props.filterListId ?? 'clone-repositories'}
+        filterListLabel={this.props.filterListLabel ?? 'Clone'}
         selectedItem={selectedListItem}
         renderItem={this.renderItem}
         renderGroupHeader={this.renderGroupHeader}
@@ -263,7 +268,9 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
         renderPostFilter={this.renderPostFilter}
         renderPreFilter={this.props.renderPreFilter}
         onItemClick={this.props.onItemClicked ? this.onItemClick : undefined}
-        placeholderText={'Filter your repositories'}
+        placeholderText={
+          this.props.placeholderText ?? 'Filter your repositories'
+        }
         getGroupAriaLabel={this.getGroupAriaLabelGetter(groups)}
       />
     )

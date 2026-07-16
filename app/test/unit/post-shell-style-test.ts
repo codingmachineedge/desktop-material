@@ -267,6 +267,26 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /&:focus-visible\s*\{[\s\S]*?outline: 2px solid/)
   })
 
+  it('keeps the clone-style Add Submodule dialog internally scrollable', () => {
+    const style = readStyle('_add-submodule.scss')
+
+    assert.match(
+      style,
+      /dialog\.clone-repository\.add-submodule-dialog\s*\{[\s\S]*?max-height: calc\(100vh - 54px\);/
+    )
+    assert.match(
+      style,
+      /\.add-submodule-scroll-region\s*\{[\s\S]*?min-width: 0;[\s\S]*?min-height: 0;[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      style,
+      /grid-template-columns: minmax\(0, 1\.15fr\) minmax\(220px, 0\.85fr\);/
+    )
+    assert.match(style, /@media \(max-width: 700px\)/)
+    assert.match(style, /@media \(max-width: 520px\)/)
+    assert.match(style, /@media \(max-height: 650px\)/)
+  })
+
   it('publishes a valid floating-popover available-height token', () => {
     const source = readFileSync(
       join(process.cwd(), 'app', 'src', 'ui', 'lib', 'popover.tsx'),

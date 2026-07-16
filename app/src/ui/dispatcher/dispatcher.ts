@@ -41,6 +41,7 @@ import {
   getRepositoryType,
   listWorktrees,
   IManagedSubmodule,
+  IAddSubmoduleOptions,
   IRemoteManagementApplyOptions,
   IRepositoryShallowHistoryFetchRequest,
 } from '../../lib/git'
@@ -2256,9 +2257,10 @@ export class Dispatcher {
     repository: Repository,
     url: string,
     path: string,
-    branch?: string | null
+    branch?: string | null,
+    options?: IAddSubmoduleOptions
   ): Promise<void> {
-    return this.appStore._addSubmodule(repository, url, path, branch)
+    return this.appStore._addSubmodule(repository, url, path, branch, options)
   }
 
   /**

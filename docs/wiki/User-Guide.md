@@ -617,6 +617,11 @@ list.
   lock/repair/remove/prune worktree operations from the Worktrees view. Remote names and URLs wrap
   only when genuinely long; before a field/control column becomes unreadable, each row changes to a
   single-column layout with fetch/push controls and actions in keyboard order.
+- Open **Repository settings → Submodules** and choose **Add submodule…** to browse GitHub.com,
+  Enterprise, GitLab, or Bitbucket with the appropriate exact account, or enter an HTTPS, SSH, or
+  local Git URL. Review the repository-relative checkout path and optional branch; Desktop rechecks
+  duplicate/occupied destinations immediately before Git, reports bounded clone progress, and lets
+  you cancel the running operation before refreshing the managed list.
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution. Build & Run discovers common nested projects across Node, Deno, Rust, Go, .NET, Python, JVM, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; choose a profile by its displayed project folder when several projects share a language or toolchain.
 
 At compact heights, the Repository Tools workspace itself scrolls vertically so the Diagnostics
@@ -634,6 +639,8 @@ signed-in account.**
 ![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
 
 ![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
+
+![Clone-style Add Submodule review with a synthetic URL, checkout path, and tracked branch](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
 
 ![Reviewed gitignore template catalogue](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-gitignore-manager.png)
 

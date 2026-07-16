@@ -4,11 +4,11 @@ import { Repository } from '../../models/repository'
 import { Dispatcher } from '../dispatcher'
 import { IManagedSubmodule, SubmoduleStatusKind } from '../../lib/git'
 import { Button } from '../lib/button'
-import { TextBox } from '../lib/text-box'
 import { Loading } from '../lib/loading'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { TooltippedContent } from '../lib/tooltipped-content'
+import { PopupType } from '../../models/popup'
 
 interface ISubmodulesProps {
   readonly repository: Repository
@@ -25,7 +25,7 @@ interface ISubmodulesState {
   /** The paths of submodules with an in-flight per-row operation. */
   readonly busyPaths: ReadonlySet<string>
 
-  /** True while an "Update all" / add operation spanning the repo runs. */
+  /** True while an "Update all" operation spanning the repo runs. */
   readonly isBusyGlobal: boolean
 
   /** The latest streamed progress line from an update, if any. */
@@ -33,11 +33,6 @@ interface ISubmodulesState {
 
   /** The most recent operation error, surfaced inline. */
   readonly error: string | null
-
-  // --- Add form ---------------------------------------------------------
-  readonly addUrl: string
-  readonly addPath: string
-  readonly addBranch: string
 }
 
 /** The user-facing label for each submodule status kind. */
@@ -71,9 +66,6 @@ export class Submodules extends React.Component<
       isBusyGlobal: false,
       progress: null,
       error: null,
-      addUrl: '',
-      addPath: '',
-      addBranch: '',
     }
   }
 
@@ -81,7 +73,7 @@ export class Submodules extends React.Component<
     this.loadSubmodules()
   }
 
-  private async loadSubmodules() {
+  private loadSubmodules = async () => {
     this.setState({ isLoading: true })
     try {
       const submodules = await this.props.dispatcher.getSubmodules(
@@ -183,36 +175,13 @@ export class Submodules extends React.Component<
     }
   }
 
-  private onAdd = async () => {
-    const url = this.state.addUrl.trim()
-    const path = this.state.addPath.trim()
-    const branch = this.state.addBranch.trim()
-
-    if (url.length === 0 || path.length === 0) {
-      return
-    }
-
-    this.setState({ isBusyGlobal: true, error: null })
-    try {
-      await this.props.dispatcher.addSubmodule(
-        this.props.repository,
-        url,
-        path,
-        branch.length > 0 ? branch : null
-      )
-      this.setState({ addUrl: '', addPath: '', addBranch: '' })
-      await this.loadSubmodules()
-    } catch (e) {
-      this.setState({ error: `Failed adding submodule: ${e}` })
-    } finally {
-      this.setState({ isBusyGlobal: false })
-    }
+  private onShowAddSubmodule = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.AddSubmodule,
+      repository: this.props.repository,
+      onAdded: this.loadSubmodules,
+    })
   }
-
-  private onAddUrlChanged = (addUrl: string) => this.setState({ addUrl })
-  private onAddPathChanged = (addPath: string) => this.setState({ addPath })
-  private onAddBranchChanged = (addBranch: string) =>
-    this.setState({ addBranch })
 
   private renderStatusPill(submodule: IManagedSubmodule): JSX.Element {
     const className = `submodule-status submodule-status-${submodule.status}`
@@ -250,7 +219,7 @@ export class Submodules extends React.Component<
     if (submodules === null || submodules.length === 0) {
       return (
         <p className="submodules-empty">
-          This repository has no submodules. Add one below to get started.
+          This repository has no submodules yet.
         </p>
       )
     }
@@ -259,51 +228,6 @@ export class Submodules extends React.Component<
       <ul className="submodule-list">
         {submodules.map(s => this.renderRow(s))}
       </ul>
-    )
-  }
-
-  private renderAddForm(): JSX.Element {
-    const canAdd =
-      this.state.addUrl.trim().length > 0 &&
-      this.state.addPath.trim().length > 0 &&
-      !this.state.isBusyGlobal
-
-    return (
-      <section className="submodules-section submodules-add">
-        <h3 className="submodules-section-title">
-          <Octicon symbol={octicons.plus} />
-          Add a submodule
-        </h3>
-        <div className="submodules-add-fields">
-          <TextBox
-            label="Repository URL"
-            placeholder="https://github.com/owner/repo.git"
-            value={this.state.addUrl}
-            spellcheck={false}
-            onValueChanged={this.onAddUrlChanged}
-          />
-          <TextBox
-            label="Path"
-            placeholder="vendor/repo"
-            value={this.state.addPath}
-            spellcheck={false}
-            onValueChanged={this.onAddPathChanged}
-          />
-          <TextBox
-            label={__DARWIN__ ? 'Branch (Optional)' : 'Branch (optional)'}
-            placeholder="main"
-            value={this.state.addBranch}
-            spellcheck={false}
-            onValueChanged={this.onAddBranchChanged}
-          />
-        </div>
-        <div className="submodules-add-actions">
-          <Button type="button" disabled={!canAdd} onClick={this.onAdd}>
-            {this.state.isBusyGlobal ? <Loading /> : null}
-            Add submodule
-          </Button>
-        </div>
-      </section>
     )
   }
 
@@ -320,17 +244,28 @@ export class Submodules extends React.Component<
                 <Octicon symbol={octicons.fileSubmodule} />
                 Submodules
               </h3>
-              {hasSubmodules && (
+              <div className="submodules-header-actions">
                 <Button
                   type="button"
                   disabled={this.state.isBusyGlobal}
-                  onClick={this.onUpdateAll}
-                  tooltip="Initialize and update every submodule"
+                  onClick={this.onShowAddSubmodule}
+                  tooltip="Choose a hosted repository or URL to add"
                 >
-                  {this.state.isBusyGlobal ? <Loading /> : null}
-                  {__DARWIN__ ? 'Update All' : 'Update all'}
+                  <Octicon symbol={octicons.plus} />
+                  Add submodule…
                 </Button>
-              )}
+                {hasSubmodules && (
+                  <Button
+                    type="button"
+                    disabled={this.state.isBusyGlobal}
+                    onClick={this.onUpdateAll}
+                    tooltip="Initialize and update every submodule"
+                  >
+                    {this.state.isBusyGlobal ? <Loading /> : null}
+                    {__DARWIN__ ? 'Update All' : 'Update all'}
+                  </Button>
+                )}
+              </div>
             </div>
             {this.state.error !== null && (
               <p className="submodules-error">{this.state.error}</p>
@@ -340,7 +275,6 @@ export class Submodules extends React.Component<
             )}
             {this.renderList()}
           </section>
-          {this.renderAddForm()}
         </div>
       </DialogContent>
     )

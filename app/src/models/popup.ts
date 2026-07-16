@@ -46,6 +46,7 @@ export enum PopupType {
   BranchRules = 'BranchRules',
   SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
+  AddSubmodule = 'AddSubmodule',
   AddRepository = 'AddRepository',
   CreateRepository = 'CreateRepository',
   CloneRepository = 'CloneRepository',
@@ -222,6 +223,11 @@ export type PopupDetail =
       type: PopupType.RepositorySettings
       repository: Repository
       initialSelectedTab?: RepositorySettingsTab
+    }
+  | {
+      type: PopupType.AddSubmodule
+      repository: Repository
+      onAdded: () => void | Promise<void>
     }
   | { type: PopupType.AddRepository; path?: string }
   | { type: PopupType.CreateRepository; path?: string }

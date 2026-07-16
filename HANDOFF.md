@@ -38,10 +38,61 @@ The final feature-completeness audit closes every current roadmap maintenance
 item. Detailed Pull All progress passed its production/headless/a11y gate at
 `1bc8a226de`; exact shipped commit `36197bf6dd` then passed CI run
 `29490902486` and installer run `29490902407`. Pages run `29489043545`
-deployed the current 51-image gallery, and the public seven-page wiki carries
+deployed the then-current 51-image gallery, and the public seven-page wiki carries
 the same inspected release documentation. A final focused checkout pass added
 37/37 green registration, Pull All, checkbox, compact-style, and Pages-gallery
 tests to those repository-wide and off-screen receipts.
+
+## 2026-07-16 clone-style Add Submodule release
+
+**Repository settings → Submodules → Add submodule…** now opens a dedicated
+Material popup with the same GitHub.com, GitHub Enterprise, URL, and GitLab &
+Bitbucket source model as Clone. Hosted tabs preserve exact-account affinity
+and repository browsing; URL mode accepts validated HTTPS, SSH, and local Git
+sources. The review binds the source to a safe repository-relative checkout
+path plus an optional tracked branch before Git starts.
+
+The Git boundary revalidates duplicate and occupied destinations against the
+live superproject immediately before spawn, forwards the selected credential
+account only to the remote operation, reports bounded clone progress, and owns
+an abort signal plus exact process callback. While Git runs, inputs freeze but
+**Cancel operation** remains active; success refreshes the underlying managed
+submodule list.
+
+Verification is green: 53 focused model/UI/Git/popup/style/Pages tests,
+TypeScript, changed-file ESLint and Prettier, the complete 1,190-test suite, and the exact
+unpackaged production build. The build and UI gate ran through low-level MCP
+checkout `806d9ba85e4afbc2af58d7499496babfa7c68891` on the single hidden desktop
+`DesktopMaterialAddSubmodule2026071601`. The visible desktop was never shown,
+focused, resized, or used for input.
+
+Chromium accepted the initial HWND-targeted onboarding click but its next
+PrintWindow frame became a stale black compositor surface, so the isolated
+loopback CDP endpoint was used for renderer interaction and capture. At the
+app's minimum logical `1000×688` renderer, the popup measured `(129,59)` to
+`(919,677)`, document/body widths were `1000=1000`, the internal scroll region
+was `790=790`, every required control was named and keyboard-reachable, and the
+review retained the synthetic source/path/branch. Native off-screen resize was
+unavailable; a requested `700×650` CDP emulation was clamped to the app's
+supported logical minimum/auto-fit behavior and is recorded as a limitation,
+not as a native-size claim.
+
+The accepted `1500×1032` screenshot is
+`docs/assets/screenshots/add-submodule-dialog.png` (109,198 bytes, SHA-256
+`9ebfe5d94f7f624736c6fada706ee15279754102735d01d63d201b322ad10834`).
+It contains only the synthetic `superproject` and `.invalid` URL. README,
+Pages, Home, User Guide, and Feature Gallery sources reference it, bringing the
+guided gallery to 52 inspected images. The exact launch PID `13704`, its
+windows, CDP listener `59317`, hidden desktop, ephemeral tooling, profile,
+fixture, and owned Temp root were revalidated and removed; the desktop reached
+zero windows before closing.
+
+The assembled Pages source also passed the isolated browser gate at desktop
+`960×660` and mobile `390×844` viewports: all 54 image instances loaded, all 53
+gallery cards rendered, document/body widths matched their scroll widths, and
+no control or content crossed the viewport. Its exact HTTP/browser PIDs,
+loopback ports, profile, hidden desktop, and containment-checked Temp root were
+then removed and verified absent.
 
 ## 2026-07-13 P0 production UI gate
 

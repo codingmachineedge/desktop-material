@@ -119,6 +119,7 @@ import type { IBYOKProvider } from '../lib/copilot/byok'
 import { getConflictResolutionModelDisplay } from '../lib/copilot/conflict-resolution-model'
 import { OpenWithExternalEditor } from './open-with-external-editor/open-with-external-editor'
 import {
+  AddSubmoduleDialog,
   RepositorySettings,
   RepositorySettingsTab,
 } from './repository-settings'
@@ -2183,6 +2184,19 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       }
+      case PopupType.AddSubmodule:
+        return (
+          <AddSubmoduleDialog
+            key={`add-submodule-${popup.repository.hash}`}
+            repository={popup.repository}
+            dispatcher={this.props.dispatcher}
+            accounts={this.state.accounts}
+            apiRepositories={this.state.apiRepositories}
+            onRefreshRepositories={this.onRefreshRepositories}
+            onAdded={popup.onAdded}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       case PopupType.SignIn:
         return (
           <SignIn

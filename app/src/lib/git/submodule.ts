@@ -1,8 +1,13 @@
+import { ChildProcess } from 'child_process'
 import { git, IGitStringExecutionOptions } from './core'
 import { Repository } from '../../models/repository'
 import { SubmoduleEntry } from '../../models/submodule'
 import { pathExists } from '../path-exists'
-import { executionOptionsWithProgress, IGitOutput } from '../progress'
+import {
+  CloneProgressParser,
+  executionOptionsWithProgress,
+  IGitOutput,
+} from '../progress'
 import {
   envForRemoteOperation,
   getFallbackUrlForProxyResolve,
@@ -12,6 +17,61 @@ import { IRemote } from '../../models/remote'
 import { Progress } from '../../models/progress'
 import { join, resolve } from 'path'
 import { readFile, rm } from 'fs/promises'
+import {
+  getSubmoduleBranchError,
+  getSubmodulePathError,
+  getSubmoduleSourceError,
+  normalizeSubmodulePath,
+} from '../../models/submodule-add'
+import { resolveSafeRepositoryPath } from './worktree-path-guard'
+import { validateEmptyFolder } from '../path-validation'
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    const error = new Error('Adding the submodule was cancelled.')
+    error.name = 'AbortError'
+    throw error
+  }
+}
+
+function getAbortableProcessCallback(signal?: AbortSignal) {
+  if (signal === undefined) {
+    return undefined
+  }
+
+  return (process: ChildProcess) => {
+    const abort = () => {
+      if (!process.killed) {
+        process.kill()
+      }
+    }
+    const cleanup = () => signal.removeEventListener('abort', abort)
+
+    if (signal.aborted) {
+      abort()
+    } else {
+      signal.addEventListener('abort', abort, { once: true })
+      process.once('exit', cleanup)
+      process.once('error', cleanup)
+    }
+  }
+}
+
+function chainProcessCallbacks(
+  first: ((process: ChildProcess) => void) | undefined,
+  second: ((process: ChildProcess) => void) | undefined
+) {
+  if (first === undefined) {
+    return second
+  }
+  if (second === undefined) {
+    return first
+  }
+  return (process: ChildProcess) => {
+    first(process)
+    second(process)
+  }
+}
 
 /**
  * Update submodules after a git operation.
@@ -444,8 +504,10 @@ export function reconcileSubmodules(
  * status (SHA, describe, up-to-date/out-of-date/uninitialized/conflicted).
  */
 export async function getSubmodules(
-  repository: Repository
+  repository: Repository,
+  signal?: AbortSignal
 ): Promise<ReadonlyArray<IManagedSubmodule>> {
+  throwIfAborted(signal)
   const configEntries = await readFile(
     join(repository.path, '.gitmodules'),
     'utf8'
@@ -457,8 +519,12 @@ export async function getSubmodules(
     ['submodule', 'status', '--'],
     repository.path,
     'getSubmodules',
-    { successExitCodes: new Set([0, 128]) }
+    {
+      successExitCodes: new Set([0, 128]),
+      processCallback: getAbortableProcessCallback(signal),
+    }
   )
+  throwIfAborted(signal)
 
   const statusEntries = exitCode === 128 ? [] : parseSubmoduleStatus(stdout)
 
@@ -467,6 +533,50 @@ export async function getSubmodules(
   }
 
   return reconcileSubmodules(configEntries, statusEntries)
+}
+
+export interface IAddSubmoduleOptions {
+  /** Stable signed-in account identity for the credential trampoline. */
+  readonly accountKey?: string
+  /** Cancellation for path inspection and the spawned Git process. */
+  readonly signal?: AbortSignal
+  /** Bounded progress text and fractional clone progress. */
+  readonly onProgress?: (line: string, percent: number) => void
+}
+
+/**
+ * Validate a submodule checkout path against the current repository state and
+ * physical worktree boundary. Returns a user-facing error or `null`.
+ */
+export async function validateSubmoduleAddPath(
+  repository: Repository,
+  path: string,
+  signal?: AbortSignal
+): Promise<string | null> {
+  const normalizedPath = normalizeSubmodulePath(path)
+  const existing = await getSubmodules(repository, signal)
+  const pathError = getSubmodulePathError(
+    normalizedPath,
+    existing.map(submodule => submodule.path)
+  )
+  if (pathError !== null) {
+    return pathError
+  }
+
+  try {
+    const destination = await resolveSafeRepositoryPath(
+      repository.path,
+      normalizedPath,
+      signal
+    )
+    const destinationError = await validateEmptyFolder(destination.path)
+    return destinationError?.message ?? null
+  } catch (error) {
+    throwIfAborted(signal)
+    return error instanceof Error
+      ? error.message
+      : 'Desktop could not validate this submodule path.'
+  }
 }
 
 /**
@@ -478,17 +588,71 @@ export async function addSubmodule(
   repository: Repository,
   url: string,
   path: string,
-  branch?: string | null
+  branch?: string | null,
+  options?: IAddSubmoduleOptions
 ): Promise<void> {
-  const args = ['submodule', 'add']
+  const source = url.trim()
+  const normalizedPath = normalizeSubmodulePath(path)
+  const normalizedBranch = branch?.trim() ?? ''
+  const sourceError = getSubmoduleSourceError(source)
+  const branchError = getSubmoduleBranchError(normalizedBranch)
 
-  if (branch && branch.length > 0) {
-    args.push('-b', branch)
+  if (sourceError !== null) {
+    throw new Error(sourceError)
+  }
+  if (branchError !== null) {
+    throw new Error(branchError)
   }
 
-  args.push('--', url, path)
+  throwIfAborted(options?.signal)
+  const pathError = await validateSubmoduleAddPath(
+    repository,
+    normalizedPath,
+    options?.signal
+  )
+  if (pathError !== null) {
+    throw new Error(pathError)
+  }
+  throwIfAborted(options?.signal)
 
-  await git(args, repository.path, 'addSubmodule')
+  const args = ['submodule', 'add']
+
+  if (normalizedBranch.length > 0) {
+    args.push('-b', normalizedBranch)
+  }
+
+  let gitOptions: IGitStringExecutionOptions = {
+    env: await envForRemoteOperation(source),
+    credentialAccountKey: options?.accountKey,
+    processCallback: getAbortableProcessCallback(options?.signal),
+  }
+
+  if (options?.onProgress !== undefined) {
+    args.push('--progress')
+    const onProgress = options.onProgress
+    const progressOptions = await executionOptionsWithProgress(
+      { ...gitOptions, trackLFSProgress: true },
+      new CloneProgressParser(),
+      progress => {
+        const text =
+          progress.kind === 'progress' ? progress.details.text : progress.text
+        onProgress(text, progress.percent)
+      }
+    )
+    gitOptions = {
+      ...progressOptions,
+      processCallback: chainProcessCallbacks(
+        progressOptions.processCallback,
+        getAbortableProcessCallback(options.signal)
+      ),
+    }
+    onProgress('Preparing the submodule checkout…', 0)
+  }
+
+  args.push('--', source, normalizedPath)
+
+  await git(args, repository.path, 'addSubmodule', gitOptions)
+  options?.onProgress?.('Submodule added.', 1)
 }
 
 /**

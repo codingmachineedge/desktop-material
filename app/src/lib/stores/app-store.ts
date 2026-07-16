@@ -265,6 +265,7 @@ import {
   syncSubmodules,
   removeSubmodule,
   IManagedSubmodule,
+  IAddSubmoduleOptions,
   IRemoteManagementApplyOptions,
   unstageAll,
   fetchRepositoryShallowHistory,
@@ -9279,9 +9280,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
     repository: Repository,
     url: string,
     path: string,
-    branch?: string | null
+    branch?: string | null,
+    options?: IAddSubmoduleOptions
   ): Promise<void> {
-    await addSubmodule(repository, url, path, branch)
+    await addSubmodule(repository, url, path, branch, options)
     await this._refreshRepository(repository)
   }
 

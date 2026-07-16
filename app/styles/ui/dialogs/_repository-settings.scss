@@ -667,6 +667,14 @@
       gap: var(--spacing);
     }
 
+    .submodules-header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
     .submodules-section-title {
       display: flex;
       align-items: center;
@@ -1010,7 +1018,8 @@
         align-items: stretch;
         flex-direction: column;
 
-        .button-component {
+        .button-component,
+        .submodules-header-actions {
           width: 100%;
           justify-content: center;
         }

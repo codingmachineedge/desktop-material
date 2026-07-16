@@ -1,14 +1,14 @@
 # Guided Feature Gallery
 
-This page maps the guided feature documentation to its 51-image acceptance gallery. Every view
+This page maps the guided feature documentation to its 52-image acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
 
 > **Publication status:** The gallery includes the July 14, 2026 Actions cache and headless
-> pagination evidence, the Pages accessibility/clipping gate, and seven inspected July 16 adaptive
-> customization captures. Exact build, interaction, and privacy receipts are retained in
-> `HANDOFF.md`; all current roadmap maintenance is complete, and main, CI, Pages, and the
-> seven-page wiki are verified against the promoted release.
+> pagination evidence, the Pages accessibility/clipping gate, seven inspected July 16 adaptive
+> customization captures, and the clone-style Add Submodule release. Exact build, interaction, and
+> privacy receipts are retained in `HANDOFF.md`; all current roadmap maintenance is complete, and
+> main, CI, Pages, and the seven-page wiki are verified against the promoted release.
 
 The verified adaptive customization maintenance release adds guarded tab
 close/arrange, Actions cancellation, reviewed rebase, repository-account
@@ -28,6 +28,7 @@ seven inspected captures below.
 | `material-rebase-review.png` | Reviewed current→target rebase with ahead/behind state and commit preview |
 | `material-shallow-clone-safe.png` | Reviewed shallow clone with a bounded commit depth |
 | `material-clone-account-fallback.png` | Generic HTTPS clone completed through exact-origin signed-in account fallback |
+| `add-submodule-dialog.png` | Clone-style Add Submodule review with source, checkout path, and branch |
 | `material-pull-all-account-fallback.png` | Pull all with per-repository results and exact-origin account retry |
 | `material-sparse-checkout-safe.png` | Validated cone-mode sparse-checkout review |
 | `material-history-deepen.png` | Deepen-history result without exposing the account used |
@@ -77,6 +78,8 @@ seven inspected captures below.
 
 ![Generic HTTPS clone completed through exact-origin signed-in account fallback](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-clone-account-fallback.png)
 
+![Clone-style Add Submodule review with a synthetic URL, checkout path, and tracked branch](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
+
 ![Pull all showing a neutral exact-origin signed-in account fallback result](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
 
 ![Validated cone-mode sparse-checkout review](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
@@ -88,9 +91,12 @@ seven inspected captures below.
 The current Remote Manager layout preserves readable semantic columns and
 stacks a row before its name, fetch/push URLs, or controls collapse. Repository
 Tools owns short-window vertical scrolling so Diagnostics and later results stay
-reachable. The reviewed current-branch rebase uses searched target selection,
-ahead/behind context, a bounded commit preview, fresh safety/ref checks, and the
-existing conflict continue/abort path; it never force-pushes automatically.
+reachable. **Repository settings → Submodules → Add submodule…** now opens the
+same provider/URL chooser as Clone, then reviews the safe relative destination
+and optional tracked branch before Git starts. The reviewed current-branch
+rebase uses searched target selection, ahead/behind context, a bounded commit
+preview, fresh safety/ref checks, and the existing conflict continue/abort
+path; it never force-pushes automatically.
 
 ![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
 

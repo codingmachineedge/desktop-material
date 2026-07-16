@@ -23,7 +23,7 @@ receipts stay in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 | **M10** | **Complete** | GitHub Actions runs, jobs, logs, reruns, dispatch, artifacts, provenance, caches, and deployment review. |
 | **M11** | **Complete** | Token-gated loopback MCP/REST agent access, stdio proxy, and CLI. |
 | **M12** | **Complete** | Desktop Plus parity controls, telemetry defaults, identity, sorting, destructive actions, and accessibility labels. |
-| **M13** | **Complete** | Repository metadata, pinning/grouping, Pull All recovery, remotes, and submodules. |
+| **M13** | **Complete** | Repository metadata, pinning/grouping, Pull All recovery, remotes, and clone-style submodule management. |
 | **M14** | **Complete** | History metadata search, commit graph, SVG controls, guarded deletion, and branch presets. |
 | **M15** | **Complete** | Repository-wide stash management and Desktop Material CLI branding. |
 | **M16** | **Complete** | Tab-aware multi-window lifecycle and serialized shared-profile mutation. |
@@ -48,8 +48,9 @@ is described as shipped.
 | Provider account binding and OAuth scope alignment | **Complete** | Verified repository-settings binding propagation without reopening, unique-match auto-binding, explicit multiple-account choice, no-match/stale/permission/SSO recovery, generation safety, no silent replacement of a valid binding, and the bounded `repo user workflow notifications read:org` sign-in scope set. |
 | Compact Repository Tools, Remote Manager, and Regex Builder | **Complete** | Verified vertical reachability at short heights; readable remote name/URL/control columns before a stacked fallback; reflowed Regex Builder categories/tokens with a scrollable body and reachable footer; named controls, focus, zoom, and no page-level horizontal overflow. |
 | Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on `main`. |
-| Repository-wide feature revalidation | **Complete** | Verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and the 51-image documentation gallery. |
-| Documentation gallery expansion | **Complete** | Seven inspected, privacy-safe adaptive-customization captures are referenced from README, wiki, Pages, and tutorial; the guided gallery now contains 51 images. |
+| Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment. |
+| Repository-wide feature revalidation | **Complete** | Verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and the 52-image documentation gallery. |
+| Documentation gallery expansion | **Complete** | Seven adaptive-customization captures plus the inspected clone-style submodule capture are referenced from README, wiki, Pages, and tutorial; the guided gallery now contains 52 images. |
 
 ## Acceptance gates
 
