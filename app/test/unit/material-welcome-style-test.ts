@@ -8,12 +8,16 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 describe('Material welcome design contract', () => {
   it('composes the first-run flow from a task card and tonal workspace panel', () => {
     const view = read('app/src/ui/welcome/welcome.tsx')
+    const start = read('app/src/ui/welcome/start.tsx')
 
     assert.match(view, /className="welcome-step-card"/)
     assert.match(view, /className="welcome-product-lockup"/)
     assert.match(view, /className="welcome-workspace-preview"/)
     assert.match(view, /aria-label="Desktop Material workspace overview"/)
     assert.match(view, /Versioned settings/)
+    assert.match(start, /className="welcome-material-icon"/)
+    assert.match(start, /viewBox="0 0 24 24"/)
+    assert.doesNotMatch(start, /Octicon|octicons\.generated/)
   })
 
   it('uses semantic Material tokens with compact and reduced-motion fallbacks', () => {

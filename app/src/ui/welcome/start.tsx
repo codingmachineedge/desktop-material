@@ -2,8 +2,6 @@ import * as React from 'react'
 import { WelcomeStep } from './welcome'
 import { LinkButton } from '../lib/link-button'
 import { Dispatcher } from '../dispatcher'
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
 import { Button } from '../lib/button'
 import { Loading } from '../lib/loading'
 import { BrowserRedirectMessage } from '../lib/authentication-form'
@@ -16,6 +14,20 @@ import { SamplesURL } from '../../lib/stats'
  * consider signing up.
  */
 export const CreateAccountURL = 'https://github.com/join?source=github-desktop'
+
+/** Material-style open-in-new affordance for the primary sign-in route. */
+function OpenInNewIcon() {
+  return (
+    <svg
+      className="welcome-material-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7ZM14 3v2h3.59L7.76 14.83l1.41 1.41L19 6.41V10h2V3h-7Z" />
+    </svg>
+  )
+}
 
 interface IStartProps {
   readonly advance: (step: WelcomeStep) => void
@@ -60,7 +72,7 @@ export class Start extends React.Component<IStartProps, {}> {
             >
               {this.props.loadingBrowserAuth && <Loading />}
               Sign in with GitHub.com
-              <Octicon symbol={octicons.linkExternal} />
+              <OpenInNewIcon />
             </Button>
             {this.props.loadingBrowserAuth ? (
               <Button onClick={this.cancelBrowserAuth}>Cancel</Button>

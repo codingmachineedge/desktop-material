@@ -118,6 +118,35 @@ body {
   transition: background 0.4s ease, color 0.4s ease;
 }
 
+.material-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.material-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.btn .material-icon,
+.hero-meta .material-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.card .glyph .material-icon {
+  width: 26px;
+  height: 26px;
+}
+
 img {
   max-width: 100%;
   height: auto;

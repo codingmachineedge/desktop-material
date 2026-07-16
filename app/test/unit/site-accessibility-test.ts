@@ -49,6 +49,14 @@ describe('Pages accessibility contracts', () => {
     )
     assert.match(markup, /tab close buttons/)
     assert.match(markup, /six project overrides\s+inherit safely/)
+    assert.match(markup, /class="material-icon-sprite"/)
+    assert.match(markup, /id="icon-palette"/)
+    assert.match(markup, /id="theme-icon" href="#icon-dark-mode"/)
+    assert.doesNotMatch(markup, /[🎨🧭🗂👥🕔🪟⚙🔔🔍⚡🤖🏢🧰☾☀]/u)
+    assert.doesNotMatch(
+      markup,
+      /<div class="glyph" aria-hidden="true">[^<]+<\/div>/
+    )
 
     for (const source of [
       'docs/assets/screenshots/material-welcome.png',
