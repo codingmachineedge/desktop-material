@@ -120,6 +120,34 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /@media \(max-width: 640px\), \(max-height: 420px\)/)
   })
 
+  it('colors terminal log accents from inverse-aware tokens for AA contrast', () => {
+    const style = readStyle('_material-build-run.scss')
+    // The panel is an inverse-surface card, so normal-surface error/primary/
+    // amber roles collapse on it; the stream accents must use the terminal
+    // tokens that flip per theme (bright on the dark card, dark on the light).
+    assert.match(
+      style,
+      /&\.stream-stderr \.line-text\s*\{\s*color: var\(--dm-term-stderr\);/
+    )
+    assert.match(
+      style,
+      /&\.stream-command \.line-text\s*\{\s*color: var\(--dm-term-command\);/
+    )
+    assert.match(
+      style,
+      /&\.stream-meta \.line-text\s*\{\s*color: var\(--dm-term-meta\);/
+    )
+    // Both themes define the terminal tokens.
+    const tokens = readRootStyle('_material.scss')
+    for (const t of ['stderr', 'command', 'meta']) {
+      assert.equal(
+        tokens.match(new RegExp(`--dm-term-${t}:`, 'g'))?.length,
+        2,
+        `--dm-term-${t} themes`
+      )
+    }
+  })
+
   it('wraps long detected project names and folders in Build & Run settings', () => {
     const style = readStyle('dialogs/_repository-settings.scss')
     assert.match(

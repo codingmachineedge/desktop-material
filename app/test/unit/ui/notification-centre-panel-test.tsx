@@ -309,7 +309,8 @@ describe('NotificationCentrePanel', () => {
     )
     await waitFor(() => assert.deepEqual(deleteCalls, [['credential-error']]))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+    const clearAllTrigger = screen.getByRole('button', { name: 'Clear all' })
+    fireEvent.click(clearAllTrigger)
     assert.equal(clearCalls, 0)
     const clearConfirmation = screen.getByRole('alertdialog', {
       name: 'Clear every Local notification?',
@@ -317,6 +318,11 @@ describe('NotificationCentrePanel', () => {
     assert.ok(
       within(clearConfirmation).getByText(/Notification history can restore/)
     )
+    // The confirmation receives focus so a screen reader announces it.
+    assert.equal(document.activeElement, clearConfirmation)
+    // Re-activating the toolbar trigger must NOT clear — only re-request.
+    fireEvent.click(clearAllTrigger)
+    assert.equal(clearCalls, 0)
     fireEvent.click(
       within(clearConfirmation).getByRole('button', { name: 'Clear all' })
     )

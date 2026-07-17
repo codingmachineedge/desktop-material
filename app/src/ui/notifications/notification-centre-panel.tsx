@@ -89,6 +89,10 @@ export class NotificationCentrePanel extends React.Component<
   private unreadTab: HTMLButtonElement | null = null
   private doneConfirmButton: HTMLButtonElement | null = null
   private doneReturnFocus: HTMLButtonElement | null = null
+  private clearConfirmation: HTMLDivElement | null = null
+  private clearReturnFocus: HTMLButtonElement | null = null
+  private bulkConfirmation: HTMLDivElement | null = null
+  private bulkReturnFocus: HTMLButtonElement | null = null
   private selectAllCheckbox: HTMLInputElement | null = null
   private mounted = false
 
@@ -156,9 +160,9 @@ export class NotificationCentrePanel extends React.Component<
     if (this.state.confirmingDone !== null) {
       this.cancelDoneConfirmation()
     } else if (this.state.confirmingBulk !== null) {
-      this.setState({ confirmingBulk: null })
+      this.onCancelBulkConfirmation()
     } else if (this.state.confirmingClear) {
-      this.setState({ confirmingClear: false })
+      this.onCancelClearAll()
     } else {
       this.onClose()
     }
@@ -217,6 +221,26 @@ export class NotificationCentrePanel extends React.Component<
 
   private onDoneConfirmButtonRef = (element: HTMLButtonElement | null) => {
     this.doneConfirmButton = element
+  }
+
+  private onClearConfirmationRef = (element: HTMLDivElement | null) => {
+    this.clearConfirmation = element
+  }
+
+  private onBulkConfirmationRef = (element: HTMLDivElement | null) => {
+    this.bulkConfirmation = element
+  }
+
+  private restoreFocus(returnFocus: HTMLButtonElement | null) {
+    if (returnFocus?.isConnected) {
+      returnFocus.focus()
+    } else {
+      const tab =
+        this.state.source === 'local'
+          ? this.localSourceTab
+          : this.githubSourceTab
+      tab?.focus()
+    }
   }
 
   private onSourceKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -417,11 +441,22 @@ export class NotificationCentrePanel extends React.Component<
     this.props.dispatcher.markAllNotificationsRead()
   }
 
-  private onClearAll = async () => {
+  // The toolbar trigger only ever requests confirmation. Splitting request
+  // from perform means a second activation of the still-focused trigger can
+  // never silently clear (the confirmation button owns the destructive path).
+  private onRequestClearAll = (event: React.MouseEvent<HTMLButtonElement>) => {
+    this.clearReturnFocus = event.currentTarget
+    this.setState({ confirmingClear: true }, () =>
+      this.clearConfirmation?.focus()
+    )
+  }
+
+  private onConfirmClearAll = async () => {
     if (!this.state.confirmingClear) {
-      this.setState({ confirmingClear: true })
       return
     }
+    const returnFocus = this.clearReturnFocus
+    this.clearReturnFocus = null
     this.setState({
       confirmingClear: false,
       selectedLocalIds: new Set<string>(),
@@ -432,11 +467,19 @@ export class NotificationCentrePanel extends React.Component<
       await this.props.dispatcher.postError(
         error instanceof Error ? error : new Error(String(error))
       )
+    } finally {
+      if (this.mounted) {
+        this.restoreFocus(returnFocus)
+      }
     }
   }
 
   private onCancelClearAll = () => {
-    this.setState({ confirmingClear: false })
+    const returnFocus = this.clearReturnFocus
+    this.clearReturnFocus = null
+    this.setState({ confirmingClear: false }, () =>
+      this.restoreFocus(returnFocus)
+    )
   }
 
   private runLocalBulkRead = async (read: boolean) => {
@@ -473,16 +516,30 @@ export class NotificationCentrePanel extends React.Component<
     void this.runLocalBulkRead(false)
   }
 
-  private onRequestBulkDelete = () => {
-    this.setState({ confirmingBulk: 'delete-local', confirmingClear: false })
+  private onRequestBulkDelete = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    this.bulkReturnFocus = event.currentTarget
+    this.setState(
+      { confirmingBulk: 'delete-local', confirmingClear: false },
+      () => this.bulkConfirmation?.focus()
+    )
   }
 
-  private onRequestBulkDone = () => {
-    this.setState({ confirmingBulk: 'done-github', confirmingClear: false })
+  private onRequestBulkDone = (event: React.MouseEvent<HTMLButtonElement>) => {
+    this.bulkReturnFocus = event.currentTarget
+    this.setState(
+      { confirmingBulk: 'done-github', confirmingClear: false },
+      () => this.bulkConfirmation?.focus()
+    )
   }
 
   private onCancelBulkConfirmation = () => {
-    this.setState({ confirmingBulk: null })
+    const returnFocus = this.bulkReturnFocus
+    this.bulkReturnFocus = null
+    this.setState({ confirmingBulk: null }, () =>
+      this.restoreFocus(returnFocus)
+    )
   }
 
   private onConfirmBulkDelete = async () => {
@@ -490,6 +547,8 @@ export class NotificationCentrePanel extends React.Component<
     if (ids.length === 0 || this.state.bulkBusy) {
       return
     }
+    const returnFocus = this.bulkReturnFocus
+    this.bulkReturnFocus = null
     this.setState({ bulkBusy: true, confirmingBulk: null })
     try {
       await this.props.dispatcher.deleteNotifications(ids)
@@ -499,17 +558,26 @@ export class NotificationCentrePanel extends React.Component<
       )
     } finally {
       if (this.mounted) {
-        this.setState({
-          bulkBusy: false,
-          selectedLocalIds: new Set<string>(),
-        })
+        this.setState(
+          {
+            bulkBusy: false,
+            selectedLocalIds: new Set<string>(),
+          },
+          () => this.restoreFocus(returnFocus)
+        )
       }
     }
   }
 
   private onConfirmBulkDone = () => {
+    const returnFocus = this.bulkReturnFocus
+    this.bulkReturnFocus = null
     this.setState({ confirmingBulk: null }, () => {
-      void this.runGitHubBulk('done')
+      void this.runGitHubBulk('done').finally(() => {
+        if (this.mounted) {
+          this.restoreFocus(returnFocus)
+        }
+      })
     })
   }
 
@@ -1004,7 +1072,7 @@ export class NotificationCentrePanel extends React.Component<
               type="button"
               className="clear-all"
               disabled={this.props.entries.length === 0 || this.state.bulkBusy}
-              onClick={this.onClearAll}
+              onClick={this.onRequestClearAll}
             >
               Clear all
             </button>
@@ -1025,6 +1093,8 @@ export class NotificationCentrePanel extends React.Component<
         aria-modal="false"
         aria-labelledby="notification-centre-clear-title"
         aria-describedby="notification-centre-clear-description"
+        tabIndex={-1}
+        ref={this.onClearConfirmationRef}
       >
         <strong id="notification-centre-clear-title">
           Clear every Local notification?
@@ -1038,7 +1108,11 @@ export class NotificationCentrePanel extends React.Component<
           <button type="button" onClick={this.onCancelClearAll}>
             Cancel
           </button>
-          <button type="button" className="danger" onClick={this.onClearAll}>
+          <button
+            type="button"
+            className="danger"
+            onClick={this.onConfirmClearAll}
+          >
             Clear all
           </button>
         </span>
@@ -1062,6 +1136,8 @@ export class NotificationCentrePanel extends React.Component<
         aria-modal="false"
         aria-labelledby="notification-centre-bulk-title"
         aria-describedby="notification-centre-bulk-description"
+        tabIndex={-1}
+        ref={this.onBulkConfirmationRef}
       >
         <strong id="notification-centre-bulk-title">
           {local

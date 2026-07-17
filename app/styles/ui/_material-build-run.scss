@@ -281,22 +281,25 @@
         min-width: 0;
       }
 
-      // stdout → neutral; stderr → error; command → primary/bold; meta → amber.
+      // The panel is an inverse-surface card, so the accent lines use
+      // terminal tokens computed for AA contrast on that card in both themes
+      // (normal-surface --md-sys-color-error/primary/--dm-amber collapse on it).
+      // stdout → neutral; stderr → red; command → blue/bold; meta → amber.
       &.stream-stdout .line-text {
         color: var(--md-sys-color-inverse-on-surface);
       }
 
       &.stream-stderr .line-text {
-        color: var(--md-sys-color-error);
+        color: var(--dm-term-stderr);
       }
 
       &.stream-command .line-text {
-        color: var(--md-sys-color-primary);
+        color: var(--dm-term-command);
         font-weight: 700;
       }
 
       &.stream-meta .line-text {
-        color: var(--dm-amber);
+        color: var(--dm-term-meta);
       }
     }
   }

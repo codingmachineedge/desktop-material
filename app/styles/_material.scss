@@ -51,6 +51,12 @@
   --dm-green-on-container: #0b3d1c;
   --dm-amber: #9a6700;
   --dm-amber-container: #ffe9b8;
+  // Terminal log accents. The Build & Run panel is an inverse-surface card
+  // (dark in light theme), so these are bright and read on that dark card;
+  // the dark block re-declares them dark for the light card in dark theme.
+  --dm-term-stderr: #ffb4ab;
+  --dm-term-command: #8dcdff;
+  --dm-term-meta: #e0b64d;
   --diff-add-bg: #e9f5ea;
   --diff-add-gutter: #d0ebd3;
   --diff-del-bg: #fdecea;
@@ -158,6 +164,11 @@ body.theme-dark {
   --dm-green-on-container: #b9f0c0;
   --dm-amber: #d8a739;
   --dm-amber-container: #3d2e00;
+  // Terminal log accents (dark theme): the inverse-surface card is light
+  // here, so the accents are dark to keep AA contrast on it.
+  --dm-term-stderr: #a30f0f;
+  --dm-term-command: #00517a;
+  --dm-term-meta: #6b4600;
   --diff-add-bg: #12261a;
   --diff-add-gutter: #1a3826;
   --diff-del-bg: #2d1512;
