@@ -793,6 +793,15 @@ list.
   duplicate/occupied destinations immediately before Git, reports bounded clone progress, and lets
   you cancel the running operation before refreshing the managed list.
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution. Build & Run discovers common nested projects across Node, Deno, Rust, Go, .NET, Python, JVM, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; choose a profile by its displayed project folder when several projects share a language or toolchain.
+- Open **Repository tools** for the full set of named, reviewed Git functions. Diagnostics cover the
+  status summary, repository health check, commit-signature audit, branch sync overview, contributor
+  summary, nearest-tag version description, whitespace/conflict-marker audit, and an ignored-files
+  preview. Maintenance covers the maintenance preview and run, a fully-merged-branch audit,
+  unreachable-object prune preview, and a two-step untracked cleanup: **Preview untracked cleanup**
+  lists exactly what would be deleted, and **Remove untracked files** deletes it only after its own
+  destructive confirmation (tracked and ignored files are always preserved). Recovery covers the
+  reflog view and an unreachable-commit finder for locating work lost to a deleted branch or reset.
+  Every card runs a fixed, reviewed Git recipe — there is no shell and no editable command line.
 
 At compact heights, the Repository Tools workspace itself scrolls vertically so the Diagnostics
 section, results, and later actions remain reachable without a horizontal page scrollbar.

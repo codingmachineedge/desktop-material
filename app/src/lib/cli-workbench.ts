@@ -8,6 +8,16 @@ export type RepositoryToolOperationID =
   | 'maintenance-run'
   | 'reflog-view'
   | 'signature-audit'
+  | 'branch-overview'
+  | 'contributor-summary'
+  | 'version-describe'
+  | 'whitespace-audit'
+  | 'ignored-files-view'
+  | 'merged-branch-audit'
+  | 'prune-preview'
+  | 'clean-preview'
+  | 'clean-run'
+  | 'unreachable-commits'
 
 export type RepositoryArchiveFormat = 'zip' | 'tar'
 

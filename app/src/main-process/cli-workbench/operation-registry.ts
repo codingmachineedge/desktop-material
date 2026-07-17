@@ -52,6 +52,58 @@ const FixedRepositoryOperations: Readonly<
     args: ['reflog', 'show', '--date=local', '-50'],
     requiresConfirmation: false,
   },
+  'branch-overview': {
+    args: [
+      'branch',
+      '--list',
+      '--verbose',
+      '--verbose',
+      '--sort=-committerdate',
+    ],
+    requiresConfirmation: false,
+  },
+  'contributor-summary': {
+    args: ['shortlog', '--summary', '--numbered', 'HEAD'],
+    requiresConfirmation: false,
+  },
+  'version-describe': {
+    args: ['describe', '--tags', '--always', '--long', '--dirty'],
+    requiresConfirmation: false,
+  },
+  'whitespace-audit': {
+    args: ['diff', '--check', 'HEAD'],
+    requiresConfirmation: false,
+  },
+  'ignored-files-view': {
+    args: [
+      'ls-files',
+      '--others',
+      '--ignored',
+      '--exclude-standard',
+      '--directory',
+    ],
+    requiresConfirmation: false,
+  },
+  'merged-branch-audit': {
+    args: ['branch', '--list', '--verbose', '--merged'],
+    requiresConfirmation: false,
+  },
+  'prune-preview': {
+    args: ['prune', '--dry-run', '--verbose'],
+    requiresConfirmation: false,
+  },
+  'clean-preview': {
+    args: ['clean', '--dry-run', '-d'],
+    requiresConfirmation: false,
+  },
+  'clean-run': {
+    args: ['clean', '--force', '-d'],
+    requiresConfirmation: true,
+  },
+  'unreachable-commits': {
+    args: ['fsck', '--unreachable', '--no-reflogs', '--no-progress'],
+    requiresConfirmation: false,
+  },
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -36,6 +36,43 @@ describe('CLI workbench operation registry', () => {
         ['maintenance-preview', ['count-objects', '-vH']],
         ['maintenance-run', ['maintenance', 'run']],
         ['reflog-view', ['reflog', 'show', '--date=local', '-50']],
+        [
+          'branch-overview',
+          [
+            'branch',
+            '--list',
+            '--verbose',
+            '--verbose',
+            '--sort=-committerdate',
+          ],
+        ],
+        [
+          'contributor-summary',
+          ['shortlog', '--summary', '--numbered', 'HEAD'],
+        ],
+        [
+          'version-describe',
+          ['describe', '--tags', '--always', '--long', '--dirty'],
+        ],
+        ['whitespace-audit', ['diff', '--check', 'HEAD']],
+        [
+          'ignored-files-view',
+          [
+            'ls-files',
+            '--others',
+            '--ignored',
+            '--exclude-standard',
+            '--directory',
+          ],
+        ],
+        ['merged-branch-audit', ['branch', '--list', '--verbose', '--merged']],
+        ['prune-preview', ['prune', '--dry-run', '--verbose']],
+        ['clean-preview', ['clean', '--dry-run', '-d']],
+        ['clean-run', ['clean', '--force', '-d']],
+        [
+          'unreachable-commits',
+          ['fsck', '--unreachable', '--no-reflogs', '--no-progress'],
+        ],
       ])
 
       for (const [id, args] of expected) {
@@ -46,7 +83,10 @@ describe('CLI workbench operation registry', () => {
         assert.equal(result.tool, 'git')
         assert.deepEqual(result.args, args)
         assert.equal(result.operation.id, id)
-        assert.equal(result.requiresConfirmation, id === 'maintenance-run')
+        assert.equal(
+          result.requiresConfirmation,
+          id === 'maintenance-run' || id === 'clean-run'
+        )
       }
     } finally {
       await rm(fixture.root, { recursive: true, force: true })
@@ -209,6 +249,9 @@ describe('CLI workbench operation registry', () => {
         { id: 'status-summary', tool: 'gh' },
         { id: 'status-summary', shell: true },
         { id: 'maintenance-run', requiresConfirmation: false },
+        { id: 'clean-run', requiresConfirmation: false },
+        { id: 'clean-run', args: ['clean', '-fdx'] },
+        { id: 'clean-preview', paths: ['..'] },
         { id: 'history-deepen', remote: '--upload-pack=payload', deepenBy: 1 },
         { id: 'history-deepen', remote: 'origin', deepenBy: 0 },
         { id: 'history-deepen', remote: 'origin', deepenBy: 1_000_001 },

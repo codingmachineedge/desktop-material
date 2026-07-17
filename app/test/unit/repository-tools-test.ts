@@ -39,8 +39,18 @@ describe('repository tool recipes', () => {
         'repository-health',
         'signature-audit',
         'maintenance-preview',
+        'branch-overview',
+        'contributor-summary',
+        'version-describe',
+        'whitespace-audit',
+        'ignored-files-view',
         'maintenance-run',
+        'merged-branch-audit',
+        'prune-preview',
+        'clean-preview',
+        'clean-run',
         'reflog-view',
+        'unreachable-commits',
       ]
     )
     assert.ok(
@@ -54,7 +64,16 @@ describe('repository tool recipes', () => {
       'repository-health',
       'signature-audit',
       'maintenance-preview',
+      'branch-overview',
+      'contributor-summary',
+      'version-describe',
+      'whitespace-audit',
+      'ignored-files-view',
+      'merged-branch-audit',
+      'prune-preview',
+      'clean-preview',
       'reflog-view',
+      'unreachable-commits',
     ] as const) {
       const operation = getRepositoryToolOperation(id)
       assert.equal(operation.mutatesRepository, false)
@@ -72,6 +91,22 @@ describe('repository tool recipes', () => {
       maintenance.confirmationDescription ?? '',
       /rewrite object packs/i
     )
+  })
+
+  it('requires an explicit destructive confirmation for untracked cleanup', () => {
+    const clean = getRepositoryToolOperation('clean-run')
+    assert.equal(clean.mutatesRepository, true)
+    assert.equal(clean.requiresConfirmation, true)
+    assert.equal(clean.confirmationActionLabel, 'Delete untracked files')
+    assert.match(clean.confirmationDescription ?? '', /deleted permanently/i)
+    assert.match(
+      clean.confirmationDescription ?? '',
+      /ignored files are preserved/i
+    )
+
+    const preview = getRepositoryToolOperation('clean-preview')
+    assert.equal(preview.mutatesRepository, false)
+    assert.equal(preview.requiresConfirmation, false)
   })
 
   it('prepares only contained ZIP and TAR exports from HEAD', () => {

@@ -571,7 +571,7 @@ export class RepositoryTools extends React.Component<
         if (this.mounted) {
           this.setState({
             error:
-              'Maintenance completed, but refreshing the repository view failed.',
+              'The operation completed, but refreshing the repository view failed.',
           })
         }
       })
@@ -631,7 +631,7 @@ export class RepositoryTools extends React.Component<
                 disabled={this.isBusy() || !this.state.gitAvailable}
                 onClick={this.getOperationHandler(operation)}
               >
-                {operation.id === 'maintenance-run' ? 'Review and run' : 'Run'}
+                {operation.requiresConfirmation ? 'Review and run' : 'Run'}
               </Button>
             </article>
           ))}
@@ -742,7 +742,7 @@ export class RepositoryTools extends React.Component<
             onButtonRef={this.setConfirmButton}
             onClick={this.onConfirmOperation}
           >
-            Confirm maintenance
+            {operation.confirmationActionLabel ?? 'Confirm and run'}
           </Button>
           <Button onClick={this.dismissConfirmation}>Go back</Button>
         </div>

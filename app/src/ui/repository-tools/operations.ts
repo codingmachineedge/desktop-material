@@ -468,6 +468,8 @@ export interface IRepositoryToolOperation {
   readonly mutatesRepository: boolean
   readonly requiresConfirmation: boolean
   readonly confirmationDescription?: string
+  /** Confirm-button label shown in the review step; defaults to Confirm and run. */
+  readonly confirmationActionLabel?: string
   readonly supportingDetails?: ReadonlyArray<string>
 }
 
@@ -524,6 +526,65 @@ export const RepositoryToolOperations: ReadonlyArray<IRepositoryToolOperation> =
       ],
     },
     {
+      id: 'branch-overview',
+      title: 'Branch sync overview',
+      description:
+        'Inspect every local branch with its tip, upstream, and ahead/behind counts, newest first.',
+      category: 'Diagnostics',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Branches are ordered by most recent commit date.',
+        'Shows gone upstreams whose remote branch no longer exists.',
+        'Does not fetch, switch, or change any branch.',
+      ],
+    },
+    {
+      id: 'contributor-summary',
+      title: 'Contributor summary',
+      description:
+        'Count commits per author across the history reachable from the current branch.',
+      category: 'Diagnostics',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+    },
+    {
+      id: 'version-describe',
+      title: 'Describe current version',
+      description:
+        'Name the current commit from the nearest tag, including the commit distance and a dirty marker.',
+      category: 'Diagnostics',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Falls back to the abbreviated commit ID when no tag is reachable.',
+        '-dirty is appended when the working tree has uncommitted changes.',
+      ],
+    },
+    {
+      id: 'whitespace-audit',
+      title: 'Audit whitespace and conflict markers',
+      description:
+        'Check uncommitted changes for whitespace errors and leftover conflict markers before committing.',
+      category: 'Diagnostics',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Compares the working tree and index against the last commit.',
+        'Findings are reported as a failed check; a clean pass completes silently.',
+        'Does not change any file or repository data.',
+      ],
+    },
+    {
+      id: 'ignored-files-view',
+      title: 'Preview ignored files',
+      description:
+        'List the files and folders in the working tree that Git currently ignores.',
+      category: 'Diagnostics',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+    },
+    {
       id: 'maintenance-run',
       title: 'Run repository maintenance',
       description:
@@ -533,6 +594,58 @@ export const RepositoryToolOperations: ReadonlyArray<IRepositoryToolOperation> =
       requiresConfirmation: true,
       confirmationDescription:
         'Git may rewrite object packs and maintenance metadata. Working files and commits are preserved, but the operation can take time on large repositories.',
+      confirmationActionLabel: 'Confirm maintenance',
+    },
+    {
+      id: 'merged-branch-audit',
+      title: 'Find fully merged branches',
+      description:
+        'List local branches whose history is already contained in the current branch.',
+      category: 'Maintenance',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Merged branches are usually safe to delete from the Branches view.',
+        'Does not delete or change any branch.',
+      ],
+    },
+    {
+      id: 'prune-preview',
+      title: 'Preview unreachable object pruning',
+      description:
+        'Report the loose objects Git would remove during pruning, without removing anything.',
+      category: 'Maintenance',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+    },
+    {
+      id: 'clean-preview',
+      title: 'Preview untracked cleanup',
+      description:
+        'List the untracked files and directories that Remove untracked files would delete.',
+      category: 'Maintenance',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Ignored files and tracked files are never listed.',
+        'This preview deletes nothing.',
+      ],
+    },
+    {
+      id: 'clean-run',
+      title: 'Remove untracked files',
+      description:
+        'Permanently delete the untracked files and directories in the working tree.',
+      category: 'Maintenance',
+      mutatesRepository: true,
+      requiresConfirmation: true,
+      confirmationDescription:
+        'The untracked files and directories shown by Preview untracked cleanup are deleted permanently and cannot be restored by Git. Tracked files and ignored files are preserved.',
+      confirmationActionLabel: 'Delete untracked files',
+      supportingDetails: [
+        'Run Preview untracked cleanup first to review the exact files.',
+        'Tracked and ignored files are preserved.',
+      ],
     },
     {
       id: 'reflog-view',
@@ -542,6 +655,20 @@ export const RepositoryToolOperations: ReadonlyArray<IRepositoryToolOperation> =
       category: 'Recovery',
       mutatesRepository: false,
       requiresConfirmation: false,
+    },
+    {
+      id: 'unreachable-commits',
+      title: 'Find unreachable commits',
+      description:
+        'List commits and other objects that no branch, tag, or reflog still references.',
+      category: 'Recovery',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Useful for locating work lost to a deleted branch or reset.',
+        'A listed commit ID can be restored from the Branches view.',
+        'Does not remove or change any object.',
+      ],
     },
   ]
 
