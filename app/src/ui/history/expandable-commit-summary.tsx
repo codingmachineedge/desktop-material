@@ -7,7 +7,6 @@ import { RichText } from '../lib/rich-text'
 import { Repository } from '../../models/repository'
 import { Commit } from '../../models/commit'
 import { getAvatarUsersForCommit, IAvatarUser } from '../../models/avatar'
-import { AvatarStack } from '../lib/avatar-stack'
 import { CommitAttribution } from '../lib/commit-attribution'
 import { Tokenizer, TokenResult } from '../../lib/text-token-parser'
 import { wrapRichTextCommitMessage } from '../../lib/wrap-rich-text-commit-message'
@@ -406,16 +405,12 @@ export class ExpandableCommitSummary extends React.Component<
     })
   }
 
+  /**
+   * Collapsed byline: the header now carries the large leading author avatar
+   * (v2 prototype "Commit detail"), so only the textual attribution remains.
+   */
   private renderAuthorStack = () => {
-    const { accounts } = this.props
-    const { avatarUsers } = this.state
-
-    return (
-      <>
-        <AvatarStack users={avatarUsers} accounts={accounts} />
-        <CommitAttribution avatarUsers={avatarUsers} />
-      </>
-    )
+    return <CommitAttribution avatarUsers={this.state.avatarUsers} />
   }
 
   private renderAuthors = () => {
@@ -521,6 +516,26 @@ export class ExpandableCommitSummary extends React.Component<
     )
   }
 
+  /**
+   * The leading 42px circular author avatar (v2 prototype "Commit detail"
+   * header). Only rendered for single-commit selections, mirroring the other
+   * single-commit affordances in this header.
+   */
+  private renderHeaderAvatar() {
+    const { selectedCommits, accounts } = this.props
+    const user = this.state.avatarUsers[0]
+
+    if (selectedCommits.length > 1 || user === undefined) {
+      return null
+    }
+
+    return (
+      <div className="ecs-header-avatar">
+        <Avatar accounts={accounts} user={user} size={42} />
+      </div>
+    )
+  }
+
   public render() {
     const className = classNames({
       expanded: this.props.isExpanded,
@@ -528,10 +543,15 @@ export class ExpandableCommitSummary extends React.Component<
 
     return (
       <div id="expandable-commit-summary" className={className}>
-        {this.renderSummary()}
-        <div className="beneath-summary">
-          {this.renderDescription()}
-          {this.renderMetaItems()}
+        <div className="ecs-header">
+          {this.renderHeaderAvatar()}
+          <div className="ecs-header-content">
+            {this.renderSummary()}
+            <div className="beneath-summary">
+              {this.renderDescription()}
+              {this.renderMetaItems()}
+            </div>
+          </div>
         </div>
         {this.renderCommitsNotReachable()}
       </div>

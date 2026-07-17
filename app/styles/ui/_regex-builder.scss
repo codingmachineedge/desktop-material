@@ -15,12 +15,13 @@
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  width: min(900px, calc(100vw - 16px));
-  height: min(644px, calc(100vh - 16px));
+  // v2 prototype: the dialog keeps a 50px margin to the viewport edges.
+  width: min(900px, calc(100vw - 50px));
+  height: min(644px, calc(100vh - 50px));
   min-width: 0;
   min-height: 0;
-  max-width: calc(100vw - 16px);
-  max-height: calc(100vh - 16px);
+  max-width: calc(100vw - 50px);
+  max-height: calc(100vh - 50px);
   background: var(--md-sys-color-surface-container-low);
   color: var(--md-sys-color-on-surface);
   border-radius: 28px;
@@ -105,6 +106,120 @@
     &:active {
       transform: scale(0.86) rotate(90deg);
     }
+  }
+}
+
+// v2 prototype: segmented two-tab row (Build / How regex works) directly
+// under the header.
+.regex-builder-views {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 0 22px 12px;
+
+  .regex-builder-view-tab {
+    flex: 1;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 38px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 280ms var(--emph), color 280ms var(--emph), transform 200ms var(--spring-fast);
+
+    &:active {
+      transform: scale(0.96);
+    }
+
+    &.selected {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    .octicon {
+      flex: none;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+// The Build tabpanel: the palette + live tester stack the scroll region used
+// to hold directly.
+.regex-builder-build-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+// v2 prototype: the scrollable "How regex works" guide panel — the alternate
+// view toggled by the segmented tabs.
+.regex-builder-guide {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  padding: 16px 24px 20px;
+}
+
+.regex-guide-section {
+  margin-bottom: 18px;
+  animation: dmUp calc(420ms * var(--mdur, 1)) var(--spring) backwards;
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    font-size: 14.5px;
+    font-weight: 700;
+  }
+
+  .regex-guide-icon {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    color: var(--md-sys-color-primary);
+  }
+
+  p {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--md-sys-color-on-surface-variant);
+    overflow-wrap: anywhere;
+  }
+}
+
+.regex-guide-code {
+  margin-top: 8px;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface);
+  padding: 10px 12px;
+  font-family: var(--font-family-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  .regex-guide-code-token {
+    color: var(--md-sys-color-primary);
+    font-weight: 700;
+  }
+
+  .regex-guide-code-note {
+    color: var(--md-sys-color-on-surface-variant);
   }
 }
 
@@ -456,6 +571,17 @@
 }
 
 @media (max-width: 760px) {
+  // With the palette collapsed to content height, let the outer scroll
+  // region own the scrolling for both views.
+  .regex-builder-build-view {
+    flex: none;
+  }
+
+  .regex-builder-guide {
+    flex: none;
+    overflow-y: visible;
+  }
+
   .regex-builder-palette {
     flex: none;
     min-height: 180px;
@@ -502,6 +628,14 @@
     }
   }
 
+  .regex-builder-views {
+    padding: 0 12px 10px;
+
+    .regex-builder-view-tab {
+      font-size: 12px;
+    }
+  }
+
   .regex-builder-pattern-row {
     flex-wrap: wrap;
     padding: 0 12px 10px;
@@ -522,6 +656,10 @@
 
   .regex-test-area {
     padding: 10px 12px;
+  }
+
+  .regex-builder-guide {
+    padding: 12px 14px 16px;
   }
 
   .regex-builder-footer {

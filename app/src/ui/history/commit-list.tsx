@@ -31,7 +31,9 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { buildCommitGraphRows, ICommitGraphRow } from './commit-graph-model'
 
-const RowHeight = 50
+// v2 prototype "History panel" row geometry: 11px vertical inset + the 34px
+// leading avatar disc.
+const RowHeight = 56
 
 /**
  * Resolve the commits a contextual action should affect. A right click or More

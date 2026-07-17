@@ -59,6 +59,7 @@ export class OrgFilterChips extends React.PureComponent<IOrgFilterChipsProps> {
         role="group"
         aria-label="Filter repositories by organization"
       >
+        <span className="org-filter-eyebrow">Owner</span>
         <button
           type="button"
           className={classNames('org-filter-chip', {

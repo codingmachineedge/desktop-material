@@ -98,7 +98,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 18px 14px 8px 20px;
+  // v2 prototype header inset: 20px top / 20px right (trailing controls keep
+  // fitting — copy block shrinks and the header can flex-wrap).
+  padding: 20px 20px 8px 20px;
 }
 
 .notification-centre-source-tabs {
@@ -594,14 +596,21 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 32px;
+  // v2 prototype empty state: 40px/20px inset, ~38px glyph, heading-weight copy.
+  padding: 40px 20px;
   color: var(--md-sys-color-on-surface-variant);
   text-align: center;
   animation: dmGrow calc(380ms * var(--mdur, 1)) var(--spring);
 
   .octicon {
-    width: 28px;
-    height: 28px;
+    width: 38px;
+    height: 38px;
+    opacity: 0.6;
+  }
+
+  span {
+    font-size: 13.5px;
+    font-weight: var(--font-weight-semibold);
   }
 }
 

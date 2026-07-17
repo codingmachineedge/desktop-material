@@ -77,6 +77,7 @@ import {
   WorktreeDropdown,
   RevertProgress,
   OneClickCommitPushButton,
+  ThemeToggleButton,
 } from './toolbar'
 import { canAutoCommitPush } from '../lib/automation/automation-guards'
 import { iconForRepository, Octicon, OcticonSymbol } from './octicons'
@@ -93,6 +94,7 @@ import {
 } from './main-process-proxy'
 import { DiscardChanges } from './discard-changes'
 import { Welcome } from './welcome'
+import { FirstRunChecklist } from './welcome/first-run-checklist'
 import { AppMenuBar } from './app-menu'
 import { UpdateAvailable, renderBanner } from './banners'
 import { Preferences } from './preferences'
@@ -4736,6 +4738,12 @@ export class App extends React.Component<IAppProps, IAppState> {
         >
           {this.renderBuildRunToolbarButton()}
         </ToolbarItem>
+        <ToolbarItem id="theme-toggle" preferredWidth={54}>
+          <ThemeToggleButton
+            dispatcher={this.props.dispatcher}
+            selectedTheme={this.state.selectedTheme}
+          />
+        </ToolbarItem>
       </Toolbar>
     )
   }
@@ -4933,6 +4941,21 @@ export class App extends React.Component<IAppProps, IAppState> {
     )
   }
 
+  private renderFirstRunChecklist() {
+    if (this.state.showWelcomeFlow) {
+      return null
+    }
+
+    return (
+      <FirstRunChecklist
+        dispatcher={this.props.dispatcher}
+        accountsCount={this.state.accounts.length}
+        repositoryCount={this.state.repositories.length}
+        selectedTheme={this.state.selectedTheme}
+      />
+    )
+  }
+
   private reloadAppWindow = () => window.location.reload()
 
   public render() {
@@ -4997,6 +5020,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.state.showWelcomeFlow
           ? this.renderWelcomeFlow()
           : this.renderApp()}
+        {this.renderFirstRunChecklist()}
         {this.renderErrorNotices()}
         {this.renderZoomInfo()}
         {this.renderFullScreenInfo()}

@@ -1,10 +1,23 @@
 dialog.clone-repository {
+  // v2 prototype: the owner row wraps onto new lines instead of scrolling
+  // sideways, with a tight 6px chip gap.
   .org-filter-chips {
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
     padding: 2px 20px 10px;
-    scrollbar-width: thin;
+  }
+
+  // Uppercase "Owner" eyebrow that leads the chip row.
+  .org-filter-eyebrow {
+    flex: 0 0 auto;
+    margin-right: 2px;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .org-filter-chip {
@@ -15,19 +28,21 @@ dialog.clone-repository {
     // v2 prototype: a denser owner chip that hugs its leading avatar.
     min-height: 32px;
     padding: 0 12px 0 6px;
-    border: 1px solid var(--md-sys-color-outline-variant);
+    // Unselected chips are borderless tonal fills rather than outlined
+    // transparent pills.
+    border: 0;
     border-radius: 999px;
     color: var(--md-sys-color-on-surface-variant);
-    background: transparent;
+    background: var(--md-sys-color-surface-container-high);
     font: inherit;
     font-size: 12px;
-    font-weight: var(--font-weight-semibold);
+    font-weight: 700;
     cursor: pointer;
     transition: background-color 180ms ease, border-radius 220ms var(--spring), transform 160ms var(--spring-fast);
 
     &:hover {
       border-radius: 12px;
-      background: var(--md-sys-color-surface-container-high);
+      background: var(--md-sys-color-surface-container-highest);
     }
 
     &:active {
@@ -35,7 +50,6 @@ dialog.clone-repository {
     }
 
     &.selected {
-      border-color: transparent;
       color: var(--md-sys-color-on-secondary-container);
       background: var(--md-sys-color-secondary-container);
     }
@@ -43,6 +57,12 @@ dialog.clone-repository {
     &:focus-visible {
       outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 2px;
+    }
+
+    // "All repositories" carries no leading avatar, so it gets symmetric
+    // padding instead of the avatar-hugging 6px inset.
+    &:not(:has(.org-avatar)) {
+      padding: 0 12px;
     }
   }
 

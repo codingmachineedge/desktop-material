@@ -371,3 +371,42 @@
     background: var(--md-sys-color-primary-container);
   }
 }
+
+// === Desktop Material v2 (History panel commit rows) ========================
+// Prototype geometry: 11px/12px row inset, hover radius 14px → 18px, and a
+// leading 34px circular avatar disc (replacing the inline byline avatar) that
+// springs to 1.1 on row hover.
+#commit-drag-element .commit,
+#commit-list .commit {
+  padding: 11px 12px;
+
+  &:hover {
+    border-radius: 18px;
+  }
+
+  .commit-avatar {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--md-sys-color-primary-container);
+    transition: transform 220ms var(--spring-fast);
+
+    .avatar-container,
+    .avatar {
+      display: block;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+    }
+
+    svg.avatar {
+      fill: var(--md-sys-color-on-primary-container);
+    }
+  }
+
+  &:hover .commit-avatar {
+    transform: scale(1.1);
+  }
+}

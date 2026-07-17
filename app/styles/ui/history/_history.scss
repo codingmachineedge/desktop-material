@@ -205,11 +205,20 @@
 // author or SHA. Lives above #commit-list inside .compare-commit-list.
 .history-commit-filter {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: var(--spacing-half);
+  flex-direction: column;
+  gap: 8px;
   flex: 0 0 auto;
-  padding: 10px 14px;
+  padding: 0 14px 10px;
+
+  // The search field plus its trailing control cluster (mode control, filter
+  // chips toggle, graph toggle) wrap as one row; the chip row sits below.
+  .history-commit-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: var(--spacing-half);
+    column-gap: 4px;
+  }
 
   .history-commit-filter-field {
     // Fill the row; the min-width doubles as the wrap threshold so the mode
@@ -298,6 +307,144 @@
     &[aria-pressed='true'] {
       color: var(--md-sys-color-on-secondary-container);
       background: var(--md-sys-color-secondary-container);
+    }
+  }
+}
+
+// === Desktop Material v2 (History panel) ====================================
+// Sidebar title header per the v2 prototype: 21px/600 H1 beside a radius-999
+// count pill (surface-container-high fill, 12.5px/700 on-surface-variant).
+.history-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 18px 18px 10px;
+
+  .history-panel-title {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--md-sys-color-on-surface);
+  }
+
+  .history-panel-count {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1;
+    transition: background-color 480ms var(--emph);
+  }
+}
+
+// The 32px radius-10 "tune" toggle that reveals the filter chip row — mirrors
+// the prototype's in-pill trailing button (secondary-container when active).
+.history-commit-filter .history-filter-chips-toggle.button-component {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  box-shadow: none;
+  transition: background-color 220ms var(--emph), color 220ms var(--emph), transform 200ms var(--spring-fast);
+
+  .octicon {
+    fill: currentColor;
+  }
+
+  &:active {
+    transform: scale(0.85);
+  }
+
+  &.active,
+  &[aria-expanded='true'] {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+}
+
+// Inline filter chip row (v2 prototype "History panel" chips): 30px radius-999
+// tonal-selectable chips with a dmPop leading check when active, followed by a
+// primary-container "Regex builder" launcher chip. Springs in with dmUp.
+.history-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  animation: dmUp calc(340ms * var(--mdur)) var(--spring) backwards;
+
+  .history-filter-chip,
+  .history-regex-builder-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 220ms var(--emph), color 220ms var(--emph), transform 200ms var(--spring-fast);
+
+    &:active {
+      transform: scale(0.92);
+    }
+  }
+
+  // Predicate chips — neutral until toggled, then tonal-selected.
+  .history-filter-chip {
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 82%, var(--md-sys-color-on-surface));
+    }
+
+    &.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    .chip-check {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+      animation: dmPop calc(300ms * var(--mdur)) var(--spring-fast) backwards;
+    }
+  }
+
+  // Trailing regex-builder launcher chip.
+  .history-regex-builder-chip {
+    gap: 6px;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    transition: background-color 480ms var(--emph), transform 200ms var(--spring-fast);
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-primary-container) 82%, var(--md-sys-color-on-primary-container));
+    }
+
+    .chip-glyph {
+      font-family: var(--font-family-monospace, monospace);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
     }
   }
 }

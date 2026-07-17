@@ -9,18 +9,41 @@
   overflow-x: hidden;
   animation: dmUp calc(560ms * var(--mdur)) var(--spring) backwards;
 
+  // Centered header column: tonal check tile above the copy (prototype's
+  // task_alt tile replacing the legacy paper-stack blankslate image).
   .interstitial-header {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
+    text-align: center;
+    margin-bottom: var(--spacing-half);
+    animation: dmGrow calc(560ms * var(--mdur)) var(--spring) backwards;
+
+    // 56x56 primary-container rounded tile hosting a filled check-circle.
+    .interstitial-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+      animation: dmBounce calc(700ms * var(--mdur)) var(--spring-fast) backwards;
+      transition: background-color 480ms var(--emph);
+
+      .octicon {
+        width: 28px;
+        height: 28px;
+        fill: currentColor;
+      }
+    }
 
     .text {
-      flex-grow: 1;
-      margin-right: var(--spacing-double);
-
       h1 {
         padding: 0;
-        margin: 0 0 var(--spacing-half);
+        margin: 0;
         font-size: 26px;
         font-weight: var(--font-weight-semibold);
         letter-spacing: -0.01em;
@@ -28,28 +51,17 @@
       }
 
       p {
-        margin: 0;
+        margin: 10px 0 22px;
         font-size: var(--font-size);
         line-height: 1.6;
         color: var(--md-sys-color-on-surface-variant);
       }
     }
-
-    .blankslate-image {
-      flex: 0;
-      height: 70px;
-      width: 73px;
-      min-width: 70px;
-      min-height: 73px;
-      align-self: center;
-    }
-
-    margin-bottom: var(--spacing-double);
   }
 
   .content {
     width: 100%;
-    max-width: 640px;
+    max-width: 560px;
   }
 
   // ---- MD3 suggestion cards ----------------------------------------------
@@ -61,10 +73,25 @@
 
     &.primary {
       margin-bottom: 10px;
+
+      .suggested-action {
+        animation-delay: calc(90ms * var(--mdur));
+      }
+    }
+
+    // Staggered dmUp entrance for the secondary suggestion cards, trailing
+    // the primary card (prototype's per-card animation-delay ladder).
+    &:not(.primary) {
+      @for $i from 1 through 4 {
+        .suggested-action:nth-child(#{$i}) {
+          animation-delay: calc(#{140 + ($i - 1) * 70}ms * var(--mdur));
+        }
+      }
     }
   }
 
   .suggested-action {
+    animation: dmUp calc(520ms * var(--mdur)) var(--spring) backwards;
     border: 0;
     border-radius: 20px;
     background: var(--md-sys-color-surface-container-low);
@@ -177,12 +204,5 @@
   /** Lessen the padding at 1.5x zoom and above  **/
   @media screen and (max-width: 640px) {
     padding: var(--spacing-double);
-  }
-
-  /** Hide the blankslate image at high zoom levels **/
-  @media screen and (max-width: 550px) {
-    .header .blankslate-image {
-      display: none;
-    }
   }
 }

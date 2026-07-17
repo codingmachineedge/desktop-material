@@ -10,8 +10,11 @@
   min-height: var(--dm-tab-strip-height, 44px);
   padding: 6px 16px 0 12px;
   // v2 prototype: the strip is transparent and undivided, reading continuous
-  // with the surface-container workspace behind it.
+  // with the surface-container workspace behind it. It drops in 40ms after the
+  // title bar on the shared dmDown entrance stagger.
   user-select: none;
+  animation: dmDown calc(480ms * var(--mdur, 1)) var(--emph) backwards;
+  animation-delay: 40ms;
 
   .repository-tab-list {
     display: flex;
@@ -310,6 +313,42 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   }
 }
 
+.repository-tab-undo,
+.repository-tab-redo {
+  // v2 prototype tab-strip trailing cluster: 32×32 radius-10 icon buttons for
+  // undo/redo of profile settings commits; press squashes to scale(.82).
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 220ms var(--emph), transform 200ms var(--spring-fast);
+
+  .octicon {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--md-sys-color-surface-container-highest);
+  }
+
+  &:active {
+    transform: scale(0.82);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+}
+
 .repository-tab-announcement {
   position: absolute;
   width: 1px;
@@ -329,7 +368,9 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 352px;
+  // v2 prototype: a 320px popover envelope — 288px of content plus the
+  // popover-content's 16px padding on either side.
+  width: 288px;
   max-width: calc(100vw - 52px);
   max-height: min(680px, calc(var(--available-height, 100vh) - 32px));
   padding-right: 2px;
@@ -512,7 +553,8 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
 
     .tab-style-size-value {
-      width: 52px;
+      // v2 prototype: a fixed 44px mono value column keeps the slider steady.
+      width: 44px;
       text-align: right;
       font-family: var(--font-family-monospace);
       font-size: 12px;

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import classNames from 'classnames'
 
 import { Commit, CommitOneLine, ICommitContext } from '../../models/commit'
 import {
@@ -43,6 +44,8 @@ import { getCommitSearchKeys } from '../../lib/commit-search'
 import { Button } from '../lib/button'
 import { Octicon } from '../octicons'
 import { getBoolean, setBoolean } from '../../lib/local-storage'
+import { RegexBuilder } from '../lib/regex-builder/regex-builder'
+import { isAttributableEmailFor } from '../../lib/email'
 
 interface ICompareSidebarProps {
   readonly repository: Repository
@@ -97,6 +100,24 @@ interface ICompareSidebarState {
 
   /** Whether the ancestry graph is visible beside commit rows. */
   readonly showCommitGraph: boolean
+
+  /**
+   * Whether the inline filter chip row (v2 prototype "History panel" chips) is
+   * shown below the commit search field.
+   */
+  readonly showCommitFilterChips: boolean
+
+  /** Chip predicate: only show commits that haven't been pushed. */
+  readonly commitFilterUnpushed: boolean
+
+  /** Chip predicate: only show commits carrying at least one tag. */
+  readonly commitFilterTagged: boolean
+
+  /** Chip predicate: only show commits authored by a signed-in account. */
+  readonly commitFilterMine: boolean
+
+  /** Whether the full regex-builder dialog is open. */
+  readonly isRegexBuilderOpen: boolean
 }
 
 /** localStorage key used to persist the History commit filter mode. */
@@ -129,6 +150,11 @@ export class CompareSidebar extends React.Component<
       commitFilterMode: readPersistedFilterMode(CommitFilterListId),
       commitFilterCaseSensitive: false,
       showCommitGraph: getBoolean(ShowCommitGraphKey, true),
+      showCommitFilterChips: false,
+      commitFilterUnpushed: false,
+      commitFilterTagged: false,
+      commitFilterMine: false,
+      isRegexBuilderOpen: false,
     }
   }
 
@@ -239,6 +265,7 @@ export class CompareSidebar extends React.Component<
 
     return (
       <div id="compare-view" role="tabpanel" aria-labelledby="history-tab">
+        {this.renderPanelHeader()}
         <div className="compare-form">
           <FancyTextBox
             ariaLabel="Branch filter"
@@ -256,6 +283,26 @@ export class CompareSidebar extends React.Component<
         </div>
 
         {showBranchList ? this.renderFilterList() : this.renderCommits()}
+      </div>
+    )
+  }
+
+  /**
+   * Sidebar title header (v2 prototype "History panel"): a 21px H1 with a
+   * pill count chip carrying the number of loaded commits, rendered above the
+   * search field.
+   */
+  private renderPanelHeader() {
+    const commitCount = this.props.compareState.commitSHAs.length
+
+    return (
+      <div className="history-panel-header">
+        <h1 className="history-panel-title">History</h1>
+        {commitCount > 0 && (
+          <span className="history-panel-count" aria-hidden="true">
+            {formatNumber(commitCount)}
+          </span>
+        )}
       </div>
     )
   }
@@ -289,18 +336,72 @@ export class CompareSidebar extends React.Component<
     })
   }
 
+  /** Whether any of the filter-chip predicates is currently toggled on. */
+  private hasActiveCommitFilterChips(): boolean {
+    return (
+      this.state.commitFilterUnpushed ||
+      this.state.commitFilterTagged ||
+      this.state.commitFilterMine
+    )
+  }
+
+  /** Whether the commit hasn't been pushed (local commit or unpushed tag). */
+  private isUnpushedCommit(commit: Commit): boolean {
+    if (this.props.localCommitSHAs.includes(commit.sha)) {
+      return true
+    }
+
+    const tagsToPush = new Set(this.props.tagsToPush ?? [])
+    return commit.tags.some(tag => tagsToPush.has(tag))
+  }
+
+  /** Whether the commit was authored/committed by a signed-in account. */
+  private isOwnCommit(commit: Commit): boolean {
+    return this.props.accounts.some(
+      account =>
+        isAttributableEmailFor(account, commit.author.email) ||
+        isAttributableEmailFor(account, commit.committer.email)
+    )
+  }
+
+  /** Test a commit against the active filter-chip predicates (AND semantics). */
+  private commitMatchesFilterChips(sha: string): boolean {
+    const commit = this.props.commitLookup.get(sha)
+    if (commit === undefined) {
+      return false
+    }
+
+    if (this.state.commitFilterUnpushed && !this.isUnpushedCommit(commit)) {
+      return false
+    }
+
+    if (this.state.commitFilterTagged && commit.tags.length === 0) {
+      return false
+    }
+
+    if (this.state.commitFilterMine && !this.isOwnCommit(commit)) {
+      return false
+    }
+
+    return true
+  }
+
   /**
    * Filter the loaded commit SHAs client-side using the current History filter
-   * text / mode. When comparing branches (or with an empty filter) the list is
-   * returned unchanged.
+   * text / mode and the filter-chip predicates. When comparing branches (or
+   * with an empty filter) the list is returned unchanged.
    */
   private getFilteredCommitSHAs(
     commitSHAs: ReadonlyArray<string>
   ): ReadonlyArray<string> {
     const query = this.state.commitFilterText.trim()
 
+    const chipFilteredSHAs = this.hasActiveCommitFilterChips()
+      ? commitSHAs.filter(sha => this.commitMatchesFilterChips(sha))
+      : commitSHAs
+
     if (query.length === 0) {
-      return commitSHAs
+      return chipFilteredSHAs
     }
 
     // Two keys so fuzzy mode (which only scores the first two) still matches on
@@ -314,7 +415,7 @@ export class CompareSidebar extends React.Component<
       return getCommitSearchKeys(commit)
     }
 
-    const { results } = matchWithMode(query, commitSHAs, getKey, {
+    const { results } = matchWithMode(query, chipFilteredSHAs, getKey, {
       mode: this.state.commitFilterMode,
       caseSensitive: this.state.commitFilterCaseSensitive,
     })
@@ -361,39 +462,183 @@ export class CompareSidebar extends React.Component<
   }
 
   private renderCommitFilter() {
+    const activeChipCount = [
+      this.state.commitFilterUnpushed,
+      this.state.commitFilterTagged,
+      this.state.commitFilterMine,
+    ].filter(on => on).length
+
+    const filterOptionsLabel = `Filter options${
+      activeChipCount > 0 ? ` (${activeChipCount} applied)` : ''
+    }`
+
     return (
       <div className="history-commit-filter">
-        <TextBox
-          className="history-commit-filter-field"
-          type="search"
-          displayClearButton={true}
-          prefixedIcon={octicons.search}
-          placeholder="Search commits"
-          ariaLabel="Search commits by title, message, tag, or hash"
-          value={this.state.commitFilterText}
-          onValueChanged={this.onCommitFilterTextChanged}
-          onSearchCleared={this.onCommitFilterCleared}
-        />
-        <FilterModeControl
-          mode={this.state.commitFilterMode}
-          caseSensitive={this.state.commitFilterCaseSensitive}
-          onModeChange={this.onCommitFilterModeChanged}
-          onCaseSensitiveChange={this.onCommitFilterCaseSensitiveChanged}
-          regexBuilderTarget="Commits"
-          getSampleItems={this.getCommitFilterSampleItems}
-          filterText={this.state.commitFilterText}
-          onRegexPatternApply={this.onCommitFilterRegexPatternApply}
-        />
-        <Button
-          className="history-commit-graph-toggle"
-          ariaLabel="Show commit graph"
-          tooltip="Show commit graph"
-          ariaPressed={this.state.showCommitGraph}
-          onClick={this.onCommitGraphToggle}
-        >
-          <Octicon symbol={octicons.gitMerge} />
-        </Button>
+        <div className="history-commit-filter-row">
+          <TextBox
+            className="history-commit-filter-field"
+            type="search"
+            displayClearButton={true}
+            prefixedIcon={octicons.search}
+            placeholder="Search commits"
+            ariaLabel="Search commits by title, message, tag, or hash"
+            value={this.state.commitFilterText}
+            onValueChanged={this.onCommitFilterTextChanged}
+            onSearchCleared={this.onCommitFilterCleared}
+          />
+          <FilterModeControl
+            mode={this.state.commitFilterMode}
+            caseSensitive={this.state.commitFilterCaseSensitive}
+            onModeChange={this.onCommitFilterModeChanged}
+            onCaseSensitiveChange={this.onCommitFilterCaseSensitiveChanged}
+            regexBuilderTarget="Commits"
+            getSampleItems={this.getCommitFilterSampleItems}
+            filterText={this.state.commitFilterText}
+            onRegexPatternApply={this.onCommitFilterRegexPatternApply}
+            showRegexBuilder={false}
+          />
+          <Button
+            className={classNames('history-filter-chips-toggle', {
+              active:
+                this.state.showCommitFilterChips ||
+                this.hasActiveCommitFilterChips(),
+            })}
+            ariaLabel={filterOptionsLabel}
+            tooltip={filterOptionsLabel}
+            ariaExpanded={this.state.showCommitFilterChips}
+            onClick={this.onToggleCommitFilterChips}
+          >
+            <Octicon symbol={octicons.filter} />
+          </Button>
+          <Button
+            className="history-commit-graph-toggle"
+            ariaLabel="Show commit graph"
+            tooltip="Show commit graph"
+            ariaPressed={this.state.showCommitGraph}
+            onClick={this.onCommitGraphToggle}
+          >
+            <Octicon symbol={octicons.gitMerge} />
+          </Button>
+        </div>
+        {this.renderCommitFilterChips()}
+        {this.renderCommitRegexBuilder()}
       </div>
+    )
+  }
+
+  /**
+   * The inline filter chip row (v2 prototype "History panel"): Unpushed /
+   * Tagged / Mine predicate chips plus a trailing Regex builder launcher chip.
+   */
+  private renderCommitFilterChips() {
+    if (!this.state.showCommitFilterChips) {
+      return null
+    }
+
+    const chips: ReadonlyArray<{
+      readonly id: string
+      readonly label: string
+      readonly on: boolean
+    }> = [
+      {
+        id: 'unpushed',
+        label: 'Unpushed',
+        on: this.state.commitFilterUnpushed,
+      },
+      { id: 'tagged', label: 'Tagged', on: this.state.commitFilterTagged },
+      { id: 'mine', label: 'Mine', on: this.state.commitFilterMine },
+    ]
+
+    return (
+      <div
+        className="history-filter-chips"
+        role="group"
+        aria-label="History filters"
+      >
+        {chips.map(chip => (
+          <button
+            key={chip.id}
+            className={classNames('history-filter-chip', { active: chip.on })}
+            aria-pressed={chip.on}
+            data-chip-id={chip.id}
+            onClick={this.onCommitFilterChipToggle}
+          >
+            {chip.on && (
+              <Octicon className="chip-check" symbol={octicons.check} />
+            )}
+            <span className="chip-label">{chip.label}</span>
+          </button>
+        ))}
+        <button
+          className="history-regex-builder-chip"
+          aria-label="Open regex builder"
+          onClick={this.onOpenCommitRegexBuilder}
+        >
+          <span className="chip-glyph">.*</span>
+          <span className="chip-label">Regex builder</span>
+        </button>
+      </div>
+    )
+  }
+
+  private renderCommitRegexBuilder() {
+    if (!this.state.isRegexBuilderOpen) {
+      return null
+    }
+
+    return (
+      <RegexBuilder
+        targetLabel="Commits"
+        initialPattern={this.state.commitFilterText}
+        sampleItems={this.getCommitFilterSampleItems()}
+        onApply={this.onCommitRegexBuilderApply}
+        onDismissed={this.onCloseCommitRegexBuilder}
+      />
+    )
+  }
+
+  private onToggleCommitFilterChips = () => {
+    this.setState(state => ({
+      showCommitFilterChips: !state.showCommitFilterChips,
+    }))
+  }
+
+  private onCommitFilterChipToggle = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const chipId = event.currentTarget.dataset.chipId
+
+    if (chipId === 'unpushed') {
+      this.setState(state => ({
+        commitFilterUnpushed: !state.commitFilterUnpushed,
+      }))
+    } else if (chipId === 'tagged') {
+      this.setState(state => ({
+        commitFilterTagged: !state.commitFilterTagged,
+      }))
+    } else if (chipId === 'mine') {
+      this.setState(state => ({ commitFilterMine: !state.commitFilterMine }))
+    }
+  }
+
+  private onOpenCommitRegexBuilder = () => {
+    this.setState({ isRegexBuilderOpen: true })
+  }
+
+  private onCloseCommitRegexBuilder = () => {
+    this.setState({ isRegexBuilderOpen: false })
+  }
+
+  private onCommitRegexBuilderApply = (pattern: string) => {
+    persistFilterMode(CommitFilterListId, FilterMode.Regex)
+    this.exhaustedSearchQuery = null
+    this.setState(
+      {
+        commitFilterMode: FilterMode.Regex,
+        commitFilterText: pattern,
+        isRegexBuilderOpen: false,
+      },
+      this.ensureCommitSearchDepth
     )
   }
 
@@ -413,7 +658,9 @@ export class CompareSidebar extends React.Component<
       ? this.getFilteredCommitSHAs(commitSHAs)
       : commitSHAs
     const isCommitFilterActive =
-      isHistory && this.state.commitFilterText.trim().length > 0
+      isHistory &&
+      (this.state.commitFilterText.trim().length > 0 ||
+        this.hasActiveCommitFilterChips())
 
     let emptyListMessage: string | JSX.Element
     if (isCommitFilterActive && filteredCommitSHAs.length === 0) {

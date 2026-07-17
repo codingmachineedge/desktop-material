@@ -284,6 +284,23 @@ export class Appearance extends React.Component<
     }
   }
 
+  private renderAutoFitLabel() {
+    // v2 prototype (settings appearance pane): the auto-fit row pairs a bold
+    // title with a muted caption on the left of the 54x32 switch. Both live in
+    // the checkbox label so the whole copy stays clickable and is announced as
+    // the control's accessible name.
+    return (
+      <span className="auto-fit-zoom-copy">
+        <span className="auto-fit-zoom-title">
+          Automatically shrink the interface to fit small windows
+        </span>
+        <span className="auto-fit-zoom-caption">
+          Recommended. Keeps the whole app visible on smaller screens.
+        </span>
+      </span>
+    )
+  }
+
   private renderScaling() {
     const percent = Math.round(this.props.zoomBaseFactor * 100)
     const effectivePercent = Math.round(this.props.windowZoomFactor * 100)
@@ -294,51 +311,56 @@ export class Appearance extends React.Component<
       <div className="appearance-section scaling-section">
         <h2 id="scaling-heading">Scale</h2>
 
-        <div
-          className="scaling-slider-row"
-          role="group"
-          aria-labelledby="scaling-heading"
-        >
-          <input
-            type="range"
-            className="scaling-slider"
-            min={50}
-            max={200}
-            step={5}
-            value={percent}
+        <div className="scaling-card">
+          <div
+            className="scaling-slider-row"
+            role="group"
             aria-labelledby="scaling-heading"
-            aria-valuetext={`${percent}%`}
-            onChange={this.onZoomSliderChanged}
+          >
+            <Octicon
+              className="scaling-zoom-icon scaling-zoom-out"
+              symbol={octicons.zoomOut}
+              height={18}
+            />
+            <input
+              type="range"
+              className="scaling-slider"
+              min={50}
+              max={200}
+              step={5}
+              value={percent}
+              aria-labelledby="scaling-heading"
+              aria-valuetext={`${percent}%`}
+              onChange={this.onZoomSliderChanged}
+            />
+            <Octicon
+              className="scaling-zoom-icon scaling-zoom-in"
+              symbol={octicons.zoomIn}
+              height={20}
+            />
+            <span className="scaling-value" aria-hidden={true}>
+              {percent}%
+            </span>
+          </div>
+
+          <Checkbox
+            className="auto-fit-zoom"
+            label={this.renderAutoFitLabel()}
+            value={
+              this.props.autoFitZoomEnabled
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onAutoFitZoomEnabledChanged}
           />
-          <span className="scaling-value" aria-hidden={true}>
-            {percent}%
-          </span>
+
+          {isTrimmed && (
+            <p className="scaling-effective">
+              Auto-fit is currently showing the interface at {effectivePercent}%
+              to fit this window.
+            </p>
+          )}
         </div>
-
-        <div className="scaling-ticks" aria-hidden={true}>
-          <span>50%</span>
-          <span>100%</span>
-          <span>200%</span>
-        </div>
-
-        <Checkbox
-          className="auto-fit-zoom"
-          label="Automatically shrink the interface to fit small windows"
-          value={
-            this.props.autoFitZoomEnabled ? CheckboxValue.On : CheckboxValue.Off
-          }
-          onChange={this.onAutoFitZoomEnabledChanged}
-        />
-        <p className="scaling-caption">
-          Recommended. Keeps the whole app visible on smaller screens.
-        </p>
-
-        {isTrimmed && (
-          <p className="scaling-effective">
-            Auto-fit is currently showing the interface at {effectivePercent}%
-            to fit this window.
-          </p>
-        )}
       </div>
     )
   }

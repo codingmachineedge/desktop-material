@@ -53,6 +53,8 @@ import { normalizeCloneDepth } from '../../models/clone-options'
 import { getAutoClonePolicy } from '../../lib/stores/auto-clone-store'
 import { Repository } from '../../models/repository'
 import { CloningRepository } from '../../models/cloning-repository'
+import { Octicon } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -516,12 +518,54 @@ export class CloneRepository extends React.Component<
     return true
   }
 
+  /**
+   * v2 header subtitle: names the account host/login the repository list is
+   * scoped to, or falls back to generic guidance on the URL tab.
+   */
+  private getDialogSubtitle(): string {
+    const tab = this.props.selectedTab
+    const account =
+      tab === CloneRepositoryTab.Generic ? null : this.getAccountForTab(tab)
+
+    if (account === null) {
+      return 'Enter a repository location, then choose where to clone it on your machine'
+    }
+
+    const host = account.friendlyEndpoint
+      .replace(/^GitLab · |^Bitbucket · /, '')
+      .toLowerCase()
+
+    return `Select any number of repositories from ${host}/${account.login}, then clone them in parallel or one by one`
+  }
+
+  /**
+   * v2 header: leading 40x40 radius-14 primary-container icon chip, the
+   * dialog title, and an 11.5px on-surface-variant subtitle line.
+   */
+  private renderDialogTitle() {
+    return (
+      <>
+        <span className="clone-dialog-icon-chip" aria-hidden="true">
+          <Octicon symbol={octicons.desktopDownload} />
+        </span>
+        <span className="clone-dialog-title-block">
+          <span className="clone-dialog-title">
+            {__DARWIN__ ? 'Clone Repositories' : 'Clone repositories'}
+          </span>
+          <span className="clone-dialog-subtitle">
+            {this.getDialogSubtitle()}
+          </span>
+        </span>
+      </>
+    )
+  }
+
   public render() {
     const { error } = this.getSelectedTabState()
     return (
       <Dialog
         className="clone-repository"
-        title={__DARWIN__ ? 'Clone a Repository' : 'Clone a repository'}
+        title={this.renderDialogTitle()}
         onSubmit={this.clone}
         onDismissed={this.props.onDismissed}
         loading={this.state.loading}

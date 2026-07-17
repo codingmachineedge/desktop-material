@@ -1,0 +1,193 @@
+// MD3 floating account switcher (v2 prototype "Account switcher" surface).
+//
+// A fixed bottom-left menu opened from the navigation rail's avatar button:
+// a surface-container-low card at 24px radius / level3 elevation with a
+// dmGrow entrance, one staggered dmUp row per signed-in account (38px
+// initials avatar, name + meta line, trailing check with a dmPop on the
+// active one) and an 'Add another account' action under an outline-variant
+// divider. All colour / motion values come from --md-sys-* / --spring* /
+// --emph / --mdur tokens; the literal geometry (14/18/334px placement,
+// 24/16/14px radii, 999px circles) is the prototype's fixed scale.
+
+.account-switcher {
+  position: fixed;
+  left: 14px;
+  bottom: 18px;
+  z-index: var(--foldout-z-index);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 334px;
+  max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 36px);
+  box-sizing: border-box;
+  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 24px;
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-sys-elevation-level3);
+  color: var(--md-sys-color-on-surface);
+  animation: dmGrow calc(420ms * var(--mdur)) var(--spring);
+  transition: background-color 480ms var(--emph);
+}
+
+.account-switcher-header {
+  padding: 6px 10px 8px 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-switcher-row {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 240ms var(--emph), transform 200ms var(--spring-fast);
+  animation: dmUp calc(400ms * var(--mdur)) var(--spring) backwards;
+
+  &:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+
+  // Active account: tonal primary-container fill (hover keeps the same fill,
+  // matching the prototype's hoverBg for the active row).
+  &.active,
+  &.active:hover {
+    background: var(--md-sys-color-primary-container);
+  }
+}
+
+// Prototype stagger: rows enter 40ms after the card does, 60ms apart. The
+// header is the card's first child so row n sits at :nth-child(n + 1).
+@for $i from 1 through 8 {
+  .account-switcher-row:nth-child(#{$i + 1}) {
+    animation-delay: #{40 + ($i - 1) * 60}ms;
+  }
+}
+
+.account-switcher-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-size: 13px;
+  font-weight: 700;
+
+  &.primary {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+}
+
+.account-switcher-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.account-switcher-name {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-switcher-meta {
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-switcher-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--md-sys-color-primary);
+  animation: dmPop 380ms var(--spring-fast);
+
+  .octicon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+}
+
+.account-switcher-divider {
+  flex: none;
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--md-sys-color-outline-variant);
+  transition: background-color 480ms var(--emph);
+}
+
+.account-switcher-add {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  margin: 0;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 220ms var(--emph);
+
+  &:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+
+  .octicon {
+    flex: none;
+    width: 19px;
+    height: 19px;
+    fill: currentColor;
+  }
+}

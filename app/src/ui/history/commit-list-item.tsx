@@ -11,7 +11,7 @@ import { IAvatarUser, getAvatarUsersForCommit } from '../../models/avatar'
 import { RichText } from '../lib/rich-text'
 import { RelativeTime } from '../relative-time'
 import { CommitAttribution } from '../lib/commit-attribution'
-import { AvatarStack } from '../lib/avatar-stack'
+import { Avatar } from '../lib/avatar'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { Draggable } from '../lib/draggable'
@@ -167,6 +167,18 @@ export class CommitListItem extends React.PureComponent<
           {this.props.graphRow === undefined ? null : (
             <CommitGraph row={this.props.graphRow} />
           )}
+          {/*
+           * v2 prototype "History panel": a 34px leading circular avatar disc
+           * replaces the inline byline avatar stack.
+           */}
+          <div className="commit-avatar">
+            <Avatar
+              accounts={this.props.accounts}
+              user={this.state.avatarUsers[0]}
+              tooltip={!enableAccessibleListToolTips()}
+              size={34}
+            />
+          </div>
           <div className="info">
             <RichText
               className={summaryClassNames}
@@ -175,11 +187,6 @@ export class CommitListItem extends React.PureComponent<
               renderUrlsAsLinks={false}
             />
             <div className="description">
-              <AvatarStack
-                users={this.state.avatarUsers}
-                accounts={this.props.accounts}
-                tooltip={!enableAccessibleListToolTips()}
-              />
               <div className="byline">
                 <CommitAttribution avatarUsers={this.state.avatarUsers} />
                 {renderRelativeTime(date, this.props.preferAbsoluteDates)}

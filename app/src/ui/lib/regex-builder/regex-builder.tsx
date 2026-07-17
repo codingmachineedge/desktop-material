@@ -1,10 +1,11 @@
 import * as React from 'react'
 import classNames from 'classnames'
-import { Octicon } from '../../octicons'
+import { Octicon, OcticonSymbol } from '../../octicons'
 import * as octicons from '../../octicons/octicons.generated'
 import { IRegexFlags, flagsToString } from './regex-block-model'
 import { RegexCategories, RegexBuilderPalette } from './regex-builder-palette'
 import { RegexTestArea } from './regex-test-area'
+import { RegexBuilderGuide } from './regex-builder-guide'
 import { clampDialogOffset } from '../../dialog/dialog-geometry'
 
 /** The maximum number of visible items used to seed the tester's sample. */
@@ -33,9 +34,13 @@ interface IRegexBuilderProps {
   readonly onDismissed: () => void
 }
 
+/** The two top-level views of the builder: composing vs. the static guide. */
+type RegexBuilderView = 'build' | 'guide'
+
 interface IRegexBuilderState {
   readonly pattern: string
   readonly flags: IRegexFlags
+  readonly view: RegexBuilderView
   readonly activeCategory: number
   readonly sample: string
   readonly dragOffset: { readonly x: number; readonly y: number }
@@ -81,6 +86,41 @@ class FlagChip extends React.Component<IFlagChipProps> {
   }
 }
 
+interface IViewTabProps {
+  readonly view: RegexBuilderView
+  readonly label: string
+  readonly icon: OcticonSymbol
+  readonly selected: boolean
+  readonly onSelectView: (view: RegexBuilderView) => void
+}
+
+/**
+ * One of the two segmented Build / "How regex works" view tabs rendered
+ * directly under the builder's header.
+ */
+class RegexBuilderViewTab extends React.Component<IViewTabProps> {
+  private onClick = () => {
+    this.props.onSelectView(this.props.view)
+  }
+
+  public render() {
+    const { view, label, icon, selected } = this.props
+    return (
+      <button
+        id={`regex-builder-view-tab-${view}`}
+        role="tab"
+        aria-selected={selected}
+        aria-controls={`regex-builder-view-${view}`}
+        className={classNames('regex-builder-view-tab', { selected })}
+        onClick={this.onClick}
+      >
+        <Octicon symbol={icon} />
+        {label}
+      </button>
+    )
+  }
+}
+
 /**
  * A self-contained, non-modal, draggable regex builder overlay. It floats over
  * the live app (its own `pointer-events` scaffold lets clicks pass through the
@@ -110,6 +150,7 @@ export class RegexBuilder extends React.Component<
     this.state = {
       pattern: props.initialPattern,
       flags: { g: false, i: true, m: false, s: false, u: false, y: false },
+      view: 'build',
       activeCategory: 0,
       sample: this.defaultSample(),
       dragOffset: { x: 0, y: 0 },
@@ -221,6 +262,10 @@ export class RegexBuilder extends React.Component<
     this.setState({ activeCategory: index })
   }
 
+  private onSelectView = (view: RegexBuilderView) => {
+    this.setState({ view })
+  }
+
   private onSampleChanged = (sample: string) => {
     this.setState({ sample })
   }
@@ -281,6 +326,57 @@ export class RegexBuilder extends React.Component<
     }
   }
 
+  private renderViewTabs() {
+    const { view } = this.state
+    return (
+      <div
+        className="regex-builder-views"
+        role="tablist"
+        aria-label="Regex builder views"
+      >
+        <RegexBuilderViewTab
+          view="build"
+          label="Build"
+          icon={octicons.tools}
+          selected={view === 'build'}
+          onSelectView={this.onSelectView}
+        />
+        <RegexBuilderViewTab
+          view="guide"
+          label="How regex works"
+          icon={octicons.book}
+          selected={view === 'guide'}
+          onSelectView={this.onSelectView}
+        />
+      </div>
+    )
+  }
+
+  private renderBuildView() {
+    return (
+      <div
+        id="regex-builder-view-build"
+        className="regex-builder-build-view"
+        role="tabpanel"
+        aria-labelledby="regex-builder-view-tab-build"
+      >
+        <RegexBuilderPalette
+          categories={RegexCategories}
+          activeCategory={this.state.activeCategory}
+          onCategoryChange={this.onCategoryChange}
+          onInsertToken={this.onInsertToken}
+        />
+
+        <RegexTestArea
+          pattern={this.state.pattern}
+          flags={flagsToString(this.state.flags)}
+          sample={this.state.sample}
+          onSampleChanged={this.onSampleChanged}
+        />
+      </div>
+    )
+  }
+
   private renderValidityIcon() {
     if (this.state.pattern.length === 0) {
       return (
@@ -335,6 +431,8 @@ export class RegexBuilder extends React.Component<
             </button>
           </div>
 
+          {this.renderViewTabs()}
+
           <div className="regex-builder-scroll-region">
             <div
               className={classNames('regex-builder-pattern-row', { invalid })}
@@ -383,19 +481,11 @@ export class RegexBuilder extends React.Component<
               ))}
             </div>
 
-            <RegexBuilderPalette
-              categories={RegexCategories}
-              activeCategory={this.state.activeCategory}
-              onCategoryChange={this.onCategoryChange}
-              onInsertToken={this.onInsertToken}
-            />
-
-            <RegexTestArea
-              pattern={this.state.pattern}
-              flags={flagsString}
-              sample={this.state.sample}
-              onSampleChanged={this.onSampleChanged}
-            />
+            {this.state.view === 'build' ? (
+              this.renderBuildView()
+            ) : (
+              <RegexBuilderGuide />
+            )}
           </div>
 
           <div className="regex-builder-footer">

@@ -187,6 +187,20 @@ export class RepositoryTabStrip extends React.Component<
     )
   }
 
+  private onUndoSettingsChange = () => {
+    this.props.dispatcher
+      .undoLastSettingsChange()
+      .then(() => this.setState({ announcement: 'Settings change undone.' }))
+      .catch(err => log.error('Failed to undo settings change', err))
+  }
+
+  private onRedoSettingsChange = () => {
+    this.props.dispatcher
+      .redoLastSettingsChange()
+      .then(() => this.setState({ announcement: 'Settings change redone.' }))
+      .catch(err => log.error('Failed to redo settings change', err))
+  }
+
   private onStyleChange = (style: ITabTitleStyle) => {
     const { styleEditorTabId } = this.state
     if (styleEditorTabId !== null) {
@@ -657,6 +671,20 @@ export class RepositoryTabStrip extends React.Component<
             isOpen={this.props.isNotificationCentreOpen}
             onClick={this.onToggleNotifications}
           />
+          <button
+            className="repository-tab-undo"
+            aria-label="Undo last settings change"
+            onClick={this.onUndoSettingsChange}
+          >
+            <Octicon symbol={octicons.undo} />
+          </button>
+          <button
+            className="repository-tab-redo"
+            aria-label="Redo settings change"
+            onClick={this.onRedoSettingsChange}
+          >
+            <Octicon symbol={octicons.redo} />
+          </button>
         </div>
         {this.renderStyleEditor()}
         {this.renderCloseMatchingPopover()}

@@ -977,6 +977,10 @@
 
     padding: 14px 18px;
 
+    // Prototype entrance: the whole header slides in from above.
+    animation: dmDown calc(420ms * var(--mdur)) var(--spring) backwards;
+    transition: border-color 480ms var(--emph);
+
     @include octicon-status;
 
     // Path + status subline column (spec §8.1). Grows to push the trailing
@@ -1026,6 +1030,7 @@
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
+        transition: background-color 480ms var(--emph);
       }
 
       .diff-line-stat-added {
@@ -1097,6 +1102,8 @@
       vertical-align: text-bottom;
       position: relative;
       align-self: center;
+      animation: dmPop calc(460ms * var(--mdur)) var(--spring-fast) backwards;
+      transition: background-color 480ms var(--emph);
 
       &.status-new,
       &.status-copied,

@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex -- result logs need keyboard focus */
 import * as React from 'react'
 import * as Path from 'path'
+import classNames from 'classnames'
 import {
   CLIWorkbenchOperation,
   ICLICommandOutputEvent,
@@ -9,6 +10,8 @@ import {
   ICLIWorkbenchRuntime,
 } from '../../lib/cli-workbench'
 import { Button } from '../lib/button'
+import { Octicon } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 import {
   cancelCLICommand,
   getCLIWorkbenchRuntime,
@@ -68,6 +71,148 @@ function findRepositoryToolOperation(
   id: RepositoryToolResultID
 ): IRepositoryToolOperation | null {
   return RepositoryToolOperations.find(operation => operation.id === id) ?? null
+}
+
+/**
+ * Every entry selectable from the tools-hub sidebar: the named registry
+ * recipes plus the guided inspection, history-depth, export, and import
+ * panels. No new operation is introduced here; the hub only lists the
+ * functions this surface already provides.
+ */
+type RepositoryToolsHubToolID =
+  | RepositoryToolID
+  | 'line-authorship'
+  | 'content-search'
+  | 'commit-notes'
+  | 'shallow-history'
+  | 'export-artifacts'
+  | 'bundle-import'
+
+type RepositoryToolsHubCategory =
+  | RepositoryToolCategory
+  | 'Inspect'
+  | 'History'
+  | 'Export'
+  | 'Import'
+
+type RepositoryToolsHubCategoryFilter = 'All' | RepositoryToolsHubCategory
+
+interface IRepositoryToolsHubEntry {
+  readonly id: RepositoryToolsHubToolID
+  readonly title: string
+  readonly description: string
+  readonly category: RepositoryToolsHubCategory
+  readonly icon: octicons.OcticonSymbol
+}
+
+const RepositoryToolOperationIcons: Record<
+  RepositoryToolID,
+  octicons.OcticonSymbol
+> = {
+  'status-summary': octicons.checklist,
+  'repository-health': octicons.pulse,
+  'signature-audit': octicons.shieldCheck,
+  'maintenance-preview': octicons.telescope,
+  'maintenance-run': octicons.gear,
+  'reflog-view': octicons.history,
+  'branch-overview': octicons.gitBranch,
+  'contributor-summary': octicons.people,
+  'version-describe': octicons.tag,
+  'whitespace-audit': octicons.diff,
+  'ignored-files-view': octicons.eyeClosed,
+  'merged-branch-audit': octicons.gitMerge,
+  'prune-preview': octicons.sparkle,
+  'clean-preview': octicons.listUnordered,
+  'clean-run': octicons.trash,
+  'unreachable-commits': octicons.gitCommit,
+  'notes-view': octicons.note,
+}
+
+const HubCategoryOrder: ReadonlyArray<RepositoryToolsHubCategory> = [
+  'Diagnostics',
+  'Inspect',
+  'Maintenance',
+  'Recovery',
+  'History',
+  'Export',
+  'Import',
+]
+
+const UnsortedHubEntries: ReadonlyArray<IRepositoryToolsHubEntry> = [
+  ...RepositoryToolOperations.map(operation => ({
+    id: operation.id,
+    title: operation.title,
+    description: operation.description,
+    category: operation.category,
+    icon: RepositoryToolOperationIcons[operation.id],
+  })),
+  {
+    id: 'line-authorship',
+    title: 'Line authorship',
+    description:
+      'See the commit, author, and date that last changed every line of one tracked file.',
+    category: 'Inspect',
+    icon: octicons.person,
+  },
+  {
+    id: 'content-search',
+    title: 'Search tracked content',
+    description:
+      'Find literal text across every tracked file, with file and line references.',
+    category: 'Inspect',
+    icon: octicons.codescan,
+  },
+  {
+    id: 'commit-notes',
+    title: 'Edit commit notes',
+    description:
+      'Save, replace, or remove the Git note attached to one commit without rewriting it.',
+    category: 'Inspect',
+    icon: octicons.pencil,
+  },
+  {
+    id: 'shallow-history',
+    title: 'Deepen a shallow repository',
+    description:
+      'Detect limited history, fetch a bounded number of older commits, or request all remaining history.',
+    category: 'History',
+    icon: octicons.unfold,
+  },
+  {
+    id: 'export-artifacts',
+    title: 'Export repository artifacts',
+    description:
+      'Create a ZIP/TAR source archive from HEAD or a portable full-history Git bundle.',
+    category: 'Export',
+    icon: octicons.upload,
+  },
+  {
+    id: 'bundle-import',
+    title: 'Import a branch from a Git bundle',
+    description:
+      'Inspect a local bundle, choose one advertised ref, and create one new local branch.',
+    category: 'Import',
+    icon: octicons.download,
+  },
+]
+
+const RepositoryToolsHubEntries: ReadonlyArray<IRepositoryToolsHubEntry> = [
+  ...UnsortedHubEntries,
+].sort(
+  (left, right) =>
+    HubCategoryOrder.indexOf(left.category) -
+    HubCategoryOrder.indexOf(right.category)
+)
+
+const RepositoryToolsHubCategories: ReadonlyArray<RepositoryToolsHubCategoryFilter> =
+  ['All', ...HubCategoryOrder]
+
+const DefaultHubTool: RepositoryToolsHubToolID = 'status-summary'
+
+function isRepositoryToolsHubCategoryFilter(
+  value: string
+): value is RepositoryToolsHubCategoryFilter {
+  return (RepositoryToolsHubCategories as ReadonlyArray<string>).includes(value)
 }
 
 export interface IRepositoryToolsClient {
@@ -138,6 +283,9 @@ interface IRepositoryToolsState {
   readonly noteTarget: string
   readonly noteMessage: string
   readonly noteRequest: IRepositoryNoteRequest | null
+  readonly toolFilter: string
+  readonly toolCategory: RepositoryToolsHubCategoryFilter
+  readonly selectedTool: RepositoryToolsHubToolID
 }
 
 let nextOperationSequence = 0
@@ -151,6 +299,7 @@ export class RepositoryTools extends React.Component<
   private unsubscribeOutput: (() => void) | null = null
   private unsubscribeState: (() => void) | null = null
   private confirmButton: HTMLButtonElement | null = null
+  private hubSearchInput: HTMLInputElement | null = null
   private archiveRunDestination: string | null = null
   private readonly operationHandlers = new WeakMap<
     IRepositoryToolOperation,
@@ -181,6 +330,9 @@ export class RepositoryTools extends React.Component<
       noteTarget: '',
       noteMessage: '',
       noteRequest: null,
+      toolFilter: '',
+      toolCategory: 'All',
+      selectedTool: DefaultHubTool,
     }
   }
 
@@ -193,6 +345,7 @@ export class RepositoryTools extends React.Component<
     this.unsubscribeOutput = this.client.onOutput(this.onOutput)
     this.unsubscribeState = this.client.onState(this.onState)
     void this.loadAvailability()
+    this.hubSearchInput?.focus()
   }
 
   public componentDidUpdate(prevProps: IRepositoryToolsProps) {
@@ -216,6 +369,9 @@ export class RepositoryTools extends React.Component<
         noteTarget: '',
         noteMessage: '',
         noteRequest: null,
+        toolFilter: '',
+        toolCategory: 'All',
+        selectedTool: DefaultHubTool,
       })
     }
   }
@@ -308,6 +464,53 @@ export class RepositoryTools extends React.Component<
 
   private setConfirmButton = (button: HTMLButtonElement | null) => {
     this.confirmButton = button
+  }
+
+  private setHubSearchInput = (input: HTMLInputElement | null) => {
+    this.hubSearchInput = input
+  }
+
+  private onHubFilterChanged = (event: React.FormEvent<HTMLInputElement>) => {
+    this.setState({ toolFilter: event.currentTarget.value })
+  }
+
+  private onHubCategoryClicked = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const category = event.currentTarget.dataset.category
+    if (
+      category !== undefined &&
+      isRepositoryToolsHubCategoryFilter(category)
+    ) {
+      this.setState({ toolCategory: category })
+    }
+  }
+
+  private onHubToolClicked = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const entry = RepositoryToolsHubEntries.find(
+      candidate => candidate.id === event.currentTarget.dataset.hubTool
+    )
+    if (entry !== undefined) {
+      this.setState({ selectedTool: entry.id })
+    }
+  }
+
+  private getVisibleHubEntries(): ReadonlyArray<IRepositoryToolsHubEntry> {
+    const filter = this.state.toolFilter.trim().toLowerCase()
+    return RepositoryToolsHubEntries.filter(entry => {
+      if (
+        this.state.toolCategory !== 'All' &&
+        entry.category !== this.state.toolCategory
+      ) {
+        return false
+      }
+      if (filter.length === 0) {
+        return true
+      }
+      return `${entry.title} ${entry.category} ${entry.description}`
+        .toLowerCase()
+        .includes(filter)
+    })
   }
 
   private async startOperation(
@@ -822,45 +1025,71 @@ export class RepositoryTools extends React.Component<
     )
   }
 
-  private renderCategory(category: RepositoryToolCategory) {
-    const operations = RepositoryToolOperations.filter(
-      operation => operation.category === category
+  private renderDetailChips(
+    category: RepositoryToolsHubCategory,
+    access: string,
+    recipe: string
+  ) {
+    return (
+      <div className="repository-tools-detail-chips">
+        <span className="repository-tools-detail-chip">{category}</span>
+        <span className="repository-tools-detail-chip">{access}</span>
+        <span className="repository-tools-detail-chip">{recipe}</span>
+      </div>
     )
+  }
+
+  private renderSelectedOperation() {
+    const operation = RepositoryToolOperations.find(
+      candidate => candidate.id === this.state.selectedTool
+    )
+    if (operation === undefined) {
+      return null
+    }
+    const category = operation.category
+    const categoryTitleId = `repository-tools-${category.toLowerCase()}-title`
     return (
       <section
         className="repository-tools-category"
-        aria-labelledby={`repository-tools-${category.toLowerCase()}-title`}
+        aria-labelledby={categoryTitleId}
       >
-        <h2 id={`repository-tools-${category.toLowerCase()}-title`}>
-          {category}
-        </h2>
+        <h2 id={categoryTitleId}>{category}</h2>
         <div className="repository-tools-card-grid">
-          {operations.map(operation => (
-            <article className="repository-tool-card" key={operation.id}>
-              <div>
+          <article className="repository-tool-card" key={operation.id}>
+            <div>
+              <div className="repository-tool-card-heading">
+                <Octicon
+                  symbol={RepositoryToolOperationIcons[operation.id]}
+                  className="repository-tool-card-icon"
+                />
                 <h3>{operation.title}</h3>
-                <p>{operation.description}</p>
-                {operation.supportingDetails !== undefined && (
-                  <ul>
-                    {operation.supportingDetails.map(detail => (
-                      <li key={detail}>{detail}</li>
-                    ))}
-                  </ul>
-                )}
               </div>
-              <Button
-                className={
-                  operation.mutatesRepository
-                    ? 'repository-tool-write-button'
-                    : undefined
-                }
-                disabled={this.isBusy() || !this.state.gitAvailable}
-                onClick={this.getOperationHandler(operation)}
-              >
-                {operation.requiresConfirmation ? 'Review and run' : 'Run'}
-              </Button>
-            </article>
-          ))}
+              <p>{operation.description}</p>
+              {operation.supportingDetails !== undefined && (
+                <ul>
+                  {operation.supportingDetails.map(detail => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              )}
+              {this.renderDetailChips(
+                category,
+                operation.mutatesRepository ? 'writes repository' : 'read-only',
+                `git · ${operation.id}`
+              )}
+            </div>
+            <Button
+              className={
+                operation.mutatesRepository
+                  ? 'repository-tool-write-button'
+                  : undefined
+              }
+              disabled={this.isBusy() || !this.state.gitAvailable}
+              onClick={this.getOperationHandler(operation)}
+            >
+              {operation.requiresConfirmation ? 'Review and run' : 'Run'}
+            </Button>
+          </article>
         </div>
       </section>
     )
@@ -875,11 +1104,22 @@ export class RepositoryTools extends React.Component<
         <h2 id="repository-tools-export-title">Export</h2>
         <article className="repository-tool-card repository-archive-card">
           <div>
-            <h3>Export repository artifacts</h3>
+            <div className="repository-tool-card-heading">
+              <Octicon
+                symbol={octicons.upload}
+                className="repository-tool-card-icon"
+              />
+              <h3>Export repository artifacts</h3>
+            </div>
             <p>
               Create a ZIP/TAR source archive from HEAD or a portable Git bundle
               containing every local ref and its reachable history.
             </p>
+            {this.renderDetailChips(
+              'Export',
+              'read-only',
+              'git · archive / bundle'
+            )}
           </div>
           <div className="repository-tool-controls">
             <Button
@@ -1015,7 +1255,196 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderLineAuthorshipCard(disabled: boolean) {
+    return (
+      <article className="repository-tool-card">
+        <div>
+          <div className="repository-tool-card-heading">
+            <Octicon
+              symbol={octicons.person}
+              className="repository-tool-card-icon"
+            />
+            <h3>Line authorship</h3>
+          </div>
+          <p>
+            See the commit, author, and date that last changed every line of one
+            tracked file.
+          </p>
+          <ul>
+            <li>Choose any tracked file inside this repository.</li>
+            <li>Read-only: no file or ref is changed.</li>
+          </ul>
+          {this.renderDetailChips('Inspect', 'read-only', 'git · file-blame')}
+        </div>
+        <Button disabled={disabled} onClick={this.onChooseFileForBlame}>
+          Choose a file…
+        </Button>
+      </article>
+    )
+  }
+
+  private renderContentSearchCard(disabled: boolean) {
+    return (
+      <article className="repository-tool-card">
+        <div>
+          <div className="repository-tool-card-heading">
+            <Octicon
+              symbol={octicons.codescan}
+              className="repository-tool-card-icon"
+            />
+            <h3>Search tracked content</h3>
+          </div>
+          <p>
+            Find literal text across every tracked file, with file and line
+            references. Untracked and ignored files are never searched.
+          </p>
+          {this.renderDetailChips(
+            'Inspect',
+            'read-only',
+            'git · content-search'
+          )}
+          {this.state.searchActive && (
+            <form
+              className="repository-tool-search"
+              onSubmit={this.onSearchSubmit}
+            >
+              <label htmlFor="repository-tool-search-input">
+                Search tracked files for
+              </label>
+              <input
+                id="repository-tool-search-input"
+                type="text"
+                value={this.state.searchPattern}
+                maxLength={256}
+                disabled={disabled}
+                placeholder="literal text, not a pattern"
+                onChange={this.onSearchPatternChanged}
+              />
+              <label htmlFor="repository-tool-search-revision">
+                At revision (optional)
+              </label>
+              <input
+                id="repository-tool-search-revision"
+                type="text"
+                value={this.state.searchRevision}
+                maxLength={1024}
+                disabled={disabled}
+                placeholder="branch, tag, HEAD, or commit ID"
+                onChange={this.onSearchRevisionChanged}
+              />
+            </form>
+          )}
+        </div>
+        {this.state.searchActive ? (
+          <div className="repository-tool-controls">
+            <Button
+              disabled={
+                disabled || this.state.searchPattern.trim().length === 0
+              }
+              onClick={this.runContentSearch}
+            >
+              Search
+            </Button>
+            <Button disabled={disabled} onClick={this.closeContentSearch}>
+              Close search
+            </Button>
+          </div>
+        ) : (
+          <Button disabled={disabled} onClick={this.openContentSearch}>
+            Start content search
+          </Button>
+        )}
+      </article>
+    )
+  }
+
+  private renderNoteEditorCard(disabled: boolean) {
+    return (
+      <article className="repository-tool-card">
+        <div>
+          <div className="repository-tool-card-heading">
+            <Octicon
+              symbol={octicons.pencil}
+              className="repository-tool-card-icon"
+            />
+            <h3>Edit commit notes</h3>
+          </div>
+          <p>
+            Save, replace, or remove the Git note attached to one commit. Notes
+            annotate a commit without rewriting it.
+          </p>
+          {this.renderDetailChips(
+            'Inspect',
+            'writes notes',
+            'git · notes-edit'
+          )}
+          {this.state.notesActive && (
+            <div className="repository-tool-search">
+              <label htmlFor="repository-tool-note-target">Commit</label>
+              <input
+                id="repository-tool-note-target"
+                type="text"
+                value={this.state.noteTarget}
+                maxLength={64}
+                disabled={disabled}
+                placeholder="HEAD or a commit ID"
+                onChange={this.onNoteTargetChanged}
+              />
+              <label htmlFor="repository-tool-note-message">Note text</label>
+              <textarea
+                id="repository-tool-note-message"
+                value={this.state.noteMessage}
+                maxLength={1024}
+                rows={3}
+                disabled={disabled}
+                placeholder="free-form note stored beside the commit"
+                onChange={this.onNoteMessageChanged}
+              />
+            </div>
+          )}
+        </div>
+        {this.state.notesActive ? (
+          <div className="repository-tool-controls">
+            <Button
+              className="repository-tool-write-button"
+              disabled={
+                disabled ||
+                this.state.noteTarget.trim().length === 0 ||
+                this.state.noteMessage.trim().length === 0
+              }
+              onClick={this.reviewNoteSave}
+            >
+              Review save
+            </Button>
+            <Button
+              className="repository-tool-write-button"
+              disabled={disabled || this.state.noteTarget.trim().length === 0}
+              onClick={this.reviewNoteRemoval}
+            >
+              Review removal
+            </Button>
+            <Button disabled={disabled} onClick={this.closeNoteEditor}>
+              Close editor
+            </Button>
+          </div>
+        ) : (
+          <Button disabled={disabled} onClick={this.openNoteEditor}>
+            Start note editor
+          </Button>
+        )}
+      </article>
+    )
+  }
+
   private renderInspection() {
+    const selected = this.state.selectedTool
+    if (
+      selected !== 'line-authorship' &&
+      selected !== 'content-search' &&
+      selected !== 'commit-notes'
+    ) {
+      return null
+    }
     const disabled = this.isBusy() || !this.state.gitAvailable
     return (
       <section
@@ -1024,147 +1453,11 @@ export class RepositoryTools extends React.Component<
       >
         <h2 id="repository-tools-inspect-title">Inspect and search</h2>
         <div className="repository-tools-card-grid">
-          <article className="repository-tool-card">
-            <div>
-              <h3>Line authorship</h3>
-              <p>
-                See the commit, author, and date that last changed every line of
-                one tracked file.
-              </p>
-              <ul>
-                <li>Choose any tracked file inside this repository.</li>
-                <li>Read-only: no file or ref is changed.</li>
-              </ul>
-            </div>
-            <Button disabled={disabled} onClick={this.onChooseFileForBlame}>
-              Choose a file…
-            </Button>
-          </article>
-          <article className="repository-tool-card">
-            <div>
-              <h3>Search tracked content</h3>
-              <p>
-                Find literal text across every tracked file, with file and line
-                references. Untracked and ignored files are never searched.
-              </p>
-              {this.state.searchActive && (
-                <form
-                  className="repository-tool-search"
-                  onSubmit={this.onSearchSubmit}
-                >
-                  <label htmlFor="repository-tool-search-input">
-                    Search tracked files for
-                  </label>
-                  <input
-                    id="repository-tool-search-input"
-                    type="text"
-                    value={this.state.searchPattern}
-                    maxLength={256}
-                    disabled={disabled}
-                    placeholder="literal text, not a pattern"
-                    onChange={this.onSearchPatternChanged}
-                  />
-                  <label htmlFor="repository-tool-search-revision">
-                    At revision (optional)
-                  </label>
-                  <input
-                    id="repository-tool-search-revision"
-                    type="text"
-                    value={this.state.searchRevision}
-                    maxLength={1024}
-                    disabled={disabled}
-                    placeholder="branch, tag, HEAD, or commit ID"
-                    onChange={this.onSearchRevisionChanged}
-                  />
-                </form>
-              )}
-            </div>
-            {this.state.searchActive ? (
-              <div className="repository-tool-controls">
-                <Button
-                  disabled={
-                    disabled || this.state.searchPattern.trim().length === 0
-                  }
-                  onClick={this.runContentSearch}
-                >
-                  Search
-                </Button>
-                <Button disabled={disabled} onClick={this.closeContentSearch}>
-                  Close search
-                </Button>
-              </div>
-            ) : (
-              <Button disabled={disabled} onClick={this.openContentSearch}>
-                Start content search
-              </Button>
-            )}
-          </article>
-          <article className="repository-tool-card">
-            <div>
-              <h3>Edit commit notes</h3>
-              <p>
-                Save, replace, or remove the Git note attached to one commit.
-                Notes annotate a commit without rewriting it.
-              </p>
-              {this.state.notesActive && (
-                <div className="repository-tool-search">
-                  <label htmlFor="repository-tool-note-target">Commit</label>
-                  <input
-                    id="repository-tool-note-target"
-                    type="text"
-                    value={this.state.noteTarget}
-                    maxLength={64}
-                    disabled={disabled}
-                    placeholder="HEAD or a commit ID"
-                    onChange={this.onNoteTargetChanged}
-                  />
-                  <label htmlFor="repository-tool-note-message">
-                    Note text
-                  </label>
-                  <textarea
-                    id="repository-tool-note-message"
-                    value={this.state.noteMessage}
-                    maxLength={1024}
-                    rows={3}
-                    disabled={disabled}
-                    placeholder="free-form note stored beside the commit"
-                    onChange={this.onNoteMessageChanged}
-                  />
-                </div>
-              )}
-            </div>
-            {this.state.notesActive ? (
-              <div className="repository-tool-controls">
-                <Button
-                  className="repository-tool-write-button"
-                  disabled={
-                    disabled ||
-                    this.state.noteTarget.trim().length === 0 ||
-                    this.state.noteMessage.trim().length === 0
-                  }
-                  onClick={this.reviewNoteSave}
-                >
-                  Review save
-                </Button>
-                <Button
-                  className="repository-tool-write-button"
-                  disabled={
-                    disabled || this.state.noteTarget.trim().length === 0
-                  }
-                  onClick={this.reviewNoteRemoval}
-                >
-                  Review removal
-                </Button>
-                <Button disabled={disabled} onClick={this.closeNoteEditor}>
-                  Close editor
-                </Button>
-              </div>
-            ) : (
-              <Button disabled={disabled} onClick={this.openNoteEditor}>
-                Start note editor
-              </Button>
-            )}
-          </article>
+          {selected === 'line-authorship' &&
+            this.renderLineAuthorshipCard(disabled)}
+          {selected === 'content-search' &&
+            this.renderContentSearchCard(disabled)}
+          {selected === 'commit-notes' && this.renderNoteEditorCard(disabled)}
         </div>
       </section>
     )
@@ -1283,41 +1576,147 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderToolListItem(entry: IRepositoryToolsHubEntry) {
+    const selected = this.state.selectedTool === entry.id
+    return (
+      <button
+        type="button"
+        key={entry.id}
+        className="repository-tools-list-item"
+        data-hub-tool={entry.id}
+        aria-current={selected ? 'true' : undefined}
+        onClick={this.onHubToolClicked}
+      >
+        <span className="repository-tools-list-item-icon">
+          <Octicon symbol={entry.icon} />
+        </span>
+        <span className="repository-tools-list-item-text">
+          <span className="repository-tools-list-item-title">
+            {entry.title}
+          </span>
+          <span className="repository-tools-list-item-category">
+            {entry.category}
+          </span>
+        </span>
+      </button>
+    )
+  }
+
+  private renderSidebar() {
+    const entries = this.getVisibleHubEntries()
+    return (
+      <aside className="repository-tools-sidebar">
+        <div className="repository-tools-search">
+          <Octicon symbol={octicons.search} />
+          <input
+            type="search"
+            className="repository-tools-search-input"
+            placeholder="Search tools"
+            aria-label="Search tools"
+            value={this.state.toolFilter}
+            onChange={this.onHubFilterChanged}
+            ref={this.setHubSearchInput}
+          />
+        </div>
+        <div
+          className="repository-tools-filter-chips"
+          role="group"
+          aria-label="Tool categories"
+        >
+          {RepositoryToolsHubCategories.map(category => (
+            <button
+              type="button"
+              key={category}
+              className="repository-tools-filter-chip"
+              data-category={category}
+              aria-pressed={this.state.toolCategory === category}
+              onClick={this.onHubCategoryClicked}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        <nav
+          className="repository-tools-functions repository-tools-list"
+          aria-label="Repository tool list"
+        >
+          {entries.map(entry => this.renderToolListItem(entry))}
+          {entries.length === 0 && (
+            <span className="repository-tools-list-empty">
+              No tools match this search.
+            </span>
+          )}
+        </nav>
+      </aside>
+    )
+  }
+
+  private renderDetail() {
+    const selected = this.state.selectedTool
+    return (
+      <section
+        className={classNames(
+          'repository-tools-results-column',
+          'repository-tools-detail'
+        )}
+        aria-label="Repository tool detail"
+      >
+        {this.renderSelectedOperation()}
+        {this.renderInspection()}
+        {selected === 'export-artifacts' && this.renderExport()}
+        <div
+          className="repository-tools-panel"
+          hidden={selected !== 'shallow-history'}
+        >
+          {this.renderShallowHistory()}
+        </div>
+        <div
+          className="repository-tools-panel"
+          hidden={selected !== 'bundle-import'}
+        >
+          {this.renderImport()}
+        </div>
+        {this.renderConfirmation()}
+        {this.renderArchiveConfirmation()}
+        {this.renderNoteConfirmation()}
+        {this.renderResults()}
+      </section>
+    )
+  }
+
   public render() {
     return (
-      <main className="repository-tools" aria-label="Repository tools">
-        <header className="repository-tools-header">
-          <div>
-            <h1>Repository tools</h1>
-            <p>{this.props.repositoryPath}</p>
+      <main
+        className="repository-tools repository-tools-hub"
+        aria-label="Repository tools"
+      >
+        <div className="repository-tools-modal">
+          <header className="repository-tools-header">
+            <span className="repository-tools-emblem">
+              <Octicon symbol={octicons.tools} />
+            </span>
+            <div className="repository-tools-heading">
+              <h1>Repository tools</h1>
+              <p className="repository-tools-introduction">
+                Diagnostics, maintenance, recovery, and transfer tools for{' '}
+                {this.props.repositoryPath} — every function runs a reviewed Git
+                recipe with no shell or editable command line.
+              </p>
+            </div>
+            {this.renderAvailability()}
+          </header>
+          {this.state.availabilityError !== null && !this.state.gitAvailable && (
+            <p
+              className="repository-tools-error repository-tools-availability-error"
+              role="alert"
+            >
+              {this.state.availabilityError}
+            </p>
+          )}
+          <div className="repository-tools-layout">
+            {this.renderSidebar()}
+            {this.renderDetail()}
           </div>
-          {this.renderAvailability()}
-        </header>
-        <p className="repository-tools-introduction">
-          Guided diagnostics, maintenance, and recovery views. Each function
-          uses a reviewed Git recipe with no shell or editable command line.
-        </p>
-        {this.state.availabilityError !== null && !this.state.gitAvailable && (
-          <p className="repository-tools-error" role="alert">
-            {this.state.availabilityError}
-          </p>
-        )}
-        <div className="repository-tools-layout">
-          <div className="repository-tools-functions">
-            {this.renderShallowHistory()}
-            {this.renderCategory('Diagnostics')}
-            {this.renderInspection()}
-            {this.renderCategory('Maintenance')}
-            {this.renderCategory('Recovery')}
-            {this.renderExport()}
-            {this.renderImport()}
-          </div>
-          <aside className="repository-tools-results-column">
-            {this.renderConfirmation()}
-            {this.renderArchiveConfirmation()}
-            {this.renderNoteConfirmation()}
-            {this.renderResults()}
-          </aside>
         </div>
       </main>
     )

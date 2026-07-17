@@ -1,0 +1,219 @@
+// Desktop Material v2 — compact first-run checklist modal ("Welcome
+// experience" surface). A 560px centered card over a 40% scrim: product
+// lockup, three-step checklist with done/pending states, a striped
+// workspace-preview strip, and Skip-for-now / Get-started actions.
+
+dialog.first-run-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  box-sizing: border-box;
+  margin: auto;
+  padding: 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  // 28px expressive dialog radius over the low container tone.
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-level3);
+  animation: dmDialog calc(520ms * var(--mdur, 1)) var(--spring);
+
+  &::backdrop {
+    background: color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
+    animation: dmScrim 300ms var(--emph);
+  }
+
+  .first-run-checklist-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .first-run-checklist-lockup {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+
+    .octicon {
+      width: 28px;
+      height: 28px;
+      fill: currentColor;
+    }
+  }
+
+  .first-run-checklist-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 1.25;
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  .first-run-checklist-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .first-run-checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  // The next step to take gets a primary outline, mirroring the prototype's
+  // in-progress row.
+  .first-run-checklist-item--next {
+    border: 2px solid var(--md-sys-color-primary);
+  }
+
+  .first-run-checklist-item-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    color: var(--md-sys-color-on-surface-variant);
+
+    .octicon {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+  }
+
+  .first-run-checklist-item--done .first-run-checklist-item-icon {
+    color: var(--md-sys-color-primary);
+  }
+
+  .first-run-checklist-item-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .first-run-checklist-item-meta {
+    flex: none;
+    font-size: 12px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .first-run-checklist-preview {
+    display: grid;
+    place-items: center;
+    flex: none;
+    height: 120px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+    background: repeating-linear-gradient(
+      45deg,
+      var(--md-sys-color-surface-container),
+      var(--md-sys-color-surface-container) 10px,
+      var(--md-sys-color-surface-container-high) 10px,
+      var(--md-sys-color-surface-container-high) 20px
+    );
+  }
+
+  .first-run-checklist-preview-badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--md-sys-color-surface-container-lowest);
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+  }
+
+  .first-run-checklist-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .first-run-checklist-skip,
+  .first-run-checklist-start {
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .first-run-checklist-skip {
+    padding: 0 18px;
+    background: transparent;
+    color: var(--md-sys-color-primary);
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+    }
+  }
+
+  .first-run-checklist-start {
+    padding: 0 22px;
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+
+    &:hover {
+      filter: brightness(1.06);
+    }
+  }
+}
+
+@media (max-height: 560px) {
+  dialog.first-run-checklist {
+    max-height: calc(100vh - 24px);
+    gap: 12px;
+    padding: 20px;
+  }
+}

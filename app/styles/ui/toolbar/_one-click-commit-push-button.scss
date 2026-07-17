@@ -11,5 +11,56 @@
       border-radius: 999px;
       background: color-mix(in srgb, var(--md-sys-color-secondary-container) 88%, var(--md-sys-color-on-secondary-container));
     }
+
+    // v2 prototype label typography: 13.5/700 title over a 10.5 description.
+    .title {
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+
+    .description {
+      font-size: 10.5px;
+    }
+  }
+}
+
+// The 46×46 circular theme toggle trailing the app bar (v2 prototype "App
+// bar" surface). It lives here with the other app-bar trailing control so the
+// toolbar styles stay together in this partial's cascade slot.
+.theme-toggle-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background-color 340ms var(--emph), transform 260ms var(--spring-fast), border-radius 300ms var(--spring);
+  animation: dmPop calc(560ms * var(--mdur, 1)) var(--spring-fast) backwards;
+  animation-delay: 280ms;
+
+  .octicon {
+    width: 20px;
+    height: 20px;
+    transition: transform 500ms var(--spring);
+  }
+
+  &:hover {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    border-radius: 14px;
+  }
+
+  &:active {
+    transform: scale(0.88) rotate(-32deg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
   }
 }

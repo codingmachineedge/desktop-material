@@ -1,6 +1,5 @@
 import * as React from 'react'
 
-import { encodePathAsUrl } from '../../lib/path'
 import { Repository } from '../../models/repository'
 import { LinkButton } from '../lib/link-button'
 import { MenuIDs } from '../../models/menu-ids'
@@ -32,6 +31,8 @@ import {
 } from '../../models/pull-request'
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
 import { formatNumber } from '../../lib/format-number'
+import { Octicon } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 
 function formatMenuItemLabel(text: string) {
   if (__WIN32__ || __LINUX__) {
@@ -50,8 +51,6 @@ function formatParentMenuLabel(menuItem: IMenuItemInfo) {
   const parentMenusText = menuItem.parentMenuLabels.join(' -> ')
   return formatMenuItemLabel(parentMenusText)
 }
-
-const PaperStackImage = encodePathAsUrl(__dirname, 'static/paper-stack.svg')
 
 interface INoChangesProps {
   readonly dispatcher: Dispatcher
@@ -776,6 +775,9 @@ export class NoChanges extends React.Component<
       <div className="changes-interstitial">
         <div className="content">
           <div className="interstitial-header">
+            <div className="interstitial-icon" aria-hidden="true">
+              <Octicon symbol={octicons.checkCircleFill} height={28} />
+            </div>
             <div className="text">
               <h1>No local changes</h1>
               <p>
@@ -783,7 +785,6 @@ export class NoChanges extends React.Component<
                 some friendly suggestions for what to do next.
               </p>
             </div>
-            <img src={PaperStackImage} className="blankslate-image" alt="" />
           </div>
           {this.renderActions()}
         </div>

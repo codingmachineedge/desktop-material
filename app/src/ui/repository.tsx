@@ -65,6 +65,7 @@ import {
   getRepositorySectionVisualIndex,
 } from './repository-sections'
 import { getAccountForRepository } from '../lib/get-account-for-repository'
+import { AccountSwitcher } from './account-switcher/account-switcher'
 
 interface IRepositoryViewProps {
   readonly repository: Repository
@@ -178,6 +179,9 @@ interface IRepositoryViewProps {
 interface IRepositoryViewState {
   readonly changesListScrollTop: number
   readonly compareListScrollTop: number
+
+  /** Whether the floating account-switcher menu is open */
+  readonly isAccountSwitcherOpen: boolean
 }
 
 export class RepositoryView extends React.Component<
@@ -193,6 +197,7 @@ export class RepositoryView extends React.Component<
 
   private readonly changesSidebarRef = React.createRef<ChangesSidebar>()
   private readonly compareSidebarRef = React.createRef<CompareSidebar>()
+  private readonly railAvatarButtonRef = React.createRef<HTMLButtonElement>()
 
   private focusHistoryNeeded: boolean = false
   private focusChangesNeeded: boolean = false
@@ -203,6 +208,7 @@ export class RepositoryView extends React.Component<
     this.state = {
       changesListScrollTop: 0,
       compareListScrollTop: 0,
+      isAccountSwitcherOpen: false,
     }
   }
 
@@ -404,6 +410,21 @@ export class RepositoryView extends React.Component<
     })
   }
 
+  private onToggleAccountSwitcher = () => {
+    this.setState(state => ({
+      isAccountSwitcherOpen: !state.isAccountSwitcherOpen,
+    }))
+  }
+
+  private onCloseAccountSwitcher = () => {
+    this.setState({ isAccountSwitcherOpen: false })
+    this.railAvatarButtonRef.current?.focus()
+  }
+
+  private onAddAccount = () => {
+    this.props.dispatcher.showDotComSignInDialog()
+  }
+
   private onShowRepositoryAccount = () => {
     this.props.dispatcher.showPopup({
       type: PopupType.RepositorySettings,
@@ -495,12 +516,32 @@ export class RepositoryView extends React.Component<
         <button
           type="button"
           className="rail-icon-button rail-avatar"
-          onClick={this.onShowAccounts}
+          onClick={this.onToggleAccountSwitcher}
           aria-label="Switch account"
+          aria-haspopup="dialog"
+          aria-expanded={this.state.isAccountSwitcherOpen}
+          ref={this.railAvatarButtonRef}
         >
           {this.renderAvatarContent()}
         </button>
       </nav>
+    )
+  }
+
+  private renderAccountSwitcher(): JSX.Element | null {
+    if (!this.state.isAccountSwitcherOpen) {
+      return null
+    }
+
+    return (
+      <AccountSwitcher
+        accounts={this.props.accounts}
+        selectedAccount={this.props.accounts[0] ?? null}
+        anchorRef={this.railAvatarButtonRef}
+        onClose={this.onCloseAccountSwitcher}
+        onSelectAccount={this.onShowAccounts}
+        onAddAccount={this.onAddAccount}
+      />
     )
   }
 
@@ -1012,6 +1053,7 @@ export class RepositoryView extends React.Component<
     return (
       <UiView id="repository">
         {this.renderRail()}
+        {this.renderAccountSwitcher()}
         {this.renderSidebar()}
         {this.renderContent()}
         {this.maybeRenderTutorialPanel()}

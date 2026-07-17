@@ -386,3 +386,66 @@
     background: var(--md-sys-color-primary-container);
   }
 }
+
+// === Desktop Material v2 (Commit detail header) =============================
+// Prototype: a header row (18/18/14 inset, 12px gap, flex-start) holding a
+// leading 42px circular author avatar (dmPop entrance) beside the 18px/600
+// summary and its meta chips.
+#expandable-commit-summary {
+  .ecs-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 0;
+    padding: 18px 18px 14px;
+  }
+
+  .ecs-header-avatar {
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--md-sys-color-primary-container);
+    animation: dmPop calc(480ms * var(--mdur)) var(--spring-fast) backwards;
+
+    .avatar-container,
+    .avatar {
+      display: block;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+    }
+
+    svg.avatar {
+      fill: var(--md-sys-color-on-primary-container);
+    }
+  }
+
+  .ecs-header-content {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  // The header row owns the 18px inset now; strip the legacy per-block insets.
+  .ecs-title {
+    padding: 0 0 6px;
+  }
+
+  .beneath-summary {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  // In expanded mode the header stretches so the scrollable commit body can
+  // take over the diff view beside the fixed avatar column.
+  &.expanded {
+    .ecs-header {
+      flex: 1;
+      min-height: 0;
+    }
+  }
+}

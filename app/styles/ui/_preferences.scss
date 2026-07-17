@@ -336,47 +336,144 @@
     }
   }
 
-  // --- Toggle switches for the Notifications & Prompts panes --------------
+  // --- Toggle switches (Notifications pane + Appearance auto-fit) ----------
   // Visual-only: the underlying <input type="checkbox"> and its label/a11y
-  // are preserved; we restyle the input into a 54x32 MD3 switch.
-  .tab-container[aria-labelledby='preferences-tab-notifications'],
+  // are preserved; we restyle the input into a 54x32 MD3 switch. The v2
+  // prototype renders the Prompts rows as checkbox CARDS instead (below), so
+  // prompts are deliberately NOT part of this selector any more.
+  .tab-container[aria-labelledby='preferences-tab-notifications'] .checkbox-component,
+  .tab-container[aria-labelledby='preferences-tab-appearance'] .checkbox-component.auto-fit-zoom {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    gap: 14px;
+
+    label {
+      margin: 0;
+      flex: 1;
+    }
+
+    input[type='checkbox'] {
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      flex-shrink: 0;
+      width: 54px;
+      height: 32px;
+      margin: 0;
+      border-radius: 999px;
+      border: 2px solid var(--md-sys-color-outline);
+      background: var(--md-sys-color-surface-container-high);
+      cursor: pointer;
+      transition: background-color 280ms var(--emph), border-color 280ms var(--emph);
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--md-sys-color-outline);
+        transform: translateY(-50%);
+        transition: transform 320ms var(--spring), width 200ms var(--spring-fast), height 200ms var(--spring-fast), background-color 280ms var(--emph);
+      }
+
+      &:checked {
+        background: var(--md-sys-color-primary);
+        border-color: var(--md-sys-color-primary);
+
+        &::before {
+          width: 24px;
+          height: 24px;
+          background: var(--md-sys-color-on-primary);
+          transform: translateY(-50%) translateX(22px);
+        }
+      }
+
+      &:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+        outline-offset: 1px;
+      }
+    }
+  }
+
+  // Stacked switch rows in the Notifications pane keep a little breathing
+  // room; the Appearance auto-fit switch sits inside the scale card, which
+  // already provides the padding.
+  .tab-container[aria-labelledby='preferences-tab-notifications'] .checkbox-component {
+    padding: 6px 0;
+  }
+
+  // --- Prompt confirmation cards (Prompts pane) ---------------------------
+  // v2 prototype (settings prompts pane): every prompt row is a filled
+  // surface card — 13px 16px padding, 16px radius — carrying a 20x20 M3
+  // checkbox (7px radius, primary fill, popping check) and a 13.5px title.
+  // Markup stays the stock <input type="checkbox"> + <label> pair.
   .tab-container[aria-labelledby='preferences-tab-prompts'] {
     .checkbox-component {
-      flex-direction: row-reverse;
-      justify-content: space-between;
       gap: 14px;
-      padding: 6px 0;
+      padding: 13px 16px;
+      border-radius: 16px;
+      background: var(--md-sys-color-surface);
+      transition: background-color 240ms var(--emph), transform 200ms var(--spring-fast);
+      animation: dmUp calc(420ms * var(--mdur, 1)) var(--spring) backwards;
+
+      // Staggered entrance, matching the prototype's per-row delays.
+      @for $i from 1 through 12 {
+        &:nth-child(#{$i}) {
+          animation-delay: #{($i - 1) * 40}ms;
+        }
+      }
+
+      &:not(:last-child) {
+        margin-bottom: 8px;
+      }
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-high);
+      }
+
+      &:active {
+        transform: scale(0.985);
+      }
 
       label {
-        margin: 0;
         flex: 1;
+        margin: 0;
+        font-size: 13.5px;
+        cursor: pointer;
       }
 
       input[type='checkbox'] {
         appearance: none;
         -webkit-appearance: none;
-        position: relative;
+        display: grid;
+        place-items: center;
         flex-shrink: 0;
-        width: 54px;
-        height: 32px;
+        box-sizing: border-box;
+        width: 20px;
+        height: 20px;
         margin: 0;
-        border-radius: 999px;
         border: 2px solid var(--md-sys-color-outline);
-        background: var(--md-sys-color-surface-container-high);
+        border-radius: 7px;
+        background: transparent;
         cursor: pointer;
-        transition: background-color 280ms var(--emph), border-color 280ms var(--emph);
+        transition: background-color 240ms var(--emph), border-color 240ms var(--emph);
 
+        // The check mark: two borders rotated into a tick, popping in with
+        // the spring curve exactly like the prototype's scaling glyph.
         &::before {
           content: '';
-          position: absolute;
-          top: 50%;
-          left: 3px;
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: var(--md-sys-color-outline);
-          transform: translateY(-50%);
-          transition: transform 320ms var(--spring), width 200ms var(--spring-fast), height 200ms var(--spring-fast), background-color 280ms var(--emph);
+          box-sizing: border-box;
+          width: 10px;
+          height: 6px;
+          margin-top: -2px;
+          border-left: 2px solid var(--md-sys-color-on-primary);
+          border-bottom: 2px solid var(--md-sys-color-on-primary);
+          opacity: 0;
+          transform: rotate(-45deg) scale(0);
+          transition: transform 300ms var(--spring-fast), opacity 140ms;
         }
 
         &:checked {
@@ -384,10 +481,8 @@
           border-color: var(--md-sys-color-primary);
 
           &::before {
-            width: 24px;
-            height: 24px;
-            background: var(--md-sys-color-on-primary);
-            transform: translateY(-50%) translateX(22px);
+            opacity: 1;
+            transform: rotate(-45deg) scale(1);
           }
         }
 
@@ -409,55 +504,80 @@
   }
 
   // --- Scale slider + auto-fit switch (Appearance) -----------------------
-  // A styled native range rendered as an MD3 slider. Track uses the surface
-  // variant, the active portion and thumb use the primary colour. No literal
-  // colours — tokens only.
+  // v2 prototype (settings appearance pane, "UI scale"): the slider row and
+  // the auto-fit switch share ONE filled surface card — 16px 18px padding,
+  // 18px radius — with zoom-out / zoom-in glyphs flanking the slider and a
+  // fixed 52px value readout. The unified M3 Expressive slider visuals come
+  // from the final `_material-controls.scss` cascade layer. Tokens only.
   .scaling-section {
     margin-bottom: var(--spacing-double);
+
+    .scaling-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: var(--md-sys-color-surface);
+      transition: background-color 480ms var(--emph);
+    }
 
     .scaling-slider-row {
       display: flex;
       align-items: center;
-      gap: var(--spacing);
-      margin-top: var(--spacing);
+      gap: 12px;
     }
 
-    // Fill the row; the unified M3 Expressive slider visuals come from the
-    // final `_material-controls.scss` cascade layer so every range control
-    // (appearance zoom, tab style, app identity) reads identically.
+    // Fill the row; the M3 slider treatment itself lives in
+    // `_material-controls.scss` so every range control reads identically.
     .scaling-slider {
       flex: 1;
+      min-width: 0;
+    }
+
+    .scaling-zoom-icon {
+      flex-shrink: 0;
+      color: var(--md-sys-color-on-surface-variant);
     }
 
     .scaling-value {
-      min-width: 48px;
+      width: 52px;
+      flex-shrink: 0;
       text-align: right;
+      font-family: var(--font-family-monospace);
+      font-size: 13px;
       font-weight: var(--font-weight-bold);
       color: var(--md-sys-color-on-surface);
       font-variant-numeric: tabular-nums;
     }
 
-    .scaling-ticks {
-      display: flex;
-      justify-content: space-between;
-      margin-top: var(--spacing-half);
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: var(--font-size-sm);
+    // The auto-fit switch row: bold title over a muted caption on the left,
+    // the 54x32 switch (styled by the shared selector above) on the right.
+    .checkbox-component.auto-fit-zoom {
+      padding: 0;
+
+      .auto-fit-zoom-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .auto-fit-zoom-title {
+        font-size: 13.5px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--md-sys-color-on-surface);
+      }
+
+      .auto-fit-zoom-caption {
+        font-size: 12px;
+        color: var(--md-sys-color-on-surface-variant);
+      }
     }
 
-    .auto-fit-zoom {
-      margin-top: var(--spacing);
-    }
-
-    .scaling-caption,
     .scaling-effective {
-      margin: var(--spacing-half) 0 0;
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: var(--font-size-sm);
-    }
-
-    .scaling-effective {
+      margin: 0;
       color: var(--md-sys-color-primary);
+      font-size: var(--font-size-sm);
     }
   }
 
@@ -1442,12 +1562,17 @@
     }
 
     .scaling-section .scaling-slider-row {
-      align-items: stretch;
       flex-wrap: wrap;
 
+      // Keep the zoom glyphs hugging the slider on the first line and let the
+      // 52px value readout wrap underneath, right-aligned.
       .scaling-slider {
-        flex-basis: calc(100% - 64px);
+        flex-basis: calc(100% - 100px);
         min-width: 0;
+      }
+
+      .scaling-value {
+        margin-left: auto;
       }
     }
 
