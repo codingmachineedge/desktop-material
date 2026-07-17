@@ -26,8 +26,11 @@ import {
   prepareRepositoryArchive,
   prepareRepositoryBundle,
   prepareRepositoryBundleVerification,
+  IRepositoryNoteRequest,
   prepareRepositoryContentSearch,
   prepareRepositoryFileBlame,
+  prepareRepositoryNoteRemoval,
+  prepareRepositoryNoteSave,
   RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
@@ -44,6 +47,8 @@ type RepositoryToolResultID =
   | 'bundle-verify'
   | 'file-blame'
   | 'content-search'
+  | 'notes-edit'
+  | 'notes-remove'
 
 /** Result-pane titles for guided operations that are not registry cards. */
 const CustomResultTitles: Record<
@@ -55,6 +60,8 @@ const CustomResultTitles: Record<
   'bundle-verify': 'Verify Git bundle',
   'file-blame': 'Line authorship',
   'content-search': 'Search tracked content',
+  'notes-edit': 'Save commit note',
+  'notes-remove': 'Remove commit note',
 }
 
 function findRepositoryToolOperation(
@@ -126,6 +133,11 @@ interface IRepositoryToolsState {
   readonly shallowHistoryBusy: boolean
   readonly searchActive: boolean
   readonly searchPattern: string
+  readonly searchRevision: string
+  readonly notesActive: boolean
+  readonly noteTarget: string
+  readonly noteMessage: string
+  readonly noteRequest: IRepositoryNoteRequest | null
 }
 
 let nextOperationSequence = 0
@@ -164,6 +176,11 @@ export class RepositoryTools extends React.Component<
       shallowHistoryBusy: false,
       searchActive: false,
       searchPattern: '',
+      searchRevision: '',
+      notesActive: false,
+      noteTarget: '',
+      noteMessage: '',
+      noteRequest: null,
     }
   }
 
@@ -194,6 +211,11 @@ export class RepositoryTools extends React.Component<
         shallowHistoryBusy: false,
         searchActive: false,
         searchPattern: '',
+        searchRevision: '',
+        notesActive: false,
+        noteTarget: '',
+        noteMessage: '',
+        noteRequest: null,
       })
     }
   }
@@ -310,6 +332,7 @@ export class RepositoryTools extends React.Component<
       resultOperation,
       confirmationOperation: null,
       archiveRequest: null,
+      noteRequest: null,
       completedArchivePath: null,
       status: 'starting',
       output: '',
@@ -454,7 +477,11 @@ export class RepositoryTools extends React.Component<
   }
 
   private closeContentSearch = () => {
-    this.setState({ searchActive: false, searchPattern: '' })
+    this.setState({
+      searchActive: false,
+      searchPattern: '',
+      searchRevision: '',
+    })
   }
 
   private onSearchPatternChanged = (
@@ -463,12 +490,21 @@ export class RepositoryTools extends React.Component<
     this.setState({ searchPattern: event.currentTarget.value })
   }
 
+  private onSearchRevisionChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.setState({ searchRevision: event.currentTarget.value })
+  }
+
   private runContentSearch = () => {
     if (this.isBusy() || !this.state.gitAvailable) {
       return
     }
     try {
-      const operation = prepareRepositoryContentSearch(this.state.searchPattern)
+      const operation = prepareRepositoryContentSearch(
+        this.state.searchPattern,
+        this.state.searchRevision
+      )
       void this.startCommand('content-search', operation, false)
     } catch (error) {
       this.setState({
@@ -483,6 +519,88 @@ export class RepositoryTools extends React.Component<
   private onSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     this.runContentSearch()
+  }
+
+  private openNoteEditor = () => {
+    this.setState({ notesActive: true, error: null })
+  }
+
+  private closeNoteEditor = () => {
+    this.setState({
+      notesActive: false,
+      noteTarget: '',
+      noteMessage: '',
+      noteRequest: null,
+    })
+  }
+
+  private onNoteTargetChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.setState({ noteTarget: event.currentTarget.value })
+  }
+
+  private onNoteMessageChanged = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    this.setState({ noteMessage: event.currentTarget.value })
+  }
+
+  private reviewNoteSave = () => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+    try {
+      const noteRequest = prepareRepositoryNoteSave(
+        this.state.noteTarget,
+        this.state.noteMessage
+      )
+      this.setState({ noteRequest, error: null }, () =>
+        this.confirmButton?.focus()
+      )
+    } catch (error) {
+      this.setState({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unable to prepare this commit note.',
+      })
+    }
+  }
+
+  private reviewNoteRemoval = () => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+    try {
+      const noteRequest = prepareRepositoryNoteRemoval(this.state.noteTarget)
+      this.setState({ noteRequest, error: null }, () =>
+        this.confirmButton?.focus()
+      )
+    } catch (error) {
+      this.setState({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unable to prepare this commit note removal.',
+      })
+    }
+  }
+
+  private onConfirmNote = () => {
+    const request = this.state.noteRequest
+    if (request === null) {
+      return
+    }
+    void this.startCommand(
+      request.action === 'save' ? 'notes-edit' : 'notes-remove',
+      request.operation,
+      true
+    )
+  }
+
+  private dismissNoteRequest = () => {
+    this.setState({ noteRequest: null })
   }
 
   private chooseBundleDestination = async () => {
@@ -946,6 +1064,18 @@ export class RepositoryTools extends React.Component<
                     placeholder="literal text, not a pattern"
                     onChange={this.onSearchPatternChanged}
                   />
+                  <label htmlFor="repository-tool-search-revision">
+                    At revision (optional)
+                  </label>
+                  <input
+                    id="repository-tool-search-revision"
+                    type="text"
+                    value={this.state.searchRevision}
+                    maxLength={1024}
+                    disabled={disabled}
+                    placeholder="branch, tag, HEAD, or commit ID"
+                    onChange={this.onSearchRevisionChanged}
+                  />
                 </form>
               )}
             </div>
@@ -969,8 +1099,125 @@ export class RepositoryTools extends React.Component<
               </Button>
             )}
           </article>
+          <article className="repository-tool-card">
+            <div>
+              <h3>Edit commit notes</h3>
+              <p>
+                Save, replace, or remove the Git note attached to one commit.
+                Notes annotate a commit without rewriting it.
+              </p>
+              {this.state.notesActive && (
+                <div className="repository-tool-search">
+                  <label htmlFor="repository-tool-note-target">Commit</label>
+                  <input
+                    id="repository-tool-note-target"
+                    type="text"
+                    value={this.state.noteTarget}
+                    maxLength={64}
+                    disabled={disabled}
+                    placeholder="HEAD or a commit ID"
+                    onChange={this.onNoteTargetChanged}
+                  />
+                  <label htmlFor="repository-tool-note-message">
+                    Note text
+                  </label>
+                  <textarea
+                    id="repository-tool-note-message"
+                    value={this.state.noteMessage}
+                    maxLength={1024}
+                    rows={3}
+                    disabled={disabled}
+                    placeholder="free-form note stored beside the commit"
+                    onChange={this.onNoteMessageChanged}
+                  />
+                </div>
+              )}
+            </div>
+            {this.state.notesActive ? (
+              <div className="repository-tool-controls">
+                <Button
+                  className="repository-tool-write-button"
+                  disabled={
+                    disabled ||
+                    this.state.noteTarget.trim().length === 0 ||
+                    this.state.noteMessage.trim().length === 0
+                  }
+                  onClick={this.reviewNoteSave}
+                >
+                  Review save
+                </Button>
+                <Button
+                  className="repository-tool-write-button"
+                  disabled={
+                    disabled || this.state.noteTarget.trim().length === 0
+                  }
+                  onClick={this.reviewNoteRemoval}
+                >
+                  Review removal
+                </Button>
+                <Button disabled={disabled} onClick={this.closeNoteEditor}>
+                  Close editor
+                </Button>
+              </div>
+            ) : (
+              <Button disabled={disabled} onClick={this.openNoteEditor}>
+                Start note editor
+              </Button>
+            )}
+          </article>
         </div>
       </section>
+    )
+  }
+
+  private renderNoteConfirmation() {
+    const request = this.state.noteRequest
+    if (request === null) {
+      return null
+    }
+    return (
+      <div
+        className="repository-tool-confirmation"
+        role="alertdialog"
+        aria-labelledby="repository-note-confirm-title"
+        aria-describedby="repository-note-confirm-description"
+      >
+        <strong id="repository-note-confirm-title">
+          {request.action === 'save'
+            ? 'Save this commit note?'
+            : 'Remove this commit note?'}
+        </strong>
+        <p id="repository-note-confirm-description">
+          Commit: <code>{request.oid}</code>
+        </p>
+        {request.message !== null ? (
+          <pre className="repository-note-confirm-message">
+            {request.message}
+          </pre>
+        ) : (
+          <p>
+            The note attached to this commit is deleted. The commit itself and
+            its history are not changed, and Git reports an error if the commit
+            has no note.
+          </p>
+        )}
+        {request.action === 'save' && (
+          <p>
+            An existing note on this commit is replaced. The commit itself and
+            its history are not changed.
+          </p>
+        )}
+        <div className="repository-tool-controls">
+          <Button
+            className="repository-tool-confirm-button"
+            onButtonRef={this.setConfirmButton}
+            onClick={this.onConfirmNote}
+          >
+            {request.action === 'save' ? 'Save note' : 'Remove note'}
+          </Button>
+          <Button onClick={this.dismissNoteRequest}>Go back</Button>
+        </div>
+      </div>
     )
   }
 
@@ -1068,6 +1315,7 @@ export class RepositoryTools extends React.Component<
           <aside className="repository-tools-results-column">
             {this.renderConfirmation()}
             {this.renderArchiveConfirmation()}
+            {this.renderNoteConfirmation()}
             {this.renderResults()}
           </aside>
         </div>

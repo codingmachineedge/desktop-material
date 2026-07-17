@@ -34,6 +34,8 @@ export {
   prepareRepositoryContentSearch,
   prepareRepositoryFetchRemoteInspection,
   prepareRepositoryFileBlame,
+  prepareRepositoryNoteRemoval,
+  prepareRepositoryNoteSave,
   prepareRepositoryHistoryDeepen,
   prepareRepositoryHistoryUnshallow,
   prepareRepositoryShallowStatusInspection,
@@ -42,6 +44,7 @@ export {
 export type {
   IRepositoryArchiveRequest,
   IRepositoryFileBlameRequest,
+  IRepositoryNoteRequest,
   IRepositoryPatchExportRequest,
   IRepositoryPatchImportRequest,
   IRepositoryBundleImportRequest,

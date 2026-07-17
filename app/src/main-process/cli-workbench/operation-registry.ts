@@ -328,6 +328,67 @@ function normalizeSearchPattern(value: unknown): string {
   return value
 }
 
+/**
+ * Accept one bounded branch, tag, HEAD, or object-ID revision name. Ranges,
+ * reflog selectors, path-spec separators, and option-shaped values are
+ * rejected instead of reaching Git's revision parser.
+ */
+function normalizeSearchRevision(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('Content search revision is invalid.')
+  }
+  if (value === 'HEAD' || /^[0-9a-f]{7,64}$/.test(value)) {
+    return value
+  }
+  if (
+    value.length === 0 ||
+    value.length > MaximumRefLength ||
+    value.startsWith('-') ||
+    value.startsWith('/') ||
+    value.endsWith('/') ||
+    value.endsWith('.') ||
+    value.endsWith('.lock') ||
+    value.includes('..') ||
+    value.includes('//') ||
+    value.includes('@{') ||
+    /[\x00-\x20\x7f~^:?*\[\\]/.test(value) ||
+    value.split('/').some(part => part.length === 0 || part.startsWith('.'))
+  ) {
+    throw new Error('Content search revision is invalid.')
+  }
+  return value
+}
+
+const MaximumNoteMessageLength = 1_024
+
+/** Accept HEAD or one bounded abbreviated/full commit object ID. */
+function normalizeNoteTarget(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    (value !== 'HEAD' && !/^[0-9a-fA-F]{7,64}$/.test(value))
+  ) {
+    throw new Error('Commit note target is invalid.')
+  }
+  return value === 'HEAD' ? value : value.toLowerCase()
+}
+
+/** Accept one bounded free-form note; newlines allowed, other controls not. */
+function normalizeNoteMessage(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('Commit note text is invalid.')
+  }
+  const normalized = value.replace(/\r\n?/g, '\n')
+  if (
+    normalized.trim().length === 0 ||
+    normalized.length > MaximumNoteMessageLength ||
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(normalized)
+  ) {
+    throw new Error('Commit note text is invalid.')
+  }
+  return normalized
+}
+
 function resolved(
   operation: CLIWorkbenchOperation,
   args: ReadonlyArray<string>,
@@ -509,12 +570,49 @@ export async function resolveCLIWorkbenchOperation(
       )
     }
     case 'content-search': {
+      if ('ref' in value) {
+        requireExactFields(value, ['id', 'pattern', 'ref'])
+        const pattern = normalizeSearchPattern(value.pattern)
+        const ref = normalizeSearchRevision(value.ref)
+        return resolved(
+          { id: value.id, pattern, ref },
+          [
+            'grep',
+            '--line-number',
+            '--fixed-strings',
+            '-e',
+            pattern,
+            ref,
+            '--',
+          ],
+          false
+        )
+      }
       requireExactFields(value, ['id', 'pattern'])
       const pattern = normalizeSearchPattern(value.pattern)
       return resolved(
         { id: value.id, pattern },
         ['grep', '--line-number', '--fixed-strings', '-e', pattern, '--'],
         false
+      )
+    }
+    case 'notes-edit': {
+      requireExactFields(value, ['id', 'oid', 'message'])
+      const oid = normalizeNoteTarget(value.oid)
+      const message = normalizeNoteMessage(value.message)
+      return resolved(
+        { id: value.id, oid, message },
+        ['notes', 'add', '--force', '-m', message, '--', oid],
+        true
+      )
+    }
+    case 'notes-remove': {
+      requireExactFields(value, ['id', 'oid'])
+      const oid = normalizeNoteTarget(value.oid)
+      return resolved(
+        { id: value.id, oid },
+        ['notes', 'remove', '--', oid],
+        true
       )
     }
     default:

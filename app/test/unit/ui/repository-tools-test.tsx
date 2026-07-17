@@ -134,6 +134,7 @@ describe('Repository tools', () => {
     assert.ok(screen.getByText('Find unreachable commits'))
     assert.ok(screen.getByText('Line authorship'))
     assert.ok(screen.getByText('Search tracked content'))
+    assert.ok(screen.getByText('Edit commit notes'))
     assert.ok(screen.getByText('Export repository artifacts'))
     assert.ok(screen.getByText('Import a branch from a Git bundle'))
     assert.equal(screen.queryByRole('searchbox'), null)
@@ -359,6 +360,121 @@ describe('Repository tools', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Close search' }))
     assert.equal(screen.queryByRole('textbox'), null)
+  })
+
+  it('scopes content search to one validated revision', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(client)
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Start content search' })
+    )
+    fireEvent.change(screen.getByLabelText('Search tracked files for'), {
+      target: { value: 'render()' },
+    })
+    fireEvent.change(screen.getByLabelText('At revision (optional)'), {
+      target: { value: 'release/2.0' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].operation, {
+      id: 'content-search',
+      pattern: 'render()',
+      ref: 'release/2.0',
+    })
+
+    client.emitState({
+      id: client.starts[0].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() =>
+      assert.match(
+        screen.getByRole('status').textContent ?? '',
+        /Status: completed/
+      )
+    )
+    fireEvent.change(screen.getByLabelText('At revision (optional)'), {
+      target: { value: 'main..dev' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await screen.findByText(
+      'Enter one branch, tag, HEAD, or commit ID without ranges or options.'
+    )
+    assert.equal(client.starts.length, 1)
+  })
+
+  it('saves and removes one commit note only after its own review', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(client)
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start note editor' }))
+    fireEvent.change(screen.getByLabelText('Commit'), {
+      target: { value: 'HEAD' },
+    })
+    fireEvent.change(screen.getByLabelText('Note text'), {
+      target: { value: 'Reviewed for release' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Review save' }))
+    assert.equal(client.starts.length, 0)
+
+    const saveDialog = screen.getByRole('alertdialog')
+    assert.match(saveDialog.textContent ?? '', /Save this commit note\?/)
+    assert.match(saveDialog.textContent ?? '', /Reviewed for release/)
+    fireEvent.click(screen.getByRole('button', { name: 'Save note' }))
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].operation, {
+      id: 'notes-edit',
+      oid: 'HEAD',
+      message: 'Reviewed for release',
+    })
+    assert.equal(client.starts[0].confirmed, true)
+    client.emitState({
+      id: client.starts[0].id,
+      state: 'completed',
+      exitCode: 0,
+      signal: null,
+    })
+    await waitFor(() =>
+      assert.match(
+        screen.getByRole('status').textContent ?? '',
+        /Status: completed/
+      )
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review removal' }))
+    const removeDialog = screen.getByRole('alertdialog')
+    assert.match(removeDialog.textContent ?? '', /Remove this commit note\?/)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove note' }))
+    await waitFor(() => assert.equal(client.starts.length, 2))
+    assert.deepStrictEqual(client.starts[1].operation, {
+      id: 'notes-remove',
+      oid: 'HEAD',
+    })
+    assert.equal(client.starts[1].confirmed, true)
+  })
+
+  it('rejects an invalid commit note target before review', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(client)
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start note editor' }))
+    fireEvent.change(screen.getByLabelText('Commit'), {
+      target: { value: 'not-a-sha' },
+    })
+    fireEvent.change(screen.getByLabelText('Note text'), {
+      target: { value: 'note' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Review save' }))
+    await screen.findByText(
+      'Enter HEAD or a commit ID of 7 to 64 hexadecimal characters.'
+    )
+    assert.equal(screen.queryByRole('alertdialog'), null)
+    assert.equal(client.starts.length, 0)
   })
 
   it('streams diagnostics into one buffer and cancels the exact run', async () => {

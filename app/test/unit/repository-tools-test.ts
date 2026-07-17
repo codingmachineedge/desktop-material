@@ -14,6 +14,8 @@ import {
   prepareRepositoryBundleVerification,
   prepareRepositoryContentSearch,
   prepareRepositoryFileBlame,
+  prepareRepositoryNoteRemoval,
+  prepareRepositoryNoteSave,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -150,6 +152,56 @@ describe('repository tool recipes', () => {
       'nul\0byte',
     ]) {
       assert.throws(() => prepareRepositoryContentSearch(pattern))
+    }
+  })
+
+  it('scopes content search to one validated revision', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryContentSearch('render()', ' release/2.0 '),
+      { id: 'content-search', pattern: 'render()', ref: 'release/2.0' }
+    )
+    assert.deepStrictEqual(prepareRepositoryContentSearch('render()', '  '), {
+      id: 'content-search',
+      pattern: 'render()',
+    })
+    for (const revision of [
+      '--all',
+      'main..dev',
+      'main@{1}',
+      'bad name',
+      'main:path',
+      '-rev',
+    ]) {
+      assert.throws(() => prepareRepositoryContentSearch('x', revision))
+    }
+  })
+
+  it('reviews commit note edits with a bounded target and message', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryNoteSave(' AbCdEf1 ', 'Reviewed for release\r\nQA ok'),
+      {
+        action: 'save',
+        oid: 'abcdef1',
+        message: 'Reviewed for release\nQA ok',
+        operation: {
+          id: 'notes-edit',
+          oid: 'abcdef1',
+          message: 'Reviewed for release\nQA ok',
+        },
+      }
+    )
+    assert.deepStrictEqual(prepareRepositoryNoteRemoval('HEAD'), {
+      action: 'remove',
+      oid: 'HEAD',
+      message: null,
+      operation: { id: 'notes-remove', oid: 'HEAD' },
+    })
+    for (const target of ['', 'HEAD~1', 'abc', 'not-a-sha', 'refs/notes']) {
+      assert.throws(() => prepareRepositoryNoteSave(target, 'note'))
+      assert.throws(() => prepareRepositoryNoteRemoval(target))
+    }
+    for (const message of ['', '   ', 'a'.repeat(1025), 'bell\x07']) {
+      assert.throws(() => prepareRepositoryNoteSave('HEAD', message))
     }
   })
 

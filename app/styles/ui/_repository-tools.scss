@@ -774,7 +774,8 @@
     overflow-wrap: anywhere;
   }
 
-  input {
+  input,
+  textarea {
     background: var(--md-sys-color-surface);
     border: 1px solid var(--md-sys-color-outline);
     border-radius: 8px;
@@ -791,6 +792,23 @@
       outline-offset: 2px;
     }
   }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+.repository-note-confirm-message {
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  font-size: 12px;
+  margin: 8px 0 0;
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  padding: 8px 9px;
+  white-space: pre-wrap;
 }
 
 .repository-tools-results-column {

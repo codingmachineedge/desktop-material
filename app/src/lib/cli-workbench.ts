@@ -75,7 +75,17 @@ export type CLIWorkbenchOperation =
     }
   | { readonly id: 'history-unshallow'; readonly remote: string }
   | { readonly id: 'file-blame'; readonly path: string }
-  | { readonly id: 'content-search'; readonly pattern: string }
+  | {
+      readonly id: 'content-search'
+      readonly pattern: string
+      readonly ref?: string
+    }
+  | {
+      readonly id: 'notes-edit'
+      readonly oid: string
+      readonly message: string
+    }
+  | { readonly id: 'notes-remove'; readonly oid: string }
 
 // Compatibility contracts for the older guided Repository Tools surfaces.
 // The main-process runner above still accepts only CLIWorkbenchOperation; these

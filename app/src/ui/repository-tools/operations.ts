@@ -793,10 +793,45 @@ export function prepareRepositoryFileBlame(
 }
 
 const MaximumContentSearchLength = 256
+const MaximumSearchRevisionLength = 1_024
 
-/** Accept one bounded single-line literal search text, never a Git option. */
+/**
+ * Mirror the main-process bound for one branch, tag, HEAD, or object-ID
+ * revision so a typo fails with guidance before the IPC boundary.
+ */
+function normalizeContentSearchRevision(revision: string): string {
+  const value = revision.trim()
+  if (value === 'HEAD' || /^[0-9a-f]{7,64}$/.test(value)) {
+    return value
+  }
+  if (
+    value.length === 0 ||
+    value.length > MaximumSearchRevisionLength ||
+    value.startsWith('-') ||
+    value.startsWith('/') ||
+    value.endsWith('/') ||
+    value.endsWith('.') ||
+    value.endsWith('.lock') ||
+    value.includes('..') ||
+    value.includes('//') ||
+    value.includes('@{') ||
+    /[\x00-\x20\x7f~^:?*\[\\]/.test(value) ||
+    value.split('/').some(part => part.length === 0 || part.startsWith('.'))
+  ) {
+    throw new Error(
+      'Enter one branch, tag, HEAD, or commit ID without ranges or options.'
+    )
+  }
+  return value
+}
+
+/**
+ * Accept one bounded single-line literal search text and an optional single
+ * revision, never a Git option, range, or pathspec.
+ */
 export function prepareRepositoryContentSearch(
-  pattern: string
+  pattern: string,
+  revision: string = ''
 ): CLIWorkbenchOperation {
   if (
     pattern.trim().length === 0 ||
@@ -808,5 +843,75 @@ export function prepareRepositoryContentSearch(
       `Enter search text of 1 to ${MaximumContentSearchLength} characters on one line.`
     )
   }
-  return { id: 'content-search', pattern }
+  if (revision.trim().length === 0) {
+    return { id: 'content-search', pattern }
+  }
+  return {
+    id: 'content-search',
+    pattern,
+    ref: normalizeContentSearchRevision(revision),
+  }
+}
+
+const MaximumNoteMessageLength = 1_024
+
+export type RepositoryNoteAction = 'save' | 'remove'
+
+export interface IRepositoryNoteRequest {
+  readonly action: RepositoryNoteAction
+  readonly oid: string
+  readonly message: string | null
+  readonly operation: CLIWorkbenchOperation
+}
+
+/** Accept HEAD or one bounded abbreviated/full commit object ID. */
+function normalizeNoteTarget(target: string): string {
+  const value = target.trim()
+  if (value === 'HEAD') {
+    return value
+  }
+  if (!/^[0-9a-fA-F]{7,64}$/.test(value)) {
+    throw new Error(
+      'Enter HEAD or a commit ID of 7 to 64 hexadecimal characters.'
+    )
+  }
+  return value.toLowerCase()
+}
+
+/** Build the reviewed recipe that saves or replaces one commit note. */
+export function prepareRepositoryNoteSave(
+  target: string,
+  message: string
+): IRepositoryNoteRequest {
+  const oid = normalizeNoteTarget(target)
+  const normalized = message.replace(/\r\n?/g, '\n')
+  if (
+    normalized.trim().length === 0 ||
+    normalized.length > MaximumNoteMessageLength ||
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(normalized)
+  ) {
+    throw new Error(
+      `Enter note text of 1 to ${MaximumNoteMessageLength} characters.`
+    )
+  }
+  return {
+    action: 'save',
+    oid,
+    message: normalized,
+    operation: { id: 'notes-edit', oid, message: normalized },
+  }
+}
+
+/** Build the reviewed recipe that removes the note from one commit. */
+export function prepareRepositoryNoteRemoval(
+  target: string
+): IRepositoryNoteRequest {
+  const oid = normalizeNoteTarget(target)
+  return {
+    action: 'remove',
+    oid,
+    message: null,
+    operation: { id: 'notes-remove', oid },
+  }
 }

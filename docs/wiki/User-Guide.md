@@ -797,9 +797,12 @@ list.
   status summary, repository health check, commit-signature audit, branch sync overview, contributor
   summary, nearest-tag version description, whitespace/conflict-marker audit, an ignored-files
   preview, and a commit-notes view. **Inspect and search** adds **Line authorship**, which shows the
-  commit, author, and date behind every line of one picked tracked file, and **Search tracked
-  content**, a bounded literal-text search across tracked files with file and line references — a
-  matchless search completes cleanly rather than reporting an error. Maintenance covers the
+  commit, author, and date behind every line of one picked tracked file; **Search tracked
+  content**, a bounded literal-text search across tracked files with file and line references that
+  can optionally be scoped to one branch, tag, HEAD, or commit ID — a matchless search completes
+  cleanly rather than reporting an error; and **Edit commit notes**, which saves, replaces, or
+  removes the free-form Git note on one commit only after a dedicated review step that shows the
+  exact commit and note text. Maintenance covers the
   maintenance preview and run, a fully-merged-branch audit, unreachable-object prune preview, and a
   two-step untracked cleanup: **Preview untracked cleanup** lists exactly what would be deleted, and
   **Remove untracked files** deletes it only after its own destructive confirmation (tracked and
