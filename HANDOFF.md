@@ -591,6 +591,11 @@ than claiming a deeper renderer state that was not exercised.
 | --- | ---: | ---: | --- |
 | `docs/assets/screenshots/material-post-merge-welcome.png` | 960×660 | 150,763 | `c0e5cd5e56fe0cc839446256a8439789229627bc932b91421b418377fcf68d5a` |
 
+> Provenance note (2026-07-17): this capture was later retired in the "one
+> screenshot per visual function" catalog dedup and is no longer tracked or
+> referenced. The row is retained as a historical receipt; the byte length and
+> SHA-256 describe the file as it existed at this checkpoint.
+
 The Pages publish layout was also assembled exactly under the owned run root.
 All 21 images loaded with nonzero natural dimensions. At 944×660 the document
 width was 929 with matching scroll/client widths and zero visible overflows. At
