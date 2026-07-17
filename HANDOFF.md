@@ -2,6 +2,14 @@
 
 ## Outcome
 
+urgent add to goal:
+
+make docker build actions, and fetch origin push origin pull origin and push and pull orin will change color background theme of that button to match the vibes
+
+also add option to auto build docker image or app when pulled new stuff
+
+and add a repository list font customization per repo that can be shown on repo list
+
 The complete **M0 through M19** Material and guided Git/GitHub roadmap is shipped
 on `main`; it turns audited capabilities into named, interactive app functions.
 The separately guarded expert GitHub API Explorer is contextualized by the
