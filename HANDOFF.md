@@ -96,6 +96,23 @@ Temp root was removed. A stale post-interaction HWND frame was rejected because
 its hash matched the pre-interaction frame; only current app-native pixels were
 promoted.
 
+### Publication checkpoint
+
+- Main implementation, documentation, verifier, and screenshots were committed
+  and pushed without force at
+  `67411a6bfaed2d411b35bd9e9026e487f23bc54a`.
+- Pages workflow `29552951424` completed successfully for that exact SHA. The
+  live Pages render referenced the bulk-action image, and both raw-main PNGs
+  returned 200 with their exact promoted byte lengths.
+- Build Installers workflow `29552951386` completed successfully for that exact
+  SHA; its Windows x64 installer job passed.
+- The separate wiki preserved its remote-only `Images/` directory and overlaid
+  only the four reviewed canonical Markdown files. Wiki `master` was committed
+  and pushed without force at
+  `5ac1ebfa3427fab7b3d49ebe2cea7ff010a715c5`; local, tracking, and direct remote
+  SHAs matched. Live Feature Gallery and User Guide renders contained the new
+  guidance, and the containment-checked temporary checkout was removed.
+
 ## 2026-07-16 GitHub API Explorer release
 
 The repository rail now includes a GitHub API Explorer contextualized by the
