@@ -39,7 +39,7 @@
       white-space: nowrap;
       cursor: pointer;
 
-      &:hover:not(:disabled) {
+      &:hover:not(:disabled):not([aria-disabled='true']) {
         background: var(--md-sys-color-surface-container-high);
       }
 
@@ -48,7 +48,11 @@
         outline-offset: 1px;
       }
 
-      &:disabled {
+      // Boundary buttons stay focusable (aria-disabled) so activating them
+      // never blurs focus to the document body; the loading state uses the
+      // real `disabled` attribute.
+      &:disabled,
+      &[aria-disabled='true'] {
         cursor: not-allowed;
         opacity: 0.5;
       }

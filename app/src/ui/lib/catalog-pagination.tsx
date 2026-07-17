@@ -36,15 +36,24 @@ interface ICatalogPaginationProps {
  * owner, which holds the page state.
  */
 export class CatalogPagination extends React.Component<ICatalogPaginationProps> {
+  /**
+   * Ignore activation of a boundary control. Boundary buttons use
+   * `aria-disabled` rather than the `disabled` attribute so activating the last
+   * page (which disables the very button that has focus) does not blur it to the
+   * document body — keyboard and assistive-technology users keep their place.
+   * A stray boundary click would otherwise re-clamp to the same page; guarding
+   * here also avoids a needless re-render.
+   */
+  private onNavClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.getAttribute('aria-disabled') === 'true') {
+      return
+    }
+    this.props.onPageChange(event)
+  }
+
   public render() {
-    const {
-      page,
-      navLabel,
-      pageSizeLabel,
-      pageSizeInputId,
-      onPageChange,
-      onPageSizeChange,
-    } = this.props
+    const { page, navLabel, pageSizeLabel, pageSizeInputId, onPageSizeChange } =
+      this.props
     const disabled = this.props.disabled === true
     return (
       <nav className="catalog-pagination" aria-label={navLabel}>
@@ -52,18 +61,20 @@ export class CatalogPagination extends React.Component<ICatalogPaginationProps> 
           <button
             type="button"
             data-page="1"
-            disabled={disabled || !page.hasPrevious}
+            disabled={disabled}
+            aria-disabled={disabled || !page.hasPrevious}
             aria-label="First page"
-            onClick={onPageChange}
+            onClick={this.onNavClick}
           >
             « First
           </button>
           <button
             type="button"
             data-page={page.page - 1}
-            disabled={disabled || !page.hasPrevious}
+            disabled={disabled}
+            aria-disabled={disabled || !page.hasPrevious}
             aria-label="Previous page"
-            onClick={onPageChange}
+            onClick={this.onNavClick}
           >
             ‹ Prev
           </button>
@@ -73,18 +84,20 @@ export class CatalogPagination extends React.Component<ICatalogPaginationProps> 
           <button
             type="button"
             data-page={page.page + 1}
-            disabled={disabled || !page.hasNext}
+            disabled={disabled}
+            aria-disabled={disabled || !page.hasNext}
             aria-label="Next page"
-            onClick={onPageChange}
+            onClick={this.onNavClick}
           >
             Next ›
           </button>
           <button
             type="button"
             data-page={page.pageCount}
-            disabled={disabled || !page.hasNext}
+            disabled={disabled}
+            aria-disabled={disabled || !page.hasNext}
             aria-label="Last page"
-            onClick={onPageChange}
+            onClick={this.onNavClick}
           >
             Last »
           </button>
