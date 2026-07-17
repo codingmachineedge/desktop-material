@@ -18,6 +18,7 @@ export type RepositoryToolOperationID =
   | 'clean-preview'
   | 'clean-run'
   | 'unreachable-commits'
+  | 'notes-view'
 
 export type RepositoryArchiveFormat = 'zip' | 'tar'
 
@@ -73,6 +74,8 @@ export type CLIWorkbenchOperation =
       readonly deepenBy: number
     }
   | { readonly id: 'history-unshallow'; readonly remote: string }
+  | { readonly id: 'file-blame'; readonly path: string }
+  | { readonly id: 'content-search'; readonly pattern: string }
 
 // Compatibility contracts for the older guided Repository Tools surfaces.
 // The main-process runner above still accepts only CLIWorkbenchOperation; these

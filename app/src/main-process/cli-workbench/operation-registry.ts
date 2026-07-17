@@ -12,6 +12,7 @@ const MaximumRemoteLength = 255
 const MaximumBranchLength = 1_000
 const MaximumRefLength = 1_024
 const MaximumDeepenCommitCount = 1_000_000
+const MaximumSearchPatternLength = 256
 
 export interface IResolvedCLIWorkbenchOperation {
   readonly operation: CLIWorkbenchOperation
@@ -102,6 +103,10 @@ const FixedRepositoryOperations: Readonly<
   },
   'unreachable-commits': {
     args: ['fsck', '--unreachable', '--no-reflogs', '--no-progress'],
+    requiresConfirmation: false,
+  },
+  'notes-view': {
+    args: ['log', '--notes', '--format=%h %s%n%N', '-50'],
     requiresConfirmation: false,
   },
 }
@@ -276,6 +281,53 @@ function normalizeDeepenCount(value: unknown): number {
   return value
 }
 
+/**
+ * Accept only a normalized repository-relative file path with forward-slash
+ * separators. Absolute, traversal, option-shaped, and .git-internal paths are
+ * rejected instead of being passed to Git.
+ */
+function normalizeRepositoryRelativePath(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MaximumPathLength ||
+    value.includes('\0') ||
+    value.includes('\\') ||
+    value.startsWith('-') ||
+    value.startsWith('/') ||
+    value.endsWith('/') ||
+    /^[A-Za-z]:/.test(value) ||
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x1f\x7f]/.test(value)
+  ) {
+    throw new Error('Repository file path is invalid.')
+  }
+  const segments = value.split('/')
+  if (
+    segments.some(
+      segment => segment.length === 0 || segment === '.' || segment === '..'
+    ) ||
+    segments[0].toLowerCase() === '.git'
+  ) {
+    throw new Error('Repository file path is invalid.')
+  }
+  return value
+}
+
+/** Accept one bounded single-line literal search text, never a Git option. */
+function normalizeSearchPattern(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MaximumSearchPatternLength ||
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x1f\x7f]/.test(value)
+  ) {
+    throw new Error('Content search text is invalid.')
+  }
+  return value
+}
+
 function resolved(
   operation: CLIWorkbenchOperation,
   args: ReadonlyArray<string>,
@@ -445,6 +497,24 @@ export async function resolveCLIWorkbenchOperation(
           remote,
         ],
         true
+      )
+    }
+    case 'file-blame': {
+      requireExactFields(value, ['id', 'path'])
+      const path = normalizeRepositoryRelativePath(value.path)
+      return resolved(
+        { id: value.id, path },
+        ['blame', '--date=short', '--', path],
+        false
+      )
+    }
+    case 'content-search': {
+      requireExactFields(value, ['id', 'pattern'])
+      const pattern = normalizeSearchPattern(value.pattern)
+      return resolved(
+        { id: value.id, pattern },
+        ['grep', '--line-number', '--fixed-strings', '-e', pattern, '--'],
+        false
       )
     }
     default:

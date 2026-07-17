@@ -91,7 +91,8 @@ function renderTools(
   revealArchive?: (path: string) => Promise<void>,
   chooseBundleDestination?: (defaultPath: string) => Promise<string | null>,
   chooseBundleToVerify?: () => Promise<string | null>,
-  chooseBundleToImport?: () => Promise<string | null>
+  chooseBundleToImport?: () => Promise<string | null>,
+  chooseFileToBlame?: () => Promise<string | null>
 ) {
   return render(
     <RepositoryTools
@@ -103,6 +104,7 @@ function renderTools(
       chooseBundleDestination={chooseBundleDestination}
       chooseBundleToVerify={chooseBundleToVerify}
       chooseBundleToImport={chooseBundleToImport}
+      chooseFileToBlame={chooseFileToBlame}
     />
   )
 }
@@ -127,8 +129,11 @@ describe('Repository tools', () => {
     assert.ok(screen.getByText('Preview unreachable object pruning'))
     assert.ok(screen.getByText('Preview untracked cleanup'))
     assert.ok(screen.getByText('Remove untracked files'))
+    assert.ok(screen.getByText('View commit notes'))
     assert.ok(screen.getByText('View recent ref movements'))
     assert.ok(screen.getByText('Find unreachable commits'))
+    assert.ok(screen.getByText('Line authorship'))
+    assert.ok(screen.getByText('Search tracked content'))
     assert.ok(screen.getByText('Export repository artifacts'))
     assert.ok(screen.getByText('Import a branch from a Git bundle'))
     assert.equal(screen.queryByRole('searchbox'), null)
@@ -279,6 +284,81 @@ describe('Repository tools', () => {
       signal: null,
     })
     await waitFor(() => assert.equal(refreshes, 1))
+  })
+
+  it('shows line authorship only for one contained picked file', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(
+      client,
+      async () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => join(uiRepositoryPath, 'src', 'lib', 'app.tsx')
+    )
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a file…' }))
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].operation, {
+      id: 'file-blame',
+      path: 'src/lib/app.tsx',
+    })
+    assert.equal(client.starts[0].confirmed, false)
+    assert.equal(screen.queryByRole('alertdialog'), null)
+  })
+
+  it('rejects a picked authorship file outside the repository', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(
+      client,
+      async () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => join(uiFixtureRoot, 'unrelated', 'outside.ts')
+    )
+    await screen.findByText('git version 2.55.0')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a file…' }))
+    await screen.findByText('Choose a file inside this repository.')
+    assert.equal(client.starts.length, 0)
+  })
+
+  it('searches tracked content and reports a matchless run as complete', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(client)
+    await screen.findByText('git version 2.55.0')
+
+    assert.equal(screen.queryByRole('textbox'), null)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Start content search' })
+    )
+    fireEvent.change(screen.getByLabelText('Search tracked files for'), {
+      target: { value: 'TODO: revisit' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => assert.equal(client.starts.length, 1))
+    assert.deepStrictEqual(client.starts[0].operation, {
+      id: 'content-search',
+      pattern: 'TODO: revisit',
+    })
+    assert.equal(client.starts[0].confirmed, false)
+
+    const id = client.starts[0].id
+    client.emitState({ id, state: 'running', exitCode: null, signal: null })
+    client.emitState({ id, state: 'failed', exitCode: 1, signal: null })
+    await screen.findByText('No tracked file contains the search text.')
+    assert.match(
+      screen.getByRole('status').textContent ?? '',
+      /Status: completed/
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }))
+    assert.equal(screen.queryByRole('textbox'), null)
   })
 
   it('streams diagnostics into one buffer and cancels the exact run', async () => {

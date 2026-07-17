@@ -31,7 +31,9 @@ export {
   prepareRepositoryBundleImport,
   prepareRepositoryBundleInspection,
   prepareRepositoryBundleVerification,
+  prepareRepositoryContentSearch,
   prepareRepositoryFetchRemoteInspection,
+  prepareRepositoryFileBlame,
   prepareRepositoryHistoryDeepen,
   prepareRepositoryHistoryUnshallow,
   prepareRepositoryShallowStatusInspection,
@@ -39,6 +41,7 @@ export {
 } from './operations'
 export type {
   IRepositoryArchiveRequest,
+  IRepositoryFileBlameRequest,
   IRepositoryPatchExportRequest,
   IRepositoryPatchImportRequest,
   IRepositoryBundleImportRequest,

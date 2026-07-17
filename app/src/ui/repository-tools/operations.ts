@@ -585,6 +585,19 @@ export const RepositoryToolOperations: ReadonlyArray<IRepositoryToolOperation> =
       requiresConfirmation: false,
     },
     {
+      id: 'notes-view',
+      title: 'View commit notes',
+      description:
+        'Inspect the latest 50 commits with any Git notes attached to them.',
+      category: 'Diagnostics',
+      mutatesRepository: false,
+      requiresConfirmation: false,
+      supportingDetails: [
+        'Notes are free-form annotations stored beside a commit without rewriting it.',
+        'A commit without notes shows only its ID and subject.',
+      ],
+    },
+    {
       id: 'maintenance-run',
       title: 'Run repository maintenance',
       description:
@@ -734,4 +747,66 @@ export function prepareRepositoryBundleVerification(
 ): CLIWorkbenchOperation {
   const normalizedPath = normalizeRepositoryBundlePath(bundlePath)
   return { id: 'bundle-verify', bundlePath: normalizedPath }
+}
+
+export interface IRepositoryFileBlameRequest {
+  readonly path: string
+  readonly operation: CLIWorkbenchOperation
+}
+
+/**
+ * Contain one picked absolute file to a repository-relative, forward-slash
+ * path for read-only line authorship. Files outside the repository, inside
+ * .git, or with option-shaped names are rejected instead of passed to Git.
+ */
+export function prepareRepositoryFileBlame(
+  repositoryPath: string,
+  filePath: string
+): IRepositoryFileBlameRequest {
+  if (
+    filePath.length === 0 ||
+    filePath.includes('\0') ||
+    !Path.isAbsolute(filePath)
+  ) {
+    throw new Error('Choose a file inside this repository.')
+  }
+  const relative = Path.relative(
+    Path.resolve(repositoryPath),
+    Path.resolve(filePath)
+  )
+  if (
+    relative.length === 0 ||
+    relative === '..' ||
+    relative.startsWith(`..${Path.sep}`) ||
+    Path.isAbsolute(relative)
+  ) {
+    throw new Error('Choose a file inside this repository.')
+  }
+  const normalized = relative.split(Path.sep).join('/')
+  if (normalized.split('/')[0].toLowerCase() === '.git') {
+    throw new Error('Line authorship cannot inspect files inside .git.')
+  }
+  if (normalized.startsWith('-')) {
+    throw new Error('Choose a file inside this repository.')
+  }
+  return { path: normalized, operation: { id: 'file-blame', path: normalized } }
+}
+
+const MaximumContentSearchLength = 256
+
+/** Accept one bounded single-line literal search text, never a Git option. */
+export function prepareRepositoryContentSearch(
+  pattern: string
+): CLIWorkbenchOperation {
+  if (
+    pattern.trim().length === 0 ||
+    pattern.length > MaximumContentSearchLength ||
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x1f\x7f]/.test(pattern)
+  ) {
+    throw new Error(
+      `Enter search text of 1 to ${MaximumContentSearchLength} characters on one line.`
+    )
+  }
+  return { id: 'content-search', pattern }
 }

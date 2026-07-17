@@ -26,6 +26,8 @@ import {
   prepareRepositoryArchive,
   prepareRepositoryBundle,
   prepareRepositoryBundleVerification,
+  prepareRepositoryContentSearch,
+  prepareRepositoryFileBlame,
   RepositoryArchiveFormat,
   RepositoryToolCategory,
   RepositoryToolID,
@@ -40,6 +42,26 @@ type RepositoryToolResultID =
   | 'archive-export'
   | 'bundle-export'
   | 'bundle-verify'
+  | 'file-blame'
+  | 'content-search'
+
+/** Result-pane titles for guided operations that are not registry cards. */
+const CustomResultTitles: Record<
+  Exclude<RepositoryToolResultID, RepositoryToolID>,
+  string
+> = {
+  'archive-export': 'Export repository archive',
+  'bundle-export': 'Export full-history Git bundle',
+  'bundle-verify': 'Verify Git bundle',
+  'file-blame': 'Line authorship',
+  'content-search': 'Search tracked content',
+}
+
+function findRepositoryToolOperation(
+  id: RepositoryToolResultID
+): IRepositoryToolOperation | null {
+  return RepositoryToolOperations.find(operation => operation.id === id) ?? null
+}
 
 export interface IRepositoryToolsClient {
   readonly getRuntime: () => Promise<ICLIWorkbenchRuntime>
@@ -74,6 +96,7 @@ export interface IRepositoryToolsProps {
   ) => Promise<string | null>
   readonly chooseBundleToVerify?: () => Promise<string | null>
   readonly chooseBundleToImport?: () => Promise<string | null>
+  readonly chooseFileToBlame?: () => Promise<string | null>
   readonly revealArchive?: (path: string) => Promise<void>
 }
 
@@ -101,6 +124,8 @@ interface IRepositoryToolsState {
   readonly error: string | null
   readonly bundleImportBusy: boolean
   readonly shallowHistoryBusy: boolean
+  readonly searchActive: boolean
+  readonly searchPattern: string
 }
 
 let nextOperationSequence = 0
@@ -137,6 +162,8 @@ export class RepositoryTools extends React.Component<
       error: null,
       bundleImportBusy: false,
       shallowHistoryBusy: false,
+      searchActive: false,
+      searchPattern: '',
     }
   }
 
@@ -165,6 +192,8 @@ export class RepositoryTools extends React.Component<
         error: null,
         bundleImportBusy: false,
         shallowHistoryBusy: false,
+        searchActive: false,
+        searchPattern: '',
       })
     }
   }
@@ -384,6 +413,78 @@ export class RepositoryTools extends React.Component<
     void this.chooseBundleToVerify()
   }
 
+  private chooseFileForBlame = async () => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+    try {
+      const filePath = this.props.chooseFileToBlame
+        ? await this.props.chooseFileToBlame()
+        : await showOpenDialog({
+            title: 'Show line authorship for a tracked file',
+            defaultPath: this.props.repositoryPath,
+            properties: ['openFile'],
+          })
+      if (filePath === null || !this.mounted) {
+        return
+      }
+      const request = prepareRepositoryFileBlame(
+        this.props.repositoryPath,
+        filePath
+      )
+      await this.startCommand('file-blame', request.operation, false)
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to prepare line authorship for this file.',
+        })
+      }
+    }
+  }
+
+  private onChooseFileForBlame = () => {
+    void this.chooseFileForBlame()
+  }
+
+  private openContentSearch = () => {
+    this.setState({ searchActive: true, error: null })
+  }
+
+  private closeContentSearch = () => {
+    this.setState({ searchActive: false, searchPattern: '' })
+  }
+
+  private onSearchPatternChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.setState({ searchPattern: event.currentTarget.value })
+  }
+
+  private runContentSearch = () => {
+    if (this.isBusy() || !this.state.gitAvailable) {
+      return
+    }
+    try {
+      const operation = prepareRepositoryContentSearch(this.state.searchPattern)
+      void this.startCommand('content-search', operation, false)
+    } catch (error) {
+      this.setState({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unable to prepare the content search.',
+      })
+    }
+  }
+
+  private onSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    this.runContentSearch()
+  }
+
   private chooseBundleDestination = async () => {
     if (this.isBusy() || !this.state.gitAvailable) {
       return
@@ -540,13 +641,18 @@ export class RepositoryTools extends React.Component<
     }
 
     const completedOperation = this.state.activeOperation
+    // Git grep reserves exit code 1 for a clean run with no matching line.
+    const searchedWithoutMatches =
+      completedOperation === 'content-search' &&
+      event.state === 'failed' &&
+      event.exitCode === 1 &&
+      event.error === undefined
+    const status = searchedWithoutMatches ? 'completed' : event.state
     const shouldRefresh =
-      event.state === 'completed' &&
+      status === 'completed' &&
       completedOperation !== null &&
-      completedOperation !== 'archive-export' &&
-      completedOperation !== 'bundle-export' &&
-      completedOperation !== 'bundle-verify' &&
-      getRepositoryToolOperation(completedOperation).mutatesRepository
+      findRepositoryToolOperation(completedOperation)?.mutatesRepository ===
+        true
     const archivePath =
       completedOperation === 'archive-export' ||
       completedOperation === 'bundle-export'
@@ -556,12 +662,14 @@ export class RepositoryTools extends React.Component<
     this.runId = null
     this.setState(state => ({
       activeOperation: null,
-      status: event.state,
-      error: event.error ?? null,
-      completedArchivePath: event.state === 'completed' ? archivePath : null,
+      status,
+      error: searchedWithoutMatches ? null : event.error ?? null,
+      completedArchivePath: status === 'completed' ? archivePath : null,
       output:
-        event.state === 'completed' && state.output.length === 0
-          ? archivePath === null
+        status === 'completed' && state.output.length === 0
+          ? searchedWithoutMatches
+            ? 'No tracked file contains the search text.'
+            : archivePath === null
             ? 'Completed successfully. Git reported no additional details.'
             : `Repository export completed: ${Path.basename(archivePath)}`
           : state.output,
@@ -789,15 +897,92 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderInspection() {
+    const disabled = this.isBusy() || !this.state.gitAvailable
+    return (
+      <section
+        className="repository-tools-category"
+        aria-labelledby="repository-tools-inspect-title"
+      >
+        <h2 id="repository-tools-inspect-title">Inspect and search</h2>
+        <div className="repository-tools-card-grid">
+          <article className="repository-tool-card">
+            <div>
+              <h3>Line authorship</h3>
+              <p>
+                See the commit, author, and date that last changed every line of
+                one tracked file.
+              </p>
+              <ul>
+                <li>Choose any tracked file inside this repository.</li>
+                <li>Read-only: no file or ref is changed.</li>
+              </ul>
+            </div>
+            <Button disabled={disabled} onClick={this.onChooseFileForBlame}>
+              Choose a file…
+            </Button>
+          </article>
+          <article className="repository-tool-card">
+            <div>
+              <h3>Search tracked content</h3>
+              <p>
+                Find literal text across every tracked file, with file and line
+                references. Untracked and ignored files are never searched.
+              </p>
+              {this.state.searchActive && (
+                <form
+                  className="repository-tool-search"
+                  onSubmit={this.onSearchSubmit}
+                >
+                  <label htmlFor="repository-tool-search-input">
+                    Search tracked files for
+                  </label>
+                  <input
+                    id="repository-tool-search-input"
+                    type="text"
+                    value={this.state.searchPattern}
+                    maxLength={256}
+                    disabled={disabled}
+                    placeholder="literal text, not a pattern"
+                    onChange={this.onSearchPatternChanged}
+                  />
+                </form>
+              )}
+            </div>
+            {this.state.searchActive ? (
+              <div className="repository-tool-controls">
+                <Button
+                  disabled={
+                    disabled || this.state.searchPattern.trim().length === 0
+                  }
+                  onClick={this.runContentSearch}
+                >
+                  Search
+                </Button>
+                <Button disabled={disabled} onClick={this.closeContentSearch}>
+                  Close search
+                </Button>
+              </div>
+            ) : (
+              <Button disabled={disabled} onClick={this.openContentSearch}>
+                Start content search
+              </Button>
+            )}
+          </article>
+        </div>
+      </section>
+    )
+  }
+
   private renderResults() {
-    const operation =
-      this.state.resultOperation === null
-        ? null
-        : this.state.resultOperation === 'archive-export' ||
-          this.state.resultOperation === 'bundle-export' ||
-          this.state.resultOperation === 'bundle-verify'
-        ? null
-        : getRepositoryToolOperation(this.state.resultOperation)
+    const resultOperation = this.state.resultOperation
+    const resultTitle =
+      resultOperation === null
+        ? 'Choose a repository tool'
+        : findRepositoryToolOperation(resultOperation)?.title ??
+          CustomResultTitles[
+            resultOperation as Exclude<RepositoryToolResultID, RepositoryToolID>
+          ]
     return (
       <section
         className="repository-tools-results"
@@ -806,17 +991,7 @@ export class RepositoryTools extends React.Component<
         <div className="repository-tools-results-heading">
           <div>
             <h2 id="repository-tools-results-title">Results</h2>
-            <span>
-              {this.state.resultOperation === 'archive-export' ||
-              this.state.resultOperation === 'bundle-export' ||
-              this.state.resultOperation === 'bundle-verify'
-                ? this.state.resultOperation === 'bundle-verify'
-                  ? 'Verify Git bundle'
-                  : this.state.resultOperation === 'bundle-export'
-                  ? 'Export full-history Git bundle'
-                  : 'Export repository archive'
-                : operation?.title ?? 'Choose a repository tool'}
-            </span>
+            <span>{resultTitle}</span>
           </div>
           <div className="repository-tool-controls">
             <Button
@@ -884,6 +1059,7 @@ export class RepositoryTools extends React.Component<
           <div className="repository-tools-functions">
             {this.renderShallowHistory()}
             {this.renderCategory('Diagnostics')}
+            {this.renderInspection()}
             {this.renderCategory('Maintenance')}
             {this.renderCategory('Recovery')}
             {this.renderExport()}

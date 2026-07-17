@@ -73,6 +73,7 @@ describe('CLI workbench operation registry', () => {
           'unreachable-commits',
           ['fsck', '--unreachable', '--no-reflogs', '--no-progress'],
         ],
+        ['notes-view', ['log', '--notes', '--format=%h %s%n%N', '-50']],
       ])
 
       for (const [id, args] of expected) {
@@ -215,6 +216,23 @@ describe('CLI workbench operation registry', () => {
           ],
           true,
         ],
+        [
+          { id: 'file-blame', path: 'app/src/ui/app.tsx' },
+          ['blame', '--date=short', '--', 'app/src/ui/app.tsx'],
+          false,
+        ],
+        [
+          { id: 'content-search', pattern: 'TODO: follow up' },
+          [
+            'grep',
+            '--line-number',
+            '--fixed-strings',
+            '-e',
+            'TODO: follow up',
+            '--',
+          ],
+          false,
+        ],
       ]
 
       for (const [operation, args, requiresConfirmation] of cases) {
@@ -252,6 +270,19 @@ describe('CLI workbench operation registry', () => {
         { id: 'clean-run', requiresConfirmation: false },
         { id: 'clean-run', args: ['clean', '-fdx'] },
         { id: 'clean-preview', paths: ['..'] },
+        { id: 'file-blame', path: '/absolute/file.ts' },
+        { id: 'file-blame', path: 'C:/absolute/file.ts' },
+        { id: 'file-blame', path: '../outside.ts' },
+        { id: 'file-blame', path: 'src/../../outside.ts' },
+        { id: 'file-blame', path: '.git/config' },
+        { id: 'file-blame', path: '-c=core.pager=payload' },
+        { id: 'file-blame', path: 'src\\main.ts' },
+        { id: 'file-blame', path: 'ok.ts', extra: true },
+        { id: 'content-search', pattern: '' },
+        { id: 'content-search', pattern: 'a'.repeat(257) },
+        { id: 'content-search', pattern: 'line\nbreak' },
+        { id: 'content-search', pattern: 'nul\0byte' },
+        { id: 'content-search', pattern: 42 },
         { id: 'history-deepen', remote: '--upload-pack=payload', deepenBy: 1 },
         { id: 'history-deepen', remote: 'origin', deepenBy: 0 },
         { id: 'history-deepen', remote: 'origin', deepenBy: 1_000_001 },

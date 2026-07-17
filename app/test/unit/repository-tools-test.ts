@@ -12,6 +12,8 @@ import {
   prepareRepositoryBundleImport,
   prepareRepositoryBundleInspection,
   prepareRepositoryBundleVerification,
+  prepareRepositoryContentSearch,
+  prepareRepositoryFileBlame,
   RepositoryToolOperations,
 } from '../../src/ui/repository-tools'
 import { RepositorySectionTab } from '../../src/lib/app-state'
@@ -44,6 +46,7 @@ describe('repository tool recipes', () => {
         'version-describe',
         'whitespace-audit',
         'ignored-files-view',
+        'notes-view',
         'maintenance-run',
         'merged-branch-audit',
         'prune-preview',
@@ -69,6 +72,7 @@ describe('repository tool recipes', () => {
       'version-describe',
       'whitespace-audit',
       'ignored-files-view',
+      'notes-view',
       'merged-branch-audit',
       'prune-preview',
       'clean-preview',
@@ -107,6 +111,46 @@ describe('repository tool recipes', () => {
     const preview = getRepositoryToolOperation('clean-preview')
     assert.equal(preview.mutatesRepository, false)
     assert.equal(preview.requiresConfirmation, false)
+  })
+
+  it('contains line authorship to repository-relative tracked paths', () => {
+    assert.deepStrictEqual(
+      prepareRepositoryFileBlame(
+        repositoryPath,
+        join(repositoryPath, 'src', 'lib', 'app.ts')
+      ),
+      {
+        path: 'src/lib/app.ts',
+        operation: { id: 'file-blame', path: 'src/lib/app.ts' },
+      }
+    )
+    for (const path of [
+      '',
+      'relative/file.ts',
+      repositoryPath,
+      join(repositoryPath, '..', 'outside.ts'),
+      join(repositoryPath, '.git', 'config'),
+      join(fixtureRoot, 'unrelated', 'file.ts'),
+    ]) {
+      assert.throws(() => prepareRepositoryFileBlame(repositoryPath, path))
+    }
+  })
+
+  it('bounds content search to one line of literal text', () => {
+    assert.deepStrictEqual(prepareRepositoryContentSearch('TODO: revisit'), {
+      id: 'content-search',
+      pattern: 'TODO: revisit',
+    })
+    for (const pattern of [
+      '',
+      '   ',
+      'a'.repeat(257),
+      'line\nbreak',
+      'tab\tstop',
+      'nul\0byte',
+    ]) {
+      assert.throws(() => prepareRepositoryContentSearch(pattern))
+    }
   })
 
   it('prepares only contained ZIP and TAR exports from HEAD', () => {
