@@ -112,6 +112,20 @@ interface IPushPullButtonProps {
 
 type ActionInProgress = 'push' | 'pull' | 'fetch' | 'force push'
 
+/**
+ * The visual state of the sync pill. Each state maps to a
+ * `push-pull-button--<state>` modifier class so the pill background can
+ * follow the action it offers (see the sync-pill vibes in _material-shell).
+ */
+type SyncPillState =
+  | 'fetch'
+  | 'pull'
+  | 'push'
+  | 'publish'
+  | 'force-push'
+  | 'progress'
+  | 'detached'
+
 interface IPushPullButtonState {
   readonly screenReaderStateMessage: string | null
   readonly actionInProgress: ActionInProgress | null
@@ -243,21 +257,32 @@ export class PushPullButton extends React.Component<
     this.setState({ screenReaderStateMessage, actionInProgress })
   }
 
-  /** The common props for all button states */
-  private defaultButtonProps() {
+  /**
+   * The common props for all button states. The state modifier class themes
+   * the pill background to match the action it offers ("the vibes"); both
+   * fetch paths (unborn tip and up-to-date branch) share the same modifier.
+   */
+  private defaultButtonProps(state: SyncPillState) {
     return {
-      className: 'push-pull-button',
+      className: classNames('push-pull-button', `push-pull-button--${state}`),
       style: ToolbarButtonStyle.Subtitle,
     }
   }
 
-  /** The common props for all dropdown states */
-  private defaultDropdownProps(): Omit<
-    IToolbarDropdownProps,
-    'dropdownContentRenderer'
-  > {
+  /**
+   * The common props for all dropdown states. The split-button pill paints
+   * its background on the outer `.toolbar-dropdown` wrapper, so the state
+   * modifier is applied there as well as on the inner button.
+   */
+  private defaultDropdownProps(
+    state: SyncPillState
+  ): Omit<IToolbarDropdownProps, 'dropdownContentRenderer'> {
     return {
-      buttonClassName: 'push-pull-button',
+      className: `push-pull-button--${state}`,
+      buttonClassName: classNames(
+        'push-pull-button',
+        `push-pull-button--${state}`
+      ),
       style: ToolbarButtonStyle.Subtitle,
       dropdownStyle: ToolbarDropdownStyle.MultiOption,
       ariaLabel: 'Push, pull, fetch options',
@@ -512,7 +537,7 @@ export class PushPullButton extends React.Component<
   private progressButton(progress: Progress, networkActionInProgress: boolean) {
     return (
       <ToolbarButton
-        {...this.defaultButtonProps()}
+        {...this.defaultButtonProps('progress')}
         title={progress.title}
         description={progress.description || 'Hang on…'}
         progressValue={progress.value}
@@ -527,12 +552,10 @@ export class PushPullButton extends React.Component<
   private publishRepositoryButton(onClick: () => void) {
     return (
       <ToolbarButton
-        {...this.defaultButtonProps()}
+        {...this.defaultButtonProps('publish')}
         title="Publish repository"
         description="Publish this repository to GitHub"
-        className="push-pull-button"
         icon={octicons.upload}
-        style={ToolbarButtonStyle.Subtitle}
         onClick={onClick}
       />
     )
@@ -545,7 +568,7 @@ export class PushPullButton extends React.Component<
 
     return (
       <ToolbarButton
-        {...this.defaultButtonProps()}
+        {...this.defaultButtonProps('detached')}
         title="Publish branch"
         description={description}
         icon={octicons.upload}
@@ -564,7 +587,7 @@ export class PushPullButton extends React.Component<
       : 'Publish this branch to the remote'
 
     const className = classNames(
-      this.defaultDropdownProps().className,
+      this.defaultDropdownProps('publish').className,
       'nudge-arrow',
       {
         'nudge-arrow-up': shouldNudge,
@@ -573,7 +596,7 @@ export class PushPullButton extends React.Component<
 
     return (
       <ToolbarDropdown
-        {...this.defaultDropdownProps()}
+        {...this.defaultDropdownProps('publish')}
         title="Publish branch"
         description={description}
         icon={octicons.upload}
@@ -594,7 +617,7 @@ export class PushPullButton extends React.Component<
     const title = `Fetch ${remoteName}`
     return (
       <ToolbarButton
-        {...this.defaultButtonProps()}
+        {...this.defaultButtonProps('fetch')}
         title={title}
         description={renderLastFetched(lastFetched)}
         icon={syncClockwise}
@@ -624,7 +647,7 @@ export class PushPullButton extends React.Component<
 
     return (
       <ToolbarDropdown
-        {...this.defaultDropdownProps()}
+        {...this.defaultDropdownProps('pull')}
         title={title}
         description={renderLastFetched(lastFetched)}
         icon={octicons.arrowDown}
@@ -649,7 +672,7 @@ export class PushPullButton extends React.Component<
   ) {
     return (
       <ToolbarDropdown
-        {...this.defaultDropdownProps()}
+        {...this.defaultDropdownProps('push')}
         title={`Push ${remoteName}`}
         description={renderLastFetched(lastFetched)}
         icon={octicons.arrowUp}
@@ -672,7 +695,7 @@ export class PushPullButton extends React.Component<
   ) {
     return (
       <ToolbarDropdown
-        {...this.defaultDropdownProps()}
+        {...this.defaultDropdownProps('force-push')}
         title={`Force push ${remoteName}`}
         description={renderLastFetched(lastFetched)}
         icon={forcePushIcon}

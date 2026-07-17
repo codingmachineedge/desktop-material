@@ -124,6 +124,56 @@ describe('appearance customization', () => {
     assert.equal(resolved.tabWidth, 'compact')
   })
 
+  it('validates repository list-name typography before it can reach a row', () => {
+    const overrides = parseRepositoryAppearanceOverrides(
+      JSON.stringify({
+        version: 1,
+        listNameStyle: {
+          fontFamily: 'Georgia',
+          fontSize: 200,
+          bold: true,
+          color: 'url(javascript:bad)',
+          textCase: 'uppercase',
+          futureKey: 'kept-for-forward-compat',
+        },
+      })
+    )
+
+    // Known fields validate independently: the size clamps to the list row's
+    // own maximum, the unsafe color drops, and unknown newer keys survive
+    // round-tripping.
+    assert.equal(overrides.listNameStyle?.fontFamily, 'Georgia')
+    assert.equal(overrides.listNameStyle?.fontSize, 18)
+    assert.equal(overrides.listNameStyle?.bold, true)
+    assert.equal(overrides.listNameStyle?.color, undefined)
+    assert.equal(overrides.listNameStyle?.textCase, 'uppercase')
+    assert.equal(overrides.listNameStyle?.futureKey, 'kept-for-forward-compat')
+  })
+
+  it('drops empty or malformed list-name typography overrides', () => {
+    assert.deepEqual(
+      parseRepositoryAppearanceOverrides(
+        JSON.stringify({ version: 1, listNameStyle: 'Comic Sans' })
+      ),
+      {}
+    )
+    assert.deepEqual(
+      parseRepositoryAppearanceOverrides(
+        JSON.stringify({ version: 1, listNameStyle: {} })
+      ),
+      {}
+    )
+    assert.deepEqual(
+      parseRepositoryAppearanceOverrides(
+        JSON.stringify({
+          version: 1,
+          listNameStyle: { fontFamily: 'javascript:alert(1)' },
+        })
+      ),
+      {}
+    )
+  })
+
   it('normalizes a local vector logo while keeping it repository-only', () => {
     const overrides = parseRepositoryAppearanceOverrides(
       JSON.stringify({

@@ -2,14 +2,6 @@
 
 ## Outcome
 
-urgent add to goal:
-
-make docker build actions, and fetch origin push origin pull origin and push and pull orin will change color background theme of that button to match the vibes
-
-also add option to auto build docker image or app when pulled new stuff
-
-and add a repository list font customization per repo that can be shown on repo list
-
 The complete **M0 through M19** Material and guided Git/GitHub roadmap is shipped
 on `main`; it turns audited capabilities into named, interactive app functions.
 The separately guarded expert GitHub API Explorer is contextualized by the
@@ -35,6 +27,73 @@ The current Pages source, README, and in-repository wiki sources are on `main`.
 Pages deployment remains subject to the protected reviewed `main` promotion
 path; historical branch-only publication receipts below are retained as
 provenance rather than current status.
+
+## 2026-07-17 Docker builds, sync-pill vibes, auto-build-on-pull, and list typography
+
+The three urgent goals previously recorded at the top of this handoff are
+implemented on `claude/handoff-md-implementation-3b529c`:
+
+- **Docker build actions.** Build & Run detects `Dockerfile` and Docker
+  Compose (`docker-compose.yml`/`.yaml`, `compose.yml`/`.yaml`) projects as a
+  first-class `docker` ecosystem with argv-encoded `docker build .`,
+  `docker compose build`, and `docker compose up` stages, a `docker --version`
+  toolchain probe, nested-directory manifest markers, and stable
+  `docker:image` / `docker:compose` profile ids (compose outranks the plain
+  image build when both exist). Docker deliberately does not suppress the
+  generic Make fallback — a Dockerfile packages a project without replacing
+  its native build — and stays out of the winget auto-install path.
+- **Sync-pill vibes.** Every push/pull toolbar state now carries a
+  `push-pull-button--<state>` modifier on both pill shapes (single-button and
+  split-button, whose backgrounds live on different DOM nodes), themed through
+  new `--dm-sync-*` background/on-color token pairs: neutral fetch, secondary
+  container pull, primary container push, green publish, and error-container
+  force push, whose ahead/behind badge and disclosure chevron also adopt the
+  error family. The aliases are declared on `body` — not `:root` — so dark
+  theme, curated accent palettes, and the neutral surface variant all flow
+  through the var() substitution; publish gained a dedicated
+  `--dm-green-on-container` tone that passes AA on the 0.75-opacity
+  description line.
+- **Auto build after pull.** A per-repository, default-off Build & Run
+  preference `autoBuildOnPull` ("Build after pulling new commits") starts the
+  selected profile only when an interactive pull actually moves the branch tip
+  to a new commit, no build-run is already in flight, and both tips are valid
+  branches — decided by the pure, tested `shouldAutoBuildAfterPull` helper.
+  Build problems never surface as pull failures. The preference participates
+  in the repository equality hash so saving the checkbox takes effect
+  immediately, the post-pull read re-resolves the live repository instance
+  (the pull can swap in a refreshed instance whose state is keyed by a new
+  hash), and the localhost agent API's `pull` command passes
+  `autoBuild: false` so a remote command can never spawn build or run
+  processes as a side effect.
+- **Repository-list fonts.** Repository appearance overrides gained a
+  validated `listNameStyle` Word-style typography field — curated font
+  family, size clamped to the row-safe `MaxListNameFontSize` (18px),
+  bold/italic, and the rest of the tab title-style model — stored beside the
+  logo in the repository's local `desktop-material.appearance` Git config,
+  resolved and LRU-cached through the shared bounded logo loader in one
+  config read, applied to the list row's name through `tabTitleStyleToCss`,
+  and edited in Repository Settings → Appearance with a live preview that
+  reproduces the row's real base typography.
+
+A three-dimension adversarial review (correctness, security/invariants, and
+UI/style consistency, with every finding independently re-verified against
+the code) confirmed nine defects, all fixed before commit: the
+stale-preference equality hash, agent-surface auto-build exposure, the
+light-theme accent freeze of `:root`-declared aliases, the 32px-size versus
+29px-row mismatch, publish description contrast, the force-push badge color
+mismatch, the misleading typography preview baseline, the stale post-pull tip
+read after a mid-pull repository refresh, and docker suppressing make.
+
+Local verification in this checkout: 105 focused tests across the build-run,
+appearance, and style-contract suites pass, including 11 Docker detection
+cases, 9 auto-build decision cases, the new typography validation cases, and
+a new sync-pill style contract; repository-wide `tsc --noEmit` introduces
+zero new errors against the pre-change baseline; changed-file Prettier and
+repository-rule ESLint are clean. The loader, list-row, and Git-config
+round-trip suites were extended for the new appearance payload but cannot
+execute in this checkout because it lacks the `dugite`/`@testing-library`
+dependencies; they run in CI. No production build or headless UI gate was run
+for this wave.
 
 ## 2026-07-17 recovery, custom logos, app functions, and responsive completion
 

@@ -28,6 +28,7 @@ export type BuildRunEcosystem =
   | 'zig'
   | 'make'
   | 'cmake'
+  | 'docker'
 
 /** The three sequential stages a plan may contain. */
 export type BuildStageKind = 'install' | 'build' | 'run'

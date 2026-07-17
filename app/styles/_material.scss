@@ -47,6 +47,7 @@
   // App-specific accent + diff tokens (light).
   --dm-green: #1b7f37;
   --dm-green-container: #d2f2d8;
+  --dm-green-on-container: #0b3d1c;
   --dm-amber: #9a6700;
   --dm-amber-container: #ffe9b8;
   --diff-add-bg: #e9f5ea;
@@ -106,6 +107,23 @@
   --font-size-md: 16px;
 }
 
+// Sync-pill state tokens ("vibes"): each push/pull button state pairs a tonal
+// background with its on-color. Declared on body (not :root) so the var()
+// aliases substitute against the same element the theme, accent, and surface
+// palette overrides are declared on, letting every variant flow through.
+body {
+  --dm-sync-fetch-bg: var(--md-sys-color-surface-container-high);
+  --dm-sync-fetch-on: var(--md-sys-color-on-surface);
+  --dm-sync-pull-bg: var(--md-sys-color-secondary-container);
+  --dm-sync-pull-on: var(--md-sys-color-on-secondary-container);
+  --dm-sync-push-bg: var(--md-sys-color-primary-container);
+  --dm-sync-push-on: var(--md-sys-color-on-primary-container);
+  --dm-sync-publish-bg: var(--dm-green-container);
+  --dm-sync-publish-on: var(--dm-green-on-container);
+  --dm-sync-force-push-bg: var(--md-sys-color-error-container);
+  --dm-sync-force-push-on: var(--md-sys-color-on-error-container);
+}
+
 body.theme-dark {
   --md-sys-color-primary: #8dcdff;
   --md-sys-color-on-primary: #00344f;
@@ -135,6 +153,7 @@ body.theme-dark {
   // App-specific accent + diff tokens (dark).
   --dm-green: #57ab5a;
   --dm-green-container: #113a1b;
+  --dm-green-on-container: #b9f0c0;
   --dm-amber: #d8a739;
   --dm-amber-container: #3d2e00;
   --diff-add-bg: #12261a;
@@ -143,6 +162,20 @@ body.theme-dark {
   --diff-del-gutter: #46201b;
   --diff-hunk-bg: #16242f;
   --diff-hunk-text: #8ab4d8;
+
+  // Sync-pill state tokens ("vibes", dark). Re-declared so the aliases
+  // substitute against the dark role values, matching the convention of the
+  // legacy alias remaps below.
+  --dm-sync-fetch-bg: var(--md-sys-color-surface-container-high);
+  --dm-sync-fetch-on: var(--md-sys-color-on-surface);
+  --dm-sync-pull-bg: var(--md-sys-color-secondary-container);
+  --dm-sync-pull-on: var(--md-sys-color-on-secondary-container);
+  --dm-sync-push-bg: var(--md-sys-color-primary-container);
+  --dm-sync-push-on: var(--md-sys-color-on-primary-container);
+  --dm-sync-publish-bg: var(--dm-green-container);
+  --dm-sync-publish-on: var(--dm-green-on-container);
+  --dm-sync-force-push-bg: var(--md-sys-color-error-container);
+  --dm-sync-force-push-on: var(--md-sys-color-on-error-container);
 
   --text-color: var(--md-sys-color-on-surface);
   --text-secondary-color: var(--md-sys-color-on-surface-variant);

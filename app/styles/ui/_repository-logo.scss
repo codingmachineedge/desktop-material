@@ -49,6 +49,16 @@
     min-width: 0;
     width: 100%;
   }
+
+  // The preview reproduces the repository-list row's base typography (side
+  // sheet rows render the name semibold at the body size on on-surface), so
+  // the inline override shifts it exactly as it shifts the real row.
+  p.repository-list-name-preview {
+    @include ellipsis;
+    color: var(--md-sys-color-on-surface);
+    font-size: var(--font-size);
+    font-weight: var(--font-weight-semibold);
+  }
 }
 
 .repository-logo-studio {

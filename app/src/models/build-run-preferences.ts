@@ -26,6 +26,14 @@ export interface IBuildRunPreferences {
   readonly autoInstallMissingTools?: boolean
 
   /**
+   * Start the selected Build & Run profile (e.g. a Docker image or app build)
+   * automatically after an interactive pull that brought new commits. Optional
+   * for back-compat with preferences persisted before this field existed;
+   * treat an absent value as disabled (see {@link defaultBuildRunPreferences}).
+   */
+  readonly autoBuildOnPull?: boolean
+
+  /**
    * Per-profile command-line overrides. A blank / absent value for a stage
    * means "use the detected command". Stored as raw command-line strings; the
    * dispatcher tokenises them into an argv array (never a shell string).
@@ -45,4 +53,5 @@ export const defaultBuildRunPreferences: IBuildRunPreferences = {
   autoRunAfterBuild: true,
   autoIgnoreBuildOutputs: true,
   autoInstallMissingTools: true,
+  autoBuildOnPull: false,
 }

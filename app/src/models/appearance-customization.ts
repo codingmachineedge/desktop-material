@@ -9,6 +9,7 @@ import {
   normalizeRepositoryLogoDesign,
   RepositoryLogoDesignVersion,
 } from './repository-logo'
+import { ITabTitleStyle, normalizeTabTitleStyle } from './repository-tab'
 
 /** The persisted appearance schema version. */
 export const AppearanceCustomizationVersion = 1 as const
@@ -62,7 +63,20 @@ export interface IRepositoryAppearanceOverrides {
   readonly tabDensity?: DensityPreference
   readonly tabWidth?: TabWidthPreference
   readonly repositoryLogo?: IRepositoryLogoDesign
+  /**
+   * Word-style typography for this repository's name in the repository list.
+   * Reuses the validated tab title-style model, so untrusted values can never
+   * reach an inline style unchecked. Absent means the default list styling.
+   */
+  readonly listNameStyle?: ITabTitleStyle
 }
+
+/**
+ * The largest list-name font size the fixed-height repository-list row can
+ * render without clipping. Tighter than the tab model's own maximum; both the
+ * normalizer and the settings picker derive from this single value.
+ */
+export const MaxListNameFontSize = 18
 
 export const DefaultAppearanceCustomization: IAppearanceCustomization = {
   version: AppearanceCustomizationVersion,
@@ -238,6 +252,7 @@ export function normalizeRepositoryAppearanceOverrides(
     tabDensity?: DensityPreference
     tabWidth?: TabWidthPreference
     repositoryLogo?: IRepositoryLogoDesign
+    listNameStyle?: ITabTitleStyle
   } = {}
 
   if (isOneOf(value.accentPalette, accentPalettes)) {
@@ -265,6 +280,16 @@ export function normalizeRepositoryAppearanceOverrides(
     overrides.repositoryLogo = normalizeRepositoryLogoDesign(
       value.repositoryLogo
     )
+  }
+  if (isRecord(value.listNameStyle)) {
+    const listNameStyle = normalizeTabTitleStyle(value.listNameStyle)
+    if (listNameStyle !== null) {
+      overrides.listNameStyle =
+        typeof listNameStyle.fontSize === 'number' &&
+        listNameStyle.fontSize > MaxListNameFontSize
+          ? { ...listNameStyle, fontSize: MaxListNameFontSize }
+          : listNameStyle
+    }
   }
 
   return overrides

@@ -9,6 +9,7 @@ import {
   parseRepositoryAppearanceOverrides,
 } from '../models/appearance-customization'
 import { IRepositoryLogoDesign } from '../models/repository-logo'
+import { ITabTitleStyle } from '../models/repository-tab'
 import { getConfigValue, setConfigValue } from './git/config'
 import { pathExists } from './path-exists'
 
@@ -88,14 +89,36 @@ export async function setRepositoryAppearanceOverrides(
   return normalized
 }
 
+/**
+ * The repository-scoped appearance a list row or tab actually renders:
+ * the resolved logo plus the optional validated list-name typography.
+ */
+export interface IResolvedRepositoryAppearance {
+  readonly logo: IRepositoryLogoDesign
+  readonly listNameStyle: ITabTitleStyle | null
+}
+
+/**
+ * Resolve the profile default and local repository overrides in one bounded
+ * Git-config read, without sharing anything with collaborators.
+ */
+export async function getResolvedRepositoryAppearance(
+  repository: Repository
+): Promise<IResolvedRepositoryAppearance> {
+  const profileLogo = getAppearanceCustomization().repositoryLogo
+  if (!(await pathExists(repository.path))) {
+    return { logo: profileLogo, listNameStyle: null }
+  }
+  const overrides = await getRepositoryAppearanceOverrides(repository)
+  return {
+    logo: overrides.repositoryLogo ?? profileLogo,
+    listNameStyle: overrides.listNameStyle ?? null,
+  }
+}
+
 /** Resolve the profile default and local repository logo without sharing it. */
 export async function getResolvedRepositoryLogo(
   repository: Repository
 ): Promise<IRepositoryLogoDesign> {
-  const profileLogo = getAppearanceCustomization().repositoryLogo
-  if (!(await pathExists(repository.path))) {
-    return profileLogo
-  }
-  const overrides = await getRepositoryAppearanceOverrides(repository)
-  return overrides.repositoryLogo ?? profileLogo
+  return (await getResolvedRepositoryAppearance(repository)).logo
 }

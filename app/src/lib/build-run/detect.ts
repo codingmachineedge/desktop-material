@@ -102,6 +102,11 @@ const MANIFEST_MARKERS = [
   'main.py',
   'app.py',
   'manage.py',
+  'Dockerfile',
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
 ]
 
 /** Penalty applied to any profile discovered below the repository root. */
@@ -1124,6 +1129,75 @@ const detectMake: Detector = probe => {
   }
 }
 
+// ── Docker ──────────────────────────────────────────────────────────────────
+
+const COMPOSE_FILES = [
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
+]
+
+const dockerToolchainCheck: IToolchainCheck = {
+  cmd: cmd('docker', ['--version']),
+  missingHint:
+    'docker was not found on your PATH. Install Docker Desktop from https://www.docker.com/products/docker-desktop/ and make sure it is running.',
+}
+
+const detectDocker: Detector = probe => {
+  const hasDockerfile = probe.exists('Dockerfile')
+  const composeFile = COMPOSE_FILES.find(f => probe.exists(f))
+  if (!hasDockerfile && composeFile === undefined) {
+    return null
+  }
+
+  const results: DetectionResult[] = []
+
+  if (composeFile !== undefined) {
+    const reasons = [`${composeFile} found`]
+    let score = 10
+    if (hasDockerfile) {
+      score += 1
+      reasons.push('Dockerfile found')
+    }
+    results.push({
+      ecosystem: 'docker',
+      label: 'Docker Compose',
+      toolIcon: 'container',
+      subId: 'compose',
+      build: [cmd('docker', ['compose', 'build'])],
+      run: [cmd('docker', ['compose', 'up'])],
+      toolchainCheck: dockerToolchainCheck,
+      needsElevation: false,
+      gitignoreTemplateId: '',
+      extraIgnores: [],
+      score,
+      reasons,
+    })
+  }
+
+  if (hasDockerfile) {
+    results.push({
+      ecosystem: 'docker',
+      label: 'Docker image',
+      toolIcon: 'container',
+      subId: 'image',
+      build: [cmd('docker', ['build', '.'])],
+      run: undefined,
+      toolchainCheck: dockerToolchainCheck,
+      needsElevation: false,
+      gitignoreTemplateId: '',
+      extraIgnores: [],
+      // When a compose file also exists it orchestrates the same Dockerfile;
+      // rank the plain image build below it.
+      score: composeFile !== undefined ? 8 : 10,
+      reasons: ['Dockerfile found'],
+    })
+  }
+
+  return results
+}
+
 /** All detectors. `detectMake` is a generic fallback, suppressed elsewhere. */
 const DETECTORS: ReadonlyArray<Detector> = [
   detectNode,
@@ -1142,6 +1216,7 @@ const DETECTORS: ReadonlyArray<Detector> = [
   detectZig,
   detectJava,
   detectCmake,
+  detectDocker,
   detectMake,
 ]
 
@@ -1203,9 +1278,15 @@ export function detectProfiles(
       }
     }
 
-    // `make` is a generic fallback: drop it when a real ecosystem matched here.
-    const nonMake = dirResults.filter(r => r.ecosystem !== 'make')
-    const effective = nonMake.length > 0 ? nonMake : dirResults
+    // `make` is a generic fallback: drop it when a real ecosystem matched
+    // here. Docker does not count — a Dockerfile packages the project without
+    // replacing whatever the Makefile natively builds.
+    const suppressesMake = dirResults.some(
+      r => r.ecosystem !== 'make' && r.ecosystem !== 'docker'
+    )
+    const effective = suppressesMake
+      ? dirResults.filter(r => r.ecosystem !== 'make')
+      : dirResults
 
     for (const result of effective) {
       const nested = dir !== ''

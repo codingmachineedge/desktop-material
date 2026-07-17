@@ -433,7 +433,9 @@ async function execute(
     }
     case 'pull': {
       const repository = repositoryFromArgs(args, getState)
-      await dispatcher.pull(repository)
+      // Agent-driven pulls never trigger the opt-in automatic build: a remote
+      // command must not spawn build or run processes as a side effect.
+      await dispatcher.pull(repository, { autoBuild: false })
       return { pulled: true }
     }
     case 'fetch': {

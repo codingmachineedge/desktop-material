@@ -49,6 +49,33 @@ describe('repository appearance config', () => {
     assert.deepEqual(await getRepositoryAppearanceOverrides(repository), {})
   })
 
+  it('round-trips the repository list-name typography override', async t => {
+    const path = await setupFixtureRepository(t, 'test-repo')
+    const repository = new Repository(path, -1, null, false)
+
+    const saved = await setRepositoryAppearanceOverrides(repository, {
+      listNameStyle: {
+        fontFamily: 'Georgia',
+        fontSize: 16,
+        bold: true,
+      },
+    })
+
+    assert.deepEqual(saved.listNameStyle, {
+      fontFamily: 'Georgia',
+      fontSize: 16,
+      bold: true,
+    })
+    assert.deepEqual(
+      (await getRepositoryAppearanceOverrides(repository)).listNameStyle,
+      saved.listNameStyle
+    )
+    assert.match(
+      (await getConfigValue(repository, RepositoryAppearanceConfigKey, true))!,
+      /"listNameStyle"/
+    )
+  })
+
   it('persists a normalized vector logo only in local Git config', async t => {
     const path = await setupFixtureRepository(t, 'test-repo')
     const repository = new Repository(path, -1, null, false)

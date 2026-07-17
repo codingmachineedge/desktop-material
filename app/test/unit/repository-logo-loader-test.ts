@@ -19,7 +19,7 @@ describe('RepositoryLogoLoader', () => {
     const loader = new RepositoryLogoLoader(async () => {
       calls++
       await gate
-      return DefaultRepositoryLogoDesign
+      return { logo: DefaultRepositoryLogoDesign, listNameStyle: null }
     }, 4)
     const repo = repository('/work/shared', 1)
 
@@ -37,7 +37,7 @@ describe('RepositoryLogoLoader', () => {
     const calls = new Map<string, number>()
     const loader = new RepositoryLogoLoader(async repo => {
       calls.set(repo.path, (calls.get(repo.path) ?? 0) + 1)
-      return DefaultRepositoryLogoDesign
+      return { logo: DefaultRepositoryLogoDesign, listNameStyle: null }
     }, 2)
     const first = repository('/work/first', 1)
     const second = repository('/work/second', 2)
@@ -58,7 +58,7 @@ describe('RepositoryLogoLoader', () => {
     let calls = 0
     const loader = new RepositoryLogoLoader(async () => {
       calls++
-      return DefaultRepositoryLogoDesign
+      return { logo: DefaultRepositoryLogoDesign, listNameStyle: null }
     })
     const repo = repository('/work/event', 1)
     const event = new Event('logo-change')
@@ -79,7 +79,7 @@ describe('RepositoryLogoLoader', () => {
       if (calls === 1) {
         throw new Error('temporary read failure')
       }
-      return DefaultRepositoryLogoDesign
+      return { logo: DefaultRepositoryLogoDesign, listNameStyle: null }
     })
     const repo = repository('/work/retry', 1)
 

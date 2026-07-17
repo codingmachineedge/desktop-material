@@ -242,6 +242,50 @@ describe('post-shell MD3 style contracts', () => {
     )
   })
 
+  it('themes each sync-pill state background to match its action', () => {
+    const tokens = readRootStyle('_material.scss')
+    const shell = readRootStyle('_material-shell.scss')
+    const button = readFileSync(
+      join(
+        process.cwd(),
+        'app',
+        'src',
+        'ui',
+        'toolbar',
+        'push-pull-button.tsx'
+      ),
+      'utf8'
+    )
+
+    // The component tags every state with a modifier on both pill shapes.
+    assert.match(button, /`push-pull-button--\$\{state\}`/)
+    for (const state of ['fetch', 'pull', 'push', 'publish', 'force-push']) {
+      assert.match(button, new RegExp(`'${state}'`))
+    }
+
+    // Every state token pairs a background with its on-color, in both themes.
+    for (const state of ['fetch', 'pull', 'push', 'publish', 'force-push']) {
+      const bg = new RegExp(`--dm-sync-${state}-bg:`, 'g')
+      const on = new RegExp(`--dm-sync-${state}-on:`, 'g')
+      assert.equal(tokens.match(bg)?.length, 2, `--dm-sync-${state}-bg themes`)
+      assert.equal(tokens.match(on)?.length, 2, `--dm-sync-${state}-on themes`)
+    }
+
+    // Single-button states paint the button; split states paint the wrapper.
+    assert.match(
+      shell,
+      /\.push-pull-button\.push-pull-button--fetch > button\s*\{[\s\S]*?background: var\(--dm-sync-fetch-bg\);/
+    )
+    for (const state of ['publish', 'pull', 'push', 'force-push']) {
+      assert.match(
+        shell,
+        new RegExp(
+          `\\.toolbar-dropdown\\.push-pull-button--${state}\\s*\\{[\\s\\S]*?background: var\\(--dm-sync-${state}-bg\\);`
+        )
+      )
+    }
+  })
+
   it('contains the Changes search and composer without horizontal scrolling', () => {
     const shell = readRootStyle('_material-shell.scss')
     const changes = readStyle('changes/_changes-list.scss')

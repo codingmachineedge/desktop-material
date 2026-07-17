@@ -1,5 +1,6 @@
 export * from './types'
 export * from './detect'
+export * from './auto-build-on-pull'
 export * from './auto-fix'
 export * from './toolchain-install'
 export * from './gitignore-integration'

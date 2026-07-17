@@ -445,6 +445,93 @@ describe('detectProfiles', () => {
     })
   })
 
+  describe('docker', () => {
+    it('detects a Dockerfile as an argv-encoded image build', () => {
+      const probe = makeProbe({ files: ['Dockerfile'] })
+      const [profile] = detectProfiles(probe)
+      assert.equal(profile.ecosystem, 'docker')
+      assert.equal(profile.label, 'Docker image')
+      assert.equal(profile.id, 'docker:image')
+      assert.equal(profile.toolIcon, 'container')
+      assert.deepEqual(profile.build?.[0], {
+        exe: 'docker',
+        args: ['build', '.'],
+        label: 'docker build .',
+      })
+      assert.equal(profile.run, undefined)
+      assert.equal(profile.score, 10)
+      assert.equal(profile.toolchainCheck.cmd.exe, 'docker')
+    })
+
+    it('detects docker compose with build and up stages', () => {
+      const probe = makeProbe({ files: ['docker-compose.yml'] })
+      const [profile] = detectProfiles(probe)
+      assert.equal(profile.ecosystem, 'docker')
+      assert.equal(profile.label, 'Docker Compose')
+      assert.equal(profile.id, 'docker:compose')
+      assert.deepEqual(profile.build?.[0].args, ['compose', 'build'])
+      assert.deepEqual(profile.run?.[0].args, ['compose', 'up'])
+      assert.equal(profile.score, 10)
+    })
+
+    for (const composeFile of [
+      'docker-compose.yaml',
+      'compose.yml',
+      'compose.yaml',
+    ]) {
+      it(`recognizes the ${composeFile} compose variant`, () => {
+        const probe = makeProbe({ files: [composeFile] })
+        const [profile] = detectProfiles(probe)
+        assert.equal(profile.label, 'Docker Compose')
+        assert.ok(profile.reasons.includes(`${composeFile} found`))
+      })
+    }
+
+    it('ranks compose above the plain image when both exist', () => {
+      const probe = makeProbe({
+        files: ['Dockerfile', 'docker-compose.yml'],
+      })
+      const profiles = detectProfiles(probe)
+      const compose = profiles.find(p => p.label === 'Docker Compose')!
+      const image = profiles.find(p => p.label === 'Docker image')!
+      // Compose: 10 + 1 (Dockerfile); image demoted below it.
+      assert.equal(compose.score, 11)
+      assert.equal(image.score, 8)
+      assert.ok(profiles.indexOf(compose) < profiles.indexOf(image))
+    })
+
+    it('detects nested docker projects through manifest markers', () => {
+      const probe = makeProbe({ files: ['services/api/Dockerfile'] })
+      const profiles = detectProfiles(probe)
+      const docker = profiles.find(p => p.ecosystem === 'docker')!
+      assert.equal(docker.cwd, 'services/api')
+      assert.equal(docker.id, 'docker:services/api:image')
+      // 10 − 4 (nested) = 6
+      assert.equal(docker.score, 6)
+    })
+
+    it('surfaces docker beside other real ecosystems and suppresses make', () => {
+      const probe = makeProbe({
+        files: ['Dockerfile', 'Makefile', 'package.json'],
+        texts: { 'package.json': pkg({}) },
+      })
+      const ecosystems = detectProfiles(probe).map(p => p.ecosystem)
+      assert.ok(ecosystems.includes('docker'))
+      assert.ok(ecosystems.includes('node'))
+      assert.ok(!ecosystems.includes('make'))
+    })
+
+    it('keeps the make fallback when docker is the only other match', () => {
+      const probe = makeProbe({
+        files: ['Dockerfile', 'Makefile'],
+        texts: { Makefile: 'all:\n\tgcc\n' },
+      })
+      const ecosystems = detectProfiles(probe).map(p => p.ecosystem)
+      assert.ok(ecosystems.includes('docker'))
+      assert.ok(ecosystems.includes('make'))
+    })
+  })
+
   describe('ranking and nesting', () => {
     it('applies a nested penalty and marks the cwd', () => {
       const probe = makeProbe({

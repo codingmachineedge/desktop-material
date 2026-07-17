@@ -166,6 +166,8 @@ import {
   probeRepository,
   resolveRunEnv,
   buildIgnoreText,
+  shouldAutoBuildAfterPull,
+  isActiveBuildRunPhase,
 } from '../../lib/build-run'
 import { readGitIgnoreAtRoot } from '../../lib/git/gitignore'
 import { startBuildRun, cancelBuildRun } from '../main-process-proxy'
@@ -1269,9 +1271,78 @@ export class Dispatcher {
     return this.appStore._push(repository, options)
   }
 
-  /** Pull the current branch. */
-  public pull(repository: Repository): Promise<void> {
-    return this.appStore._pull(repository)
+  /**
+   * Pull the current branch. Interactive pulls may start the repository's
+   * opted-in automatic build afterwards; non-interactive surfaces (e.g. the
+   * local agent API) pass `autoBuild: false` so a remote command can never
+   * spawn build or run processes as a side effect.
+   */
+  public async pull(
+    repository: Repository,
+    options?: { readonly autoBuild?: boolean }
+  ): Promise<void> {
+    const beforeSha = this.getValidTipSha(repository)
+    await this.appStore._pull(repository)
+    if (options?.autoBuild !== false) {
+      await this.maybeAutoBuildAfterPull(repository, beforeSha)
+    }
+  }
+
+  /** The current tip SHA, or `null` when the tip is not a valid branch. */
+  private getValidTipSha(repository: Repository): string | null {
+    const { tip } = this.repositoryStateManager.get(repository).branchesState
+    return tip.kind === TipState.Valid ? tip.branch.tip.sha : null
+  }
+
+  /**
+   * Start the repository's opted-in Build & Run profile after a pull that
+   * moved the branch tip to new commits. Never lets a build problem surface
+   * as a pull failure.
+   */
+  private async maybeAutoBuildAfterPull(
+    repository: Repository,
+    beforeSha: string | null
+  ): Promise<void> {
+    // The pull may have swapped in a refreshed Repository instance (state and
+    // preferences are keyed by its hash), so re-resolve the live instance
+    // before reading the post-pull tip and preferences.
+    const liveRepository =
+      this.appStore
+        .getState()
+        .repositories.find(
+          (r): r is Repository =>
+            r instanceof Repository && r.id === repository.id
+        ) ?? repository
+
+    const prefs =
+      liveRepository.buildRunPreferences ?? defaultBuildRunPreferences
+    const { phase } = this.buildRunStore.getStateForRepository(
+      liveRepository.id
+    )
+
+    const should = shouldAutoBuildAfterPull({
+      autoBuildOnPull: prefs.autoBuildOnPull === true,
+      beforeSha,
+      afterSha: this.getValidTipSha(liveRepository),
+      buildInProgress: isActiveBuildRunPhase(phase),
+    })
+
+    if (!should) {
+      return
+    }
+
+    log.info(
+      `[autoBuildOnPull] pull moved the tip of ${liveRepository.name}; starting the selected Build & Run profile`
+    )
+
+    try {
+      await this.startBuildRun(liveRepository)
+    } catch (e) {
+      log.error(
+        `Automatic build after pull failed for ${liveRepository.name}`,
+        e
+      )
+    }
   }
 
   public pullAllRepositories(

@@ -196,6 +196,15 @@ export class BuildRunSettings extends React.Component<
     })
   }
 
+  private onAutoBuildOnPullChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onPreferencesChanged({
+      ...this.props.preferences,
+      autoBuildOnPull: event.currentTarget.checked,
+    })
+  }
+
   private onAutoIgnoreBuildOutputsChanged = (
     event: React.FormEvent<HTMLInputElement>
   ) => {
@@ -264,7 +273,7 @@ export class BuildRunSettings extends React.Component<
             No runnable project profiles were detected in this repository. Build
             &amp; Run looks for supported project manifests and entrypoints
             across common Node, Deno, Rust, Go, .NET, Python, JVM, PHP, Ruby,
-            Swift, Dart, Elixir, Make and CMake projects.
+            Swift, Dart, Elixir, Docker, Make and CMake projects.
           </p>
         </section>
       )
@@ -429,11 +438,26 @@ export class BuildRunSettings extends React.Component<
             }
             onChange={this.onAutoIgnoreBuildOutputsChanged}
           />
+          <Checkbox
+            label={
+              __DARWIN__
+                ? 'Build After Pulling New Commits'
+                : 'Build after pulling new commits'
+            }
+            value={
+              prefs.autoBuildOnPull ?? false
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onAutoBuildOnPullChanged}
+          />
         </div>
         <p className="build-run-section-description">
           Auto-ignore adds the profile's build-output patterns to{' '}
           <code>.gitignore</code> before installing. It uses managed sections,
           so it is idempotent and reversible from the Ignored files tab.
+          Building after a pull starts the selected profile (for example a
+          Docker image or app build) only when the pull brings new commits.
         </p>
       </section>
     )

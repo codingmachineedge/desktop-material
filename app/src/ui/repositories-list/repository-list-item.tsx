@@ -13,6 +13,7 @@ import { Tooltip } from '../lib/tooltip'
 import { enableAccessibleListToolTips } from '../../lib/feature-flag'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { IRepositoryLogoDesign } from '../../models/repository-logo'
+import { ITabTitleStyle, tabTitleStyleToCss } from '../../models/repository-tab'
 import { RepositoryLogo } from '../repository-logo/repository-logo'
 import {
   getProfileRepositoryLogo,
@@ -54,6 +55,8 @@ interface IRepositoryListItemProps {
 interface IRepositoryListItemState {
   readonly logoDesign: IRepositoryLogoDesign | null
   readonly logoPath: string | null
+  /** The repository's validated list-name typography, if it defines one. */
+  readonly nameStyle: ITabTitleStyle | null
 }
 
 /** A repository item. */
@@ -66,7 +69,7 @@ export class RepositoryListItem extends React.Component<
 
   public constructor(props: IRepositoryListItemProps) {
     super(props)
-    this.state = { logoDesign: null, logoPath: null }
+    this.state = { logoDesign: null, logoPath: null, nameStyle: null }
   }
 
   public componentDidMount() {
@@ -124,19 +127,27 @@ export class RepositoryListItem extends React.Component<
     const logoPath = this.getLogoPath(repository)
 
     if (!(repository instanceof Repository) || logoPath === null) {
-      if (this.state.logoDesign !== null || this.state.logoPath !== null) {
-        this.setState({ logoDesign: null, logoPath: null })
+      if (
+        this.state.logoDesign !== null ||
+        this.state.logoPath !== null ||
+        this.state.nameStyle !== null
+      ) {
+        this.setState({ logoDesign: null, logoPath: null, nameStyle: null })
       }
       return
     }
 
     try {
-      const logoDesign = await this.loader.load(repository)
+      const appearance = await this.loader.loadAppearance(repository)
       if (
         requestId === this.logoRequestId &&
         this.getLogoPath(this.props.repository) === logoPath
       ) {
-        this.setState({ logoDesign, logoPath })
+        this.setState({
+          logoDesign: appearance.logo,
+          logoPath,
+          nameStyle: appearance.listNameStyle,
+        })
       }
     } catch (error) {
       log.warn(`Unable to load repository-list logo for ${logoPath}`, error)
@@ -147,6 +158,7 @@ export class RepositoryListItem extends React.Component<
         this.setState({
           logoDesign: getProfileRepositoryLogo(),
           logoPath,
+          nameStyle: null,
         })
       }
     }
@@ -181,7 +193,10 @@ export class RepositoryListItem extends React.Component<
 
         {this.renderRepositoryIcon(repository, alias)}
 
-        <div className={classNames(classNameList)}>
+        <div
+          className={classNames(classNameList)}
+          style={tabTitleStyleToCss(this.state.nameStyle)}
+        >
           {prefix ? <span className="prefix">{prefix}</span> : null}
           <HighlightText
             text={alias ?? repository.name}
@@ -267,7 +282,8 @@ export class RepositoryListItem extends React.Component<
   ): boolean {
     if (
       nextState.logoDesign !== this.state.logoDesign ||
-      nextState.logoPath !== this.state.logoPath
+      nextState.logoPath !== this.state.logoPath ||
+      nextState.nameStyle !== this.state.nameStyle
     ) {
       return true
     }

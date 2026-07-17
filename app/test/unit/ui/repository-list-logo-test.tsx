@@ -4,6 +4,7 @@ import * as React from 'react'
 
 import {
   AppearanceCustomizationStorageKey,
+  IResolvedRepositoryAppearance,
   RepositoryLogoChangedEvent,
   setAppearanceCustomization,
 } from '../../../src/lib/appearance-customization'
@@ -14,6 +15,7 @@ import {
   DefaultRepositoryLogoDesign,
   IRepositoryLogoDesign,
 } from '../../../src/models/repository-logo'
+import { ITabTitleStyle } from '../../../src/models/repository-tab'
 import { ShowBranchNameInRepoListSetting } from '../../../src/models/show-branch-name-in-repo-list'
 import { Dispatcher } from '../../../src/ui/dispatcher'
 import { IRepositoryLogoLoader } from '../../../src/ui/repository-logo/repository-logo-loader'
@@ -90,21 +92,28 @@ class DeferredLogoLoader implements IRepositoryLogoLoader {
   private readonly pending = new Map<
     string,
     Array<{
-      resolve: (value: IRepositoryLogoDesign) => void
-      promise: Promise<IRepositoryLogoDesign>
+      resolve: (value: IResolvedRepositoryAppearance) => void
+      promise: Promise<IResolvedRepositoryAppearance>
     }>
   >()
 
-  public load(repository: Repository): Promise<IRepositoryLogoDesign> {
+  public loadAppearance(
+    repository: Repository
+  ): Promise<IResolvedRepositoryAppearance> {
     this.loadCalls.push(repository.path)
-    let resolvePromise: (value: IRepositoryLogoDesign) => void = () => undefined
-    const promise = new Promise<IRepositoryLogoDesign>(resolve => {
+    let resolvePromise: (value: IResolvedRepositoryAppearance) => void = () =>
+      undefined
+    const promise = new Promise<IResolvedRepositoryAppearance>(resolve => {
       resolvePromise = resolve
     })
     const requests = this.pending.get(repository.path) ?? []
     requests.push({ resolve: resolvePromise, promise })
     this.pending.set(repository.path, requests)
     return promise
+  }
+
+  public load(repository: Repository): Promise<IRepositoryLogoDesign> {
+    return this.loadAppearance(repository).then(appearance => appearance.logo)
   }
 
   public invalidate(repositoryPath: string | null): void {
@@ -120,7 +129,7 @@ class DeferredLogoLoader implements IRepositoryLogoLoader {
   ) {
     const pending = this.pending.get(repositoryPath)?.[request]
     assert.notEqual(pending, undefined)
-    pending?.resolve(value)
+    pending?.resolve({ logo: value, listNameStyle: null })
   }
 }
 
@@ -128,12 +137,19 @@ class ImmediateLogoLoader implements IRepositoryLogoLoader {
   public readonly loadCalls: string[] = []
   public readonly invalidations: Array<string | null> = []
   public readonly profileSignatures: string[] = []
+  public listNameStyle: ITabTitleStyle | null = null
 
   public constructor(public value: IRepositoryLogoDesign) {}
 
-  public async load(repository: Repository): Promise<IRepositoryLogoDesign> {
+  public async loadAppearance(
+    repository: Repository
+  ): Promise<IResolvedRepositoryAppearance> {
     this.loadCalls.push(repository.path)
-    return this.value
+    return { logo: this.value, listNameStyle: this.listNameStyle }
+  }
+
+  public async load(repository: Repository): Promise<IRepositoryLogoDesign> {
+    return (await this.loadAppearance(repository)).logo
   }
 
   public invalidate(repositoryPath: string | null): void {
@@ -293,6 +309,26 @@ describe('repository-list custom logos', () => {
       assert.notEqual(logo, null)
       assert.equal(logo?.getAttribute('aria-hidden'), 'true')
       assert.equal(logo?.getAttribute('role'), null)
+    })
+  })
+
+  it('applies the repository list-name typography to the row name', async () => {
+    const loader = new ImmediateLogoLoader(design('#5a5a5a'))
+    loader.listNameStyle = {
+      fontFamily: 'Georgia',
+      fontSize: 16,
+      bold: true,
+      italic: true,
+    }
+    const view = render(row(repository('/work/typography', 9), loader))
+
+    await waitFor(() => {
+      const name = view.container.querySelector<HTMLElement>('.name')
+      assert.notEqual(name, null)
+      assert.match(name?.style.fontFamily ?? '', /Georgia/)
+      assert.equal(name?.style.fontSize, '16px')
+      assert.equal(name?.style.fontWeight, 'bold')
+      assert.equal(name?.style.fontStyle, 'italic')
     })
   })
 

@@ -1,6 +1,7 @@
 import {
   getAppearanceCustomization,
-  getResolvedRepositoryLogo,
+  getResolvedRepositoryAppearance,
+  IResolvedRepositoryAppearance,
 } from '../../lib/appearance-customization'
 import { Repository } from '../../models/repository'
 import {
@@ -10,9 +11,9 @@ import {
 
 const DefaultMaximumRepositoryLogoEntries = 128
 
-type ResolveRepositoryLogo = (
+type ResolveRepositoryAppearance = (
   repository: Repository
-) => Promise<IRepositoryLogoDesign>
+) => Promise<IResolvedRepositoryAppearance>
 
 /**
  * The small contract consumed by repository-logo UI surfaces. Keeping this
@@ -20,6 +21,7 @@ type ResolveRepositoryLogo = (
  */
 export interface IRepositoryLogoLoader {
   load(repository: Repository): Promise<IRepositoryLogoDesign>
+  loadAppearance(repository: Repository): Promise<IResolvedRepositoryAppearance>
   invalidate(repositoryPath: string | null, token?: object): void
   synchronizeProfile(profileSignature: string): void
 }
@@ -37,20 +39,24 @@ export function getProfileRepositoryLogoSignature(): string {
 }
 
 /**
- * A bounded LRU of both in-flight and resolved logo reads.
+ * A bounded LRU of both in-flight and resolved appearance reads.
  *
  * Repository list rows can be repeated in the Pinned and Recent groups and a
  * repository can also have an open tab. Caching the promise itself guarantees
- * those consumers share one Git-config read. Failed reads are removed so a
- * later request can recover.
+ * those consumers share one Git-config read, which resolves the logo and the
+ * list-name typography together. Failed reads are removed so a later request
+ * can recover.
  */
 export class RepositoryLogoLoader implements IRepositoryLogoLoader {
-  private readonly entries = new Map<string, Promise<IRepositoryLogoDesign>>()
+  private readonly entries = new Map<
+    string,
+    Promise<IResolvedRepositoryAppearance>
+  >()
   private readonly invalidationTokens = new WeakSet<object>()
   private profileSignature: string | null = null
 
   public constructor(
-    private readonly resolve: ResolveRepositoryLogo = getResolvedRepositoryLogo,
+    private readonly resolve: ResolveRepositoryAppearance = getResolvedRepositoryAppearance,
     private readonly maximumEntries = DefaultMaximumRepositoryLogoEntries
   ) {
     if (!Number.isSafeInteger(maximumEntries) || maximumEntries < 1) {
@@ -67,7 +73,13 @@ export class RepositoryLogoLoader implements IRepositoryLogoLoader {
     this.entries.clear()
   }
 
-  public load(repository: Repository): Promise<IRepositoryLogoDesign> {
+  public async load(repository: Repository): Promise<IRepositoryLogoDesign> {
+    return (await this.loadAppearance(repository)).logo
+  }
+
+  public loadAppearance(
+    repository: Repository
+  ): Promise<IResolvedRepositoryAppearance> {
     this.synchronizeProfile(getProfileRepositoryLogoSignature())
 
     const key = repository.path

@@ -348,6 +348,88 @@ body {
     }
   }
 
+  // ---- Sync pill vibes ----------------------------------------------------
+  // Each sync state carries a `push-pull-button--<state>` modifier on both
+  // pill shapes, so the button's tonal background matches the action it
+  // offers. Tokens pair each background with its on-color in _material.scss.
+  // Single-button shape (background lives on the button itself). The split
+  // shape's transparent inner-segment rule above is more specific, so these
+  // backgrounds only ever paint the one-piece pill.
+  .push-pull-button.push-pull-button--fetch > button {
+    background: var(--dm-sync-fetch-bg);
+    color: var(--dm-sync-fetch-on);
+
+    &:not(:disabled):hover {
+      background: var(--dm-sync-fetch-bg);
+    }
+  }
+
+  .push-pull-button.push-pull-button--publish > button {
+    background: var(--dm-sync-publish-bg);
+    color: var(--dm-sync-publish-on);
+
+    &:not(:disabled):hover {
+      background: var(--dm-sync-publish-bg);
+    }
+  }
+
+  .push-pull-button.push-pull-button--pull > button {
+    color: var(--dm-sync-pull-on);
+  }
+
+  .push-pull-button.push-pull-button--push > button {
+    color: var(--dm-sync-push-on);
+  }
+
+  .push-pull-button.push-pull-button--force-push > button {
+    color: var(--dm-sync-force-push-on);
+  }
+
+  // Split-button shape (background lives on the outer wrapper pill).
+  .toolbar-dropdown.push-pull-button--publish {
+    background: var(--dm-sync-publish-bg);
+
+    > .toolbar-button > button {
+      color: var(--dm-sync-publish-on);
+    }
+  }
+
+  .toolbar-dropdown.push-pull-button--pull {
+    background: var(--dm-sync-pull-bg);
+
+    > .toolbar-button > button {
+      color: var(--dm-sync-pull-on);
+    }
+  }
+
+  .toolbar-dropdown.push-pull-button--push {
+    background: var(--dm-sync-push-bg);
+
+    > .toolbar-button > button {
+      color: var(--dm-sync-push-on);
+    }
+  }
+
+  .toolbar-dropdown.push-pull-button--force-push {
+    background: var(--dm-sync-force-push-bg);
+
+    > .toolbar-button > button {
+      color: var(--dm-sync-force-push-on);
+    }
+  }
+
+  // The force-push pill keeps its whole surface in the error family: the
+  // ahead/behind count badge drops its accent-following primary tone and the
+  // disclosure chevron matches the state's on-color.
+  .push-pull-button--force-push .ahead-behind {
+    background: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+  }
+
+  .toolbar-dropdown.push-pull-button--force-push .dropdownArrow {
+    color: var(--dm-sync-force-push-on);
+  }
+
   // The measured overflow affordance is a compact trailing app-bar action.
   // It is shown only when one or more optional actions no longer fit.
   .toolbar-overflow-trigger {
