@@ -18,6 +18,7 @@ import {
   CloseTabsExceptContainingPopover,
 } from '../../../src/ui/repository-tabs/close-tabs-containing-popover'
 import { RepositoryTabStrip } from '../../../src/ui/repository-tabs/repository-tab-strip'
+import { TabSearchPopover } from '../../../src/ui/repository-tabs/tab-search-popover'
 import {
   repositoryTabMatchKeys,
   repositoryTabStatusRank,
@@ -92,6 +93,7 @@ function ArrangeHarness(props: IArrangeHarnessProps) {
       tabsStore={props.store}
       anchor={null}
       resolveLabel={tab => visibleTabLabel(tab, repository(tab))}
+      resolveMatchKeys={tab => repositoryTabMatchKeys(tab, repository(tab))}
       resolveStatusRank={tab => props.ranks[tab.id] ?? 3}
       onClose={props.onClose ?? (() => undefined)}
     />
@@ -358,6 +360,186 @@ describe('ArrangeTabsPopover', () => {
     )
     assert.equal(store.getState().activeTabId, 'beta')
   })
+
+  it('filters across literal label, alias, and path terms without changing sort scope', async () => {
+    const zed = new Repository(
+      '/clients/material/zed',
+      1,
+      null,
+      false,
+      'Studio'
+    )
+    const alpha = new Repository('/work/alpha', 2, null, false)
+    const beta = new Repository('/work/beta', 3, null, false)
+    const store = await createStore([
+      makeTab('zed', zed, { customLabel: 'Material workspace' }),
+      makeTab('beta', beta),
+      makeTab('alpha', alpha),
+    ])
+    render(
+      <ArrangeHarness
+        store={store}
+        repositories={[zed, alpha, beta]}
+        ranks={{}}
+      />
+    )
+
+    const filter = screen.getByRole('searchbox', { name: 'Filter tabs' })
+    fireEvent.change(filter, { target: { value: 'studio clients material' } })
+    assert.ok(screen.getByText('1 of 3 tabs'))
+    assert.ok(screen.getByText('Material workspace'))
+    assert.equal(screen.queryByText('alpha'), null)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Label A → Z' }))
+    await waitFor(() =>
+      assert.deepEqual(
+        store.getState().tabs.map(tab => tab.id),
+        ['alpha', 'beta', 'zed']
+      )
+    )
+
+    fireEvent.change(filter, { target: { value: 'not present' } })
+    assert.ok(screen.getByText('0 of 3 tabs'))
+    assert.ok(screen.getByText('No tabs match this filter.'))
+  })
+
+  it('uses full pin-group indices when the filtered row is at a boundary', async () => {
+    const pinned = new Repository('/work/pinned', 1, null, false)
+    const first = new Repository('/work/first', 2, null, false)
+    const last = new Repository('/work/last', 3, null, false)
+    const store = await createStore([
+      makeTab('pinned', pinned, { isPinned: true }),
+      makeTab('first', first),
+      makeTab('last', last),
+    ])
+    render(
+      <ArrangeHarness
+        store={store}
+        repositories={[pinned, first, last]}
+        ranks={{}}
+      />
+    )
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter tabs' }), {
+      target: { value: 'first' },
+    })
+    assert.equal(
+      screen
+        .getByRole('button', { name: 'Move first left' })
+        .hasAttribute('disabled'),
+      true
+    )
+    assert.equal(
+      screen
+        .getByRole('button', { name: 'Move first right' })
+        .hasAttribute('disabled'),
+      false
+    )
+  })
+})
+
+describe('TabSearchPopover', () => {
+  const alpha = new Repository('/work/alpha', 1, null, false)
+  const material = new Repository(
+    '/clients/material',
+    2,
+    null,
+    false,
+    'Studio Alias'
+  )
+  const omega = new Repository('/work/omega', 3, null, false)
+  const repositories = [alpha, material, omega]
+  const tabs = [
+    makeTab('alpha', alpha),
+    makeTab('material', material, {
+      customLabel: 'Material workspace',
+      isPinned: true,
+      isFavorite: true,
+    }),
+    makeTab('omega', omega),
+  ]
+  const repository = (tab: IRepositoryTab) =>
+    repositories.find(candidate => candidate.id === tab.repositoryId) ?? null
+
+  it('searches all literal keys and switches with Home, End, Enter, and Escape', async () => {
+    let selected: string | null = null
+    let closes = 0
+    render(
+      <TabSearchPopover
+        tabs={tabs}
+        activeTabId="material"
+        anchor={null}
+        resolveLabel={tab => visibleTabLabel(tab, repository(tab))}
+        resolveMatchKeys={tab => repositoryTabMatchKeys(tab, repository(tab))}
+        onSelect={tab => (selected = tab.id)}
+        onClose={() => closes++}
+      />
+    )
+
+    const input = screen.getByRole('combobox', { name: 'Search open tabs' })
+    await waitFor(() => assert.equal(document.activeElement, input))
+    assert.ok(
+      screen.getByRole('option', {
+        name: 'Material workspace, active, pinned, favorite',
+      })
+    )
+
+    fireEvent.change(input, {
+      target: { value: 'studio clients material' },
+    })
+    assert.equal(screen.getAllByRole('option').length, 1)
+    assert.ok(screen.getByText('1 matching tab'))
+
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.keyDown(input, { key: 'End' })
+    assert.equal(
+      input.getAttribute('aria-activedescendant'),
+      'tab-search-result-2'
+    )
+    fireEvent.keyDown(input, { key: 'Home' })
+    assert.equal(
+      input.getAttribute('aria-activedescendant'),
+      'tab-search-result-0'
+    )
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    assert.equal(selected, 'material')
+    assert.equal(closes, 1)
+
+    fireEvent.keyDown(input, { key: 'Escape' })
+    assert.equal(closes, 2)
+  })
+
+  it('clamps keyboard highlighting when matching tabs are removed', () => {
+    const { rerender } = render(
+      <TabSearchPopover
+        tabs={tabs}
+        activeTabId="alpha"
+        anchor={null}
+        resolveLabel={tab => visibleTabLabel(tab, repository(tab))}
+        resolveMatchKeys={tab => repositoryTabMatchKeys(tab, repository(tab))}
+        onSelect={() => undefined}
+        onClose={() => undefined}
+      />
+    )
+    const input = screen.getByRole('combobox', { name: 'Search open tabs' })
+    fireEvent.keyDown(input, { key: 'End' })
+    rerender(
+      <TabSearchPopover
+        tabs={[tabs[0]]}
+        activeTabId="alpha"
+        anchor={null}
+        resolveLabel={tab => visibleTabLabel(tab, repository(tab))}
+        resolveMatchKeys={tab => repositoryTabMatchKeys(tab, repository(tab))}
+        onSelect={() => undefined}
+        onClose={() => undefined}
+      />
+    )
+    assert.equal(
+      input.getAttribute('aria-activedescendant'),
+      'tab-search-result-0'
+    )
+  })
 })
 
 describe('RepositoryTabStrip drag arrangement', () => {
@@ -433,6 +615,55 @@ describe('RepositoryTabStrip drag arrangement', () => {
     assert.ok(screen.getByRole('dialog', { name: 'Arrange tabs' }))
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() => assert.equal(document.activeElement, arrangeButton))
+  })
+
+  it('switches a searched tab through the existing selection path and scrolls it into view', async () => {
+    const alpha = new Repository('/work/alpha', 1, null, false)
+    const beta = new Repository('/work/beta', 2, null, false, 'Beta Alias')
+    const store = await createStore([
+      makeTab('alpha', alpha),
+      makeTab('beta', beta),
+    ])
+    let selectedRepositoryId: number | null = null
+    const dispatcher = {
+      selectRepository: (repository: Repository) =>
+        (selectedRepositoryId = repository.id),
+      showFoldout: () => undefined,
+      setNotificationCentreOpen: () => undefined,
+    } as unknown as Dispatcher
+    const stateManager = {
+      get: () => {
+        throw new Error('status cache should not be read during search')
+      },
+    } as unknown as RepositoryStateCache
+
+    render(
+      <RepositoryTabStrip
+        tabsStore={store}
+        repositories={[alpha, beta]}
+        dispatcher={dispatcher}
+        repositoryStateManager={stateManager}
+        unreadNotificationCount={0}
+        isNotificationCentreOpen={false}
+      />
+    )
+
+    const betaTab = screen.getByRole('tab', { name: 'beta' })
+    let scrolled = false
+    Object.defineProperty(betaTab, 'scrollIntoView', {
+      configurable: true,
+      value: () => (scrolled = true),
+    })
+    const searchButton = screen.getByRole('button', { name: 'Search tabs' })
+    fireEvent.click(searchButton)
+    const input = screen.getByRole('combobox', { name: 'Search open tabs' })
+    fireEvent.change(input, { target: { value: 'beta alias' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => assert.equal(store.getState().activeTabId, 'beta'))
+    assert.equal(selectedRepositoryId, beta.id)
+    await waitFor(() => assert.equal(scrolled, true))
+    await waitFor(() => assert.equal(document.activeElement, searchButton))
   })
 })
 

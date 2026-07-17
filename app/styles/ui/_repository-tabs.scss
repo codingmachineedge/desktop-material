@@ -262,7 +262,8 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   }
 }
 
-.repository-tab-arrange {
+.repository-tab-arrange,
+.repository-tab-search {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1239,6 +1240,47 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
   }
 
+  .arrange-tabs-filter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    min-width: 0;
+
+    label {
+      grid-column: 1 / -1;
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+
+  .arrange-tabs-filter-input {
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 11px;
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 12px;
+    background: var(--md-sys-color-surface-container-low);
+    color: var(--md-sys-color-on-surface);
+    font: inherit;
+  }
+
+  .arrange-tabs-filter-count {
+    align-self: center;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .arrange-tabs-empty {
+    min-height: 64px;
+    margin: 0;
+    padding: 18px 12px;
+    border: 1px dashed var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+    color: var(--md-sys-color-on-surface-variant);
+    text-align: center;
+  }
+
   section {
     min-width: 0;
 
@@ -1355,6 +1397,13 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
   }
 
+  .arrange-tabs-sort-hint {
+    margin: -3px 0 8px;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
   button:disabled {
     opacity: 0.46;
     cursor: default;
@@ -1394,9 +1443,153 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   }
 }
 
+.tab-search-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 420px;
+  min-width: 0;
+  max-width: calc(100vw - 52px);
+  max-height: min(560px, calc(var(--available-height, 100vh) - 28px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  color: var(--md-sys-color-on-surface);
+
+  .tab-search-header {
+    min-width: 0;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    p {
+      margin: 4px 0 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  }
+
+  .tab-search-input {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 13px;
+    background: var(--md-sys-color-surface-container-low);
+    color: var(--md-sys-color-on-surface);
+    font: inherit;
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .tab-search-results {
+    min-width: 0;
+    max-height: 350px;
+    margin: 0;
+    padding: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+    list-style: none;
+  }
+
+  .tab-search-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &.highlighted {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    &.active {
+      box-shadow: inset 3px 0 var(--md-sys-color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  .tab-search-result-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+
+    strong,
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    strong {
+      font-size: 12px;
+    }
+
+    span {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px;
+    }
+  }
+
+  .tab-search-result-chips {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+
+    > span {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--md-sys-color-surface-container-highest);
+      font-size: 9px;
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+
+  .tab-search-empty {
+    min-height: 80px;
+    margin: 0;
+    padding: 24px 12px;
+    color: var(--md-sys-color-on-surface-variant);
+    text-align: center;
+  }
+
+  .tab-search-status {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+  }
+}
+
 .popover-component:has(.close-tabs-containing),
 .popover-component:has(.close-tabs-except),
-.popover-component:has(.arrange-tabs) {
+.popover-component:has(.arrange-tabs),
+.popover-component:has(.tab-search-popover) {
   max-width: calc(100vw - 20px);
   border-radius: 22px;
   box-shadow: var(--md-sys-elevation-level3);
@@ -1413,13 +1606,22 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 @media (max-width: 520px), (max-height: 560px) {
   .close-tabs-containing,
   .close-tabs-except,
-  .arrange-tabs {
+  .arrange-tabs,
+  .tab-search-popover {
     gap: 10px;
     max-width: calc(100vw - 36px);
     max-height: calc(var(--available-height, 100vh) - 20px);
   }
 
   .arrange-tabs {
+    .arrange-tabs-filter {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .arrange-tabs-filter-count {
+      justify-self: start;
+    }
+
     .arrange-tabs-list {
       max-height: 168px;
     }
@@ -1442,9 +1644,14 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
   }
 
+  .tab-search-popover .tab-search-results {
+    max-height: 220px;
+  }
+
   .popover-component:has(.close-tabs-containing) .popover-content,
   .popover-component:has(.close-tabs-except) .popover-content,
-  .popover-component:has(.arrange-tabs) .popover-content {
+  .popover-component:has(.arrange-tabs) .popover-content,
+  .popover-component:has(.tab-search-popover) .popover-content {
     padding: 10px;
   }
 }

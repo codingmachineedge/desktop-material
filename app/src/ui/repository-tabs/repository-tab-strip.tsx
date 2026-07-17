@@ -23,6 +23,7 @@ import { FoldoutType } from '../../lib/app-state'
 import { NotificationBellButton } from '../notifications/notification-bell-button'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { ArrangeTabsPopover } from './arrange-tabs-popover'
+import { TabSearchPopover } from './tab-search-popover'
 import {
   repositoryTabMatchKeys,
   repositoryTabStatusRank,
@@ -46,6 +47,7 @@ interface IRepositoryTabStripState {
   readonly closeMatchingAnchor: HTMLElement | null
   readonly closeExceptAnchor: HTMLElement | null
   readonly arrangeAnchor: HTMLElement | null
+  readonly searchAnchor: HTMLElement | null
   readonly draggingTabId: string | null
   readonly announcement: string
 }
@@ -56,6 +58,7 @@ export class RepositoryTabStrip extends React.Component<
   IRepositoryTabStripState
 > {
   private disposable: Disposable | null = null
+  private readonly stripRef = React.createRef<HTMLDivElement>()
 
   public constructor(props: IRepositoryTabStripProps) {
     super(props)
@@ -66,6 +69,7 @@ export class RepositoryTabStrip extends React.Component<
       closeMatchingAnchor: null,
       closeExceptAnchor: null,
       arrangeAnchor: null,
+      searchAnchor: null,
       draggingTabId: null,
       announcement: '',
     }
@@ -94,6 +98,24 @@ export class RepositoryTabStrip extends React.Component<
       this.props.dispatcher.selectRepository(repository)
     }
     this.props.tabsStore.activateTab(tab.id)
+    this.scrollTabIntoView(tab.id)
+  }
+
+  private scrollTabIntoView(tabId: string) {
+    const scroll = () => {
+      const tab = Array.from(
+        this.stripRef.current?.querySelectorAll<HTMLElement>(
+          '.repository-tab[data-tab-id]'
+        ) ?? []
+      ).find(element => element.dataset.tabId === tabId)
+      tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    }
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(scroll)
+    } else {
+      window.setTimeout(scroll, 0)
+    }
   }
 
   /** Re-select the repository for the tab that became active after a close. */
@@ -292,6 +314,7 @@ export class RepositoryTabStrip extends React.Component<
       closeMatchingAnchor: null,
       closeExceptAnchor: anchor,
       arrangeAnchor: null,
+      searchAnchor: null,
     })
   }
 
@@ -310,6 +333,7 @@ export class RepositoryTabStrip extends React.Component<
       arrangeAnchor: anchor,
       closeMatchingAnchor: null,
       closeExceptAnchor: null,
+      searchAnchor: null,
     })
   }
 
@@ -325,6 +349,31 @@ export class RepositoryTabStrip extends React.Component<
       return
     }
     this.setState({ arrangeAnchor: null }, () =>
+      this.restorePopoverFocus(anchor)
+    )
+  }
+
+  private openSearch = (anchor: HTMLElement) => {
+    this.setState({
+      searchAnchor: anchor,
+      arrangeAnchor: null,
+      closeMatchingAnchor: null,
+      closeExceptAnchor: null,
+    })
+  }
+
+  private onSearchButtonClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    this.openSearch(event.currentTarget)
+  }
+
+  private onSearchDismiss = () => {
+    const anchor = this.state.searchAnchor
+    if (anchor === null) {
+      return
+    }
+    this.setState({ searchAnchor: null }, () =>
       this.restorePopoverFocus(anchor)
     )
   }
@@ -362,6 +411,7 @@ export class RepositoryTabStrip extends React.Component<
       closeMatchingAnchor: anchor,
       closeExceptAnchor: null,
       arrangeAnchor: null,
+      searchAnchor: null,
     })
   }
 
@@ -517,8 +567,27 @@ export class RepositoryTabStrip extends React.Component<
         tabsStore={this.props.tabsStore}
         anchor={arrangeAnchor}
         resolveLabel={this.labelForTab}
+        resolveMatchKeys={this.matchKeysForTab}
         resolveStatusRank={this.statusRankForTab}
         onClose={this.onArrangeDismiss}
+      />
+    )
+  }
+
+  private renderSearchPopover() {
+    const { searchAnchor } = this.state
+    if (searchAnchor === null) {
+      return null
+    }
+    return (
+      <TabSearchPopover
+        tabs={this.state.tabs.tabs}
+        activeTabId={this.state.tabs.activeTabId}
+        anchor={searchAnchor}
+        resolveLabel={this.labelForTab}
+        resolveMatchKeys={this.matchKeysForTab}
+        onSelect={this.onSelect}
+        onClose={this.onSearchDismiss}
       />
     )
   }
@@ -528,6 +597,7 @@ export class RepositoryTabStrip extends React.Component<
 
     return (
       <div
+        ref={this.stripRef}
         className="repository-tab-strip"
         role="tablist"
         aria-label="Repository tabs"
@@ -557,6 +627,15 @@ export class RepositoryTabStrip extends React.Component<
           ))}
         </div>
         <button
+          className="repository-tab-search"
+          aria-label="Search tabs"
+          aria-haspopup="dialog"
+          aria-expanded={this.state.searchAnchor !== null}
+          onClick={this.onSearchButtonClick}
+        >
+          <Octicon symbol={octicons.search} />
+        </button>
+        <button
           className="repository-tab-arrange"
           aria-label="Arrange tabs"
           aria-haspopup="dialog"
@@ -583,6 +662,7 @@ export class RepositoryTabStrip extends React.Component<
         {this.renderCloseMatchingPopover()}
         {this.renderCloseExceptPopover()}
         {this.renderArrangePopover()}
+        {this.renderSearchPopover()}
         <div
           className="repository-tab-announcement"
           role="status"

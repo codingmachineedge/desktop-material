@@ -47,6 +47,14 @@ describe('repository tab action responsive styles', () => {
     )
     assert.match(
       style,
+      /\.tab-search-popover\s*\{[\s\S]*?min-width: 0;[\s\S]*?max-width: calc\(100vw - 52px\);[\s\S]*?max-height: min\([\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      style,
+      /\.tab-search-results\s*\{[\s\S]*?max-height: 350px;[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      style,
       /\.popover-component:has\(\.close-tabs-except\),[\s\S]*?max-width: calc\(100vw - 20px\);[\s\S]*?max-height: var\(--available-height,[\s\S]*?overflow: hidden;/
     )
   })
@@ -60,6 +68,14 @@ describe('repository tab action responsive styles', () => {
     assert.match(
       style,
       /@media \(max-width: 520px\), \(max-height: 560px\)[\s\S]*?\.arrange-tabs-row\s*\{[\s\S]*?flex-direction: column;[\s\S]*?\.arrange-tabs-sort-grid\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/
+    )
+    assert.match(
+      style,
+      /\.arrange-tabs-filter\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;/
+    )
+    assert.match(
+      style,
+      /@media \(max-width: 520px\), \(max-height: 560px\)[\s\S]*?\.tab-search-popover \.tab-search-results\s*\{[\s\S]*?max-height: 220px;/
     )
   })
 

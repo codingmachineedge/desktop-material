@@ -250,6 +250,12 @@ interface IListProps {
     event: React.MouseEvent<HTMLDivElement>
   ) => void
 
+  /** Invoked when a focused row receives Context Menu or Shift+F10. */
+  readonly onRowKeyboardContextMenu?: (
+    row: number,
+    event: React.KeyboardEvent<HTMLDivElement>
+  ) => void
+
   /**
    * A handler called whenever the user drops items on the list to be inserted.
    *
@@ -855,6 +861,13 @@ export class List extends React.Component<IListProps, IListState> {
     this.props.onRowContextMenu?.(indexPath.row, e)
   }
 
+  private onRowKeyboardContextMenu = (
+    indexPath: RowIndexPath,
+    e: React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    this.props.onRowKeyboardContextMenu?.(indexPath.row, e)
+  }
+
   /** Convenience method for invoking canSelectRow callback when it exists */
   private canSelectRow = (rowIndex: number) => {
     return this.props.canSelectRow ? this.props.canSelectRow(rowIndex) : true
@@ -1215,7 +1228,16 @@ export class List extends React.Component<IListProps, IListState> {
           onRowFocus={this.onRowFocus}
           onRowKeyboardFocus={this.onRowKeyboardFocus}
           onRowBlur={this.onRowBlur}
-          onContextMenu={this.onRowContextMenu}
+          onContextMenu={
+            this.props.onRowContextMenu === undefined
+              ? undefined
+              : this.onRowContextMenu
+          }
+          onKeyboardContextMenu={
+            this.props.onRowKeyboardContextMenu === undefined
+              ? undefined
+              : this.onRowKeyboardContextMenu
+          }
           style={params.style}
           tabIndex={tabIndex}
           children={element}

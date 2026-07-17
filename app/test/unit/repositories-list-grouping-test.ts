@@ -8,6 +8,38 @@ import {
   ShowBranchNameInRepoListSetting,
   shouldShowBranchName,
 } from '../../src/models/show-branch-name-in-repo-list'
+import {
+  Account,
+  AccountProvider,
+  getAccountKey,
+} from '../../src/models/account'
+import {
+  accountFilterFor,
+  filterRepositoryGroups,
+  repositoryService,
+} from '../../src/ui/repositories-list/repository-list-filters'
+
+const makeAccount = (
+  login: string,
+  endpoint: string,
+  id: number,
+  provider: AccountProvider
+) =>
+  new Account(
+    login,
+    endpoint,
+    'token',
+    [],
+    '',
+    id,
+    '',
+    'free',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    provider
+  )
 
 describe('repository list grouping', () => {
   const repositories: Array<Repository | CloningRepository> = [
@@ -250,6 +282,165 @@ describe('repository list grouping', () => {
     assert.deepEqual(
       grouped[0].items.map(item => item.repository.id),
       [11, 10]
+    )
+  })
+
+  it('filters grouped rows by exact account and service with AND semantics', () => {
+    const endpoint = 'https://api.github.example'
+    const first = makeAccount('first', endpoint, 10, 'github')
+    const second = makeAccount('second', endpoint, 20, 'github')
+    const gitlab = makeAccount(
+      'gitlab-user',
+      'https://gitlab.example/api/v4',
+      30,
+      'gitlab'
+    )
+    const firstRepo = new Repository(
+      'first',
+      101,
+      gitHubRepoFixture({ endpoint, owner: 'team', name: 'first' }),
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      getAccountKey(first)
+    )
+    const secondRepo = new Repository(
+      'second',
+      102,
+      gitHubRepoFixture({ endpoint, owner: 'team', name: 'second' }),
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      getAccountKey(second)
+    )
+    const gitlabRepo = new Repository(
+      'gitlab',
+      103,
+      gitHubRepoFixture({
+        endpoint: gitlab.endpoint,
+        owner: 'team',
+        name: 'gitlab',
+      }),
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      getAccountKey(gitlab)
+    )
+    const local = new Repository('local', 104, null, false)
+    const groups = groupRepositories(
+      [firstRepo, secondRepo, gitlabRepo, local],
+      cache,
+      []
+    )
+    const accounts = [first, second, gitlab]
+
+    const firstOnly = filterRepositoryGroups(
+      groups,
+      accounts,
+      accountFilterFor(first),
+      'github'
+    )
+    assert.deepEqual(
+      firstOnly.flatMap(group => group.items.map(item => item.repository.id)),
+      [firstRepo.id]
+    )
+    assert.equal(
+      filterRepositoryGroups(
+        groups,
+        accounts,
+        accountFilterFor(gitlab),
+        'github'
+      ).length,
+      0
+    )
+    assert.deepEqual(
+      filterRepositoryGroups(groups, accounts, 'all', 'local').flatMap(group =>
+        group.items.map(item => item.repository.id)
+      ),
+      [local.id]
+    )
+  })
+
+  it('classifies stale hosted bindings as unknown without guessing the provider', () => {
+    const staleGitLab = new Repository(
+      'stale-gitlab',
+      201,
+      gitHubRepoFixture({
+        endpoint: 'https://gitlab.example/api/v4',
+        owner: 'team',
+        name: 'stale-gitlab',
+      }),
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      'missing-account'
+    )
+    const cloning = new CloningRepository(
+      '/tmp/cloning',
+      'https://bitbucket.example/team/cloning.git'
+    )
+    const bitbucket = makeAccount(
+      'bb-user',
+      'https://bitbucket.example/api/2.0',
+      40,
+      'bitbucket'
+    )
+    cloning.accountKey = getAccountKey(bitbucket)
+
+    assert.equal(repositoryService(staleGitLab, []), 'unknown')
+    assert.equal(repositoryService(cloning, [bitbucket]), 'bitbucket')
+  })
+
+  it('filters after full grouping so pinned and recent duplicates stay coherent', () => {
+    const account = makeAccount(
+      'octocat',
+      'https://api.github.com',
+      50,
+      'github'
+    )
+    const hosted = new Repository(
+      'hosted',
+      301,
+      gitHubRepoFixture({ owner: 'octocat', name: 'hosted' }),
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      getAccountKey(account)
+    )
+    const locals = Array.from(
+      { length: 7 },
+      (_, index) => new Repository(`local-${index}`, 400 + index, null, false)
+    )
+    const fullGroups = groupRepositories(
+      [hosted, ...locals],
+      cache,
+      [hosted.id],
+      true,
+      [hosted.id]
+    )
+    const filtered = filterRepositoryGroups(
+      fullGroups,
+      [account],
+      'all',
+      'github'
+    )
+
+    assert.deepEqual(
+      filtered.map(group => group.identifier.kind),
+      ['pinned', 'recent', 'dotcom']
+    )
+    assert.ok(
+      filtered.every(group => group.items[0].repository.id === hosted.id)
     )
   })
 })

@@ -161,6 +161,7 @@ import { ReleaseNotes } from './release-notes'
 import { DeletePullRequest } from './delete-branch/delete-pull-request-dialog'
 import { CommitConflictsWarning } from './merge-conflicts'
 import { AppTheme } from './app-theme'
+import { ButtonHints } from './lib/button-hints'
 import { ApplicationTheme } from './lib/application-theme'
 import { RepositoryStateCache } from '../lib/stores/repository-state-cache'
 import { hasModalPopup, PopupType, Popup } from '../models/popup'
@@ -1319,6 +1320,9 @@ export class App extends React.Component<IAppProps, IAppState> {
    */
   private onCustomizationContextMenu = (event: MouseEvent) => {
     if (event.defaultPrevented || !(event.target instanceof Element)) {
+      return
+    }
+    if (event.target.closest('[data-context-menu-owner="true"]') !== null) {
       return
     }
     if (
@@ -4038,6 +4042,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     const repositories = this.state.repositories
     return (
       <RepositoriesList
+        accounts={this.state.accounts}
         filterText={filterText}
         onFilterTextChanged={this.onRepositoryFilterTextChanged}
         selectedRepository={selectedRepository}
@@ -4890,6 +4895,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         style={{ tabSize: currentTabSize }}
       >
         <AppTheme theme={currentTheme} appearance={appearance} />
+        <ButtonHints />
         {this.renderTitlebar()}
         {this.state.showWelcomeFlow
           ? this.renderWelcomeFlow()

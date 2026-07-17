@@ -44,6 +44,7 @@ maintenance acceptance items are complete.
 - Mark tabs as favorites, drag a repository folder onto the app to open or switch its tab, and export or import the current ordered tab session with pins, favorites, aliases, and per-tab appearance
 - Keep the original **Close Tabs Containing…** regex workflow, or use the guarded inverse **Close all tabs except those containing…** action. The inverse matches a case-insensitive literal substring across the visible label, repository alias/name, and local path; live counts and a bounded preview make the result reviewable, and an empty or zero-match query cannot confirm
 - Pin important tabs and arrange each pinned or unpinned group manually with drag-and-drop or named keyboard move actions. **Arrange tabs** also offers one-shot A→Z, Z→A, newest-opened, oldest-opened, repository-status, and favorites-first/last sorts; the chosen order persists without continuously reshuffling as repository status changes
+- Use **Search tabs** to switch by name, alias, path, or clone URL, and narrow **Arrange tabs** with its literal multi-key filter without changing the all-tab scope of one-shot sorts
 
 **Multi-account**
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
@@ -53,12 +54,14 @@ maintenance acceptance items are complete.
 - Select all repositories with a mixed-state checkbox, or opt in to automatically clone newly discovered repositories while the clone dialog remains open
 - Clone a private repository from a generic HTTPS URL without a credential prompt when an eligible signed-in account matches the exact origin. Only authentication or repository-not-found ambiguity can try another exact-origin account; the successful account affinity is retained, while tokenless or stale tokenless bindings are skipped and missing, SSH, non-authentication, and cross-origin credentials never widen fallback
 - The repository list can hide its automatically maintained Recent group from **Settings → Appearance**
+- Filter the cloned-repository list independently by its exact bound account and provider service; local-only, unavailable-account, and unknown/signed-out scopes are explicit instead of inferred from a host name
 - Repositories can be pinned from their context menu into a dedicated top group
 - Provider triage consumes the same exact repository-account binding selected in Repository Settings. One valid matching identity can bind an unassigned repository; multiple matches require an explicit labelled choice; missing, stale, permission, and organization-SSO states route to the appropriate sign-in or account-management recovery without silently replacing a valid binding
 
 **Versioned settings & history**
 - Per-account settings stored in a local git repo — every settings/tabs change auto-commits. Open **Edit → Settings History…** (`Ctrl+Alt+Z`) for a non-modal timeline with lazy diffs, undo, redo, and restore; each history action adds an audit commit instead of rewriting history
 - Right-click appropriate shell and repository surfaces for a direct customization route plus the exact owning profile or local repository history context; specialized editing/context menus retain priority
+- Right-click a History commit—or press the row's named **More actions** control, Context Menu key, or `Shift+F10`—for the same selection-aware reset, checkout, reorder, revert, branch, tag, cherry-pick, copy, and provider actions
 
 **Non-modal dialog framework**
 - Dialogs float without blocking the app, drag by their headers, cascade, and can be brought to front — the app stays fully interactive behind an open dialog
@@ -128,6 +131,7 @@ maintenance acceptance items are complete.
 
 **Fully Material, everywhere**
 - The remaining stock surfaces — tooltips, menus, banners, autocomplete popups, segmented controls, split-buttons, dialog internals, History/CI surfaces — are re-tinted through the Material token system in both light and dark themes
+- Every button now exposes a shared hover and keyboard-focus hint derived from its explicit help text, accessible name, or visible label; icon-only native buttons mounted later by dialogs and virtualized views receive the same non-native tooltip treatment
 - Compact-height dialogs and tools keep named actions reachable without page-level horizontal clipping. In particular, the Regex Builder reflows its category/token grid and scrolls its body while preserving the tester and footer, and the Remote Manager protects readable field/control widths before stacking
 
 **Also shipped:** multi-clone with organization chips, parallel/sequential modes and URL-only import/export; one-click commit and push with a generated message; self-update checks against Desktop Material releases; SVG diff hardening and display controls; safer undo/reset/tag deletion confirmations; and responsive, keyboard-accessible MD3 surfaces throughout the app.
@@ -158,6 +162,10 @@ set.
 | <img src="docs/assets/screenshots/material-repository-tools.png" alt="Repository Tools administration hub" width="420"><br><sub>Repository Tools</sub> | <img src="docs/assets/screenshots/material-actions-cache-manager.png" alt="Actions cache manager" width="420"><br><sub>Actions caches</sub> | <img src="docs/assets/screenshots/material-scale-200-autofit.png" alt="Two hundred percent scale auto-fit without clipping" width="420"><br><sub>200% auto-fit</sub> |
 | <img src="docs/assets/screenshots/material-pull-all-account-fallback.png" alt="Pull All results for several repositories" width="420"><br><sub>Pull All</sub> | <img src="docs/assets/screenshots/material-native-pull-request.png" alt="Native pull request creation" width="420"><br><sub>Pull requests</sub> | <img src="docs/assets/screenshots/material-workspace-changes.png" alt="Desktop Material Changes workspace" width="420"><br><sub>Changes workspace</sub> |
 | <img src="docs/assets/screenshots/material-stash-manager.png" alt="Repository-wide stash manager" width="420"><br><sub>Stash manager</sub> | <img src="docs/assets/screenshots/material-github-issues.png" alt="GitHub issue detail and lifecycle controls" width="420"><br><sub>Issues</sub> | <img src="docs/assets/screenshots/material-responsive-overflow-fixed.png" alt="Responsive workspace without horizontal clipping" width="420"><br><sub>Responsive clipping gate</sub> |
+
+| Runtime tab search | History commit actions | Repository Tools at the true bottom |
+| --- | --- | --- |
+| <img src="docs/assets/screenshots/material-tab-search.png" alt="Runtime repository-tab search matching the active local fixture by name and path" width="420"><br><sub>Search and switch tabs</sub> | <img src="docs/assets/screenshots/material-history-context-actions.png" alt="History commit row with its named More actions control and hover hint" width="420"><br><sub>Right-click and keyboard-equivalent actions</sub> | <img src="docs/assets/screenshots/material-repository-tools-scroll.png" alt="Short Repository Tools workspace scrolled to its reachable final results surface" width="420"><br><sub>Verified bottom reachability</sub> |
 
 | Complete GitHub API Explorer |
 | --- |

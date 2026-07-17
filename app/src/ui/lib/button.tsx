@@ -33,6 +33,13 @@ export interface IButtonProps {
   /** An optional tooltip to render when hovering over the button */
   readonly tooltip?: string
 
+  /**
+   * Whether a tooltip should be inferred from the accessible label or visible
+   * button text when an explicit tooltip is not supplied. Defaults to true.
+   * Composite controls which own their tooltip target can disable this.
+   */
+  readonly inferTooltip?: boolean
+
   /** Is the button disabled? */
   readonly disabled?: boolean
 
@@ -229,7 +236,13 @@ export class Button extends React.Component<IButtonProps, {}> {
   }
 
   public render() {
-    const { disabled, tooltip } = this.props
+    const { disabled } = this.props
+    const tooltip = getButtonHint(
+      this.props.tooltip,
+      this.props.ariaLabel,
+      this.props.children,
+      this.props.inferTooltip
+    )
 
     const className = classNames('button-component', this.props.className, {
       'small-button': this.props.size === 'small',
@@ -266,7 +279,10 @@ export class Button extends React.Component<IButtonProps, {}> {
             delay={disabled ? 0 : undefined}
             onlyWhenOverflowed={this.props.onlyShowTooltipWhenOverflowed}
             openOnTargetClick={this.props.openTooltipOnClick}
-            applyAriaDescribedBy={this.props.applyTooltipAriaDescribedBy}
+            applyAriaDescribedBy={
+              this.props.applyTooltipAriaDescribedBy ??
+              this.props.tooltip !== undefined
+            }
             dismissable={this.props.tooltipDismissable}
           >
             {tooltip}
@@ -294,6 +310,58 @@ export class Button extends React.Component<IButtonProps, {}> {
       event.preventDefault()
     }
   }
+}
+
+/**
+ * Resolve the concise hint displayed for a button without relying on the
+ * browser's native `title` tooltip.
+ */
+export function getButtonHint(
+  tooltip: string | undefined,
+  ariaLabel: string | undefined,
+  children: React.ReactNode,
+  inferTooltip = true
+): string | undefined {
+  if (tooltip !== undefined || !inferTooltip) {
+    return normalizeButtonHint(tooltip)
+  }
+
+  return normalizeButtonHint(ariaLabel) ?? getVisibleButtonText(children)
+}
+
+function getVisibleButtonText(children: React.ReactNode): string | undefined {
+  const parts = new Array<string>()
+
+  const collect = (node: React.ReactNode) => {
+    React.Children.forEach(node, child => {
+      if (typeof child === 'string' || typeof child === 'number') {
+        parts.push(String(child))
+        return
+      }
+
+      if (!React.isValidElement(child) || child.props['aria-hidden'] === true) {
+        return
+      }
+
+      const childAriaLabel = normalizeButtonHint(child.props['aria-label'])
+      if (childAriaLabel !== undefined) {
+        parts.push(childAriaLabel)
+        return
+      }
+
+      collect(child.props.children)
+    })
+  }
+
+  collect(children)
+  return normalizeButtonHint(parts.join(' '))
+}
+
+function normalizeButtonHint(value: string | undefined) {
+  const normalized = value?.replace(/\s+/g, ' ').trim()
+  return normalized === undefined || normalized.length === 0
+    ? undefined
+    : normalized
 }
 
 const preventDefault = (e: Event | React.SyntheticEvent) => e.preventDefault()

@@ -167,7 +167,7 @@ export class RepositoryTab extends React.Component<
 
     if (this.state.isRenaming) {
       return (
-        <div className={className} style={frameStyle}>
+        <div className={className} style={frameStyle} data-tab-id={tab.id}>
           {this.renderIcon()}
           <input
             className="repository-tab-rename"
@@ -186,6 +186,7 @@ export class RepositoryTab extends React.Component<
       <div
         className={className}
         style={frameStyle}
+        data-tab-id={tab.id}
         role="tab"
         aria-selected={isActive}
         aria-label={`${this.label}${tab.isPinned === true ? ', pinned' : ''}${

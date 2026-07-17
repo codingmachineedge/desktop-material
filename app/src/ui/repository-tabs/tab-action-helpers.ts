@@ -55,6 +55,32 @@ export function repositoryTabMatchKeys(
 }
 
 /**
+ * Match every whitespace-delimited query term literally against all known tab
+ * keys. Terms may match different keys, so a query can combine (for example)
+ * a repository alias and a path segment without treating either as a regular
+ * expression.
+ */
+export function repositoryTabMatchesQuery(
+  query: string,
+  keys: ReadonlyArray<string>
+): boolean {
+  const terms = query
+    .trim()
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter(term => term.length > 0)
+
+  if (terms.length === 0) {
+    return true
+  }
+
+  const searchableKeys = keys.map(key => key.toLocaleLowerCase())
+  return terms.every(term =>
+    searchableKeys.some(searchableKey => searchableKey.includes(term))
+  )
+}
+
+/**
  * Provider-neutral stable status rank used by the one-shot Arrange action:
  * 0 conflicts/errors/unavailable, 1 changed, 2 ahead/behind/diverged, 3 clean.
  * Missing/cloning repositories and a TipState.Unknown cache entry are treated

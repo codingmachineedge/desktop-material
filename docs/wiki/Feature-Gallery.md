@@ -1,6 +1,6 @@
 # Guided Feature Gallery
 
-This page maps 58 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 61 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
@@ -15,7 +15,8 @@ contract rejects missing, duplicate, or unassigned assets.
 > pagination evidence, the Pages accessibility/clipping gate, the inspected July 16 adaptive
 > customization set, the profile app-identity workspace, the clone-style Add Submodule release,
 > the repository-contextual GitHub API Explorer, filtered notification bulk triage, and
-> configurable bottom-right error notices. Exact build, interaction, and
+> configurable bottom-right error notices, runtime tab search, History commit actions, and
+> true-bottom Repository Tools scrolling. Exact build, interaction, and
 > privacy receipts are retained in `HANDOFF.md`; each promoted release records its own main, CI,
 > Pages, and wiki verification without implying that later maintenance work is complete.
 
@@ -41,6 +42,7 @@ display.
 | `material-toolbar-overflow.png` | Measured narrow toolbar with Build & Run and Commit & Push in More |
 | `material-tab-appearance-word.png` | Word-style tab typography, alignment, and independent color palettes |
 | `material-tab-arrange.png` | Pinned/manual movement and one-shot tab ordering controls |
+| `material-tab-search.png` | Runtime tab search across names, aliases, paths, and clone URLs |
 | `material-actions-cancel.png` | Exact workflow-run cancellation review with ref, actor, and commit context |
 | `material-rebase-review.png` | Reviewed current→target rebase with ahead/behind state and commit preview |
 | `material-shallow-clone-safe.png` | Reviewed shallow clone with a bounded commit depth |
@@ -63,8 +65,10 @@ display.
 | `material-github-issues.png` | Issue detail, comments, and reviewed lifecycle controls |
 | `material-provider-triage.png` | Account- and repository-bound provider triage |
 | `material-repository-tools.png` | Named Repository Tools administration hub |
+| `material-repository-tools-scroll.png` | Short-height Repository Tools scrolled to its reachable final results surface |
 | `material-workspace-changes.png` | Material Changes workspace and commit flow |
 | `material-history.png` | Core History browsing and selected-commit inspection |
+| `material-history-context-actions.png` | Selection-aware History commit More/right-click actions and button hint |
 | `material-settings.png` | Responsive Material Settings dialog |
 | `settings-history-manager.png` | Git-backed Settings history side sheet |
 | `material-repositories-sheet.png` | Repository navigation side sheet |
@@ -134,6 +138,8 @@ path; it never force-pushes automatically.
 ![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
 
 ![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
+
+![Short Repository Tools workspace scrolled to its reachable final results surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools-scroll.png)
 
 ![Reviewed current-branch rebase showing current to target, ahead and behind counts, and a bounded commit preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-rebase-review.png)
 
@@ -226,6 +232,8 @@ shown with the matching inspected evidence below.
 
 ![Arrange tabs surface with pinned and manual movement controls plus one-shot label, opened-date, and repository-status sorts](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-arrange.png)
 
+![Runtime repository-tab search matching an active repository by name and path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-search.png)
+
 ## Material shell and accessibility
 
 ![Material Changes workspace and commit flow](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-workspace-changes.png)
@@ -251,6 +259,8 @@ reachable without page-level horizontal clipping.
 ![Block-based regular expression builder and live tester](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/regex-builder.png)
 
 ![Core History browsing and selected-commit inspection](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history.png)
+
+![History commit row with its named More actions control and hover hint](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-context-actions.png)
 
 ![Searchable History and commit ancestry graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 

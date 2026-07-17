@@ -142,7 +142,12 @@ export class AuthorHandle extends React.Component<IAuthorHandleProps> {
             symbol={author.state === 'error' ? octicons.stop : syncClockwise}
           />
         )}
-        <button onClick={this.onRemoveClick} tabIndex={-1}>
+        <button
+          type="button"
+          aria-label={`Remove ${getDisplayTextForAuthor(author)}`}
+          onClick={this.onRemoveClick}
+          tabIndex={-1}
+        >
           <Octicon className="delete" symbol={octicons.x} />
         </button>
       </div>

@@ -114,6 +114,45 @@
     }
   }
 
+  .repository-list-scope-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 0 0 auto;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 12px 4px;
+
+    label {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+
+      > span {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+      }
+    }
+
+    select {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      min-height: 36px;
+      padding: 6px 28px 6px 9px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 11px;
+      background-color: var(--md-sys-color-surface-container);
+      color: var(--md-sys-color-on-surface);
+      font: inherit;
+
+      &:focus-visible {
+        outline: 2px solid var(--md-sys-color-primary);
+        outline-offset: 2px;
+      }
+    }
+  }
+
   .no-items {
     text-align: center;
     padding: var(--spacing);
@@ -156,6 +195,12 @@
         text-align: center;
       }
     }
+  }
+}
+
+@media (max-width: 520px), (max-height: 560px) {
+  .repository-list .repository-list-scope-filters {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

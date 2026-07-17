@@ -28,6 +28,35 @@ Pages deployment remains subject to the protected reviewed `main` promotion
 path; historical branch-only publication receipts below are retained as
 provenance rather than current status.
 
+## 2026-07-16 navigation, context actions, and scroll containment
+
+Repository tabs now have a runtime search/switcher across labels, aliases,
+paths, and clone URLs. Arrange Tabs has its own literal multi-key filter while
+one-shot sorts continue to apply to all open tabs. The repositories side sheet
+adds independent exact-account and provider-service scopes, including explicit
+local-only, unavailable-account, and unknown/signed-out states.
+
+Every button receives a discoverable shared hover and keyboard-focus hint.
+History commit rows own their specialized context path: right-click, Context
+Menu, `Shift+F10`, and the named More button all build the same action set from
+the effective selection, so an unselected clicked row cannot accidentally act
+on an unrelated multi-selection.
+
+Repository Tools now wins the real compiled Material-card cascade with an
+owned vertical scroll region. The production gate reached its exact bottom at
+regular, `640×480`, `960×420`, and 150% zoom layouts with the final named
+control inside both the surface and viewport.
+
+| Promoted screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-tab-search.png` | 1000×687 | 91,055 | `1a18b970c9aaffe4716be61cbbc84afa34cad6395a9e2e35bdfe48472396abc5` |
+| `docs/assets/screenshots/material-history-context-actions.png` | 1000×687 | 92,197 | `c5c2b722a4c79979ce3973ed8ce921fb1eac661caa1c03ace2317d4f81ef0ec0` |
+| `docs/assets/screenshots/material-repository-tools-scroll.png` | 960×420 | 29,840 | `d39dad61015ca333fbb95d388a8d75d7484a662d85f068e99a4b5fefa80f8b45` |
+
+The exact hidden-desktop verifier and safety/build/geometry receipts live in
+`.codex/run-manifests/2026-07-16-navigation-context-scroll.md`. The app process,
+desktop, CDP listener, and disposable fixture were removed after promotion.
+
 The **July 16 adaptive customization maintenance release** also passed its exact
 production build and off-screen interaction gate at tested code source
 `c5205838dfc5ee2b7ce80ce488215a2cd903bb26`. It adds profile/repository/tab
@@ -106,6 +135,8 @@ promoted.
   returned 200 with their exact promoted byte lengths.
 - Build Installers workflow `29552951386` completed successfully for that exact
   SHA; its Windows x64 installer job passed.
+- CI workflow `29552951433` completed successfully for that exact SHA: lint,
+  Windows and macOS E2E smoke, Windows x64/arm64, and macOS x64/arm64 all passed.
 - The separate wiki preserved its remote-only `Images/` directory and overlaid
   only the four reviewed canonical Markdown files. Wiki `master` was committed
   and pushed without force at

@@ -38,10 +38,20 @@ import {
   getPinnedRepositories,
   removePinnedRepository,
 } from '../../lib/stores/repository-pinning'
+import { Account } from '../../models/account'
+import {
+  accountFilterFor,
+  filterRepositoryGroups,
+  isAccountFilterAvailable,
+  RepositoryAccountFilter,
+  RepositoryServiceFilter,
+} from './repository-list-filters'
 
 const BlankSlateImage = encodePathAsUrl(__dirname, 'static/empty-no-repo.svg')
 
 interface IRepositoriesListProps {
+  /** Signed-in identities used by the account and provider scope controls. */
+  readonly accounts?: ReadonlyArray<Account>
   readonly selectedRepository: Repositoryish | null
   readonly repositories: ReadonlyArray<Repositoryish>
   readonly recentRepositories: ReadonlyArray<number>
@@ -97,6 +107,8 @@ interface IRepositoriesListState {
   readonly newRepositoryMenuExpanded: boolean
   readonly selectedItem: IRepositoryListItem | null
   readonly pinnedRepositoryIds: ReadonlyArray<number>
+  readonly accountFilter: RepositoryAccountFilter
+  readonly serviceFilter: RepositoryServiceFilter
 }
 
 const RowHeight = 29
@@ -172,6 +184,20 @@ export class RepositoriesList extends React.Component<
       newRepositoryMenuExpanded: false,
       selectedItem: null,
       pinnedRepositoryIds: getPinnedRepositories(),
+      accountFilter: 'all',
+      serviceFilter: 'all',
+    }
+  }
+
+  public componentDidUpdate(prevProps: IRepositoriesListProps) {
+    if (
+      prevProps.accounts !== this.props.accounts &&
+      !isAccountFilterAvailable(
+        this.state.accountFilter,
+        this.props.accounts ?? []
+      )
+    ) {
+      this.setState({ accountFilter: 'all', selectedItem: null })
     }
   }
 
@@ -367,12 +393,18 @@ export class RepositoriesList extends React.Component<
       this.getGroupLabel(groups[group].identifier)
 
   public render() {
-    const groups = this.getRepositoryGroups(
+    const allGroups = this.getRepositoryGroups(
       this.props.repositories,
       this.props.localRepositoryStateLookup,
       this.props.recentRepositories,
       this.props.showRecentRepositories,
       this.state.pinnedRepositoryIds
+    )
+    const groups = filterRepositoryGroups(
+      allGroups,
+      this.props.accounts ?? [],
+      this.state.accountFilter,
+      this.state.serviceFilter
     )
 
     // So there's two types of selection at play here. There's the repository
@@ -394,6 +426,7 @@ export class RepositoriesList extends React.Component<
           filterListLabel="Repositories"
           filterText={this.props.filterText}
           onFilterTextChanged={this.props.onFilterTextChanged}
+          renderPreList={this.renderScopeFilters}
           renderItem={this.renderItem}
           renderRowFocusTooltip={this.renderRowFocusTooltip}
           renderGroupHeader={this.renderGroupHeader}
@@ -406,6 +439,9 @@ export class RepositoriesList extends React.Component<
             filterText: this.props.filterText,
             showRecentRepositories: this.props.showRecentRepositories,
             pinnedRepositoryIds: this.state.pinnedRepositoryIds,
+            accounts: this.props.accounts,
+            accountFilter: this.state.accountFilter,
+            serviceFilter: this.state.serviceFilter,
           }}
           onItemContextMenu={this.onItemContextMenu}
           getGroupAriaLabel={this.getGroupAriaLabelGetter(groups)}
@@ -418,6 +454,70 @@ export class RepositoriesList extends React.Component<
 
   private onSelectionChanged = (selectedItem: IRepositoryListItem | null) => {
     this.setState({ selectedItem })
+  }
+
+  private onAccountFilterChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    this.setState({
+      accountFilter: event.currentTarget.value as RepositoryAccountFilter,
+      selectedItem: null,
+    })
+  }
+
+  private onServiceFilterChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    this.setState({
+      serviceFilter: event.currentTarget.value as RepositoryServiceFilter,
+      selectedItem: null,
+    })
+  }
+
+  private renderScopeFilters = () => {
+    const accounts = this.props.accounts ?? []
+    return (
+      <div
+        className="repository-list-scope-filters"
+        role="group"
+        aria-label="Repository scope filters"
+      >
+        <label>
+          <span>Repository account</span>
+          <select
+            aria-label="Repository account"
+            value={this.state.accountFilter}
+            onChange={this.onAccountFilterChange}
+          >
+            <option value="all">All accounts</option>
+            {accounts.map(account => (
+              <option
+                key={accountFilterFor(account)}
+                value={accountFilterFor(account)}
+              >
+                {account.friendlyName} · {account.friendlyEndpoint}
+              </option>
+            ))}
+            <option value="unassigned">No available account</option>
+          </select>
+        </label>
+        <label>
+          <span>Repository service</span>
+          <select
+            aria-label="Repository service"
+            value={this.state.serviceFilter}
+            onChange={this.onServiceFilterChange}
+          >
+            <option value="all">All services</option>
+            <option value="github">GitHub</option>
+            <option value="gitlab">GitLab</option>
+            <option value="bitbucket">Bitbucket</option>
+            <option value="local">Local only</option>
+            <option value="unknown">Unknown or signed out</option>
+          </select>
+        </label>
+      </div>
+    )
   }
 
   // In-sheet header (spec-overlays §3.1): title + close ✕. The Add split-button

@@ -90,6 +90,12 @@ interface IListRowProps {
     e: React.MouseEvent<HTMLDivElement>
   ) => void
 
+  /** Called when the keyboard Context Menu key or Shift+F10 is pressed. */
+  readonly onKeyboardContextMenu?: (
+    index: RowIndexPath,
+    e: React.KeyboardEvent<HTMLDivElement>
+  ) => void
+
   /**
    * Whether or not this list row is going to be selectable either through
    * keyboard navigation, pointer clicks, or both. This is used to determine
@@ -203,6 +209,19 @@ export class ListRow extends React.Component<IListRowProps, {}> {
   }
 
   private onRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (
+      this.props.onKeyboardContextMenu !== undefined &&
+      (e.key === 'ContextMenu' ||
+        e.key === 'Apps' ||
+        (e.shiftKey && e.key === 'F10'))
+    ) {
+      e.preventDefault()
+      e.stopPropagation()
+      this.props.onKeyboardContextMenu(this.props.rowIndex, e)
+      this.keyboardFocusDetectionState = 'failed'
+      return
+    }
+
     this.props.onRowKeyDown(this.props.rowIndex, e)
     this.keyboardFocusDetectionState = 'failed'
   }
@@ -289,6 +308,18 @@ export class ListRow extends React.Component<IListRowProps, {}> {
         aria-posinset={ariaPosInSet}
         aria-selected={selectable ? selected : undefined}
         aria-label={this.props.ariaLabel}
+        aria-haspopup={
+          this.props.onContextMenu !== undefined ||
+          this.props.onKeyboardContextMenu !== undefined
+            ? 'menu'
+            : undefined
+        }
+        data-context-menu-owner={
+          this.props.onContextMenu !== undefined ||
+          this.props.onKeyboardContextMenu !== undefined
+            ? 'true'
+            : undefined
+        }
         className={rowClassName}
         tabIndex={tabIndex}
         ref={this.onRowRef}

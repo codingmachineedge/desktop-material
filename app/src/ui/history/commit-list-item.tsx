@@ -29,6 +29,7 @@ import { TooltippedContent } from '../lib/tooltipped-content'
 import { formatDate } from '../../lib/format-date'
 import { CommitGraph } from './commit-graph'
 import { ICommitGraphRow } from './commit-graph-model'
+import { Button } from '../lib/button'
 
 interface ICommitProps {
   readonly gitHubRepository: GitHubRepository | null
@@ -53,6 +54,10 @@ interface ICommitProps {
   readonly accounts: ReadonlyArray<Account>
   readonly preferAbsoluteDates: boolean
   readonly graphRow?: ICommitGraphRow
+  readonly onShowContextMenu?: (
+    commit: Commit,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => void
 }
 
 interface ICommitListItemState {
@@ -182,9 +187,27 @@ export class CommitListItem extends React.PureComponent<
             </div>
           </div>
           {this.renderCommitIndicators()}
+          {this.props.onShowContextMenu !== undefined && (
+            <Button
+              className="commit-more-actions"
+              ariaLabel={`More actions for ${commitSummary}`}
+              tooltip="More actions"
+              // The list row is the roving focus target. Context Menu and
+              // Shift+F10 open this same menu without adding a tab stop per row.
+              tabIndex={-1}
+              onClick={this.onShowContextMenu}
+            >
+              <Octicon symbol={octicons.kebabHorizontal} />
+            </Button>
+          )}
         </div>
       </Draggable>
     )
+  }
+
+  private onShowContextMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    this.props.onShowContextMenu?.(this.props.commit, event)
   }
 
   private renderCommitIndicators() {

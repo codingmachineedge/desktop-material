@@ -28,6 +28,23 @@ const InteractiveTooltipHideDelay = 250
 // HTMLElement like mouseenter, mouseleave etc. So we make our own type here.
 export type TooltipTarget = Element & GlobalEventHandlers
 
+const tooltipTargetCounts = new WeakMap<Element, number>()
+
+function markTooltipTarget(target: Element) {
+  tooltipTargetCounts.set(target, (tooltipTargetCounts.get(target) ?? 0) + 1)
+  target.setAttribute('data-tooltip-target', 'true')
+}
+
+function unmarkTooltipTarget(target: Element) {
+  const count = tooltipTargetCounts.get(target) ?? 0
+  if (count <= 1) {
+    tooltipTargetCounts.delete(target)
+    target.removeAttribute('data-tooltip-target')
+  } else {
+    tooltipTargetCounts.set(target, count - 1)
+  }
+}
+
 export interface ITooltipProps<T> {
   /**
    * The target element for which to display a tooltip. Use
@@ -203,6 +220,7 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   ITooltipProps<T>,
   ITooltipState
 > {
+  private mounted = false
   private mouseRect = new DOMRect()
 
   private mouseOverTarget = false
@@ -229,6 +247,9 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
     }
 
     this.resizeObserver = new ResizeObserver(entries => {
+      if (!this.mounted) {
+        return
+      }
       for (const entry of entries) {
         if (entry.target === this.tooltipRef) {
           const tooltipRect = this.tooltipRef.getBoundingClientRect()
@@ -246,6 +267,7 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   }
 
   public componentDidMount() {
+    this.mounted = true
     const { target } = this.props
     target.subscribe(this.onTargetRef)
 
@@ -257,15 +279,29 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   }
 
   public onTargetRef = (target: TooltipTarget | null) => {
+    if (!this.mounted) {
+      return
+    }
+    // React clears host refs while tearing down their owning component. The
+    // Tooltip will be unmounted in the same pass, so avoid queueing a state
+    // update against a target which has already left the document.
+    if (
+      target === null &&
+      this.state.target !== null &&
+      !this.state.target.isConnected
+    ) {
+      return
+    }
     this.setState({ target, tooltipHost: tooltipHostFor(target) })
   }
 
   public onTooltipRef = (elem: HTMLDivElement | null) => {
+    if (!this.mounted) {
+      this.tooltipRef = elem
+      return
+    }
+
     if (elem === null) {
-      if (this.state.id) {
-        releaseUniqueId(this.state.id)
-        this.setState({ id: undefined })
-      }
       this.resizeObserver.disconnect()
       const { tooltipRef } = this
 
@@ -406,6 +442,7 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   }
 
   private installTooltip(elem: TooltipTarget) {
+    markTooltipTarget(elem)
     elem.addEventListener('mouseenter', this.onTargetMouseEnter)
     elem.addEventListener('mouseleave', this.onTargetMouseLeave)
     elem.addEventListener('mousemove', this.onTargetMouseMove)
@@ -422,6 +459,7 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
 
   private removeTooltip(prevTarget: TooltipTarget | null) {
     if (prevTarget !== null) {
+      unmarkTooltipTarget(prevTarget)
       if (prevTarget.getAttribute('aria-describedby')) {
         this.removeFromTargetAriaDescribedBy(prevTarget)
       }
@@ -435,6 +473,8 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
       prevTarget.removeEventListener('blur', this.onTargetBlur)
       prevTarget.removeEventListener('click', this.onTargetClick)
       prevTarget.removeEventListener('keydown', this.onKeyDown)
+      prevTarget.removeEventListener('tooltip-shown', this.onTooltipShown)
+      prevTarget.removeEventListener('tooltip-hidden', this.onTooltipHidden)
     }
   }
 
@@ -564,6 +604,10 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   private showTooltip = () => {
     this.cancelShowTooltip()
 
+    if (!this.mounted) {
+      return
+    }
+
     const { tooltipHost, target } = this.state
     if (tooltipHost === null || target === null) {
       return
@@ -623,6 +667,10 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
     this.cancelShowTooltip()
     this.cancelHideTooltip()
 
+    if (!this.mounted) {
+      return
+    }
+
     if (this.state.show) {
       this.state.target?.dispatchEvent(
         new CustomEvent('tooltip-hidden', { bubbles: true })
@@ -640,7 +688,10 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   }
 
   public componentWillUnmount() {
+    this.mounted = false
     this.cancelShowTooltip()
+    this.cancelHideTooltip()
+    this.resizeObserver.disconnect()
     this.props.target.unsubscribe(this.onTargetRef)
     this.removeTooltip(this.state.target)
 

@@ -37,4 +37,5 @@
 - Main implementation, documentation, verifier, and screenshots were committed and pushed without force at `67411a6bfaed2d411b35bd9e9026e487f23bc54a`; local `main`, `origin/main`, and the direct remote ref matched after publication.
 - Pages workflow `29552951424` completed successfully for that exact SHA. The live Pages render contained the new bulk-action asset reference, and both raw-main PNGs returned `200` with the exact promoted byte lengths.
 - Build Installers workflow `29552951386` completed successfully for that exact SHA; its Windows x64 installer job passed.
+- CI workflow `29552951433` completed successfully for that exact SHA: lint, Windows and macOS E2E smoke, Windows x64/arm64, and macOS x64/arm64 all passed.
 - The separate wiki preserved its remote-only `Images/` directory, overlaid only the four reviewed canonical Markdown files, and pushed `master` without force at `5ac1ebfa3427fab7b3d49ebe2cea7ff010a715c5`. Local, tracking, and direct remote SHAs matched; live Feature Gallery and User Guide renders contained the new bulk/error guidance. The clean containment-checked wiki checkout was removed.

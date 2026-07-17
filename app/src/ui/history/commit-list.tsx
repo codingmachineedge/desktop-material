@@ -33,6 +33,27 @@ import { buildCommitGraphRows, ICommitGraphRow } from './commit-graph-model'
 
 const RowHeight = 50
 
+/**
+ * Resolve the commits a contextual action should affect. A right click or More
+ * actions click on an unselected row must not accidentally act on a stale
+ * multi-selection, while a click within the current selection preserves it.
+ */
+export function getEffectiveCommitSelection(
+  clickedCommit: Commit,
+  selectedSHAs: ReadonlyArray<string>,
+  commitLookup: ReadonlyMap<string, Commit>
+): ReadonlyArray<Commit> {
+  if (!selectedSHAs.includes(clickedCommit.sha)) {
+    return [clickedCommit]
+  }
+
+  const commits = selectedSHAs
+    .map(sha => commitLookup.get(sha))
+    .filter((commit): commit is Commit => commit !== undefined)
+
+  return commits.length === 0 ? [clickedCommit] : commits
+}
+
 interface ICommitListProps {
   /** The GitHub repository associated with this commit (if found) */
   readonly gitHubRepository: GitHubRepository | null
@@ -333,6 +354,9 @@ export class CommitList extends React.Component<
         accounts={this.props.accounts}
         preferAbsoluteDates={this.props.preferAbsoluteDates}
         graphRow={graphRow}
+        onShowContextMenu={
+          this.inKeyboardReorderMode ? undefined : this.onShowCommitContextMenu
+        }
       />
     )
   }
@@ -623,6 +647,7 @@ export class CommitList extends React.Component<
           onCancelKeyboardInsertion={this.props.onCancelKeyboardReorder}
           onConfirmKeyboardInsertion={this.onConfirmKeyboardReorder}
           onRowContextMenu={this.onRowContextMenu}
+          onRowKeyboardContextMenu={this.onRowKeyboardContextMenu}
           selectionMode="multi"
           onScroll={this.onScroll}
           keyboardInsertionData={this.props.keyboardReorderData}
@@ -716,7 +741,32 @@ export class CommitList extends React.Component<
     row: number,
     event: React.MouseEvent<HTMLDivElement>
   ) => {
+    this.showRowContextMenu(row, event)
+  }
+
+  private onRowKeyboardContextMenu = (
+    row: number,
+    event: React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    this.showRowContextMenu(row, event)
+  }
+
+  private onShowCommitContextMenu = (
+    commit: Commit,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const row = this.props.commitSHAs.indexOf(commit.sha)
+    if (row !== -1) {
+      this.showRowContextMenu(row, event)
+    }
+  }
+
+  private showRowContextMenu = (
+    row: number,
+    event: React.SyntheticEvent<HTMLElement>
+  ) => {
     event.preventDefault()
+    event.stopPropagation()
 
     if (this.inKeyboardReorderMode) {
       return
@@ -733,9 +783,15 @@ export class CommitList extends React.Component<
       return
     }
 
+    const selectedCommits = getEffectiveCommitSelection(
+      commit,
+      this.props.selectedSHAs,
+      this.props.commitLookup
+    )
+
     let items: IMenuItem[] = []
-    if (this.props.selectedSHAs.length > 1) {
-      items = this.getContextMenuMultipleCommits(commit)
+    if (selectedCommits.length > 1) {
+      items = this.getContextMenuMultipleCommits(commit, selectedCommits)
     } else {
       items = this.getContextMenuForSingleCommit(row, commit)
     }
@@ -837,6 +893,7 @@ export class CommitList extends React.Component<
             this.props.onCreateBranch(commit)
           }
         },
+        enabled: this.props.onCreateBranch !== undefined,
       },
       {
         label: 'Create Tag…',
@@ -860,7 +917,7 @@ export class CommitList extends React.Component<
     items.push(
       {
         label: __DARWIN__ ? 'Cherry-pick Commit…' : 'Cherry-pick commit…',
-        action: () => this.props.onCherryPick?.(this.selectedCommits),
+        action: () => this.props.onCherryPick?.([commit]),
         enabled: this.canCherryPick(),
       },
       { type: 'separator' },
@@ -942,29 +999,32 @@ export class CommitList extends React.Component<
     }
   }
 
-  private getContextMenuMultipleCommits(commit: Commit): IMenuItem[] {
-    const count = this.props.selectedSHAs.length
+  private getContextMenuMultipleCommits(
+    commit: Commit,
+    selectedCommits: ReadonlyArray<Commit>
+  ): IMenuItem[] {
+    const count = selectedCommits.length
 
     return [
       {
         label: __DARWIN__
           ? `Cherry-pick ${count} Commits…`
           : `Cherry-pick ${count} commits…`,
-        action: () => this.props.onCherryPick?.(this.selectedCommits),
+        action: () => this.props.onCherryPick?.(selectedCommits),
         enabled: this.canCherryPick(),
       },
       {
         label: __DARWIN__
           ? `Squash ${count} Commits…`
           : `Squash ${count} commits…`,
-        action: () => this.onSquash(this.selectedCommits, commit, true),
+        action: () => this.onSquash(selectedCommits, commit, true),
         enabled: this.canSquash(),
       },
       {
         label: __DARWIN__
           ? `Reorder ${count} Commits…`
           : `Reorder ${count} commits…`,
-        action: () => this.props.onKeyboardReorder?.(this.selectedCommits),
+        action: () => this.props.onKeyboardReorder?.(selectedCommits),
         enabled: this.canReorder(),
       },
     ]

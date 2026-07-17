@@ -108,6 +108,19 @@ describe('Pages accessibility contracts', () => {
     }
   })
 
+  it('publishes navigation, History actions, and Tools scroll evidence', () => {
+    const markup = read('site/index.html')
+
+    for (const source of [
+      'docs/assets/screenshots/material-tab-search.png',
+      'docs/assets/screenshots/material-history-context-actions.png',
+      'docs/assets/screenshots/material-repository-tools-scroll.png',
+    ]) {
+      assert.ok(markup.includes(`href="${source}"`))
+      assert.ok(markup.includes(`src="${source}"`))
+    }
+  })
+
   it('visually distinguishes in-text section links without color alone', () => {
     const style = read('site/style.css')
 

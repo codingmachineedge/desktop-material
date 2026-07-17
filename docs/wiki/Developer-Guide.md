@@ -212,6 +212,12 @@ publication, release, or cleanup evidence.
   lane model and renderer are `app/src/ui/history/commit-graph-model.ts` and
   `app/src/ui/history/commit-graph.tsx`. Keep graph construction independent from filtered list row
   indices.
+- **Button and commit context ownership** — shared buttons infer a tooltip only after explicit help
+  text and accessible labels; `app/src/ui/lib/button-hints.tsx` delegates the same Tooltip behavior
+  to later-mounted native buttons, with pointer intent taking precedence over a differently focused
+  control. History rows mark specialized context-menu ownership so the app-shell customization menu
+  cannot intercept them. Right-click, Context Menu, `Shift+F10`, and the row's More button must all
+  build actions from the same effective-selection helper.
 - **Stashes, remotes, worktrees, and branch visibility** — Git operations remain in
   `app/src/lib/git/stash.ts`, `app/src/lib/git/remote-manager.ts`, and
   `app/src/lib/git/worktree.ts`; the complete manager surfaces live in `app/src/ui/stashing/`,

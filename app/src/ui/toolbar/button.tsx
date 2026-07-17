@@ -176,7 +176,13 @@ export class ToolbarButton extends React.Component<IToolbarButtonProps, {}> {
   }
 
   public render() {
-    const { tooltip } = this.props
+    const tooltip =
+      this.props.tooltip ??
+      this.props.ariaLabel ??
+      this.props.title ??
+      (typeof this.props.description === 'string'
+        ? this.props.description
+        : undefined)
     const icon = this.props.icon ? (
       <Octicon
         symbol={this.props.icon}
@@ -212,6 +218,7 @@ export class ToolbarButton extends React.Component<IToolbarButtonProps, {}> {
             direction={TooltipDirection.SOUTH}
             onlyWhenOverflowed={this.props.onlyShowTooltipWhenOverflowed}
             isTargetOverflowed={this.props.isOverflowed}
+            applyAriaDescribedBy={this.props.tooltip !== undefined}
           >
             {tooltip}
           </Tooltip>
@@ -229,6 +236,7 @@ export class ToolbarButton extends React.Component<IToolbarButtonProps, {}> {
           ariaHaspopup={this.props.ariaHaspopup}
           ariaControls={this.props.ariaControls}
           ariaLabel={this.props.ariaLabel}
+          inferTooltip={false}
         >
           {progress}
           {icon}

@@ -89,6 +89,11 @@ GitHub.com accounts, or a work and a personal GitHub Enterprise identity side by
 Each account keeps its **own tabs, repositories, and settings**. Switching the active account
 switches the whole workspace to that identity's context.
 
+Open the repositories side sheet to narrow cloned repositories by **Repository account** and
+**Repository service**. The filters combine: for example, choose one exact account and GitLab, or
+choose **No available account** and **Local only**. Signed-out/stale bindings remain explicit under
+**Unknown or signed out**; the app does not guess a provider from a hostname.
+
 GitHub browser sign-in requests only the feature scopes used by Desktop Material: repository/user
 access, workflow-file updates, notifications, and read-only organization membership. It does not
 request unrelated repository deletion, administrative key, package, codespace, audit, or gist
@@ -204,7 +209,13 @@ Each sort is a one-time edit: later repository-status changes do not reshuffle t
 order remains manually editable and restores with the account/window tab state. Pin or unpin a tab
 explicitly before moving it across the group boundary.
 
+Use the strip's **Search tabs** button to find and switch to an open repository by its visible name,
+alias, local path, or clone URL. **Arrange tabs** has a separate **Filter tabs** field for narrowing
+the manual-order rows; the one-shot sort buttons still apply to every open tab and say so explicitly.
+
 ![Arrange tabs surface with pinned and manual movement controls plus one-shot label, opened-date, and repository-status sorts](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-arrange.png)
+
+![Runtime repository-tab search matching an active repository by name and path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-search.png)
 
 ### Export or import the current tabs
 
@@ -393,6 +404,12 @@ The production fixture began with 3 visible commits and finished with all 15; th
 below shows the final state. The raw verification receipt is retained in the P0 run manifest.
 
 ![Repository Tools showing full history after a verified deepen](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepening.png)
+
+Repository Tools owns its vertical scroll region. At normal, minimum, short-height, and 150% zoom
+layouts, scrolling reaches the exact final results surface without moving the whole document or
+clipping controls below the viewport.
+
+![Short Repository Tools workspace scrolled to its reachable final results surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools-scroll.png)
 
 ### Sparse checkout
 
@@ -645,7 +662,14 @@ Open **History** and use the search field to match a commit's title, message, ta
 results retain the normal commit detail view. Toggle **Show commit graph** to add ancestry lanes and
 merge edges beside the unfiltered list; turn the graph off when a compact list is more useful.
 
+Right-click a commit row for reset, checkout, reorder, revert, branch, tag, cherry-pick, copy, and
+provider actions. The row's named **More actions** button, the Context Menu key, and `Shift+F10`
+open the same action set. Invoking an unselected commit targets only that row; invoking a member of
+the current multi-selection preserves the selection for eligible multi-commit actions.
+
 ![History search and commit graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
+
+![History commit row with its named More actions control and hover hint](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-context-actions.png)
 
 ---
 

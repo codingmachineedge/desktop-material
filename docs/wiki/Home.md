@@ -157,6 +157,10 @@ the tonal workspace preview hides when a compact window needs the space.
   heights; Remote Manager protects readable name/URL/control widths before stacking; Regex Builder
   reflows its category/token grid and scrolls its body while keeping the tester and footer
   reachable, without page-level horizontal clipping.
+- **Searchable navigation and contextual actions** — search open tabs by label, alias, path, or URL;
+  filter the Arrange surface; scope cloned repositories by exact account and service; and open the
+  same selection-aware History commit actions by right-click, **More actions**, Context Menu, or
+  `Shift+F10`. Every button also receives a shared hover/focus hint.
 - **Clone-style Add Submodule** — open **Repository settings → Submodules → Add submodule…** to use
   the same GitHub.com, Enterprise, URL, and GitLab/Bitbucket selection model as Clone, then review a
   safe repository-relative path and optional branch with exact-account routing, bounded progress,
@@ -165,6 +169,12 @@ the tonal workspace preview hides when a compact window needs the space.
 ![Word-style tab appearance editor with typography, alignment, and independent text and background palettes](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-appearance-word.png)
 
 ![Arrange tabs surface with pinned and manual movement controls plus one-shot sorts](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-arrange.png)
+
+![Runtime repository-tab search matching an active repository by name and path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-search.png)
+
+![History commit row with its named More actions control and hover hint](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-context-actions.png)
+
+![Short Repository Tools workspace scrolled to its reachable final results surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools-scroll.png)
 
 ![Material workflow-run cancellation review naming the exact run, ref, actor, and commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-cancel.png)
 

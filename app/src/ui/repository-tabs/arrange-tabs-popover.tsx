@@ -6,12 +6,14 @@ import {
 } from '../lib/popover'
 import { RepositoryTabsStore } from '../../lib/stores/repository-tabs-store'
 import { IProfileTabsState, IRepositoryTab } from '../../models/repository-tab'
+import { repositoryTabMatchesQuery } from './tab-action-helpers'
 
 interface IArrangeTabsPopoverProps {
   readonly tabs: IProfileTabsState
   readonly tabsStore: RepositoryTabsStore
   readonly anchor: HTMLElement | null
   readonly resolveLabel: (tab: IRepositoryTab) => string
+  readonly resolveMatchKeys: (tab: IRepositoryTab) => ReadonlyArray<string>
   readonly resolveStatusRank: (tab: IRepositoryTab) => number
   readonly onClose: () => void
 }
@@ -19,6 +21,7 @@ interface IArrangeTabsPopoverProps {
 interface IArrangeTabsPopoverState {
   readonly isApplying: boolean
   readonly announcement: string
+  readonly query: string
 }
 
 /** A Material one-shot arrange surface with accessible manual-order actions. */
@@ -31,6 +34,7 @@ export class ArrangeTabsPopover extends React.Component<
     this.state = {
       isApplying: false,
       announcement: 'Choose a manual move or a one-time sort.',
+      query: '',
     }
   }
 
@@ -118,9 +122,10 @@ export class ArrangeTabsPopover extends React.Component<
     }
   }
 
-  private renderManualRow(tab: IRepositoryTab, index: number) {
+  private renderManualRow(tab: IRepositoryTab) {
     const { tabs } = this.props.tabs
     const label = this.props.resolveLabel(tab)
+    const index = tabs.findIndex(candidate => candidate.id === tab.id)
     const pinnedCount = tabs.filter(item => item.isPinned === true).length
     const groupStart = tab.isPinned === true ? 0 : pinnedCount
     const groupEnd =
@@ -280,9 +285,20 @@ export class ArrangeTabsPopover extends React.Component<
     }
   }
 
+  private onFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({ query: event.currentTarget.value })
+  }
+
   public render() {
     const { tabs } = this.props.tabs
     const disabled = this.state.isApplying || tabs.length < 2
+    const filteredTabs = tabs.filter(tab =>
+      repositoryTabMatchesQuery(
+        this.state.query,
+        this.props.resolveMatchKeys(tab)
+      )
+    )
+    const resultSummary = `${filteredTabs.length} of ${tabs.length} tabs`
 
     return (
       <Popover
@@ -302,15 +318,40 @@ export class ArrangeTabsPopover extends React.Component<
             </p>
           </header>
 
+          <div className="arrange-tabs-filter" role="search">
+            <label htmlFor="arrange-tabs-filter-input">Filter tabs</label>
+            <input
+              id="arrange-tabs-filter-input"
+              className="arrange-tabs-filter-input"
+              type="search"
+              value={this.state.query}
+              onChange={this.onFilterChange}
+              autoFocus={true}
+              placeholder="Name, alias, path, or URL"
+            />
+            <span className="arrange-tabs-filter-count" aria-live="polite">
+              {resultSummary}
+            </span>
+          </div>
+
           <section aria-labelledby="arrange-tabs-manual-title">
             <h4 id="arrange-tabs-manual-title">Manual order</h4>
-            <ul className="arrange-tabs-list">
-              {tabs.map((tab, index) => this.renderManualRow(tab, index))}
-            </ul>
+            {filteredTabs.length === 0 ? (
+              <p className="arrange-tabs-empty" role="status">
+                No tabs match this filter.
+              </p>
+            ) : (
+              <ul className="arrange-tabs-list">
+                {filteredTabs.map(tab => this.renderManualRow(tab))}
+              </ul>
+            )}
           </section>
 
           <section aria-labelledby="arrange-tabs-sort-title">
             <h4 id="arrange-tabs-sort-title">Sort once</h4>
+            <p className="arrange-tabs-sort-hint">
+              Sort actions apply to all open tabs, even while filtering.
+            </p>
             <div className="arrange-tabs-sort-grid">
               <button
                 type="button"
