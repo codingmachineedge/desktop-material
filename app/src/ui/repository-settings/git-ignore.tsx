@@ -7,6 +7,11 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { Tooltip } from '../lib/tooltip'
 import { createObservableRef } from '../lib/observable-ref'
+import { CatalogPagination } from '../lib/catalog-pagination'
+import {
+  DefaultCatalogPageSize,
+  paginateCatalogItems,
+} from '../../lib/catalog-pagination'
 import { Repository } from '../../models/repository'
 import {
   applyTemplate,
@@ -35,6 +40,12 @@ interface IGitIgnoreState {
   readonly browseOpen: boolean
   /** The current catalog search filter. */
   readonly filter: string
+  /** The current catalog category filter, or '' for every category. */
+  readonly category: '' | GitIgnoreCategory
+  /** The current one-based browse page. */
+  readonly page: number
+  /** Templates shown per browse page. */
+  readonly pageSize: number
 }
 
 /** Category grouping order and labels for the browse view. */
@@ -161,6 +172,9 @@ export class GitIgnore extends React.Component<
       suggestions: [],
       browseOpen: false,
       filter: '',
+      category: '',
+      page: 1,
+      pageSize: DefaultCatalogPageSize,
     }
   }
 
@@ -205,7 +219,25 @@ export class GitIgnore extends React.Component<
   }
 
   private onFilterChanged = (event: React.FormEvent<HTMLInputElement>) => {
-    this.setState({ filter: event.currentTarget.value })
+    this.setState({ filter: event.currentTarget.value, page: 1 })
+  }
+
+  private onCategoryChanged = (event: React.FormEvent<HTMLSelectElement>) => {
+    this.setState({
+      category: event.currentTarget.value as '' | GitIgnoreCategory,
+      page: 1,
+    })
+  }
+
+  private onPageChanged = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const page = Number(event.currentTarget.dataset.page)
+    if (Number.isFinite(page)) {
+      this.setState({ page })
+    }
+  }
+
+  private onPageSizeChanged = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({ pageSize: Number(event.currentTarget.value), page: 1 })
   }
 
   private renderSuggestions(appliedIds: ReadonlySet<string>) {
@@ -276,8 +308,16 @@ export class GitIgnore extends React.Component<
 
   private renderBrowse(appliedIds: ReadonlySet<string>) {
     const filter = this.state.filter.trim().toLowerCase()
-    const catalog = getTemplateCatalog().filter(
-      t => filter.length === 0 || t.label.toLowerCase().includes(filter)
+    const category = this.state.category
+    const matches = getTemplateCatalog().filter(
+      t =>
+        (filter.length === 0 || t.label.toLowerCase().includes(filter)) &&
+        (category === '' || t.category === category)
+    )
+    const { page, items: pageItems } = paginateCatalogItems(
+      matches,
+      this.state.page,
+      this.state.pageSize
     )
 
     return (
@@ -302,49 +342,92 @@ export class GitIgnore extends React.Component<
 
         {this.state.browseOpen && (
           <div className="gitignore-browse-card">
-            <div className="gitignore-search">
-              <Octicon
-                className="gitignore-search-icon"
-                symbol={octicons.search}
-              />
-              <input
-                type="text"
-                className="gitignore-search-input"
-                placeholder="Search templates"
-                aria-label="Search templates"
-                value={this.state.filter}
-                onChange={this.onFilterChanged}
-              />
+            <div className="gitignore-browse-controls">
+              <div className="gitignore-search">
+                <Octicon
+                  className="gitignore-search-icon"
+                  symbol={octicons.search}
+                />
+                <input
+                  type="text"
+                  className="gitignore-search-input"
+                  placeholder="Search templates"
+                  aria-label="Search templates"
+                  value={this.state.filter}
+                  onChange={this.onFilterChanged}
+                />
+              </div>
+              <label className="gitignore-category">
+                <span className="gitignore-category-label">Category</span>
+                <select
+                  className="gitignore-category-select"
+                  aria-label="Filter templates by category"
+                  value={category}
+                  onChange={this.onCategoryChanged}
+                >
+                  <option value="">All categories</option>
+                  {CATEGORY_ORDER.map(entry => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
-            {catalog.length === 0 ? (
+            <p
+              className="gitignore-catalog-count"
+              role="status"
+              aria-live="polite"
+            >
+              {matches.length === 0
+                ? 'No templates match these filters'
+                : `Showing ${page.startItem}–${page.endItem} of ${
+                    matches.length
+                  } template${matches.length === 1 ? '' : 's'}`}
+            </p>
+
+            {matches.length === 0 ? (
               <div className="gitignore-catalog-empty">
-                No templates match “{this.state.filter}”.
+                No templates match these filters. Try another search or
+                category.
               </div>
             ) : (
-              CATEGORY_ORDER.map(category => {
-                const items = catalog.filter(t => t.category === category.id)
-                if (items.length === 0) {
-                  return null
-                }
-                return (
-                  <div key={category.id} className="gitignore-catalog-group">
-                    <div className="gitignore-catalog-group-label">
-                      {category.label}
+              <>
+                {CATEGORY_ORDER.map(entry => {
+                  const items = pageItems.filter(t => t.category === entry.id)
+                  if (items.length === 0) {
+                    return null
+                  }
+                  return (
+                    <div key={entry.id} className="gitignore-catalog-group">
+                      <div className="gitignore-catalog-group-label">
+                        {entry.label}
+                      </div>
+                      <div className="gitignore-catalog-grid">
+                        {items.map(template => (
+                          <CatalogItem
+                            key={template.id}
+                            template={template}
+                            isApplied={appliedIds.has(template.id)}
+                            onToggle={this.onToggleTemplate}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <div className="gitignore-catalog-grid">
-                      {items.map(template => (
-                        <CatalogItem
-                          key={template.id}
-                          template={template}
-                          isApplied={appliedIds.has(template.id)}
-                          onToggle={this.onToggleTemplate}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )
-              })
+                  )
+                })}
+                {page.pageCount > 1 ? (
+                  <CatalogPagination
+                    page={page}
+                    navLabel="Template catalog pages"
+                    pageSizeLabel="Templates per page"
+                    pageSizeInputId="gitignore-catalog-page-size"
+                    onPageChange={this.onPageChanged}
+                    onPageSizeChange={this.onPageSizeChanged}
+                  />
+                ) : null}
+              </>
             )}
           </div>
         )}

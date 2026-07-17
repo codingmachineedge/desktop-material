@@ -1,0 +1,90 @@
+// Shared First/Previous/Next/Last pagination controls used by every product
+// catalog (GitHub REST + GraphQL operations, the .gitignore template catalog).
+.catalog-pagination {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+
+  .catalog-pagination-controls {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    align-items: center;
+
+    > span {
+      padding: 0 4px;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    button {
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid var(--md-sys-color-outline);
+      border-radius: 999px;
+      color: var(--md-sys-color-on-surface);
+      background: var(--md-sys-color-surface-container);
+      font: inherit;
+      font-size: 10px;
+      font-weight: 650;
+      white-space: nowrap;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        background: var(--md-sys-color-surface-container-high);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--md-sys-color-primary);
+        outline-offset: 1px;
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+    }
+  }
+
+  .catalog-pagination-page-size {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    align-items: center;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    select {
+      width: auto;
+      min-height: 30px;
+      padding: 4px 8px;
+      border: 1px solid var(--md-sys-color-outline);
+      border-radius: 999px;
+      color: var(--md-sys-color-on-surface);
+      background: var(--md-sys-color-surface-container-lowest);
+      font: inherit;
+
+      &:focus-visible {
+        border-color: var(--md-sys-color-primary);
+        outline: none;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-sys-color-primary) 26%, transparent);
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.62;
+      }
+    }
+  }
+}

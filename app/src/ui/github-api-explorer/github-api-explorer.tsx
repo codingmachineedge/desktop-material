@@ -28,7 +28,6 @@ import {
   validateGitHubAPIWorkbenchRequest,
 } from '../../lib/github-api-workbench'
 import {
-  CatalogPageSizeOptions,
   DefaultCatalogPageSize,
   ICatalogPage,
   paginateCatalogItems,
@@ -36,6 +35,7 @@ import {
 import { Account, getAccountKey } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
+import { CatalogPagination } from '../lib/catalog-pagination'
 import { LinkButton } from '../lib/link-button'
 import {
   createNamedAPIFunctionBinding,
@@ -1047,69 +1047,16 @@ export class GitHubAPIExplorer extends React.Component<
     onPageChange: (event: React.MouseEvent<HTMLButtonElement>) => void,
     onPageSizeChange: (event: React.ChangeEvent<HTMLSelectElement>) => void
   ) {
-    const disabled = this.state.loading
     return (
-      <nav className="github-api-explorer-pagination" aria-label={navLabel}>
-        <div className="github-api-explorer-pagination-controls">
-          <button
-            type="button"
-            data-page="1"
-            disabled={disabled || !page.hasPrevious}
-            aria-label="First page"
-            onClick={onPageChange}
-          >
-            « First
-          </button>
-          <button
-            type="button"
-            data-page={page.page - 1}
-            disabled={disabled || !page.hasPrevious}
-            aria-label="Previous page"
-            onClick={onPageChange}
-          >
-            ‹ Prev
-          </button>
-          <span aria-live="polite">
-            Page {page.page} of {page.pageCount}
-          </span>
-          <button
-            type="button"
-            data-page={page.page + 1}
-            disabled={disabled || !page.hasNext}
-            aria-label="Next page"
-            onClick={onPageChange}
-          >
-            Next ›
-          </button>
-          <button
-            type="button"
-            data-page={page.pageCount}
-            disabled={disabled || !page.hasNext}
-            aria-label="Last page"
-            onClick={onPageChange}
-          >
-            Last »
-          </button>
-        </div>
-        <label
-          className="github-api-explorer-page-size"
-          htmlFor={pageSizeInputId}
-        >
-          {pageSizeLabel}
-          <select
-            id={pageSizeInputId}
-            value={page.pageSize}
-            disabled={disabled}
-            onChange={onPageSizeChange}
-          >
-            {CatalogPageSizeOptions.map(size => (
-              <option key={size} value={size}>
-                {size} per page
-              </option>
-            ))}
-          </select>
-        </label>
-      </nav>
+      <CatalogPagination
+        page={page}
+        navLabel={navLabel}
+        pageSizeLabel={pageSizeLabel}
+        pageSizeInputId={pageSizeInputId}
+        disabled={this.state.loading}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     )
   }
 

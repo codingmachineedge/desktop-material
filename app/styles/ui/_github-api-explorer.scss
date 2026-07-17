@@ -272,75 +272,8 @@
   }
 }
 
-.github-api-explorer-pagination {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 4px;
-  border-top: 1px solid var(--md-sys-color-outline-variant);
-
-  .github-api-explorer-pagination-controls {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    gap: 4px 6px;
-    align-items: center;
-
-    > span {
-      padding: 0 4px;
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: 10px;
-      font-weight: 650;
-      white-space: nowrap;
-    }
-
-    button {
-      min-height: 30px;
-      padding: 4px 10px;
-      border: 1px solid var(--md-sys-color-outline);
-      border-radius: 999px;
-      color: var(--md-sys-color-on-surface);
-      background: var(--md-sys-color-surface-container);
-      font: inherit;
-      font-size: 10px;
-      font-weight: 650;
-      white-space: nowrap;
-      cursor: pointer;
-
-      &:hover:not(:disabled) {
-        background: var(--md-sys-color-surface-container-high);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--md-sys-color-primary);
-        outline-offset: 1px;
-      }
-
-      &:disabled {
-        cursor: not-allowed;
-        opacity: 0.5;
-      }
-    }
-  }
-}
-
-.github-api-explorer-page-size {
-  display: flex !important;
-  flex: 0 0 auto;
-  gap: 6px;
-  align-items: center;
-  white-space: nowrap;
-
-  select {
-    width: auto;
-    min-height: 30px;
-    padding: 4px 8px;
-    border-radius: 999px;
-  }
-}
+// The catalog pagination controls are shared across catalogs; see
+// `styles/ui/_catalog-pagination.scss`.
 
 .github-api-explorer-builder {
   min-height: 0;
