@@ -49,20 +49,10 @@ describe('GitHub API Explorer responsive Material styles', () => {
     )
   })
 
-  it('styles the catalog pagination controls and page-size selector', () => {
-    assert.match(styles, /\.github-api-explorer-pagination\s*\{/)
-    assert.match(
-      styles,
-      /\.github-api-explorer-pagination-controls\s*\{[\s\S]*flex-wrap:\s*wrap/
-    )
-    assert.match(
-      styles,
-      /\.github-api-explorer-pagination-controls\s*\{[\s\S]*button\s*\{[\s\S]*&:disabled\s*\{[\s\S]*cursor:\s*not-allowed/
-    )
-    assert.match(
-      styles,
-      /\.github-api-explorer-page-size\s*\{[\s\S]*select\s*\{[\s\S]*width:\s*auto/
-    )
+  it('delegates catalog pagination styling to the shared partial', () => {
+    assert.match(imports, /@import 'ui\/catalog-pagination'/)
+    // The Explorer must not redefine its own pagination controls.
+    assert.doesNotMatch(styles, /github-api-explorer-pagination/)
   })
 
   it('uses semantic Material tokens for surfaces, selection, and risk', () => {

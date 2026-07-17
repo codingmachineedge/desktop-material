@@ -228,16 +228,16 @@ describe('GitHub API Explorer', () => {
     const last = within(nav).getByRole('button', { name: 'Last page' })
 
     // First page: backward controls disabled, exact leading range shown.
-    assert.equal(first.hasAttribute('disabled'), true)
-    assert.equal(previous.hasAttribute('disabled'), true)
-    assert.equal(next.hasAttribute('disabled'), false)
+    assert.equal(first.getAttribute('aria-disabled'), 'true')
+    assert.equal(previous.getAttribute('aria-disabled'), 'true')
+    assert.equal(next.getAttribute('aria-disabled'), 'false')
     assert.ok(within(nav).getByText('Page 1 of 25'))
     assert.ok(screen.getByText('Showing 1–50 of 1,206'))
 
     fireEvent.click(next)
     assert.ok(within(nav).getByText('Page 2 of 25'))
     assert.ok(screen.getByText('Showing 51–100 of 1,206'))
-    assert.equal(previous.hasAttribute('disabled'), false)
+    assert.equal(previous.getAttribute('aria-disabled'), 'false')
     assert.equal(
       within(
         screen.getByRole('list', { name: 'GitHub API operations' })
@@ -248,8 +248,8 @@ describe('GitHub API Explorer', () => {
     fireEvent.click(last)
     assert.ok(within(nav).getByText('Page 25 of 25'))
     assert.ok(screen.getByText('Showing 1,201–1,206 of 1,206'))
-    assert.equal(next.hasAttribute('disabled'), true)
-    assert.equal(last.hasAttribute('disabled'), true)
+    assert.equal(next.getAttribute('aria-disabled'), 'true')
+    assert.equal(last.getAttribute('aria-disabled'), 'true')
     // Final page holds the remainder (1206 - 1200 = 6 operations).
     assert.equal(
       within(
@@ -261,6 +261,39 @@ describe('GitHub API Explorer', () => {
     fireEvent.click(first)
     assert.ok(within(nav).getByText('Page 1 of 25'))
     assert.ok(screen.getByText('Showing 1–50 of 1,206'))
+  })
+
+  it('keeps boundary controls focusable so activating them does not drop focus', () => {
+    render(
+      <GitHubAPIExplorer
+        repository={selectedRepository}
+        accounts={[selectedAccount]}
+        client={new FakeExplorerClient()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('Catalog scope'), {
+      target: { value: 'all' },
+    })
+    const nav = screen.getByRole('navigation', {
+      name: 'GitHub API operation pages',
+    })
+    const last = within(nav).getByRole('button', { name: 'Last page' })
+
+    // Boundary controls use aria-disabled, not the disabled attribute, so a
+    // keyboard user who activates "Last page" (which then disables it) keeps
+    // focus on the control instead of dropping it to the document body.
+    last.focus()
+    assert.equal(document.activeElement, last)
+    fireEvent.click(last)
+    assert.ok(within(nav).getByText('Page 25 of 25'))
+    assert.equal(last.getAttribute('aria-disabled'), 'true')
+    assert.equal(last.hasAttribute('disabled'), false)
+    assert.equal(document.activeElement, last)
+
+    // A stray click on the now-boundary control is a no-op, not an overshoot.
+    fireEvent.click(last)
+    assert.ok(within(nav).getByText('Page 25 of 25'))
   })
 
   it('changes the REST page size and resets to the first page', () => {
@@ -294,7 +327,56 @@ describe('GitHub API Explorer', () => {
     )
   })
 
-  it('clamps a stale REST page when a filter shrinks the result set', () => {
+  it('jumps directly to a chosen REST page via the page selector', () => {
+    render(
+      <GitHubAPIExplorer
+        repository={selectedRepository}
+        accounts={[selectedAccount]}
+        client={new FakeExplorerClient()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('Catalog scope'), {
+      target: { value: 'all' },
+    })
+    const nav = screen.getByRole('navigation', {
+      name: 'GitHub API operation pages',
+    })
+
+    // The selector offers exactly one option per page.
+    const jump = within(nav).getByLabelText('Go to page') as HTMLSelectElement
+    assert.equal(jump.options.length, 25)
+
+    fireEvent.change(jump, { target: { value: '13' } })
+    assert.ok(within(nav).getByText('Page 13 of 25'))
+    // Page 13 of 50 => items 601–650.
+    assert.ok(screen.getByText('Showing 601–650 of 1,206'))
+    assert.equal(
+      (within(nav).getByLabelText('Go to page') as HTMLSelectElement).value,
+      '13'
+    )
+  })
+
+  it('hides the page selector when a filter leaves a single page', () => {
+    render(
+      <GitHubAPIExplorer
+        repository={selectedRepository}
+        accounts={[selectedAccount]}
+        client={new FakeExplorerClient()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('Search operations'), {
+      target: { value: 'secret-scanning/list-repo-custom-patterns' },
+    })
+    const nav = screen.getByRole('navigation', {
+      name: 'GitHub API operation pages',
+    })
+    assert.ok(within(nav).getByText('Page 1 of 1'))
+    assert.equal(within(nav).queryByLabelText('Go to page'), null)
+  })
+
+  it('resets to the first page when a filter narrows the REST catalog', () => {
     render(
       <GitHubAPIExplorer
         repository={selectedRepository}
@@ -312,8 +394,9 @@ describe('GitHub API Explorer', () => {
     fireEvent.click(within(nav).getByRole('button', { name: 'Last page' }))
     assert.ok(within(nav).getByText('Page 25 of 25'))
 
-    // Narrowing the catalog collapses the page count; the view must clamp back
-    // to a valid page instead of rendering an empty window past the new end.
+    // Changing any filter returns to page 1, so the view can never be left on a
+    // page beyond the narrowed result set. (The pure page-clamp guard for stale
+    // requests is covered directly in catalog-pagination-test.ts.)
     fireEvent.change(screen.getByLabelText('Category'), {
       target: { value: 'secret-scanning' },
     })
@@ -334,6 +417,16 @@ describe('GitHub API Explorer', () => {
       />
     )
 
+    // Advance the REST catalog to a non-first page first.
+    fireEvent.change(screen.getByLabelText('Catalog scope'), {
+      target: { value: 'all' },
+    })
+    const restNav = screen.getByRole('navigation', {
+      name: 'GitHub API operation pages',
+    })
+    fireEvent.click(within(restNav).getByRole('button', { name: 'Next page' }))
+    assert.ok(within(restNav).getByText('Page 2 of 25'))
+
     fireEvent.click(screen.getByRole('tab', { name: 'GraphQL' }))
     const nav = screen.getByRole('navigation', {
       name: 'GitHub GraphQL root operation pages',
@@ -348,9 +441,32 @@ describe('GitHub API Explorer', () => {
       GitHubAPIExplorerDefaultPageSize
     )
 
-    fireEvent.click(within(nav).getByRole('button', { name: 'Last page' }))
+    const graphQLLast = within(nav).getByRole('button', { name: 'Last page' })
+    fireEvent.click(graphQLLast)
     assert.ok(within(nav).getByText('Page 6 of 6'))
     assert.ok(screen.getByText('Showing 251–299 of 299'))
+    assert.equal(graphQLLast.getAttribute('aria-disabled'), 'true')
+    assert.equal(
+      within(nav)
+        .getByRole('button', { name: 'Next page' })
+        .getAttribute('aria-disabled'),
+      'true'
+    )
+
+    // Changing the GraphQL page size resets GraphQL to page 1...
+    fireEvent.change(screen.getByLabelText('Roots per page'), {
+      target: { value: '100' },
+    })
+    assert.ok(within(nav).getByText('Page 1 of 3'))
+    assert.ok(screen.getByText('Showing 1–100 of 299'))
+
+    // ...while the REST catalog kept its own independent page-2 position.
+    fireEvent.click(screen.getByRole('tab', { name: 'REST' }))
+    assert.ok(
+      within(
+        screen.getByRole('navigation', { name: 'GitHub API operation pages' })
+      ).getByText('Page 2 of 25')
+    )
   })
 
   it('uses only the repository-bound GitHub account', () => {

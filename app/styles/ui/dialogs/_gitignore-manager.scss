@@ -204,6 +204,56 @@
       }
     }
 
+    // Row holding the search pill and the category filter.
+    .gitignore-browse-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+
+      .gitignore-search {
+        flex: 1 1 220px;
+        min-width: 0;
+      }
+    }
+
+    .gitignore-category {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+
+      .gitignore-category-label {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .gitignore-category-select {
+        min-height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--md-sys-color-outline);
+        border-radius: 999px;
+        color: var(--md-sys-color-on-surface);
+        background: var(--md-sys-color-surface-container-high);
+        font: inherit;
+        font-size: 13px;
+
+        &:focus-visible {
+          border-color: var(--md-sys-color-primary);
+          outline: none;
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
+        }
+      }
+    }
+
+    .gitignore-catalog-count {
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 12px;
+    }
+
     .gitignore-catalog-empty {
       color: var(--md-sys-color-on-surface-variant);
       font-size: 13px;
