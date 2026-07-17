@@ -137,9 +137,11 @@ describe('NotificationCentrePanel', () => {
     assert.equal(all.getAttribute('aria-controls'), filterPanel.id)
     assert.equal(unread.getAttribute('aria-controls'), filterPanel.id)
     assert.equal(filterPanel.getAttribute('aria-labelledby'), all.id)
+    // The unread state is exposed to screen readers as a text suffix, so the
+    // unread fixture row's accessible text carries it beside the title.
     assert.equal(
       screen.getByText('Local notification').textContent,
-      'Local notification'
+      'Local notification (unread)'
     )
     assert.ok(screen.getByRole('button', { name: 'Notification history' }))
     assert.equal(

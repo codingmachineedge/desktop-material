@@ -23,13 +23,18 @@ describe('RepositoryLogoLoader', () => {
     }, 4)
     const repo = repository('/work/shared', 1)
 
-    const first = loader.load(repo)
-    const second = loader.load(repo)
+    // The cached unit is the appearance read; repeated requests share the
+    // exact same promise, and the logo-only wrapper rides the same read.
+    const first = loader.loadAppearance(repo)
+    const second = loader.loadAppearance(repo)
+    const logo = loader.load(repo)
 
     assert.strictEqual(second, first)
     assert.equal(calls, 1)
     complete()
+    assert.strictEqual(await logo, DefaultRepositoryLogoDesign)
     await first
+    assert.equal(calls, 1)
     assert.equal(loader.size, 1)
   })
 
