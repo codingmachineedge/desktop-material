@@ -378,23 +378,24 @@
   box-sizing: border-box;
   max-width: calc(100% - 16px);
   min-width: 0;
-  margin: 0 8px 8px;
-  padding: 9px;
-  gap: 6px;
+  // v2 prototype composer card: roomier margin/padding/gap and a 20px radius.
+  margin: 0 12px 12px;
+  padding: 14px;
+  gap: 10px;
   border-top: 0;
-  border-radius: 16px;
+  border-radius: 20px;
   background-color: var(--md-sys-color-surface-container-low);
   animation: dmUp calc(600ms * var(--mdur, 1)) var(--spring) 200ms backwards;
 
   // Compact round primary-container avatar. Overrides the shared
   // _commit-message-avatar.scss sizing via the extra composer-scoped class.
   .commit-message-avatar-component {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
 
     .avatar-button {
-      width: 30px;
-      height: 30px;
+      width: 34px;
+      height: 34px;
       border-radius: 999px;
       background-color: var(--md-sys-color-primary-container);
       color: var(--md-sys-color-on-primary-container);
@@ -425,10 +426,11 @@
 
       input {
         width: 100%;
-        height: 40px;
-        padding: 0 10px;
+        // v2 prototype summary field: taller with a 14px radius.
+        height: 46px;
+        padding: 0 12px;
         border: 2px solid var(--md-sys-color-outline-variant);
-        border-radius: 12px;
+        border-radius: 14px;
         background-color: var(--md-sys-color-surface);
         color: var(--md-sys-color-on-surface);
         font-size: 13.5px;
@@ -593,24 +595,25 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    // v2 prototype commit button: taller with slightly larger label/gap.
+    gap: 9px;
     width: 100%;
     max-width: 100%;
-    height: 40px;
-    min-height: 40px;
+    height: 48px;
+    min-height: 48px;
     margin-top: 2px;
     padding: 0 12px;
     border: 0;
     border-radius: 999px;
     background-color: var(--md-sys-color-primary);
     color: var(--md-sys-color-on-primary);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.01em;
     transition: border-radius 260ms var(--spring), box-shadow 200ms var(--emph), transform 200ms var(--spring-fast), background-color 200ms var(--emph), color 200ms var(--emph);
 
     &:not(:disabled):hover {
-      border-radius: 16px;
+      border-radius: 18px;
       box-shadow: var(--md-sys-elevation-level2);
       background-color: var(--md-sys-color-primary);
       color: var(--md-sys-color-on-primary);

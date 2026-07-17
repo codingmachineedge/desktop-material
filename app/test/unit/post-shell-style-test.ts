@@ -337,13 +337,15 @@ describe('post-shell MD3 style contracts', () => {
     const changes = readStyle('changes/_changes-list.scss')
     const composer = readStyle('changes/_commit-message.scss')
 
+    // v2 prototype workspace spec: roomier than the old compact density, and
+    // never below a comfortable hit target.
     assert.match(
       changes,
-      /\.changes-panel-header\s*\{[\s\S]*?gap: 8px;[\s\S]*?padding: 10px 12px 5px;/
+      /\.changes-panel-header\s*\{[\s\S]*?gap: 10px;[\s\S]*?padding: 18px 18px 10px;/
     )
     assert.match(
       changes,
-      /\.filter-list-filter-field\s*\{[\s\S]*?input\s*\{[\s\S]*?height: 40px;[\s\S]*?min-height: 40px;/
+      /\.filter-list-filter-field\s*\{[\s\S]*?input\s*\{[\s\S]*?height: 46px;[\s\S]*?min-height: 46px;/
     )
     assert.match(
       changes,
@@ -355,11 +357,11 @@ describe('post-shell MD3 style contracts', () => {
     )
     assert.match(
       composer,
-      /\.commit-message-component\s*\{[\s\S]*?padding: 9px;[\s\S]*?gap: 6px;[\s\S]*?border-radius: 16px;/
+      /\.commit-message-component\s*\{[\s\S]*?padding: 14px;[\s\S]*?gap: 10px;[\s\S]*?border-radius: 20px;/
     )
     assert.match(
       composer,
-      /\.commit-button\s*\{[\s\S]*?height: 40px;[\s\S]*?min-height: 40px;/
+      /\.commit-button\s*\{[\s\S]*?height: 48px;[\s\S]*?min-height: 48px;/
     )
     assert.match(composer, /\.description-field textarea[\s\S]*?height: 46px;/)
   })

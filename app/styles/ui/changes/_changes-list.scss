@@ -777,13 +777,14 @@
   .changes-panel-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex: 0 0 auto;
-    padding: 10px 12px 5px;
+    // v2 prototype header inset + 21px title.
+    padding: 18px 18px 10px;
 
     .changes-panel-title {
       margin: 0;
-      font-size: 18px;
+      font-size: 21px;
       font-weight: 600;
       line-height: 1.1;
       letter-spacing: -0.01em;
@@ -795,12 +796,12 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      height: 20px;
-      padding: 0 7px;
+      height: 24px;
+      padding: 0 10px;
       border-radius: 999px;
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
-      font-size: 11.5px;
+      font-size: 12.5px;
       font-weight: 700;
       line-height: 1;
       animation: dmBounce 500ms var(--spring-fast) backwards;
@@ -852,13 +853,14 @@
       }
 
       input {
-        height: 40px;
-        min-height: 40px;
+        // v2 prototype: a taller search pill.
+        height: 46px;
+        min-height: 46px;
         border-radius: 999px;
         background: var(--md-sys-color-surface-container-high);
         border: 2px solid transparent;
         padding: 0 10px 0 36px;
-        font-size: 13px;
+        font-size: 13.5px;
         box-shadow: none;
         transition: border-color 160ms var(--emph), background-color 200ms var(--emph);
 
@@ -966,11 +968,11 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      height: 28px;
-      padding: 0 9px;
+      height: 30px;
+      padding: 0 12px;
       border: 0;
       border-radius: 999px;
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 700;
       line-height: 1;
       cursor: pointer;
@@ -1114,12 +1116,12 @@
 #changes-list {
   .list-item {
     border-bottom: 0;
-    // Compact rows retain the prototype's expressive corner morph.
-    border-radius: 10px;
+    // v2 prototype: the expressive pill→squircle corner morph (14px → 18px).
+    border-radius: 14px;
     transition: background-color 140ms var(--emph), border-radius 260ms var(--spring), transform 180ms var(--spring-fast);
 
     &:not(.not-selectable):hover {
-      border-radius: 12px;
+      border-radius: 18px;
     }
 
     &:active {

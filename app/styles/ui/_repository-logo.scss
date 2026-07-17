@@ -61,6 +61,227 @@
   }
 }
 
+// ── Rich editor controls ────────────────────────────────────────────────────
+// A labelled field wrapping either a swatch row or a segmented control.
+.appearance-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+
+  .appearance-field-label {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+
+.appearance-swatch-row,
+.appearance-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+// Colour swatch: a round chip filled with its own --swatch colour; the
+// selected one gets a primary focus ring.
+.appearance-swatch {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--swatch, var(--md-sys-color-surface-variant));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent);
+  cursor: pointer;
+  transition: transform 160ms var(--spring-fast), border-color 160ms var(--emph);
+
+  &:hover:not(:disabled) {
+    transform: scale(1.08);
+  }
+
+  &.active {
+    border-color: var(--md-sys-color-primary);
+    box-shadow: 0 0 0 2px var(--md-sys-color-surface-container-low), 0 0 0 4px var(--md-sys-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+}
+
+// Text pill used by segmented controls and style toggles.
+.appearance-chip {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12.5px;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color 180ms var(--emph), color 180ms var(--emph), transform 160ms var(--spring-fast);
+
+  &:hover:not(:disabled) {
+    background: var(--md-sys-color-surface-container-highest);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  &.active {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  &.inherit-chip {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+
+    &.active {
+      background: var(--md-sys-color-secondary-container);
+      box-shadow: none;
+    }
+  }
+
+  &.chip-bold.active {
+    font-weight: 800;
+  }
+
+  &.chip-italic {
+    font-style: italic;
+  }
+
+  &.chip-underline.active {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+}
+
+// Live preview: a mock tab + repository-list row that reflect the current
+// accent, density, and list-name typography as the controls change.
+.repository-appearance-preview {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: var(--spacing-double);
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container);
+
+  .repository-appearance-preview-eyebrow {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .repository-appearance-preview-canvas {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 18px;
+    background: var(--md-sys-color-surface);
+  }
+
+  .repository-appearance-preview-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-self: start;
+    min-height: 38px;
+    max-width: 100%;
+    padding: 0 12px;
+    border-radius: 14px 14px 5px 5px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface);
+    box-shadow: var(--md-sys-elevation-level1);
+
+    &.compact {
+      min-height: 32px;
+    }
+
+    .octicon {
+      flex: none;
+      opacity: 0.85;
+    }
+
+    .preview-tab-label {
+      @include ellipsis;
+      min-width: 0;
+      font-size: var(--font-size);
+    }
+  }
+
+  .repository-appearance-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--md-sys-color-surface-container-low);
+
+    .preview-row-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+
+      .octicon {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .preview-row-name {
+      @include ellipsis;
+      flex: 1;
+      min-width: 0;
+      color: var(--md-sys-color-on-surface);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .preview-row-branch {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex: none;
+      color: var(--md-sys-color-primary);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+
+      .octicon {
+        width: 13px;
+        height: 13px;
+      }
+    }
+  }
+}
+
 .repository-logo-studio {
   background: var(--md-sys-color-surface-container-low);
   border: 1px solid var(--md-sys-color-outline-variant);
