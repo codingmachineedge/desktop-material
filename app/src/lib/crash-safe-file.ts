@@ -1,16 +1,7 @@
 import { constants, Stats } from 'fs'
-import { lstat, open, readdir, rename, unlink } from 'fs/promises'
+import { lstat, open, readdir, realpath, rename, unlink } from 'fs/promises'
 import { randomUUID } from 'crypto'
-import {
-  basename,
-  dirname,
-  isAbsolute,
-  join,
-  parse,
-  relative,
-  resolve,
-  sep,
-} from 'path'
+import { basename, dirname, isAbsolute, join, resolve } from 'path'
 
 /**
  * Narrow pattern used by app-owned Git repositories to ignore persistence
@@ -43,6 +34,7 @@ export interface ICrashSafeFileSystem {
     mode?: number
   ): Promise<ICrashSafeFileHandle>
   readdir(path: string): Promise<ReadonlyArray<string>>
+  realpath(path: string): Promise<string>
   rename(source: string, destination: string): Promise<void>
   unlink(path: string): Promise<void>
 }
@@ -51,6 +43,7 @@ const nodeFileSystem: ICrashSafeFileSystem = {
   lstat,
   open: (path, flags, mode) => open(path, flags, mode),
   readdir,
+  realpath,
   rename,
   unlink,
 }
@@ -311,7 +304,12 @@ export class CrashSafeFilePersistence {
     const retired = new Array<string>()
 
     for (const source of sources) {
-      if (!(await this.regularFileExists(source, source !== paths.target && source !== paths.backup))) {
+      if (
+        !(await this.regularFileExists(
+          source,
+          source !== paths.target && source !== paths.backup
+        ))
+      ) {
         continue
       }
       const stale = this.uniqueArtifactPath(paths, 'stale')
@@ -326,10 +324,7 @@ export class CrashSafeFilePersistence {
     for (const stale of retired) {
       await this.unlinkIfGenerated(stale)
     }
-    await this.cleanupArtifacts(
-      paths,
-      new Set(['temp', 'recovery', 'stale'])
-    )
+    await this.cleanupArtifacts(paths, new Set(['temp', 'recovery', 'stale']))
     await this.syncDirectory(paths.directory)
   }
 
@@ -343,29 +338,39 @@ export class CrashSafeFilePersistence {
       )
     }
 
-    const directory = dirname(path)
+    const requestedDirectory = dirname(path)
     const baseName = basename(path)
     if (baseName.length === 0 || baseName === '.' || baseName === '..') {
       throw new Error('Crash-safe persistence requires a file target')
     }
 
-    await this.assertNoLinkedDirectoryComponents(directory)
+    // Canonicalize the directory before anything is built from it: resolving
+    // links up front means every subsequent open/rename targets the real
+    // location, so a linked ancestor (a normal situation on macOS, where the
+    // temp root lives under the /var -> /private/var link) can never redirect
+    // persistence elsewhere. The resolved form is still required to be an
+    // ordinary directory so a racing swap fails closed.
+    const directory = await this.canonicalDirectory(requestedDirectory)
 
-    const artifactPrefix = `.${baseName}${ArtifactMarker}`
-    const backup =
-      requestedBackupPath ?? join(directory, `${artifactPrefix}backup`)
     if (
-      !isAbsolute(backup) ||
-      resolve(backup) !== backup ||
-      dirname(backup) !== directory ||
-      backup === path
+      requestedBackupPath !== undefined &&
+      (!isAbsolute(requestedBackupPath) ||
+        resolve(requestedBackupPath) !== requestedBackupPath ||
+        dirname(requestedBackupPath) !== requestedDirectory ||
+        requestedBackupPath === path)
     ) {
       throw new Error(
         'Crash-safe persistence requires a distinct same-directory backup path'
       )
     }
+
+    const artifactPrefix = `.${baseName}${ArtifactMarker}`
+    const backup =
+      requestedBackupPath !== undefined
+        ? join(directory, basename(requestedBackupPath))
+        : join(directory, `${artifactPrefix}backup`)
     return {
-      target: path,
+      target: join(directory, baseName),
       directory,
       baseName,
       artifactPrefix,
@@ -688,17 +693,13 @@ export class CrashSafeFilePersistence {
     }
   }
 
-  private async assertNoLinkedDirectoryComponents(path: string): Promise<void> {
-    const root = parse(path).root
-    const remainder = relative(root, path)
-    let current = root
-    for (const component of remainder.split(sep).filter(Boolean)) {
-      current = join(current, component)
-      const metadata = await this.fileSystem.lstat(current)
-      if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
-        throw new Error('Crash-safe persistence refuses linked directories')
-      }
+  private async canonicalDirectory(path: string): Promise<string> {
+    const canonical = await this.fileSystem.realpath(path)
+    const metadata = await this.fileSystem.lstat(canonical)
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new Error('Crash-safe persistence refuses linked directories')
     }
+    return canonical
   }
 }
 

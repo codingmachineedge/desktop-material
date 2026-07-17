@@ -50,9 +50,14 @@ function requireCanonicalDirectory(value, label) {
   if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
     fail(`${label} must be an ordinary directory.`)
   }
-  const parsed = path.parse(requested)
+  // Canonicalize before the component walk: linked ancestors are a normal
+  // situation (macOS keeps its temp root under the /var -> /private/var
+  // link), and resolving them first means every later check and write uses
+  // the real location. The canonical form must then be link-free.
+  const canonical = realpathSync(requested)
+  const parsed = path.parse(canonical)
   let current = parsed.root
-  for (const segment of requested
+  for (const segment of canonical
     .slice(parsed.root.length)
     .split(path.sep)
     .filter(part => part.length > 0)) {
@@ -61,7 +66,6 @@ function requireCanonicalDirectory(value, label) {
       fail(`${label} must not traverse a link or junction.`)
     }
   }
-  const canonical = realpathSync(requested)
   return canonical
 }
 

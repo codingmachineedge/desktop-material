@@ -5,6 +5,7 @@ import {
   open,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   symlink,
@@ -28,12 +29,18 @@ const nativeFileSystem: ICrashSafeFileSystem = {
   lstat,
   open: (path, flags, mode) => open(path, flags, mode),
   readdir,
+  realpath,
   rename,
   unlink,
 }
 
 async function temporaryTarget(t: TestContext): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), 'desktop-material-atomic-'))
+  // Canonicalize so path expectations survive linked or short-form temp
+  // roots (macOS /var -> /private/var, Windows 8.3 names): the persistence
+  // layer resolves its directory the same way before building paths.
+  const directory = await realpath(
+    await mkdtemp(join(tmpdir(), 'desktop-material-atomic-'))
+  )
   t.after(() => rm(directory, { recursive: true, force: true }))
   return join(directory, 'state.json')
 }
