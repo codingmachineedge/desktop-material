@@ -104,6 +104,32 @@ credential was deleted and read back absent; all recorded PIDs and both ports
 reached zero; the named desktop closed exactly once; and the containment-checked
 owned Temp root was removed and verified absent.
 
+### Publication checkpoint
+
+- The implementation, evidence ledger, screenshots, and canonical docs were
+  committed and pushed without force at
+  `fb15895289341f2e197fe9857e55ebfefab65497`. The platform-neutral test-fixture
+  correction and its failure receipt were pushed at
+  `a052e322f6fa47a6bc26fc7baf737fc747065ed2`.
+- Corrective CI run `29572459399` completed successfully for exact SHA
+  `a052e322f6fa47a6bc26fc7baf737fc747065ed2`: lint, Windows x64/arm64, macOS
+  x64/arm64, and Windows/macOS E2E smoke all passed. Corrective Build Installers
+  run `29572459417` also completed successfully, including Windows x64.
+- Pages run `29571690395` completed successfully for the implementation SHA.
+  The live page returned 200 with both new gallery entries; the raw logo-studio
+  and API-function PNGs returned their exact promoted byte lengths and SHA-256
+  values.
+- The separate wiki preserved its remote-only `Images/` directory and overlaid
+  only Agent API, Developer Guide, Feature Gallery, and User Guide. Wiki
+  `master` was committed and pushed without force at
+  `905047f4cc7e0934516ea0ebaf79c4510f4385ed`; local, tracking, and direct remote
+  SHAs matched. The rendered gallery returned 200 with all 63 named entries and
+  both new images, and the rendered User Guide contained the new API-function
+  and logo guidance.
+- After remote proof, the containment-checked disposable wiki checkout was sent
+  to the Recycle Bin and verified absent. Main had one worktree, one local
+  branch, no stashes, and no unintegrated or divergent tip.
+
 ## 2026-07-16 navigation, context actions, and scroll containment
 
 Repository tabs now have a runtime search/switcher across labels, aliases,
