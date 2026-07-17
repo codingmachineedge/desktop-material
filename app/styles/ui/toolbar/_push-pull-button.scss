@@ -8,6 +8,10 @@
   border-radius: 999px;
   box-sizing: border-box;
   color: var(--md-sys-color-on-primary);
+  // Never shrink below the count content: the sibling text column is the
+  // shrinkable one, so squeezed pills ellipsize the label instead of letting
+  // digits spill outside this rounded chip.
+  flex: none;
   font-size: 11.5px;
   font-weight: 700;
   gap: 1px;

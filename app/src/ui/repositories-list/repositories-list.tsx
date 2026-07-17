@@ -15,6 +15,7 @@ import {
 import { IFilterListGroup } from '../lib/filter-list'
 import { IMatches } from '../../lib/fuzzy-find'
 import { ILocalRepositoryState, Repository } from '../../models/repository'
+import { DensityPreference } from '../../models/appearance-customization'
 import { Dispatcher } from '../dispatcher'
 import { Button } from '../lib/button'
 import { Octicon } from '../octicons'
@@ -70,6 +71,12 @@ interface IRepositoriesListProps {
   readonly recentRepositories: ReadonlyArray<number>
   readonly showRecentRepositories: boolean
   readonly showBranchNameInRepoList: ShowBranchNameInRepoListSetting
+
+  /**
+   * The app-wide repository-list density; compact uses the shorter side-sheet
+   * row geometry. Optional so focused tests default to comfortable.
+   */
+  readonly repositoryListDensity?: DensityPreference
 
   /** A cache of the latest repository state values, keyed by the repository id */
   readonly localRepositoryStateLookup: ReadonlyMap<
@@ -128,7 +135,18 @@ interface IRepositoriesListState {
   readonly repositoryLogoChange: IRepositoryLogoChange
 }
 
-const RowHeight = 29
+/**
+ * Side-sheet row geometry. The list renders exclusively inside the Current
+ * Repository foldout, so each height mirrors the `#foldout-container` rules in
+ * `app/styles/ui/_repository-list.scss`: a 34px icon chip plus 2×10px block
+ * padding (comfortable), a 28px chip plus 2×5px at compact repository-list
+ * density, and the uppercase group label with its block padding. Keep these in
+ * sync with the SCSS — a shorter virtualized slot makes rows overlap their
+ * neighbors and mis-target clicks.
+ */
+const RowHeight = 54
+const CompactRowHeight = 38
+const GroupHeaderRowHeight = 36
 
 /**
  * Iterate over all groups until a list item is found that matches
@@ -271,6 +289,20 @@ export class RepositoriesList extends React.Component<
         repositoryPath,
       },
     }))
+  }
+
+  /** Match each virtualized slot to the side-sheet geometry it renders. */
+  private getRowHeight = ({
+    item,
+  }: {
+    readonly item: IRepositoryListItem | null
+  }) => {
+    if (item === null) {
+      return GroupHeaderRowHeight
+    }
+    return this.props.repositoryListDensity === 'compact'
+      ? CompactRowHeight
+      : RowHeight
   }
 
   private renderItem = (item: IRepositoryListItem, matches: IMatches) => {
@@ -494,7 +526,7 @@ export class RepositoriesList extends React.Component<
       <div className="repository-list">
         {this.renderSheetHeader()}
         <SectionFilterList<IRepositoryListItem, RepositoryListGroup>
-          rowHeight={RowHeight}
+          rowHeight={this.getRowHeight}
           selectedItem={selectedItem}
           filterListId="repositories"
           filterListLabel="Repositories"

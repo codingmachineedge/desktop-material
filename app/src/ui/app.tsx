@@ -4115,6 +4115,9 @@ export class App extends React.Component<IAppProps, IAppState> {
         recentRepositories={this.state.recentRepositories}
         showRecentRepositories={this.state.showRecentRepositories}
         showBranchNameInRepoList={this.state.showBranchNameInRepoList}
+        repositoryListDensity={
+          this.state.appearanceCustomization.repositoryListDensity
+        }
         localRepositoryStateLookup={this.state.localRepositoryStateLookup}
         askForConfirmationOnRemoveRepository={
           this.state.askForConfirmationOnRepositoryRemoval

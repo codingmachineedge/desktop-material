@@ -126,8 +126,11 @@ body {
     }
   }
 
-  // Let the 54px chips escape the upstream 50px toolbar-height cap.
-  .toolbar-button {
+  // Let the 54px chips escape the upstream 50px toolbar-height cap. The
+  // `.resizable` co-selector repeats the upstream specificity so a wrapped
+  // sync description can also grow a resizable pill instead of clipping.
+  .toolbar-button,
+  .toolbar-button.resizable {
     max-height: none;
   }
 
@@ -530,7 +533,10 @@ body[data-dm-toolbar-density='compact'] #desktop-app-toolbar {
   & > .toolbar-item .toolbar-button > button,
   & > .toolbar-overflow-control > .toolbar-button > button {
     gap: 8px;
-    height: 44px;
+    // A minimum, not a fixed height: the base chip's 54px minimum would
+    // otherwise clamp a fixed 44px back up (nullifying compact density), and
+    // a wrapped sync description must grow the pill instead of clipping.
+    min-height: 44px;
     padding-inline: 10px 12px;
 
     .icon {
@@ -550,6 +556,15 @@ body[data-dm-toolbar-labels='icons'] #desktop-app-toolbar {
     flex: 0 1 92px;
     max-width: 92px !important;
     min-width: 48px !important;
+  }
+
+  // The labeled layout's 130px chip floors would overflow the 92px icon caps
+  // and clip the split sync pill's disclosure arrow out of reach; icons-only
+  // chips shrink to their icon instead.
+  & > .toolbar-item .toolbar-button.push-pull-button,
+  & > .toolbar-item .toolbar-button.branch-toolbar-button,
+  & > .toolbar-item .toolbar-button.revert-progress {
+    min-width: 0;
   }
 
   & > .toolbar-item:has(.push-pull-button) {

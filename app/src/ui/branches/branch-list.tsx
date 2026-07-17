@@ -40,6 +40,15 @@ interface IBranchListProps {
   readonly repository: Repository
 
   /**
+   * Overrides the default 30px row height. The Branches side sheet passes its
+   * own geometry (34px icon chips plus padding) so virtualized slots match
+   * what its rows actually draw; dialog consumers keep the default.
+   */
+  readonly rowHeight?:
+    | number
+    | ((info: { readonly item: IBranchListItem | null }) => number)
+
+  /**
    * See IBranchesState.defaultBranch
    */
   readonly defaultBranch: Branch | null
@@ -282,7 +291,7 @@ export class BranchList extends React.Component<
       <SectionFilterList<IBranchListItem>
         ref={this.onBranchesFilterListRef}
         className="branches-list"
-        rowHeight={RowHeight}
+        rowHeight={this.props.rowHeight ?? RowHeight}
         filterListId="branches"
         filterListLabel="Branches"
         filterText={this.props.filterText}

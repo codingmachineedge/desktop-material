@@ -86,6 +86,15 @@ interface IBranchesContainerState {
   } | null
 }
 
+/**
+ * Side-sheet branch row geometry, mirroring the `#foldout-container` rules in
+ * `app/styles/ui/_branches.scss`: a 34px icon chip plus 2×8px block padding
+ * per row, and the uppercase group header with its block padding. Keep in
+ * sync with the SCSS — a shorter virtualized slot makes rows overlap.
+ */
+const SheetRowHeight = 50
+const SheetGroupHeaderRowHeight = 36
+
 /** The unified Branches and Pull Requests component. */
 export class BranchesContainer extends React.Component<
   IBranchesContainerProps,
@@ -255,6 +264,13 @@ export class BranchesContainer extends React.Component<
     )
   }
 
+  /** Match each virtualized slot to the side-sheet geometry it renders. */
+  private getSheetRowHeight = ({
+    item,
+  }: {
+    readonly item: IBranchListItem | null
+  }) => (item === null ? SheetGroupHeaderRowHeight : SheetRowHeight)
+
   private renderBranch = (
     item: IBranchListItem,
     matches: IMatches,
@@ -313,6 +329,7 @@ export class BranchesContainer extends React.Component<
             allBranches={this.props.allBranches}
             recentBranches={this.props.recentBranches}
             branchSortOrder={this.props.branchSortOrder}
+            rowHeight={this.getSheetRowHeight}
             onItemClick={this.onBranchItemClick}
             filterText={this.state.branchFilterText}
             onFilterTextChanged={this.onBranchFilterTextChanged}
