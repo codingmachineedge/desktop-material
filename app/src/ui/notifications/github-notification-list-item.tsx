@@ -9,6 +9,12 @@ import { RelativeTime } from '../relative-time'
 interface IGitHubNotificationListItemProps {
   readonly thread: IAPINotificationThread
   readonly busy: boolean
+  readonly selected: boolean
+  readonly selectionDisabled?: boolean
+  readonly onToggleSelected: (
+    thread: IAPINotificationThread,
+    selected: boolean
+  ) => void
   readonly onActivate: (thread: IAPINotificationThread) => void
   readonly onMarkRead: (thread: IAPINotificationThread) => void
   readonly onRequestDone: (
@@ -53,14 +59,29 @@ export class GitHubNotificationListItem extends React.Component<IGitHubNotificat
     this.props.onRequestDone(this.props.thread, event.currentTarget)
   }
 
+  private onToggleSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation()
+    this.props.onToggleSelected(this.props.thread, event.currentTarget.checked)
+  }
+
   public render() {
-    const { thread, busy } = this.props
+    const { thread, busy, selected, selectionDisabled } = this.props
     return (
       <li
         className={classNames('notification-item', 'github-notification-item', {
           unread: thread.unread,
+          selected,
         })}
       >
+        <label className="notification-item-selection">
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={selectionDisabled || busy}
+            aria-label={`Select GitHub notification: ${thread.subject.title}`}
+            onChange={this.onToggleSelected}
+          />
+        </label>
         <button
           type="button"
           className="notification-item-activate"

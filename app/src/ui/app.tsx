@@ -114,6 +114,7 @@ import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
 import { GitHubPullRequestLifecycleDialog } from './github-pull-request-lifecycle'
 import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
+import { ErrorNoticeStack } from './error-notice-stack'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
 import { EditCopilotBYOKProviderDialog } from './copilot/edit-byok-provider-dialog'
@@ -2105,6 +2106,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             useWindowsOpenSSH={this.state.useWindowsOpenSSH}
             showCommitLengthWarning={this.state.showCommitLengthWarning}
             notificationsEnabled={this.state.notificationsEnabled}
+            errorPresentationStyle={this.state.errorPresentationStyle}
             optOutOfUsageTracking={this.state.optOutOfUsageTracking}
             useExternalCredentialHelper={this.state.useExternalCredentialHelper}
             repository={repository}
@@ -3979,6 +3981,19 @@ export class App extends React.Component<IAppProps, IAppState> {
     )
   }
 
+  private renderErrorNotices() {
+    return (
+      <ErrorNoticeStack
+        notices={this.state.errorNotices}
+        onDismiss={this.onErrorNoticeDismissed}
+      />
+    )
+  }
+
+  private onErrorNoticeDismissed = (id: string) => {
+    this.props.dispatcher.dismissErrorNotice(id)
+  }
+
   private renderApp() {
     return (
       <div
@@ -4879,6 +4894,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.state.showWelcomeFlow
           ? this.renderWelcomeFlow()
           : this.renderApp()}
+        {this.renderErrorNotices()}
         {this.renderZoomInfo()}
         {this.renderFullScreenInfo()}
       </div>

@@ -194,6 +194,207 @@ describe('NotificationCentrePanel', () => {
     assert.ok(screen.getByText('Local notification'))
   })
 
+  it('filters Local notifications and scopes bulk actions to the visible selection', async () => {
+    const entries: ReadonlyArray<INotificationEntry> = [
+      {
+        id: 'credential-error',
+        kind: 'app-error',
+        title: 'Credential helper failed',
+        body: 'The GitHub credential could not be stored',
+        createdAt: '2026-07-12T14:00:00Z',
+        read: false,
+      },
+      {
+        id: 'completed-clone',
+        kind: 'clone-batch',
+        title: 'Clone completed',
+        body: 'The selected repository is ready',
+        createdAt: '2026-07-12T13:00:00Z',
+        read: true,
+      },
+      localEntry,
+    ]
+    const readCalls = new Array<{
+      ids: ReadonlyArray<string>
+      read: boolean
+    }>()
+    const deleteCalls = new Array<ReadonlyArray<string>>()
+    let clearCalls = 0
+    const bulkDispatcher = {
+      ...dispatcher,
+      setNotificationsRead: async (
+        ids: ReadonlyArray<string>,
+        read: boolean
+      ) => {
+        readCalls.push({ ids: [...ids], read })
+      },
+      deleteNotifications: async (ids: ReadonlyArray<string>) => {
+        deleteCalls.push([...ids])
+      },
+      clearAllNotifications: async () => {
+        clearCalls++
+      },
+    } as unknown as Dispatcher
+
+    render(
+      <NotificationCentrePanel
+        dispatcher={bulkDispatcher}
+        entries={entries}
+        unreadCount={2}
+        repositories={[]}
+        accounts={[]}
+      />
+    )
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Search local notifications',
+    })
+    const type = screen.getByRole('combobox', {
+      name: 'Local notification type',
+    })
+
+    fireEvent.change(type, { target: { value: 'app-error' } })
+    fireEvent.change(search, { target: { value: 'credential' } })
+    assert.ok(screen.getByText('Credential helper failed'))
+    assert.equal(screen.queryByText('Clone completed'), null)
+    assert.equal(screen.queryByText('Local notification'), null)
+
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Select all visible notifications',
+      })
+    )
+    assert.equal(screen.getByText('1 selected').textContent, '1 selected')
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }))
+    await waitFor(() =>
+      assert.deepEqual(readCalls, [{ ids: ['credential-error'], read: true }])
+    )
+    await waitFor(() =>
+      assert.equal(screen.getByText('0 selected').textContent, '0 selected')
+    )
+
+    fireEvent.change(search, { target: { value: '' } })
+    fireEvent.change(type, { target: { value: 'clone-batch' } })
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Select all visible notifications',
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Mark unread' }))
+    await waitFor(() =>
+      assert.deepEqual(readCalls, [
+        { ids: ['credential-error'], read: true },
+        { ids: ['completed-clone'], read: false },
+      ])
+    )
+
+    fireEvent.change(type, { target: { value: 'app-error' } })
+    fireEvent.change(search, { target: { value: 'credential' } })
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Select all visible notifications',
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+    const deleteConfirmation = screen.getByRole('alertdialog', {
+      name: 'Delete selected notifications?',
+    })
+    assert.ok(within(deleteConfirmation).getByText(/history-backed change/))
+    fireEvent.click(
+      within(deleteConfirmation).getByRole('button', {
+        name: 'Delete selected',
+      })
+    )
+    await waitFor(() => assert.deepEqual(deleteCalls, [['credential-error']]))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+    assert.equal(clearCalls, 0)
+    const clearConfirmation = screen.getByRole('alertdialog', {
+      name: 'Clear every Local notification?',
+    })
+    assert.ok(
+      within(clearConfirmation).getByText(/Notification history can restore/)
+    )
+    fireEvent.click(
+      within(clearConfirmation).getByRole('button', { name: 'Clear all' })
+    )
+    await waitFor(() => assert.equal(clearCalls, 1))
+  })
+
+  it('searches GitHub notifications and limits bulk read and done to visible threads', async () => {
+    const selected = account('first', 1)
+    const reads = new Array<string>()
+    const dones = new Array<string>()
+    const api: IGitHubNotificationsAPI = {
+      fetchNotifications: async () =>
+        page([
+          notification('alpha', true, 'Alpha review requested'),
+          notification('beta', true, 'Beta build failed'),
+        ]),
+      markNotificationThreadRead: async id => {
+        reads.push(id)
+      },
+      markNotificationThreadDone: async id => {
+        dones.push(id)
+      },
+    }
+    const store = new GitHubNotificationsStore([selected], () => api)
+
+    render(
+      <NotificationCentrePanel
+        dispatcher={dispatcher}
+        entries={[]}
+        unreadCount={0}
+        repositories={[]}
+        accounts={[selected]}
+        githubNotificationsStore={store}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'GitHub' }))
+    await waitFor(() => assert.ok(screen.getByText('Alpha review requested')))
+    const search = screen.getByRole('searchbox', {
+      name: 'Search github notifications',
+    })
+
+    fireEvent.change(search, { target: { value: 'alpha' } })
+    assert.equal(screen.queryByText('Beta build failed'), null)
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Select all visible notifications',
+      })
+    )
+    assert.ok(
+      (
+        screen.getByRole('checkbox', {
+          name: 'Select GitHub notification: Alpha review requested',
+        }) as HTMLInputElement
+      ).checked
+    )
+    assert.equal(screen.getByText('1 selected').textContent, '1 selected')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark selected done' }))
+    const doneConfirmation = screen.getByRole('alertdialog', {
+      name: 'Mark selected threads done?',
+    })
+    fireEvent.click(
+      within(doneConfirmation).getByRole('button', { name: 'Mark done' })
+    )
+    await waitFor(() => assert.deepEqual(dones, ['alpha']))
+    assert.deepEqual(reads, [])
+
+    fireEvent.change(search, { target: { value: 'beta' } })
+    await waitFor(() => assert.ok(screen.getByText('Beta build failed')))
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Select all visible notifications',
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }))
+    await waitFor(() => assert.deepEqual(reads, ['beta']))
+    assert.deepEqual(dones, ['alpha'])
+  })
+
   it('loads bounded pages across accounts and supports exact read and done actions', async () => {
     const first = account('first', 1)
     const second = account('second', 2)

@@ -1156,6 +1156,81 @@
     color: var(--md-sys-color-on-surface-variant);
   }
 
+  .error-presentation-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+
+    .radio-button-component {
+      min-width: 0;
+      margin: 0;
+    }
+
+    label {
+      display: flex;
+      align-items: flex-start;
+      min-height: 92px;
+      box-sizing: border-box;
+      padding: 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+      background: var(--md-sys-color-surface-container-low);
+      cursor: pointer;
+
+      &:has(input:checked) {
+        border-color: var(--md-sys-color-primary);
+        background: var(--md-sys-color-primary-container);
+      }
+
+      &:has(input:focus-visible) {
+        outline: 2px solid var(--md-sys-color-primary);
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  .error-presentation-option-copy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+
+    span {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: var(--font-size-sm);
+      line-height: 1.4;
+    }
+  }
+
+  .error-presentation-sample {
+    display: grid;
+    gap: 3px;
+    width: min(360px, 100%);
+    box-sizing: border-box;
+    margin: 12px 0 0 auto;
+    padding: 12px;
+    border-radius: var(--md-sys-shape-corner-large);
+    background: var(--md-sys-color-error);
+    box-shadow: var(--md-sys-elevation-level2);
+    color: var(--md-sys-color-on-error);
+    font-size: var(--font-size-sm);
+
+    &.dialog {
+      margin-right: auto;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-extra-large);
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface);
+      box-shadow: var(--md-sys-elevation-level3);
+    }
+  }
+
+  .error-presentation-sample-action {
+    justify-self: end;
+    margin-top: 6px;
+    font-weight: var(--font-weight-semibold);
+  }
+
   .example-link {
     cursor: default !important;
   }
@@ -1265,6 +1340,15 @@
   // auto-fit and selected 200%. Container queries are intentional here: the
   // settings card can be narrow while the Electron viewport is still wider.
   @container preferences-dialog (max-width: 620px) {
+    .error-presentation-options {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .error-presentation-sample {
+      width: 100%;
+      margin-inline: 0;
+    }
+
     .preferences-rail {
       width: 72px;
       padding: 12px 8px 10px;

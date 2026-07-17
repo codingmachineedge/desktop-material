@@ -8,8 +8,9 @@ workflow intact underneath.
 
 On top of that shell, Desktop Material ships multi-provider accounts and organizations, automation,
 GitHub Actions and logs, agent access, searchable graph History, multiple stashes, pull-all,
-multi-window workflows, per-account repository tabs, Git-backed settings and notifications, and a
-non-modal dialog framework. Its Material first-run experience, adaptive toolbar, profile-backed
+multi-window workflows, per-account repository tabs, Git-backed settings and notification bulk
+triage, configurable bottom-right error notices, and a non-modal dialog framework. Its Material
+first-run experience, adaptive toolbar, profile-backed
 app identity, favorite/portable tabs, and layered appearance controls let the workspace respond to
 both the active profile and the selected repository. The completed parity roadmap turns audited Git, `gh`, REST, and GraphQL capabilities
 into named app functions rather than a searchable command or endpoint catalogue.
@@ -30,7 +31,7 @@ into named app functions rather than a searchable command or endpoint catalogue.
 | Page | What it covers |
 | --- | --- |
 | [User Guide](User-Guide) | Task-oriented walkthrough for the Material welcome, appearance scopes, adaptive toolbar, accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
-| [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 55 named visual functions and states, with automated missing/duplicate coverage checks. |
+| [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 58 named visual functions and states, with automated missing/duplicate coverage checks. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
@@ -108,6 +109,11 @@ the tonal workspace preview hides when a compact window needs the space.
 - **Non-modal dialogs** that float without blocking the app, drag by their headers, cascade, and
   come to front on focus. Preferences is an MD3 940×660 dialog with a left rail, an Active chip, and
   a pill footer; the repository and branch pickers are MD3 side sheets.
+- **Notification and error triage** — search and type-filter Local notifications, select the visible
+  result set, apply history-backed read/unread/delete actions, or confirm **Clear all**. GitHub inbox
+  items have account-scoped search and bulk read/done controls. Acknowledgement-only errors default
+  to dismissible red bottom-right notices and can be switched to blocking dialogs in Notifications
+  settings; errors with a real retry, authentication, or remediation choice stay modal.
 
 ### Automation, CI, and agent control
 

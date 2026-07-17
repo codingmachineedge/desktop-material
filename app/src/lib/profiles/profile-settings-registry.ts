@@ -51,6 +51,7 @@ export const profileSettingsRegistry: ReadonlyArray<IProfileSettingEntry> = [
     label: 'confirm commit message override',
   },
   { key: 'confirmWorktreeRemoval', label: 'confirm worktree removal' },
+  { key: 'error-presentation-style', label: 'error presentation' },
 
   // Diff and appearance preferences
   { key: 'theme', label: 'appearance' },

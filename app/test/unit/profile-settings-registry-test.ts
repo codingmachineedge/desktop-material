@@ -27,6 +27,7 @@ describe('captureSettingsSnapshot', () => {
       theme: 'dark',
       'underline-links': '1',
       'appearance-customization-v1': '{"version":1}',
+      'error-presentation-style': 'notice',
       'zoom-factor': '1.25',
       'last-selected-repository-id': '42',
       users: '[secret]',
@@ -38,6 +39,7 @@ describe('captureSettingsSnapshot', () => {
     assert.equal(snapshot['theme'], 'dark')
     assert.equal(snapshot['underline-links'], '1')
     assert.equal(snapshot['appearance-customization-v1'], '{"version":1}')
+    assert.equal(snapshot['error-presentation-style'], 'notice')
     assert.equal(snapshot['zoom-factor'], '1.25')
     assert.equal(snapshot['last-selected-repository-id'], undefined)
     assert.equal(snapshot['users'], undefined)
@@ -74,6 +76,16 @@ describe('describeSettingsChange', () => {
     assert.deepEqual(
       describeSettingsChange({ 'tab-size': '2' }, { 'tab-size': '8' }),
       ['Change tab size']
+    )
+  })
+
+  it('versions the error presentation preference with a readable label', () => {
+    assert.deepEqual(
+      describeSettingsChange(
+        { 'error-presentation-style': 'notice' },
+        { 'error-presentation-style': 'dialog' }
+      ),
+      ['Change error presentation']
     )
   })
 

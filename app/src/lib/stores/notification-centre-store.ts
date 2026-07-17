@@ -18,9 +18,11 @@ import {
 } from '../profiles/profile-git'
 import {
   countUnread,
+  deleteNotificationEntries,
   insertNotification,
   parseNotificationLog,
   serializeNotificationLog,
+  setNotificationEntriesRead,
   INotificationEntry,
   INotificationInput,
 } from '../../models/notification-centre'
@@ -169,6 +171,35 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
     await this.persist(`${verb}: ${target.title}`)
   }
 
+  /** Set the read state of a selected group in one persisted mutation. */
+  public async setReadMany(
+    ids: ReadonlySet<string> | ReadonlyArray<string>,
+    read: boolean
+  ): Promise<void> {
+    await this.initialize()
+    if (!this.enabled) {
+      return
+    }
+
+    const previous = this.entries
+    const entries = setNotificationEntriesRead(previous, ids, read)
+    if (entries === previous) {
+      return
+    }
+
+    const changedCount = previous.reduce(
+      (count, entry, index) => count + (entry === entries[index] ? 0 : 1),
+      0
+    )
+    this.entries = entries
+    this.emitState()
+
+    const noun = changedCount === 1 ? 'notification' : 'notifications'
+    await this.persist(
+      `Mark ${changedCount} ${noun} ${read ? 'read' : 'unread'}`
+    )
+  }
+
   /** Delete a single notification. */
   public async delete(id: string): Promise<void> {
     await this.initialize()
@@ -185,6 +216,29 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
     this.emitState()
 
     await this.persist(`Delete notification: ${target.title}`)
+  }
+
+  /** Delete a selected group in one persisted mutation. */
+  public async deleteMany(
+    ids: ReadonlySet<string> | ReadonlyArray<string>
+  ): Promise<void> {
+    await this.initialize()
+    if (!this.enabled) {
+      return
+    }
+
+    const previous = this.entries
+    const entries = deleteNotificationEntries(previous, ids)
+    if (entries === previous) {
+      return
+    }
+
+    const deletedCount = previous.length - entries.length
+    this.entries = entries
+    this.emitState()
+
+    const noun = deletedCount === 1 ? 'notification' : 'notifications'
+    await this.persist(`Delete ${deletedCount} ${noun}`)
   }
 
   /** Mark every notification as read. */

@@ -19,6 +19,10 @@ import { getFileFromExceedsError } from '../lib/helpers/regex'
 import { CopilotError, getCopilotErrorDisplayInfo } from '../lib/copilot-error'
 import { Terminal } from './terminal'
 import { coerceToString } from '../lib/git/coerce-to-string'
+import {
+  getAppErrorPresentation,
+  getUnderlyingAppError,
+} from '../lib/app-error-presentation'
 
 interface IAppErrorProps {
   /** The error to be displayed  */
@@ -153,38 +157,7 @@ export class AppError extends React.Component<IAppErrorProps, IAppErrorState> {
   }
 
   private getTitle(error: Error) {
-    const underlyingError = getUnderlyingError(error)
-
-    if (underlyingError instanceof CopilotError) {
-      const displayInfo = getCopilotErrorDisplayInfo(underlyingError)
-      if (displayInfo !== null) {
-        return displayInfo.title
-      }
-    }
-
-    switch (getDugiteError(error)) {
-      case DugiteError.PushWithFileSizeExceedingLimit:
-        return 'File size limit exceeded'
-    }
-
-    switch (getRetryActionType(error)) {
-      case RetryActionType.Clone:
-        return 'Clone failed'
-      case RetryActionType.Push:
-        return 'Failed to push'
-    }
-
-    if (isErrorWithMetaData(error)) {
-      const { gitContext } = error.metadata
-      switch (gitContext?.kind) {
-        case 'create-repository':
-          return `Failed creating repository`
-        case 'commit':
-          return `Commit failed`
-      }
-    }
-
-    return 'Error'
+    return getAppErrorPresentation(error).title
   }
 
   private renderContentAfterErrorMessage(error: Error) {
@@ -321,7 +294,7 @@ export class AppError extends React.Component<IAppErrorProps, IAppErrorState> {
 }
 
 export function getUnderlyingError(error: Error): Error {
-  return isErrorWithMetaData(error) ? error.underlyingError : error
+  return getUnderlyingAppError(error)
 }
 
 export function isErrorWithMetaData(error: Error): error is ErrorWithMetadata {
@@ -346,17 +319,4 @@ function isCloneError(error: Error) {
   }
   const { retryAction } = error.metadata
   return retryAction !== undefined && retryAction.type === RetryActionType.Clone
-}
-
-function getRetryActionType(error: Error) {
-  if (!isErrorWithMetaData(error)) {
-    return undefined
-  }
-
-  return error.metadata.retryAction?.type
-}
-
-function getDugiteError(error: Error) {
-  const e = getUnderlyingError(error)
-  return isGitError(e) ? e.result.gitError : undefined
 }

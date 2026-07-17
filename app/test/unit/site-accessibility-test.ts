@@ -93,6 +93,21 @@ describe('Pages accessibility contracts', () => {
     assert.ok(markup.includes(`src="${source}"`))
   })
 
+  it('publishes notification bulk actions and non-blocking error evidence', () => {
+    const markup = read('site/index.html')
+
+    assert.match(markup, /select-visible bulk actions/)
+    assert.match(markup, /Acknowledgement-only errors/)
+
+    for (const source of [
+      'docs/assets/screenshots/material-notification-bulk-actions.png',
+      'docs/assets/screenshots/material-error-notice.png',
+    ]) {
+      assert.ok(markup.includes(`href="${source}"`))
+      assert.ok(markup.includes(`src="${source}"`))
+    }
+  })
+
   it('visually distinguishes in-text section links without color alone', () => {
     const style = read('site/style.css')
 
@@ -118,9 +133,12 @@ describe('Pages accessibility contracts', () => {
     )
 
     for (const [, figure] of figures) {
+      const href = figure.match(/<a\s+[\s\S]*?href="([^"]+)"/)?.[1]
       const source = figure.match(/<img\s+[\s\S]*?src="([^"]+)"/)?.[1]
       const alt = figure.match(/<img\s+[\s\S]*?alt="([^"]+)"/)?.[1]
+      assert.ok(href, 'Gallery image is missing its full-size link')
       assert.ok(source, 'Gallery image is missing a source')
+      assert.equal(href, source, `${source} full-size link does not match`)
       assert.ok(alt?.trim(), `${source} is missing useful alt text`)
       assert.match(figure, /loading="lazy"/)
       assert.match(figure, /target="_blank"/)

@@ -1,0 +1,182 @@
+.error-notice-stack {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: var(--popup-z-index);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  box-sizing: border-box;
+  padding: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: none;
+
+  .error-notice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--md-sys-color-on-error) 22%, transparent);
+    border-radius: var(--md-sys-shape-corner-large);
+    background: var(--md-sys-color-error);
+    box-shadow: var(--md-sys-elevation-level3);
+    color: var(--md-sys-color-on-error);
+    pointer-events: auto;
+  }
+
+  .error-notice-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--md-sys-color-on-error) 14%, transparent);
+
+    .octicon {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+  }
+
+  .error-notice-content {
+    min-width: 0;
+
+    h2,
+    p {
+      min-width: 0;
+      margin: 0;
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+
+    h2 {
+      font-size: 14px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 1.35;
+    }
+
+    p {
+      margin-top: 3px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+  }
+
+  .error-notice-occurrences {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    margin-top: 7px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--md-sys-color-on-error) 15%, transparent);
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .error-notice-diagnostic {
+    max-height: min(220px, 34vh);
+    margin: 9px 0 0;
+    padding: 8px;
+    overflow: auto;
+    border-radius: var(--md-sys-shape-corner-small);
+    background: color-mix(in srgb, var(--md-sys-color-on-error) 12%, transparent);
+    color: inherit;
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .error-notice-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .error-notice-details,
+  .error-notice-dismiss {
+    min-height: 36px;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-on-error) 14%, transparent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-on-error);
+      outline-offset: 2px;
+    }
+  }
+
+  .error-notice-details {
+    padding: 0 10px;
+    border-radius: 999px;
+  }
+
+  .error-notice-dismiss {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    padding: 0;
+    border-radius: 999px;
+
+    .octicon {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .error-notice-stack {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100vw - 16px);
+
+    .error-notice {
+      grid-template-columns: auto minmax(0, 1fr);
+      padding: 10px;
+    }
+
+    .error-notice-actions {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+@media (max-height: 480px) {
+  .error-notice-stack {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-height: calc(100vh - 16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .error-notice-stack,
+  .error-notice-stack * {
+    scroll-behavior: auto;
+  }
+}

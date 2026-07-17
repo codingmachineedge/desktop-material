@@ -1,6 +1,6 @@
 # Guided Feature Gallery
 
-This page maps 56 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 58 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
@@ -14,7 +14,8 @@ contract rejects missing, duplicate, or unassigned assets.
 > **Publication status:** The gallery includes the July 14, 2026 Actions cache and headless
 > pagination evidence, the Pages accessibility/clipping gate, the inspected July 16 adaptive
 > customization set, the profile app-identity workspace, the clone-style Add Submodule release,
-> and the repository-contextual GitHub API Explorer. Exact build, interaction, and
+> the repository-contextual GitHub API Explorer, filtered notification bulk triage, and
+> configurable bottom-right error notices. Exact build, interaction, and
 > privacy receipts are retained in `HANDOFF.md`; each promoted release records its own main, CI,
 > Pages, and wiki verification without implying that later maintenance work is complete.
 
@@ -72,6 +73,8 @@ display.
 | `material-gitignore-manager.png` | Reviewed `.gitignore` template catalogue |
 | `material-automation.png` | Layered automation schedules and account overrides |
 | `material-notification-center.png` | Git-backed notification centre |
+| `material-notification-bulk-actions.png` | Filtered Local notification selection and bulk triage |
+| `material-error-notice.png` | Configurable bottom-right acknowledgement-only error notice |
 | `material-github-notifications.png` | Account-aware GitHub notifications |
 | `material-provider-accounts.png` | GitHub, GitLab, and Bitbucket account controls |
 | `material-agent-access.png` | Local MCP and REST agent access controls |
@@ -256,6 +259,18 @@ reachable without page-level horizontal clipping.
 ![Merge All branches and worktrees with per-target state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-branch-merge-all.png)
 
 ![Git-backed notification centre](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-center.png)
+
+Local notifications can be searched and filtered by type, selected as the
+currently visible result set, and triaged with one history-backed mark-read,
+mark-unread, or delete operation. **Clear all** requires an inline confirmation
+and leaves the Git-backed history available for restoration. Acknowledgement-only
+errors use the profile's selected presentation: a dismissible red bottom-right
+notice by default, or the legacy blocking dialog. Errors that require a retry,
+authentication choice, or remediation remain decision dialogs.
+
+![Filtered Local notifications selected for bulk triage](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-bulk-actions.png)
+
+![Dismissible bottom-right acknowledgement-only error notice](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
 
 ![Account-aware GitHub notifications](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
 

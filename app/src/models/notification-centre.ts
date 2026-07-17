@@ -154,6 +154,51 @@ export function countUnread(
   return entries.reduce((total, entry) => (entry.read ? total : total + 1), 0)
 }
 
+type NotificationEntryIds = ReadonlySet<string> | ReadonlyArray<string>
+
+function toNotificationEntryIdSet(
+  ids: NotificationEntryIds
+): ReadonlySet<string> {
+  return 'has' in ids ? ids : new Set(ids)
+}
+
+/**
+ * Set the read state of every matching notification. Unknown and duplicate ids
+ * are ignored. The original array is returned when no entry changes so callers
+ * can cheaply avoid unnecessary persistence and update events.
+ */
+export function setNotificationEntriesRead(
+  entries: ReadonlyArray<INotificationEntry>,
+  ids: NotificationEntryIds,
+  read: boolean
+): ReadonlyArray<INotificationEntry> {
+  const idSet = toNotificationEntryIdSet(ids)
+  let changed = false
+  const updated = entries.map(entry => {
+    if (!idSet.has(entry.id) || entry.read === read) {
+      return entry
+    }
+
+    changed = true
+    return { ...entry, read }
+  })
+
+  return changed ? updated : entries
+}
+
+/**
+ * Delete every notification whose id is selected. Unknown and duplicate ids
+ * are ignored. The original array is returned when nothing is deleted.
+ */
+export function deleteNotificationEntries(
+  entries: ReadonlyArray<INotificationEntry>,
+  ids: NotificationEntryIds
+): ReadonlyArray<INotificationEntry> {
+  const idSet = toNotificationEntryIdSet(ids)
+  const updated = entries.filter(entry => !idSet.has(entry.id))
+  return updated.length === entries.length ? entries : updated
+}
+
 /** Serialize an entry list to the pretty-printed on-disk format. */
 export function serializeNotificationLog(
   entries: ReadonlyArray<INotificationEntry>

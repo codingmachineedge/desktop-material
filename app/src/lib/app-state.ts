@@ -8,6 +8,8 @@ import type {
 } from './copilot-conflict-resolution'
 import { Account } from '../models/account'
 import { INotificationEntry } from '../models/notification-centre'
+import { IErrorNotice } from '../models/error-notice'
+import { ErrorPresentationStyle } from '../models/error-presentation'
 import { IBatchCloneState } from '../models/batch-clone'
 import { CommitIdentity } from '../models/commit-identity'
 import { IDiff, ImageDiffType } from '../models/diff'
@@ -420,6 +422,12 @@ export interface IAppState {
    * Whether or not the user enabled high-signal notifications.
    */
   readonly notificationsEnabled: boolean
+
+  /** How acknowledgement-only errors are shown. */
+  readonly errorPresentationStyle: ErrorPresentationStyle
+
+  /** Bounded, transient acknowledgement-only errors currently on screen. */
+  readonly errorNotices: ReadonlyArray<IErrorNotice>
 
   /** The users last chosen pull request suggested next action. */
   readonly pullRequestSuggestedNextAction:

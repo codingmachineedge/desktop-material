@@ -457,6 +457,9 @@
                 Dialogs float without blocking the app, drag by their headers,
                 cascade, and come to front on focus. Preferences is an MD3
                 940×660 dialog; repo and branch pickers are side sheets.
+                Acknowledgement-only errors default to dismissible red
+                bottom-right notices, while decisions and recovery actions
+                remain dialogs.
               </p>
             </article>
 
@@ -499,8 +502,9 @@
               <h3>Notification centre <span class="tag">Shipped</span></h3>
               <p>
                 A Git-backed Local view plus an account-aware GitHub inbox with
-                All, Unread, and participating-only controls and a complete
-                signed-out state.
+                search, filters, select-visible bulk actions, and an explicit
+                Local Clear all control. GitHub keeps All, Unread,
+                participating-only, and complete signed-out states.
               </p>
             </article>
 
@@ -773,7 +777,7 @@
           <div class="gallery-grid">
             <figure class="shot">
               <a
-                href="docs/assets/screenshots/material-workspace-changes.png"
+                href="docs/assets/screenshots/material-app-identity-workspace.png"
                 target="_blank"
                 rel="noopener"
               >
@@ -910,7 +914,7 @@
 
             <figure class="shot">
               <a
-                href="docs/assets/screenshots/material-app-identity-workspace.png"
+                href="docs/assets/screenshots/material-workspace-changes.png"
                 target="_blank"
                 rel="noopener"
               >
@@ -1693,6 +1697,42 @@
               </a>
               <figcaption>
                 Notification centre <span class="tag">History · unread</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/material-notification-bulk-actions.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-notification-bulk-actions.png"
+                  alt="Filtered Local notification centre with select-visible and bulk read, unread, delete, and Clear all actions"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Notification bulk actions
+                <span class="tag">Search · select · clear</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/material-error-notice.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-error-notice.png"
+                  alt="Dismissible red bottom-right application error notice with an optional Details action"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Non-blocking errors
+                <span class="tag">Configurable · dismissible</span>
               </figcaption>
             </figure>
 

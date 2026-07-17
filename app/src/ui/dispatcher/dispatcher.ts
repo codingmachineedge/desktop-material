@@ -107,6 +107,7 @@ import { ManualConflictResolution } from '../../models/manual-conflict-resolutio
 import { Popup, PopupType } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
 import { INotificationInput } from '../../models/notification-centre'
+import { ErrorPresentationStyle } from '../../models/error-presentation'
 import {
   PullRequest,
   PullRequestSuggestedNextAction,
@@ -421,6 +422,19 @@ export class Dispatcher {
     return this.appStore._deleteNotification(id)
   }
 
+  /** Set the read state of an explicit notification selection atomically. */
+  public setNotificationsRead(
+    ids: ReadonlyArray<string>,
+    read: boolean
+  ): Promise<void> {
+    return this.appStore._setNotificationsRead(ids, read)
+  }
+
+  /** Delete an explicit notification selection atomically. */
+  public deleteNotifications(ids: ReadonlyArray<string>): Promise<void> {
+    return this.appStore._deleteNotifications(ids)
+  }
+
   /** Mark every notification as read. */
   public markAllNotificationsRead(): Promise<void> {
     return this.appStore._markAllNotificationsRead()
@@ -429,6 +443,11 @@ export class Dispatcher {
   /** Remove every notification. */
   public clearAllNotifications(): Promise<void> {
     return this.appStore._clearAllNotifications()
+  }
+
+  /** Dismiss one transient acknowledgement-only error notice. */
+  public dismissErrorNotice(id: string): void {
+    this.appStore._dismissErrorNotice(id)
   }
 
   /** Load a newest-first page of notification-history commits. */
@@ -4207,6 +4226,10 @@ export class Dispatcher {
 
   public setNotificationsEnabled(notificationsEnabled: boolean) {
     this.appStore._setNotificationsEnabled(notificationsEnabled)
+  }
+
+  public setErrorPresentationStyle(style: ErrorPresentationStyle): void {
+    this.appStore._setErrorPresentationStyle(style)
   }
 
   private logHowToRevertCherryPick(

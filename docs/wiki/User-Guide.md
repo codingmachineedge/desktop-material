@@ -11,7 +11,7 @@ release: adaptive appearance and profile app identity, favorite/portable tabs, M
 cancellation, reviewed rebase, repository-account propagation, bounded OAuth scopes, and compact
 surface corrections, plus the repository-contextual GitHub API Explorer. Exact build, off-screen UI, publication, and cleanup receipts are recorded in
 the repository's `HANDOFF.md` only as each release is verified.
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 56-function visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 58-function visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
@@ -478,15 +478,33 @@ The **bell** in the app chrome opens the **notification centre** side panel. Its
 keep local app events separate from GitHub inbox items:
 
 - **Local** is backed by its own git repo. An unread badge shows how many notifications you have not
-  seen; you can mark items read/unread or delete them.
+  seen. Search titles and messages, filter by notification type, select every visible result, and
+  apply **Mark read**, **Mark unread**, or **Delete selected** as one history-backed change. **Clear
+  all** opens an inline confirmation and the notification history can restore the removed entries
+  later.
 - **GitHub** uses an explicit account selector with **All**, **Unread**, and **Participating only**
-  controls. When no account is signed in, the complete **No signed-in accounts** state remains
-  visible and tells you to sign in before refreshing the inbox.
+  controls. Search loaded titles, repositories, types, and reasons; select all visible matches;
+  then mark them read or done in bulk. Changing account, source, filter, or search safely resets the
+  scoped selection. When no account is signed in, the complete **No signed-in accounts** state
+  remains visible and tells you to sign in before refreshing the inbox.
 
 The account, filters, and empty state are part of the guided inbox workflow rather than a `gh`
 command or GitHub API search screen.
 
+![Filtered Local notifications selected for bulk triage](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-bulk-actions.png)
+
 ![GitHub notification view with the no-signed-in-account state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
+
+### Error presentation
+
+Acknowledgement-only failures appear as dismissible red notices in the bottom-right corner by
+default, without blocking the task underneath. A notice can expose bounded diagnostic details when
+they differ from the user-facing message. In **Settings → Notifications**, choose either
+**Bottom-right notice** or **Blocking dialog** for these acknowledgement-only errors. Failures that
+need a retry, authentication choice, external remediation, or another real decision remain dialogs
+regardless of that preference.
+
+![Dismissible bottom-right acknowledgement-only error notice](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
 
 ---
 

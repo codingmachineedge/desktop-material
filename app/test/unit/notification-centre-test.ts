@@ -2,9 +2,11 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   countUnread,
+  deleteNotificationEntries,
   insertNotification,
   parseNotificationLog,
   serializeNotificationLog,
+  setNotificationEntriesRead,
   shapeNotificationEntry,
   NotificationCentreCap,
   NotificationDedupeWindowMs,
@@ -180,6 +182,70 @@ describe('notification-centre model', () => {
         shapeNotificationEntry(baseInput, 'c', new Date()),
       ]
       assert.equal(countUnread(entries), 2)
+    })
+  })
+
+  describe('bulk mutations', () => {
+    const entries = (): ReadonlyArray<INotificationEntry> => [
+      shapeNotificationEntry(baseInput, 'a', new Date()),
+      { ...shapeNotificationEntry(baseInput, 'b', new Date()), read: true },
+      shapeNotificationEntry(baseInput, 'c', new Date()),
+    ]
+
+    it('sets matching entries read or unread without changing other entries', () => {
+      const original = entries()
+      const read = setNotificationEntriesRead(
+        original,
+        ['a', 'a', 'missing'],
+        true
+      )
+
+      assert.notEqual(read, original)
+      assert.equal(read[0].read, true)
+      assert.equal(read[1], original[1])
+      assert.equal(read[2], original[2])
+      assert.equal(original[0].read, false)
+
+      const unread = setNotificationEntriesRead(
+        read,
+        new Set(['a', 'b']),
+        false
+      )
+      assert.equal(unread[0].read, false)
+      assert.equal(unread[1].read, false)
+      assert.equal(unread[2], read[2])
+    })
+
+    it('returns the original array when a bulk read mutation is a no-op', () => {
+      const original = entries()
+      assert.equal(
+        setNotificationEntriesRead(original, ['b', 'missing'], true),
+        original
+      )
+      assert.equal(setNotificationEntriesRead(original, [], false), original)
+    })
+
+    it('deletes every matching entry and ignores duplicate or unknown ids', () => {
+      const original = entries()
+      const deleted = deleteNotificationEntries(original, [
+        'a',
+        'a',
+        'c',
+        'missing',
+      ])
+
+      assert.deepEqual(
+        deleted.map(entry => entry.id),
+        ['b']
+      )
+      assert.deepEqual(
+        original.map(entry => entry.id),
+        ['a', 'b', 'c']
+      )
+      assert.equal(
+        deleteNotificationEntries(original, new Set(['missing'])),
+        original
+      )
     })
   })
 

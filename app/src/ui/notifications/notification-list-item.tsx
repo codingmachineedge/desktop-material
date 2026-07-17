@@ -10,6 +10,12 @@ import {
 
 interface INotificationListItemProps {
   readonly entry: INotificationEntry
+  readonly selected: boolean
+  readonly selectionDisabled?: boolean
+  readonly onToggleSelected: (
+    entry: INotificationEntry,
+    selected: boolean
+  ) => void
   /** Activate the row: run its action (if any) and mark it read. */
   readonly onActivate: (entry: INotificationEntry) => void
   /** Toggle the read/unread state without activating the action. */
@@ -44,14 +50,29 @@ export class NotificationListItem extends React.Component<INotificationListItemP
     this.props.onDelete(this.props.entry)
   }
 
+  private onToggleSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation()
+    this.props.onToggleSelected(this.props.entry, event.currentTarget.checked)
+  }
+
   public render() {
-    const { entry } = this.props
+    const { entry, selected, selectionDisabled } = this.props
     const className = classNames('notification-item', `kind-${entry.kind}`, {
       unread: !entry.read,
+      selected,
     })
 
     return (
       <li className={className}>
+        <label className="notification-item-selection">
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={selectionDisabled}
+            aria-label={`Select notification: ${entry.title}`}
+            onChange={this.onToggleSelected}
+          />
+        </label>
         <button
           type="button"
           className="notification-item-activate"

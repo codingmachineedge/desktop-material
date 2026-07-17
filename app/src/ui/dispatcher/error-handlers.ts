@@ -152,6 +152,11 @@ export async function externalEditorErrorHandler(
 
   const { suggestDefaultEditor, openPreferences } = e.metadata
 
+  if (!suggestDefaultEditor && !openPreferences) {
+    await dispatcher.presentError(new Error(e.message))
+    return null
+  }
+
   await dispatcher.showPopup({
     type: PopupType.ExternalEditorFailed,
     message: e.message,
@@ -568,6 +573,19 @@ export async function localChangesOverwrittenHandler(
   const files = parseFilesToBeOverwritten(
     coerceToString(gitError.result.stderr)
   )
+
+  if (retryAction.type === RetryActionType.PopStash) {
+    const affectedFiles =
+      files.length === 0
+        ? ''
+        : `\n\nFiles that would be overwritten:\n${files.join('\n')}`
+    await dispatcher.presentError(
+      new Error(
+        `Unable to restore stashed changes because local changes would be overwritten.${affectedFiles}`
+      )
+    )
+    return null
+  }
 
   dispatcher.showPopup({
     type: PopupType.LocalChangesOverwritten,

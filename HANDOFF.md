@@ -46,6 +46,56 @@ the same inspected release documentation. A final focused checkout pass added
 37/37 green registration, Pull All, checkbox, compact-style, and Pages-gallery
 tests to those repository-wide and off-screen receipts.
 
+## 2026-07-16 notification triage and error notices
+
+The notification centre now supports explicit Local/GitHub sources, text
+search, source-appropriate filters, select-all-visible, and bounded bulk
+triage. Local rows can be marked read or unread and deleted together in one
+history-backed mutation; GitHub rows can be marked read or done only within
+the loaded account/filter context. The former trash-only affordance is now an
+explicit **Clear all** action with a visible non-modal confirmation and a
+notification-history recovery explanation.
+
+Generic errors that previously opened a blocking acknowledgement-only dialog
+now appear as bounded, dismissible red notices in the bottom-right corner by
+default. **Preferences → Notifications → Application errors** can restore the
+legacy blocking-dialog style. Authentication, retry, file-size, Copilot, and
+other flows that require a decision or remediation remain dialogs regardless
+of that preference. Safe error summaries continue to be written to the local
+notification history independently of the transient notice stack.
+
+| Promoted screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-error-notice.png` | 1000×687 | 101,359 | `953467ac7846bf01ec3090b01b15938c35e7be2ee73bd0638e1df3bfeaf3fe0b` |
+| `docs/assets/screenshots/material-notification-bulk-actions.png` | 1029×600 | 101,445 | `b3ca2875c1080733e832df49bc0680e7711ad650809c33149382f96fe8cf7c32` |
+
+Focused notification, error-routing, preference, profile-history,
+responsive-style, and React interaction coverage first passed `68/68` tests
+across 21 suites. The final combined source, Pages, and 58-item wiki-gallery
+gate passed `84/84` tests across 24 suites. Full TypeScript,
+repository-aware ESLint, targeted Prettier, diff integrity, and the exact
+unpackaged production build also passed; the final MCP build emitted every
+webpack target in 131.72 seconds without a timeout or dependency download.
+
+The accepted app-native geometry had equal document/body client and scroll
+widths. The normal error notice stayed fixed entirely inside a 1000×687 CSS
+viewport with no card overflow. In the short-height notification gate, the
+panel stayed inside a 1029×600 CSS viewport; its source surface measured
+374/374 pixels client/scroll width and 473/486 pixels client/scroll height
+with `overflow-y:auto`. Exactly three filtered rows were selected, all named
+bulk controls were reachable, and the Clear-all recovery confirmation remained
+visible. Both promoted PNGs were reopened at original resolution and contain
+only the deterministic `git-source` fixture and synthetic error copy.
+
+The fixed low-level MCP ran only on the uniquely named off-screen desktop. The
+final saved launch PID `12760`, runtime HWND `7406868`, and CDP port `57931`
+were revalidated. The alternate-desktop generic close path failed closed, so
+only the exact owned Electron process set was terminated; the listener reached
+zero, the desktop listed zero windows and closed, and the containment-checked
+Temp root was removed. A stale post-interaction HWND frame was rejected because
+its hash matched the pre-interaction frame; only current app-native pixels were
+promoted.
+
 ## 2026-07-16 GitHub API Explorer release
 
 The repository rail now includes a GitHub API Explorer contextualized by the

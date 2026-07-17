@@ -11,7 +11,10 @@ import { shell } from '../../lib/app-shell'
 import { IAPINotificationThread } from '../../lib/api'
 import { Account, getAccountKey } from '../../models/account'
 import { CloningRepository } from '../../models/cloning-repository'
-import { INotificationEntry } from '../../models/notification-centre'
+import {
+  INotificationEntry,
+  NotificationCentreKind,
+} from '../../models/notification-centre'
 import { PopupType } from '../../models/popup'
 import { Repository } from '../../models/repository'
 import { Dispatcher } from '../dispatcher'
@@ -19,9 +22,30 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { GitHubNotificationListItem } from './github-notification-list-item'
 import { NotificationListItem } from './notification-list-item'
+import { TooltippedContent } from '../lib/tooltipped-content'
+import { TooltipDirection } from '../lib/tooltip'
 
 type NotificationSource = 'local' | 'github'
 type NotificationFilter = 'all' | 'unread'
+type NotificationKindFilter = 'all' | NotificationCentreKind
+type BulkConfirmation = 'delete-local' | 'done-github'
+
+const notificationKindLabels: Readonly<Record<NotificationCentreKind, string>> =
+  {
+    'pr-review-submit': 'Pull request reviews',
+    'pr-comment': 'Pull request comments',
+    'pr-checks-failed': 'Failed checks',
+    'app-error': 'Errors',
+    'clone-batch': 'Clones',
+    'auto-commit': 'Automatic commits',
+    'merge-all': 'Merge all',
+    'auto-pull': 'Automatic pulls',
+    info: 'Information',
+  }
+
+const notificationKinds = Object.keys(
+  notificationKindLabels
+) as ReadonlyArray<NotificationCentreKind>
 
 export interface INotificationCentrePanelProps {
   readonly dispatcher: Dispatcher
@@ -36,6 +60,12 @@ export interface INotificationCentrePanelProps {
 interface INotificationCentrePanelState {
   readonly source: NotificationSource
   readonly filter: NotificationFilter
+  readonly query: string
+  readonly kind: NotificationKindFilter
+  readonly selectedLocalIds: ReadonlySet<string>
+  readonly selectedGitHubIds: ReadonlySet<string>
+  readonly bulkBusy: boolean
+  readonly confirmingBulk: BulkConfirmation | null
   readonly confirmingClear: boolean
   readonly confirmingDone: IAPINotificationThread | null
   readonly github: IGitHubNotificationsState
@@ -59,6 +89,7 @@ export class NotificationCentrePanel extends React.Component<
   private unreadTab: HTMLButtonElement | null = null
   private doneConfirmButton: HTMLButtonElement | null = null
   private doneReturnFocus: HTMLButtonElement | null = null
+  private selectAllCheckbox: HTMLInputElement | null = null
   private mounted = false
 
   public constructor(props: INotificationCentrePanelProps) {
@@ -70,6 +101,12 @@ export class NotificationCentrePanel extends React.Component<
     this.state = {
       source: 'local',
       filter: 'all',
+      query: '',
+      kind: 'all',
+      selectedLocalIds: new Set<string>(),
+      selectedGitHubIds: new Set<string>(),
+      bulkBusy: false,
+      confirmingBulk: null,
       confirmingClear: false,
       confirmingDone: null,
       github: this.githubStore.getState(),
@@ -86,6 +123,8 @@ export class NotificationCentrePanel extends React.Component<
     if (prevProps.accounts !== this.props.accounts) {
       this.githubStore.setAccounts(this.props.accounts)
     }
+    this.pruneSelections()
+    this.updateSelectAllIndeterminate()
   }
 
   public componentWillUnmount() {
@@ -116,6 +155,8 @@ export class NotificationCentrePanel extends React.Component<
     event.preventDefault()
     if (this.state.confirmingDone !== null) {
       this.cancelDoneConfirmation()
+    } else if (this.state.confirmingBulk !== null) {
+      this.setState({ confirmingBulk: null })
     } else if (this.state.confirmingClear) {
       this.setState({ confirmingClear: false })
     } else {
@@ -135,7 +176,16 @@ export class NotificationCentrePanel extends React.Component<
     }
     this.doneReturnFocus = null
     this.setState(
-      { source, confirmingClear: false, confirmingDone: null },
+      {
+        source,
+        query: '',
+        selectedLocalIds: new Set<string>(),
+        selectedGitHubIds: new Set<string>(),
+        bulkBusy: false,
+        confirmingClear: false,
+        confirmingBulk: null,
+        confirmingDone: null,
+      },
       () => {
         if (source === 'github') {
           void this.githubStore.start()
@@ -224,10 +274,20 @@ export class NotificationCentrePanel extends React.Component<
 
   private selectFilter = (filter: NotificationFilter) => {
     if (this.state.source === 'local') {
-      this.setState({ filter })
+      this.setState({
+        filter,
+        selectedLocalIds: new Set<string>(),
+        bulkBusy: false,
+        confirmingBulk: null,
+      })
     } else {
       this.doneReturnFocus = null
-      this.setState({ confirmingDone: null })
+      this.setState({
+        selectedGitHubIds: new Set<string>(),
+        bulkBusy: false,
+        confirmingBulk: null,
+        confirmingDone: null,
+      })
       void this.githubStore.setFilter(filter)
     }
   }
@@ -235,17 +295,278 @@ export class NotificationCentrePanel extends React.Component<
   private onSelectAll = () => this.selectFilter('all')
   private onSelectUnread = () => this.selectFilter('unread')
 
+  private onQueryChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({
+      query: event.currentTarget.value,
+      selectedLocalIds: new Set<string>(),
+      selectedGitHubIds: new Set<string>(),
+      confirmingBulk: null,
+    })
+  }
+
+  private onKindChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({
+      kind: event.currentTarget.value as NotificationKindFilter,
+      selectedLocalIds: new Set<string>(),
+      confirmingBulk: null,
+    })
+  }
+
+  private onSelectAllCheckboxRef = (element: HTMLInputElement | null) => {
+    this.selectAllCheckbox = element
+    this.updateSelectAllIndeterminate()
+  }
+
+  private updateSelectAllIndeterminate() {
+    if (this.selectAllCheckbox === null) {
+      return
+    }
+    const selected = this.currentSelectedIds
+    const visible = this.visibleIds
+    const selectedVisible = visible.filter(id => selected.has(id)).length
+    this.selectAllCheckbox.indeterminate =
+      selectedVisible > 0 && selectedVisible < visible.length
+  }
+
+  private get currentSelectedIds(): ReadonlySet<string> {
+    return this.state.source === 'local'
+      ? this.state.selectedLocalIds
+      : this.state.selectedGitHubIds
+  }
+
+  private get visibleIds(): ReadonlyArray<string> {
+    return this.state.source === 'local'
+      ? this.visibleEntries.map(entry => entry.id)
+      : this.visibleGitHubNotifications.map(thread => thread.id)
+  }
+
+  private get allVisibleSelected(): boolean {
+    const visible = this.visibleIds
+    const selected = this.currentSelectedIds
+    return visible.length > 0 && visible.every(id => selected.has(id))
+  }
+
+  private onSelectAllVisible = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = new Set(this.currentSelectedIds)
+    for (const id of this.visibleIds) {
+      if (event.currentTarget.checked) {
+        selected.add(id)
+      } else {
+        selected.delete(id)
+      }
+    }
+    if (this.state.source === 'local') {
+      this.setState({
+        selectedLocalIds: selected,
+        confirmingBulk: null,
+      })
+    } else {
+      this.setState({
+        selectedGitHubIds: selected,
+        confirmingBulk: null,
+      })
+    }
+  }
+
+  private onToggleLocalSelected = (
+    entry: INotificationEntry,
+    checked: boolean
+  ) => {
+    const selected = new Set(this.state.selectedLocalIds)
+    if (checked) {
+      selected.add(entry.id)
+    } else {
+      selected.delete(entry.id)
+    }
+    this.setState({ selectedLocalIds: selected, confirmingBulk: null })
+  }
+
+  private onToggleGitHubSelected = (
+    thread: IAPINotificationThread,
+    checked: boolean
+  ) => {
+    const selected = new Set(this.state.selectedGitHubIds)
+    if (checked) {
+      selected.add(thread.id)
+    } else {
+      selected.delete(thread.id)
+    }
+    this.setState({ selectedGitHubIds: selected, confirmingBulk: null })
+  }
+
+  private pruneSelections() {
+    const localIds = new Set(this.props.entries.map(entry => entry.id))
+    const githubIds = new Set(
+      this.state.github.notifications.map(thread => thread.id)
+    )
+    const selectedLocalIds = new Set(
+      [...this.state.selectedLocalIds].filter(id => localIds.has(id))
+    )
+    const selectedGitHubIds = new Set(
+      [...this.state.selectedGitHubIds].filter(id => githubIds.has(id))
+    )
+    if (
+      selectedLocalIds.size !== this.state.selectedLocalIds.size ||
+      selectedGitHubIds.size !== this.state.selectedGitHubIds.size
+    ) {
+      this.setState({ selectedLocalIds, selectedGitHubIds })
+    }
+  }
+
   private onMarkAllRead = () => {
     this.props.dispatcher.markAllNotificationsRead()
   }
 
-  private onClearAll = () => {
+  private onClearAll = async () => {
     if (!this.state.confirmingClear) {
       this.setState({ confirmingClear: true })
       return
     }
+    this.setState({
+      confirmingClear: false,
+      selectedLocalIds: new Set<string>(),
+    })
+    try {
+      await this.props.dispatcher.clearAllNotifications()
+    } catch (error) {
+      await this.props.dispatcher.postError(
+        error instanceof Error ? error : new Error(String(error))
+      )
+    }
+  }
+
+  private onCancelClearAll = () => {
     this.setState({ confirmingClear: false })
-    this.props.dispatcher.clearAllNotifications()
+  }
+
+  private runLocalBulkRead = async (read: boolean) => {
+    const ids = [...this.state.selectedLocalIds]
+    if (ids.length === 0 || this.state.bulkBusy) {
+      return
+    }
+    this.setState({ bulkBusy: true, confirmingBulk: null })
+    try {
+      await this.props.dispatcher.setNotificationsRead(ids, read)
+    } catch (error) {
+      await this.props.dispatcher.postError(
+        error instanceof Error ? error : new Error(String(error))
+      )
+    } finally {
+      if (this.mounted) {
+        this.setState({
+          bulkBusy: false,
+          selectedLocalIds: new Set<string>(),
+        })
+      }
+    }
+  }
+
+  private onBulkMarkRead = () => {
+    if (this.state.source === 'local') {
+      void this.runLocalBulkRead(true)
+    } else {
+      void this.runGitHubBulk('read')
+    }
+  }
+
+  private onBulkMarkUnread = () => {
+    void this.runLocalBulkRead(false)
+  }
+
+  private onRequestBulkDelete = () => {
+    this.setState({ confirmingBulk: 'delete-local', confirmingClear: false })
+  }
+
+  private onRequestBulkDone = () => {
+    this.setState({ confirmingBulk: 'done-github', confirmingClear: false })
+  }
+
+  private onCancelBulkConfirmation = () => {
+    this.setState({ confirmingBulk: null })
+  }
+
+  private onConfirmBulkDelete = async () => {
+    const ids = [...this.state.selectedLocalIds]
+    if (ids.length === 0 || this.state.bulkBusy) {
+      return
+    }
+    this.setState({ bulkBusy: true, confirmingBulk: null })
+    try {
+      await this.props.dispatcher.deleteNotifications(ids)
+    } catch (error) {
+      await this.props.dispatcher.postError(
+        error instanceof Error ? error : new Error(String(error))
+      )
+    } finally {
+      if (this.mounted) {
+        this.setState({
+          bulkBusy: false,
+          selectedLocalIds: new Set<string>(),
+        })
+      }
+    }
+  }
+
+  private onConfirmBulkDone = () => {
+    this.setState({ confirmingBulk: null }, () => {
+      void this.runGitHubBulk('done')
+    })
+  }
+
+  private runGitHubBulk = async (action: 'read' | 'done') => {
+    const ids = [...this.state.selectedGitHubIds]
+    if (ids.length === 0 || this.state.bulkBusy) {
+      return
+    }
+    const context = {
+      selectedAccountKey: this.state.github.selectedAccountKey,
+      filter: this.state.github.filter,
+      participating: this.state.github.participating,
+    }
+    const failed = new Set<string>()
+    this.setState({ bulkBusy: true, confirmingBulk: null })
+    for (const id of ids) {
+      const current = this.githubStore.getState()
+      if (
+        current.selectedAccountKey !== context.selectedAccountKey ||
+        current.filter !== context.filter ||
+        current.participating !== context.participating
+      ) {
+        if (this.mounted) {
+          this.setState({
+            bulkBusy: false,
+            selectedGitHubIds: new Set<string>(),
+          })
+        }
+        return
+      }
+      const succeeded =
+        action === 'read'
+          ? await this.githubStore.markThreadRead(id)
+          : await this.githubStore.markThreadDone(id)
+      if (!succeeded) {
+        failed.add(id)
+      }
+    }
+    if (!this.mounted || this.state.source !== 'github') {
+      return
+    }
+    const current = this.githubStore.getState()
+    if (
+      current.selectedAccountKey !== context.selectedAccountKey ||
+      current.filter !== context.filter ||
+      current.participating !== context.participating
+    ) {
+      this.setState({
+        bulkBusy: false,
+        selectedGitHubIds: new Set<string>(),
+      })
+      return
+    }
+    this.setState({
+      bulkBusy: false,
+      selectedGitHubIds: failed,
+    })
   }
 
   private onShowHistory = () => {
@@ -253,6 +574,9 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private onToggleRead = (entry: INotificationEntry) => {
+    const selectedLocalIds = new Set(this.state.selectedLocalIds)
+    selectedLocalIds.delete(entry.id)
+    this.setState({ selectedLocalIds })
     if (entry.read) {
       this.props.dispatcher.markNotificationUnread(entry.id)
     } else {
@@ -261,10 +585,16 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private onDelete = (entry: INotificationEntry) => {
+    const selectedLocalIds = new Set(this.state.selectedLocalIds)
+    selectedLocalIds.delete(entry.id)
+    this.setState({ selectedLocalIds })
     this.props.dispatcher.deleteNotification(entry.id)
   }
 
   private onActivate = (entry: INotificationEntry) => {
+    const selectedLocalIds = new Set(this.state.selectedLocalIds)
+    selectedLocalIds.delete(entry.id)
+    this.setState({ selectedLocalIds })
     if (!entry.read) {
       this.props.dispatcher.markNotificationRead(entry.id)
     }
@@ -308,7 +638,12 @@ export class NotificationCentrePanel extends React.Component<
 
   private onAccountChange = (event: React.FormEvent<HTMLSelectElement>) => {
     this.doneReturnFocus = null
-    this.setState({ confirmingDone: null })
+    this.setState({
+      selectedGitHubIds: new Set<string>(),
+      bulkBusy: false,
+      confirmingBulk: null,
+      confirmingDone: null,
+    })
     void this.githubStore.selectAccount(event.currentTarget.value)
   }
 
@@ -316,7 +651,12 @@ export class NotificationCentrePanel extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.doneReturnFocus = null
-    this.setState({ confirmingDone: null })
+    this.setState({
+      selectedGitHubIds: new Set<string>(),
+      bulkBusy: false,
+      confirmingBulk: null,
+      confirmingDone: null,
+    })
     void this.githubStore.setParticipating(event.currentTarget.checked)
   }
 
@@ -333,6 +673,9 @@ export class NotificationCentrePanel extends React.Component<
     if (account === null) {
       return
     }
+    const selectedGitHubIds = new Set(this.state.selectedGitHubIds)
+    selectedGitHubIds.delete(thread.id)
+    this.setState({ selectedGitHubIds })
     if (thread.unread) {
       void this.githubStore.markThreadRead(thread.id)
     }
@@ -343,6 +686,9 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private onMarkGitHubRead = (thread: IAPINotificationThread) => {
+    const selectedGitHubIds = new Set(this.state.selectedGitHubIds)
+    selectedGitHubIds.delete(thread.id)
+    this.setState({ selectedGitHubIds })
     void this.githubStore.markThreadRead(thread.id)
   }
 
@@ -351,7 +697,9 @@ export class NotificationCentrePanel extends React.Component<
     returnFocus: HTMLButtonElement
   ) => {
     this.doneReturnFocus = returnFocus
-    this.setState({ confirmingDone: thread }, () =>
+    const selectedGitHubIds = new Set(this.state.selectedGitHubIds)
+    selectedGitHubIds.delete(thread.id)
+    this.setState({ confirmingDone: thread, selectedGitHubIds }, () =>
       this.doneConfirmButton?.focus()
     )
   }
@@ -422,46 +770,54 @@ export class NotificationCentrePanel extends React.Component<
         </span>
         {local ? (
           <>
-            <button
-              type="button"
-              className="notification-centre-icon-button"
-              aria-label="Mark all as read"
-              disabled={this.props.unreadCount === 0}
-              onClick={this.onMarkAllRead}
+            <TooltippedContent
+              className="notification-centre-tooltip-target"
+              tooltip="Mark every Local notification as read"
+              direction={TooltipDirection.SOUTH_WEST}
+              openOnFocus={true}
             >
-              <Octicon symbol={octicons.checklist} />
-            </button>
-            <button
-              type="button"
-              className="notification-centre-icon-button"
-              aria-label="Notification history"
-              onClick={this.onShowHistory}
+              <button
+                type="button"
+                className="notification-centre-icon-button"
+                aria-label="Mark all as read"
+                disabled={this.props.unreadCount === 0}
+                onClick={this.onMarkAllRead}
+              >
+                <Octicon symbol={octicons.checklist} />
+              </button>
+            </TooltippedContent>
+            <TooltippedContent
+              className="notification-centre-tooltip-target"
+              tooltip="Open notification history"
+              direction={TooltipDirection.SOUTH_WEST}
+              openOnFocus={true}
             >
-              <Octicon symbol={octicons.history} />
-            </button>
-            <button
-              type="button"
-              className={classNames('notification-centre-icon-button', {
-                confirming: this.state.confirmingClear,
-              })}
-              aria-label={
-                this.state.confirmingClear ? 'Confirm clear all' : 'Clear all'
-              }
-              disabled={this.props.entries.length === 0}
-              onClick={this.onClearAll}
-            >
-              <Octicon symbol={octicons.trash} />
-            </button>
+              <button
+                type="button"
+                className="notification-centre-icon-button"
+                aria-label="Notification history"
+                onClick={this.onShowHistory}
+              >
+                <Octicon symbol={octicons.history} />
+              </button>
+            </TooltippedContent>
           </>
         ) : null}
-        <button
-          type="button"
-          className="notification-centre-icon-button notification-centre-close"
-          aria-label="Close notifications"
-          onClick={this.onClose}
+        <TooltippedContent
+          className="notification-centre-tooltip-target"
+          tooltip="Close notifications"
+          direction={TooltipDirection.SOUTH_WEST}
+          openOnFocus={true}
         >
-          <Octicon symbol={octicons.x} />
-        </button>
+          <button
+            type="button"
+            className="notification-centre-icon-button notification-centre-close"
+            aria-label="Close notifications"
+            onClick={this.onClose}
+          >
+            <Octicon symbol={octicons.x} />
+          </button>
+        </TooltippedContent>
       </header>
     )
   }
@@ -551,16 +907,245 @@ export class NotificationCentrePanel extends React.Component<
     )
   }
 
+  private renderSearchFilters() {
+    const local = this.state.source === 'local'
+    return (
+      <div className="notification-centre-filter-bar">
+        <label className="notification-centre-search">
+          <span>Search</span>
+          <input
+            type="search"
+            value={this.state.query}
+            disabled={this.state.bulkBusy}
+            aria-label={`Search ${this.state.source} notifications`}
+            placeholder="Title, message, repository, or reason"
+            onChange={this.onQueryChange}
+          />
+        </label>
+        {local ? (
+          <label className="notification-centre-kind-filter">
+            <span>Type</span>
+            <select
+              value={this.state.kind}
+              disabled={this.state.bulkBusy}
+              aria-label="Local notification type"
+              onChange={this.onKindChange}
+            >
+              <option value="all">All types</option>
+              {notificationKinds.map(kind => (
+                <option key={kind} value={kind}>
+                  {notificationKindLabels[kind]}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
+    )
+  }
+
+  private renderBulkToolbar() {
+    const local = this.state.source === 'local'
+    const selected = this.currentSelectedIds
+    const selectedEntries = this.props.entries.filter(entry =>
+      this.state.selectedLocalIds.has(entry.id)
+    )
+    const selectedThreads = this.state.github.notifications.filter(thread =>
+      this.state.selectedGitHubIds.has(thread.id)
+    )
+    const canMarkRead = local
+      ? selectedEntries.some(entry => !entry.read)
+      : selectedThreads.some(thread => thread.unread)
+    const canMarkUnread = selectedEntries.some(entry => entry.read)
+    const disabled = selected.size === 0 || this.state.bulkBusy
+    return (
+      <div className="notification-centre-bulk-toolbar">
+        <label className="notification-centre-select-all">
+          <input
+            ref={this.onSelectAllCheckboxRef}
+            type="checkbox"
+            checked={this.allVisibleSelected}
+            disabled={this.visibleIds.length === 0 || this.state.bulkBusy}
+            aria-label="Select all visible notifications"
+            onChange={this.onSelectAllVisible}
+          />
+          <span>Select all visible</span>
+        </label>
+        <span className="notification-centre-selected-count" aria-live="polite">
+          {selected.size} selected
+        </span>
+        <div className="notification-centre-bulk-actions">
+          <button
+            type="button"
+            disabled={disabled || !canMarkRead}
+            onClick={this.onBulkMarkRead}
+          >
+            Mark read
+          </button>
+          {local ? (
+            <button
+              type="button"
+              disabled={disabled || !canMarkUnread}
+              onClick={this.onBulkMarkUnread}
+            >
+              Mark unread
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="danger"
+            disabled={disabled}
+            onClick={local ? this.onRequestBulkDelete : this.onRequestBulkDone}
+          >
+            {local ? 'Delete selected' : 'Mark selected done'}
+          </button>
+          {local ? (
+            <button
+              type="button"
+              className="clear-all"
+              disabled={this.props.entries.length === 0 || this.state.bulkBusy}
+              onClick={this.onClearAll}
+            >
+              Clear all
+            </button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  private renderClearConfirmation() {
+    if (!this.state.confirmingClear) {
+      return null
+    }
+    return (
+      <div
+        className="notification-centre-confirmation"
+        role="alertdialog"
+        aria-modal="false"
+        aria-labelledby="notification-centre-clear-title"
+        aria-describedby="notification-centre-clear-description"
+      >
+        <strong id="notification-centre-clear-title">
+          Clear every Local notification?
+        </strong>
+        <span id="notification-centre-clear-description">
+          This removes {this.props.entries.length} notification
+          {this.props.entries.length === 1 ? '' : 's'} from the current list.
+          Notification history can restore them later.
+        </span>
+        <span className="notification-centre-confirmation-actions">
+          <button type="button" onClick={this.onCancelClearAll}>
+            Cancel
+          </button>
+          <button type="button" className="danger" onClick={this.onClearAll}>
+            Clear all
+          </button>
+        </span>
+      </div>
+    )
+  }
+
+  private renderBulkConfirmation() {
+    const confirmation = this.state.confirmingBulk
+    if (confirmation === null) {
+      return null
+    }
+    const local = confirmation === 'delete-local'
+    const count = local
+      ? this.state.selectedLocalIds.size
+      : this.state.selectedGitHubIds.size
+    return (
+      <div
+        className="notification-centre-confirmation"
+        role="alertdialog"
+        aria-modal="false"
+        aria-labelledby="notification-centre-bulk-title"
+        aria-describedby="notification-centre-bulk-description"
+      >
+        <strong id="notification-centre-bulk-title">
+          {local
+            ? 'Delete selected notifications?'
+            : 'Mark selected threads done?'}
+        </strong>
+        <span id="notification-centre-bulk-description">
+          {local
+            ? `Delete ${count} selected Local notification${
+                count === 1 ? '' : 's'
+              } in one history-backed change.`
+            : `Remove ${count} loaded thread${
+                count === 1 ? '' : 's'
+              } from the selected GitHub inbox.`}
+        </span>
+        <span className="notification-centre-confirmation-actions">
+          <button type="button" onClick={this.onCancelBulkConfirmation}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={local ? this.onConfirmBulkDelete : this.onConfirmBulkDone}
+          >
+            {local ? 'Delete selected' : 'Mark done'}
+          </button>
+        </span>
+      </div>
+    )
+  }
+
   private get visibleEntries(): ReadonlyArray<INotificationEntry> {
-    return this.state.filter === 'unread'
-      ? this.props.entries.filter(entry => !entry.read)
-      : this.props.entries
+    return this.props.entries.filter(entry => {
+      if (this.state.filter === 'unread' && entry.read) {
+        return false
+      }
+      if (this.state.kind !== 'all' && entry.kind !== this.state.kind) {
+        return false
+      }
+      return this.matchesQuery([
+        entry.title,
+        entry.body,
+        notificationKindLabels[entry.kind],
+        entry.accountKey ?? '',
+        entry.repositoryId?.toString() ?? '',
+      ])
+    })
+  }
+
+  private get visibleGitHubNotifications(): ReadonlyArray<IAPINotificationThread> {
+    return this.state.github.notifications.filter(thread => {
+      if (this.state.github.filter === 'unread' && !thread.unread) {
+        return false
+      }
+      return this.matchesQuery([
+        thread.subject.title,
+        thread.subject.type,
+        thread.repository.full_name,
+        thread.reason.replace(/_/g, ' '),
+      ])
+    })
+  }
+
+  private matchesQuery(fields: ReadonlyArray<string>): boolean {
+    const terms = this.state.query
+      .trim()
+      .toLocaleLowerCase()
+      .split(/\s+/)
+      .filter(term => term.length > 0)
+    if (terms.length === 0) {
+      return true
+    }
+    const searchable = fields.join(' ').toLocaleLowerCase()
+    return terms.every(term => searchable.includes(term))
   }
 
   private renderLocalList() {
     const entries = this.visibleEntries
     if (entries.length === 0) {
-      return this.renderEmpty("You're all caught up")
+      return this.renderEmpty(
+        this.state.query.trim().length > 0 || this.state.kind !== 'all'
+          ? 'No Local notifications match these filters'
+          : "You're all caught up"
+      )
     }
     return (
       <ol className="notification-centre-list">
@@ -568,6 +1153,9 @@ export class NotificationCentrePanel extends React.Component<
           <NotificationListItem
             key={entry.id}
             entry={entry}
+            selected={this.state.selectedLocalIds.has(entry.id)}
+            selectionDisabled={this.state.bulkBusy}
+            onToggleSelected={this.onToggleLocalSelected}
             onActivate={this.onActivate}
             onToggleRead={this.onToggleRead}
             onDelete={this.onDelete}
@@ -690,6 +1278,7 @@ export class NotificationCentrePanel extends React.Component<
 
   private renderGitHubList() {
     const { github } = this.state
+    const notifications = this.visibleGitHubNotifications
     if (github.selectedAccountKey === null) {
       return this.renderEmpty('Sign in to a GitHub account to view its inbox')
     }
@@ -699,9 +1288,11 @@ export class NotificationCentrePanel extends React.Component<
     if (github.error !== null && github.notifications.length === 0) {
       return this.renderGitHubError()
     }
-    if (github.notifications.length === 0) {
+    if (notifications.length === 0) {
       return this.renderEmpty(
-        github.filter === 'unread'
+        this.state.query.trim().length > 0
+          ? 'No GitHub notifications match this search'
+          : github.filter === 'unread'
           ? 'No unread GitHub notifications'
           : 'No GitHub notifications found'
       )
@@ -710,11 +1301,14 @@ export class NotificationCentrePanel extends React.Component<
       <>
         {this.renderGitHubError()}
         <ol className="notification-centre-list github-notifications-list">
-          {github.notifications.map(thread => (
+          {notifications.map(thread => (
             <GitHubNotificationListItem
               key={`${github.selectedAccountKey}:${thread.id}`}
               thread={thread}
               busy={github.busyThreadId === thread.id}
+              selected={this.state.selectedGitHubIds.has(thread.id)}
+              selectionDisabled={this.state.bulkBusy}
+              onToggleSelected={this.onToggleGitHubSelected}
               onActivate={this.onActivateGitHub}
               onMarkRead={this.onMarkGitHubRead}
               onRequestDone={this.onRequestDone}
@@ -776,7 +1370,11 @@ export class NotificationCentrePanel extends React.Component<
           aria-labelledby={`notification-centre-${source}-source-tab`}
         >
           {source === 'github' ? this.renderGitHubToolbar() : null}
+          {this.renderSearchFilters()}
           {this.renderFilters()}
+          {this.renderBulkToolbar()}
+          {this.renderClearConfirmation()}
+          {this.renderBulkConfirmation()}
           {source === 'github' ? this.renderDoneConfirmation() : null}
           <div
             id="notification-centre-filter-panel"

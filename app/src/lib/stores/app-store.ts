@@ -475,6 +475,20 @@ import {
   INotificationInput,
 } from '../../models/notification-centre'
 import {
+  dismissErrorNotice,
+  enqueueErrorNotice,
+  IErrorNotice,
+} from '../../models/error-notice'
+import {
+  ErrorPresentationStyle,
+  getErrorPresentationStyle,
+  setErrorPresentationStyle,
+} from '../../models/error-presentation'
+import {
+  getAppErrorPresentation,
+  shouldPresentErrorAsNotice,
+} from '../app-error-presentation'
+import {
   BatchCloneMode,
   IBatchCloneItem,
   IBatchCloneState,
@@ -872,6 +886,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private notifications: ReadonlyArray<INotificationEntry> = []
   private unreadNotificationCount = 0
   private isNotificationCentreOpen = false
+
+  /** Non-modal acknowledgement-only errors, newest at the bottom of the stack. */
+  private errorNotices: ReadonlyArray<IErrorNotice> = []
+  private errorPresentationStyle = getErrorPresentationStyle()
 
   /** Coordinates cloning many repositories at once (see BatchCloneStore). */
   private readonly batchCloneStore: BatchCloneStore
@@ -1579,6 +1597,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       branchPresetScript: this.branchPresetScript,
       showCIStatusPopover: this.showCIStatusPopover,
       notificationsEnabled: getNotificationsEnabled(),
+      errorPresentationStyle: this.errorPresentationStyle,
+      errorNotices: this.errorNotices,
       pullRequestSuggestedNextAction: this.pullRequestSuggestedNextAction,
       resizablePaneActive: this.resizablePaneActive,
       cachedRepoRulesets: this.cachedRepoRulesets,
@@ -2995,6 +3015,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       confirmWorktreeRemovalKey,
       confirmWorktreeRemovalDefault
     )
+
+    this.errorPresentationStyle = getErrorPresentationStyle()
 
     this.uncommittedChangesStrategy =
       getEnum(uncommittedChangesStrategyKey, UncommittedChangesStrategy) ??
@@ -4863,6 +4885,26 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.emitUpdate()
   }
 
+  public _setErrorPresentationStyle(style: ErrorPresentationStyle): void {
+    if (this.errorPresentationStyle === style) {
+      return
+    }
+
+    setErrorPresentationStyle(style)
+    this.errorPresentationStyle = style
+    this.emitUpdate()
+  }
+
+  public _dismissErrorNotice(id: string): void {
+    const next = dismissErrorNotice(this.errorNotices, id)
+    if (next === this.errorNotices) {
+      return
+    }
+
+    this.errorNotices = next
+    this.emitUpdate()
+  }
+
   /**
    * Refresh all the data for the Changes section.
    *
@@ -5649,11 +5691,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   /** This shouldn't be called directly. See `Dispatcher`. */
   public _pushError(error: Error): Promise<void> {
-    this.popupManager.addErrorPopup(error)
+    const presentation = getAppErrorPresentation(error)
+
+    if (shouldPresentErrorAsNotice(error, this.errorPresentationStyle)) {
+      this.errorNotices = enqueueErrorNotice(this.errorNotices, {
+        title: presentation.title,
+        message: presentation.message,
+        details: presentation.details,
+      }).notices
+    } else {
+      this.popupManager.addErrorPopup(error)
+    }
+
     this.postNotification({
       kind: 'app-error',
-      title: 'An error occurred',
-      body: error.message,
+      title: presentation.title,
+      body: presentation.message,
     })
     this.emitUpdate()
 
@@ -6207,6 +6260,19 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Delete a single notification. */
   public _deleteNotification(id: string): Promise<void> {
     return this.notificationCentreStore.delete(id)
+  }
+
+  /** Set the read state of an explicit notification selection atomically. */
+  public _setNotificationsRead(
+    ids: ReadonlyArray<string>,
+    read: boolean
+  ): Promise<void> {
+    return this.notificationCentreStore.setReadMany(ids, read)
+  }
+
+  /** Delete an explicit notification selection atomically. */
+  public _deleteNotifications(ids: ReadonlyArray<string>): Promise<void> {
+    return this.notificationCentreStore.deleteMany(ids)
   }
 
   /** Mark every notification read. */
@@ -10670,6 +10736,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       confirmWorktreeRemovalKey,
       confirmWorktreeRemovalDefault
     )
+    this.errorPresentationStyle = getErrorPresentationStyle()
 
     const imageDiffTypeValue = localStorage.getItem(imageDiffTypeKey)
     this.imageDiffType =

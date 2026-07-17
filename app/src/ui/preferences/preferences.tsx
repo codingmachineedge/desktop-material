@@ -89,6 +89,7 @@ import {
   setShowCommitAuthorInfo,
 } from '../../models/commit-author-display'
 import { AgentAccess } from './agent-access'
+import { ErrorPresentationStyle } from '../../models/error-presentation'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -98,6 +99,7 @@ interface IPreferencesProps {
   readonly useWindowsOpenSSH: boolean
   readonly showCommitLengthWarning: boolean
   readonly notificationsEnabled: boolean
+  readonly errorPresentationStyle: ErrorPresentationStyle
   readonly optOutOfUsageTracking: boolean
   readonly useExternalCredentialHelper: boolean
   readonly initialSelectedTab?: PreferencesTab
@@ -151,6 +153,7 @@ interface IPreferencesState {
   readonly useWindowsOpenSSH: boolean
   readonly showCommitLengthWarning: boolean
   readonly notificationsEnabled: boolean
+  readonly errorPresentationStyle: ErrorPresentationStyle
   readonly optOutOfUsageTracking: boolean
   readonly useExternalCredentialHelper: boolean
   readonly confirmRepositoryRemoval: boolean
@@ -260,6 +263,7 @@ export class Preferences extends React.Component<
       useWindowsOpenSSH: false,
       showCommitLengthWarning: false,
       notificationsEnabled: true,
+      errorPresentationStyle: this.props.errorPresentationStyle,
       optOutOfUsageTracking: false,
       useExternalCredentialHelper: false,
       confirmRepositoryRemoval: false,
@@ -352,6 +356,7 @@ export class Preferences extends React.Component<
       useWindowsOpenSSH: this.props.useWindowsOpenSSH,
       showCommitLengthWarning: this.props.showCommitLengthWarning,
       notificationsEnabled: this.props.notificationsEnabled,
+      errorPresentationStyle: this.props.errorPresentationStyle,
       optOutOfUsageTracking: this.props.optOutOfUsageTracking,
       useExternalCredentialHelper: this.props.useExternalCredentialHelper,
       confirmRepositoryRemoval: this.props.confirmRepositoryRemoval,
@@ -755,6 +760,10 @@ export class Preferences extends React.Component<
           <Notifications
             notificationsEnabled={this.state.notificationsEnabled}
             onNotificationsEnabledChanged={this.onNotificationsEnabledChanged}
+            errorPresentationStyle={this.state.errorPresentationStyle}
+            onErrorPresentationStyleChanged={
+              this.onErrorPresentationStyleChanged
+            }
           />
         )
         break
@@ -897,6 +906,12 @@ export class Preferences extends React.Component<
 
   private onNotificationsEnabledChanged = (notificationsEnabled: boolean) => {
     this.setState({ notificationsEnabled })
+  }
+
+  private onErrorPresentationStyleChanged = (
+    errorPresentationStyle: ErrorPresentationStyle
+  ) => {
+    this.setState({ errorPresentationStyle })
   }
 
   private onOptOutofReportingChanged = (value: boolean) => {
@@ -1223,6 +1238,7 @@ export class Preferences extends React.Component<
     dispatcher.setUseWindowsOpenSSH(this.state.useWindowsOpenSSH)
     dispatcher.setShowCommitLengthWarning(this.state.showCommitLengthWarning)
     dispatcher.setNotificationsEnabled(this.state.notificationsEnabled)
+    dispatcher.setErrorPresentationStyle(this.state.errorPresentationStyle)
 
     await dispatcher.setStatsOptOut(this.state.optOutOfUsageTracking, false)
 

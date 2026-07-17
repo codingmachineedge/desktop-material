@@ -78,7 +78,9 @@ settings:
 - Every settings or tab change **auto-commits** to that account's profile repo.
 - The **history manager** (Settings → History) is `git log` over that repo — **undo/redo** walk the
   commits, and **restore** checks out an earlier state (see `settings-history-manager.png`).
-- The **notification centre** is backed by its own repo in the same way.
+- The **notification centre** is backed by its own repo in the same way. Filtered bulk read/unread,
+  delete, and clear operations go through its store so each user action produces one ordered,
+  history-backed mutation rather than a sequence of per-row commits.
 - The strict `appearance-customization-v1` value is allowlisted by
   `app/src/lib/profiles/profile-settings-registry.ts`, captured in the active profile's
   `settings.json`, and described as an appearance-customization change in Git history.
@@ -130,7 +132,7 @@ The current maintenance additions in this section are implemented but remain sub
 integrated production/headless/publication gate. Historical gallery references do not imply that
 new acceptance has already completed.
 
-The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 55
+The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 58
 synthetic, user-facing visual functions and states associated with these subsystems. Each function
 owns one distinct tracked PNG; missing, duplicate, and unassigned assets fail the catalog contract.
 Keep captures free of personal paths, account identifiers, credentials, signed URLs, and unbounded
@@ -143,6 +145,14 @@ publication, release, or cleanup evidence.
   GitLab/Bitbucket browser; publish ownership is selected in `app/src/ui/publish-repository/`.
   `app/src/lib/github-oauth-scopes.ts` is the reviewed GitHub browser-authorization allowlist; keep
   feature scope additions explicit and never infer destructive/admin families.
+- **Notifications and acknowledgement errors** —
+  `app/src/lib/stores/notification-centre-store.ts` owns durable Local notification mutations while
+  `app/src/ui/notifications/notification-centre-panel.tsx` keeps search, type, source, account, and
+  visible-selection scope explicit. `app/src/lib/app-error-presentation.ts` classifies errors before
+  `AppStore` routes them: only acknowledgement-only failures follow the profile's notice/dialog
+  preference. `app/src/models/error-notice.ts` bounds and deduplicates the transient queue, and
+  `app/src/ui/error-notice-stack.tsx` renders dismissible bottom-right alerts. Retry,
+  authentication, and remediation choices must remain dialogs.
 - **Appearance and adaptive Material shell** —
   `app/src/models/appearance-customization.ts` owns the strict versioned model for the 12 profile
   defaults: accent palette, surface palette, elevation, interface font, monospace font, motion,
