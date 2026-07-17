@@ -89,6 +89,10 @@ export const profileSettingsRegistry: ReadonlyArray<IProfileSettingEntry> = [
   { key: 'underline-links', label: 'underline links' },
   { key: 'diff-check-marks-visible', label: 'diff check marks' },
   {
+    key: 'named-api-functions-v1',
+    label: 'named API functions',
+  },
+  {
     key: 'pull-request-suggested-next-action-key',
     label: 'pull request suggested next action',
   },

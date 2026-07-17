@@ -3,13 +3,20 @@ import assert from 'node:assert'
 import * as Path from 'path'
 import {
   BatchCloneMode,
+  IBatchCloneState,
   IBatchCloneItem,
   IBatchCloneItemStatus,
+  MaxBatchCloneFolderNameLength,
+  MaxBatchCloneRawFolderNameLength,
+  assertSafeBatchCloneItems,
+  batchCloneURLContainsEmbeddedCredentials,
+  batchCloneNeedsAttention,
   buildBatchCloneItems,
   computeBatchCloneProgress,
   deriveBatchCloneName,
   isBatchCloneDone,
   summarizeBatchClone,
+  sanitizeBatchCloneFolderName,
   uniquifyName,
 } from '../../src/models/batch-clone'
 
@@ -77,7 +84,7 @@ describe('batch-clone model', () => {
       )
       assert.equal(items.length, 2)
       assert.equal(items[0].name, 'a')
-      assert.equal(items[0].path, Path.join('/base', 'a'))
+      assert.equal(items[0].path, Path.resolve('/base', 'a'))
       assert.equal(items[0].defaultBranch, 'main')
       assert.equal(items[0].accountKey, accountKey)
       assert.equal(items[1].name, 'b')
@@ -105,6 +112,177 @@ describe('batch-clone model', () => {
       )
       assert.equal(items[0].name, 'custom')
     })
+
+    it('sanitizes API names, Windows aliases, and case-insensitive collisions', () => {
+      const base = Path.resolve('/base')
+      const items = buildBatchCloneItems(
+        [
+          { url: 'https://example.test/1.git', name: '../escape' },
+          { url: 'https://example.test/2.git', name: 'CON .txt' },
+          { url: 'https://example.test/3.git', name: 'COM¹' },
+          { url: 'https://example.test/4.git', name: 'Repo' },
+          { url: 'https://example.test/5.git', name: 'repo' },
+          { url: 'https://example.test/6.git', name: 'REPO' },
+        ],
+        base
+      )
+
+      assert.equal(items[1].name, '_CON .txt')
+      assert.equal(items[2].name, '_COM¹')
+      assert.deepEqual(
+        items.slice(3).map(item => item.name),
+        ['Repo', 'repo-2', 'REPO-3']
+      )
+      for (const item of items) {
+        const relative = Path.relative(base, item.path)
+        assert.equal(Path.dirname(relative), '.')
+        assert.ok(relative !== '..' && !relative.startsWith(`..${Path.sep}`))
+        assert.equal(relative, item.name)
+      }
+    })
+
+    it('bounds raw and resolved names and requires an absolute base', () => {
+      assert.throws(
+        () =>
+          buildBatchCloneItems(
+            [
+              {
+                url: 'https://example.test/long.git',
+                name: 'x'.repeat(MaxBatchCloneRawFolderNameLength + 1),
+              },
+            ],
+            Path.resolve('/base')
+          ),
+        /folder name exceeds/i
+      )
+      assert.throws(
+        () =>
+          buildBatchCloneItems(
+            [{ url: 'https://example.test/a.git' }],
+            'relative-clone-directory'
+          ),
+        /absolute/i
+      )
+
+      const taken = new Set<string>(['x'.repeat(MaxBatchCloneFolderNameLength)])
+      const suffixed = uniquifyName(
+        'x'.repeat(MaxBatchCloneFolderNameLength),
+        taken
+      )
+      assert.ok(Array.from(suffixed).length <= MaxBatchCloneFolderNameLength)
+      assert.match(suffixed, /-2$/)
+    })
+
+    it('rejects duplicate destinations and queues spanning multiple parents', () => {
+      const base = Path.resolve('/base')
+      const safe = buildBatchCloneItems(
+        [{ url: 'https://example.test/a.git', name: 'a' }],
+        base
+      )[0]
+      assert.throws(
+        () =>
+          assertSafeBatchCloneItems([
+            safe,
+            { ...safe, name: 'A', path: Path.join(base, 'A') },
+          ]),
+        /unsafe or oversized/i
+      )
+      assert.throws(
+        () =>
+          assertSafeBatchCloneItems([
+            safe,
+            {
+              url: 'https://example.test/b.git',
+              name: 'b',
+              path: Path.resolve('/other-base/b'),
+            },
+          ]),
+        /unsafe or oversized/i
+      )
+    })
+
+    it('normalizes traversal-only and trailing-dot names', () => {
+      assert.equal(sanitizeBatchCloneFolderName('..'), 'repository')
+      assert.equal(sanitizeBatchCloneFolderName('folder.  '), 'folder')
+      assert.equal(sanitizeBatchCloneFolderName('a/b\\c'), 'a-b-c')
+    })
+
+    it('rejects credentialed web URLs without echoing their secret', () => {
+      const secret = 'super-secret-batch-token'
+      const credentialedURLs = [
+        `https://x-access-token:${secret}@github.com/owner/repo.git`,
+        `https://${secret}@github.com/owner/repo.git`,
+        `ftp://user:${secret}@example.test/owner/repo.git`,
+        `https:\\\\${secret}@github.com\\owner\\repo.git`,
+      ]
+
+      for (const url of credentialedURLs) {
+        assert.equal(batchCloneURLContainsEmbeddedCredentials(url), true)
+        assert.throws(
+          () => buildBatchCloneItems([{ url }], Path.resolve('/base')),
+          error =>
+            error instanceof Error &&
+            /embedded credentials/i.test(error.message) &&
+            !error.message.includes(secret)
+        )
+      }
+
+      assert.equal(
+        batchCloneURLContainsEmbeddedCredentials(
+          'ssh://git@github.com/owner/repo.git'
+        ),
+        false
+      )
+      assert.equal(
+        batchCloneURLContainsEmbeddedCredentials(
+          'git@github.com:owner/repo.git'
+        ),
+        false
+      )
+      assert.equal(
+        batchCloneURLContainsEmbeddedCredentials(
+          `ssh://git:${secret}@github.com/owner/repo.git`
+        ),
+        true
+      )
+    })
+  })
+
+  describe('batchCloneNeedsAttention', () => {
+    const item: IBatchCloneItem = {
+      url: 'https://example.test/a.git',
+      name: 'a',
+      path: Path.resolve('/base/a'),
+    }
+    const state = (
+      status: IBatchCloneItemStatus,
+      overrides: Partial<IBatchCloneState> = {}
+    ): IBatchCloneState => ({
+      items: [item],
+      statuses: new Map([[item.path, status]]),
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      isRunning: false,
+      isPaused: false,
+      overallProgress: 1,
+      isDone: true,
+      ...overrides,
+    })
+
+    it('retains unfinished, failed, reviewed, and unfinalized successful queues', () => {
+      assert.equal(batchCloneNeedsAttention(null), false)
+      assert.equal(
+        batchCloneNeedsAttention(state({ kind: 'pending' }, { isDone: false })),
+        true
+      )
+      assert.equal(batchCloneNeedsAttention(state({ kind: 'failed' })), true)
+      assert.equal(batchCloneNeedsAttention(state({ kind: 'review' })), true)
+      assert.equal(batchCloneNeedsAttention(state({ kind: 'done' })), true)
+      assert.equal(
+        batchCloneNeedsAttention(state({ kind: 'done', finalized: true })),
+        false
+      )
+    })
   })
 
   describe('summarizeBatchClone', () => {
@@ -129,6 +307,8 @@ describe('batch-clone model', () => {
         total: 4,
         pending: 1,
         cloning: 1,
+        interrupted: 0,
+        review: 0,
         done: 1,
         failed: 1,
         skipped: 0,

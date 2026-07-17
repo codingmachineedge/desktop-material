@@ -27,6 +27,8 @@ export type AgentCommandName =
   | 'get-automation-status'
   | 'run-automation'
   | 'trigger-workflow'
+  | 'list-api-functions'
+  | 'invoke-api-function'
 
 export interface IAgentCommandEnvelope {
   readonly id: string
@@ -274,6 +276,29 @@ export const AgentToolDefinitions: ReadonlyArray<IAgentToolDefinition> = [
       ['workflowId', 'ref']
     ),
   },
+  {
+    name: 'list-api-functions',
+    description:
+      'List validated, profile-backed GitHub API functions without credentials.',
+    inputSchema: emptySchema,
+  },
+  {
+    name: 'invoke-api-function',
+    description:
+      'Invoke a named read-only GitHub API function. Mutations require interactive app review.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name'],
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 64 },
+        arguments: {
+          type: 'object',
+          maxProperties: 100,
+        },
+      },
+    },
+  },
 ]
 
 const commandNames = new Set(AgentToolDefinitions.map(x => x.name))
@@ -293,7 +318,12 @@ export function agentCommandError(
 }
 
 const sensitiveKey =
-  /(?:^|[-_])(token|authorization|password|secret|credential|api[-_]?key)(?:$|[-_])/i
+  /(?:^|[-_])(authorization|cookie|credential|password|private[-_]?key|secret|signature|token|api[-_]?key)(?:$|[-_])/i
+
+function isSensitiveKey(value: string): boolean {
+  const delimited = value.replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+  return sensitiveKey.test(value) || sensitiveKey.test(delimited)
+}
 
 /**
  * Remove credential-shaped properties before a value leaves the renderer.
@@ -315,7 +345,7 @@ export function redactAgentValue(value: unknown, depth = 0): unknown {
   if (value !== null && typeof value === 'object') {
     const result: Record<string, unknown> = {}
     for (const [key, child] of Object.entries(value).slice(0, 500)) {
-      result[key] = sensitiveKey.test(key)
+      result[key] = isSensitiveKey(key)
         ? '[redacted]'
         : redactAgentValue(child, depth + 1)
     }
@@ -345,7 +375,7 @@ export function assertSafeAgentArgs(value: unknown, depth = 0): void {
       throw new Error('A command argument object has too many properties')
     }
     for (const [key, child] of entries) {
-      if (sensitiveKey.test(key)) {
+      if (isSensitiveKey(key)) {
         throw new Error(`Credential-shaped argument '${key}' is not allowed`)
       }
       assertSafeAgentArgs(child, depth + 1)

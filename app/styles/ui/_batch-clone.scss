@@ -158,7 +158,12 @@ dialog#batch-clone-progress {
         fill: var(--md-sys-color-error);
       }
 
+      &.review {
+        fill: var(--md-sys-color-error);
+      }
+
       &.skipped,
+      &.interrupted,
       &.pending {
         fill: var(--md-sys-color-on-surface-variant);
       }
@@ -193,6 +198,17 @@ dialog#batch-clone-progress {
       progress {
         width: 100%;
       }
+    }
+  }
+
+  .dialog-footer {
+    flex-wrap: wrap;
+    gap: var(--spacing-half);
+  }
+
+  @media (max-height: 550px) {
+    .batch-clone-list {
+      max-height: min(38vh, 220px);
     }
   }
 }

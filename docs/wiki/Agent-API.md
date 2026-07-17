@@ -40,9 +40,57 @@ state flow and safety checks as human ones:
   safety guards as the UI.
 - **GitHub Actions** — `trigger-workflow` dispatches a workflow with a numeric workflow ID, ref, and
   optional declared inputs.
+- **Named GitHub API functions** — `list-api-functions` reports the active profile's validated
+  repository-bound catalog and `invoke-api-function` invokes a named read function. MCP and REST
+  also publish every valid function directly as `github_api_<function-name>`.
 
 Where the app already gates an action (for example the [Automation](Automation) preconditions), the
 agent path is subject to the **same gates** — it cannot force an operation the UI would refuse.
+
+## Named API app functions
+
+Create a function from the repository rail's **API → App functions** panel. The source must be a
+matching REST catalog operation or a named GraphQL operation; Desktop Material derives a closed JSON
+argument schema and records the assessed read/write/destructive risk. The definition follows the
+active profile and is capped with the rest of the catalog at 64 functions.
+
+There are three equivalent discovery/invocation paths:
+
+- MCP `tools/list` includes each function as `github_api_<function-name>` with its generated input
+  schema and read/destructive annotations. Call that exact tool name with the generated arguments.
+- `GET /api/v1/info` includes the same dynamic names. Invoke one with
+  `POST /api/v1/command/github_api_<function-name>` and a JSON object body containing its arguments.
+- The static command contract exposes `list-api-functions` and `invoke-api-function`; the latter
+  accepts `{ "name": "<function-name>", "arguments": { ... } }`. This is useful to the CLI and
+  clients that cache only the base command list.
+
+Function names start with a lowercase letter, contain only lowercase letters, numbers, `_`, or `-`,
+and are at most 64 characters before the `github_api_` transport prefix. Argument schemas use
+`additionalProperties: false`; undeclared, missing, wrongly typed, oversized, prototype-shaped, or
+credential-shaped values are rejected rather than forwarded.
+
+### Exact binding and fail-closed behavior
+
+A definition stores a stable account reference, never an account token, and is bound to all of the
+following:
+
+- the stored local repository path and its SHA-256 binding fingerprint;
+- the exact GitHub remote owner/name;
+- the GitHub or GitHub Enterprise endpoint; and
+- the exact account key selected for that repository.
+
+Every invocation resolves the repository and account again, recomputes the binding, validates the
+arguments and request template, and checks that the current risk still matches the stored risk. A
+missing repository/account, changed remote/endpoint, stale fingerprint, malformed profile document,
+unknown operation, or schema/risk mismatch fails closed. Invalid restored profile state publishes an
+empty dynamic catalog, so an older function cannot remain runnable from stale UI state.
+
+Read functions can execute through the agent transports. Write and destructive definitions remain
+visible in discovery, but invocation returns an error directing the user to the API tab's
+interactive mutation review; no agent argument can confirm that review. Credential-shaped keys,
+Bearer/Basic values, provider tokens, password-bearing URLs, and credential-like GraphQL fields are
+rejected when definitions or calls are validated. The bounded/redacted API workbench response and
+the agent server's normal output redaction still apply after a successful read.
 
 ## Security model
 
@@ -61,6 +109,9 @@ The agent server is designed to be safe-by-default:
   can never *read them back out* — account tokens are not part of any response payload.
 - **Redacts output.** Credential-shaped keys and bearer-like values are removed before responses
   leave the app; credential-shaped command arguments are rejected before execution.
+- **Keeps extensions bound.** Named API functions carry no credentials, are revalidated against the
+  exact live repository/remote/endpoint/account, and cannot execute mutations without the app's
+  visible review flow.
 
 ## Transports
 

@@ -7,6 +7,10 @@ import {
   assertSafeAgentArgs,
   isAgentCommandName,
 } from '../../lib/agent-commands'
+import {
+  namedAPIFunctionNameFromTool,
+  namedAPIFunctionToolName,
+} from '../../lib/named-api-functions'
 
 export type AgentCommandExecutor = (
   command: IAgentCommandEnvelope
@@ -44,6 +48,61 @@ function isRequest(value: unknown): value is IJSONRPCRequest {
   )
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+async function namedAPIFunctionTools(
+  execute: AgentCommandExecutor
+): Promise<ReadonlyArray<Record<string, unknown>>> {
+  const result = await execute({
+    id: `mcp-${randomUUID()}`,
+    version: AgentCommandVersion,
+    name: 'list-api-functions',
+    args: {},
+  })
+  if (!result.ok || !Array.isArray(result.data)) {
+    return []
+  }
+  const tools: Array<Record<string, unknown>> = []
+  for (const value of result.data) {
+    if (
+      !isRecord(value) ||
+      typeof value.name !== 'string' ||
+      typeof value.description !== 'string' ||
+      !isRecord(value.inputSchema)
+    ) {
+      continue
+    }
+    try {
+      const risk =
+        value.risk === 'read'
+          ? 'read'
+          : value.risk === 'destructive'
+          ? 'destructive mutation'
+          : 'mutation'
+      tools.push({
+        name: namedAPIFunctionToolName(value.name),
+        description: `${
+          value.description
+        } (${risk}; GitHub API operation ${String(
+          value.operationId ?? 'unknown'
+        )})`,
+        inputSchema: value.inputSchema,
+        annotations: {
+          readOnlyHint: value.risk === 'read',
+          destructiveHint: value.risk === 'destructive',
+          idempotentHint: value.risk === 'read',
+          openWorldHint: true,
+        },
+      })
+    } catch {
+      // A malformed renderer entry is omitted from the public tool catalog.
+    }
+  }
+  return tools
+}
+
 /** Handle one sessionless MCP JSON-RPC request over local HTTP or stdio. */
 export async function handleMCPRequest(
   value: unknown,
@@ -62,6 +121,8 @@ export async function handleMCPRequest(
     case 'initialize':
       return success(id, {
         protocolVersion,
+        // HTTP requests are sessionless, so clients refresh tools/list when
+        // they need profile changes; this transport does not emit push events.
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'desktop-material', version: '1.0.0' },
         instructions:
@@ -70,13 +131,20 @@ export async function handleMCPRequest(
     case 'ping':
       return success(id, {})
     case 'tools/list':
-      return success(id, { tools: AgentToolDefinitions })
+      return success(id, {
+        tools: [
+          ...AgentToolDefinitions,
+          ...(await namedAPIFunctionTools(execute)),
+        ],
+      })
     case 'tools/call': {
       if (params === null || typeof params !== 'object') {
         return failure(id, { code: -32602, message: 'Invalid params' })
       }
       const call = params as { name?: unknown; arguments?: unknown }
-      if (!isAgentCommandName(call.name)) {
+      const customFunctionName = namedAPIFunctionNameFromTool(call.name)
+      const commandName = isAgentCommandName(call.name) ? call.name : null
+      if (commandName === null && customFunctionName === null) {
         return failure(id, { code: -32602, message: 'Unknown tool name' })
       }
       const args = call.arguments ?? {}
@@ -98,8 +166,12 @@ export async function handleMCPRequest(
       const result = await execute({
         id: `mcp-${randomUUID()}`,
         version: AgentCommandVersion,
-        name: call.name,
-        args: args as Readonly<Record<string, unknown>>,
+        name:
+          customFunctionName === null ? commandName! : 'invoke-api-function',
+        args:
+          customFunctionName === null
+            ? (args as Readonly<Record<string, unknown>>)
+            : { name: customFunctionName, arguments: args },
       })
       const payload = result.ok ? result.data : result.error
       return success(id, {

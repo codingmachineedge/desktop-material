@@ -78,6 +78,13 @@ function parseArguments(argv) {
     windowWidth,
     windowHeight,
     capturePath: validateCapturePath(values.get('capture'), 'capture'),
+    functionsCapturePath:
+      values.get('functions-capture') === undefined
+        ? null
+        : validateCapturePath(
+            values.get('functions-capture'),
+            'functions-capture'
+          ),
     fixtureAccount: {
       endpoint: parsedEndpoint.toString().replace(/\/$/, ''),
       login: accountLogin,
@@ -161,6 +168,9 @@ const geometryExpression = `(() => {
     responseStatus: response?.querySelector('header strong')?.textContent.trim() || null,
     responseHasFirstPattern: response?.textContent.includes('Material production credential') || false,
     responseHasLongPattern: response?.textContent.includes('Long synthetic release signing identity for responsive Explorer verification') || false,
+    functionCount: document.querySelectorAll('.github-api-functions li').length,
+    functionNames: [...document.querySelectorAll('.github-api-functions li strong')].map(value => value.textContent.trim()),
+    functionMessage: document.querySelector('.github-api-functions .github-api-explorer-message')?.textContent.trim() || null,
     errorText: document.querySelector('.github-api-explorer-error')?.textContent.trim() || null,
     ancestors,
     overflow,
@@ -337,7 +347,112 @@ async function interact(client, options) {
   }
 
   const captureBytes = await capture(client, options.capturePath)
-  return { receipt, captureBytes }
+
+  const functionName = 'list_material_patterns'
+  const functionDescription =
+    'List the bounded custom-pattern fixture through the app catalog'
+  const functionDescriptionUpdated = `${functionDescription} (verified)`
+  const filled = await evaluate(
+    client,
+    `(() => {
+      const setValue = (labelText, value) => {
+        const label = [...document.querySelectorAll('.github-api-function-editor label')]
+          .find(candidate => candidate.textContent.includes(labelText))
+        const input = label?.querySelector('input')
+        if (!(input instanceof HTMLInputElement)) return false
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        setter.call(input, value)
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        return true
+      }
+      return setValue('Function name', ${JSON.stringify(functionName)}) &&
+        setValue('Function description', ${JSON.stringify(functionDescription)})
+    })()`
+  )
+  if (!filled) fail('Unable to fill the app-function editor.')
+  await clickButton(client, 'Add current request as function')
+  await waitFor(
+    client,
+    `[...document.querySelectorAll('.github-api-functions li strong')].some(value => value.textContent.trim() === ${JSON.stringify(
+      functionName
+    )})`,
+    'named app function creation'
+  )
+
+  await clickButton(client, 'Run function')
+  await waitFor(
+    client,
+    `document.querySelector('.github-api-explorer-response header strong')?.textContent.trim() === '200 OK' && document.querySelector('.github-api-functions .github-api-explorer-message')?.textContent.includes(${JSON.stringify(
+      functionName
+    )})`,
+    'named app function execution'
+  )
+
+  await clickButton(client, 'Edit')
+  const edited = await evaluate(
+    client,
+    `(() => {
+      const label = [...document.querySelectorAll('.github-api-function-editor label')]
+        .find(candidate => candidate.textContent.includes('Function description'))
+      const input = label?.querySelector('input')
+      if (!(input instanceof HTMLInputElement)) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter.call(input, ${JSON.stringify(functionDescriptionUpdated)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`
+  )
+  if (!edited) fail('Unable to edit the app-function description.')
+  await clickButton(client, 'Update function from current request')
+  await waitFor(
+    client,
+    `[...document.querySelectorAll('.github-api-functions li')].some(value => value.textContent.includes(${JSON.stringify(
+      functionDescriptionUpdated
+    )}))`,
+    'named app function update'
+  )
+
+  await evaluate(
+    client,
+    `(() => {
+      const panel = document.querySelector('.github-api-functions')
+      panel?.scrollIntoView({ block: 'start', inline: 'nearest' })
+      return panel !== null
+    })()`
+  )
+  await new Promise(resolve => setTimeout(resolve, 300))
+  const functionReceipt = await evaluate(client, geometryExpression)
+  assertGeometry(functionReceipt)
+  if (
+    functionReceipt.functionCount !== 1 ||
+    !functionReceipt.functionNames.includes(functionName) ||
+    functionReceipt.errorText !== null
+  ) {
+    fail(
+      `App-function state was unexpected: ${JSON.stringify(functionReceipt)}`
+    )
+  }
+  const functionsCaptureBytes =
+    options.functionsCapturePath === null
+      ? null
+      : await capture(client, options.functionsCapturePath)
+
+  await clickButton(client, 'Remove')
+  await waitFor(
+    client,
+    `document.querySelectorAll('.github-api-functions li').length === 0 && !document.querySelector('.github-api-functions')?.textContent.includes(${JSON.stringify(
+      functionName
+    )}) && (document.querySelector('.github-api-functions .github-api-explorer-message')?.textContent.includes('removed from the catalog') || document.querySelector('.github-api-functions-unavailable')?.textContent.includes('No functions yet'))`,
+    'named app function removal'
+  )
+
+  return {
+    receipt,
+    captureBytes,
+    functionReceipt,
+    functionsCaptureBytes,
+    functionRemoved: true,
+  }
 }
 
 async function main() {

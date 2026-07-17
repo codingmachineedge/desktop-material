@@ -49,5 +49,12 @@
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+}
+
+// Most repository pages delegate scrolling to an owned descendant. The API
+// Explorer and Actions page instead become their own scroll owners when their
+// columns stack, so do not let this higher-specificity card rule override those
+// responsive contracts.
+#repository > *:not(.repository-rail):not(.focus-container):not(.tutorial-panel-component):not(.github-api-explorer):not(.actions-view) {
   overflow: hidden;
 }

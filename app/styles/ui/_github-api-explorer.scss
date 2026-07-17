@@ -412,6 +412,181 @@
   justify-content: flex-start;
 }
 
+.github-api-functions {
+  display: grid;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  overflow-x: hidden;
+  background: var(--md-sys-color-surface-container-lowest);
+
+  > header,
+  li > header,
+  .github-api-function-actions {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  > header {
+    h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    p {
+      max-width: 620px;
+      margin: 4px 0 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px;
+    }
+
+    > span {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px;
+    }
+  }
+
+  > ul {
+    display: grid;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  > ul > li {
+    display: grid;
+    min-width: 0;
+    gap: 9px;
+    padding: 12px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 12px;
+    background: var(--md-sys-color-surface-container-low);
+
+    > header > div {
+      display: grid;
+      min-width: 0;
+      gap: 3px;
+    }
+
+    > header code {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 9px;
+    }
+
+    > header > span {
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: var(--md-sys-color-on-secondary-container);
+      background: var(--md-sys-color-secondary-container);
+      font-size: 9px;
+      font-weight: 650;
+
+      &.write,
+      &.destructive {
+        color: var(--md-sys-color-on-error-container);
+        background: var(--md-sys-color-error-container);
+      }
+    }
+
+    > p {
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 11px;
+    }
+
+    textarea {
+      min-height: 72px;
+    }
+
+    details {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px;
+
+      summary {
+        cursor: pointer;
+        font-weight: 650;
+      }
+
+      pre {
+        max-height: 180px;
+        margin: 8px 0 0;
+        padding: 8px;
+        border-radius: 8px;
+        overflow: auto;
+        white-space: pre-wrap;
+        background: var(--md-sys-color-surface-container);
+        font-size: 9px;
+      }
+    }
+  }
+}
+
+.github-api-function-editor {
+  display: grid;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(0, 1fr);
+  gap: 10px;
+
+  .github-api-explorer-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+.github-api-function-actions {
+  justify-content: flex-start !important;
+
+  button {
+    min-height: 32px;
+    padding: 5px 11px;
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 999px;
+    color: var(--md-sys-color-on-surface);
+    background: var(--md-sys-color-surface-container);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 650;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+    }
+  }
+}
+
+.github-api-functions-unavailable {
+  margin: 0;
+  padding: 10px;
+  border-radius: 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container);
+  font-size: 10px;
+}
+
 .github-api-explorer-review,
 .github-api-explorer-response,
 .github-api-explorer-loading,
@@ -546,9 +721,15 @@
 }
 
 @media (max-width: 900px) {
-  .github-api-explorer {
+  // Material cards apply `overflow: hidden` through a higher-specificity
+  // `#repository > *` selector. Match that repository relationship here so
+  // the Explorer itself remains the reachable scroll owner once its two
+  // columns stack on compact windows.
+  #repository > .github-api-explorer {
     overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .github-api-explorer-layout {
@@ -593,6 +774,14 @@
 
   .github-api-explorer-filters label:first-child {
     grid-column: auto;
+  }
+
+  .github-api-function-editor {
+    grid-template-columns: minmax(0, 1fr);
+
+    .github-api-explorer-actions {
+      grid-column: auto;
+    }
   }
 
   .github-api-explorer-catalog {

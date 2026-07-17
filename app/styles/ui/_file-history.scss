@@ -553,4 +553,49 @@
   .file-blame-details {
     padding: 10px;
   }
+
+  // At phone widths, wrap the source preview into the available track. Wider
+  // panels retain the deliberate horizontal source scroller above.
+  .file-blame-lines {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .file-blame-line {
+    min-width: 0;
+    grid-template-columns: 92px 52px minmax(0, 1fr);
+
+    > code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+  }
+}
+
+// Header and wrapped tab chrome can consume nearly the entire 200%-zoom
+// minimum viewport. In that one extreme, use the panel as a unified vertical
+// scroll owner instead of forcing the master/detail grid into a zero-height
+// track. Normal-height sheets keep their independent panes.
+@media (max-height: 320px) {
+  .file-history-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .file-history-content {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .file-history-layout {
+    height: auto;
+    overflow: visible;
+    grid-template-rows: auto auto;
+  }
+
+  .file-history-master,
+  .file-history-details {
+    overflow: visible;
+  }
 }

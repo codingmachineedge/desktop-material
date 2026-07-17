@@ -17,6 +17,14 @@ import { BatchCloneMode, IBatchCloneItem } from '../models/batch-clone'
 import { Dispatcher } from '../ui/dispatcher'
 import { RepositoryTabsStore } from './stores/repository-tabs-store'
 import * as ipcRenderer from './ipc-renderer'
+import { API } from './api'
+import { getAccountKey } from '../models/account'
+import {
+  createNamedAPIFunctionBinding,
+  functionBelongsToBinding,
+  INamedAPIFunctionDefinition,
+  prepareNamedAPIFunctionInvocation,
+} from './named-api-functions'
 
 const CommandTimeoutMs = 60_000
 const MaxQueuedPerRepository = 16
@@ -37,6 +45,10 @@ interface IActionsDispatcher {
     ref: string,
     inputs: Readonly<Record<string, string>>
   ): Promise<void>
+}
+
+interface INamedAPIFunctionDispatcher {
+  getNamedAPIFunctions(): ReadonlyArray<INamedAPIFunctionDefinition>
 }
 
 type GetState = () => IAppState
@@ -208,6 +220,103 @@ function queueKey(command: IAgentCommandEnvelope): string {
     return `path:${Path.resolve(path).toLocaleLowerCase()}`
   }
   return `global:${command.name}`
+}
+
+function namedAPIFunctions(
+  dispatcher: Dispatcher
+): ReadonlyArray<INamedAPIFunctionDefinition> {
+  const registry = dispatcher as unknown as Partial<INamedAPIFunctionDispatcher>
+  return typeof registry.getNamedAPIFunctions === 'function'
+    ? registry.getNamedAPIFunctions.call(dispatcher)
+    : []
+}
+
+function serializeNamedAPIFunction(definition: INamedAPIFunctionDefinition) {
+  return {
+    id: definition.id,
+    name: definition.name,
+    description: definition.description,
+    owner: definition.owner,
+    operationId: definition.operationId,
+    risk: definition.risk,
+    binding: {
+      provider: definition.binding.provider,
+      repositoryPath: definition.binding.repositoryPath,
+      remoteFullName: definition.binding.remoteFullName,
+      endpoint: definition.binding.endpoint,
+      accountKey: definition.binding.accountKey,
+    },
+    inputSchema: definition.parameterSchema,
+  }
+}
+
+async function invokeNamedAPIFunction(
+  definition: INamedAPIFunctionDefinition,
+  rawArguments: unknown,
+  getState: GetState
+): Promise<unknown> {
+  const invocation = prepareNamedAPIFunctionInvocation(
+    definition,
+    rawArguments ?? {}
+  )
+  if (invocation.requiresConfirmation) {
+    throw new Error(
+      `Function '${definition.name}' modifies GitHub state and requires interactive review in the API tab.`
+    )
+  }
+  const state = getState()
+  const repository = state.repositories.find(
+    value =>
+      value instanceof Repository &&
+      Path.resolve(value.path).toLocaleLowerCase() ===
+        Path.resolve(definition.binding.repositoryPath).toLocaleLowerCase()
+  )
+  if (!(repository instanceof Repository)) {
+    throw new Error('The function-bound repository is not known to the app.')
+  }
+  const remote = repository.gitHubRepository
+  if (
+    remote === null ||
+    remote.fullName !== definition.binding.remoteFullName ||
+    remote.endpoint !== definition.binding.endpoint
+  ) {
+    throw new Error('The function repository binding no longer matches.')
+  }
+  const account = state.accounts.find(
+    value =>
+      value.provider === definition.binding.provider &&
+      value.endpoint === definition.binding.endpoint &&
+      getAccountKey(value) === definition.binding.accountKey
+  )
+  if (account === undefined) {
+    throw new Error('Sign in to the exact account bound to this function.')
+  }
+  if (
+    !functionBelongsToBinding(
+      definition,
+      createNamedAPIFunctionBinding(repository, account)
+    )
+  ) {
+    throw new Error('The function repository binding no longer matches.')
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), CommandTimeoutMs - 1000)
+  try {
+    const response = await API.fromAccount(account).executeGitHubAPIWorkbench(
+      invocation.request,
+      false,
+      controller.signal
+    )
+    return {
+      function: definition.name,
+      operationId: definition.operationId,
+      repository: serializeRepository(repository),
+      response,
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 async function execute(
@@ -514,6 +623,18 @@ async function execute(
         inputs
       )
       return { dispatched: true }
+    }
+    case 'list-api-functions':
+      return namedAPIFunctions(dispatcher).map(serializeNamedAPIFunction)
+    case 'invoke-api-function': {
+      const name = stringArg(args, 'name')!
+      const definition = namedAPIFunctions(dispatcher).find(
+        value => value.name === name
+      )
+      if (definition === undefined) {
+        throw new Error(`Named API function '${name}' was not found.`)
+      }
+      return invokeNamedAPIFunction(definition, args.arguments, getState)
     }
   }
 }

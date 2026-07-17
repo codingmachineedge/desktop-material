@@ -41,6 +41,7 @@ import {
   ActionsStore,
   GitHubReleasesStore,
   GitHubIssuesStore,
+  NamedAPIFunctionsStore,
 } from '../lib/stores'
 import { GitHubUserDatabase } from '../lib/databases'
 import { SelectionType, IAppState } from '../lib/app-state'
@@ -274,6 +275,7 @@ const cloningRepositoriesStore = new CloningRepositoriesStore(() =>
 )
 
 const profileStore = new ProfileStore(accountsStore)
+const namedAPIFunctionsStore = new NamedAPIFunctionsStore(localStorage)
 const repositoryTabsStore = new RepositoryTabsStore(
   profileStore,
   getCurrentWindowScope()
@@ -379,7 +381,15 @@ appStore.onDidUpdate(state => {
 
 profileStore
   .initialize()
-  .then(() => repositoryTabsStore.initialize())
+  .then(() => {
+    try {
+      namedAPIFunctionsStore.migrate()
+      profileStore.onAppStateChanged()
+    } catch (error) {
+      log.error('Failed to migrate named API functions', error)
+    }
+    return repositoryTabsStore.initialize()
+  })
   .catch(err => log.error('Failed to initialize profile stores', err))
 
 notificationCentreStore
@@ -404,7 +414,8 @@ const dispatcher = new Dispatcher(
   commitStatusStore,
   profileStore,
   repositoryTabsStore,
-  buildRunStore
+  buildRunStore,
+  namedAPIFunctionsStore
 )
 
 installAgentCommandExecutor(

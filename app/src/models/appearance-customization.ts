@@ -3,6 +3,12 @@ import {
   IAppIdentityCustomization,
   normalizeAppIdentityCustomization,
 } from './app-identity'
+import {
+  DefaultRepositoryLogoDesign,
+  IRepositoryLogoDesign,
+  normalizeRepositoryLogoDesign,
+  RepositoryLogoDesignVersion,
+} from './repository-logo'
 
 /** The persisted appearance schema version. */
 export const AppearanceCustomizationVersion = 1 as const
@@ -40,6 +46,8 @@ export interface IAppearanceCustomization {
   readonly tabWidth: TabWidthPreference
   readonly tabCloseButtons: TabCloseButtonPreference
   readonly appIdentity: IAppIdentityCustomization
+  /** Default vector identity inherited by repositories without an override. */
+  readonly repositoryLogo: IRepositoryLogoDesign
 }
 
 /**
@@ -53,6 +61,7 @@ export interface IRepositoryAppearanceOverrides {
   readonly toolbarDensity?: DensityPreference
   readonly tabDensity?: DensityPreference
   readonly tabWidth?: TabWidthPreference
+  readonly repositoryLogo?: IRepositoryLogoDesign
 }
 
 export const DefaultAppearanceCustomization: IAppearanceCustomization = {
@@ -70,6 +79,7 @@ export const DefaultAppearanceCustomization: IAppearanceCustomization = {
   tabWidth: 'standard',
   tabCloseButtons: 'hover',
   appIdentity: DefaultAppIdentityCustomization,
+  repositoryLogo: DefaultRepositoryLogoDesign,
 }
 
 export const accentPalettes: ReadonlyArray<AccentPalette> = [
@@ -116,7 +126,7 @@ export const tabWidthPreferences: ReadonlyArray<TabWidthPreference> = [
 export const tabCloseButtonPreferences: ReadonlyArray<TabCloseButtonPreference> =
   ['hover', 'always', 'active']
 
-const MaxPersistedAppearanceLength = 4096
+const MaxPersistedAppearanceLength = 32_768
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -178,6 +188,11 @@ export function normalizeAppearanceCustomization(
       ? source.tabCloseButtons
       : defaults.tabCloseButtons,
     appIdentity: normalizeAppIdentityCustomization(source.appIdentity),
+    repositoryLogo:
+      isRecord(source.repositoryLogo) &&
+      source.repositoryLogo.version === RepositoryLogoDesignVersion
+        ? normalizeRepositoryLogoDesign(source.repositoryLogo)
+        : defaults.repositoryLogo,
   }
 }
 
@@ -222,6 +237,7 @@ export function normalizeRepositoryAppearanceOverrides(
     toolbarDensity?: DensityPreference
     tabDensity?: DensityPreference
     tabWidth?: TabWidthPreference
+    repositoryLogo?: IRepositoryLogoDesign
   } = {}
 
   if (isOneOf(value.accentPalette, accentPalettes)) {
@@ -241,6 +257,14 @@ export function normalizeRepositoryAppearanceOverrides(
   }
   if (isOneOf(value.tabWidth, tabWidthPreferences)) {
     overrides.tabWidth = value.tabWidth
+  }
+  if (
+    isRecord(value.repositoryLogo) &&
+    value.repositoryLogo.version === RepositoryLogoDesignVersion
+  ) {
+    overrides.repositoryLogo = normalizeRepositoryLogoDesign(
+      value.repositoryLogo
+    )
   }
 
   return overrides

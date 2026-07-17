@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Octicon, iconForRepository } from '../octicons'
+import { iconForRepository, Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { Repository } from '../../models/repository'
 import { CloningRepository } from '../../models/cloning-repository'
@@ -8,6 +8,20 @@ import {
   tabTitleStyleToCss,
   tabFrameStyleToCss,
 } from '../../models/repository-tab'
+import {
+  IRepositoryLogoDesign,
+  DefaultRepositoryLogoDesign,
+} from '../../models/repository-logo'
+import {
+  IRepositoryLogoChangedDetail,
+  RepositoryLogoChangedEvent,
+} from '../../lib/appearance-customization'
+import { RepositoryLogo } from '../repository-logo/repository-logo'
+import {
+  getProfileRepositoryLogo,
+  getProfileRepositoryLogoSignature,
+  repositoryLogoLoader,
+} from '../repository-logo/repository-logo-loader'
 
 interface IRepositoryTabProps {
   readonly tab: IRepositoryTab
@@ -41,6 +55,7 @@ interface IRepositoryTabProps {
 interface IRepositoryTabState {
   readonly isRenaming: boolean
   readonly draftLabel: string
+  readonly logoDesign: IRepositoryLogoDesign
 }
 
 /** A single browser-style repository tab. */
@@ -48,9 +63,105 @@ export class RepositoryTab extends React.Component<
   IRepositoryTabProps,
   IRepositoryTabState
 > {
+  private logoRequestId = 0
+  private profileLogoSignature: string
+
   public constructor(props: IRepositoryTabProps) {
     super(props)
-    this.state = { isRenaming: false, draftLabel: '' }
+    const profileLogo = getProfileRepositoryLogo()
+    this.profileLogoSignature = getProfileRepositoryLogoSignature()
+    repositoryLogoLoader.synchronizeProfile(this.profileLogoSignature)
+    this.state = {
+      isRenaming: false,
+      draftLabel: '',
+      logoDesign: profileLogo,
+    }
+  }
+
+  public componentDidMount() {
+    document.addEventListener(
+      RepositoryLogoChangedEvent,
+      this.onRepositoryLogoChanged
+    )
+    this.loadLogo()
+  }
+
+  public componentDidUpdate(prevProps: IRepositoryTabProps) {
+    const previousPath =
+      prevProps.repository instanceof Repository &&
+      !prevProps.repository.missing
+        ? prevProps.repository.path
+        : null
+    const nextPath =
+      this.props.repository instanceof Repository &&
+      !this.props.repository.missing
+        ? this.props.repository.path
+        : null
+    const profileLogoSignature = getProfileRepositoryLogoSignature()
+    const profileLogoChanged =
+      profileLogoSignature !== this.profileLogoSignature
+    this.profileLogoSignature = profileLogoSignature
+
+    // Profile history restore writes registered settings directly before the
+    // app rerenders, so it doesn't emit the editor's logo-changed event. Watch
+    // the normalized profile value here as well to keep inherited tab icons in
+    // sync. loadLogo's request id still prevents an older repository read from
+    // winning if the path and profile change close together.
+    if (previousPath !== nextPath || profileLogoChanged) {
+      if (previousPath !== null && previousPath !== nextPath) {
+        repositoryLogoLoader.invalidate(previousPath)
+      }
+      repositoryLogoLoader.synchronizeProfile(profileLogoSignature)
+      this.loadLogo()
+    }
+  }
+
+  public componentWillUnmount() {
+    this.logoRequestId++
+    document.removeEventListener(
+      RepositoryLogoChangedEvent,
+      this.onRepositoryLogoChanged
+    )
+  }
+
+  private onRepositoryLogoChanged = (event: Event) => {
+    const detail = (event as CustomEvent<IRepositoryLogoChangedDetail>).detail
+    const repository = this.props.repository
+    if (
+      repository instanceof Repository &&
+      !repository.missing &&
+      (detail.repositoryPath === null ||
+        detail.repositoryPath === repository.path)
+    ) {
+      if (detail.repositoryPath === null) {
+        this.profileLogoSignature = getProfileRepositoryLogoSignature()
+        repositoryLogoLoader.synchronizeProfile(this.profileLogoSignature)
+      }
+      repositoryLogoLoader.invalidate(detail.repositoryPath, event)
+      this.loadLogo()
+    }
+  }
+
+  private loadLogo = async () => {
+    const requestId = ++this.logoRequestId
+    const repository = this.props.repository
+    if (!(repository instanceof Repository) || repository.missing) {
+      this.setState({ logoDesign: DefaultRepositoryLogoDesign })
+      return
+    }
+    try {
+      const logoDesign = await repositoryLogoLoader.load(repository)
+      if (requestId === this.logoRequestId) {
+        this.setState({ logoDesign })
+      }
+    } catch (error) {
+      log.warn(`Unable to load repository logo for ${repository.path}`, error)
+      if (requestId === this.logoRequestId) {
+        const logoDesign = getProfileRepositoryLogo()
+        this.profileLogoSignature = getProfileRepositoryLogoSignature()
+        this.setState({ logoDesign })
+      }
+    }
   }
 
   private get label(): string {
@@ -145,11 +256,25 @@ export class RepositoryTab extends React.Component<
 
   private renderIcon() {
     const { repository } = this.props
-    const symbol =
-      repository instanceof Repository
-        ? iconForRepository(repository)
-        : octicons.repo
-    return <Octicon className="repository-tab-icon" symbol={symbol} />
+    if (repository instanceof Repository && !repository.missing) {
+      return (
+        <RepositoryLogo
+          className="repository-tab-icon repository-logo-small"
+          design={this.state.logoDesign}
+          repositoryName={repository.alias ?? repository.name}
+          size={18}
+        />
+      )
+    }
+    if (repository instanceof Repository) {
+      return (
+        <Octicon
+          className="repository-tab-icon"
+          symbol={iconForRepository(repository)}
+        />
+      )
+    }
+    return <Octicon className="repository-tab-icon" symbol={octicons.repo} />
   }
 
   public render() {

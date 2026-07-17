@@ -3,6 +3,7 @@ import { writeFile } from 'fs/promises'
 import {
   AccountsStore,
   BatchCloneStore,
+  selectRegisteredBatchClonePaths,
   CloningRepositoriesStore,
   CopilotStore,
   GitHubUserStore,
@@ -284,6 +285,8 @@ import {
   matchGitHubRepository,
   matchExistingRepository,
   urlMatchesRemote,
+  urlMatchesCloneURL,
+  urlsMatch,
 } from '../repository-matching'
 import { ForcePushBranchState, getCurrentBranchForcePushState } from '../rebase'
 import { RetryAction, RetryActionType } from '../../models/retry-actions'
@@ -490,9 +493,13 @@ import {
 } from '../app-error-presentation'
 import {
   BatchCloneMode,
+  BatchCloneSource,
+  IBatchCloneInput,
   IBatchCloneItem,
   IBatchCloneState,
+  buildBatchCloneItems,
 } from '../../models/batch-clone'
+import { AutoCloneStore } from './auto-clone-store'
 import { IProfileHistoryPage } from '../../models/profile'
 import * as ipcRenderer from '../ipc-renderer'
 import { pathExists } from '../path-exists'
@@ -894,6 +901,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Coordinates cloning many repositories at once (see BatchCloneStore). */
   private readonly batchCloneStore: BatchCloneStore
   private batchCloneState: IBatchCloneState | null = null
+  private readonly autoCloneStore: AutoCloneStore
 
   public constructor(
     private readonly gitHubUserStore: GitHubUserStore,
@@ -913,6 +921,20 @@ export class AppStore extends TypedBaseStore<IAppState> {
     super()
 
     this.batchCloneStore = new BatchCloneStore(this.cloningRepositoriesStore)
+    this.autoCloneStore = new AutoCloneStore({
+      getAccounts: () => this.accounts,
+      getApiRepositories: () => this.apiRepositoriesStore.getState(),
+      isRepositoryTracked: this.isAutoCloneRepositoryTracked,
+      refreshRepositories: account =>
+        this.apiRepositoriesStore.loadAll(account),
+      startBackgroundBatch: this.startBackgroundAutoCloneBatch,
+      notify: (title, body) =>
+        this.postNotification({ kind: 'clone-batch', title, body }),
+    })
+    window.addEventListener('beforeunload', () => {
+      this.autoCloneStore.stop()
+      void this.batchCloneStore.flush()
+    })
 
     this.showWelcomeFlow = !hasShownWelcomeFlow()
 
@@ -1321,6 +1343,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     })
 
     this.cloningRepositoriesStore.onDidUpdate(() => {
+      this.autoCloneStore.dataChanged()
       this.emitUpdate()
     })
 
@@ -1328,8 +1351,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.batchCloneStore.onDidUpdate(state => {
       this.batchCloneState = state
+      this.autoCloneStore.dataChanged()
       this.emitUpdate()
     })
+    this.batchCloneStore.onDidError(error => this.emitError(error))
 
     this.signInStore.onDidAuthenticate(account => this._addAccount(account))
     this.signInStore.onDidUpdate(() => this.emitUpdate())
@@ -1346,6 +1371,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       updateAccounts(endpointTokens)
 
       this.refreshSelectedRepositoryAfterAccountChange()
+      this.autoCloneStore.dataChanged()
 
       this.emitUpdate()
     })
@@ -1354,6 +1380,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.repositoriesStore.onDidUpdate(updateRepositories => {
       this.repositories = updateRepositories
       this.updateRepositorySelectionAfterRepositoriesChanged()
+      this.autoCloneStore.dataChanged()
       this.emitUpdate()
     })
 
@@ -1369,7 +1396,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
     )
 
-    this.apiRepositoriesStore.onDidUpdate(() => this.emitUpdate())
+    this.apiRepositoriesStore.onDidUpdate(() => {
+      this.autoCloneStore.dataChanged()
+      this.emitUpdate()
+    })
     this.apiRepositoriesStore.onDidError(error => this.emitError(error))
 
     // updateStore is a global, App.tsx handles most of it but we carry the
@@ -3145,6 +3175,27 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.selectedCopilotModels = this.loadCopilotModelSelections()
     this.byokProviders = loadBYOKProviders()
+
+    await this.batchCloneStore.initialize()
+    await this.finalizeBatchClone()
+    const recoveredBatch = this.batchCloneStore.getState()
+    if (recoveredBatch?.isPaused === true) {
+      const interrupted = recoveredBatch.items.filter(item => {
+        const kind = recoveredBatch.statuses.get(item.path)?.kind
+        return kind === 'interrupted' || kind === 'pending'
+      }).length
+      this.postNotification({
+        kind: 'clone-batch',
+        title: 'Clone queue recovered',
+        body: `${interrupted} ${
+          interrupted === 1 ? 'repository needs' : 'repositories need'
+        } to be resumed after the previous app session ended. Existing destination data will be inspected, never deleted.`,
+      })
+      if (recoveredBatch.source === 'manual') {
+        void this._showPopup({ type: PopupType.BatchCloneProgress })
+      }
+    }
+    this.autoCloneStore.start()
 
     this.emitUpdateNow()
 
@@ -7200,15 +7251,21 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** This shouldn't be called directly. See `Dispatcher`. */
   public async _cloneBatch(
     items: ReadonlyArray<IBatchCloneItem>,
-    mode: BatchCloneMode
+    mode: BatchCloneMode,
+    source: BatchCloneSource = 'manual'
   ): Promise<void> {
-    await this.batchCloneStore.startBatch(items, mode)
+    await this.batchCloneStore.startBatch(items, mode, source)
     await this.finalizeBatchClone()
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
   public async _retryBatchCloneFailed(): Promise<void> {
     await this.batchCloneStore.retryFailed()
+    await this.finalizeBatchClone()
+  }
+
+  /** Retry adding completed clone paths which were temporarily unavailable. */
+  public async _retryBatchCloneRegistration(): Promise<void> {
     await this.finalizeBatchClone()
   }
 
@@ -7222,13 +7279,34 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.batchCloneStore.requestCancel()
   }
 
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _pauseBatchClone(): void {
+    this.batchCloneStore.requestPause()
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _resumeBatchClone(): Promise<void> {
+    await this.batchCloneStore.resume()
+    await this.finalizeBatchClone()
+  }
+
+  /** Configure account-scoped automatic clone without tying it to a dialog. */
+  public _configureAutoClone(
+    account: Account,
+    baseDirectory: string,
+    mode: BatchCloneMode,
+    enabled: boolean
+  ): void {
+    this.autoCloneStore.configure(account, baseDirectory, mode, enabled)
+  }
+
   /**
    * Add every successfully-cloned repository from the current batch to the
    * repository list and post a summary notification.
    */
   private async finalizeBatchClone(): Promise<void> {
     const state = this.batchCloneState
-    if (state === null) {
+    if (state === null || !state.isDone) {
       return
     }
 
@@ -7236,35 +7314,113 @@ export class AppStore extends TypedBaseStore<IAppState> {
       item => state.statuses.get(item.path)?.kind === 'done'
     )
     const clonedPaths = clonedItems.map(item => item.path)
+    const unfinalizedItems = clonedItems.filter(
+      item => state.statuses.get(item.path)?.finalized !== true
+    )
+    const unfinalizedPaths = unfinalizedItems.map(item => item.path)
+    let registrationComplete = true
 
     const accountKeysByPath = new Map<string, string>()
-    for (const item of clonedItems) {
+    for (const item of unfinalizedItems) {
       const accountKey = state.statuses.get(item.path)?.accountKey
       if (accountKey !== undefined) {
         accountKeysByPath.set(item.path, accountKey)
       }
     }
 
-    if (clonedPaths.length > 0) {
-      await this._addRepositories(clonedPaths, accountKeysByPath)
-      this.statsStore.recordCloneRepository()
+    if (unfinalizedPaths.length > 0) {
+      const addedRepositories = await this._addRepositories(
+        unfinalizedPaths,
+        accountKeysByPath
+      )
+      const finalizedPaths = selectRegisteredBatchClonePaths(
+        unfinalizedPaths,
+        addedRepositories
+      )
+      await this.batchCloneStore.markFinalized(finalizedPaths)
+      registrationComplete = finalizedPaths.length === unfinalizedPaths.length
+      // Mark registration durably before recording analytics. A crash between
+      // these steps may omit one statistic, but can never count one clone batch
+      // twice after recovery.
+      if (registrationComplete) {
+        this.statsStore.recordCloneRepository()
+      }
     }
+
+    // A completed clone can be temporarily unavailable (for example, on a
+    // disconnected external drive). Keep its journal and completion summary
+    // pending until the repository list actually accepts every successful
+    // path, so the visible retry action can recover it later.
+    if (!registrationComplete) {
+      return
+    }
+
+    if (!this.batchCloneStore.completionNotificationPending) {
+      return
+    }
+    await this.batchCloneStore.markCompletionNotified()
 
     const failed = state.items.filter(
       item => state.statuses.get(item.path)?.kind === 'failed'
     ).length
+    const review = state.items.filter(
+      item => state.statuses.get(item.path)?.kind === 'review'
+    ).length
 
     const body =
-      failed > 0
-        ? `Cloned ${clonedPaths.length} of ${state.items.length} repositories (${failed} failed).`
+      failed > 0 || review > 0
+        ? `Cloned ${clonedPaths.length} of ${state.items.length} repositories (${failed} failed, ${review} require review).`
         : `Cloned ${clonedPaths.length} ${
             clonedPaths.length === 1 ? 'repository' : 'repositories'
           }.`
 
     this.postNotification({
       kind: 'clone-batch',
-      title: 'Batch clone finished',
+      title:
+        state.source === 'auto'
+          ? 'Automatic clone finished'
+          : 'Batch clone finished',
       body,
+    })
+  }
+
+  private startBackgroundAutoCloneBatch = (
+    inputs: ReadonlyArray<IBatchCloneInput>,
+    baseDirectory: string,
+    mode: BatchCloneMode
+  ): boolean => {
+    if (this.batchCloneStore.requiresAttention || inputs.length === 0) {
+      return false
+    }
+    let items: ReadonlyArray<IBatchCloneItem>
+    try {
+      items = buildBatchCloneItems(inputs, baseDirectory)
+    } catch (error) {
+      this.emitError(error instanceof Error ? error : new Error(String(error)))
+      return false
+    }
+    void this._cloneBatch(items, mode, 'auto').catch(error =>
+      this.emitError(error instanceof Error ? error : new Error(String(error)))
+    )
+    return true
+  }
+
+  private isAutoCloneRepositoryTracked = (cloneURL: string): boolean => {
+    if (
+      this.cloningRepositoriesStore.repositories.some(repository =>
+        urlsMatch(repository.url, cloneURL)
+      )
+    ) {
+      return true
+    }
+    return this.repositories.some(repository => {
+      if (!isRepositoryWithGitHubRepository(repository)) {
+        return false
+      }
+      return (
+        urlMatchesCloneURL(cloneURL, repository.gitHubRepository) ||
+        urlsMatch(repository.gitHubRepository.htmlURL ?? '', cloneURL)
+      )
     })
   }
 

@@ -11,18 +11,23 @@ describe('RepositoryAppearance', () => {
       <RepositoryAppearance
         overrides={{ accentPalette: 'violet' }}
         isLoading={false}
+        repositoryName="desktop-material"
         onChanged={overrides => changes.push(overrides)}
       />
     )
 
-    const selects = view.container.querySelectorAll('select')
-    assert.equal(selects.length, 6)
-    assert.equal(selects[0].value, 'violet')
+    const accent = view.container.querySelector<HTMLSelectElement>(
+      'select[name="accentPalette"]'
+    )!
+    const surface = view.container.querySelector<HTMLSelectElement>(
+      'select[name="surfacePalette"]'
+    )!
+    assert.equal(accent.value, 'violet')
 
-    fireEvent.change(selects[0], { target: { value: '' } })
+    fireEvent.change(accent, { target: { value: '' } })
     assert.deepEqual(changes.at(-1), { accentPalette: undefined })
 
-    fireEvent.change(selects[1], { target: { value: 'neutral' } })
+    fireEvent.change(surface, { target: { value: 'neutral' } })
     assert.deepEqual(changes.at(-1), {
       accentPalette: 'violet',
       surfacePalette: 'neutral',

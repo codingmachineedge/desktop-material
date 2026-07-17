@@ -1,4 +1,5 @@
 import * as Path from 'path'
+import { URL } from 'url'
 import { parseRepositoryIdentifier } from '../lib/remote-parsing'
 
 /** How a batch of repositories should be cloned. */
@@ -12,13 +13,27 @@ export enum BatchCloneMode {
 /** The maximum number of concurrent clones when running in parallel mode. */
 export const BatchCloneParallelLimit = 3
 
+/** Defensive queue/input limits shared by persistence and execution. */
+export const MaxBatchCloneItems = 500
+export const MaxBatchCloneURLLength = 8192
+export const MaxBatchCloneRawFolderNameLength = 1024
+export const MaxBatchCloneFolderNameLength = 100
+export const MaxBatchClonePathLength = 32767
+export const MaxBatchCloneBranchLength = 1024
+export const MaxBatchCloneAccountKeyLength = 4096
+
 /** The lifecycle state of a single repository within a batch clone. */
 export type BatchCloneItemStatusKind =
   | 'pending'
   | 'cloning'
+  | 'interrupted'
+  | 'review'
   | 'done'
   | 'failed'
   | 'skipped'
+
+/** Where a batch originated. Auto-clone batches never open a progress dialog. */
+export type BatchCloneSource = 'manual' | 'auto'
 
 /**
  * The status of a single item in the batch, tracked separately from the item
@@ -38,6 +53,9 @@ export interface IBatchCloneItemStatus {
 
   /** Stable identity that completed the clone, when fallback was used. */
   readonly accountKey?: string
+
+  /** The completed clone has been registered with the local repository list. */
+  readonly finalized?: boolean
 }
 
 /** A single repository to be cloned as part of a batch. */
@@ -69,6 +87,15 @@ export interface IBatchCloneState {
   /** Whether the batch is running in parallel or sequential mode. */
   readonly mode: BatchCloneMode
 
+  /** Whether new work is currently being launched. */
+  readonly isRunning: boolean
+
+  /** Whether the queue is paused. Active Git processes are allowed to finish. */
+  readonly isPaused: boolean
+
+  /** Whether this batch was user-started or created by background auto-clone. */
+  readonly source: BatchCloneSource
+
   /** The overall progress across the whole batch, between 0 and 1. */
   readonly overallProgress: number
 
@@ -90,6 +117,7 @@ export function isTerminalStatus(status: IBatchCloneItemStatus): boolean {
   return (
     status.kind === 'done' ||
     status.kind === 'failed' ||
+    status.kind === 'review' ||
     status.kind === 'skipped'
   )
 }
@@ -116,20 +144,184 @@ export function deriveBatchCloneName(url: string): string {
  * suffixing `-2`, `-3`, … on collision. The chosen name is added to `taken`.
  */
 export function uniquifyName(candidate: string, taken: Set<string>): string {
-  if (!taken.has(candidate)) {
-    taken.add(candidate)
-    return candidate
+  const sanitized = sanitizeBatchCloneFolderName(candidate)
+  const collisionKeys = new Set(Array.from(taken, nameCollisionKey))
+  if (!collisionKeys.has(nameCollisionKey(sanitized))) {
+    taken.add(sanitized)
+    return sanitized
   }
 
   let counter = 2
-  let name = `${candidate}-${counter}`
-  while (taken.has(name)) {
+  let name = withNumericSuffix(sanitized, counter)
+  while (collisionKeys.has(nameCollisionKey(name))) {
     counter += 1
-    name = `${candidate}-${counter}`
+    name = withNumericSuffix(sanitized, counter)
   }
 
   taken.add(name)
   return name
+}
+
+const WindowsReservedFolderName =
+  /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:[ .]|$)/i
+
+/**
+ * Convert API/user supplied labels into one portable path segment. Separators,
+ * control characters, Windows-reserved punctuation/names, trailing dots/spaces,
+ * and traversal-only segments are never allowed through.
+ */
+export function sanitizeBatchCloneFolderName(candidate: string): string {
+  let name = candidate
+    .normalize('NFC')
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '')
+
+  if (name === '' || name === '.' || name === '..') {
+    name = 'repository'
+  }
+  if (WindowsReservedFolderName.test(name)) {
+    name = `_${name}`
+  }
+
+  const codePoints = Array.from(name)
+  if (codePoints.length > MaxBatchCloneFolderNameLength) {
+    name = codePoints.slice(0, MaxBatchCloneFolderNameLength).join('')
+    name = name.replace(/[. ]+$/g, '') || 'repository'
+  }
+  return name
+}
+
+/** Resolve and prove that a sanitized name is exactly one child of base. */
+export function resolveBatchCloneDestination(
+  baseDirectory: string,
+  folderName: string
+): string {
+  if (typeof baseDirectory !== 'string' || !Path.isAbsolute(baseDirectory)) {
+    throw new Error('Clone base directory must be absolute.')
+  }
+  if (
+    typeof folderName !== 'string' ||
+    folderName !== sanitizeBatchCloneFolderName(folderName)
+  ) {
+    throw new Error('Clone destination folder name is unsafe.')
+  }
+  const base = Path.resolve(baseDirectory)
+  const resolvedDestination = Path.resolve(base, folderName)
+  const relative = Path.relative(base, resolvedDestination)
+  if (
+    relative === '' ||
+    Path.isAbsolute(relative) ||
+    relative === '..' ||
+    relative.startsWith(`..${Path.sep}`) ||
+    Path.dirname(relative) !== '.'
+  ) {
+    throw new Error(
+      'Clone destination must be a direct child of the base directory.'
+    )
+  }
+  if (resolvedDestination.length > MaxBatchClonePathLength) {
+    throw new Error('Clone destination path is too long.')
+  }
+  return resolvedDestination
+}
+
+function nameCollisionKey(name: string): string {
+  return name.normalize('NFC').toLocaleLowerCase('en-US')
+}
+
+function withNumericSuffix(candidate: string, counter: number): string {
+  const suffix = `-${counter}`
+  const available = MaxBatchCloneFolderNameLength - suffix.length
+  const prefix = Array.from(candidate).slice(0, available).join('')
+  return `${prefix}${suffix}`
+}
+
+export function isSafeBatchCloneItem(item: IBatchCloneItem): boolean {
+  if (typeof item !== 'object' || item === null) {
+    return false
+  }
+  if (
+    typeof item.url !== 'string' ||
+    item.url.length === 0 ||
+    item.url.length > MaxBatchCloneURLLength ||
+    batchCloneURLContainsEmbeddedCredentials(item.url) ||
+    typeof item.name !== 'string' ||
+    item.name.length > MaxBatchCloneRawFolderNameLength ||
+    item.name !== sanitizeBatchCloneFolderName(item.name) ||
+    Array.from(item.name).length > MaxBatchCloneFolderNameLength ||
+    typeof item.path !== 'string' ||
+    item.path.length === 0 ||
+    item.path.length > MaxBatchClonePathLength ||
+    !Path.isAbsolute(item.path) ||
+    (item.defaultBranch !== undefined &&
+      (typeof item.defaultBranch !== 'string' ||
+        item.defaultBranch.length > MaxBatchCloneBranchLength)) ||
+    (item.accountKey !== undefined &&
+      (typeof item.accountKey !== 'string' ||
+        item.accountKey.length > MaxBatchCloneAccountKeyLength))
+  ) {
+    return false
+  }
+
+  const expected = Path.resolve(Path.dirname(item.path), item.name)
+  return (
+    Path.resolve(item.path).toLocaleLowerCase('en-US') ===
+    expected.toLocaleLowerCase('en-US')
+  )
+}
+
+/**
+ * Whether a clone URL contains credentials that must never enter the durable
+ * batch queue. HTTP(S) userinfo is always rejected because a username-only PAT
+ * is indistinguishable from a harmless username. Passwordless SSH usernames
+ * remain supported, including scp-like `git@host:owner/repo.git` URLs.
+ */
+export function batchCloneURLContainsEmbeddedCredentials(url: string): boolean {
+  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(url)
+  if (scheme === null) {
+    return false
+  }
+
+  const protocol = scheme[1].toLocaleLowerCase('en-US')
+  const authorityPrefix = url.slice(scheme[0].length)
+  if (!/^[\\/]{2}/.test(authorityPrefix)) {
+    return false
+  }
+
+  try {
+    const parsed = new URL(url)
+    if (parsed.password.length > 0) {
+      return true
+    }
+    if (parsed.username.length === 0) {
+      return false
+    }
+    return protocol !== 'ssh' && protocol !== 'git+ssh'
+  } catch {
+    // An explicit URL authority that cannot be parsed is still fail-closed
+    // when it contains userinfo. This also covers malformed percent escapes.
+    const authority = authorityPrefix.slice(2).split(/[\\/?#]/, 1)[0]
+    return authority.includes('@')
+  }
+}
+
+export function assertSafeBatchCloneItems(
+  items: ReadonlyArray<IBatchCloneItem>
+): void {
+  if (items.length > MaxBatchCloneItems || !items.every(isSafeBatchCloneItem)) {
+    throw new Error('Clone queue contains an unsafe or oversized destination.')
+  }
+  const paths = items.map(item =>
+    Path.resolve(item.path).toLocaleLowerCase('en-US')
+  )
+  const parents = items.map(item =>
+    Path.dirname(Path.resolve(item.path)).toLocaleLowerCase('en-US')
+  )
+  if (new Set(paths).size !== paths.length || new Set(parents).size > 1) {
+    throw new Error('Clone queue contains an unsafe or oversized destination.')
+  }
 }
 
 /**
@@ -141,19 +333,56 @@ export function buildBatchCloneItems(
   inputs: ReadonlyArray<IBatchCloneInput>,
   baseDirectory: string
 ): ReadonlyArray<IBatchCloneItem> {
+  if (inputs.length > MaxBatchCloneItems) {
+    throw new Error(
+      `A clone batch cannot contain more than ${MaxBatchCloneItems} repositories.`
+    )
+  }
   const taken = new Set<string>()
 
   return inputs.map(input => {
+    if (
+      typeof input.url !== 'string' ||
+      input.url.length === 0 ||
+      input.url.length > MaxBatchCloneURLLength
+    ) {
+      throw new Error('Clone URL is empty or exceeds the supported length.')
+    }
+    if (batchCloneURLContainsEmbeddedCredentials(input.url)) {
+      throw new Error(
+        'Clone URLs with embedded credentials cannot be saved in a batch. Use the credential manager or a passwordless SSH URL.'
+      )
+    }
+    if (input.name !== undefined && typeof input.name !== 'string') {
+      throw new Error('Repository folder name must be text.')
+    }
+    if (
+      input.defaultBranch !== undefined &&
+      (typeof input.defaultBranch !== 'string' ||
+        input.defaultBranch.length > MaxBatchCloneBranchLength)
+    ) {
+      throw new Error('Default branch name exceeds the supported length.')
+    }
+    if (
+      input.accountKey !== undefined &&
+      (typeof input.accountKey !== 'string' ||
+        input.accountKey.length > MaxBatchCloneAccountKeyLength)
+    ) {
+      throw new Error('Account identity exceeds the supported length.')
+    }
     const preferred =
       input.name && input.name.length > 0
         ? input.name
         : deriveBatchCloneName(input.url)
+    if (preferred.length > MaxBatchCloneRawFolderNameLength) {
+      throw new Error('Repository folder name exceeds the supported length.')
+    }
     const name = uniquifyName(preferred, taken)
 
     return {
       url: input.url,
       name,
-      path: Path.join(baseDirectory, name),
+      path: resolveBatchCloneDestination(baseDirectory, name),
       ...(input.defaultBranch !== undefined
         ? { defaultBranch: input.defaultBranch }
         : {}),
@@ -169,6 +398,8 @@ export interface IBatchCloneSummary {
   readonly total: number
   readonly pending: number
   readonly cloning: number
+  readonly interrupted: number
+  readonly review: number
   readonly done: number
   readonly failed: number
   readonly skipped: number
@@ -181,6 +412,8 @@ export function summarizeBatchClone(
 ): IBatchCloneSummary {
   let pending = 0
   let cloning = 0
+  let interrupted = 0
+  let review = 0
   let done = 0
   let failed = 0
   let skipped = 0
@@ -194,6 +427,12 @@ export function summarizeBatchClone(
       case 'cloning':
         cloning += 1
         break
+      case 'interrupted':
+        interrupted += 1
+        break
+      case 'review':
+        review += 1
+        break
       case 'done':
         done += 1
         break
@@ -206,7 +445,16 @@ export function summarizeBatchClone(
     }
   }
 
-  return { total: items.length, pending, cloning, done, failed, skipped }
+  return {
+    total: items.length,
+    pending,
+    cloning,
+    interrupted,
+    review,
+    done,
+    failed,
+    skipped,
+  }
 }
 
 /**
@@ -225,7 +473,11 @@ export function computeBatchCloneProgress(
   let sum = 0
   for (const item of items) {
     const status = statuses.get(item.path)
-    if (status === undefined || status.kind === 'pending') {
+    if (
+      status === undefined ||
+      status.kind === 'pending' ||
+      status.kind === 'interrupted'
+    ) {
       continue
     }
 
@@ -252,6 +504,28 @@ export function isBatchCloneDone(
   return items.every(item => {
     const status = statuses.get(item.path)
     return status !== undefined && isTerminalStatus(status)
+  })
+}
+
+/** Whether an explicit user request should reopen retained queue status. */
+export function batchCloneNeedsAttention(
+  state: IBatchCloneState | null
+): boolean {
+  if (state === null) {
+    return false
+  }
+  if (!state.isDone || state.isPaused || state.isRunning) {
+    return true
+  }
+  return state.items.some(item => {
+    const status = state.statuses.get(item.path)
+    const kind = status?.kind
+    return (
+      kind === 'failed' ||
+      kind === 'review' ||
+      kind === 'interrupted' ||
+      (kind === 'done' && status?.finalized !== true)
+    )
   })
 }
 

@@ -28,6 +28,63 @@ describe('compact shell style contracts', () => {
     )
   })
 
+  it('keeps diff header actions inside the minimum 200%-zoom pane', () => {
+    const style = read('app/styles/ui/_diff.scss')
+
+    assert.match(
+      style,
+      /@media \(max-width: 420px\) and \(max-height: 320px\)[\s\S]*?\.diff-container \.header\s*\{[\s\S]*?gap: 4px;[\s\S]*?padding: 6px 8px;[\s\S]*?\.diff-line-stats\s*\{[\s\S]*?display: none;/
+    )
+  })
+
+  it('keeps Actions and the changed-file rows reachable in short panes', () => {
+    const cards = read('app/styles/ui/_material-cards.scss')
+    const changes = read('app/styles/ui/changes/_changes-list.scss')
+
+    assert.match(
+      cards,
+      /:not\(\.github-api-explorer\):not\(\.actions-view\)\s*\{[\s\S]*?overflow: hidden;/
+    )
+    const actions = read('app/styles/ui/_actions-view.scss')
+    assert.match(
+      actions,
+      /@media \(max-width: 620px\)[\s\S]*?\.actions-run-pagination\s*\{[\s\S]*?flex-direction: column;[\s\S]*?> span\s*\{[\s\S]*?flex-basis: auto;/
+    )
+    assert.match(
+      changes,
+      /\.filtered-changes-list\s*\{[\s\S]*?min-height: 148px;/
+    )
+  })
+
+  it('uses reversible repository master-detail layouts at 200% zoom', () => {
+    const shell = read('app/styles/_material-shell.scss')
+    const rail = read('app/styles/ui/_material-rail.scss')
+    const repository = read('app/src/ui/repository.tsx')
+
+    assert.match(
+      shell,
+      /@media \(max-width: 420px\) and \(max-height: 320px\)[\s\S]*?#repository:has\(> \.diff-container\) > \.focus-container,[\s\S]*?#repository:has\(> #history\) > \.focus-container\s*\{[\s\S]*?display: none;/
+    )
+    assert.match(
+      shell,
+      /@media \(max-width: 420px\) and \(max-height: 320px\)[\s\S]*?#repository:has\(> #history\) > #history\s*\{[\s\S]*?max-height: 100%;[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;[\s\S]*?overscroll-behavior: contain;[\s\S]*?scrollbar-gutter: stable;[\s\S]*?#expandable-commit-summary,[\s\S]*?\.commit-details\s*\{[\s\S]*?flex: 0 0 auto;/
+    )
+    assert.match(
+      rail,
+      /\.compact-changes-list-button,[\s\S]*?\.compact-history-list-button\s*\{[\s\S]*?display: none;[\s\S]*?@media \(max-width: 420px\) and \(max-height: 320px\)[\s\S]*?\.repository-rail \.compact-changes-list-button,[\s\S]*?\.repository-rail \.compact-history-list-button\s*\{[\s\S]*?display: flex;/
+    )
+    assert.match(
+      repository,
+      /onShowChangesList[\s\S]*?selectWorkingDirectoryFiles\([\s\S]*?this\.props\.repository,[\s\S]*?\[\][\s\S]*?compact-changes-list-button/
+    )
+    assert.match(
+      repository,
+      /onShowHistoryList[\s\S]*?changeCommitSelection\([\s\S]*?this\.props\.repository,[\s\S]*?\[\],[\s\S]*?true[\s\S]*?compact-history-list-button/
+    )
+    assert.match(repository, /aria-label="Show changed files"/)
+    assert.match(repository, /aria-label="Show commit list"/)
+  })
+
   it('preserves whole app-bar hit targets and accessible compact labels', () => {
     const style = read('app/styles/_material-shell.scss')
     const toolbar = read('app/styles/ui/toolbar/_toolbar.scss')

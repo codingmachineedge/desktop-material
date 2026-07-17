@@ -289,6 +289,12 @@ interface ISectionListProps {
     event: React.MouseEvent<HTMLDivElement>
   ) => void
 
+  /** Invoked when a focused row receives Context Menu or Shift+F10. */
+  readonly onRowKeyboardContextMenu?: (
+    row: RowIndexPath,
+    event: React.KeyboardEvent<HTMLDivElement>
+  ) => void
+
   /**
    * A handler called whenever the user drops items on the list to be inserted.
    *
@@ -838,6 +844,13 @@ export class SectionList extends React.Component<
     this.props.onRowContextMenu?.(row, e)
   }
 
+  private onRowKeyboardContextMenu = (
+    row: RowIndexPath,
+    e: React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    this.props.onRowKeyboardContextMenu?.(row, e)
+  }
+
   private get firstRowIndexPath(): RowIndexPath {
     for (let section = 0; section < this.props.rowCount.length; section++) {
       const rowCount = this.props.rowCount[section]
@@ -1259,6 +1272,7 @@ export class SectionList extends React.Component<
           onRowKeyboardFocus={this.onRowKeyboardFocus}
           onRowBlur={this.onRowBlur}
           onContextMenu={this.onRowContextMenu}
+          onKeyboardContextMenu={this.onRowKeyboardContextMenu}
           style={params.style}
           tabIndex={tabIndex}
           children={element}

@@ -99,6 +99,42 @@ describe('GitHub API workbench contract', () => {
       }).risk,
       'read'
     )
+
+    const commentInsideString = {
+      mode: 'graphql' as const,
+      query:
+        'query Decoy { search(query: "query Evil #", type: REPOSITORY, first: 1) { repositoryCount } } mutation Evil { updateRepository(input: { repositoryId: "R_1", name: "renamed" }) { repository { name } } }',
+      variablesText: '{}',
+      operationName: 'Evil',
+    }
+    assert.equal(
+      assessGitHubAPIWorkbenchRequest(commentInsideString).risk,
+      'write'
+    )
+    assert.equal(
+      assessGitHubAPIWorkbenchRequest(commentInsideString).requiresConfirmation,
+      true
+    )
+    assert.throws(() => prepareGitHubAPIWorkbenchExecution(commentInsideString))
+
+    assert.equal(
+      assessGitHubAPIWorkbenchRequest({
+        mode: 'graphql',
+        query:
+          'query Text { search(query: """mutation sample \\""" remains text""", type: REPOSITORY, first: 1) { repositoryCount } }',
+        variablesText: '{}',
+      }).risk,
+      'read'
+    )
+    assert.throws(
+      () =>
+        assessGitHubAPIWorkbenchRequest({
+          mode: 'graphql',
+          query: 'query Broken { search(query: "unterminated) { id } }',
+          variablesText: '{}',
+        }),
+      /unterminated string/
+    )
   })
 
   it('prepares exact requests and gates every mutation', () => {

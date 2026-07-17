@@ -24,6 +24,13 @@ import {
 import { Account, getAccountKey } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
+import {
+  createNamedAPIFunctionBinding,
+  functionBelongsToBinding,
+  INamedAPIFunctionDefinition,
+  INamedAPIFunctionDraft,
+  prepareNamedAPIFunctionInvocation,
+} from '../../lib/named-api-functions'
 
 export const GitHubAPIExplorerDefaultOperationId =
   'secret-scanning/list-repo-custom-patterns'
@@ -74,6 +81,20 @@ export interface IGitHubAPIExplorerProps {
   readonly repository: Repository
   readonly accounts: ReadonlyArray<Account>
   readonly client?: IGitHubAPIExplorerClient
+  readonly functionRegistry?: IGitHubAPIFunctionRegistry
+}
+
+export interface IGitHubAPIFunctionRegistry {
+  readonly getNamedAPIFunctions: () =>
+    | ReadonlyArray<INamedAPIFunctionDefinition>
+    | Promise<ReadonlyArray<INamedAPIFunctionDefinition>>
+  readonly saveNamedAPIFunction: (
+    draft: INamedAPIFunctionDraft
+  ) => INamedAPIFunctionDefinition | Promise<INamedAPIFunctionDefinition>
+  readonly removeNamedAPIFunction: (id: string) => boolean | Promise<boolean>
+  readonly onNamedAPIFunctionsChanged?: (
+    listener: (functions: ReadonlyArray<INamedAPIFunctionDefinition>) => void
+  ) => { readonly dispose: () => void } | null
 }
 
 interface IGitHubAPIExplorerReview {
@@ -99,6 +120,13 @@ interface IGitHubAPIExplorerState {
   readonly response: IGitHubAPIWorkbenchResponse | null
   readonly error: string | null
   readonly message: string | null
+  readonly namedFunctions: ReadonlyArray<INamedAPIFunctionDefinition>
+  readonly functionName: string
+  readonly functionDescription: string
+  readonly editingFunctionId: string | null
+  readonly functionArguments: Readonly<Record<string, string>>
+  readonly functionError: string | null
+  readonly functionMessage: string | null
 }
 
 const defaultOperation = GitHubAPIOperations.find(
@@ -192,6 +220,13 @@ function initialState(props: IGitHubAPIExplorerProps): IGitHubAPIExplorerState {
     response: null,
     error: null,
     message: null,
+    namedFunctions: [],
+    functionName: '',
+    functionDescription: '',
+    editingFunctionId: null,
+    functionArguments: {},
+    functionError: null,
+    functionMessage: null,
   }
 }
 
@@ -251,7 +286,11 @@ export class GitHubAPIExplorer extends React.Component<
 > {
   private mounted = false
   private generation = 0
+  private functionLoadGeneration = 0
   private executionController: AbortController | null = null
+  private functionRegistrySubscription: {
+    readonly dispose: () => void
+  } | null = null
   private readonly clearReviewState = {
     review: null,
     error: null,
@@ -265,21 +304,35 @@ export class GitHubAPIExplorer extends React.Component<
 
   public componentDidMount() {
     this.mounted = true
+    this.subscribeToNamedFunctions()
+    void this.loadNamedFunctions()
   }
 
   public componentDidUpdate(prevProps: IGitHubAPIExplorerProps) {
+    if (prevProps.functionRegistry !== this.props.functionRegistry) {
+      this.functionRegistrySubscription?.dispose()
+      this.functionRegistrySubscription = null
+      this.subscribeToNamedFunctions()
+    }
     if (
       repositoryContextKey(prevProps) !== repositoryContextKey(this.props) ||
       prevProps.accounts !== this.props.accounts ||
-      prevProps.client !== this.props.client
+      prevProps.client !== this.props.client ||
+      prevProps.functionRegistry !== this.props.functionRegistry
     ) {
       this.invalidateExecution()
-      this.setState(initialState(this.props))
+      this.setState(
+        initialState(this.props),
+        () => void this.loadNamedFunctions()
+      )
     }
   }
 
   public componentWillUnmount() {
     this.mounted = false
+    this.functionLoadGeneration++
+    this.functionRegistrySubscription?.dispose()
+    this.functionRegistrySubscription = null
     this.invalidateExecution()
   }
 
@@ -311,6 +364,55 @@ export class GitHubAPIExplorer extends React.Component<
           variablesText: this.state.graphQLVariables,
           operationName: this.state.graphQLOperationName,
         }
+  }
+
+  private async loadNamedFunctions() {
+    const registry = this.props.functionRegistry
+    const generation = ++this.functionLoadGeneration
+    if (registry === undefined) {
+      if (this.mounted) {
+        this.setState({ namedFunctions: [] })
+      }
+      return
+    }
+    const context = repositoryContextKey(this.props)
+    try {
+      const functions = await registry.getNamedAPIFunctions()
+      if (
+        this.mounted &&
+        this.props.functionRegistry === registry &&
+        this.functionLoadGeneration === generation &&
+        repositoryContextKey(this.props) === context
+      ) {
+        this.setState({ namedFunctions: functions, functionError: null })
+      }
+    } catch (error) {
+      if (
+        this.mounted &&
+        this.props.functionRegistry === registry &&
+        this.functionLoadGeneration === generation &&
+        repositoryContextKey(this.props) === context
+      ) {
+        this.setState({ functionError: errorMessage(error) })
+      }
+    }
+  }
+
+  private subscribeToNamedFunctions() {
+    const registry = this.props.functionRegistry
+    if (registry?.onNamedAPIFunctionsChanged === undefined) {
+      return
+    }
+    this.functionRegistrySubscription = registry.onNamedAPIFunctionsChanged(
+      functions => {
+        if (this.mounted && this.props.functionRegistry === registry) {
+          this.setState({
+            namedFunctions: functions,
+            functionError: null,
+          })
+        }
+      }
+    )
   }
 
   private onRunRequest = (event: React.FormEvent) => {
@@ -529,6 +631,217 @@ export class GitHubAPIExplorer extends React.Component<
 
   private onSelectGraphQLMode = () => {
     this.setState({ mode: 'graphql', ...this.clearReviewState })
+  }
+
+  private onFunctionNameChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.setState({ functionName: event.currentTarget.value })
+  }
+
+  private onFunctionDescriptionChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.setState({ functionDescription: event.currentTarget.value })
+  }
+
+  private currentFunctionBinding(account: Account) {
+    return createNamedAPIFunctionBinding(this.props.repository, account)
+  }
+
+  private currentOperationId(): string {
+    if (this.state.mode === 'rest') {
+      if (this.state.selectedOperationId === null) {
+        throw new Error('Choose a REST catalog operation first.')
+      }
+      return this.state.selectedOperationId
+    }
+    const name = this.state.graphQLOperationName.trim()
+    if (name.length === 0) {
+      throw new Error('Name the GraphQL operation first.')
+    }
+    return `graphql:${name}`
+  }
+
+  private onSaveNamedFunction = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const registry = this.props.functionRegistry
+    const account = getExplorerAccount(
+      this.props.repository,
+      this.props.accounts
+    )
+    if (registry === undefined || account === null) {
+      this.setState({
+        functionError: 'Named app functions are unavailable in this window.',
+        functionMessage: null,
+      })
+      return
+    }
+    try {
+      const saved = await registry.saveNamedAPIFunction({
+        ...(this.state.editingFunctionId === null
+          ? {}
+          : { id: this.state.editingFunctionId }),
+        name: this.state.functionName,
+        description: this.state.functionDescription,
+        operationId: this.currentOperationId(),
+        binding: this.currentFunctionBinding(account),
+        request: this.getRequest(),
+      })
+      if (!this.mounted) {
+        return
+      }
+      this.setState({
+        namedFunctions: [
+          ...this.state.namedFunctions.filter(value => value.id !== saved.id),
+          saved,
+        ],
+        functionName: '',
+        functionDescription: '',
+        editingFunctionId: null,
+        functionError: null,
+        functionMessage: `Function '${saved.name}' is available to the app and agent catalog.`,
+      })
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          functionError: errorMessage(error),
+          functionMessage: null,
+        })
+      }
+    }
+  }
+
+  private onEditNamedFunction = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const id = event.currentTarget.dataset.functionId
+    const definition = this.state.namedFunctions.find(value => value.id === id)
+    if (definition === undefined) {
+      return
+    }
+    this.setState({
+      functionName: definition.name,
+      functionDescription: definition.description,
+      editingFunctionId: definition.id,
+      functionError: null,
+      functionMessage:
+        'Editing metadata. Saving replaces its template with the current request.',
+    })
+  }
+
+  private onCancelFunctionEdit = () => {
+    this.setState({
+      functionName: '',
+      functionDescription: '',
+      editingFunctionId: null,
+      functionError: null,
+      functionMessage: null,
+    })
+  }
+
+  private onRemoveNamedFunction = async (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const id = event.currentTarget.dataset.functionId
+    const registry = this.props.functionRegistry
+    if (id === undefined || registry === undefined) {
+      return
+    }
+    try {
+      const removed = await registry.removeNamedAPIFunction(id)
+      if (this.mounted && removed) {
+        const definition = this.state.namedFunctions.find(
+          value => value.id === id
+        )
+        this.setState({
+          namedFunctions: this.state.namedFunctions.filter(
+            value => value.id !== id
+          ),
+          editingFunctionId:
+            this.state.editingFunctionId === id
+              ? null
+              : this.state.editingFunctionId,
+          functionError: null,
+          functionMessage:
+            definition === undefined
+              ? 'Function removed.'
+              : `Function '${definition.name}' removed from the catalog.`,
+        })
+      }
+    } catch (error) {
+      if (this.mounted) {
+        this.setState({
+          functionError: errorMessage(error),
+          functionMessage: null,
+        })
+      }
+    }
+  }
+
+  private onFunctionArgumentsChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const id = event.currentTarget.dataset.functionId
+    if (id === undefined) {
+      return
+    }
+    this.setState({
+      functionArguments: {
+        ...this.state.functionArguments,
+        [id]: event.currentTarget.value,
+      },
+    })
+  }
+
+  private onRunNamedFunction = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const id = event.currentTarget.dataset.functionId
+    const definition = this.state.namedFunctions.find(value => value.id === id)
+    const account = getExplorerAccount(
+      this.props.repository,
+      this.props.accounts
+    )
+    if (definition === undefined || account === null) {
+      return
+    }
+    try {
+      const binding = this.currentFunctionBinding(account)
+      if (!functionBelongsToBinding(definition, binding)) {
+        throw new Error(
+          'This function belongs to another repository or account.'
+        )
+      }
+      const text = this.state.functionArguments[definition.id] ?? '{}'
+      if (text.length > 64 * 1024) {
+        throw new Error('Function arguments are limited to 64 KiB.')
+      }
+      const invocation = prepareNamedAPIFunctionInvocation(
+        definition,
+        JSON.parse(text)
+      )
+      if (invocation.requiresConfirmation) {
+        this.setState({
+          review: {
+            request: invocation.request,
+            assessment: assessGitHubAPIWorkbenchRequest(invocation.request),
+            preview: formatGitHubAPIWorkbenchPreview(invocation.request),
+          },
+          functionError: null,
+          functionMessage: `Review function '${definition.name}' before it runs.`,
+        })
+      } else {
+        this.setState({
+          functionError: null,
+          functionMessage: `Running function '${definition.name}'.`,
+        })
+        void this.execute(invocation.request, false)
+      }
+    } catch (error) {
+      this.setState({
+        functionError: errorMessage(error),
+        functionMessage: null,
+      })
+    }
   }
 
   private renderUnavailable() {
@@ -779,6 +1092,150 @@ export class GitHubAPIExplorer extends React.Component<
     )
   }
 
+  private renderNamedFunctions(account: Account) {
+    const binding = this.currentFunctionBinding(account)
+    const functions = this.state.namedFunctions.filter(value =>
+      functionBelongsToBinding(value, binding)
+    )
+    const registryAvailable = this.props.functionRegistry !== undefined
+    return (
+      <section
+        className="github-api-functions"
+        aria-labelledby="github-api-functions-heading"
+      >
+        <header>
+          <div>
+            <h2 id="github-api-functions-heading">App functions</h2>
+            <p>
+              Extend the app and local agent with validated, repository-bound
+              API operations. Credentials stay in the selected account.
+            </p>
+          </div>
+          <span>{functions.length} for this repository</span>
+        </header>
+        <form
+          className="github-api-function-editor"
+          onSubmit={this.onSaveNamedFunction}
+        >
+          <label>
+            Function name
+            <input
+              value={this.state.functionName}
+              disabled={!registryAvailable || this.state.loading}
+              maxLength={64}
+              pattern="[a-z][a-z0-9_-]{0,63}"
+              placeholder="list_custom_patterns"
+              onChange={this.onFunctionNameChange}
+            />
+          </label>
+          <label>
+            Function description
+            <input
+              value={this.state.functionDescription}
+              disabled={!registryAvailable || this.state.loading}
+              maxLength={500}
+              placeholder="Describe what this function returns or changes"
+              onChange={this.onFunctionDescriptionChange}
+            />
+          </label>
+          <div className="github-api-explorer-actions">
+            <Button
+              type="submit"
+              className="primary"
+              disabled={!registryAvailable || this.state.loading}
+            >
+              {this.state.editingFunctionId === null
+                ? 'Add current request as function'
+                : 'Update function from current request'}
+            </Button>
+            {this.state.editingFunctionId === null ? null : (
+              <Button onClick={this.onCancelFunctionEdit}>Cancel edit</Button>
+            )}
+          </div>
+        </form>
+        {!registryAvailable ? (
+          <p className="github-api-functions-unavailable" role="status">
+            The app function registry is unavailable in this window.
+          </p>
+        ) : functions.length === 0 ? (
+          <p className="github-api-functions-unavailable" role="status">
+            No functions yet. Choose a catalog operation or validated GraphQL
+            template, then add the current request.
+          </p>
+        ) : (
+          <ul aria-label="Named API functions">
+            {functions.map(definition => (
+              <li key={definition.id}>
+                <header>
+                  <div>
+                    <strong>{definition.name}</strong>
+                    <code>{definition.operationId}</code>
+                  </div>
+                  <span className={definition.risk}>{definition.risk}</span>
+                </header>
+                <p>{definition.description}</p>
+                <details>
+                  <summary>Parameters</summary>
+                  <pre>
+                    {JSON.stringify(definition.parameterSchema, null, 2)}
+                  </pre>
+                </details>
+                <label>
+                  Arguments for {definition.name}
+                  <textarea
+                    value={this.state.functionArguments[definition.id] ?? '{}'}
+                    disabled={this.state.loading}
+                    spellCheck={false}
+                    data-function-id={definition.id}
+                    onChange={this.onFunctionArgumentsChange}
+                  />
+                </label>
+                <div className="github-api-function-actions">
+                  <button
+                    type="button"
+                    disabled={this.state.loading}
+                    data-function-id={definition.id}
+                    onClick={this.onRunNamedFunction}
+                  >
+                    {definition.risk === 'read'
+                      ? 'Run function'
+                      : 'Review function'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={this.state.loading}
+                    data-function-id={definition.id}
+                    onClick={this.onEditNamedFunction}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={this.state.loading}
+                    data-function-id={definition.id}
+                    onClick={this.onRemoveNamedFunction}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {this.state.functionError === null ? null : (
+          <div className="github-api-explorer-error" role="alert">
+            {this.state.functionError}
+          </div>
+        )}
+        {this.state.functionMessage === null ? null : (
+          <div className="github-api-explorer-message" role="status">
+            {this.state.functionMessage}
+          </div>
+        )}
+      </section>
+    )
+  }
+
   private renderReview(account: Account) {
     const review = this.state.review
     if (review === null) {
@@ -913,6 +1370,7 @@ export class GitHubAPIExplorer extends React.Component<
               ) : null}
             </div>
           </form>
+          {this.renderNamedFunctions(account)}
           {this.renderReview(account)}
           {this.state.loading ? (
             <div className="github-api-explorer-loading" role="status">

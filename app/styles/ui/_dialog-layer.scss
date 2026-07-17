@@ -45,6 +45,7 @@
       min-width: min(400px, calc(100vw - 16px));
       min-height: 0;
       margin: auto;
+      overflow: hidden;
       translate: var(--dialog-cascade-offset, 0 0);
 
       // Background dialogs sit at elevation 1; the frontmost is raised below.
@@ -52,18 +53,58 @@
 
       animation: dmDialog calc(520ms * var(--mdur, 1)) var(--spring);
 
-      > form,
-      > form > fieldset {
+      // The header is a sibling of the form. A percentage-height form therefore
+      // overcommits the dialog by the header height and can put the footer below
+      // the clipped edge. Give every level an explicit flex owner instead: the
+      // form and fieldset shrink inside the bounded dialog, the content owns the
+      // normal vertical scroll, and the action footer remains reachable.
+      > form {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        width: 100%;
+        height: auto;
         min-width: 0;
         min-height: 0;
         max-height: 100%;
         overflow: hidden;
       }
 
+      > form > fieldset {
+        // Chromium lays fieldset children inside a special anonymous box which
+        // ignores flex shrinking and cannot be scrolled reliably. Keep the
+        // semantic disabled owner in the DOM, but remove its box so the normal
+        // descendant below becomes the form's real, bounded flex item.
+        display: contents;
+      }
+
+      > form > fieldset > .dialog-fieldset-content {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        width: 100%;
+        height: auto;
+        min-width: 0;
+        min-height: 0;
+        max-width: 100%;
+        max-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+
       .dialog-header,
       .dialog-footer {
         min-width: 0;
-        flex: none;
+        flex: 0 0 auto;
+      }
+
+      .dialog-footer {
+        max-height: min(45vh, 220px);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
       }
 
       .dialog-content {
@@ -72,6 +113,12 @@
         max-width: 100%;
         overflow-x: hidden;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+
+      > form > fieldset > .dialog-fieldset-content > .dialog-content {
+        flex: 1 1 auto;
       }
 
       .dialog-footer .button-group {

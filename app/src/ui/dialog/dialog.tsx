@@ -1097,7 +1097,7 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
 
         <form onSubmit={this.onSubmit} onReset={this.onDismiss}>
           <fieldset disabled={this.props.disabled}>
-            {this.props.children}
+            <div className="dialog-fieldset-content">{this.props.children}</div>
           </fieldset>
         </form>
       </dialog>

@@ -1153,6 +1153,12 @@
     align-items: stretch;
     flex-direction: column;
 
+    > span {
+      // The desktop row uses a 220px flex basis. In a column that basis becomes
+      // height and can consume the whole run viewport, collapsing the list.
+      flex-basis: auto;
+    }
+
     .button-component {
       width: 100%;
     }

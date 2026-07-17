@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Account } from '../../models/account'
+import { Account, accountEquals } from '../../models/account'
 import { IFilterListGroup } from '../lib/filter-list'
 import { IAPIRepository } from '../../lib/api'
 import {
@@ -102,6 +102,18 @@ interface ICloneableRepositoryFilterListProps {
 }
 
 const RowHeight = 31
+
+export function shouldRefreshCloneableRepositories(
+  previousAccount: Account,
+  account: Account,
+  previousRepositories: ReadonlyArray<IAPIRepository> | null,
+  repositories: ReadonlyArray<IAPIRepository> | null
+): boolean {
+  return (
+    !accountEquals(previousAccount, account) ||
+    (previousRepositories !== repositories && repositories === null)
+  )
+}
 
 /**
  * Iterate over all groups until a list item is found that matches
@@ -224,8 +236,12 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
 
   public componentDidUpdate(prevProps: ICloneableRepositoryFilterListProps) {
     if (
-      prevProps.repositories !== this.props.repositories &&
-      this.props.repositories === null
+      shouldRefreshCloneableRepositories(
+        prevProps.account,
+        this.props.account,
+        prevProps.repositories,
+        this.props.repositories
+      )
     ) {
       this.refreshRepositories()
     }

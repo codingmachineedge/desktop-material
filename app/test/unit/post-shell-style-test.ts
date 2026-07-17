@@ -145,7 +145,24 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /max-height: calc\(100vh - 54px\);/)
     assert.match(
       style,
-      /\.dialog-content\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-x: hidden;/
+      /> form\s*\{[\s\S]*?display: flex;[\s\S]*?flex: 1 1 auto;[\s\S]*?height: auto;[\s\S]*?overflow: hidden;/
+    )
+    assert.match(style, /> form > fieldset\s*\{[\s\S]*?display: contents;/)
+    assert.match(
+      style,
+      /> form > fieldset > \.dialog-fieldset-content\s*\{[\s\S]*?display: flex;[\s\S]*?flex: 1 1 auto;[\s\S]*?height: auto;[\s\S]*?min-height: 0;[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-gutter: stable;/
+    )
+    assert.match(
+      style,
+      /\.dialog-content\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-gutter: stable;/
+    )
+    assert.match(
+      style,
+      /> form > fieldset > \.dialog-fieldset-content > \.dialog-content\s*\{[\s\S]*?flex: 1 1 auto;/
+    )
+    assert.match(
+      style,
+      /\.dialog-footer\s*\{[\s\S]*?max-height: min\(45vh, 220px\);[\s\S]*?overflow-y: auto;/
     )
     assert.match(
       style,
@@ -159,6 +176,47 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(
       style,
       /\.active-tab\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-y: auto;/
+    )
+  })
+
+  it('bounds compact Git settings and Create Branch controls horizontally', () => {
+    const preferences = readStyle('_preferences.scss')
+    const dialog = readStyle('_dialog.scss')
+
+    assert.match(
+      preferences,
+      /\.dialog-content\.git-preferences\s*\{[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;[\s\S]*?\.tab-bar\s*\{[\s\S]*?overflow-x: hidden;/
+    )
+    assert.match(
+      preferences,
+      /\.git-preferences-content\s*\{[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/
+    )
+    assert.match(
+      dialog,
+      /&#create-branch\s*\{[\s\S]*?\.vertical-segmented-control,[\s\S]*?\.radio-button-component > label > span\s*\{[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;/
+    )
+    assert.match(
+      dialog,
+      /\.radio-button-component > label > span\s*\{[\s\S]*?overflow-wrap: anywhere;/
+    )
+  })
+
+  it('keeps compact Worktree, Thank You, and accessible-only content width-safe', () => {
+    const app = readStyle('_app.scss')
+    const worktrees = readStyle('_worktrees.scss')
+    const thankYou = readStyle('dialogs/_thank-you.scss')
+
+    assert.match(
+      app,
+      /\.sr-only\s*\{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: normal;/
+    )
+    assert.match(
+      worktrees,
+      /#add-worktree\s*\{[\s\S]*?@media \(max-width: 400px\)[\s\S]*?\.dialog-content > \.row-component:has\(> \.button-component\)[\s\S]*?flex-direction: column;[\s\S]*?\.button-component\s*\{[\s\S]*?align-self: stretch;/
+    )
+    assert.match(
+      thankYou,
+      /\.container\s*\{[\s\S]*?box-sizing: border-box;[\s\S]*?width: 100%;[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;[\s\S]*?padding-inline: clamp\(var\(--spacing-double\), 12vw, 72px\);/
     )
   })
 
@@ -285,6 +343,18 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /@media \(max-width: 700px\)/)
     assert.match(style, /@media \(max-width: 520px\)/)
     assert.match(style, /@media \(max-height: 650px\)/)
+  })
+
+  it('does not reintroduce the legacy short clone-dialog scroll lock', () => {
+    const dialog = readStyle('_dialog.scss')
+    const shortCloneRule = dialog.match(
+      /@media \(max-height: 550px\)[\s\S]*?&\.clone-repository\s*\{([\s\S]*?)\n    \}/
+    )?.[1]
+
+    assert.ok(shortCloneRule, 'The short clone-dialog rule is missing')
+    assert.doesNotMatch(shortCloneRule, /overflow-y:\s*unset/)
+    assert.doesNotMatch(shortCloneRule, /min-height:\s*calc\(100vh/)
+    assert.doesNotMatch(shortCloneRule, /max-height:\s*unset/)
   })
 
   it('publishes a valid floating-popover available-height token', () => {

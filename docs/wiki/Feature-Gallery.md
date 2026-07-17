@@ -1,6 +1,6 @@
 # Guided Feature Gallery
 
-This page maps 61 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 63 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
@@ -16,7 +16,8 @@ contract rejects missing, duplicate, or unassigned assets.
 > customization set, the profile app-identity workspace, the clone-style Add Submodule release,
 > the repository-contextual GitHub API Explorer, filtered notification bulk triage, and
 > configurable bottom-right error notices, runtime tab search, History commit actions, and
-> true-bottom Repository Tools scrolling. Exact build, interaction, and
+> true-bottom Repository Tools scrolling. It now also includes the safe custom repository-logo
+> studio and named API app functions. Exact build, interaction, and
 > privacy receipts are retained in `HANDOFF.md`; each promoted release records its own main, CI,
 > Pages, and wiki verification without implying that later maintenance work is complete.
 
@@ -39,6 +40,7 @@ display.
 | `material-app-identity-workspace.png` | Restart-restored profile app identity and favorite repository tab |
 | `material-welcome.png` | Material first-run task card and responsive workspace preview |
 | `material-customization.png` | Git-backed profile appearance defaults and repository override guidance |
+| `material-repository-logo-studio.png` | Layered custom repository-logo studio with live preview and safe transfer controls |
 | `material-toolbar-overflow.png` | Measured narrow toolbar with Build & Run and Commit & Push in More |
 | `material-tab-appearance-word.png` | Word-style tab typography, alignment, and independent color palettes |
 | `material-tab-arrange.png` | Pinned/manual movement and one-shot tab ordering controls |
@@ -56,6 +58,7 @@ display.
 | `material-stash-manager.png` | Repository-wide stash selection and exact-entry actions |
 | `material-actions-job-log.png` | Searchable in-app Actions job log |
 | `material-github-api-explorer.png` | Repository-bound REST/GraphQL API Explorer with mutation review and bounded responses |
+| `material-api-app-functions.png` | Named repository-bound API functions extending the app through reviewed contracts |
 | `material-actions-artifact-download.png` | Bounded artifact download with a locally computed digest |
 | `material-actions-cache-manager.png` | Actions cache usage, inventory, refs, and deletion controls |
 | `material-actions-pagination-headless.png` | Headless Actions run pagination and page-two sentinel |
@@ -157,6 +160,11 @@ to the selected repository; every mutation stops for exact-request review,
 while returned headers and bodies are bounded and credential-redacted before
 display.
 
+Named API functions turn a reviewed REST or GraphQL definition into a reusable
+app extension. Each function is versioned in the active profile, fingerprinted,
+bound to the exact repository/provider/account context, and revalidated before
+execution; malformed definitions and credential-bearing inputs fail closed.
+
 For queued, running, waiting, or pending workflow runs, the current Actions
 surface adds an exact-run cancellation review with available ref/actor/commit
 context. Repository/account/run identity and live status are revalidated before
@@ -165,6 +173,8 @@ continues to a terminal state with explicit authentication, SSO, and conflict
 recovery.
 
 ![Repository-contextual GitHub API Explorer with a searchable operation catalog, REST request builder, and bounded redacted response](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-api-explorer.png)
+
+![Named API app functions with repository-bound definitions and reviewed execution](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-api-app-functions.png)
 
 ![Native pull-request creation with bounded metadata](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-native-pull-request.png)
 
@@ -220,11 +230,16 @@ the inverse literal close flow adds live counts/preview and cannot confirm empty
 or zero-match input. Pinned/manual/keyboard arrangement plus stable one-shot
 label/opened/status sorts persist without continuously reacting to later status
 changes. App/profile appearance inheritance and measured toolbar overflow are
-shown with the matching inspected evidence below.
+shown with the matching inspected evidence below. The custom repository-logo
+studio composes bounded mark and text layers, transforms and colors in a live
+preview with undo/redo and safe JSON transfer; a profile default can be
+overridden locally per repository without accepting executable SVG.
 
 ![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-welcome.png)
 
 ![Profile-backed Appearance preferences with repository override guidance](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+
+![Layered custom repository-logo studio with live preview and safe transfer controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 
 ![Measured narrow toolbar with Build and Run and Commit and Push available from More without clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
 

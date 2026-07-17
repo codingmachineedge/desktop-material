@@ -717,6 +717,33 @@ body.repository-folder-dragging .repository-drop-overlay {
   }
 }
 
+// A selected Changes or History detail cannot share the 320px-wide, 200%-zoom
+// canvas with the rail and the sidebar's deliberate 220px minimum. Switch only
+// those extreme states to a reversible master/detail presentation. A compact
+// rail action clears the selection and restores the corresponding list.
+@media (max-width: 420px) and (max-height: 320px) {
+  #repository:has(> .diff-container) > .focus-container,
+  #repository:has(> #history) > .focus-container {
+    display: none;
+  }
+
+  // The card is only about 84px tall below the compact app chrome. Give the
+  // selected detail one explicit outer scroll owner and keep its summary from
+  // shrinking into an unusable zero-height nested scroller.
+  #repository:has(> #history) > #history {
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+
+    #expandable-commit-summary,
+    .commit-details {
+      flex: 0 0 auto;
+    }
+  }
+}
+
 .panel,
 .changes-view,
 .history-view,

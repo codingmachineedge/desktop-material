@@ -456,9 +456,6 @@ dialog {
       }
 
       .dialog-content {
-        overflow-y: unset;
-        min-height: calc(100vh - 158px);
-
         .row-component {
           margin-bottom: 0px;
         }
@@ -466,11 +463,6 @@ dialog {
         .local-path-field {
           padding-top: var(--spacing);
           padding-bottom: var(--spacing);
-        }
-
-        .clone-github-repo {
-          height: calc(100vh - 225px);
-          max-height: unset;
         }
       }
     }
@@ -580,6 +572,27 @@ dialog {
 
   &#create-branch {
     width: 400px;
+
+    .dialog-fieldset-content,
+    .dialog-content,
+    .row-component,
+    .vertical-segmented-control,
+    .radio-button-component,
+    .radio-button-component > label,
+    .radio-button-component > label > span {
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .dialog-content > *,
+    .radio-button-component > label > span {
+      overflow-wrap: anywhere;
+    }
+
+    .radio-button-component > label {
+      width: 100%;
+    }
+
     .link-button-component {
       display: inline;
     }

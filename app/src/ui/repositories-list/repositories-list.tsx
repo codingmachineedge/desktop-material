@@ -1,6 +1,10 @@
 import * as React from 'react'
 
-import { commitGrammar, RepositoryListItem } from './repository-list-item'
+import {
+  commitGrammar,
+  IRepositoryLogoChange,
+  RepositoryListItem,
+} from './repository-list-item'
 import {
   groupRepositories,
   IRepositoryListItem,
@@ -46,6 +50,15 @@ import {
   RepositoryAccountFilter,
   RepositoryServiceFilter,
 } from './repository-list-filters'
+import {
+  getProfileRepositoryLogoSignature,
+  IRepositoryLogoLoader,
+  repositoryLogoLoader,
+} from '../repository-logo/repository-logo-loader'
+import {
+  IRepositoryLogoChangedDetail,
+  RepositoryLogoChangedEvent,
+} from '../../lib/appearance-customization'
 
 const BlankSlateImage = encodePathAsUrl(__dirname, 'static/empty-no-repo.svg')
 
@@ -101,6 +114,9 @@ interface IRepositoriesListProps {
   readonly filterText: string
 
   readonly dispatcher: Dispatcher
+
+  /** Test seam for deterministic repository-logo loading. */
+  readonly repositoryLogoLoader?: IRepositoryLogoLoader
 }
 
 interface IRepositoriesListState {
@@ -109,6 +125,7 @@ interface IRepositoriesListState {
   readonly pinnedRepositoryIds: ReadonlyArray<number>
   readonly accountFilter: RepositoryAccountFilter
   readonly serviceFilter: RepositoryServiceFilter
+  readonly repositoryLogoChange: IRepositoryLogoChange
 }
 
 const RowHeight = 29
@@ -141,6 +158,8 @@ export class RepositoriesList extends React.Component<
   IRepositoriesListProps,
   IRepositoriesListState
 > {
+  private profileLogoSignature: string
+
   /**
    * A memoized function for grouping repositories for display
    * in the FilterList. The group will not be recomputed as long
@@ -180,13 +199,25 @@ export class RepositoriesList extends React.Component<
   public constructor(props: IRepositoriesListProps) {
     super(props)
 
+    this.profileLogoSignature = getProfileRepositoryLogoSignature()
+    const logoLoader = props.repositoryLogoLoader ?? repositoryLogoLoader
+    logoLoader.synchronizeProfile(this.profileLogoSignature)
+
     this.state = {
       newRepositoryMenuExpanded: false,
       selectedItem: null,
       pinnedRepositoryIds: getPinnedRepositories(),
       accountFilter: 'all',
       serviceFilter: 'all',
+      repositoryLogoChange: { revision: 0, repositoryPath: null },
     }
+  }
+
+  public componentDidMount() {
+    document.addEventListener(
+      RepositoryLogoChangedEvent,
+      this.onRepositoryLogoChanged
+    )
   }
 
   public componentDidUpdate(prevProps: IRepositoriesListProps) {
@@ -199,6 +230,47 @@ export class RepositoriesList extends React.Component<
     ) {
       this.setState({ accountFilter: 'all', selectedItem: null })
     }
+
+    const profileLogoSignature = getProfileRepositoryLogoSignature()
+    if (profileLogoSignature !== this.profileLogoSignature) {
+      this.profileLogoSignature = profileLogoSignature
+      this.logoLoader.synchronizeProfile(profileLogoSignature)
+      this.bumpRepositoryLogoChange(null)
+    } else if (
+      prevProps.repositoryLogoLoader !== this.props.repositoryLogoLoader
+    ) {
+      this.logoLoader.synchronizeProfile(profileLogoSignature)
+    }
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      RepositoryLogoChangedEvent,
+      this.onRepositoryLogoChanged
+    )
+  }
+
+  private get logoLoader(): IRepositoryLogoLoader {
+    return this.props.repositoryLogoLoader ?? repositoryLogoLoader
+  }
+
+  private onRepositoryLogoChanged = (event: Event) => {
+    const detail = (event as CustomEvent<IRepositoryLogoChangedDetail>).detail
+    const repositoryPath = detail?.repositoryPath ?? null
+    const profileLogoSignature = getProfileRepositoryLogoSignature()
+    this.profileLogoSignature = profileLogoSignature
+    this.logoLoader.synchronizeProfile(profileLogoSignature)
+    this.logoLoader.invalidate(repositoryPath, event)
+    this.bumpRepositoryLogoChange(repositoryPath)
+  }
+
+  private bumpRepositoryLogoChange(repositoryPath: string | null) {
+    this.setState(state => ({
+      repositoryLogoChange: {
+        revision: state.repositoryLogoChange.revision + 1,
+        repositoryPath,
+      },
+    }))
   }
 
   private renderItem = (item: IRepositoryListItem, matches: IMatches) => {
@@ -220,6 +292,8 @@ export class RepositoriesList extends React.Component<
             ? item.branchName
             : null
         }
+        repositoryLogoChange={this.state.repositoryLogoChange}
+        repositoryLogoLoader={this.logoLoader}
       />
     )
   }
@@ -442,6 +516,7 @@ export class RepositoriesList extends React.Component<
             accounts: this.props.accounts,
             accountFilter: this.state.accountFilter,
             serviceFilter: this.state.serviceFilter,
+            repositoryLogoRevision: this.state.repositoryLogoChange.revision,
           }}
           onItemContextMenu={this.onItemContextMenu}
           getGroupAriaLabel={this.getGroupAriaLabelGetter(groups)}

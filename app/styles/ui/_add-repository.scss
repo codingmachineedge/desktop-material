@@ -155,7 +155,10 @@ dialog.clone-repository {
   [role='tabpanel'] {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .dialog-content {
@@ -289,6 +292,8 @@ dialog.clone-repository {
     min-width: 0;
     overflow-x: hidden;
     padding: 12px 18px 16px;
+    max-height: min(42vh, 260px);
+    overflow-y: auto;
 
     .button-component {
       min-width: 0;
@@ -426,6 +431,35 @@ dialog.clone-repository {
       .button-component {
         align-self: flex-end;
       }
+    }
+  }
+
+  // The legacy global short-window rule made clone content taller than the
+  // viewport and explicitly disabled scrolling. Keep every clone section in
+  // this dialog's own bounded scroll container instead.
+  @media (max-height: 550px) {
+    .clone-repository-tab-panel {
+      min-height: 0;
+      max-height: none;
+      overflow-y: auto;
+    }
+
+    .dialog-content {
+      min-height: 0;
+      max-height: none;
+      overflow: visible;
+    }
+
+    .clone-github-repo {
+      height: clamp(120px, 34vh, 260px);
+      min-height: 120px;
+      max-height: 260px;
+    }
+
+    .dialog-footer {
+      flex: 0 1 auto;
+      max-height: min(42vh, 220px);
+      overflow-y: auto;
     }
   }
 }

@@ -52,6 +52,9 @@ interface ICloneGithubRepositoryProps {
    */
   readonly loading: boolean
 
+  /** Most recent failure loading the selected account's repositories. */
+  readonly repositoryError: Error | null
+
   readonly organizations: ReadonlyArray<IAPIOrganization>
   readonly organizationsLoading: boolean
   readonly selectedOrganization: string | null
@@ -157,8 +160,8 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
           <span>
             <strong>Automatically clone new repositories</strong>
             <small>
-              Refresh periodically and download new repositories into this base
-              directory.
+              Runs in the background after this dialog closes and downloads new
+              repositories into this base directory.
             </small>
           </span>
         </label>
@@ -212,6 +215,17 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
           loading={this.props.organizationsLoading}
           onSelect={this.props.onSelectedOrganizationChanged}
         />
+        {this.props.repositoryError !== null && (
+          <div className="org-repositories-error" role="alert">
+            <span>We couldn't refresh this account's repositories.</span>
+            <Button
+              onClick={this.renderAccountRepositoryRefresh}
+              tooltip="Retry loading repositories"
+            >
+              Try again
+            </Button>
+          </div>
+        )}
         {this.props.organizationError !== null && (
           <div className="org-repositories-error" role="alert">
             <span>
@@ -252,5 +266,9 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
         {this.renderBatchControls()}
       </DialogContent>
     )
+  }
+
+  private renderAccountRepositoryRefresh = () => {
+    this.props.onRefreshRepositories(this.props.account)
   }
 }

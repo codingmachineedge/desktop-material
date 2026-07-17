@@ -45,6 +45,13 @@
       width: 16px;
     }
 
+    .repository-list-logo {
+      // RepositoryLogo's shared small-preview rule is 18px; rows retain the
+      // historical 16px footprint until the compact/foldout variants below
+      // intentionally promote the icon tile.
+      height: 16px;
+    }
+
     .name {
       // Long repository names truncate and ellipse
       @include ellipsis;

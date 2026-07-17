@@ -14,6 +14,10 @@ import {
   redactAgentValue,
 } from '../../lib/agent-commands'
 import { AgentCommandExecutor, handleMCPRequest } from './mcp-handler'
+import {
+  namedAPIFunctionNameFromTool,
+  namedAPIFunctionToolName,
+} from '../../lib/named-api-functions'
 
 const MaxBodyBytes = 64 * 1024
 const MaxActiveCommands = 8
@@ -253,12 +257,13 @@ export class AgentServer {
 
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     if (request.method === 'GET' && url.pathname === '/api/v1/info') {
+      const namedFunctions = await this.listNamedAPIFunctions()
       writeJSON(response, 200, {
         name: 'desktop-material',
         version: 1,
         mcp: '/mcp',
         rest: '/api/v1/command/<name>',
-        commands: AgentToolDefinitions.map(x => x.name),
+        commands: [...AgentToolDefinitions.map(x => x.name), ...namedFunctions],
         limits: {
           bodyBytes: MaxBodyBytes,
           activeCommands: MaxActiveCommands,
@@ -297,7 +302,9 @@ export class AgentServer {
       throw new HTTPError(404, 'Endpoint not found')
     }
     const name = decodeURIComponent(url.pathname.slice(prefix.length))
-    if (!isAgentCommandName(name)) {
+    const customFunctionName = namedAPIFunctionNameFromTool(name)
+    const commandName = isAgentCommandName(name) ? name : null
+    if (commandName === null && customFunctionName === null) {
       throw new HTTPError(404, 'Unknown command')
     }
     if (body === null || typeof body !== 'object' || Array.isArray(body)) {
@@ -314,10 +321,45 @@ export class AgentServer {
     const result = await this.enqueue({
       id: `rest-${randomUUID()}`,
       version: AgentCommandVersion,
-      name,
-      args: body as Readonly<Record<string, unknown>>,
+      name: customFunctionName === null ? commandName! : 'invoke-api-function',
+      args:
+        customFunctionName === null
+          ? (body as Readonly<Record<string, unknown>>)
+          : {
+              name: customFunctionName,
+              arguments: body as Readonly<Record<string, unknown>>,
+            },
     })
     writeJSON(response, result.ok ? 200 : 422, result)
+  }
+
+  private async listNamedAPIFunctions(): Promise<ReadonlyArray<string>> {
+    const result = await this.enqueue({
+      id: `catalog-${randomUUID()}`,
+      version: AgentCommandVersion,
+      name: 'list-api-functions',
+      args: {},
+    })
+    if (!result.ok || !Array.isArray(result.data)) {
+      return []
+    }
+    const names: Array<string> = []
+    for (const value of result.data) {
+      if (
+        value === null ||
+        typeof value !== 'object' ||
+        typeof (value as { name?: unknown }).name !== 'string'
+      ) {
+        continue
+      }
+      try {
+        names.push(namedAPIFunctionToolName((value as { name: string }).name))
+      } catch {
+        // Ignore a malformed renderer catalog entry rather than advertising a
+        // route that the strict command parser will reject.
+      }
+    }
+    return names
   }
 
   private enqueue(command: IAgentCommandEnvelope): Promise<AgentCommandResult> {

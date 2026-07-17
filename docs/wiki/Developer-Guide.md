@@ -83,7 +83,11 @@ settings:
   history-backed mutation rather than a sequence of per-row commits.
 - The strict `appearance-customization-v1` value is allowlisted by
   `app/src/lib/profiles/profile-settings-registry.ts`, captured in the active profile's
-  `settings.json`, and described as an appearance-customization change in Git history.
+  `settings.json`, and described as an appearance-customization change in Git history. It includes
+  the profile's normalized default repository-logo document.
+- `named-api-functions-v1` is another allowlisted profile value. Its transactional store validates
+  the complete bounded document before replacing the previous catalog and publishes an empty
+  catalog when restored or externally edited state is invalid.
 - Per-tab title/background styling is written with the tab to `tabs.json`; the bounded recent-color
   list is another allowlisted profile setting.
 - Optional `isPinned` and `openedAt` values share that serialized tab model. Missing legacy values
@@ -95,11 +99,12 @@ Because these are real git repos, the audit trail and restore semantics come "fo
 rather than from a bespoke persistence format. When adding data that should be versioned per account,
 persist it into the relevant profile repo and commit through the same path.
 
-Repository appearance overrides are deliberately outside that profile repository. The six
-allowlisted fields — accent palette, surface palette, toolbar labels, toolbar density, tab density,
-and tab width — are serialized under `desktop-material.appearance` in the selected repository's
-local `.git/config`. Missing fields inherit the active-profile defaults. Never move this value into
-a tracked repository file or treat per-tab background color as a repository override.
+Repository appearance overrides are deliberately outside that profile repository. The six scalar
+fields — accent palette, surface palette, toolbar labels, toolbar density, tab density, and tab
+width — plus the optional normalized repository-logo design are serialized under
+`desktop-material.appearance` in the selected repository's local `.git/config`. Missing fields
+inherit the active-profile defaults. Never move this value into a tracked repository file or treat
+per-tab background color as a repository override.
 
 ---
 
@@ -116,6 +121,13 @@ opt-in**, and **never exposes account tokens**.
   Electron processes.
 - `app/src/lib/agent-command-executor.ts` resolves repository targets and sends allowed operations
   through the same Dispatcher/AppStore paths used by the UI.
+- `app/src/lib/named-api-functions.ts` owns the versioned function model, exact binding fingerprint,
+  generated argument schema, credential rejection, risk validation, and invocation preparation;
+  `app/src/lib/stores/named-api-functions-store.ts` owns the active-profile catalog.
+- MCP `tools/list` and the REST info route derive `github_api_<name>` entries from that validated
+  catalog. Read functions are revalidated against the live repository, remote, endpoint, and
+  account immediately before execution; mutations fail closed and require interactive review in
+  the API tab.
 - `app/src/ui/preferences/agent-access.tsx` controls opt-in lifecycle and token rotation.
 - `script/agent/mcp-stdio-proxy.js` and `script/agent/desktop-agent.js` are the shipped stdio and CLI
   clients. They read the app's restricted connection file instead of embedding a port or token.
@@ -132,7 +144,7 @@ The current maintenance additions in this section are implemented but remain sub
 integrated production/headless/publication gate. Historical gallery references do not imply that
 new acceptance has already completed.
 
-The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 58
+The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 63
 synthetic, user-facing visual functions and states associated with these subsystems. Each function
 owns one distinct tracked PNG; missing, duplicate, and unassigned assets fail the catalog contract.
 Keep captures free of personal paths, account identifiers, credentials, signed URLs, and unbounded
@@ -145,6 +157,14 @@ publication, release, or cleanup evidence.
   GitLab/Bitbucket browser; publish ownership is selected in `app/src/ui/publish-repository/`.
   `app/src/lib/github-oauth-scopes.ts` is the reviewed GitHub browser-authorization allowlist; keep
   feature scope additions explicit and never infer destructive/admin families.
+- **Clone orchestration and recovery** — `app/src/models/batch-clone.ts` owns bounded queue inputs and
+  safe URL/path rules; `app/src/lib/stores/batch-clone-store.ts` serializes pause, resume, retry,
+  cancel, and completion transitions; `app/src/lib/stores/batch-clone-journal.ts` writes the bounded
+  token-free primary/backup journal and performs non-destructive destination inspection.
+  `app/src/lib/stores/auto-clone-store.ts` owns account-specific future-discovery baselines and starts
+  background queues without opening a dialog. Reinspect immediately before Git, reject links and
+  credential-bearing URLs, never replace an active/review queue, and never delete or move an
+  occupied destination during recovery.
 - **Notifications and acknowledgement errors** —
   `app/src/lib/stores/notification-centre-store.ts` owns durable Local notification mutations while
   `app/src/ui/notifications/notification-centre-panel.tsx` keeps search, type, source, account, and
@@ -157,7 +177,12 @@ publication, release, or cleanup evidence.
   `app/src/models/appearance-customization.ts` owns the strict versioned model for the 12 profile
   defaults: accent palette, surface palette, elevation, interface font, monospace font, motion,
   toolbar labels, toolbar density, repository-list density, tab density, tab width, and tab close
-  buttons. `app/src/lib/appearance-customization.ts` resolves the six repository-local overrides;
+  buttons plus the profile's default repository logo. `app/src/models/repository-logo.ts` owns the
+  versioned code-native vector model: bounded backgrounds and at most eight allowlisted mark/text
+  layers, with strict color, transform, typography, text, and 16 KiB document normalization.
+  `app/src/lib/appearance-customization.ts` resolves the six scalar repository-local overrides and
+  optional local logo; `app/src/ui/repository-logo/` renders the safe SVG projection, full studio,
+  and bounded 128-entry shared async cache. It never accepts raw SVG or image bytes.
   `app/src/ui/app-theme.tsx` applies only normalized data attributes and tokens; Preferences and
   Repository Settings expose the two scopes. `app/src/ui/toolbar/toolbar-overflow-layout.ts` keeps
   the width/priority calculation pure while `toolbar.tsx` owns ResizeObserver, More-surface focus,
@@ -199,6 +224,13 @@ publication, release, or cleanup evidence.
   stores under `app/src/lib/stores/` and views under `app/src/ui/github-releases/` and
   `app/src/ui/github-issues/`. Keep all writes account/repository/item/operation/payload-bound and
   cap streamed API and asset responses before parsing or writing.
+- **GitHub API Explorer and named functions** — `app/src/lib/github-api-operation-catalog.ts` owns
+  the pinned REST catalog projection and `app/src/lib/github-api-workbench.ts` validates, assesses,
+  bounds, and redacts requests and responses. `app/src/ui/github-api-explorer/` owns REST/GraphQL
+  editing, visible mutation review, and the function catalog. A stored function must match a known
+  operation, generated closed argument schema, recomputed risk, and stable SHA-256 fingerprint over
+  repository path/remote/endpoint/account key. Reject credential-shaped keys/text and fail closed on
+  malformed profile state or any live binding mismatch.
 - **Provider-neutral triage** — `app/src/lib/provider-triage.ts` contains provider adapters,
   `app/src/lib/provider-triage-json.ts` validates bounded projections,
   `app/src/lib/stores/provider-triage-store.ts` owns cancelable account/repository generations, and
@@ -235,6 +267,37 @@ publication, release, or cleanup evidence.
   branch, repository editor overrides, SVG diff controls, and pushed-history safety confirmations
   are integrated into their existing repository, branch, diff, and undo/reset/tag surfaces rather
   than a separate compatibility layer.
+
+---
+
+## Verification architecture
+
+Responsive acceptance is catalog-driven. `.codex/verification/responsive_surface_catalog.json`
+enumerates every registered repository rail page, Preferences section, Repository Settings section,
+Clone tab, nested panel, and safe menu dialog together with its owning source and risk. Its viewport
+matrix covers the normal desktop, 640×480 minimum, narrow portrait, short landscape, wide desktop,
+125% and 150% zoom, and 640×480 at 200% zoom.
+
+`.codex/verification/verify_responsive_surface_matrix_cdp.js` exercises that catalog against the
+exact built renderer and a deterministic fixture. For every applicable surface it records requested
+and observed metrics, proves each vertical scroll owner can reach its bottom, and rejects document,
+root, or required-target horizontal overflow; clipped final controls; unreachable dialog
+forms/fieldsets/footers; and unnamed buttons. Safe audit wrappers still emit a complete ledger when
+one row fails, so a partial run cannot be mistaken for full coverage.
+
+Feature-specific verifiers add state assertions that geometry alone cannot prove:
+`verify_repository_logo_cdp.js` edits layers and checks the generated tab/list SVG propagation and
+cleanup; `verify_github_api_explorer_cdp.js` executes the deterministic provider request and the full
+add/run/edit/remove function lifecycle; and the notification/navigation verifiers cover bulk state,
+error notices, context actions, and scroll endpoints. Run them on an off-screen Win32 desktop with
+an isolated profile and fixture, inspect promoted PNGs at original resolution, and retain the JSON
+ledger and cleanup receipts with the milestone.
+
+Unit contracts mirror these boundaries: parsers and stores test malformed, oversized,
+credential-shaped, stale-binding, crash, link/junction, concurrent-resume, and cache-race cases,
+while style and catalog tests ensure the named scroll/container selectors cannot silently disappear.
+A screenshot is evidence of one accepted state, not a substitute for exact-source build, typed/unit
+checks, the catalog ledger, or resource cleanup.
 
 ---
 

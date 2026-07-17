@@ -11,7 +11,7 @@ release: adaptive appearance and profile app identity, favorite/portable tabs, M
 cancellation, reviewed rebase, repository-account propagation, bounded OAuth scopes, and compact
 surface corrections, plus the repository-contextual GitHub API Explorer. Exact build, off-screen UI, publication, and cleanup receipts are recorded in
 the repository's `HANDOFF.md` only as each release is verified.
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 58-function visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 63-function visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
@@ -247,6 +247,10 @@ for the active profile. All 12 are saved through the profile's local Git-backed 
 11. **Tab width** — Compact, Standard, or Wide.
 12. **Tab close buttons** — On hover, Always, or Active tab only.
 
+The same page also owns the active profile's **default repository logo**. Repositories inherit this
+editable vector design unless they save a local override, so switching profiles can change both the
+workspace defaults and the repository identity shown in tabs and the repository list.
+
 Changing profile switches these defaults with the rest of that account's settings. Open
 **Edit → Settings History…** (`Ctrl+Alt+Z`) to inspect, undo, redo, or restore an appearance change
 without rewriting the profile history.
@@ -268,15 +272,40 @@ path; repository surfaces instead identify that repository and can open its comm
 
 ### Repository-local overrides
 
-Open **Repository settings → Appearance** when one project needs a different workspace. The six
-optional overrides are **accent color**, **surface color**, **toolbar labels**, **toolbar density**,
-**tab density**, and **tab width**. Every field starts at **Use app default** and independently
+Open **Repository settings → Appearance** when one project needs a different workspace. The page
+groups the six optional workspace-chrome overrides — **accent color**, **surface color**, **toolbar
+labels**, **toolbar density**, **tab density**, and **tab width** — and provides one action to
+inherit every profile default again. Each field starts at **Use app default** and independently
 inherits the active-profile value until changed.
 
-These six values are stored under `desktop-material.appearance` in the repository's local
-`.git/config`. They are not committed and are not shared with collaborators. Interface/code fonts,
-surface depth, motion, repository-list density, and tab close-button behavior intentionally remain
-profile defaults; individual tab text/background styling remains in the profile's tab history.
+These six values and an optional custom repository-logo document are stored under
+`desktop-material.appearance` in the repository's local `.git/config`. They are not committed and
+are not shared with collaborators. Interface/code fonts, surface depth, motion, repository-list
+density, and tab close-button behavior intentionally remain profile defaults; individual tab
+text/background styling remains in the profile's tab history.
+
+### Advanced repository logo studio
+
+The **Custom repository logo** studio appears in both **Settings → Appearance** (the profile
+default) and **Repository settings → Appearance** (the selected repository's local override). It is
+a full editable vector workbench rather than a group of logo dropdowns:
+
+- Start from the repository-mark, monogram, or repository-name preset and watch the live preview.
+- Choose a rounded square, circle, square, or hexagon; use a solid or gradient fill; then tune
+  colors, gradient angle, border, and shadow.
+- Compose up to eight mark and text layers. Reorder or remove layers and edit their mark/text
+  source, font, weight, letter spacing, color, position, scale, rotation, and opacity.
+- Use **Undo** and **Redo** while experimenting. A repository override can return to **Inherit
+  profile logo** without changing the profile design.
+- **Export JSON…** saves the portable design and **Import JSON…** validates a version 1 document
+  before adding it to the current settings edit. Save the settings window to apply an import.
+
+Logo JSON is capped at 16 KiB, text and layer counts are bounded, and every value is normalized to
+the supported model. The studio never stores uploaded image bytes, HTML, or executable/raw SVG.
+Tabs and repository-list rows render only the app's own code-generated SVG projection of that safe
+model.
+
+![Layered custom repository-logo studio with a live preview and safe vector controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 
 ![Profile-backed Appearance preferences with repository override guidance](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
@@ -337,6 +366,10 @@ The multi-clone window clones **many repositories in one pass**.
    - **One-by-one** — clone sequentially (gentler; easier to watch progress and spot failures).
 6. Start the clone. Progress is shown per repository.
 
+Changing the account clears repository selections from the previous identity before loading the new
+account's list. If a provider refresh fails, use **Try again** in the same view; a stale repository
+cannot remain selected for cloning under the replacement account.
+
 ![Block-based regex builder with live repository-name testing](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/regex-builder.png)
 
 On a compact or zoomed viewport, the builder stacks its category and building-block areas before
@@ -349,6 +382,38 @@ the dialog does not require page-level horizontal scrolling.
   no credentials.
 - **Import** loads such a list back into the checkbox selection, so you can re-clone the same set on
   another machine or share a curated set with a teammate.
+
+### Background auto-clone
+
+In the GitHub clone view, select the account, base directory, and parallel or one-at-a-time mode,
+then enable **Automatically clone new repositories**. Desktop Material records the current provider
+list as a baseline; it does not immediately clone every existing repository. Repositories discovered
+after that baseline are queued into the chosen directory in the background.
+
+Discovery continues for the app lifetime after the Clone window closes. It refreshes periodically,
+does not open a progress dialog on its own, and posts a notification when a background queue starts
+or when refresh needs attention. The policy is account-specific and rejects invalid directories,
+oversized provider lists, duplicate/unsafe URLs, and URLs containing embedded credentials.
+
+### Pause, resume, and crash recovery
+
+The batch progress surface can be hidden while cloning continues. Choose **Pause remaining** to stop
+new queue items from starting; clones already running finish, and **Resume** safely continues the
+pending work. **Cancel remaining** marks work that has not started as skipped, while **Retry failed**
+starts only failed items again.
+
+Queue transitions are durably journaled. If the renderer or app closes during a clone, the next
+launch restores the queue in a paused state and labels formerly running rows **interrupted**. Resume
+then inspects each destination before invoking Git again:
+
+- an empty destination can be retried;
+- a clean, non-bare worktree with a valid `HEAD` and the exact matching `origin` is accepted as the
+  completed clone; and
+- an occupied, incomplete, linked, bare, tracked-modified, or differently bound destination is left
+  untouched and marked for review.
+
+Recovery never deletes or moves destination contents. The bounded journal stores queue metadata and
+stable account references, never provider tokens or credential-bearing clone URLs.
 
 ---
 
@@ -375,6 +440,21 @@ the selected repository. The Explorer never falls back to another identity on th
   after **Run reviewed request** is confirmed.
 - The response view exposes status and allowlisted diagnostic headers, bounds and truncates the
   displayed body, and recursively redacts credential-shaped values before rendering them.
+
+#### Save API requests as app functions
+
+The **App functions** panel turns a validated REST catalog request or named GraphQL operation into a
+reusable extension of Desktop Material. Enter a lowercase function name and description, then choose
+**Add current request as function**. Each saved function includes a generated argument schema and
+can be run, edited from the current request, or removed in the same panel.
+
+Functions follow the active profile and appear only for the exact repository, remote, GitHub host,
+and account binding used when they were created. Read functions can run from the panel or through
+the local Agent API as `github_api_<function-name>` tools. A write or destructive function must run
+through the API tab's visible mutation-review flow; an agent cannot bypass that confirmation.
+Credentials are neither accepted in a function template nor stored with one.
+
+![Named repository-bound API app functions with reviewed execution](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-api-app-functions.png)
 
 ![Repository-contextual GitHub API Explorer with a searchable operation catalog, REST request builder, and bounded redacted response](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-api-explorer.png)
 
@@ -760,9 +840,9 @@ client, and use **Regenerate token** to disconnect existing clients immediately.
   client for the same bounded command contract.
 
 The contract covers account/repository/tab discovery, repository status, single/batch clone,
-commit, fetch/pull/push, branch creation/merge, tab selection, automation status/runs, and Actions
-workflow dispatch. It never returns provider credentials. See [Agent API](Agent-API) for command and
-security details.
+commit, fetch/pull/push, branch creation/merge, tab selection, automation status/runs, Actions
+workflow dispatch, and the active profile's repository-bound named API read functions. It never
+returns provider credentials. See [Agent API](Agent-API) for command and security details.
 
 ![Agent access connection and token controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
 

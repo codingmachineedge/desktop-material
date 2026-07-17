@@ -180,8 +180,8 @@ interface IFilterListProps<T extends IFilterListItem, GroupIdentifier> {
    * A handler called whenever a context menu event is received on the
    * row container element.
    *
-   * The context menu is invoked when a user right clicks the row or
-   * uses keyboard shortcut.s
+   * The context menu is invoked when a user right clicks the row or uses the
+   * Context Menu key / Shift+F10 while the row is focused.
    */
   readonly onItemContextMenu?: (
     item: T,
@@ -505,6 +505,7 @@ export class FilterList<
           onRowClick={this.onRowClick}
           onRowKeyDown={this.onRowKeyDown}
           onRowContextMenu={this.onRowContextMenu}
+          onRowKeyboardContextMenu={this.onRowKeyboardContextMenu}
           canSelectRow={this.canSelectRow}
           invalidationProps={{
             ...this.props,
@@ -596,6 +597,20 @@ export class FilterList<
     }
 
     this.props.onItemContextMenu(row.item, source)
+  }
+
+  private onRowKeyboardContextMenu = (
+    index: number,
+    source: React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    // Existing menu owners only depend on the shared SyntheticEvent contract
+    // (preventDefault/currentTarget) and show a native menu without pointer
+    // coordinates. Preserve their public callback type while routing the
+    // keyboard activation through the exact same action builder.
+    this.onRowContextMenu(
+      index,
+      source as unknown as React.MouseEvent<HTMLDivElement>
+    )
   }
 
   private onRowKeyDown = (row: number, event: React.KeyboardEvent<any>) => {

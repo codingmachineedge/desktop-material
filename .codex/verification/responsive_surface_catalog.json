@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "viewportMatrix": [
+    { "id": "desktop", "width": 1000, "height": 687, "zoom": 1 },
+    { "id": "minimum", "width": 640, "height": 480, "zoom": 1 },
+    { "id": "narrow", "width": 480, "height": 640, "zoom": 1 },
+    { "id": "short", "width": 960, "height": 420, "zoom": 1 },
+    { "id": "wide", "width": 1600, "height": 900, "zoom": 1 },
+    { "id": "zoom-125", "width": 1000, "height": 687, "zoom": 1.25 },
+    { "id": "zoom-150", "width": 1000, "height": 687, "zoom": 1.5 },
+    { "id": "minimum-zoom-200", "width": 640, "height": 480, "zoom": 2 }
+  ],
+  "surfaceGroups": {
+    "repositorySections": {
+      "source": "app/src/lib/app-state.ts#RepositorySectionTab",
+      "kind": "page",
+      "risk": "safe",
+      "surfaces": [
+        { "member": "Changes", "label": "Changes" },
+        { "member": "History", "label": "History" },
+        { "member": "Actions", "label": "Actions" },
+        { "member": "RepositoryTools", "label": "Tools" },
+        { "member": "Releases", "label": "Releases" },
+        { "member": "Issues", "label": "Issues" },
+        { "member": "Triage", "label": "Triage" },
+        { "member": "GitHubAPI", "label": "API" }
+      ]
+    },
+    "preferences": {
+      "source": "app/src/models/preferences.ts#PreferencesTab",
+      "kind": "settings-page",
+      "risk": "safe",
+      "surfaces": [
+        { "member": "Accounts", "label": "Accounts" },
+        { "member": "Integrations", "label": "Integrations" },
+        { "member": "Copilot", "label": "Copilot", "conditional": true },
+        { "member": "Git", "label": "Git" },
+        { "member": "Appearance", "label": "Appearance" },
+        { "member": "Notifications", "label": "Notifications" },
+        { "member": "Prompts", "label": "Prompts" },
+        { "member": "Advanced", "label": "Advanced" },
+        { "member": "Accessibility", "label": "Accessibility" },
+        { "member": "AgentAccess", "label": "Agent access" },
+        { "member": "Automation", "label": "Automation" }
+      ]
+    },
+    "repositorySettings": {
+      "source": "app/src/ui/repository-settings/repository-settings.tsx#RepositorySettingsTab",
+      "kind": "settings-page",
+      "risk": "safe",
+      "surfaces": [
+        { "member": "Remote", "label": "Remote" },
+        { "member": "IgnoredFiles", "label": "Ignored files" },
+        { "member": "GitConfig", "label": "Git config" },
+        { "member": "BuildRun", "label": "Build & run" },
+        { "member": "Submodules", "label": "Submodules" },
+        { "member": "Automation", "label": "Automation" },
+        { "member": "Metadata", "label": "Metadata" },
+        { "member": "Appearance", "label": "Appearance" },
+        {
+          "member": "ForkSettings",
+          "label": "Fork behavior",
+          "conditional": true
+        }
+      ]
+    },
+    "cloneTabs": {
+      "source": "app/src/models/clone-repository-tab.ts#CloneRepositoryTab",
+      "kind": "dialog-page",
+      "risk": "safe",
+      "surfaces": [
+        { "member": "DotCom", "label": "GitHub.com" },
+        { "member": "Enterprise", "label": "GitHub Enterprise" },
+        { "member": "Generic", "label": "URL" },
+        { "member": "Providers", "label": "GitLab & Bitbucket" }
+      ]
+    },
+    "menuDialogs": {
+      "source": "app/src/ui/app.tsx#onMenuEvent",
+      "kind": "dialog",
+      "risk": "safe",
+      "surfaces": [
+        { "member": "add-local-repository", "label": "Add local repository" },
+        { "member": "create-repository", "label": "Create repository" },
+        { "member": "create-branch", "label": "Create branch" },
+        { "member": "remove-repository", "label": "Remove repository" },
+        { "member": "show-settings-history", "label": "Settings history" },
+        { "member": "manage-sparse-checkout", "label": "Sparse checkout" },
+        { "member": "inspect-branch-rules", "label": "Branch rules" },
+        {
+          "member": "export-repository-list",
+          "label": "Export repository list"
+        },
+        {
+          "member": "import-repository-list",
+          "label": "Import repository list"
+        },
+        { "member": "export-tab-session", "label": "Export tab session" },
+        { "member": "import-tab-session", "label": "Import tab session" },
+        { "member": "show-about", "label": "About" },
+        { "member": "create-worktree", "label": "Create worktree" },
+        {
+          "member": "test-confirm-committing-conflicted-files",
+          "label": "Conflicted commit warning"
+        },
+        {
+          "member": "test-discarded-changes-will-be-unrecoverable",
+          "label": "Unrecoverable discard warning"
+        },
+        {
+          "member": "test-do-you-want-fork-this-repository",
+          "label": "Fork repository"
+        },
+        { "member": "test-files-too-large", "label": "Oversized files" },
+        {
+          "member": "test-generic-git-authentication",
+          "label": "Git authentication"
+        },
+        { "member": "test-icons", "label": "Icon preview" },
+        {
+          "member": "test-invalidated-account-token",
+          "label": "Invalid account token"
+        },
+        {
+          "member": "test-move-to-application-folder",
+          "label": "Move to Applications"
+        },
+        {
+          "member": "test-newer-commits-on-remote",
+          "label": "Newer remote commits"
+        },
+        { "member": "test-notification", "label": "Test notifications" },
+        { "member": "test-push-rejected", "label": "Push rejected" },
+        {
+          "member": "test-re-authorization-required",
+          "label": "Reauthorization required"
+        },
+        {
+          "member": "test-release-notes-popup",
+          "label": "Release notes"
+        },
+        { "member": "test-thank-you-popup", "label": "Thank you" },
+        {
+          "member": "test-unable-to-locate-git",
+          "label": "Unable to locate Git"
+        },
+        { "member": "test-untrusted-server", "label": "Untrusted server" },
+        {
+          "member": "test-update-existing-git-lfs-filters",
+          "label": "Git LFS filter update"
+        },
+        {
+          "member": "test-upstream-already-exists",
+          "label": "Upstream already exists"
+        },
+        { "member": "test-about-dialog", "label": "About test dialog" },
+        { "member": "test-cli-action", "label": "CLI action" }
+      ]
+    }
+  },
+  "nestedSurfaces": [
+    {
+      "id": "preferences.git.author",
+      "parentId": "preferences.Git",
+      "kind": "tab",
+      "source": "app/src/ui/preferences/git.tsx",
+      "label": "Author",
+      "risk": "safe"
+    },
+    {
+      "id": "preferences.git.default-branch",
+      "parentId": "preferences.Git",
+      "kind": "tab",
+      "source": "app/src/ui/preferences/git.tsx",
+      "label": "Default branch",
+      "risk": "safe"
+    },
+    {
+      "id": "preferences.git.hooks",
+      "parentId": "preferences.Git",
+      "kind": "tab",
+      "source": "app/src/ui/preferences/git.tsx",
+      "label": "Hooks",
+      "risk": "safe"
+    },
+    {
+      "id": "preferences.copilot.models",
+      "parentId": "preferences.Copilot",
+      "kind": "tab",
+      "source": "app/src/ui/preferences/copilot.tsx",
+      "label": "Models",
+      "risk": "safe",
+      "conditional": true
+    },
+    {
+      "id": "preferences.copilot.providers",
+      "parentId": "preferences.Copilot",
+      "kind": "tab",
+      "source": "app/src/ui/preferences/copilot.tsx",
+      "label": "Providers",
+      "risk": "safe",
+      "conditional": true
+    },
+    {
+      "id": "repository.api.rest",
+      "parentId": "repository.GitHubAPI",
+      "kind": "tab",
+      "source": "app/src/ui/github-api-explorer/github-api-explorer.tsx",
+      "label": "REST",
+      "risk": "external"
+    },
+    {
+      "id": "repository.api.graphql",
+      "parentId": "repository.GitHubAPI",
+      "kind": "tab",
+      "source": "app/src/ui/github-api-explorer/github-api-explorer.tsx",
+      "label": "GraphQL",
+      "risk": "external"
+    },
+    {
+      "id": "repository.api.functions",
+      "parentId": "repository.GitHubAPI",
+      "kind": "panel",
+      "source": "app/src/ui/github-api-explorer/github-api-explorer.tsx",
+      "label": "App functions",
+      "risk": "stateful",
+      "ownerSelector": ".github-api-explorer",
+      "selector": ".github-api-functions"
+    },
+    {
+      "id": "preferences.appearance.logo-studio",
+      "parentId": "preferences.Appearance",
+      "kind": "editor",
+      "source": "app/src/ui/preferences/appearance.tsx",
+      "label": "Custom repository logo",
+      "risk": "stateful",
+      "ownerSelector": "#preferences",
+      "selector": ".repository-logo-studio"
+    },
+    {
+      "id": "repository-settings.appearance.logo-studio",
+      "parentId": "repository-settings.Appearance",
+      "kind": "editor",
+      "source": "app/src/ui/repository-settings/appearance.tsx",
+      "label": "Custom repository logo",
+      "risk": "stateful",
+      "ownerSelector": "#repository-settings",
+      "selector": ".repository-logo-studio"
+    },
+    {
+      "id": "file-history.history",
+      "parentId": "popup.FileHistory",
+      "kind": "tab",
+      "source": "app/src/ui/file-history/file-history.tsx",
+      "label": "History",
+      "risk": "safe"
+    },
+    {
+      "id": "file-history.blame",
+      "parentId": "popup.FileHistory",
+      "kind": "tab",
+      "source": "app/src/ui/file-history/file-history.tsx",
+      "label": "Line blame",
+      "risk": "safe"
+    },
+    {
+      "id": "notifications.local",
+      "parentId": "notification-centre",
+      "kind": "tab",
+      "source": "app/src/ui/notifications/notification-centre-panel.tsx",
+      "label": "Local",
+      "risk": "safe"
+    },
+    {
+      "id": "notifications.github",
+      "parentId": "notification-centre",
+      "kind": "tab",
+      "source": "app/src/ui/notifications/notification-centre-panel.tsx",
+      "label": "GitHub",
+      "risk": "external"
+    }
+  ]
+}

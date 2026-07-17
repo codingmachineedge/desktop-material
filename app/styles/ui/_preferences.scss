@@ -71,10 +71,41 @@
     }
   }
   .dialog-content.git-preferences {
+    max-width: 100%;
+    min-width: 0;
     padding: 0;
 
+    .tab-bar {
+      max-width: 100%;
+      min-width: 0;
+      overflow-x: hidden;
+
+      .tab-bar-item {
+        min-width: 0;
+
+        > span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+    }
+
     .git-preferences-content {
+      max-width: 100%;
+      min-width: 0;
+      overflow-wrap: anywhere;
       padding: var(--spacing-double);
+
+      .row-component,
+      .select-component,
+      .text-box-component,
+      input,
+      select {
+        max-width: 100%;
+        min-width: 0;
+      }
     }
 
     .git-hook-shell-select {

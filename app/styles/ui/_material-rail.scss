@@ -165,6 +165,13 @@
     flex: 1;
   }
 
+  // Reversible master/detail affordances for the extreme high-zoom Changes and
+  // History layouts. Normal layouts keep each list and detail visible together.
+  .compact-changes-list-button,
+  .compact-history-list-button {
+    display: none;
+  }
+
   // Bottom icon buttons (Settings gear + account avatar) — the button itself is
   // the pill; no label.
   .rail-icon-button {
@@ -273,5 +280,12 @@
       min-height: 40px;
       flex: none;
     }
+  }
+}
+
+@media (max-width: 420px) and (max-height: 320px) {
+  .repository-rail .compact-changes-list-button,
+  .repository-rail .compact-history-list-button {
+    display: flex;
   }
 }

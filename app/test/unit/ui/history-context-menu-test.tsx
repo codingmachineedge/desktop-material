@@ -75,7 +75,9 @@ describe('history contextual actions', () => {
 
     assert.deepEqual(cherryPicked, [[clicked]])
     assert.equal(
-      items.find(item => item.label?.startsWith('Create branch'))?.enabled,
+      items.find(item =>
+        item.label?.toLocaleLowerCase().startsWith('create branch')
+      )?.enabled,
       false
     )
   })

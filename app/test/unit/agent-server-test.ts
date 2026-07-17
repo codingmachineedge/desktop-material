@@ -8,7 +8,10 @@ import { execFile as execFileCallback, spawn } from 'child_process'
 import { once } from 'events'
 import { promisify } from 'util'
 import { AgentServer } from '../../src/main-process/agent-server/agent-server'
-import { IAgentCommandEnvelope } from '../../src/lib/agent-commands'
+import {
+  AgentCommandResult,
+  IAgentCommandEnvelope,
+} from '../../src/lib/agent-commands'
 
 const execFile = promisify(execFileCallback)
 
@@ -73,7 +76,10 @@ async function withServer(
     server: AgentServer,
     connection: { port: number; token: string; configPath: string },
     commands: IAgentCommandEnvelope[]
-  ) => Promise<void>
+  ) => Promise<void>,
+  executeOverride?: (
+    command: IAgentCommandEnvelope
+  ) => Promise<AgentCommandResult>
 ) {
   const directory = await Fs.mkdtemp(
     Path.join(Os.tmpdir(), 'desktop-agent-test-')
@@ -82,6 +88,27 @@ async function withServer(
   const commands: IAgentCommandEnvelope[] = []
   const server = new AgentServer(configPath, async command => {
     commands.push(command)
+    if (executeOverride !== undefined) {
+      return executeOverride(command)
+    }
+    if (command.name === 'list-api-functions') {
+      return {
+        ok: true,
+        data: [
+          {
+            name: 'fixture_read',
+            description: 'Read fixture data.',
+            operationId: 'fixture/read',
+            risk: 'read',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: { page: { type: 'integer' } },
+            },
+          },
+        ],
+      }
+    }
     return { ok: true, data: { command: command.name } }
   })
   try {
@@ -110,6 +137,7 @@ describe('agent server', () => {
       const info = await request(port, '/api/v1/info', token)
       assert.equal(info.status, 200)
       assert.ok(info.body.commands.includes('list-repositories'))
+      assert.ok(info.body.commands.includes('github_api_fixture_read'))
       assert.equal(JSON.stringify(info.body).includes(token), false)
 
       const rest = await request(port, '/api/v1/command/push', token, {
@@ -128,6 +156,11 @@ describe('agent server', () => {
         body: { jsonrpc: '2.0', id: 2, method: 'tools/list' },
       })
       assert.ok(tools.body.result.tools.length >= 20)
+      const namedTool = tools.body.result.tools.find(
+        (tool: { name: string }) => tool.name === 'github_api_fixture_read'
+      )
+      assert.ok(namedTool)
+      assert.equal(namedTool.annotations.readOnlyHint, true)
 
       const call = await request(port, '/mcp', token, {
         body: {
@@ -138,11 +171,72 @@ describe('agent server', () => {
         },
       })
       assert.equal(call.body.result.structuredContent.command, 'list-tabs')
+      const customCall = await request(port, '/mcp', token, {
+        body: {
+          jsonrpc: '2.0',
+          id: 4,
+          method: 'tools/call',
+          params: {
+            name: 'github_api_fixture_read',
+            arguments: { page: 2 },
+          },
+        },
+      })
+      assert.equal(
+        customCall.body.result.structuredContent.command,
+        'invoke-api-function'
+      )
       assert.deepEqual(
         commands.map(x => x.name),
-        ['push', 'list-tabs']
+        [
+          'list-api-functions',
+          'push',
+          'list-api-functions',
+          'list-tabs',
+          'invoke-api-function',
+        ]
       )
+      assert.deepEqual(commands[4].args, {
+        name: 'fixture_read',
+        arguments: { page: 2 },
+      })
     })
+  })
+
+  it('keeps the static MCP catalog available when profile functions are invalid', async () => {
+    await withServer(
+      async (_server, { port, token }) => {
+        const info = await request(port, '/api/v1/info', token)
+        assert.equal(info.status, 200)
+        assert.ok(info.body.commands.includes('list-repositories'))
+        assert.equal(
+          info.body.commands.some((name: string) =>
+            name.startsWith('github_api_')
+          ),
+          false
+        )
+
+        const tools = await request(port, '/mcp', token, {
+          body: { jsonrpc: '2.0', id: 9, method: 'tools/list' },
+        })
+        assert.equal(tools.status, 200)
+        assert.ok(
+          tools.body.result.tools.some(
+            (tool: { name: string }) => tool.name === 'list-repositories'
+          )
+        )
+      },
+      async command =>
+        command.name === 'list-api-functions'
+          ? {
+              ok: false,
+              error: {
+                code: 'command_failed',
+                message: 'Named API functions are not valid JSON.',
+              },
+            }
+          : { ok: true, data: { command: command.name } }
+    )
   })
 
   it('rejects bad tokens, browser origins, invalid hosts, and credentials', async () => {
@@ -177,6 +271,19 @@ describe('agent server', () => {
       assert.equal(credential.status, 400)
       assert.equal(
         JSON.stringify(credential.body).includes('must-not-cross'),
+        false
+      )
+      const camelCaseCredential = await request(
+        port,
+        '/api/v1/command/list-repositories',
+        token,
+        { body: { accessToken: 'must-not-cross-either' } }
+      )
+      assert.equal(camelCaseCredential.status, 400)
+      assert.equal(
+        JSON.stringify(camelCaseCredential.body).includes(
+          'must-not-cross-either'
+        ),
         false
       )
 

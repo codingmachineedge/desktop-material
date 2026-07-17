@@ -196,18 +196,96 @@ export function validateGitHubAPIWorkbenchRequest(
   }
 }
 
-function executableGraphQLText(query: string): string {
-  return query
-    .replace(/#[^\r\n]*/g, '')
-    .replace(/"""[\s\S]*?"""/g, '""')
-    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+/**
+ * Remove GraphQL comments and string contents before inspecting executable
+ * tokens. This deliberately performs lexical scanning instead of regex
+ * replacement: comments only begin outside strings, and an escaped triple
+ * quote inside a block string must not terminate that string. Malformed
+ * strings fail closed before any request can be classified or executed.
+ */
+export function getExecutableGraphQLText(query: string): string {
+  const executable: Array<string> = []
+  let index = 0
+
+  while (index < query.length) {
+    if (query[index] === '#') {
+      while (
+        index < query.length &&
+        query[index] !== '\r' &&
+        query[index] !== '\n'
+      ) {
+        index++
+      }
+      executable.push(' ')
+      continue
+    }
+
+    if (query.startsWith('"""', index)) {
+      index += 3
+      let closed = false
+      while (index < query.length) {
+        if (query.startsWith('\\"""', index)) {
+          index += 4
+          continue
+        }
+        if (query.startsWith('"""', index)) {
+          index += 3
+          closed = true
+          break
+        }
+        index++
+      }
+      if (!closed) {
+        throw new Error('GraphQL contains an unterminated block string.')
+      }
+      executable.push('""')
+      continue
+    }
+
+    if (query[index] === '"') {
+      index++
+      let closed = false
+      while (index < query.length) {
+        const current = query[index]
+        if (current === '"') {
+          index++
+          closed = true
+          break
+        }
+        if (current === '\r' || current === '\n') {
+          throw new Error('GraphQL contains an unterminated string.')
+        }
+        if (current === '\\') {
+          const escaped = query[index + 1]
+          if (escaped === undefined || escaped === '\r' || escaped === '\n') {
+            throw new Error('GraphQL contains an unterminated string escape.')
+          }
+          index += 2
+          continue
+        }
+        index++
+      }
+      if (!closed) {
+        throw new Error('GraphQL contains an unterminated string.')
+      }
+      executable.push('""')
+      continue
+    }
+
+    executable.push(query[index])
+    index++
+  }
+
+  return executable.join('')
 }
 
 export function assessGitHubAPIWorkbenchRequest(
   request: GitHubAPIWorkbenchRequest
 ): IGitHubAPIWorkbenchAssessment {
   if (request.mode === 'graphql') {
-    const mutation = /\bmutation\b/.test(executableGraphQLText(request.query))
+    const mutation = /\bmutation\b/.test(
+      getExecutableGraphQLText(request.query)
+    )
     return mutation
       ? {
           risk: 'write',
@@ -291,7 +369,7 @@ export function formatGitHubAPIWorkbenchPreview(
     const body = request.bodyText.trim().length === 0 ? '' : ' with JSON body'
     return `${request.method} /${path}${body}`
   }
-  const kind = /\bmutation\b/.test(executableGraphQLText(request.query))
+  const kind = /\bmutation\b/.test(getExecutableGraphQLText(request.query))
     ? 'mutation'
     : 'query'
   const name = request.operationName?.trim()

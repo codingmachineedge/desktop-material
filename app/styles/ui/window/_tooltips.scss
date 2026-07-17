@@ -1,14 +1,15 @@
 body > .tooltip,
 .tooltip-host > .tooltip {
+  --tooltip-max-width: 300px;
+
   display: flex;
-  position: absolute;
   left: 0;
   top: 0;
   z-index: var(--tooltip-z-index);
   pointer-events: none;
 
-  max-height: 500px;
-  max-width: 300px;
+  max-height: min(500px, calc(100vh - var(--spacing-double)));
+  max-width: min(var(--tooltip-max-width), calc(100vw - var(--spacing-double)));
 
   word-wrap: break-word;
   word-break: break-word;
@@ -115,7 +116,7 @@ body > .tooltip,
   }
 
   &.sha-hint {
-    max-width: 500px;
+    --tooltip-max-width: 500px;
 
     .tooltip-content {
       display: flex;
@@ -171,7 +172,7 @@ body > .tooltip,
   }
 
   &.length-hint-tooltip {
-    max-width: none;
+    --tooltip-max-width: calc(100vw - var(--spacing-double));
     .tooltip-content {
       .title {
         white-space: pre;
@@ -234,6 +235,17 @@ body > .tooltip,
       font-weight: bold;
     }
   }
+}
+
+// Body-hosted tooltips use viewport coordinates. Keeping them fixed prevents a
+// stale transform during a resize or zoom transition from expanding the root
+// document before React has recomputed their position.
+body > .tooltip {
+  position: fixed;
+}
+
+.tooltip-host > .tooltip {
+  position: absolute;
 }
 
 .tooltip-host {

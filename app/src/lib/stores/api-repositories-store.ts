@@ -76,6 +76,9 @@ export interface IAccountRepositories {
    */
   readonly loading: boolean
 
+  /** The most recent account repository-list failure, if any. */
+  readonly error: Error | null
+
   /** Organizations to which the authenticated account belongs. */
   readonly organizations: ReadonlyArray<IAPIOrganization>
 
@@ -97,6 +100,7 @@ export interface IOrganizationRepositories {
 
 const EmptyAccountRepositories: IAccountRepositories = {
   loading: false,
+  error: null,
   repositories: [],
   organizations: [],
   organizationsLoading: false,
@@ -122,7 +126,10 @@ export class ApiRepositoriesStore extends BaseStore {
     IAccountRepositories
   >()
 
-  public constructor(accountsStore: AccountsStore) {
+  public constructor(
+    accountsStore: AccountsStore,
+    private readonly apiForAccount: (account: Account) => API = API.fromAccount
+  ) {
     super()
     accountsStore.onDidUpdate(this.onAccountsChanged)
   }
@@ -211,7 +218,7 @@ export class ApiRepositoriesStore extends BaseStore {
 
     this.updateAccount(account, { organizationsLoading: true })
     try {
-      const api = API.fromAccount(resolveAccount(account, this.accountState))
+      const api = this.apiForAccount(resolveAccount(account, this.accountState))
       const organizations = (await api.fetchOrgs())
         .slice()
         .sort((a, b) =>
@@ -249,7 +256,7 @@ export class ApiRepositoriesStore extends BaseStore {
       error: null,
     })
     try {
-      const api = API.fromAccount(resolveAccount(account, this.accountState))
+      const api = this.apiForAccount(resolveAccount(account, this.accountState))
       const repositories = await api.fetchOrgRepositories(organization.login)
       this.updateOrganizationRepositories(account, key, {
         repositories,
@@ -283,7 +290,7 @@ export class ApiRepositoriesStore extends BaseStore {
       return
     }
 
-    this.updateAccount(account, { loading: true })
+    this.updateAccount(account, { loading: true, error: null })
 
     // We don't want to throw away the existing list of repositories if we're
     // refreshing the list of repositories but we'll need to keep track of
@@ -309,41 +316,43 @@ export class ApiRepositoriesStore extends BaseStore {
       this.updateAccount(account, { repositories: [...repositories.values()] })
     }
 
-    const api = API.fromAccount(resolveAccount(account, this.accountState))
+    try {
+      const api = this.apiForAccount(resolveAccount(account, this.accountState))
 
-    // The vast majority of users have few repositories and no org affiliations.
-    // We'll start by making one request to load all repositories available to
-    // the user regardless of affiliation and only if that request isn't enough
-    // to load all repositories will we divvy up the requests and load
-    // repositories by owner and collaborator+org affiliation separately. This
-    // way we can avoid making unnecessary requests to the API for the majority
-    // of users while still improving the user experience for those users who
-    // have access to a lot of repositories and orgs.
-    await api.streamUserRepositories(addPage, undefined, {
-      async continue() {
-        // If the continue callback is called we know that the first request
-        // wasn't enough to load all repositories.
-        //
-        // For these users (with access to more than 100 repositories) we'll
-        // stream each of the three different affiliation types concurrently to
-        // minimize the time it takes to load all repositories.
-        await Promise.all([
-          api.streamUserRepositories(addPage, 'owner'),
-          api.streamUserRepositories(addPage, 'collaborator'),
-          api.streamUserRepositories(addPage, 'organization_member'),
-        ])
+      // The vast majority of users have few repositories and no org
+      // affiliations. Start with one request and only split affiliations when
+      // pagination proves that it is necessary.
+      await api.streamUserRepositories(addPage, undefined, {
+        async continue() {
+          await Promise.all([
+            api.streamUserRepositories(addPage, 'owner'),
+            api.streamUserRepositories(addPage, 'collaborator'),
+            api.streamUserRepositories(addPage, 'organization_member'),
+          ])
+          return false
+        },
+      })
 
-        // Don't load more than one page in the initial stream request.
-        return false
-      },
-    })
-
-    if (missing.size) {
-      missing.forEach((_, clone_url) => repositories.delete(clone_url))
-      this.updateAccount(account, { repositories: [...repositories.values()] })
+      if (missing.size) {
+        missing.forEach((_, clone_url) => repositories.delete(clone_url))
+        this.updateAccount(account, {
+          repositories: [...repositories.values()],
+        })
+      }
+      this.updateAccount(account, { error: null })
+    } catch (error) {
+      const repositoryError =
+        error instanceof Error ? error : new Error(String(error))
+      this.updateAccount(account, { error: repositoryError })
+      log.error(
+        `Unable to load repositories for ${account.friendlyEndpoint}`,
+        repositoryError
+      )
+    } finally {
+      // A rejected API request must never strand the account in loading=true;
+      // account switches can immediately retry through the same store entry.
+      this.updateAccount(account, { loading: false })
     }
-
-    this.updateAccount(account, { loading: false })
   }
 
   public getState(): ReadonlyMap<Account, IAccountRepositories> {

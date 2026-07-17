@@ -766,6 +766,10 @@
 
 .filtered-changes-list {
   max-width: 100%;
+  // The title, search, and select-all rows consume roughly 114px. Preserve one
+  // actual file row below them; the enclosing sidebar panel owns any extra
+  // vertical scrolling when the commit composer also needs space.
+  min-height: 148px;
   min-width: 0;
 
   // Panel header (§6.1): H1 "Changes" title + secondary-container count chip,

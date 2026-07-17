@@ -28,6 +28,74 @@ Pages deployment remains subject to the protected reviewed `main` promotion
 path; historical branch-only publication receipts below are retained as
 provenance rather than current status.
 
+## 2026-07-17 recovery, custom logos, app functions, and responsive completion
+
+Clone account changes now invalidate stale provider selections and reload the
+new account before a repository can be chosen. Automatic clone work is owned by
+an app-lifetime background store instead of a blocking dialog. Its versioned
+journal preserves queued, running, paused, interrupted, failed, and
+review-required items across renderer or process restarts, with explicit
+pause/resume/retry/dismiss controls. Clone recovery rejects credential-bearing
+URLs, unsafe canonical paths, origin mismatches, non-owned worktrees, symlink
+escapes, and time-of-check/time-of-use path changes; displayed failures redact
+credential material. Recovery finalizes only repositories which were actually
+added to the app: a temporarily unavailable completed clone remains journaled,
+visibly needs attention, exposes **Retry adding repositories**, and cannot emit
+or suppress its completion summary prematurely.
+
+Repository appearance now includes a code-native vector logo studio rather
+than another set of dropdowns. Profiles can define a default and individual
+repositories can inherit or override it. The bounded model supports presets,
+text and mark layers, transforms, colors, live preview, undo/redo, and guarded
+JSON import/export without accepting raw SVG. The selected logo propagates to
+the repository list and open tabs through the shared bounded loader.
+
+The API surface now exposes saved, versioned **app functions** with stable
+names, exact repository/provider/account bindings, reviewed mutation behavior,
+bounded redacted output, SHA-256 fingerprints, and the same catalog through the
+app, local Agent API, MCP, and REST adapters. Malformed persisted state fails
+closed and never stores credentials. The GitHub API Explorer can create,
+inspect, execute, update, reload, and remove these functions.
+
+The final review also replaced three regex-based GraphQL token strippers with
+one shared lexical scanner. Comments are recognized only outside strings,
+ordinary escapes and escaped triple quotes in block strings remain contained,
+and malformed strings fail closed. Exact lexical-decoy regressions prove that a
+retained mutation cannot be classified or invoked as a noninteractive read.
+
+The responsive smoke catalog accounts for every registered repository page,
+preferences page, repository-settings page, clone and notification tab, File
+History surface, and safely orchestrated dialog/menu surface. All 76 applicable
+rows passed all eight viewport/zoom scenarios; the three unavailable fixture
+integrations are explicit N/A rows, with zero failures, blockers, missing rows,
+document-width overflows, unreachable scroll bottoms, or unnamed buttons. The
+scenarios include the 320×240 CSS viewport produced by 200% zoom as well as
+short, portrait, standard, and wide layouts. The complete 79-row evidence is in
+`docs/verification/responsive-surface-matrix-2026-07-17.json` (SHA-256
+`108c4c444feda61bb890d341cc83fb5bc27c008695fe9f384114d6499ed9532b`).
+
+| Promoted screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-repository-logo-studio.png` | 960×660 | 110,716 | `791c67e611a87c9e7e716616c1031c3bf696cd8acdb7f98aa1fbdffb36858777` |
+| `docs/assets/screenshots/material-api-app-functions.png` | 944×1000 | 126,774 | `10d635a3e884902d4e791258e9cb470c83be0b268aa4e88aaab537601bb6a3f5` |
+
+The exact required unpackaged production build completed through the fixed MCP
+endpoint in 365.14 seconds under concurrent verification load, without a
+timeout or dependency download. Full TypeScript, repository-aware ESLint over
+77 changed source files, Prettier over 113 supported files, and diff-integrity
+checks passed. The final sequential unit run covered 457 files in two batches:
+3,139 tests across 863 suites, with 3,138 passing, zero failures, and one
+intentional skip. The focused script harness also passed all 15 tests; the
+post-review clone/API audit passed all 59 tests.
+
+The hidden run used only `DesktopMaterialP0_20260717_0139`, saved app PID
+`8700`, provider PIDs `14392`/`6460`, provider port `61130`, and CDP port
+`61241`. The generic alternate-desktop close route failed closed, after which
+the exact revalidated app PID was terminated gracefully. The disposable
+credential was deleted and read back absent; all recorded PIDs and both ports
+reached zero; the named desktop closed exactly once; and the containment-checked
+owned Temp root was removed and verified absent.
+
 ## 2026-07-16 navigation, context actions, and scroll containment
 
 Repository tabs now have a runtime search/switcher across labels, aliases,

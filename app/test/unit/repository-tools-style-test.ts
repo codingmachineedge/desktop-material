@@ -77,4 +77,11 @@ describe('Repository tools responsive styles', () => {
       /\.repository-tool-confirmation[\s\S]*overflow-wrap: anywhere/
     )
   })
+
+  it('lets the final result log enter the minimum 200%-zoom scrollport', () => {
+    assert.match(
+      styles,
+      /@media \(max-height: 320px\)[\s\S]*?\.repository-tools-output\s*\{[\s\S]*?height: 48px;[\s\S]*?max-height: 48px;[\s\S]*?min-height: 48px;/
+    )
+  })
 })

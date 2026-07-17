@@ -117,7 +117,13 @@
   clip-path: inset(50%);
   height: 1px;
   overflow: hidden;
+  overflow-wrap: anywhere;
   position: absolute;
-  white-space: nowrap;
+  // Keeping visually-hidden live-region text on one line gives the element an
+  // intrinsic scroll width equal to the whole announcement. Chromium can
+  // propagate that hidden width into a clipped dialog at high zoom. Wrapping
+  // inside the existing 1px clipped box preserves the accessible text without
+  // widening its surface.
+  white-space: normal;
   width: 1px;
 }

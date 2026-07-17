@@ -1132,3 +1132,18 @@
     }
   }
 }
+
+// A 640x480 window at 200% zoom leaves the repository content pane roughly
+// 220px wide. Preserve both interactive header controls at that extreme by
+// tightening the frame and omitting the non-interactive line-stat chips. The
+// path remains ellipsized and the full diff still exposes the changed lines.
+@media (max-width: 420px) and (max-height: 320px) {
+  .diff-container .header {
+    gap: 4px;
+    padding: 6px 8px;
+
+    .diff-line-stats {
+      display: none;
+    }
+  }
+}

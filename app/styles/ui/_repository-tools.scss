@@ -1148,3 +1148,15 @@
     width: 100%;
   }
 }
+
+// At the supported minimum window and 200% zoom the repository pane is only
+// 84px tall after the app chrome. Keep the final, independently scrollable log
+// small enough to enter that outer scrollport in full; users can still inspect
+// arbitrary output by scrolling inside the log.
+@media (max-height: 320px) {
+  .repository-tools-output {
+    height: 48px;
+    max-height: 48px;
+    min-height: 48px;
+  }
+}

@@ -48,8 +48,20 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
     this.props.dispatcher.retryBatchCloneFailed()
   }
 
+  private onRetryRegistration = () => {
+    this.props.dispatcher.retryBatchCloneRegistration()
+  }
+
   private onCancel = () => {
     this.props.dispatcher.cancelBatchClone()
+  }
+
+  private onPause = () => {
+    this.props.dispatcher.pauseBatchClone()
+  }
+
+  private onResume = () => {
+    this.props.dispatcher.resumeBatchClone()
   }
 
   private onDone = () => {
@@ -61,9 +73,19 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
     const kind = status?.kind ?? 'pending'
     switch (kind) {
       case 'done':
-        return <Octicon className="status done" symbol={octicons.check} />
+        return status?.finalized !== true ? (
+          <Octicon className="status review" symbol={octicons.alertFill} />
+        ) : (
+          <Octicon className="status done" symbol={octicons.check} />
+        )
       case 'failed':
         return <Octicon className="status failed" symbol={octicons.x} />
+      case 'review':
+        return <Octicon className="status review" symbol={octicons.alertFill} />
+      case 'interrupted':
+        return (
+          <Octicon className="status interrupted" symbol={octicons.clock} />
+        )
       case 'skipped':
         return (
           <Octicon className="status skipped" symbol={octicons.circleSlash} />
@@ -98,7 +120,7 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
             {item.name}
           </TooltippedContent>
           {kind === 'cloning' && <progress value={progressValue} />}
-          {kind === 'failed' && status?.error && (
+          {(kind === 'failed' || kind === 'review') && status?.error && (
             <TooltippedContent
               tagName="div"
               className="error"
@@ -107,6 +129,11 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
             >
               {status.error.message}
             </TooltippedContent>
+          )}
+          {kind === 'done' && status?.finalized !== true && (
+            <div className="error">
+              Cloned successfully, but not yet added to the repository list.
+            </div>
           )}
         </div>
       </li>
@@ -139,21 +166,44 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
     }
 
     const summary = summarizeBatchClone(state.items, state.statuses)
+    const pendingRegistration = state.items.filter(item => {
+      const status = state.statuses.get(item.path)
+      return status?.kind === 'done' && status.finalized !== true
+    }).length
     const overall = Math.round(state.overallProgress * 100)
-    const title = state.isDone
-      ? 'Clone complete'
-      : `Cloning ${state.items.length} repositories`
+    const title =
+      pendingRegistration > 0
+        ? 'Add cloned repositories'
+        : state.isDone
+        ? 'Clone complete'
+        : state.isPaused
+        ? 'Clone queue paused'
+        : `Cloning ${state.items.length} repositories`
 
     return (
-      <Dialog id="batch-clone-progress" title={title} onDismissed={this.onDone}>
+      <Dialog
+        id="batch-clone-progress"
+        title={title}
+        onDismissed={
+          state.isDone && pendingRegistration === 0
+            ? this.onDone
+            : this.props.onDismissed
+        }
+      >
         <DialogContent>
           <div className="batch-clone-overall">
             <div className="summary">
               {summary.done} done
               {summary.failed > 0 ? `, ${summary.failed} failed` : ''}
-              {summary.skipped > 0
-                ? `, ${summary.skipped} skipped`
-                : ''} of {summary.total}
+              {summary.interrupted > 0
+                ? `, ${summary.interrupted} interrupted`
+                : ''}
+              {summary.review > 0 ? `, ${summary.review} need review` : ''}
+              {summary.skipped > 0 ? `, ${summary.skipped} skipped` : ''}
+              {pendingRegistration > 0
+                ? `, ${pendingRegistration} waiting to be added`
+                : ''}{' '}
+              of {summary.total}
             </div>
             <progress value={state.overallProgress || undefined} />
             <div className="percent">{overall}%</div>
@@ -164,17 +214,47 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
             )}
           </ul>
         </DialogContent>
-        {this.renderFooter(state, summary.failed > 0)}
+        {this.renderFooter(
+          state,
+          summary.failed > 0,
+          summary.review > 0,
+          pendingRegistration > 0
+        )}
       </Dialog>
     )
   }
 
-  private renderFooter(state: IBatchCloneState, hasFailures: boolean) {
+  private renderFooter(
+    state: IBatchCloneState,
+    hasFailures: boolean,
+    hasReview: boolean,
+    hasPendingRegistration: boolean
+  ) {
     if (!state.isDone) {
       // Running: allow hiding (clones continue in the sidebar) or cancelling.
       return (
         <DialogFooter>
           <Button onClick={this.onCancel}>Cancel remaining</Button>
+          {state.isPaused ? (
+            <Button
+              onClick={this.onResume}
+              disabled={state.isRunning}
+              tooltip={
+                state.isRunning
+                  ? 'Active clones are finishing before resume is available'
+                  : 'Inspect destinations and resume pending clones'
+              }
+            >
+              {state.isRunning ? 'Pausing…' : 'Resume'}
+            </Button>
+          ) : (
+            <Button
+              onClick={this.onPause}
+              tooltip="Pause pending clones; active clones will finish"
+            >
+              Pause remaining
+            </Button>
+          )}
           <OkCancelButtonGroup
             okButtonText="Hide"
             onOkButtonClick={this.props.onDismissed}
@@ -189,9 +269,27 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
         {hasFailures && (
           <Button onClick={this.onRetryFailed}>Retry failed</Button>
         )}
+        {hasReview && (
+          <Button
+            onClick={this.onResume}
+            tooltip="Inspect reviewed destinations again and resume safe paths"
+          >
+            Recheck destinations
+          </Button>
+        )}
+        {hasPendingRegistration && (
+          <Button
+            onClick={this.onRetryRegistration}
+            tooltip="Try adding completed clones to the repository list again"
+          >
+            Retry adding repositories
+          </Button>
+        )}
         <OkCancelButtonGroup
-          okButtonText="Done"
-          onOkButtonClick={this.onDone}
+          okButtonText={hasPendingRegistration ? 'Close' : 'Done'}
+          onOkButtonClick={
+            hasPendingRegistration ? this.props.onDismissed : this.onDone
+          }
           cancelButtonVisible={false}
         />
       </DialogFooter>

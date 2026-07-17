@@ -191,8 +191,8 @@ interface ISectionFilterListProps<T extends IFilterListItem, GroupIdentifier> {
    * A handler called whenever a context menu event is received on the
    * row container element.
    *
-   * The context menu is invoked when a user right clicks the row or
-   * uses keyboard shortcut.s
+   * The context menu is invoked when a user right clicks the row or uses the
+   * Context Menu key / Shift+F10 while the row is focused.
    */
   readonly onItemContextMenu?: (
     item: T,
@@ -524,6 +524,7 @@ export class SectionFilterList<
           onRowClick={this.onRowClick}
           onRowKeyDown={this.onRowKeyDown}
           onRowContextMenu={this.onRowContextMenu}
+          onRowKeyboardContextMenu={this.onRowKeyboardContextMenu}
           canSelectRow={this.canSelectRow}
           invalidationProps={{
             ...this.props,
@@ -676,6 +677,18 @@ export class SectionFilterList<
     }
 
     this.props.onItemContextMenu(row.item, source)
+  }
+
+  private onRowKeyboardContextMenu = (
+    index: RowIndexPath,
+    source: React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    // The native menu does not consume pointer coordinates. Reuse the existing
+    // item callback so right-click, Context Menu, and Shift+F10 cannot drift.
+    this.onRowContextMenu(
+      index,
+      source as unknown as React.MouseEvent<HTMLDivElement>
+    )
   }
 
   private onRowKeyDown = (

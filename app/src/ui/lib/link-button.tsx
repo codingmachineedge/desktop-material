@@ -3,6 +3,7 @@ import { shell } from '../../lib/app-shell'
 import classNames from 'classnames'
 import { Tooltip } from './tooltip'
 import { createObservableRef } from './observable-ref'
+import { getButtonHint } from './button'
 
 interface ILinkButtonProps {
   /** A URI to open on click. */
@@ -51,7 +52,12 @@ export class LinkButton extends React.Component<ILinkButtonProps, {}> {
      * */
     const role = this.props.uri === undefined ? 'button' : undefined
     const className = classNames('link-button-component', this.props.className)
-    const { title } = this.props
+    const tooltip = getButtonHint(
+      this.props.title,
+      this.props.ariaLabel,
+      this.props.children,
+      role === 'button'
+    )
 
     return (
       <a
@@ -67,7 +73,14 @@ export class LinkButton extends React.Component<ILinkButtonProps, {}> {
         aria-label={this.props.ariaLabel}
         role={role}
       >
-        {title && <Tooltip target={this.anchorRef}>{title}</Tooltip>}
+        {tooltip && (
+          <Tooltip
+            target={this.anchorRef}
+            applyAriaDescribedBy={this.props.title !== undefined}
+          >
+            {tooltip}
+          </Tooltip>
+        )}
         {this.props.children}
       </a>
     )

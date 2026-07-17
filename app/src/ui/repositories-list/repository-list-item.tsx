@@ -12,6 +12,19 @@ import { createObservableRef } from '../lib/observable-ref'
 import { Tooltip } from '../lib/tooltip'
 import { enableAccessibleListToolTips } from '../../lib/feature-flag'
 import { TooltippedContent } from '../lib/tooltipped-content'
+import { IRepositoryLogoDesign } from '../../models/repository-logo'
+import { RepositoryLogo } from '../repository-logo/repository-logo'
+import {
+  getProfileRepositoryLogo,
+  IRepositoryLogoLoader,
+  repositoryLogoLoader,
+} from '../repository-logo/repository-logo-loader'
+
+export interface IRepositoryLogoChange {
+  readonly revision: number
+  /** Null means that the profile default, and every inherited logo, changed. */
+  readonly repositoryPath: string | null
+}
 
 interface IRepositoryListItemProps {
   readonly repository: Repositoryish
@@ -30,14 +43,114 @@ interface IRepositoryListItemProps {
 
   /** Current branch to show beside the repository name, or null to hide it. */
   readonly branchName: string | null
+
+  /** The latest repository-logo invalidation observed by the parent list. */
+  readonly repositoryLogoChange?: IRepositoryLogoChange
+
+  /** Test seam for exercising async ordering without touching Git. */
+  readonly repositoryLogoLoader?: IRepositoryLogoLoader
+}
+
+interface IRepositoryListItemState {
+  readonly logoDesign: IRepositoryLogoDesign | null
+  readonly logoPath: string | null
 }
 
 /** A repository item. */
 export class RepositoryListItem extends React.Component<
   IRepositoryListItemProps,
-  {}
+  IRepositoryListItemState
 > {
   private readonly listItemRef = createObservableRef<HTMLDivElement>()
+  private logoRequestId = 0
+
+  public constructor(props: IRepositoryListItemProps) {
+    super(props)
+    this.state = { logoDesign: null, logoPath: null }
+  }
+
+  public componentDidMount() {
+    this.loadLogo()
+  }
+
+  public componentDidUpdate(prevProps: IRepositoryListItemProps) {
+    const previousPath = this.getLogoPath(prevProps.repository)
+    const nextPath = this.getLogoPath(this.props.repository)
+
+    if (previousPath !== nextPath) {
+      if (previousPath !== null) {
+        const previousLoader =
+          prevProps.repositoryLogoLoader ?? repositoryLogoLoader
+        previousLoader.invalidate(previousPath)
+      }
+      this.loadLogo()
+      return
+    }
+
+    if (prevProps.repositoryLogoLoader !== this.props.repositoryLogoLoader) {
+      this.loadLogo()
+      return
+    }
+
+    const previousChange = prevProps.repositoryLogoChange
+    const nextChange = this.props.repositoryLogoChange
+    if (
+      nextPath !== null &&
+      previousChange?.revision !== nextChange?.revision &&
+      (nextChange?.repositoryPath === null ||
+        nextChange?.repositoryPath === nextPath)
+    ) {
+      this.loadLogo()
+    }
+  }
+
+  public componentWillUnmount() {
+    this.logoRequestId++
+  }
+
+  private get loader(): IRepositoryLogoLoader {
+    return this.props.repositoryLogoLoader ?? repositoryLogoLoader
+  }
+
+  private getLogoPath(repository: Repositoryish): string | null {
+    return repository instanceof Repository && !repository.missing
+      ? repository.path
+      : null
+  }
+
+  private loadLogo = async () => {
+    const requestId = ++this.logoRequestId
+    const repository = this.props.repository
+    const logoPath = this.getLogoPath(repository)
+
+    if (!(repository instanceof Repository) || logoPath === null) {
+      if (this.state.logoDesign !== null || this.state.logoPath !== null) {
+        this.setState({ logoDesign: null, logoPath: null })
+      }
+      return
+    }
+
+    try {
+      const logoDesign = await this.loader.load(repository)
+      if (
+        requestId === this.logoRequestId &&
+        this.getLogoPath(this.props.repository) === logoPath
+      ) {
+        this.setState({ logoDesign, logoPath })
+      }
+    } catch (error) {
+      log.warn(`Unable to load repository-list logo for ${logoPath}`, error)
+      if (
+        requestId === this.logoRequestId &&
+        this.getLogoPath(this.props.repository) === logoPath
+      ) {
+        this.setState({
+          logoDesign: getProfileRepositoryLogo(),
+          logoPath,
+        })
+      }
+    }
+  }
 
   public render() {
     const repository = this.props.repository
@@ -66,10 +179,7 @@ export class RepositoryListItem extends React.Component<
           {this.renderTooltip()}
         </Tooltip>
 
-        <Octicon
-          className="icon-for-repository"
-          symbol={iconForRepository(repository)}
-        />
+        {this.renderRepositoryIcon(repository, alias)}
 
         <div className={classNames(classNameList)}>
           {prefix ? <span className="prefix">{prefix}</span> : null}
@@ -106,6 +216,34 @@ export class RepositoryListItem extends React.Component<
     )
   }
 
+  private renderRepositoryIcon(
+    repository: Repositoryish,
+    alias: string | null
+  ): JSX.Element {
+    if (
+      repository instanceof Repository &&
+      !repository.missing &&
+      this.state.logoDesign !== null &&
+      this.state.logoPath === repository.path
+    ) {
+      return (
+        <RepositoryLogo
+          className="icon-for-repository repository-logo-small repository-list-logo"
+          design={this.state.logoDesign}
+          repositoryName={alias ?? repository.name}
+          size={16}
+        />
+      )
+    }
+
+    return (
+      <Octicon
+        className="icon-for-repository"
+        symbol={iconForRepository(repository)}
+      />
+    )
+  }
+
   private renderTooltip() {
     const repo = this.props.repository
     const gitHubRepo = repo instanceof Repository ? repo.gitHubRepository : null
@@ -123,17 +261,39 @@ export class RepositoryListItem extends React.Component<
     )
   }
 
-  public shouldComponentUpdate(nextProps: IRepositoryListItemProps): boolean {
+  public shouldComponentUpdate(
+    nextProps: IRepositoryListItemProps,
+    nextState: IRepositoryListItemState
+  ): boolean {
+    if (
+      nextState.logoDesign !== this.state.logoDesign ||
+      nextState.logoPath !== this.state.logoPath
+    ) {
+      return true
+    }
+
     if (
       nextProps.repository instanceof Repository &&
       this.props.repository instanceof Repository
     ) {
+      const nextLogoPath = this.getLogoPath(nextProps.repository)
+      const nextLogoChange = nextProps.repositoryLogoChange
+      const relevantLogoChange =
+        nextLogoPath !== null &&
+        nextLogoChange?.revision !==
+          this.props.repositoryLogoChange?.revision &&
+        (nextLogoChange?.repositoryPath === null ||
+          nextLogoChange?.repositoryPath === nextLogoPath)
+
       return (
-        nextProps.repository.id !== this.props.repository.id ||
+        nextProps.repository.hash !== this.props.repository.hash ||
+        nextProps.needsDisambiguation !== this.props.needsDisambiguation ||
         nextProps.matches !== this.props.matches ||
         nextProps.aheadBehind !== this.props.aheadBehind ||
         nextProps.changedFilesCount !== this.props.changedFilesCount ||
-        nextProps.branchName !== this.props.branchName
+        nextProps.branchName !== this.props.branchName ||
+        relevantLogoChange ||
+        nextProps.repositoryLogoLoader !== this.props.repositoryLogoLoader
       )
     } else {
       return true

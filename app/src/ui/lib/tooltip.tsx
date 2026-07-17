@@ -229,6 +229,7 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
   private hideTooltipTimeout: number | null = null
 
   private tooltipRef: TooltipTarget | null = null
+  private viewportListenersInstalled = false
 
   private readonly resizeObserver: ResizeObserver
 
@@ -358,9 +359,13 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
     }
 
     if (this.state.show !== prevState.show) {
-      if (this.state.show && this.props.accessible !== false && this.state.id) {
-        this.addToTargetAriaDescribedBy(target)
+      if (this.state.show) {
+        this.installViewportListeners()
+        if (this.props.accessible !== false && this.state.id) {
+          this.addToTargetAriaDescribedBy(target)
+        }
       } else {
+        this.removeViewportListeners()
         this.removeFromTargetAriaDescribedBy(target)
       }
     }
@@ -621,9 +626,31 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
       measure: true,
       show: false,
       targetRect: this.getTargetRect(target),
-      hostRect: tooltipHost.getBoundingClientRect(),
-      windowRect: new DOMRect(0, 0, window.innerWidth, window.innerHeight),
+      hostRect: getTooltipHostRect(tooltipHost),
+      windowRect: getWindowRect(),
     })
+  }
+
+  private installViewportListeners() {
+    if (this.viewportListenersInstalled) {
+      return
+    }
+
+    window.addEventListener('resize', this.hideTooltip)
+    window.visualViewport?.addEventListener('resize', this.hideTooltip)
+    window.addEventListener('scroll', this.hideTooltip, true)
+    this.viewportListenersInstalled = true
+  }
+
+  private removeViewportListeners() {
+    if (!this.viewportListenersInstalled) {
+      return
+    }
+
+    window.removeEventListener('resize', this.hideTooltip)
+    window.visualViewport?.removeEventListener('resize', this.hideTooltip)
+    window.removeEventListener('scroll', this.hideTooltip, true)
+    this.viewportListenersInstalled = false
   }
 
   private getTargetRect(target: TooltipTarget) {
@@ -691,6 +718,7 @@ export class Tooltip<T extends TooltipTarget> extends React.Component<
     this.mounted = false
     this.cancelShowTooltip()
     this.cancelHideTooltip()
+    this.removeViewportListeners()
     this.resizeObserver.disconnect()
     this.props.target.unsubscribe(this.onTargetRef)
     this.removeTooltip(this.state.target)
@@ -888,5 +916,11 @@ function getTooltipRectRelativeTo(
 
 const tooltipHostFor = (target: Element | undefined | null) =>
   target?.closest('.tooltip-host') ?? document.body
+
+const getTooltipHostRect = (host: Element) =>
+  host === document.body ? new DOMRect() : host.getBoundingClientRect()
+
+const getWindowRect = () =>
+  new DOMRect(0, 0, window.innerWidth, window.innerHeight)
 
 const stopPropagation = (e: React.SyntheticEvent) => e.stopPropagation()

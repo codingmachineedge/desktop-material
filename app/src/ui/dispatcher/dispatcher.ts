@@ -61,6 +61,11 @@ import { AppStore } from '../../lib/stores/app-store'
 import { ProfileStore } from '../../lib/stores/profile-store'
 import { RepositoryTabsStore } from '../../lib/stores/repository-tabs-store'
 import { BuildRunStore } from '../../lib/stores/build-run-store'
+import { NamedAPIFunctionsStore } from '../../lib/stores/named-api-functions-store'
+import {
+  INamedAPIFunctionDefinition,
+  INamedAPIFunctionDraft,
+} from '../../lib/named-api-functions'
 import type {
   CopilotFeature,
   CopilotModelSelections,
@@ -275,7 +280,8 @@ export class Dispatcher {
     private readonly commitStatusStore: CommitStatusStore,
     private readonly profileStore: ProfileStore,
     private readonly repositoryTabsStore: RepositoryTabsStore,
-    private readonly buildRunStore: BuildRunStore
+    private readonly buildRunStore: BuildRunStore,
+    private readonly namedAPIFunctionsStore?: NamedAPIFunctionsStore
   ) {
     this.incrementMetric = statsStore.increment.bind(statsStore)
   }
@@ -283,6 +289,42 @@ export class Dispatcher {
   /** Load the initial state for the app. */
   public loadInitialState(): Promise<void> {
     return this.appStore.loadInitialState()
+  }
+
+  /** Catalog of profile-backed API functions exposed to the app and agent. */
+  public getNamedAPIFunctions(): ReadonlyArray<INamedAPIFunctionDefinition> {
+    return this.namedAPIFunctionsStore?.getAll() ?? []
+  }
+
+  /** Observe profile restores and edits without retaining a stale catalog. */
+  public onNamedAPIFunctionsChanged(
+    listener: (functions: ReadonlyArray<INamedAPIFunctionDefinition>) => void
+  ): Disposable | null {
+    return this.namedAPIFunctionsStore?.onDidUpdate(listener) ?? null
+  }
+
+  /** Add or update one validated function as an atomic profile setting. */
+  public saveNamedAPIFunction(
+    draft: INamedAPIFunctionDraft
+  ): INamedAPIFunctionDefinition {
+    if (this.namedAPIFunctionsStore === undefined) {
+      throw new Error('Named API functions are unavailable in this window.')
+    }
+    const definition = this.namedAPIFunctionsStore.upsert(draft)
+    this.profileStore.onAppStateChanged()
+    return definition
+  }
+
+  /** Remove one function and schedule the profile history cascade commit. */
+  public removeNamedAPIFunction(id: string): boolean {
+    if (this.namedAPIFunctionsStore === undefined) {
+      return false
+    }
+    const removed = this.namedAPIFunctionsStore.remove(id)
+    if (removed) {
+      this.profileStore.onAppStateChanged()
+    }
+    return removed
   }
 
   /** Trigger a workflow_dispatch event for a repository workflow. */
@@ -490,6 +532,13 @@ export class Dispatcher {
 
   private async reloadProfileBackedState(): Promise<void> {
     await this.appStore._reloadProfileBackedSettings()
+    let namedFunctionError: Error | null = null
+    try {
+      this.namedAPIFunctionsStore?.migrate()
+    } catch (error) {
+      namedFunctionError =
+        error instanceof Error ? error : new Error(String(error))
+    }
     await this.repositoryTabsStore.reloadFromDisk()
 
     const activeTab = this.repositoryTabsStore.getActiveTab()
@@ -513,6 +562,9 @@ export class Dispatcher {
     }
 
     await this.appStore._selectRepository(selectedRepository)
+    if (namedFunctionError !== null) {
+      throw namedFunctionError
+    }
   }
 
   /**
@@ -1362,9 +1414,34 @@ export class Dispatcher {
     return this.appStore._retryBatchCloneFailed()
   }
 
+  /** Retry registering completed clones which were temporarily unavailable. */
+  public retryBatchCloneRegistration(): Promise<void> {
+    return this.appStore._retryBatchCloneRegistration()
+  }
+
   /** Cancel a running batch clone (skips items that haven't started). */
   public cancelBatchClone(): void {
     this.appStore._cancelBatchClone()
+  }
+
+  /** Pause pending queue work. Active clones are allowed to finish. */
+  public pauseBatchClone(): void {
+    this.appStore._pauseBatchClone()
+  }
+
+  /** Resume a paused/recovered clone queue after destination inspection. */
+  public resumeBatchClone(): Promise<void> {
+    return this.appStore._resumeBatchClone()
+  }
+
+  /** Configure app-lifetime background auto-clone for one account. */
+  public configureAutoClone(
+    account: Account,
+    baseDirectory: string,
+    mode: BatchCloneMode,
+    enabled: boolean
+  ): void {
+    this.appStore._configureAutoClone(account, baseDirectory, mode, enabled)
   }
 
   /** Dismiss the batch clone popup and clear its state. */

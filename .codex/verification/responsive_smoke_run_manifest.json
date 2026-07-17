@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "runId": "desktop-material-p0-ui-20260717-0139",
+  "mode": "publish",
+  "milestone": "clone recovery, custom repository logos, named API app functions, responsive surfaces, and button hints",
+  "createdAt": "2026-07-17T01:39:31-04:00",
+  "completedAt": "2026-07-17T05:47:15-04:00",
+  "project": "C:\\Users\\Administrator\\Documents\\GitHub\\desktop-material",
+  "remote": "https://github.com/codingmachineedge/desktop-material.git",
+  "expectedBranch": "main",
+  "githubAccount": "codingmachineedge",
+  "initialState": {
+    "branch": "main",
+    "baseline": "Shared feature worktree is intentionally dirty with the current milestone's implementation and tests; preserve every unrelated or concurrent agent edit.",
+    "expectedRemote": "origin/main"
+  },
+  "expectedUiState": [
+    "Every registered repository page, preferences page, repository-settings page, clone tab, notification tab, and safe dialog/menu surface launches without a blank renderer.",
+    "Every audited surface remains vertically reachable without document-level horizontal overflow at all cataloged viewport and zoom scenarios.",
+    "Clone selection refreshes after account changes; automatic clone work stays in the background; paused, interrupted, failed, and review-required queues remain recoverable.",
+    "Custom repository logos render in the studio, active tabs, and repository list, and named API functions refresh from profile state and execute through bounded app-extension contracts.",
+    "Buttons expose accessible names and hover/focus hints; History commits expose the same action menu through pointer and keyboard context-menu routes."
+  ],
+  "orderedBackgroundInteractions": [
+    "Preflight the fixed lowlevel-computer-use MCP endpoint and scheduled-task command.",
+    "Build the unpackaged development renderer through MCP run_command.",
+    "Prepare an isolated local Git fixture and fake GitHub provider beneath the owned run root.",
+    "Create one uniquely named off-screen Win32 desktop and launch only the built Desktop Material executable with isolated user data.",
+    "Run focused CDP feature verifiers, then the complete responsive surface matrix against the hidden renderer.",
+    "Capture and inspect current original-resolution evidence; promote only selected documentation-safe screenshots.",
+    "Gracefully close the verified HWND, terminate only the recorded PID if needed, close the owned desktop, and remove only validated owned temporary paths."
+  ],
+  "fixture": {
+    "runRoot": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\desktop-material-p0-ui-20260717-0139",
+    "repositoryPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\desktop-material-p0-ui-20260717-0139\\fixture",
+    "userDataPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\desktop-material-p0-ui-20260717-0139\\profile",
+    "desktopName": "DesktopMaterialP0_20260717_0139",
+    "cleanupLedger": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\desktop-material-p0-ui-20260717-0139\\cleanup-ledger.json"
+  },
+  "captures": {
+    "theme": "light",
+    "canonicalDimensions": "1000x687",
+    "responsiveScenarios": [
+      "1000x687@100%",
+      "640x480@100%",
+      "480x640@100%",
+      "960x420@100%",
+      "1600x900@100%",
+      "1000x687@125%",
+      "1000x687@150%",
+      "640x480@200%"
+    ],
+    "temporaryTarget": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\desktop-material-p0-ui-20260717-0139\\captures",
+    "documentationTarget": "docs/assets/screenshots"
+  },
+  "documentationAllowlist": [
+    "README.md",
+    "HANDOFF.md",
+    "docs/",
+    ".codex/verification/",
+    "separate desktop-material.wiki.git checkout"
+  ],
+  "declaredTests": [
+    "npx --no-install tsc --noEmit",
+    "node script/test.mjs (all current unit tests)",
+    "npx --no-install eslint (changed TypeScript/TSX/JavaScript)",
+    "npx --no-install prettier --check (changed supported text files)",
+    "git diff --check",
+    "exact MCP production build command",
+    "focused notification, navigation/context, GitHub API, clone recovery, repository-logo, named-function, and responsive CDP verifiers",
+    "responsive_surface_catalog.json full matrix ledger gate"
+  ],
+  "results": {
+    "build": {
+      "command": "npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod",
+      "transport": "fixed lowlevel-computer-use MCP run_command",
+      "returnCode": 0,
+      "timedOut": false,
+      "dependencyDownload": false,
+      "durationSeconds": 365.14
+    },
+    "responsiveMatrix": {
+      "catalogRows": 79,
+      "passed": 76,
+      "notApplicable": 3,
+      "failed": 0,
+      "blocked": 0,
+      "missing": 0,
+      "scenariosPerPassingRow": 8,
+      "ledger": "docs/verification/responsive-surface-matrix-2026-07-17.json",
+      "ledgerSha256": "108c4c444feda61bb890d341cc83fb5bc27c008695fe9f384114d6499ed9532b",
+      "notApplicableRows": [
+        "preferences.copilot.models",
+        "preferences.copilot.providers",
+        "repository-settings.ForkSettings"
+      ]
+    },
+    "featureVerification": {
+      "repositoryLogoStudio": "Passed layer editing, live text, guarded import/export, undo/redo, short-height bottom reachability, tab/list propagation, save/cancel, and cleanup to inherited state.",
+      "namedApiFunctions": "Passed catalog search, bound GET execution, response redaction, add/reload/app-agent catalog/remove lifecycle, and viewport containment.",
+      "compactActions": "At 320x240 CSS the run list remained visible, scrolled to its exact bottom, and retained reachable pagination.",
+      "compactFileHistory": "At 320x240 CSS the unified panel scrolled to its exact bottom and kept Restore reachable; narrow blame rows wrapped without document overflow.",
+      "graphQLMutationReview": "A shared lexical scanner preserves executable mutation tokens across comments, ordinary strings, escaped block-string triple quotes, and malformed-input fail-closed paths; exact lexical-decoy regressions passed.",
+      "cloneRegistrationRecovery": "Only repository paths actually accepted by the repository list are finalized; temporarily unavailable completed clones remain journaled with a visible retry and pending completion summary."
+    },
+    "promotedCaptures": [
+      {
+        "path": "docs/assets/screenshots/material-repository-logo-studio.png",
+        "width": 960,
+        "height": 660,
+        "bytes": 110716,
+        "sha256": "791c67e611a87c9e7e716616c1031c3bf696cd8acdb7f98aa1fbdffb36858777"
+      },
+      {
+        "path": "docs/assets/screenshots/material-api-app-functions.png",
+        "width": 944,
+        "height": 1000,
+        "bytes": 126774,
+        "sha256": "10d635a3e884902d4e791258e9cb470c83be0b268aa4e88aaab537601bb6a3f5"
+      }
+    ],
+    "validation": {
+      "typeScript": "pass",
+      "eslint": "pass over 77 changed TypeScript/TSX/JavaScript files with repository rules",
+      "prettier": "pass over 113 changed supported files",
+      "diffCheck": "pass",
+      "fullUnit": {
+        "files": 457,
+        "suites": 863,
+        "tests": 3139,
+        "passed": 3138,
+        "failed": 0,
+        "skipped": 1
+      },
+      "scriptHarness": {
+        "files": 2,
+        "suites": 4,
+        "tests": 15,
+        "passed": 15,
+        "failed": 0
+      },
+      "postReviewCloneAndAPIAudit": {
+        "scope": "batch model, journal, recovery UI, GitHub API workbench, and named API definition/store",
+        "tests": 59,
+        "passed": 59,
+        "failed": 0
+      }
+    }
+  },
+  "cleanup": {
+    "savedAppPid": 8700,
+    "resolvedHwnd": 21824746,
+    "gracefulWindowClose": "failed closed because the generic window tool could not resolve an alternate-desktop HWND",
+    "exactPidTermination": "passed with force=false after HWND revalidation",
+    "credential": "deleted and verified absent",
+    "providerPids": [14392, 6460],
+    "providerPort": 61130,
+    "cdpPort": 61241,
+    "recordedPidsAbsent": true,
+    "portsAbsent": true,
+    "desktopClosedExactlyOnce": true,
+    "desktopAbsent": true,
+    "ownedRunRootRemoved": true,
+    "ownedRunRootAbsent": true
+  }
+}

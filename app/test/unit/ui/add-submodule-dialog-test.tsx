@@ -148,6 +148,7 @@ function accountRepositories(
   return {
     repositories,
     loading: false,
+    error: null,
     organizations: [],
     organizationsLoading: false,
     organizationRepositories: new Map(),

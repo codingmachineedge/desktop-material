@@ -35,7 +35,12 @@
   }
 
   .container {
-    padding: var(--spacing-triple) 72px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-block: var(--spacing-triple);
+    padding-inline: clamp(var(--spacing-double), 12vw, 72px);
     overflow-x: hidden;
     overflow-y: auto;
 

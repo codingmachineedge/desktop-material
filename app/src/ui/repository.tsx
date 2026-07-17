@@ -385,6 +385,14 @@ export class RepositoryView extends React.Component<
     this.props.dispatcher.showFoldout({ type: FoldoutType.Branch })
   }
 
+  private onShowHistoryList = () => {
+    this.props.dispatcher.changeCommitSelection(this.props.repository, [], true)
+  }
+
+  private onShowChangesList = () => {
+    this.props.dispatcher.selectWorkingDirectoryFiles(this.props.repository, [])
+  }
+
   private onShowPreferences = () => {
     this.props.dispatcher.showPopup({ type: PopupType.Preferences })
   }
@@ -425,9 +433,45 @@ export class RepositoryView extends React.Component<
   }
 
   private renderRail(): JSX.Element {
+    const selectedSection = this.getSelectedSection()
+    const changesSelection = this.props.state.changesState.selection
+    const showCompactChangesList =
+      selectedSection === RepositorySectionTab.Changes &&
+      changesSelection.kind === ChangesSelectionKind.WorkingDirectory &&
+      changesSelection.selectedFileIDs.length === 1
+    const showCompactHistoryList =
+      selectedSection === RepositorySectionTab.History &&
+      this.props.state.commitSelection.shas.length > 0
+
     return (
       <nav className="repository-rail" aria-label="Repository navigation">
         {this.renderTabs()}
+        {showCompactChangesList && (
+          <button
+            type="button"
+            className="rail-nav-button compact-changes-list-button"
+            onClick={this.onShowChangesList}
+            aria-label="Show changed files"
+          >
+            <span className="rail-pill">
+              <Octicon symbol={octicons.listUnordered} className="rail-icon" />
+            </span>
+            <span className="rail-label">Changed files</span>
+          </button>
+        )}
+        {showCompactHistoryList && (
+          <button
+            type="button"
+            className="rail-nav-button compact-history-list-button"
+            onClick={this.onShowHistoryList}
+            aria-label="Show commit list"
+          >
+            <span className="rail-pill">
+              <Octicon symbol={octicons.listUnordered} className="rail-icon" />
+            </span>
+            <span className="rail-label">Commit list</span>
+          </button>
+        )}
         <button
           type="button"
           className="rail-nav-button"
@@ -937,6 +981,7 @@ export class RepositoryView extends React.Component<
         <GitHubAPIExplorer
           repository={this.props.repository}
           accounts={this.props.accounts}
+          functionRegistry={this.props.dispatcher}
         />
       )
     } else if (selectedSection === RepositorySectionTab.Triage) {

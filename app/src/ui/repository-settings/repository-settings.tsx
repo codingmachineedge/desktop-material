@@ -471,6 +471,9 @@ export class RepositorySettings extends React.Component<
           <RepositoryAppearance
             overrides={this.state.appearanceOverrides}
             isLoading={this.state.isLoadingAppearanceOverrides}
+            repositoryName={
+              this.props.repository.alias ?? this.props.repository.name
+            }
             onChanged={this.onAppearanceOverridesChanged}
           />
         )

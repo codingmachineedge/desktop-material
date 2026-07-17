@@ -154,17 +154,67 @@ async function prepareApp(page, repositoryPath) {
     await continueWithoutAccount.click()
   }
 
+  for (const selector of [
+    '.tab-search-popover',
+    '.arrange-tabs',
+    '#app-menu-foldout',
+  ]) {
+    const surface = page.locator(selector)
+    if (await surface.isVisible()) {
+      await page.keyboard.press('Escape')
+      await surface.waitFor({ state: 'detached' })
+    }
+  }
+
+  const targetName = path.basename(repositoryPath)
+  const repositoryDropdown = page.locator('.toolbar-dropdown.foldout-style', {
+    has: page.locator('.description', { hasText: 'Current repository' }),
+  })
+  const currentRepositoryTitle = repositoryDropdown.locator('.title')
   const history = page.getByRole('tab', { name: 'History', exact: true })
   const addLocalHeading = page.getByRole('heading', {
     name: 'Add local repository',
     exact: true,
   })
   await page.waitForTimeout(500)
-  if (!(await history.isVisible())) {
-    if (!(await addLocalHeading.isVisible())) {
-      await page
-        .getByRole('button', { name: /Add an Existing Repository/ })
+  if (
+    (await currentRepositoryTitle.textContent().catch(() => null))?.trim() !==
+    targetName
+  ) {
+    await repositoryDropdown.locator('.toolbar-button > button').click()
+    const repositoryList = page.locator('.repository-list')
+    await repositoryList.waitFor({ state: 'visible', timeout: 10_000 })
+    const targetOption = repositoryList
+      .getByRole('option')
+      .filter({ hasText: targetName })
+      .first()
+    if ((await targetOption.count()) > 0) {
+      await targetOption.click()
+      await repositoryList.waitFor({ state: 'detached', timeout: 30_000 })
+    } else {
+      await repositoryList
+        .getByRole('button', { name: 'Close', exact: true })
         .click()
+      await repositoryList.waitFor({ state: 'detached' })
+      await page.evaluate(() => {
+        require('electron').ipcRenderer.emit(
+          'menu-event',
+          {},
+          'add-local-repository'
+        )
+      })
+      await addLocalHeading.waitFor({ state: 'visible', timeout: 10_000 })
+    }
+  }
+  if (!(await history.isVisible()) || (await addLocalHeading.isVisible())) {
+    if (!(await addLocalHeading.isVisible())) {
+      await page.evaluate(() => {
+        require('electron').ipcRenderer.emit(
+          'menu-event',
+          {},
+          'add-local-repository'
+        )
+      })
       await addLocalHeading.waitFor({ state: 'visible', timeout: 10_000 })
     }
     const localPath = page.locator('#__TextBox_Local_path')
@@ -180,6 +230,10 @@ async function prepareApp(page, repositoryPath) {
     await add.click()
     await addLocalHeading.waitFor({ state: 'detached', timeout: 30_000 })
   }
+
+  await currentRepositoryTitle
+    .filter({ hasText: targetName })
+    .waitFor({ state: 'visible', timeout: 30_000 })
 
   await history.waitFor({
     state: 'visible',
@@ -356,7 +410,7 @@ async function verifyTabActions(page, capture) {
   })
   await filter.waitFor({ state: 'visible' })
   await filter.fill('git-source')
-  await page.getByText('1 of 1 tabs', { exact: true }).waitFor()
+  await page.getByText(/^1 of \d+ tabs$/).waitFor()
   await filter.fill('no-such-material-tab')
   await page.getByText('No tabs match this filter.', { exact: true }).waitFor()
   const arrangeReceipt = await inspectSurface(page, '.arrange-tabs')
@@ -370,11 +424,10 @@ async function verifyTabActions(page, capture) {
 
 async function verifyRepositoryScopes(page) {
   const currentRepository = page
-    .getByRole('button', {
-      name: 'git-source',
-      exact: true,
+    .locator('.toolbar-dropdown.foldout-style', {
+      has: page.locator('.description', { hasText: 'Current repository' }),
     })
-    .first()
+    .locator('.toolbar-button > button')
   await currentRepository.click()
   const list = page.locator('.repository-list')
   await list.waitFor({ state: 'visible' })

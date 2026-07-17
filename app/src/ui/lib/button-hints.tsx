@@ -107,7 +107,11 @@ export class ButtonHints extends React.Component<{}, IButtonHintsState> {
     const hint = button === null ? null : getNativeButtonHint(button)
     const activation = ++this.activation
 
-    if (button === null || hint === null || hasOwnedTooltip(button)) {
+    if (
+      button === null ||
+      hint === null ||
+      hasOwnedTooltip(button, this.target.current)
+    ) {
       this.target(null)
       this.setState({ hint: null, active: false })
       return
@@ -165,10 +169,17 @@ function buttonForEvent(event: Event): HTMLButtonElement | null {
   return button instanceof HTMLButtonElement ? button : null
 }
 
-function hasOwnedTooltip(button: HTMLButtonElement) {
+function hasOwnedTooltip(
+  button: HTMLButtonElement,
+  delegatedTarget: HTMLButtonElement | null
+) {
+  const tooltipOwner = button.closest<HTMLElement>(
+    '[data-tooltip-target="true"]'
+  )
+
   return (
     button.classList.contains('button-component') ||
-    button.closest('[data-tooltip-target="true"]') !== null
+    (tooltipOwner !== null && tooltipOwner !== delegatedTarget)
   )
 }
 

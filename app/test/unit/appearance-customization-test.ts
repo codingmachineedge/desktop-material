@@ -26,6 +26,12 @@ describe('appearance customization', () => {
       parseAppearanceCustomization('x'.repeat(4097)),
       DefaultAppearanceCustomization
     )
+    assert.deepEqual(
+      parseAppearanceCustomization(
+        JSON.stringify({ version: 1, padding: 'x'.repeat(33_000) })
+      ),
+      DefaultAppearanceCustomization
+    )
   })
 
   it('keeps valid values and replaces invalid fields independently', () => {
@@ -45,6 +51,7 @@ describe('appearance customization', () => {
     assert.equal(parsed.motion, 'reduced')
     assert.equal(parsed.tabWidth, 'wide')
     assert.equal(parsed.appIdentity.displayName, 'Desktop Material')
+    assert.equal(parsed.repositoryLogo.version, 1)
     assert.equal('unexpected' in parsed, false)
   })
 
@@ -115,5 +122,33 @@ describe('appearance customization', () => {
     assert.equal(resolved.accentPalette, 'amber')
     assert.equal(resolved.surfacePalette, 'neutral')
     assert.equal(resolved.tabWidth, 'compact')
+  })
+
+  it('normalizes a local vector logo while keeping it repository-only', () => {
+    const overrides = parseRepositoryAppearanceOverrides(
+      JSON.stringify({
+        version: 1,
+        repositoryLogo: {
+          version: 1,
+          background: {
+            shape: 'circle',
+            fill: 'solid',
+            primaryColor: '#123456',
+          },
+          layers: [
+            {
+              id: 'mark',
+              type: 'mark',
+              mark: 'star',
+              color: 'url(javascript:bad)',
+            },
+          ],
+        },
+      })
+    )
+
+    assert.equal(overrides.repositoryLogo?.background.shape, 'circle')
+    assert.equal(overrides.repositoryLogo?.background.primaryColor, '#123456')
+    assert.equal(overrides.repositoryLogo?.layers[0]?.color, '#ffffff')
   })
 })

@@ -34,6 +34,7 @@ maintenance acceptance items are complete.
 **Appearance customization**
 - Twelve app defaults in **Settings → Appearance**: accent color, surface color, surface depth, interface font, code/diff font, animation, toolbar labels, toolbar density, repository-list density, tab density, tab width, and tab-close-button behavior
 - A live **App identity** editor for the in-app logo, app name, logo geometry/border/shadow, colors, font, width, weight, case, size, spacing, opacity, emphasis, highlight, and text effects. Identity follows the active profile and restores across restart; signed binaries and the operating-system icon remain unchanged
+- A safe vector **Custom repository logo** studio with presets, editable mark/text layers, colors, transforms, live preview, undo/redo, bounded JSON import/export, a profile default, and per-repository inheritance. The resolved design follows the repository into its tab and repository-list row; executable/raw SVG is never stored
 - App defaults are versioned with the active profile in its local Git history, so they follow the selected profile and participate in the existing settings-history workflow
 - Six repository-only overrides in **Repository Settings → Appearance**: accent color, surface color, toolbar labels, toolbar density, tab density, and tab width. Each field can inherit **Use app default**; explicit values stay in the repository's local `.git/config` and are neither committed nor shared
 - Toolbar measurement respects Icons only and compact density. Build & Run overflows first, followed by Commit & Push; widening the window or shortening a dynamic label restores the same mounted controls deterministically, while an open **More** surface remains stable until it closes
@@ -51,7 +52,9 @@ maintenance acceptance items are complete.
 - GitHub browser sign-in requests the bounded feature scopes used by the app: repository/user access, workflow-file updates, notifications, and read-only organization membership. Unrelated destructive and administrative OAuth scopes are intentionally excluded
 - Browse complete GitHub organization repository lists, filter cloning by organization, and choose an organization when publishing
 - Add GitLab accounts, including self-hosted endpoints, with a personal access token; add Bitbucket accounts with an app password, then browse and clone their repositories from the provider tab
-- Select all repositories with a mixed-state checkbox, or opt in to automatically clone newly discovered repositories while the clone dialog remains open
+- Select all repositories with a mixed-state checkbox, or opt in to automatically clone only newly discovered repositories in the background. Auto-clone keeps the saved account/base-directory/mode policy and never opens an unsolicited progress dialog
+- Pause and resume pending multi-clones, including after restart or an interrupted process. A bounded atomic recovery journal revalidates the exact destination, usable clean worktree, `HEAD`, and matching origin without deleting occupied folders; failed/review-required queues remain visible until explicitly dismissed
+- Switching clone accounts clears stale repository selection and validation, reloads the exact account catalog, and keeps its latest async result from being overwritten by an older account/path check
 - Clone a private repository from a generic HTTPS URL without a credential prompt when an eligible signed-in account matches the exact origin. Only authentication or repository-not-found ambiguity can try another exact-origin account; the successful account affinity is retained, while tokenless or stale tokenless bindings are skipped and missing, SSH, non-authentication, and cross-origin credentials never widen fallback
 - The repository list can hide its automatically maintained Recent group from **Settings → Appearance**
 - Filter the cloned-repository list independently by its exact bound account and provider service; local-only, unavailable-account, and unknown/signed-out scopes are explicit instead of inferred from a host name
@@ -106,6 +109,7 @@ maintenance acceptance items are complete.
 **Agent access and command line**
 - Enable an opt-in, token-gated local agent server from **Settings → Agent access**; it exposes MCP and REST on a random loopback-only port and never returns account credentials
 - Use the bundled stdio proxy or command-line client to list accounts/repos/tabs, inspect status, clone, commit, fetch/pull/push, manage branches/tabs, run automation, and dispatch workflows
+- Turn a validated REST catalog request or named GraphQL operation into a profile-backed **App function** from the API rail. Functions are bound to the exact repository, provider, and account; read functions extend the local MCP/REST agent catalog, while mutation functions always return to the visible review step
 
 **Power-user history, stashes, and windows**
 - Search History by title, message, tag, or hash and toggle a lane graph that visualizes commit ancestry
@@ -133,6 +137,7 @@ maintenance acceptance items are complete.
 - The remaining stock surfaces — tooltips, menus, banners, autocomplete popups, segmented controls, split-buttons, dialog internals, History/CI surfaces — are re-tinted through the Material token system in both light and dark themes
 - Every button now exposes a shared hover and keyboard-focus hint derived from its explicit help text, accessible name, or visible label; icon-only native buttons mounted later by dialogs and virtualized views receive the same non-native tooltip treatment
 - Compact-height dialogs and tools keep named actions reachable without page-level horizontal clipping. In particular, the Regex Builder reflows its category/token grid and scrolls its body while preserving the tester and footer, and the Remote Manager protects readable field/control widths before stacking
+- The exhaustive responsive gate inventories every repository rail page, preferences tab, repository-settings tab, clone tab, nested API/File History/notification surface, and safe menu dialog, then proves true-bottom reachability at desktop, minimum, narrow, short, wide, 125%, 150%, and minimum-window 200% scenarios
 
 **Also shipped:** multi-clone with organization chips, parallel/sequential modes and URL-only import/export; one-click commit and push with a generated message; self-update checks against Desktop Material releases; SVG diff hardening and display controls; safer undo/reset/tag deletion confirmations; and responsive, keyboard-accessible MD3 surfaces throughout the app.
 
@@ -170,6 +175,10 @@ set.
 | Complete GitHub API Explorer |
 | --- |
 | <img src="docs/assets/screenshots/material-github-api-explorer.png" alt="Repository-contextual GitHub API Explorer with a searchable REST catalog, REST and GraphQL request builder, and bounded redacted response" width="720"><br><sub>1,206 REST operations · exactly 10 new since the prior pinned 2026-03-10 catalog · reviewed mutations</sub> |
+
+| Custom repository-logo studio | Named API app functions |
+| --- | --- |
+| <img src="docs/assets/screenshots/material-repository-logo-studio.png" alt="Layered custom repository-logo studio with live preview, undo and redo, safe JSON transfer, and repository inheritance" width="520"><br><sub>Safe vector layers · profile default · repository override</sub> | <img src="docs/assets/screenshots/material-api-app-functions.png" alt="Named API app functions extending the selected repository through reviewed REST and GraphQL definitions" width="520"><br><sub>Versioned definitions · exact binding · reviewed execution</sub> |
 
 <details>
 <summary><strong>Open 30 more verified screenshots</strong></summary>

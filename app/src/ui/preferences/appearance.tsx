@@ -29,10 +29,11 @@ import { IAppearanceCustomization } from '../../models/appearance-customization'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { AppIdentity } from './app-identity'
+import { RepositoryLogoStudio } from '../repository-logo/repository-logo-studio'
 
 type AppearanceSelectKey = Exclude<
   keyof IAppearanceCustomization,
-  'version' | 'appIdentity'
+  'version' | 'appIdentity' | 'repositoryLogo'
 >
 
 interface IAppearanceProps {
@@ -130,6 +131,15 @@ export class Appearance extends React.Component<
     this.props.onAppearanceCustomizationChanged({
       ...this.props.appearanceCustomization,
       appIdentity,
+    })
+  }
+
+  private onDefaultRepositoryLogoChanged = (
+    repositoryLogo: IAppearanceCustomization['repositoryLogo']
+  ) => {
+    this.props.onAppearanceCustomizationChanged({
+      ...this.props.appearanceCustomization,
+      repositoryLogo,
     })
   }
 
@@ -639,6 +649,11 @@ export class Appearance extends React.Component<
         <AppIdentity
           value={this.props.appearanceCustomization.appIdentity}
           onChange={this.onAppIdentityChanged}
+        />
+        <RepositoryLogoStudio
+          value={this.props.appearanceCustomization.repositoryLogo}
+          repositoryName="Example repository"
+          onChange={this.onDefaultRepositoryLogoChanged}
         />
         {this.renderScaling()}
         {this.renderSelectedTheme()}

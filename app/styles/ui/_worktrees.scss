@@ -154,4 +154,27 @@
     margin-bottom: var(--spacing);
     margin-top: calc(-1 * var(--spacing));
   }
+
+  @media (max-width: 400px) {
+    // At 200% zoom the path and picker no longer fit side by side. Let both
+    // controls keep a readable label and full hit target instead of shrinking
+    // the Choose button until its text is clipped.
+    .dialog-content > .row-component:has(> .button-component) {
+      align-items: stretch;
+      flex-direction: column;
+      gap: var(--spacing);
+
+      > * {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        margin-right: 0;
+      }
+
+      .button-component {
+        align-self: stretch;
+        white-space: normal;
+      }
+    }
+  }
 }

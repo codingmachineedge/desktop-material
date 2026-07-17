@@ -52,6 +52,7 @@ import { findItemByAccessKey, itemIsSelectable } from '../models/app-menu'
 import { Account, isDotComAccount } from '../models/account'
 import { TipState } from '../models/tip'
 import { CloneRepositoryTab } from '../models/clone-repository-tab'
+import { batchCloneNeedsAttention } from '../models/batch-clone'
 import { CloningRepository } from '../models/cloning-repository'
 import { resolveAppearanceCustomization } from '../models/appearance-customization'
 import {
@@ -969,6 +970,15 @@ export class App extends React.Component<IAppProps, IAppState> {
   }
 
   private showCloneRepo = (cloneUrl?: string) => {
+    if (
+      cloneUrl === undefined &&
+      batchCloneNeedsAttention(this.state.batchCloneState)
+    ) {
+      return this.props.dispatcher.showPopup({
+        type: PopupType.BatchCloneProgress,
+      })
+    }
+
     let initialURL: string | null = null
 
     if (cloneUrl !== undefined) {

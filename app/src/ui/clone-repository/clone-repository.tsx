@@ -41,6 +41,7 @@ import memoizeOne from 'memoize-one'
 import { validateEmptyFolder } from '../../lib/path-validation'
 import {
   BatchCloneMode,
+  IBatchCloneItem,
   IBatchCloneInput,
   buildBatchCloneItems,
 } from '../../models/batch-clone'
@@ -49,16 +50,9 @@ import { PopupType } from '../../models/popup'
 import { PreferencesTab } from '../../models/preferences'
 import { getPreferredGenericCloneAccountKey } from '../../lib/automation/clone-account-fallback'
 import { normalizeCloneDepth } from '../../models/clone-options'
-import { getBoolean, setBoolean } from '../../lib/local-storage'
-import { urlsMatch, urlMatchesCloneURL } from '../../lib/repository-matching'
-import {
-  Repository,
-  isRepositoryWithGitHubRepository,
-} from '../../models/repository'
+import { getAutoClonePolicy } from '../../lib/stores/auto-clone-store'
+import { Repository } from '../../models/repository'
 import { CloningRepository } from '../../models/cloning-repository'
-
-const AutoCloneNewRepositoriesKey = 'clone-auto-clone-new-repositories'
-const AutoCloneRefreshInterval = 5 * 60 * 1000
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -121,6 +115,34 @@ export function accountMatchesCloneTab(
     default:
       return assertNever(tab, `Unknown clone repository tab: ${tab}`)
   }
+}
+
+/**
+ * True when an account-list update changes the identity a hosted clone tab
+ * resolves to. Account objects are routinely refreshed in place, so compare
+ * stable endpoint/id keys rather than object identity.
+ */
+export function resolvedCloneAccountChanged(
+  tab: CloneRepositoryTab,
+  selectedAccount: Account | null,
+  previousAccounts: ReadonlyArray<Account>,
+  accounts: ReadonlyArray<Account>
+): boolean {
+  if (tab === CloneRepositoryTab.Generic) {
+    return false
+  }
+  const previous = resolveSelectedAccount(
+    previousAccounts.filter(account => accountMatchesCloneTab(tab, account)),
+    selectedAccount
+  )
+  const current = resolveSelectedAccount(
+    accounts.filter(account => accountMatchesCloneTab(tab, account)),
+    selectedAccount
+  )
+  return (
+    (previous === null ? null : getAccountKey(previous)) !==
+    (current === null ? null : getAccountKey(current))
+  )
 }
 
 /**
@@ -248,8 +270,11 @@ export class CloneRepository extends React.Component<
   ICloneRepositoryProps,
   ICloneRepositoryState
 > {
-  private autoCloneRefreshHandle: number | null = null
-  private readonly autoCloneQueuedUrls = new Set<string>()
+  /** Invalidates async validation when the selected tab/account/input changes. */
+  private pathValidationSequence = 0
+  private cloneInputSequence = 0
+  private autoCloneHydrationKey: string | null = null
+  private hasUnmounted = false
 
   private checkIsTopMostDialog = isTopMostDialog(
     () => {
@@ -287,7 +312,7 @@ export class CloneRepository extends React.Component<
       batchMode: BatchCloneMode.Parallel,
       shallowClone: false,
       cloneDepth: '1',
-      autoCloneNewRepositories: getBoolean(AutoCloneNewRepositoriesKey, false),
+      autoCloneNewRepositories: false,
       dotComTabState: {
         kind: 'dotComTabState',
         filterText: '',
@@ -323,18 +348,33 @@ export class CloneRepository extends React.Component<
 
   public componentDidUpdate(prevProps: ICloneRepositoryProps) {
     if (prevProps.selectedTab !== this.props.selectedTab) {
-      this.validatePath()
+      this.pathValidationSequence += 1
+      this.cloneInputSequence += 1
+      this.syncAutoCloneState(false, () =>
+        this.validatePath(this.props.selectedTab)
+      )
     }
 
     if (prevProps.initialURL !== this.props.initialURL) {
       this.updateUrl(this.props.initialURL || '')
     }
 
-    this.checkIsTopMostDialog(this.props.isTopMost)
-
-    if (this.state.autoCloneNewRepositories) {
-      this.autoCloneNewRepositories()
+    if (prevProps.accounts !== this.props.accounts) {
+      this.pathValidationSequence += 1
+      this.cloneInputSequence += 1
+      if (this.resetChangedHostedAccounts(prevProps.accounts)) {
+        // The reset callback hydrates any saved policy against the new account
+        // and validates its destination after stale selection state is gone.
+      } else {
+        this.syncAutoCloneState()
+      }
     }
+
+    if (prevProps.repositories !== this.props.repositories) {
+      this.syncAutoCloneState()
+    }
+
+    this.checkIsTopMostDialog(this.props.isTopMost)
   }
 
   public componentDidMount() {
@@ -344,61 +384,136 @@ export class CloneRepository extends React.Component<
     }
 
     this.checkIsTopMostDialog(this.props.isTopMost)
-    if (this.state.autoCloneNewRepositories) {
-      this.startAutoClonePolling()
-      this.autoCloneNewRepositories()
-    }
+    this.syncAutoCloneState()
   }
 
   public componentWillUnmount(): void {
+    this.hasUnmounted = true
     this.checkIsTopMostDialog(false)
-    this.stopAutoClonePolling()
-  }
-
-  private startAutoClonePolling = () => {
-    if (this.autoCloneRefreshHandle !== null) {
-      return
-    }
-
-    this.autoCloneRefreshHandle = window.setInterval(() => {
-      const account = this.getAccountForTab(this.props.selectedTab)
-      if (account !== null) {
-        this.props.onRefreshRepositories(account)
-      }
-    }, AutoCloneRefreshInterval)
-  }
-
-  private stopAutoClonePolling = () => {
-    if (this.autoCloneRefreshHandle !== null) {
-      window.clearInterval(this.autoCloneRefreshHandle)
-      this.autoCloneRefreshHandle = null
-    }
+    this.pathValidationSequence += 1
+    this.cloneInputSequence += 1
   }
 
   private initializePath = async () => {
     const initialPath = await getDefaultDir()
-    const dotComTabState = { ...this.state.dotComTabState, path: initialPath }
-    const enterpriseTabState = {
-      ...this.state.enterpriseTabState,
-      path: initialPath,
+    if (this.hasUnmounted) {
+      return
     }
-    const urlTabState = { ...this.state.urlTabState, path: initialPath }
-    const providerTabState = {
-      ...this.state.providerTabState,
-      path: initialPath,
+    this.setState(
+      previousState => ({
+        initialPath,
+        dotComTabState:
+          previousState.dotComTabState.path === null
+            ? { ...previousState.dotComTabState, path: initialPath }
+            : previousState.dotComTabState,
+        enterpriseTabState:
+          previousState.enterpriseTabState.path === null
+            ? { ...previousState.enterpriseTabState, path: initialPath }
+            : previousState.enterpriseTabState,
+        providerTabState:
+          previousState.providerTabState.path === null
+            ? { ...previousState.providerTabState, path: initialPath }
+            : previousState.providerTabState,
+        urlTabState:
+          previousState.urlTabState.path === null
+            ? { ...previousState.urlTabState, path: initialPath }
+            : previousState.urlTabState,
+      }),
+      () => {
+        // The asynchronous default-directory lookup must not overwrite a
+        // persisted per-account automatic-clone destination.
+        this.autoCloneHydrationKey = null
+        this.syncAutoCloneState(true, () => {
+          const selectedTabState = this.getSelectedTabState()
+          this.updateUrl(selectedTabState.url)
+        })
+      }
+    )
+  }
+
+  /**
+   * Clear repository-specific state when sign-out/account refresh changes the
+   * account a tab falls back to. Without this, the new account can inherit the
+   * previous account's selected row, URL, organization, and checked batch.
+   */
+  private resetChangedHostedAccounts(
+    previousAccounts: ReadonlyArray<Account>
+  ): boolean {
+    const changed = new Map<CloneRepositoryTab, Account | null>()
+    const hostedTabs = [
+      CloneRepositoryTab.DotCom,
+      CloneRepositoryTab.Enterprise,
+      CloneRepositoryTab.Providers,
+    ] as const
+
+    for (const tab of hostedTabs) {
+      const tabState = this.getGitHubTabState(tab)
+      if (
+        resolvedCloneAccountChanged(
+          tab,
+          tabState.selectedAccount,
+          previousAccounts,
+          this.props.accounts
+        )
+      ) {
+        changed.set(tab, this.getAccountForTab(tab))
+      }
     }
-    this.setState({
-      initialPath,
-      dotComTabState,
-      enterpriseTabState,
-      providerTabState,
-      urlTabState,
+
+    if (changed.size === 0) {
+      return false
+    }
+
+    const reset = (
+      state: IGitHubTabState,
+      account: Account | null
+    ): IGitHubTabState => ({
+      ...state,
+      selectedAccount: account,
+      selectedOrganization: null,
+      selectedItem: null,
+      checkedUrls: new Set<string>(),
+      url: '',
+      lastParsedIdentifier: null,
+      error: null,
+      path:
+        state.path !== null && state.lastParsedIdentifier !== null
+          ? Path.dirname(state.path)
+          : state.path,
     })
 
-    // Update the local path based on the current url now that we have an
-    // initial path
-    const selectedTabState = this.getSelectedTabState()
-    this.updateUrl(selectedTabState.url)
+    this.setState(
+      previousState => ({
+        dotComTabState: changed.has(CloneRepositoryTab.DotCom)
+          ? reset(
+              previousState.dotComTabState,
+              changed.get(CloneRepositoryTab.DotCom) ?? null
+            )
+          : previousState.dotComTabState,
+        enterpriseTabState: changed.has(CloneRepositoryTab.Enterprise)
+          ? reset(
+              previousState.enterpriseTabState,
+              changed.get(CloneRepositoryTab.Enterprise) ?? null
+            )
+          : previousState.enterpriseTabState,
+        providerTabState: changed.has(CloneRepositoryTab.Providers)
+          ? reset(
+              previousState.providerTabState,
+              changed.get(CloneRepositoryTab.Providers) ?? null
+            )
+          : previousState.providerTabState,
+      }),
+      () => {
+        const selectedAccount = changed.get(this.props.selectedTab)
+        if (selectedAccount !== undefined && selectedAccount !== null) {
+          this.props.onRefreshRepositories(selectedAccount)
+        }
+        this.syncAutoCloneState(false, () =>
+          this.validatePath(this.props.selectedTab)
+        )
+      }
+    )
+    return true
   }
 
   public render() {
@@ -423,7 +538,11 @@ export class CloneRepository extends React.Component<
 
         {error ? <DialogError>{error.message}</DialogError> : null}
 
-        <div role="tabpanel" aria-labelledby={this.getSelectedTabId()}>
+        <div
+          className="clone-repository-tab-panel"
+          role="tabpanel"
+          aria-labelledby={this.getSelectedTabId()}
+        >
           {this.renderActiveTab()}
         </div>
 
@@ -534,7 +653,14 @@ export class CloneRepository extends React.Component<
   }
 
   private onPathChanged = (path: string) => {
-    this.setSelectedTabState({ path }, this.validatePath)
+    const tab = this.props.selectedTab
+    this.cloneInputSequence += 1
+    this.setTabState({ path }, tab, () => {
+      this.validatePath(tab)
+      if (this.state.autoCloneNewRepositories) {
+        this.onAutoCloneNewRepositoriesChanged(true)
+      }
+    })
   }
 
   private renderActiveTab() {
@@ -599,6 +725,7 @@ export class CloneRepository extends React.Component<
               onChooseDirectory={this.onChooseDirectory}
               repositories={visibleRepositories}
               loading={loading || organizationState?.loading === true}
+              repositoryError={accountState?.error ?? null}
               organizations={accountState?.organizations ?? []}
               organizationsLoading={accountState?.organizationsLoading ?? false}
               selectedOrganization={tabState.selectedOrganization}
@@ -630,15 +757,33 @@ export class CloneRepository extends React.Component<
   }
 
   private onSelectedAccountChanged = (account: Account) => {
-    if (this.props.selectedTab !== CloneRepositoryTab.Generic) {
+    const tab = this.props.selectedTab
+    if (tab !== CloneRepositoryTab.Generic) {
+      const previous = this.getGitHubTabState(tab)
+      const basePath =
+        previous.path !== null && previous.lastParsedIdentifier !== null
+          ? Path.dirname(previous.path)
+          : previous.path
+      this.pathValidationSequence += 1
+      this.cloneInputSequence += 1
       this.setGitHubTabState(
         {
           selectedAccount: account,
           selectedOrganization: null,
           selectedItem: null,
           checkedUrls: new Set<string>(),
+          url: '',
+          lastParsedIdentifier: null,
+          error: null,
+          path: basePath,
         },
-        this.props.selectedTab
+        tab,
+        () => {
+          this.syncAutoCloneState(false, () => {
+            this.props.onRefreshRepositories(account)
+            this.validatePath(tab)
+          })
+        }
       )
     }
   }
@@ -801,20 +946,30 @@ export class CloneRepository extends React.Component<
     tab:
       | CloneRepositoryTab.DotCom
       | CloneRepositoryTab.Enterprise
-      | CloneRepositoryTab.Providers
+      | CloneRepositoryTab.Providers,
+    callback?: () => void
   ): void {
     if (tab === CloneRepositoryTab.DotCom) {
-      this.setState(prevState => ({
-        dotComTabState: merge(prevState.dotComTabState, tabState),
-      }))
+      this.setState(
+        prevState => ({
+          dotComTabState: merge(prevState.dotComTabState, tabState),
+        }),
+        callback
+      )
     } else if (tab === CloneRepositoryTab.Enterprise) {
-      this.setState(prevState => ({
-        enterpriseTabState: merge(prevState.enterpriseTabState, tabState),
-      }))
+      this.setState(
+        prevState => ({
+          enterpriseTabState: merge(prevState.enterpriseTabState, tabState),
+        }),
+        callback
+      )
     } else if (tab === CloneRepositoryTab.Providers) {
-      this.setState(prevState => ({
-        providerTabState: merge(prevState.providerTabState, tabState),
-      }))
+      this.setState(
+        prevState => ({
+          providerTabState: merge(prevState.providerTabState, tabState),
+        }),
+        callback
+      )
     } else {
       return assertNever(tab, `Unknown tab: ${tab}`)
     }
@@ -929,131 +1084,109 @@ export class CloneRepository extends React.Component<
   }
 
   private onAutoCloneNewRepositoriesChanged = (enabled: boolean) => {
-    setBoolean(AutoCloneNewRepositoriesKey, enabled)
-    this.setState({ autoCloneNewRepositories: enabled }, () => {
-      if (enabled) {
-        this.startAutoClonePolling()
-        this.autoCloneNewRepositories()
-      } else {
-        this.stopAutoClonePolling()
-        this.autoCloneQueuedUrls.clear()
-      }
-    })
-  }
-
-  private getAutoCloneRepositories(): ReadonlyArray<IAPIRepository> | null {
     const tab = this.props.selectedTab
     if (tab === CloneRepositoryTab.Generic) {
-      return null
+      return
     }
-
     const account = this.getAccountForTab(tab)
     if (account === null) {
-      return null
+      return
     }
-
-    const accountState = this.props.apiRepositories.get(account)
-    if (accountState === undefined || accountState.loading) {
-      return null
-    }
-
-    const organization =
-      this.getGitHubTabState(tab).selectedOrganization === null
-        ? null
-        : accountState.organizations.find(
-            x => x.login === this.getGitHubTabState(tab).selectedOrganization
-          ) ?? null
-    const organizationState = organization
-      ? accountState.organizationRepositories.get(
-          organization.login.toLowerCase()
-        )
-      : undefined
-
-    if (organization === null) {
-      return accountState.repositories
-    }
-
-    return mergeOrganizationRepositories(
-      accountState.repositories,
-      organizationState?.repositories ?? [],
-      organization.login
-    )
-  }
-
-  private isAutoCloneRepositoryTracked(apiRepository: IAPIRepository) {
-    return this.props.repositories.some(repository => {
-      if (repository instanceof CloningRepository) {
-        return urlsMatch(repository.url, apiRepository.clone_url)
-      }
-
-      if (
-        !(repository instanceof Repository) ||
-        !isRepositoryWithGitHubRepository(repository)
-      ) {
-        return false
-      }
-
-      return (
-        urlMatchesCloneURL(
-          apiRepository.clone_url,
-          repository.gitHubRepository
-        ) ||
-        urlsMatch(
-          repository.gitHubRepository.htmlURL ?? '',
-          apiRepository.html_url
-        )
+    const baseDirectory = this.getAutoCloneBaseDirectory(tab)
+    if (enabled && (baseDirectory === null || baseDirectory.length === 0)) {
+      this.setGitHubTabState(
+        {
+          error: new Error(
+            'Choose a base directory before enabling auto-clone.'
+          ),
+        },
+        tab
       )
-    })
-  }
-
-  private autoCloneNewRepositories = () => {
-    const tab = this.props.selectedTab
-    if (tab === CloneRepositoryTab.Generic) {
       return
     }
-
-    const baseDirectory = this.getGitHubTabState(tab).path
-    const account = this.getAccountForTab(tab)
-    const repositories = this.getAutoCloneRepositories()
-    if (
-      account === null ||
-      baseDirectory === null ||
-      baseDirectory.length === 0 ||
-      repositories === null
-    ) {
-      return
-    }
-
-    const accountKey =
-      account.token.length > 0 ? getAccountKey(account) : undefined
-    const inputs: ReadonlyArray<IBatchCloneInput> = repositories
-      .filter(
-        repository =>
-          !this.autoCloneQueuedUrls.has(repository.clone_url) &&
-          !this.isAutoCloneRepositoryTracked(repository)
-      )
-      .map(repository => {
-        this.autoCloneQueuedUrls.add(repository.clone_url)
-        return {
-          url: repository.clone_url,
-          name: repository.name,
-          defaultBranch: repository.default_branch,
-          ...(accountKey !== undefined ? { accountKey } : {}),
-        }
-      })
-
-    if (inputs.length === 0) {
-      return
-    }
-
-    this.props.dispatcher.cloneBatch(
-      buildBatchCloneItems(inputs, baseDirectory),
-      this.state.batchMode
+    this.props.dispatcher.configureAutoClone(
+      account,
+      baseDirectory ?? '',
+      this.state.batchMode,
+      enabled
     )
+    this.setState({ autoCloneNewRepositories: enabled })
   }
 
   private onBatchModeChanged = (batchMode: BatchCloneMode) => {
-    this.setState({ batchMode })
+    this.setState({ batchMode }, () => {
+      if (this.state.autoCloneNewRepositories) {
+        this.onAutoCloneNewRepositoriesChanged(true)
+      }
+    })
+  }
+
+  private syncAutoCloneState = (
+    forceHydration = false,
+    callback?: () => void
+  ) => {
+    const tab = this.props.selectedTab
+    const account =
+      tab === CloneRepositoryTab.Generic ? null : this.getAccountForTab(tab)
+    const policy = account === null ? null : getAutoClonePolicy(account)
+    const hydrationKey =
+      account === null ? `${tab}:none` : `${tab}:${getAccountKey(account)}`
+    const shouldHydrate =
+      forceHydration || this.autoCloneHydrationKey !== hydrationKey
+    this.autoCloneHydrationKey = hydrationKey
+
+    const enabled = policy !== null
+    const nextState = {
+      autoCloneNewRepositories: enabled,
+      batchMode: policy?.mode ?? this.state.batchMode,
+    }
+    const finish = () => {
+      if (
+        shouldHydrate &&
+        policy !== null &&
+        tab !== CloneRepositoryTab.Generic
+      ) {
+        const tabState = this.getGitHubTabState(tab)
+        if (tabState.selectedItem === null && tabState.url.length === 0) {
+          this.setGitHubTabState(
+            {
+              path: policy.baseDirectory,
+              lastParsedIdentifier: null,
+              error: null,
+            },
+            tab,
+            callback
+          )
+          return
+        }
+      }
+      callback?.()
+    }
+
+    if (
+      this.state.autoCloneNewRepositories !==
+        nextState.autoCloneNewRepositories ||
+      this.state.batchMode !== nextState.batchMode
+    ) {
+      this.setState(nextState, finish)
+    } else {
+      finish()
+    }
+  }
+
+  private getAutoCloneBaseDirectory(
+    tab:
+      | CloneRepositoryTab.DotCom
+      | CloneRepositoryTab.Enterprise
+      | CloneRepositoryTab.Providers
+  ): string | null {
+    const tabState = this.getGitHubTabState(tab)
+    if (tabState.path === null) {
+      return null
+    }
+    return tabState.lastParsedIdentifier === null
+      ? tabState.path
+      : Path.dirname(tabState.path)
   }
 
   private onCloneBatch = () => {
@@ -1063,7 +1196,7 @@ export class CloneRepository extends React.Component<
     }
 
     const tabState = this.getGitHubTabState(tab)
-    const baseDirectory = tabState.path
+    const baseDirectory = this.getAutoCloneBaseDirectory(tab)
 
     if (baseDirectory === null || baseDirectory.length === 0) {
       this.setGitHubTabState(
@@ -1105,7 +1238,21 @@ export class CloneRepository extends React.Component<
       return
     }
 
-    const items = buildBatchCloneItems(inputs, baseDirectory)
+    let items: ReadonlyArray<IBatchCloneItem>
+    try {
+      items = buildBatchCloneItems(inputs, baseDirectory)
+    } catch (error) {
+      this.setGitHubTabState(
+        {
+          error:
+            error instanceof Error
+              ? error
+              : new Error('Unable to build a safe clone queue.'),
+        },
+        tab
+      )
+      return
+    }
 
     this.props.dispatcher.closeFoldout(FoldoutType.Repository)
     this.props.dispatcher.cloneBatch(items, this.state.batchMode)
@@ -1114,27 +1261,49 @@ export class CloneRepository extends React.Component<
     this.props.onDismissed()
   }
 
-  private validatePath = async () => {
-    const tabState = this.getSelectedTabState()
+  private validatePath = async (
+    tab: CloneRepositoryTab = this.props.selectedTab
+  ) => {
+    const request = ++this.pathValidationSequence
+    const tabState = this.getTabState(tab)
     const { path, url, error } = tabState
+    const accountSnapshotKey = this.getAccountSnapshotKey(tab)
     const { initialPath } = this.state
     const isDefaultPath = initialPath === path
     const isURLNotEntered = url === ''
+    const isHostedBaseDirectory =
+      tab !== CloneRepositoryTab.Generic &&
+      isURLNotEntered &&
+      tabState.lastParsedIdentifier === null
 
-    if (isDefaultPath && isURLNotEntered) {
+    if ((isDefaultPath && isURLNotEntered) || isHostedBaseDirectory) {
       if (error) {
-        this.setSelectedTabState({ error: null })
+        this.setTabState({ error: null }, tab)
       }
     } else {
       const pathValidation = await validateEmptyFolder(path)
 
-      // We only care about the result if the path hasn't
-      // changed since we went async
-      const newTabState = this.getSelectedTabState()
-      if (newTabState.path === path) {
-        this.setSelectedTabState({ error: pathValidation, path })
+      // A validation belongs to one exact tab/account/url/path snapshot. An OS
+      // picker, account switch, or tab switch invalidates it before it can land.
+      const newTabState = this.getTabState(tab)
+      if (
+        request === this.pathValidationSequence &&
+        this.props.selectedTab === tab &&
+        newTabState.path === path &&
+        newTabState.url === url &&
+        this.getAccountSnapshotKey(tab) === accountSnapshotKey
+      ) {
+        this.setTabState({ error: pathValidation, path }, tab)
       }
     }
+  }
+
+  private getAccountSnapshotKey(tab: CloneRepositoryTab): string | null {
+    if (tab === CloneRepositoryTab.Generic) {
+      return null
+    }
+    const account = this.getAccountForTab(tab)
+    return account === null ? null : getAccountKey(account)
   }
 
   private onChooseDirectory = async () => {
@@ -1149,30 +1318,40 @@ export class CloneRepository extends React.Component<
   }
 
   private onChooseWithOpenDialog = async (): Promise<string | undefined> => {
+    const tab = this.props.selectedTab
+    const accountSnapshotKey = this.getAccountSnapshotKey(tab)
+    const request = this.cloneInputSequence
     const path = await showOpenDialog({
       properties: ['createDirectory', 'openDirectory'],
     })
 
-    if (path === null) {
+    if (
+      path === null ||
+      request !== this.cloneInputSequence ||
+      tab !== this.props.selectedTab ||
+      accountSnapshotKey !== this.getAccountSnapshotKey(tab)
+    ) {
       return
     }
 
-    const tabState = this.getSelectedTabState()
+    const tabState = this.getTabState(tab)
     const lastParsedIdentifier = tabState.lastParsedIdentifier
     const directory = lastParsedIdentifier
       ? Path.join(path, lastParsedIdentifier.name)
       : path
 
-    this.setSelectedTabState(
-      { path: directory, error: null },
-      this.validatePath
+    this.setTabState({ path: directory, error: null }, tab, () =>
+      this.validatePath(tab)
     )
 
     return directory
   }
 
   private onChooseWithSaveDialog = async (): Promise<string | undefined> => {
-    const tabState = this.getSelectedTabState()
+    const tab = this.props.selectedTab
+    const accountKey = this.getAccountSnapshotKey(tab)
+    const request = this.cloneInputSequence
+    const tabState = this.getTabState(tab)
 
     const path = await showSaveDialog({
       buttonLabel: 'Select',
@@ -1182,23 +1361,30 @@ export class CloneRepository extends React.Component<
       properties: ['createDirectory'],
     })
 
-    if (path == null) {
+    if (
+      path == null ||
+      request !== this.cloneInputSequence ||
+      tab !== this.props.selectedTab ||
+      accountKey !== this.getAccountSnapshotKey(tab)
+    ) {
       return
     }
 
-    this.setSelectedTabState({ path, error: null }, this.validatePath)
+    this.setTabState({ path, error: null }, tab, () => this.validatePath(tab))
 
     return path
   }
 
   private updateUrl = async (url: string) => {
+    const tab = this.props.selectedTab
+    this.cloneInputSequence += 1
     const parsed = parseRepositoryIdentifier(url)
-    const tabState = this.getSelectedTabState()
+    const tabState = this.getTabState(tab)
     const lastParsedIdentifier = tabState.lastParsedIdentifier
 
     // If there is no path yet, just update the url
     if (tabState.path === null) {
-      this.setSelectedTabState({ url }, this.validatePath)
+      this.setTabState({ url }, tab, () => this.validatePath(tab))
       return
     }
 
@@ -1217,13 +1403,14 @@ export class CloneRepository extends React.Component<
       newPath = dirPath
     }
 
-    this.setSelectedTabState(
+    this.setTabState(
       {
         url,
         lastParsedIdentifier: parsed,
         path: newPath,
       },
-      this.validatePath
+      tab,
+      () => this.validatePath(tab)
     )
   }
 
@@ -1279,10 +1466,25 @@ export class CloneRepository extends React.Component<
   }
 
   private clone = async () => {
+    const tab = this.props.selectedTab
+    const inputSequence = this.cloneInputSequence
+    const accountSnapshotKey = this.getAccountSnapshotKey(tab)
+    const inputState = this.getTabState(tab)
     this.setState({ loading: true })
 
     const cloneInfo = await this.resolveCloneInfo()
-    const { path } = this.getSelectedTabState()
+    const currentState = this.getTabState(tab)
+    if (
+      tab !== this.props.selectedTab ||
+      inputSequence !== this.cloneInputSequence ||
+      accountSnapshotKey !== this.getAccountSnapshotKey(tab) ||
+      inputState.url !== currentState.url ||
+      inputState.path !== currentState.path
+    ) {
+      this.setState({ loading: false })
+      return
+    }
+    const { path } = currentState
 
     if (path == null) {
       const error = new Error(`Directory could not be created at this path.`)
@@ -1304,7 +1506,7 @@ export class CloneRepository extends React.Component<
 
     this.props.dispatcher.closeFoldout(FoldoutType.Repository)
     try {
-      this.cloneImpl(url.trim(), path, defaultBranch, accountKey)
+      this.cloneImpl(url.trim(), path, defaultBranch, accountKey ?? undefined)
     } catch (e) {
       log.error(`CloneRepository: clone failed to complete to ${path}`, e)
       this.setState({ loading: false })
