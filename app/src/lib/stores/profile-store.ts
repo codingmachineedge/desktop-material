@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { writeFile, readFile, stat } from 'fs/promises'
+import { stat } from 'fs/promises'
 import { TypedBaseStore } from './base-store'
 import { AccountsStore } from './accounts-store'
 import { Account, getAccountKey } from '../../models/account'
@@ -37,6 +37,7 @@ import {
   readWindowTabsState,
 } from '../profiles/profile-tabs-file'
 import { PrimaryWindowScope } from '../window-scope'
+import { readCrashSafeText, writeCrashSafeJson } from '../crash-safe-file'
 
 /** localStorage key holding the raw key of the active profile. */
 const ActiveProfileStorageKey = 'active-profile-key'
@@ -277,8 +278,13 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
       }
 
       try {
-        const raw = await readFile(join(repository.path, 'tabs.json'), 'utf8')
-        return readWindowTabsState(JSON.parse(raw), windowScope)
+        const saved = await readCrashSafeText(
+          join(repository.path, 'tabs.json'),
+          { validate: isJsonObject }
+        )
+        return saved === null
+          ? null
+          : readWindowTabsState(JSON.parse(saved.contents), windowScope)
       } catch {
         // Absent or corrupt — treat as no saved tabs.
       }
@@ -308,7 +314,10 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
       const path = join(repository.path, 'tabs.json')
       let current: unknown = null
       try {
-        current = JSON.parse(await readFile(path, 'utf8'))
+        const saved = await readCrashSafeText(path, {
+          validate: isJsonObject,
+        })
+        current = saved === null ? null : JSON.parse(saved.contents)
       } catch {
         // Missing or corrupt state is replaced with a valid scoped file.
       }
@@ -478,7 +487,7 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
       login,
     })
 
-    if (!(await fileExists(join(dir, 'settings.json')))) {
+    if (!(await hasRecoverableSettingsFile(join(dir, 'settings.json')))) {
       await this.writeSettingsFile(repository, captureSettingsSnapshot())
     }
 
@@ -496,7 +505,9 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
       version: SettingsFileVersion,
       settings,
     }
-    await writeJsonFile(join(repository.path, 'settings.json'), contents)
+    await writeCrashSafeJson(join(repository.path, 'settings.json'), contents, {
+      validatePrevious: isSettingsFile,
+    })
   }
 
   private async onAccountsChanged(
@@ -579,7 +590,9 @@ function loginForKey(
 }
 
 async function writeJsonFile(path: string, contents: unknown): Promise<void> {
-  await writeFile(path, JSON.stringify(contents, null, 2))
+  await writeCrashSafeJson(path, contents, {
+    validatePrevious: isJsonObject,
+  })
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -604,7 +617,17 @@ function emptyHistoryPage(): IProfileHistoryPage {
 async function readSettingsSnapshot(
   repository: Repository
 ): Promise<Record<string, string>> {
-  const raw = await readFile(join(repository.path, 'settings.json'), 'utf8')
+  const path = join(repository.path, 'settings.json')
+  const saved = await readCrashSafeText(path, {
+    validate: isSettingsFile,
+  })
+  if (saved === null) {
+    throw new Error('The profile settings file does not exist')
+  }
+  return parseSettingsSnapshot(saved.contents)
+}
+
+function parseSettingsSnapshot(raw: string): Record<string, string> {
   const parsed: unknown = JSON.parse(raw)
 
   if (!isRecord(parsed) || parsed.version !== SettingsFileVersion) {
@@ -631,6 +654,38 @@ async function readSettingsSnapshot(
   }
 
   return snapshot
+}
+
+function isSettingsFile(raw: string): boolean {
+  try {
+    parseSettingsSnapshot(raw)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function isJsonObject(raw: string): boolean {
+  try {
+    return isRecord(JSON.parse(raw))
+  } catch {
+    return false
+  }
+}
+
+async function hasRecoverableSettingsFile(path: string): Promise<boolean> {
+  try {
+    return (
+      (await readCrashSafeText(path, {
+        validate: isSettingsFile,
+      })) !== null
+    )
+  } catch (error) {
+    // Preserve an unrecoverable working file for Git-backed/manual recovery.
+    // A future settings mutation will safely replace it with a valid snapshot.
+    log.error('Unable to recover the profile settings file', error)
+    return fileExists(path)
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

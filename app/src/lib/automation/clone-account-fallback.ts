@@ -79,6 +79,18 @@ export interface ICloneAccountFallbackResult {
   readonly accountKey: string | null
 }
 
+export function isCloneAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError'
+}
+
+function throwIfCloneAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    const error = new Error('Repository clone cancelled.')
+    error.name = 'AbortError'
+    throw error
+  }
+}
+
 /**
  * Use a valid hosted-tab account selection for the first clone attempt. A
  * generic URL keeps the normal unforced first attempt. Only after an HTTPS
@@ -93,14 +105,17 @@ export async function cloneWithAccountFallback(
   remoteUrl: string,
   getAccounts: () => Promise<ReadonlyArray<Account>>,
   preferredAccountKey: string | null,
-  operation: (forcedAccountKey?: string) => Promise<void>
+  operation: (forcedAccountKey?: string) => Promise<void>,
+  signal?: AbortSignal
 ): Promise<ICloneAccountFallbackResult> {
+  throwIfCloneAborted(signal)
   let accounts: ReadonlyArray<Account> | undefined
   let eligibleAccountKeys: ReadonlyArray<string> | undefined
   let initialAccountKey: string | undefined
 
   if (preferredAccountKey !== null) {
     accounts = await getAccounts()
+    throwIfCloneAborted(signal)
     eligibleAccountKeys = getCloneAccountKeys(remoteUrl, accounts)
     if (eligibleAccountKeys.includes(preferredAccountKey)) {
       initialAccountKey = preferredAccountKey
@@ -108,15 +123,22 @@ export async function cloneWithAccountFallback(
   }
 
   try {
+    throwIfCloneAborted(signal)
     await operation(initialAccountKey)
+    throwIfCloneAborted(signal)
     return { accountKey: initialAccountKey ?? null }
   } catch (error) {
+    if (signal?.aborted || isCloneAbortError(error)) {
+      throwIfCloneAborted(signal)
+      throw error
+    }
     if (!isPullAllHTTPSAuthenticationFailure(error, remoteUrl)) {
       throw error
     }
 
     let lastError = error
     accounts ??= await getAccounts()
+    throwIfCloneAborted(signal)
     const fallbackAccountKeys =
       initialAccountKey === undefined
         ? getPullAllFallbackAccountKeys(remoteUrl, accounts, null)
@@ -126,9 +148,15 @@ export async function cloneWithAccountFallback(
 
     for (const accountKey of fallbackAccountKeys) {
       try {
+        throwIfCloneAborted(signal)
         await operation(accountKey)
+        throwIfCloneAborted(signal)
         return { accountKey }
       } catch (retryError) {
+        if (signal?.aborted || isCloneAbortError(retryError)) {
+          throwIfCloneAborted(signal)
+          throw retryError
+        }
         if (!isPullAllHTTPSAuthenticationFailure(retryError, remoteUrl)) {
           throw retryError
         }

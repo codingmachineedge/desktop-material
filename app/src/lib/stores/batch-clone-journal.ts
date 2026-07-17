@@ -1,14 +1,7 @@
-import {
-  copyFile,
-  lstat,
-  readFile,
-  readdir,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from 'fs/promises'
+import { constants } from 'fs'
+import { lstat, open, readdir, rename, unlink } from 'fs/promises'
 import { Buffer } from 'buffer'
+import { randomUUID } from 'crypto'
 import { dirname, join } from 'path'
 import {
   BatchCloneMode,
@@ -19,19 +12,31 @@ import {
   MaxBatchCloneItems,
   MaxBatchClonePathLength,
   assertSafeBatchCloneItems,
+  isBatchCloneRecoveryId,
   isSafeBatchCloneItem,
 } from '../../models/batch-clone'
 import { pathExists } from '../path-exists'
 import { git } from '../git/core'
 import { urlsMatch } from '../repository-matching'
 import { validateEmptyFolder } from '../path-validation'
+import {
+  CrashSafeFileCorruptError,
+  CrashSafeFilePersistence,
+  sharedCrashSafeFilePersistence,
+} from '../crash-safe-file'
 
+/** Legacy direct-to-destination queues remain readable but never gain staging. */
 export const BatchCloneJournalVersion = 1
+/** New queues use app-owned staging and an unguessable recovery id per item. */
+export const CurrentBatchCloneJournalVersion = 2
+export type SupportedBatchCloneJournalVersion =
+  | typeof BatchCloneJournalVersion
+  | typeof CurrentBatchCloneJournalVersion
 export const MaxBatchCloneJournalBytes = 2 * 1024 * 1024
 export const MaxBatchCloneJournalStatusTextLength = 8192
 
 export interface IBatchCloneJournalSnapshot {
-  readonly version: typeof BatchCloneJournalVersion
+  readonly version: SupportedBatchCloneJournalVersion
   readonly updatedAt: string
   readonly items: ReadonlyArray<IBatchCloneItem>
   readonly statuses: ReadonlyArray<readonly [string, IBatchCloneItemStatus]>
@@ -60,7 +65,7 @@ interface ISerializedStatus {
 }
 
 interface ISerializedBatchCloneJournal {
-  readonly version: number
+  readonly version: SupportedBatchCloneJournalVersion
   readonly updatedAt: string
   readonly items: ReadonlyArray<IBatchCloneItem>
   readonly statuses: ReadonlyArray<readonly [string, ISerializedStatus]>
@@ -79,96 +84,84 @@ export class FileBatchCloneJournal implements IBatchCloneJournal {
   private readonly userDataPath: string
   private readonly path: string
   private readonly backupPath: string
+  private operationChain: Promise<void> = Promise.resolve()
 
-  public constructor(userDataPath: string) {
+  public constructor(
+    userDataPath: string,
+    private readonly persistence: Pick<
+      CrashSafeFilePersistence,
+      'readText' | 'writeText' | 'clear'
+    > = sharedCrashSafeFilePersistence
+  ) {
     this.userDataPath = userDataPath
     this.path = join(userDataPath, 'clone-queue-v1.json')
     this.backupPath = `${this.path}.backup`
   }
 
-  public async load(): Promise<IBatchCloneJournalSnapshot | null> {
-    await this.scrubLegacyQuarantines()
-    const raw = await readBoundedJournalFile(this.path).catch(error => {
-      if (error.code === 'ENOENT') {
-        return null
-      }
-      log.error('Clone queue journal is unreadable; preserving it', error)
-      return 'corrupt'
-    })
-    if (raw === null) {
-      return this.loadBackup()
-    }
-
-    const parsed = raw === 'corrupt' ? null : parseBatchCloneJournal(raw)
-    if (parsed !== null) {
-      return parsed
-    }
-
-    const quarantine = `${this.path}.corrupt-${Date.now()}`
-    await replaceWithSafeQuarantineMarker(
-      this.path,
-      quarantine,
-      'active clone queue journal'
-    )
-    return this.loadBackup()
+  public load(): Promise<IBatchCloneJournalSnapshot | null> {
+    return this.enqueue(() => this.loadUnlocked())
   }
 
-  public async save(snapshot: IBatchCloneJournalSnapshot): Promise<void> {
-    const temporaryPath = `${this.path}.tmp-${process.pid}`
-    const serialized = serializeBatchCloneJournal(snapshot)
-    await writeFile(temporaryPath, serialized, 'utf8')
-    try {
-      await copyFile(this.path, this.backupPath).catch(error => {
-        if (error.code !== 'ENOENT') {
-          throw error
-        }
+  public save(snapshot: IBatchCloneJournalSnapshot): Promise<void> {
+    return this.enqueue(async () => {
+      const serialized = serializeBatchCloneJournal(snapshot)
+      await this.persistence.writeText(this.path, serialized, {
+        backupPath: this.backupPath,
+        maxPreviousBytes: MaxBatchCloneJournalBytes,
+        validatePrevious: isBatchCloneJournal,
       })
-      await rename(temporaryPath, this.path)
-    } catch (error) {
-      await unlink(temporaryPath).catch(() => undefined)
-      throw error
-    }
+    })
   }
 
-  public async clear(): Promise<void> {
-    await Promise.all(
-      [this.path, this.backupPath].map(path =>
-        unlink(path).catch(error => {
-          if (error.code !== 'ENOENT') {
-            throw error
-          }
-        })
-      )
+  public clear(): Promise<void> {
+    return this.enqueue(async () => {
+      await this.persistence.clear(this.path, {
+        backupPath: this.backupPath,
+      })
+      await this.removeLegacyTemporaryFiles()
+    })
+  }
+
+  private enqueue<T>(action: () => Promise<T>): Promise<T> {
+    const operation = this.operationChain.then(action)
+    this.operationChain = operation.then(
+      () => undefined,
+      () => undefined
     )
+    return operation
   }
 
-  private async loadBackup(): Promise<IBatchCloneJournalSnapshot | null> {
-    let backup: string
-    try {
-      backup = await readBoundedJournalFile(this.backupPath)
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        return null
-      }
-      log.error('Clone queue journal backup is unreadable', error)
+  private async loadUnlocked(): Promise<IBatchCloneJournalSnapshot | null> {
+    await this.scrubLegacyQuarantines()
+    await this.removeLegacyTemporaryFiles()
+
+    const primaryInspection = await inspectJournalFile(this.path)
+    if (primaryInspection === 'invalid') {
       await replaceWithSafeQuarantineMarker(
-        this.backupPath,
-        `${this.backupPath}.corrupt-${Date.now()}`,
-        'clone queue journal backup'
+        this.path,
+        `${this.path}.corrupt-${Date.now()}-${randomUUID()}`,
+        'active clone queue journal'
       )
+    }
+
+    try {
+      const saved = await this.persistence.readText(this.path, {
+        backupPath: this.backupPath,
+        maxBytes: MaxBatchCloneJournalBytes,
+        validate: isBatchCloneJournal,
+      })
+      return saved === null ? null : parseBatchCloneJournal(saved.contents)
+    } catch (error) {
+      log.error('Clone queue journal is unreadable; preserving it', error)
+      if (error instanceof CrashSafeFileCorruptError) {
+        await replaceWithSafeQuarantineMarker(
+          this.backupPath,
+          `${this.backupPath}.corrupt-${Date.now()}-${randomUUID()}`,
+          'clone queue journal backup'
+        )
+      }
       return null
     }
-
-    const parsed = parseBatchCloneJournal(backup)
-    if (parsed !== null) {
-      return parsed
-    }
-    await replaceWithSafeQuarantineMarker(
-      this.backupPath,
-      `${this.backupPath}.corrupt-${Date.now()}`,
-      'clone queue journal backup'
-    )
-    return null
   }
 
   /**
@@ -198,6 +191,28 @@ export class FileBatchCloneJournal implements IBatchCloneJournal {
           quarantinePath,
           'legacy clone queue quarantine'
         )
+      }
+    }
+  }
+
+  private async removeLegacyTemporaryFiles(): Promise<void> {
+    let names: ReadonlyArray<string>
+    try {
+      names = await readdir(this.userDataPath)
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error
+      }
+      return
+    }
+
+    for (const name of names) {
+      if (name.startsWith('clone-queue-v1.json.tmp-')) {
+        await unlink(join(this.userDataPath, name)).catch(error => {
+          if (error.code !== 'ENOENT') {
+            throw error
+          }
+        })
       }
     }
   }
@@ -312,7 +327,7 @@ export function parseBatchCloneJournal(
   }
 
   return {
-    version: BatchCloneJournalVersion,
+    version: value.version,
     updatedAt: value.updatedAt,
     items: value.items,
     statuses: value.statuses.map(([path, status]) => [
@@ -353,7 +368,8 @@ function isSerializedJournal(
 
   const journal = value as Partial<ISerializedBatchCloneJournal>
   if (
-    journal.version !== BatchCloneJournalVersion ||
+    (journal.version !== BatchCloneJournalVersion &&
+      journal.version !== CurrentBatchCloneJournalVersion) ||
     typeof journal.updatedAt !== 'string' ||
     journal.updatedAt.length > 64 ||
     !Array.isArray(journal.items) ||
@@ -384,6 +400,14 @@ function isSerializedJournal(
   try {
     assertSafeBatchCloneItems(journal.items)
   } catch {
+    return false
+  }
+
+  if (
+    journal.version === CurrentBatchCloneJournalVersion
+      ? !journal.items.every(item => isBatchCloneRecoveryId(item.recoveryId))
+      : journal.items.some(item => item.recoveryId !== undefined)
+  ) {
     return false
   }
 

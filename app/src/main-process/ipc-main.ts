@@ -1,13 +1,13 @@
 import { RequestChannels, RequestResponseChannels } from '../lib/ipc-shared'
 // eslint-disable-next-line no-restricted-imports
 import { ipcMain } from 'electron'
-import { IpcMainEvent, IpcMainInvokeEvent } from 'electron/main'
+import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron/main'
 import { isTrustedIPCSender } from './trusted-ipc-sender'
 
 type RequestChannelListener<T extends keyof RequestChannels> = (
   event: IpcMainEvent,
   ...args: Parameters<RequestChannels[T]>
-) => void
+) => void | Promise<void>
 
 type RequestResponseChannelListener<T extends keyof RequestResponseChannels> = (
   event: IpcMainInvokeEvent,
@@ -23,7 +23,7 @@ export function on<T extends keyof RequestChannels>(
   channel: T,
   listener: RequestChannelListener<T>
 ): () => void {
-  const wrapped = safeListener(listener)
+  const wrapped = safeSimplexListener(channel, listener)
   ipcMain.on(channel, wrapped)
   return () => ipcMain.removeListener(channel, wrapped)
 }
@@ -37,7 +37,7 @@ export function once<T extends keyof RequestChannels>(
   channel: T,
   listener: RequestChannelListener<T>
 ) {
-  ipcMain.once(channel, safeListener(listener))
+  ipcMain.once(channel, safeSimplexListener(channel, listener))
 }
 
 /**
@@ -64,5 +64,22 @@ function safeListener<E extends IpcMainEvent | IpcMainInvokeEvent, R>(
     }
 
     return listener(event, ...args)
+  }
+}
+
+function safeSimplexListener<T extends keyof RequestChannels>(
+  channel: T,
+  listener: RequestChannelListener<T>
+) {
+  const trustedListener = safeListener(listener)
+
+  return (event: IpcMainEvent, ...args: Parameters<RequestChannels[T]>) => {
+    const result = trustedListener(event, ...args)
+
+    if (result !== undefined) {
+      void Promise.resolve(result).catch(error => {
+        log.error(`Simplex IPC listener "${channel}" failed`, error)
+      })
+    }
   }
 }

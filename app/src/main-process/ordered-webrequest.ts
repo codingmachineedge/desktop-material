@@ -1,4 +1,4 @@
-import {
+import type {
   WebRequest,
   OnBeforeRequestListenerDetails,
   CallbackResponse,
@@ -67,7 +67,9 @@ class AsyncListenerSet<TDetails, TResponse> {
     private readonly eventHandler: (
       listeners: Iterable<AsyncListener<TDetails, TResponse>>,
       details: TDetails
-    ) => Promise<TResponse>
+    ) => Promise<TResponse>,
+    private readonly fallbackResponse: () => TResponse,
+    private readonly eventName: string
   ) {}
 
   public addEventListener(listener: AsyncListener<TDetails, TResponse>) {
@@ -75,8 +77,36 @@ class AsyncListenerSet<TDetails, TResponse> {
     this.listeners.add(listener)
 
     if (firstListener) {
-      this.subscribe(async (details, cb) => {
-        cb(await this.eventHandler([...this.listeners], details))
+      this.subscribe((details, cb) => {
+        let callbackInvoked = false
+        const invokeCallback = (response: TResponse) => {
+          if (callbackInvoked) {
+            log.error(
+              `Attempted to invoke the ${this.eventName} web request callback more than once`
+            )
+            return
+          }
+
+          callbackInvoked = true
+          try {
+            cb(response)
+          } catch (error) {
+            log.error(
+              `Failed to deliver the ${this.eventName} web request response`,
+              error
+            )
+          }
+        }
+
+        void Promise.resolve()
+          .then(() => this.eventHandler([...this.listeners], details))
+          .then(invokeCallback, error => {
+            log.error(
+              `${this.eventName} web request listener failed; cancelling the request`,
+              error
+            )
+            invokeCallback(this.fallbackResponse())
+          })
       })
     }
   }
@@ -137,7 +167,10 @@ export class OrderedWebRequest {
       webRequest.onBeforeRedirect.bind(webRequest)
     )
 
-    this.onBeforeRequest = new AsyncListenerSet(
+    this.onBeforeRequest = new AsyncListenerSet<
+      OnBeforeRequestListenerDetails,
+      CallbackResponse
+    >(
       webRequest.onBeforeRequest.bind(webRequest),
       async (listeners, details) => {
         let response: CallbackResponse = {}
@@ -154,10 +187,15 @@ export class OrderedWebRequest {
         }
 
         return response
-      }
+      },
+      () => ({ cancel: true }),
+      'onBeforeRequest'
     )
 
-    this.onBeforeSendHeaders = new AsyncListenerSet(
+    this.onBeforeSendHeaders = new AsyncListenerSet<
+      OnBeforeSendHeadersListenerDetails,
+      BeforeSendResponse
+    >(
       webRequest.onBeforeSendHeaders.bind(webRequest),
       async (listeners, initialDetails) => {
         let details = initialDetails
@@ -183,7 +221,9 @@ export class OrderedWebRequest {
         }
 
         return details
-      }
+      },
+      () => ({ cancel: true }),
+      'onBeforeSendHeaders'
     )
 
     this.onCompleted = new SyncListenerSet(
@@ -194,7 +234,10 @@ export class OrderedWebRequest {
       webRequest.onErrorOccurred.bind(webRequest)
     )
 
-    this.onHeadersReceived = new AsyncListenerSet(
+    this.onHeadersReceived = new AsyncListenerSet<
+      OnHeadersReceivedListenerDetails,
+      HeadersReceivedResponse
+    >(
       webRequest.onHeadersReceived.bind(webRequest),
       async (listeners, initialDetails) => {
         let details = initialDetails
@@ -220,7 +263,9 @@ export class OrderedWebRequest {
         }
 
         return details
-      }
+      },
+      () => ({ cancel: true }),
+      'onHeadersReceived'
     )
 
     this.onResponseStarted = new SyncListenerSet(

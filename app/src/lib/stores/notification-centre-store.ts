@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { readFile, writeFile, rename } from 'fs/promises'
+import { rename } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import { TypedBaseStore } from './base-store'
 import { getPath } from '../../ui/main-process-proxy'
@@ -27,6 +27,11 @@ import {
   INotificationInput,
 } from '../../models/notification-centre'
 import { IProfileHistoryPage } from '../../models/profile'
+import {
+  CrashSafeFileCorruptError,
+  readCrashSafeText,
+  writeCrashSafeText,
+} from '../crash-safe-file'
 
 /** The single notifications file tracked by the notification repository. */
 const NotificationsFileName = 'notifications.json'
@@ -287,11 +292,11 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
       return
     }
 
-    const raw = await readFile(
+    const saved = await readCrashSafeText(
       join(this.repository.path, NotificationsFileName),
-      'utf8'
+      { validate: isNotificationLog }
     ).catch(() => null)
-    const parsed = raw === null ? null : parseNotificationLog(raw)
+    const parsed = saved === null ? null : parseNotificationLog(saved.contents)
     this.entries = parsed?.entries ?? []
     this.emitState()
   }
@@ -389,9 +394,10 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
     this.writeChain = this.writeChain
       .catch(() => undefined)
       .then(async () => {
-        await writeFile(
+        await writeCrashSafeText(
           join(repository.path, NotificationsFileName),
-          serializeNotificationLog(this.entries)
+          serializeNotificationLog(this.entries),
+          { validatePrevious: isNotificationLog }
         )
         queue.schedule(description)
       })
@@ -402,18 +408,36 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
   private async loadOrInitialize(repository: Repository): Promise<void> {
     const path = join(repository.path, NotificationsFileName)
 
-    const raw = await readFile(path, 'utf8').catch(() => null)
-    if (raw === null) {
+    let saved = null
+    try {
+      saved = await readCrashSafeText(path, {
+        validate: isNotificationLog,
+      })
+    } catch (error) {
+      if (!(error instanceof CrashSafeFileCorruptError)) {
+        throw error
+      }
+    }
+
+    if (saved === null && !(await notificationFileExists(path))) {
       // Fresh install — seed an empty log and record the first commit.
       this.entries = []
-      await writeFile(path, serializeNotificationLog([]))
+      await writeCrashSafeText(path, serializeNotificationLog([]), {
+        validatePrevious: isNotificationLog,
+      })
       await commitAllChanges(repository, 'Initialize notifications')
       return
     }
 
-    const parsed = parseNotificationLog(raw)
+    const parsed = saved === null ? null : parseNotificationLog(saved.contents)
     if (parsed !== null) {
       this.entries = parsed.entries
+      if (saved?.source !== 'primary') {
+        await commitAllChanges(
+          repository,
+          `Recover notifications from crash-safe ${saved?.source}`
+        )
+      }
       return
     }
 
@@ -423,7 +447,9 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
       const recovered = await this.readEntriesFromCommit(repository, back)
       if (recovered !== null) {
         this.entries = recovered
-        await writeFile(path, serializeNotificationLog(recovered))
+        await writeCrashSafeText(path, serializeNotificationLog(recovered), {
+          validatePrevious: isNotificationLog,
+        })
         await commitAllChanges(
           repository,
           `Recover notifications from HEAD~${back}`
@@ -461,15 +487,28 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
 
     const repository = await ensureProfileRepository(dir)
     this.entries = []
-    await writeFile(
+    await writeCrashSafeText(
       join(repository.path, NotificationsFileName),
-      serializeNotificationLog([])
+      serializeNotificationLog([]),
+      { validatePrevious: isNotificationLog }
     )
     await commitAllChanges(
       repository,
       'Reinitialize notifications after corruption'
     )
     return repository
+  }
+}
+
+function isNotificationLog(raw: string): boolean {
+  return parseNotificationLog(raw) !== null
+}
+
+async function notificationFileExists(path: string): Promise<boolean> {
+  try {
+    return (await readCrashSafeText(path)) !== null
+  } catch (error) {
+    return error instanceof CrashSafeFileCorruptError
   }
 }
 

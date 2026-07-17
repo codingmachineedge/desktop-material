@@ -5,9 +5,10 @@
  * Exhaustive responsive-surface verifier for Desktop Material. The caller owns
  * the exact production build, Electron process, loopback CDP port, isolated
  * user-data/repository fixture, off-screen Win32 desktop, and cleanup. This
- * helper prepares one deterministic File History probe, drives the
- * already-running renderer, and writes evidence inside the caller-owned run
- * root.
+ * helper expects seed_batch_clone_recovery_fixture.js to have populated the
+ * isolated userData directory before launch, prepares one deterministic File
+ * History probe, drives the already-running renderer, and writes evidence
+ * inside the caller-owned run root.
  */
 
 const crypto = require('crypto')
@@ -16,6 +17,9 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { chromium } = require('playwright')
+const {
+  FixtureItemCount: BatchCloneRecoveryFixtureItemCount,
+} = require('./seed_batch_clone_recovery_fixture')
 
 // On Windows, fs.realpathSync can preserve an 8.3 spelling for os.tmpdir()
 // while expanding a caller-supplied child path. The native variant returns a
@@ -767,7 +771,8 @@ async function auditMatrix(
   options,
   id,
   selector,
-  targetSelector = null
+  targetSelector = null,
+  assertReceipt = assertSurface
 ) {
   const evidence = []
   let capture = null
@@ -775,7 +780,7 @@ async function auditMatrix(
     for (const scenario of catalog.viewportMatrix) {
       const metrics = await setMetrics(page, session, scenario)
       const receipt = await inspectSurface(page, selector, targetSelector)
-      assertSurface(receipt, `${id}/${scenario.id}`)
+      assertReceipt(receipt, `${id}/${scenario.id}`)
       evidence.push({ scenario, metrics, receipt })
       if (scenario.id === 'short') {
         const capturePath = path.join(options.captureDirectory, captureName(id))
@@ -796,6 +801,100 @@ async function auditMatrix(
     await restoreMetrics(page, session)
   }
   return { id, status: 'pass', evidence, capture }
+}
+
+function assertBatchCloneRecoverySurface(receipt, label) {
+  assertSurface(receipt, label)
+  const cloneList = receipt.scrollOwners.find(owner =>
+    owner.label.split('.').includes('batch-clone-list')
+  )
+  if (cloneList === undefined || !cloneList.reachedBottom) {
+    fail(`${label}: clone queue list did not expose a reachable bottom.`)
+  }
+  if (receipt.lastControl?.label !== 'Hide') {
+    fail(`${label}: Hide was not the final reachable control.`)
+  }
+}
+
+async function auditBatchCloneRecoveryPopup(page, session, options, ledger) {
+  const id = 'popup.batch-clone-recovery'
+  const dialog = page.locator('dialog#batch-clone-progress')
+  let row = null
+  try {
+    await dialog.waitFor({ state: 'visible', timeout: 30_000 })
+    const fixtureState = await dialog.evaluate(root => {
+      const items = [...root.querySelectorAll('.batch-clone-item')]
+      const title = root.querySelector('h1, h2, header')?.textContent ?? ''
+      const summary = root.querySelector(
+        '.batch-clone-overall .summary'
+      )?.textContent
+      const buttons = [...root.querySelectorAll('button')]
+      const findButton = label =>
+        buttons.find(
+          button => button.textContent?.replace(/\s+/g, ' ').trim() === label
+        )
+      const resume = findButton('Resume')
+      return {
+        title: title.replace(/\s+/g, ' ').trim(),
+        summary: summary?.replace(/\s+/g, ' ').trim() ?? '',
+        itemCount: items.length,
+        interruptedCount: items.filter(item =>
+          item.classList.contains('interrupted')
+        ).length,
+        resumeEnabled: resume instanceof HTMLButtonElement && !resume.disabled,
+        hidePresent: findButton('Hide') instanceof HTMLButtonElement,
+      }
+    })
+    if (
+      fixtureState.title !== 'Clone queue paused' ||
+      fixtureState.itemCount !== BatchCloneRecoveryFixtureItemCount ||
+      fixtureState.interruptedCount !== fixtureState.itemCount ||
+      !fixtureState.resumeEnabled ||
+      !fixtureState.hidePresent ||
+      !fixtureState.summary.includes(`${fixtureState.itemCount} interrupted`)
+    ) {
+      fail(
+        `The initial clone recovery popup was not the paused/interrupted fixture: ${JSON.stringify(
+          fixtureState
+        )}`
+      )
+    }
+
+    const matrixRow = await auditMatrix(
+      page,
+      session,
+      options,
+      id,
+      '#batch-clone-progress',
+      null,
+      assertBatchCloneRecoverySurface
+    )
+    row = { ...matrixRow, fixtureState }
+
+    const hide = dialog.getByRole('button', { name: 'Hide', exact: true })
+    await hide.click()
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+    await settle(page)
+  } catch (error) {
+    row = {
+      id,
+      status: 'failed',
+      evidence: [],
+      capture: null,
+      notes: error instanceof Error ? error.message : String(error),
+    }
+    if (await dialog.isVisible().catch(() => false)) {
+      const hide = dialog.getByRole('button', { name: 'Hide', exact: true })
+      if ((await hide.count()) > 0 && (await hide.isVisible())) {
+        await hide.click().catch(() => undefined)
+        await dialog
+          .waitFor({ state: 'hidden', timeout: 10_000 })
+          .catch(() => undefined)
+        await settle(page).catch(() => undefined)
+      }
+    }
+  }
+  ledger.push(row)
 }
 
 async function safeAuditMatrix(
@@ -1550,6 +1649,21 @@ function validateLedger(ledger) {
       ) {
         fail(`Invalid responsive capture receipt for ${row.id}.`)
       }
+      if (row.id === 'popup.batch-clone-recovery') {
+        const state = row.fixtureState
+        if (
+          state?.title !== 'Clone queue paused' ||
+          state?.itemCount !== BatchCloneRecoveryFixtureItemCount ||
+          state?.interruptedCount !== BatchCloneRecoveryFixtureItemCount ||
+          state?.resumeEnabled !== true ||
+          state?.hidePresent !== true ||
+          !state?.summary?.includes(
+            `${BatchCloneRecoveryFixtureItemCount} interrupted`
+          )
+        ) {
+          fail('The clone recovery ledger row lacks valid fixture state.')
+        }
+      }
     } else if (row.capture !== null) {
       fail(`Non-passing responsive ledger row ${row.id} retained a capture.`)
     }
@@ -1577,6 +1691,7 @@ async function main() {
   const ledger = []
   let auditError = null
   try {
+    await auditBatchCloneRecoveryPopup(page, session, options, ledger)
     await prepareApp(page, options.repositoryPath)
     await auditRepositorySections(page, session, options, ledger)
     await auditFileHistory(page, session, options, ledger, fileHistoryProbe)

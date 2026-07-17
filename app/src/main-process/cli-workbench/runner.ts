@@ -1,11 +1,15 @@
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
+import {
+  spawn,
+  ChildProcessWithoutNullStreams,
+  SpawnOptionsWithoutStdio,
+} from 'child_process'
 import { WebContents } from 'electron'
 import {
   ICLICommandOutputEvent,
   ICLICommandStateEvent,
 } from '../../lib/cli-workbench'
 import * as ipcWebContents from '../ipc-webcontents'
-import { killTree } from '../build-run/kill-tree'
+import { killTreeAndWait } from '../build-run/kill-tree'
 import {
   CLICommandConcurrencyCap,
   CLICommandOutputLimiter,
@@ -20,24 +24,77 @@ interface IActiveCLICommand {
   readonly child: ChildProcessWithoutNullStreams
   readonly pid: number | null
   readonly output: CLICommandOutputLimiter
+  readonly closed: Promise<void>
+  readonly resolveClosed: () => void
   cancelled: boolean
+  exited: boolean
   finished: boolean
+  cancellation: Promise<void> | null
   cleanup: () => void
 }
 
 const OutputTruncatedMessage =
   '\n[CLI workbench output truncated at the 4 MiB safety limit.]\n'
+const CLICommandTerminationDeadlineMilliseconds = 15_000
+
+type SpawnCLICommand = (
+  executable: string,
+  args: ReadonlyArray<string>,
+  options: SpawnOptionsWithoutStdio
+) => ChildProcessWithoutNullStreams
+
+export interface ICLIWorkbenchRunnerDependencies {
+  readonly spawn?: SpawnCLICommand
+  readonly killTree?: (
+    pid: number,
+    isStillOwned: () => boolean
+  ) => Promise<boolean>
+  readonly validateRequest?: (
+    value: unknown
+  ) => Promise<IResolvedCLICommandRequest>
+  readonly resolveTool?: typeof resolveCLIWorkbenchTool
+  readonly terminationDeadlineMilliseconds?: number
+}
+
+function logRunnerFailure(message: string, error?: unknown): void {
+  try {
+    log.error(message, error instanceof Error ? error : undefined)
+  } catch {
+    // Diagnostics cannot turn a bounded teardown into an unhandled failure.
+  }
+}
 
 /** Bounded main-process runner for explicit Git and GitHub CLI argv. */
 export class CLIWorkbenchRunner {
   private readonly runs = new Map<string, IActiveCLICommand>()
+  private readonly spawnCommand: SpawnCLICommand
+  private readonly killProcessTree: (
+    pid: number,
+    isStillOwned: () => boolean
+  ) => Promise<boolean>
+  private readonly validateRequest: (
+    value: unknown
+  ) => Promise<IResolvedCLICommandRequest>
+  private readonly resolveTool: typeof resolveCLIWorkbenchTool
+  private readonly terminationDeadlineMilliseconds: number
+
+  public constructor(dependencies: ICLIWorkbenchRunnerDependencies = {}) {
+    this.spawnCommand = dependencies.spawn ?? spawn
+    this.killProcessTree = dependencies.killTree ?? killTreeAndWait
+    this.validateRequest =
+      dependencies.validateRequest ?? validateCLICommandRequest
+    this.resolveTool = dependencies.resolveTool ?? resolveCLIWorkbenchTool
+    this.terminationDeadlineMilliseconds =
+      dependencies.terminationDeadlineMilliseconds ??
+      CLICommandTerminationDeadlineMilliseconds
+  }
 
   public async start(value: unknown, sender: WebContents): Promise<void> {
     if (this.runs.size >= CLICommandConcurrencyCap) {
       throw new Error('Too many CLI commands are already running.')
     }
 
-    const request = await validateCLICommandRequest(value)
+    const request = await this.validateRequest(value)
     // Validation touches the filesystem. Recheck after that await so a burst
     // of simultaneous requests cannot all pass the initial capacity check.
     if (this.runs.size >= CLICommandConcurrencyCap) {
@@ -50,7 +107,7 @@ export class CLIWorkbenchRunner {
     let executable: string
     let toolEnv: Record<string, string | undefined>
     try {
-      const resolved = resolveCLIWorkbenchTool(request.tool)
+      const resolved = this.resolveTool(request.tool)
       executable = resolved.executable
       toolEnv = resolved.env
     } catch {
@@ -58,7 +115,7 @@ export class CLIWorkbenchRunner {
     }
     let child: ChildProcessWithoutNullStreams
     try {
-      child = spawn(executable, [...request.args], {
+      child = this.spawnCommand(executable, [...request.args], {
         cwd: request.repositoryPath,
         env: toolEnv,
         shell: false,
@@ -70,23 +127,41 @@ export class CLIWorkbenchRunner {
       throw new Error(`Unable to start ${request.tool}.`)
     }
 
+    let resolveClosed: () => void = () => undefined
+    const closed = new Promise<void>(resolve => {
+      resolveClosed = resolve
+    })
     const run: IActiveCLICommand = {
       request,
       sender,
       child,
       pid: child.pid ?? null,
       output: new CLICommandOutputLimiter(),
+      closed,
+      resolveClosed,
       cancelled: false,
+      exited: false,
       finished: false,
+      cancellation: null,
       cleanup: () => {},
     }
     this.runs.set(request.id, run)
 
     const onNavigate = () => {
-      void this.cancel(request.id, sender)
+      void this.cancel(request.id, sender).catch(error =>
+        logRunnerFailure(
+          '[cli-workbench] renderer navigation cancel failed',
+          error
+        )
+      )
     }
     const onDestroyed = () => {
-      void this.cancel(request.id, sender)
+      void this.cancel(request.id, sender).catch(error =>
+        logRunnerFailure(
+          '[cli-workbench] renderer teardown cancel failed',
+          error
+        )
+      )
     }
     sender.on('did-start-navigation', onNavigate)
     sender.once('destroyed', onDestroyed)
@@ -118,7 +193,12 @@ export class CLIWorkbenchRunner {
         error: `Unable to run ${request.tool}.`,
       })
     })
+    child.once('exit', () => {
+      run.exited = true
+    })
     child.once('close', (code, signal) => {
+      run.exited = true
+      run.resolveClosed()
       if (run.finished) {
         return
       }
@@ -150,25 +230,73 @@ export class CLIWorkbenchRunner {
     if (run === undefined || (sender !== undefined && run.sender !== sender)) {
       return false
     }
-    if (run.cancelled || run.finished) {
+    if (run.finished && run.exited) {
       return true
     }
-    run.cancelled = true
-    run.child.stdin.end()
-    if (run.pid !== null) {
-      killTree(run.pid)
-    }
+    await this.cancelRun(run)
     return true
   }
 
   /** Kill every exact PID tree during application shutdown. */
-  public killAll(): void {
-    for (const run of this.runs.values()) {
+  public async killAll(): Promise<void> {
+    const runs = [...this.runs.values()]
+    await Promise.all(runs.map(run => this.cancelRun(run)))
+  }
+
+  private async cancelRun(run: IActiveCLICommand): Promise<void> {
+    if (run.cancellation === null) {
       run.cancelled = true
+      run.cancellation = this.terminate(run).catch(error => {
+        logRunnerFailure('[cli-workbench] command teardown failed', error)
+      })
+    }
+    await run.cancellation
+  }
+
+  private async terminate(run: IActiveCLICommand): Promise<void> {
+    try {
       run.child.stdin.end()
-      if (run.pid !== null) {
-        killTree(run.pid)
+    } catch {
+      // The process may have closed its pipe before cancellation arrived.
+    }
+
+    const isStillOwned = () => !run.exited
+    if (run.pid !== null && isStillOwned()) {
+      let killed = false
+      try {
+        killed = await this.killProcessTree(run.pid, isStillOwned)
+      } catch (error) {
+        logRunnerFailure(
+          '[cli-workbench] process-tree termination failed',
+          error
+        )
       }
+      if (!killed && isStillOwned()) {
+        try {
+          run.child.kill('SIGKILL')
+        } catch {
+          // The exact child may have exited at the fallback boundary.
+        }
+      }
+    }
+
+    let deadline: ReturnType<typeof setTimeout> | null = null
+    const closed = await Promise.race([
+      run.closed.then(() => true),
+      new Promise<false>(resolve => {
+        deadline = setTimeout(
+          () => resolve(false),
+          this.terminationDeadlineMilliseconds
+        )
+      }),
+    ])
+    if (deadline !== null) {
+      clearTimeout(deadline)
+    }
+    if (!closed) {
+      logRunnerFailure(
+        `[cli-workbench] timed out waiting for command ${run.request.id} to close`
+      )
     }
   }
 

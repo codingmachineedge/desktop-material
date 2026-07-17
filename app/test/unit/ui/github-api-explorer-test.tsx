@@ -2,11 +2,14 @@ import assert from 'node:assert'
 import { resolve } from 'node:path'
 import { describe, it } from 'node:test'
 import * as React from 'react'
+import * as semver from 'semver'
 
 import {
   GitHubAPIWorkbenchRequest,
   IGitHubAPIWorkbenchResponse,
 } from '../../../src/lib/github-api-workbench'
+import { resolveGitHubGraphQLOperationCatalog } from '../../../src/lib/github-graphql-operation-catalog'
+import { resolveGitHubAPIOperationCatalog } from '../../../src/lib/github-api-operation-catalog'
 import { Account, getAccountKey } from '../../../src/models/account'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
@@ -74,11 +77,12 @@ class FakeExplorerClient implements IGitHubAPIExplorerClient {
 function account(
   login: string,
   id: number,
-  provider: Account['provider'] = 'github'
+  provider: Account['provider'] = 'github',
+  endpoint = 'https://api.github.com'
 ) {
   return new Account(
     login,
-    'https://api.github.com',
+    endpoint,
     `${login}-token`,
     [],
     '',
@@ -197,11 +201,16 @@ describe('GitHub API Explorer', () => {
   it('uses only the repository-bound GitHub account', () => {
     const sameHostAccount = account('other-user', 99)
     const client = new FakeExplorerClient()
+    let catalogResolutionCount = 0
     render(
       <GitHubAPIExplorer
         repository={selectedRepository}
         accounts={[sameHostAccount]}
         client={client}
+        catalogResolver={endpoint => {
+          catalogResolutionCount++
+          return resolveGitHubAPIOperationCatalog(endpoint)
+        }}
       />
     )
 
@@ -209,6 +218,255 @@ describe('GitHub API Explorer', () => {
     assert.ok(screen.getByText(/never falls back to another account/))
     assert.equal(screen.queryByRole('button', { name: 'Run request' }), null)
     assert.equal(client.calls.length, 0)
+    assert.equal(catalogResolutionCount, 0)
+  })
+
+  it('shows the GHEC catalog without leaking GitHub.com-only operations', () => {
+    const ghecAccount = account(
+      'enterprise-bot',
+      43,
+      'github',
+      'https://api.acme.ghe.com'
+    )
+    render(
+      <GitHubAPIExplorer
+        repository={repository(ghecAccount)}
+        accounts={[ghecAccount]}
+        client={new FakeExplorerClient()}
+      />
+    )
+
+    assert.ok(
+      screen.getByText(
+        /GitHub Enterprise Cloud REST API 2026-03-10 · 1,446 operations/
+      )
+    )
+    assert.equal(
+      (screen.getByLabelText('Catalog scope') as HTMLSelectElement).value,
+      'all'
+    )
+    fireEvent.change(screen.getByLabelText('Search operations'), {
+      target: { value: 'actions/create-hosted-runner-for-enterprise' },
+    })
+    const list = screen.getByRole('list', { name: 'GitHub API operations' })
+    assert.equal(within(list).getAllByRole('listitem').length, 1)
+    assert.match(
+      list.textContent ?? '',
+      /actions\/create-hosted-runner-for-enterprise/
+    )
+  })
+
+  it('fails closed for unknown GHES versions but keeps the manual builder', () => {
+    const ghesAccount = account(
+      'server-bot',
+      44,
+      'github',
+      'https://github.enterprise.test/api/v3'
+    )
+    render(
+      <GitHubAPIExplorer
+        repository={repository(ghesAccount)}
+        accounts={[ghesAccount]}
+        client={new FakeExplorerClient()}
+        catalogResolver={endpoint =>
+          resolveGitHubAPIOperationCatalog(endpoint, () => null)
+        }
+      />
+    )
+
+    assert.ok(
+      screen.getByRole('heading', { name: 'Operation catalog unavailable' })
+    )
+    assert.ok(screen.getByText('GitHub Enterprise Server version unknown'))
+    assert.ok(screen.getByText(/No GitHub.com operation is substituted/))
+    assert.equal(
+      screen.queryByRole('list', { name: 'GitHub API operations' }),
+      null
+    )
+    assert.ok(screen.getByLabelText('REST API path'))
+    assert.ok(screen.getByRole('button', { name: 'Run request' }))
+  })
+
+  it('shows the exact GHES 3.21 catalog when that server version is known', () => {
+    const ghesAccount = account(
+      'server-bot',
+      45,
+      'github',
+      'https://github.enterprise.test/api/v3'
+    )
+    render(
+      <GitHubAPIExplorer
+        repository={repository(ghesAccount)}
+        accounts={[ghesAccount]}
+        client={new FakeExplorerClient()}
+        catalogResolver={endpoint =>
+          resolveGitHubAPIOperationCatalog(
+            endpoint,
+            () => new semver.SemVer('3.21.7')
+          )
+        }
+      />
+    )
+
+    assert.ok(
+      screen.getByText(
+        /GitHub Enterprise Server 3.21 REST API 2026-03-10 · 1,092 operations/
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Search operations'), {
+      target: { value: 'enterprise-admin/create-global-webhook' },
+    })
+    const list = screen.getByRole('list', { name: 'GitHub API operations' })
+    assert.equal(within(list).getAllByRole('listitem').length, 1)
+    assert.match(
+      list.textContent ?? '',
+      /enterprise-admin\/create-global-webhook/
+    )
+  })
+
+  it('searches GraphQL roots and generates an editable exact-signature template', () => {
+    render(
+      <GitHubAPIExplorer
+        repository={selectedRepository}
+        accounts={[selectedAccount]}
+        client={new FakeExplorerClient()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'GraphQL' }))
+    assert.ok(
+      screen.getByText(
+        /GitHub.com · schema 2026-07-16 · 31 queries · 268 mutations/
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Root kind'), {
+      target: { value: 'query' },
+    })
+    let list = screen.getByRole('list', {
+      name: 'GitHub GraphQL root operations',
+    })
+    assert.equal(within(list).getAllByRole('listitem').length, 31)
+
+    fireEvent.change(screen.getByLabelText('Search GraphQL roots'), {
+      target: { value: 'repository owner String!' },
+    })
+    list = screen.getByRole('list', {
+      name: 'GitHub GraphQL root operations',
+    })
+    const operation = within(list).getByRole('button', {
+      name: 'query repository, returns Repository',
+    })
+    fireEvent.click(operation)
+    assert.equal(operation.getAttribute('aria-pressed'), 'true')
+    assert.match(
+      (screen.getByLabelText('GraphQL query') as HTMLTextAreaElement).value,
+      /query Repository\([\s\S]*\$owner: String![\s\S]*repository\([\s\S]*__typename/
+    )
+    assert.equal(
+      (screen.getByLabelText('GraphQL variables') as HTMLTextAreaElement).value,
+      '{}'
+    )
+    assert.equal(
+      (
+        screen.getByLabelText(
+          'GraphQL operation name (optional)'
+        ) as HTMLInputElement
+      ).value,
+      'Repository'
+    )
+    assert.ok(screen.getByText('Root signature and product provenance'))
+    assert.ok(screen.getByRole('link', { name: 'Official product schema' }))
+
+    fireEvent.change(screen.getByLabelText('Root kind'), {
+      target: { value: 'mutation' },
+    })
+    fireEvent.change(screen.getByLabelText('Search GraphQL roots'), {
+      target: { value: 'updateRepository' },
+    })
+    const mutation = screen.getByRole('button', {
+      name: 'mutation updateRepository, returns UpdateRepositoryPayload',
+    })
+    fireEvent.click(mutation)
+    assert.match(
+      (screen.getByLabelText('GraphQL query') as HTMLTextAreaElement).value,
+      /^mutation UpdateRepository\(/
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Run request' }))
+    assert.ok(
+      screen.getByRole('heading', { name: 'Review GitHub API mutation' })
+    )
+  })
+
+  it('keeps manual GraphQL available when a GHES schema cannot be selected', () => {
+    const ghesAccount = account(
+      'server-graphql-bot',
+      46,
+      'github',
+      'https://graphql.enterprise.test/api/v3'
+    )
+    render(
+      <GitHubAPIExplorer
+        repository={repository(ghesAccount)}
+        accounts={[ghesAccount]}
+        client={new FakeExplorerClient()}
+        graphQLCatalogResolver={endpoint =>
+          resolveGitHubGraphQLOperationCatalog(endpoint, () => null)
+        }
+      />
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'GraphQL' }))
+    assert.ok(
+      screen.getByRole('heading', {
+        name: 'GraphQL root schema unavailable',
+      })
+    )
+    assert.ok(screen.getByText(/manual GraphQL builder remains available/))
+    assert.equal(
+      screen.queryByRole('list', {
+        name: 'GitHub GraphQL root operations',
+      }),
+      null
+    )
+    assert.ok(screen.getByLabelText('GraphQL query'))
+    assert.ok(screen.getByRole('button', { name: 'Run request' }))
+  })
+
+  it('shows only the pinned GHES 3.21 GraphQL roots for a known server', () => {
+    const ghesAccount = account(
+      'server-graphql-bot',
+      47,
+      'github',
+      'https://graphql.enterprise.test/api/v3'
+    )
+    render(
+      <GitHubAPIExplorer
+        repository={repository(ghesAccount)}
+        accounts={[ghesAccount]}
+        client={new FakeExplorerClient()}
+        graphQLCatalogResolver={endpoint =>
+          resolveGitHubGraphQLOperationCatalog(
+            endpoint,
+            () => new semver.SemVer('3.21.4')
+          )
+        }
+      />
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'GraphQL' }))
+    assert.ok(
+      screen.getByText(
+        /GitHub Enterprise Server 3.21 · schema 2026-07-16 · 24 queries · 236 mutations/
+      )
+    )
+    fireEvent.change(screen.getByLabelText('Search GraphQL roots'), {
+      target: { value: 'addEnterpriseAdmin' },
+    })
+    const list = screen.getByRole('list', {
+      name: 'GitHub GraphQL root operations',
+    })
+    assert.equal(within(list).getAllByRole('listitem').length, 1)
+    assert.match(list.textContent ?? '', /mutation:addEnterpriseAdmin/)
   })
 
   it('executes GET and HEAD directly but reviews REST mutations', async () => {

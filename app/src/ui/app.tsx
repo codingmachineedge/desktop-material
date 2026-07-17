@@ -116,6 +116,8 @@ import { GitHubPullRequestLifecycleDialog } from './github-pull-request-lifecycl
 import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { ErrorNoticeStack } from './error-notice-stack'
+import { CrashProofBoundary } from './crash-proof-boundary'
+import { Button } from './lib/button'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
 import { EditCopilotBYOKProviderDialog } from './copilot/edit-byok-provider-dialog'
@@ -334,6 +336,7 @@ export const bannerTransitionTimeout = { enter: 500, exit: 400 }
 const ReadyDelay = 100
 export class App extends React.Component<IAppProps, IAppState> {
   private loading = true
+  private initializationError: Error | null = null
   private repositoryFileDragDepth = 0
   private readonly effectiveBranchRulesetCache =
     new EffectiveBranchRulesetCache()
@@ -390,22 +393,45 @@ export class App extends React.Component<IAppProps, IAppState> {
   public constructor(props: IAppProps) {
     super(props)
 
-    props.dispatcher.loadInitialState().then(() => {
-      this.loading = false
-      this.forceUpdate()
+    props.dispatcher.loadInitialState().then(
+      () => {
+        this.loading = false
+        this.forceUpdate()
 
-      requestIdleCallback(
-        () => {
-          const now = performance.now()
-          sendReady(now - props.startTime)
+        requestIdleCallback(
+          () => {
+            const now = performance.now()
+            sendReady(now - props.startTime)
 
-          requestIdleCallback(() => {
-            this.performDeferredLaunchActions()
-          })
-        },
-        { timeout: ReadyDelay }
-      )
-    })
+            requestIdleCallback(() => {
+              this.performDeferredLaunchActions()
+            })
+          },
+          { timeout: ReadyDelay }
+        )
+      },
+      error => {
+        const normalizedError =
+          error instanceof Error
+            ? error
+            : new Error('Initial application state could not be loaded.')
+        try {
+          log.error('Initial application state failed to load', normalizedError)
+        } catch {
+          // The visible startup recovery must not depend on diagnostics.
+        }
+        try {
+          sendNonFatalException('startupInitialization', normalizedError)
+        } catch {
+          // Continue to the bounded recovery surface when reporting is down.
+        }
+        this.initializationError = normalizedError
+        this.loading = false
+        this.forceUpdate(() => {
+          sendReady(performance.now() - props.startTime)
+        })
+      }
+    )
 
     this.state = props.appStore.getState()
     props.appStore.onDidUpdate(state => {
@@ -3871,6 +3897,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
             const modal = ModalPopupTypes.has(popup.type)
             const onRequestFront = this.getOnPopupRequestFrontFn(popup.id)
+            const onPopupDismissedFn = this.getOnPopupDismissedFn(popup.id)
 
             return (
               <CSSTransition
@@ -3878,16 +3905,22 @@ export class App extends React.Component<IAppProps, IAppState> {
                 timeout={dialogTransitionTimeout}
                 key={popup.id}
               >
-                <DialogStackContext.Provider
-                  value={{
-                    isTopMost,
-                    modal,
-                    onRequestFront,
-                    stackOrder: index,
-                  }}
+                <CrashProofBoundary
+                  name={`${popup.type} dialog`}
+                  resetKey={`${popup.id}:${popup.type}`}
+                  onDismiss={onPopupDismissedFn}
                 >
-                  {content}
-                </DialogStackContext.Provider>
+                  <DialogStackContext.Provider
+                    value={{
+                      isTopMost,
+                      modal,
+                      onRequestFront,
+                      stackOrder: index,
+                    }}
+                  >
+                    {content}
+                  </DialogStackContext.Provider>
+                </CrashProofBoundary>
               </CSSTransition>
             )
           })}
@@ -4009,6 +4042,12 @@ export class App extends React.Component<IAppProps, IAppState> {
   }
 
   private renderApp() {
+    const selectedState = this.state.selectedState
+    const repositoryBoundaryKey =
+      selectedState === null
+        ? `none:${this.state.repositories.length}`
+        : `${selectedState.type}:${selectedState.repository.hash}`
+
     return (
       <div
         id="desktop-app-contents"
@@ -4020,9 +4059,24 @@ export class App extends React.Component<IAppProps, IAppState> {
         {this.renderRepositoryTabStrip()}
         {this.renderToolbar()}
         {this.renderBanner()}
-        {this.renderRepository()}
-        {this.renderBuildRunPanel()}
-        {this.renderNotificationCentre()}
+        <CrashProofBoundary
+          name="Repository workspace"
+          resetKey={repositoryBoundaryKey}
+        >
+          {this.renderRepository()}
+        </CrashProofBoundary>
+        <CrashProofBoundary
+          name="Build runner"
+          resetKey={repositoryBoundaryKey}
+        >
+          {this.renderBuildRunPanel()}
+        </CrashProofBoundary>
+        <CrashProofBoundary
+          name="Notification center"
+          resetKey={this.state.isNotificationCentreOpen ? 'open' : 'closed'}
+        >
+          {this.renderNotificationCentre()}
+        </CrashProofBoundary>
         {this.renderPopups()}
         {this.renderDragElement()}
         <div
@@ -4876,9 +4930,39 @@ export class App extends React.Component<IAppProps, IAppState> {
     )
   }
 
+  private reloadAppWindow = () => window.location.reload()
+
   public render() {
     if (this.loading) {
       return null
+    }
+
+    if (this.initializationError !== null) {
+      return (
+        <section
+          className="crash-proof-boundary crash-proof-boundary-root"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="crash-proof-boundary-card">
+            <p className="crash-proof-boundary-eyebrow">Startup contained</p>
+            <h1>Desktop Material could not finish starting</h1>
+            <p>
+              The app stopped safely before showing incomplete data. Your
+              repositories and durable background work were not modified.
+            </p>
+            <p className="crash-proof-boundary-message">
+              A saved setting or local cache could not be loaded. Reload the app
+              window after repairing or restoring the affected data.
+            </p>
+            <div className="crash-proof-boundary-actions">
+              <Button type="button" onClick={this.reloadAppWindow}>
+                Reload app window
+              </Button>
+            </div>
+          </div>
+        </section>
+      )
     }
 
     const className = classNames(

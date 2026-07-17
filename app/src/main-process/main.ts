@@ -97,6 +97,11 @@ import {
   findWindowForRepositoryPath as findOwningWindow,
   nextWindowScope,
 } from './window-routing'
+import {
+  createChildProcessFailureError,
+  createRendererFailureError,
+  normalizeUnhandledRejection,
+} from './renderer-failure'
 
 app.setAppLogsPath()
 enableSourceMaps()
@@ -108,12 +113,17 @@ const launchTime = now()
 
 let preventQuit = false
 let readyTime: number | null = null
+let handlingFatalError = false
 
 type OnDidLoadFn = (window: AppWindow) => void
 /** See the `onDidLoad` function. */
 const pendingOnDidLoadFns = new Array<OnDidLoadFn>()
 
 function handleUncaughtException(error: Error) {
+  if (handlingFatalError) {
+    return
+  }
+  handlingFatalError = true
   preventQuit = true
 
   // If we haven't got a window we'll assume it's because
@@ -125,7 +135,20 @@ function handleUncaughtException(error: Error) {
   const isLaunchError = windows.size === 0
 
   for (const window of windows.values()) {
-    window.destroy()
+    try {
+      window.destroy()
+    } catch (destroyError) {
+      try {
+        log.error(
+          'Unable to destroy a failed application window',
+          destroyError instanceof Error
+            ? destroyError
+            : new Error(String(destroyError))
+        )
+      } catch {
+        // Continue tearing down remaining windows even if logging is broken.
+      }
+    }
   }
   windows.clear()
 
@@ -144,6 +167,25 @@ function getExtraErrorContext(): Record<string, string> {
     uptime: getUptimeInSeconds().toFixed(3),
     time: new Date().toString(),
   }
+}
+
+function reportErrorSafely(
+  error: Error,
+  extra?: Record<string, string>,
+  nonFatal?: boolean
+): void {
+  void reportError(error, extra, nonFatal).catch(reportingError => {
+    try {
+      log.error(
+        'Unable to submit an exception report',
+        reportingError instanceof Error
+          ? reportingError
+          : new Error(String(reportingError))
+      )
+    } catch {
+      // Reporting and logging are diagnostics; neither may trigger recovery.
+    }
+  })
 }
 
 /** Extra argument for the protocol launcher on Windows */
@@ -178,33 +220,90 @@ app.on('window-all-closed', () => {
   // the crash process window which is shown after the main window is closed.
 })
 
-const provenanceShutdown = new ActionsArtifactProvenanceShutdownBarrier(
-  killAllActionsArtifactProvenanceVerifications,
-  () => app.quit()
-)
-// Wait until Electron has actually accepted every window close. A before-quit
-// barrier would permanently disable the verifier when update UX cancels close.
-app.on('will-quit', event => {
-  provenanceShutdown.handle(event)
+app.on('child-process-gone', (_event, details) => {
+  if (details.reason === 'clean-exit') {
+    return
+  }
+  const error = createChildProcessFailureError(details)
+  log.error('Electron child process exited unexpectedly', error)
+  reportErrorSafely(error, {
+    ...getExtraErrorContext(),
+    failureKind: 'electron-child-process-gone',
+    processType: details.type,
+  })
 })
 
-app.on('will-quit', () => {
-  // Ensure no owned child process (or its tree) outlives the app.
-  buildRunner.killAll()
-  cliWorkbenchCatalog.killAll()
-  cliWorkbenchRunner.killAll()
-  cancelAllActionsArtifactSubjectOperations()
-  releaseAllActionsArtifactProvenanceCredentialLeases()
-  releaseAllCompletedActionsArtifactDownloads()
-  agentServerController
-    ?.stop()
-    .catch(error => log.error('Failed to stop agent server cleanly', error))
-  terminateDesktopNotifications()
+async function runOwnedShutdownTask(
+  name: string,
+  task: () => void | Promise<void>
+): Promise<void> {
+  try {
+    await task()
+  } catch (error) {
+    try {
+      log.error(
+        `Failed to stop ${name} cleanly`,
+        error instanceof Error ? error : new Error(String(error))
+      )
+    } catch {
+      // A diagnostic failure cannot keep the application alive forever.
+    }
+  }
+}
+
+async function shutdownOwnedProcesses(): Promise<void> {
+  await Promise.all([
+    runOwnedShutdownTask(
+      'Actions provenance verification',
+      killAllActionsArtifactProvenanceVerifications
+    ),
+    runOwnedShutdownTask('Build & Run processes', () => buildRunner.killAll()),
+    runOwnedShutdownTask('CLI catalog probes', () =>
+      cliWorkbenchCatalog.killAll()
+    ),
+    runOwnedShutdownTask('CLI workbench processes', () =>
+      cliWorkbenchRunner.killAll()
+    ),
+    runOwnedShutdownTask('Actions artifact subject operations', () =>
+      cancelAllActionsArtifactSubjectOperations()
+    ),
+    runOwnedShutdownTask('Actions provenance credential leases', () =>
+      releaseAllActionsArtifactProvenanceCredentialLeases()
+    ),
+    runOwnedShutdownTask('completed Actions artifact downloads', () =>
+      releaseAllCompletedActionsArtifactDownloads()
+    ),
+    runOwnedShutdownTask('agent server', async () => {
+      await agentServerController?.stop()
+    }),
+    runOwnedShutdownTask('desktop notifications', () =>
+      terminateDesktopNotifications()
+    ),
+  ])
+}
+
+const ownedProcessShutdown = new ActionsArtifactProvenanceShutdownBarrier(
+  shutdownOwnedProcesses,
+  () => app.quit()
+)
+// Wait until Electron has accepted every window close. A before-quit barrier
+// would permanently disable owned services when update UX cancels that close.
+app.on('will-quit', event => {
+  ownedProcessShutdown.handle(event)
 })
 
 process.on('uncaughtException', (error: Error) => {
   error = withSourceMappedStack(error)
-  reportError(error, getExtraErrorContext())
+  reportErrorSafely(error, getExtraErrorContext())
+  handleUncaughtException(error)
+})
+
+process.on('unhandledRejection', reason => {
+  const error = withSourceMappedStack(normalizeUnhandledRejection(reason))
+  reportErrorSafely(error, {
+    ...getExtraErrorContext(),
+    failureKind: 'main-process-unhandled-rejection',
+  })
   handleUncaughtException(error)
 })
 
@@ -767,23 +866,25 @@ app.on('ready', () => {
    * without clicking on any item or the item click was handled by the main
    * process as opposed to the renderer.
    */
-  ipcMain.handle('show-contextual-menu', (event, items, addSpellCheckMenu) => {
-    return new Promise(async resolve => {
-      const window = BrowserWindow.fromWebContents(event.sender) || undefined
-
+  ipcMain.handle(
+    'show-contextual-menu',
+    async (event, items, addSpellCheckMenu) => {
+      const window = BrowserWindow.fromWebContents(event.sender) ?? undefined
       const spellCheckMenuItems = addSpellCheckMenu
         ? await buildSpellCheckMenu(window)
         : undefined
 
-      const menu = buildContextMenu(
-        items,
-        indices => resolve(indices),
-        spellCheckMenuItems
-      )
+      return new Promise(resolve => {
+        const menu = buildContextMenu(
+          items,
+          indices => resolve(indices),
+          spellCheckMenuItems
+        )
 
-      menu.popup({ window, callback: () => resolve(null) })
-    })
-  })
+        menu.popup({ window, callback: () => resolve(null) })
+      })
+    }
+  )
 
   ipcMain.handle('check-for-updates', async (event, url) =>
     getAppWindowFromWebContents(event.sender)?.checkForUpdates(url)
@@ -869,8 +970,8 @@ app.on('ready', () => {
   )
 
   if (__WIN32__) {
-    ipcMain.on('install-windows-cli', installWindowsCLI)
-    ipcMain.on('uninstall-windows-cli', uninstallWindowsCLI)
+    ipcMain.on('install-windows-cli', () => installWindowsCLI())
+    ipcMain.on('uninstall-windows-cli', () => uninstallWindowsCLI())
   }
 
   /**
@@ -896,7 +997,7 @@ app.on('ready', () => {
   ipcMain.on('uncaught-exception', (_, error) => handleUncaughtException(error))
 
   ipcMain.on('send-error-report', (_, error, extra, nonFatal) => {
-    reportError(error, { ...getExtraErrorContext(), ...extra }, nonFatal)
+    reportErrorSafely(error, { ...getExtraErrorContext(), ...extra }, nonFatal)
   })
 
   ipcMain.handle('open-external', async (_, path: string) => {
@@ -1153,6 +1254,16 @@ function createWindow(onWindowDidLoad?: OnDidLoadFn): AppWindow {
     if (!__DARWIN__ && windows.size === 0 && !preventQuit) {
       app.quit()
     }
+  })
+
+  window.onRendererFailure(failure => {
+    const error = createRendererFailureError(window.scope, failure)
+    reportErrorSafely(error, {
+      ...getExtraErrorContext(),
+      failureKind: failure.kind,
+      windowScope: window.scope,
+    })
+    handleUncaughtException(error)
   })
 
   window.onDidLoad(() => {

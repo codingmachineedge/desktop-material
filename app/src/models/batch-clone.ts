@@ -21,6 +21,8 @@ export const MaxBatchCloneFolderNameLength = 100
 export const MaxBatchClonePathLength = 32767
 export const MaxBatchCloneBranchLength = 1024
 export const MaxBatchCloneAccountKeyLength = 4096
+export const BatchCloneRecoveryIdBytes = 24
+export const BatchCloneRecoveryIdLength = BatchCloneRecoveryIdBytes * 2
 
 /** The lifecycle state of a single repository within a batch clone. */
 export type BatchCloneItemStatusKind =
@@ -74,6 +76,13 @@ export interface IBatchCloneItem {
 
   /** Stable signed-in account identity preferred for the first HTTPS attempt. */
   readonly accountKey?: string
+
+  /**
+   * Unguessable ownership proof for v2 staged clones. Legacy v1 queue items do
+   * not have one and are therefore recovered without deleting or promoting
+   * any destination data.
+   */
+  readonly recoveryId?: string
 }
 
 /** Public state describing the progress of an in-flight (or finished) batch. */
@@ -90,7 +99,7 @@ export interface IBatchCloneState {
   /** Whether new work is currently being launched. */
   readonly isRunning: boolean
 
-  /** Whether the queue is paused. Active Git processes are allowed to finish. */
+  /** Whether the queue is paused; active Git clones are aborted for restart. */
   readonly isPaused: boolean
 
   /** Whether this batch was user-started or created by background auto-clone. */
@@ -260,7 +269,8 @@ export function isSafeBatchCloneItem(item: IBatchCloneItem): boolean {
         item.defaultBranch.length > MaxBatchCloneBranchLength)) ||
     (item.accountKey !== undefined &&
       (typeof item.accountKey !== 'string' ||
-        item.accountKey.length > MaxBatchCloneAccountKeyLength))
+        item.accountKey.length > MaxBatchCloneAccountKeyLength)) ||
+    (item.recoveryId !== undefined && !isBatchCloneRecoveryId(item.recoveryId))
   ) {
     return false
   }
@@ -269,6 +279,15 @@ export function isSafeBatchCloneItem(item: IBatchCloneItem): boolean {
   return (
     Path.resolve(item.path).toLocaleLowerCase('en-US') ===
     expected.toLocaleLowerCase('en-US')
+  )
+}
+
+/** A fixed-width lowercase hex id with 192 bits of randomness. */
+export function isBatchCloneRecoveryId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length === BatchCloneRecoveryIdLength &&
+    /^[a-f\d]+$/.test(value)
   )
 }
 

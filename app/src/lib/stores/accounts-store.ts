@@ -68,6 +68,140 @@ interface IAccount {
   readonly provider?: AccountProvider
 }
 
+const maximumPersistedAccountCount = 100
+const maximumPersistedEmailCount = 100
+const maximumPersistedAccountsLength = 1_000_000
+const supportedAccountProviders = new Set<AccountProvider>([
+  'github',
+  'gitlab',
+  'bitbucket',
+])
+
+interface IPersistedAccountsParseResult {
+  readonly accounts: ReadonlyArray<IAccount>
+  readonly repaired: boolean
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isValidHTTPSEndpoint = (value: string) => {
+  try {
+    const protocol = new URL(value).protocol
+    return protocol === 'https:' || protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+const isEmailVisibility = (value: unknown): value is EmailVisibility =>
+  value === 'public' || value === 'private' || value === null
+
+const parsePersistedEmail = (value: unknown): IEmail | null => {
+  if (
+    !isRecord(value) ||
+    typeof value.email !== 'string' ||
+    value.email.length > 1_024 ||
+    typeof value.verified !== 'boolean' ||
+    typeof value.primary !== 'boolean' ||
+    !isEmailVisibility(value.visibility)
+  ) {
+    return null
+  }
+
+  return {
+    email: value.email,
+    verified: value.verified,
+    primary: value.primary,
+    visibility: value.visibility,
+  }
+}
+
+const parsePersistedAccount = (value: unknown): IAccount | null => {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const provider = value.provider ?? 'github'
+  if (
+    typeof provider !== 'string' ||
+    !supportedAccountProviders.has(provider as AccountProvider) ||
+    typeof value.login !== 'string' ||
+    value.login.length === 0 ||
+    value.login.length > 1_024 ||
+    typeof value.endpoint !== 'string' ||
+    value.endpoint.length > 8_192 ||
+    !isValidHTTPSEndpoint(value.endpoint) ||
+    !Array.isArray(value.emails) ||
+    value.emails.length > maximumPersistedEmailCount ||
+    typeof value.avatarURL !== 'string' ||
+    value.avatarURL.length > 8_192 ||
+    typeof value.id !== 'number' ||
+    !Number.isSafeInteger(value.id) ||
+    typeof value.name !== 'string' ||
+    value.name.length > 4_096 ||
+    (value.plan !== undefined &&
+      (typeof value.plan !== 'string' || value.plan.length > 4_096))
+  ) {
+    return null
+  }
+
+  const emails = value.emails.map(parsePersistedEmail)
+  if (emails.some(email => email === null)) {
+    return null
+  }
+
+  return {
+    // Tokens belong exclusively in the secure store. Accept the legacy field,
+    // but never preserve its value when repairing persisted metadata.
+    token: '',
+    login: value.login,
+    endpoint: value.endpoint,
+    emails: emails as ReadonlyArray<IEmail>,
+    avatarURL: value.avatarURL,
+    id: value.id,
+    name: value.name,
+    plan: value.plan as string | undefined,
+    provider: provider as AccountProvider,
+  }
+}
+
+const parsePersistedAccounts = (raw: string): IPersistedAccountsParseResult => {
+  if (raw.length > maximumPersistedAccountsLength) {
+    return { accounts: [], repaired: true }
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { accounts: [], repaired: true }
+  }
+
+  if (!Array.isArray(parsed)) {
+    return { accounts: [], repaired: true }
+  }
+
+  const candidates = parsed.slice(0, maximumPersistedAccountCount)
+  const accounts = candidates
+    .map(parsePersistedAccount)
+    .filter((account): account is IAccount => account !== null)
+  const containsPersistedSecret = candidates.some(
+    candidate =>
+      isRecord(candidate) &&
+      typeof candidate.token === 'string' &&
+      candidate.token.length > 0
+  )
+
+  return {
+    accounts,
+    repaired:
+      parsed.length !== candidates.length ||
+      accounts.length !== candidates.length ||
+      containsPersistedSecret,
+  }
+}
+
 /** The store for logged in accounts. */
 export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
   private dataStore: IDataStore
@@ -222,14 +356,29 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
    * Load the users into memory from storage.
    */
   private async loadFromStore(): Promise<void> {
-    const raw = this.dataStore.getItem('users')
+    let raw: string | null
+    try {
+      raw = this.dataStore.getItem('users')
+    } catch (error) {
+      log.error('Failed to read saved account metadata', error)
+      this.accounts = []
+      this.emitUpdate(this.accounts)
+      queueMicrotask(() =>
+        this.emitError(
+          new Error(
+            'Desktop Material could not read saved account metadata. You may need to sign in again.'
+          )
+        )
+      )
+      return
+    }
     if (!raw || !raw.length) {
       this.accounts = []
       this.emitUpdate(this.accounts)
       return
     }
 
-    const parsedAccounts: ReadonlyArray<IAccount> = JSON.parse(raw)
+    const { accounts: parsedAccounts, repaired } = parsePersistedAccounts(raw)
     const migratedAccounts = this.getMigratedGHEAccounts(parsedAccounts)
     const rawAccounts = migratedAccounts ?? parsedAccounts
 
@@ -264,8 +413,18 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
 
     this.accounts = sortAccounts(accountsWithTokens)
     // If any account was migrated, make sure to persist the new value
-    if (migratedAccounts !== null) {
+    if (migratedAccounts !== null || repaired) {
       this.save() // Save already emits an update
+      if (repaired) {
+        log.warn('Repaired invalid saved account metadata')
+        queueMicrotask(() =>
+          this.emitError(
+            new Error(
+              'Desktop Material repaired invalid saved account metadata. You may need to sign in again.'
+            )
+          )
+        )
+      }
     } else {
       this.emitUpdate(this.accounts)
     }
@@ -275,7 +434,18 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
     const usersWithoutTokens = this.accounts.map(account =>
       account.withToken('')
     )
-    this.dataStore.setItem('users', JSON.stringify(usersWithoutTokens))
+    try {
+      this.dataStore.setItem('users', JSON.stringify(usersWithoutTokens))
+    } catch (error) {
+      log.error('Failed to save account metadata', error)
+      queueMicrotask(() =>
+        this.emitError(
+          new Error(
+            'Desktop Material could not save account metadata. Your accounts remain available in this window.'
+          )
+        )
+      )
+    }
 
     this.emitUpdate(this.accounts)
   }

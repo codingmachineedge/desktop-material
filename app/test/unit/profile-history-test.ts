@@ -389,6 +389,79 @@ describe('ProfileStore settings history', () => {
     assert.equal(tabs, null)
   })
 
+  it('recovers tabs from the last valid atomic backup without polluting history', async t => {
+    installTestLocalStorage(t)
+    const [{ ProfileStore }, { AccountsStore }] = await Promise.all([
+      import('../../src/lib/stores/profile-store'),
+      import('../../src/lib/stores/accounts-store'),
+    ])
+    const repository = await createProfileRepository(t)
+    await writeSettings(repository, { 'tab-size': '2' })
+    await commitAllChanges(repository, 'Initialize profile')
+
+    const previousTabSize = localStorage.getItem('tab-size')
+    t.after(() => restoreStorageValue('tab-size', previousTabSize))
+    localStorage.setItem('tab-size', '2')
+    const store = new ProfileStore(
+      new AccountsStore(new InMemoryStore(), new AsyncInMemoryStore())
+    )
+    const internals = store as unknown as {
+      enabled: boolean
+      lastSnapshotsByKey: Map<string, Record<string, string>>
+      repositoriesByKey: Map<string, Repository>
+      queuesByKey: Map<string, ProfileCommitQueue>
+    }
+    internals.enabled = true
+    internals.lastSnapshotsByKey.set(LocalProfileKey, { 'tab-size': '2' })
+    internals.repositoriesByKey.set(LocalProfileKey, repository)
+    internals.queuesByKey.set(
+      LocalProfileKey,
+      new ProfileCommitQueue(repository)
+    )
+
+    const first = {
+      tabs: [
+        {
+          id: 'first',
+          repositoryId: 1,
+          repositoryPath: 'C:\\repositories\\first',
+          customLabel: null,
+          titleStyle: null,
+        },
+      ],
+      activeTabId: 'first',
+    }
+    const second = {
+      tabs: [
+        {
+          id: 'second',
+          repositoryId: 2,
+          repositoryPath: 'C:\\repositories\\second',
+          customLabel: null,
+          titleStyle: null,
+        },
+      ],
+      activeTabId: 'second',
+    }
+    await store.writeTabs(first, 'Save first tab state')
+    await store.writeTabs(second, 'Save second tab state')
+    await writeFile(join(repository.path, 'tabs.json'), '{"partial":', 'utf8')
+
+    assert.deepEqual(await store.readTabs(), first)
+    await store.flush()
+
+    const history = await getProfileHistory(repository)
+    assert.deepEqual(
+      await getProfileCommitFiles(repository, history.entries[0].sha),
+      ['tabs.json']
+    )
+    assert.equal(
+      (await git(['status', '--porcelain'], repository.path, 'testStatus'))
+        .stdout,
+      ''
+    )
+  })
+
   it('preserves and appends settings edited after a non-modal history action begins', async t => {
     installTestLocalStorage(t)
     const [{ ProfileStore }, { AccountsStore }] = await Promise.all([

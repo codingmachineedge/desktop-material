@@ -2,8 +2,13 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import * as path from 'path'
 import { existsSync } from 'fs'
+import { ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 
-import { clone } from '../../../src/lib/git/clone'
+import {
+  clone,
+  createCloneProcessAbortHandler,
+} from '../../../src/lib/git/clone'
 import { setupEmptyRepository } from '../../helpers/repositories'
 import { makeCommit } from '../../helpers/repository-scaffolding'
 import { createTempDirectory } from '../../helpers/temp'
@@ -20,6 +25,44 @@ async function createEmptyBareRepository(
 }
 
 describe('git/clone', () => {
+  it('owns an abort which arrives before Dugite exposes the process', async () => {
+    const controller = new AbortController()
+    const child = new EventEmitter() as ChildProcess
+    let terminated: ChildProcess | null = null
+    const abort = createCloneProcessAbortHandler(controller.signal, async p => {
+      terminated = p
+    })
+
+    controller.abort()
+    abort.processCallback(undefined)(child)
+    await abort.abortAndWait()
+
+    assert.equal(terminated, child)
+  })
+
+  it('terminates the owned process when progress setup throws', async () => {
+    const controller = new AbortController()
+    const child = new EventEmitter() as ChildProcess
+    const progressError = new Error('progress callback failed')
+    let terminated = false
+    const abort = createCloneProcessAbortHandler(
+      controller.signal,
+      async () => {
+        terminated = true
+      }
+    )
+    const callback = abort.processCallback(() => {
+      throw progressError
+    })
+
+    assert.throws(
+      () => callback(child),
+      error => error === progressError
+    )
+    await abort.waitForTermination()
+    assert.equal(terminated, true)
+  })
+
   it('clones a local repository', async t => {
     // Create a source repo with a commit
     const source = await setupEmptyRepository(t)

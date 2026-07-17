@@ -2,8 +2,8 @@ import { Account, getAccountKey } from '../models/account'
 import { createHash, randomUUID } from 'crypto'
 import { Repository } from '../models/repository'
 import {
-  GitHubAPIOperations,
   IGitHubAPIOperation,
+  resolveGitHubAPIOperationCatalog,
 } from './github-api-operation-catalog'
 import {
   assessGitHubAPIWorkbenchRequest,
@@ -77,6 +77,8 @@ export interface INamedAPIFunctionBinding {
 
 export interface INamedRESTAPIFunctionTemplate {
   readonly mode: 'rest'
+  /** Exact pinned product catalog used to validate this function. */
+  readonly catalogId: string
   readonly method: GitHubAPIWorkbenchMethod
   readonly pathTemplate: string
   readonly bodyText: string
@@ -563,7 +565,11 @@ export function createNamedAPIFunctionDefinition(
 
   if (draft.request.mode === 'rest') {
     operationId = normalizeOperationId(draft.operationId, 'rest')
-    const operation = GitHubAPIOperations.find(
+    const resolution = resolveGitHubAPIOperationCatalog(binding.endpoint)
+    if (resolution.status !== 'available') {
+      throw new Error(resolution.message)
+    }
+    const operation = resolution.catalog.operations.find(
       value => value.id === operationId
     )
     if (operation === undefined || operation.method !== draft.request.method) {
@@ -590,6 +596,7 @@ export function createNamedAPIFunctionDefinition(
     }
     template = {
       mode: 'rest',
+      catalogId: resolution.catalog.id,
       method: operation.method,
       pathTemplate: draft.request.path.trim().replace(/^\/+/, ''),
       bodyText: draft.request.bodyText.trim(),
@@ -885,6 +892,16 @@ export function validateNamedAPIFunctionDefinition(
       createdAt: assertISOTime(value.createdAt as string, 'Created time'),
     }
   )
+  if (
+    template.mode === 'rest' &&
+    typeof template.catalogId === 'string' &&
+    (definition.template.mode !== 'rest' ||
+      template.catalogId !== definition.template.catalogId)
+  ) {
+    throw new Error(
+      'The stored REST function catalog does not match its bound endpoint.'
+    )
+  }
   if (
     !/^github-api:[a-z][a-z0-9_-]{0,63}:[a-z0-9]+:[a-f0-9-]{36}$/.test(
       definition.id

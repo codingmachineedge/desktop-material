@@ -156,11 +156,14 @@ const geometryExpression = `(() => {
     bodyClientWidth: document.body.clientWidth,
     bodyScrollWidth: document.body.scrollWidth,
     rootPresent: root !== null,
+    catalogProduct: document.querySelector('.github-api-explorer-catalog header p')?.textContent.trim() || null,
     catalogCount: document.querySelector('.github-api-explorer-catalog header > span')?.textContent.trim() || null,
     operationCount: document.querySelectorAll('.github-api-explorer-operation-list > li').length,
     newBadgeCount: [...document.querySelectorAll('.github-api-explorer-operation-heading em')]
       .filter(value => value.textContent.trim() === 'New').length,
     selectedOperation: selected?.getAttribute('aria-label') || null,
+    requestMode: document.querySelector('.github-api-explorer-tabs [role="tab"][aria-selected="true"]')?.textContent.trim() || null,
+    selectedSignature: document.querySelector('.github-api-explorer-operation-summary code')?.textContent.trim() || null,
     method: document.querySelector('select[aria-label="REST method"]')?.value ||
       [...document.querySelectorAll('label')].find(value => value.firstChild?.textContent?.trim() === 'REST method')?.querySelector('select')?.value || null,
     path: [...document.querySelectorAll('label')]
@@ -281,24 +284,49 @@ async function interact(client, options) {
   )
   await waitFor(
     client,
-    `document.querySelector('.github-api-explorer-catalog header > span')?.textContent.trim() === '10 of 10 shown' && document.querySelectorAll('.github-api-explorer-operation-list > li').length === 10`,
-    'exact new-operation catalog'
+    `document.querySelector('.github-api-explorer-catalog header p')?.textContent.includes('GitHub Enterprise Server 3.21 REST API 2026-03-10') && document.querySelector('.github-api-explorer-catalog header > span')?.textContent.trim() === '60 of 1092 shown' && document.querySelectorAll('.github-api-explorer-operation-list > li').length === 60`,
+    'exact GHES 3.21 REST operation catalog'
   )
 
   const initial = await evaluate(client, geometryExpression)
   if (
-    initial.catalogCount !== '10 of 10 shown' ||
-    initial.operationCount !== 10 ||
-    initial.newBadgeCount !== 10 ||
-    !initial.selectedOperation?.startsWith(
-      'GET List repository custom patterns'
-    ) ||
-    initial.method !== 'GET' ||
-    initial.path !==
-      'repos/material-fixture-owner/material-fixture/secret-scanning/custom-patterns'
+    initial.catalogCount !== '60 of 1092 shown' ||
+    initial.operationCount !== 60 ||
+    initial.newBadgeCount !== 0 ||
+    !initial.catalogProduct?.includes('GitHub Enterprise Server 3.21') ||
+    initial.requestMode !== 'REST'
   ) {
     fail(`Explorer catalog state was unexpected: ${JSON.stringify(initial)}`)
   }
+
+  const filteredREST = await evaluate(
+    client,
+    `(() => {
+      const label = [...document.querySelectorAll('.github-api-explorer-filters label')]
+        .find(value => value.textContent.includes('Search operations'))
+      const input = label?.querySelector('input[type="search"]')
+      if (!(input instanceof HTMLInputElement)) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter.call(input, 'list-repo-custom-patterns')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`
+  )
+  if (!filteredREST) fail('Unable to filter the REST product catalog.')
+  await waitFor(
+    client,
+    `document.querySelector('.github-api-explorer-catalog header > span')?.textContent.trim() === '1 of 1 shown' && document.querySelector('.github-api-explorer-operation-list button')?.dataset.operationId === 'secret-scanning/list-repo-custom-patterns'`,
+    'exact repository custom-pattern operation'
+  )
+  await evaluate(
+    client,
+    `document.querySelector('.github-api-explorer-operation-list button')?.click()`
+  )
+  await waitFor(
+    client,
+    `[...document.querySelectorAll('label')].find(value => value.firstChild?.textContent?.trim() === 'REST API path')?.querySelector('input')?.value === 'repos/material-fixture-owner/material-fixture/secret-scanning/custom-patterns'`,
+    'selected REST operation template'
+  )
 
   await clickButton(client, 'Run request')
   await waitFor(
@@ -321,9 +349,9 @@ async function interact(client, options) {
   const receipt = await evaluate(client, geometryExpression)
   assertGeometry(receipt)
   if (
-    receipt.catalogCount !== '10 of 10 shown' ||
-    receipt.operationCount !== 10 ||
-    receipt.newBadgeCount !== 10 ||
+    receipt.catalogCount !== '1 of 1 shown' ||
+    receipt.operationCount !== 1 ||
+    receipt.newBadgeCount !== 0 ||
     receipt.responseStatus !== '200 OK' ||
     !receipt.responseHasFirstPattern ||
     !receipt.responseHasLongPattern ||
@@ -346,7 +374,81 @@ async function interact(client, options) {
     }
   }
 
+  await evaluate(
+    client,
+    `document.querySelector('#github-api-explorer-graphql-tab')?.click()`
+  )
+  await waitFor(
+    client,
+    `document.querySelector('.github-api-explorer-catalog header p')?.textContent.includes('GitHub Enterprise Server 3.21') && document.querySelector('.github-api-explorer-catalog header p')?.textContent.includes('24 queries') && document.querySelector('.github-api-explorer-catalog header p')?.textContent.includes('236 mutations') && document.querySelector('.github-api-explorer-catalog header > span')?.textContent.trim() === '60 of 260 shown'`,
+    'exact GHES 3.21 GraphQL root catalog'
+  )
+  const filteredGraphQL = await evaluate(
+    client,
+    `(() => {
+      const label = [...document.querySelectorAll('.github-api-explorer-filters label')]
+        .find(value => value.textContent.includes('Search GraphQL roots'))
+      const input = label?.querySelector('input[type="search"]')
+      if (!(input instanceof HTMLInputElement)) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter.call(input, 'followRenames')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`
+  )
+  if (!filteredGraphQL) fail('Unable to filter the GraphQL product catalog.')
+  await waitFor(
+    client,
+    `document.querySelector('.github-api-explorer-catalog header > span')?.textContent.trim() === '1 of 1 shown' && document.querySelector('.github-api-explorer-operation-list button')?.dataset.operationId === 'query:repository'`,
+    'exact repository GraphQL root'
+  )
+  await evaluate(
+    client,
+    `document.querySelector('.github-api-explorer-operation-list button')?.click()`
+  )
+  await waitFor(
+    client,
+    `document.querySelector('.github-api-explorer-operation-summary code')?.textContent.includes('repository(followRenames: Boolean = true, name: String!, owner: String!): Repository') && [...document.querySelectorAll('label')].find(value => value.textContent.includes('GraphQL operation name'))?.querySelector('input')?.value === 'repository'`,
+    'exact GraphQL root signature and editable template'
+  )
+  await evaluate(
+    client,
+    `(() => {
+      document.querySelector('.github-api-explorer-operation-summary')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      return true
+    })()`
+  )
+  await new Promise(resolve => setTimeout(resolve, 300))
+  const graphQLReceipt = await evaluate(client, geometryExpression)
+  assertGeometry(graphQLReceipt)
+  if (
+    graphQLReceipt.requestMode !== 'GraphQL' ||
+    graphQLReceipt.catalogCount !== '1 of 1 shown' ||
+    graphQLReceipt.operationCount !== 1 ||
+    !graphQLReceipt.catalogProduct?.includes('schema 2026-07-16') ||
+    !graphQLReceipt.selectedSignature?.includes(
+      'followRenames: Boolean = true'
+    ) ||
+    graphQLReceipt.errorText !== null
+  ) {
+    fail(
+      `GraphQL product catalog state was unexpected: ${JSON.stringify(
+        graphQLReceipt
+      )}`
+    )
+  }
+
   const captureBytes = await capture(client, options.capturePath)
+
+  await evaluate(
+    client,
+    `document.querySelector('#github-api-explorer-rest-tab')?.click()`
+  )
+  await waitFor(
+    client,
+    `document.querySelector('.github-api-explorer-operation-list button')?.dataset.operationId === 'secret-scanning/list-repo-custom-patterns'`,
+    'return to selected REST operation'
+  )
 
   const functionName = 'list_material_patterns'
   const functionDescription =
@@ -447,7 +549,9 @@ async function interact(client, options) {
   )
 
   return {
+    initial,
     receipt,
+    graphQLReceipt,
     captureBytes,
     functionReceipt,
     functionsCaptureBytes,

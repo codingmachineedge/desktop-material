@@ -24,6 +24,7 @@ import { offsetFromNow } from '../../lib/offset-from'
 import { gte, SemVer } from 'semver'
 import { getVersion } from './app-proxy'
 import { getUserAgent } from '../../lib/http'
+import { runAfterRendererShutdown } from './renderer-shutdown'
 
 /** The last version a showcase was seen. */
 export const lastShowCaseVersionSeen = 'version-of-last-showcase'
@@ -262,12 +263,14 @@ class UpdateStore {
   }
 
   /** Quit and install the update. */
-  public quitAndInstallUpdate() {
-    // This is synchronous so that we can ensure the app will let itself be quit
-    // before we call the function to quit.
-    // eslint-disable-next-line no-sync
-    sendWillQuitSync()
-    quitAndInstallUpdate()
+  public async quitAndInstallUpdate(): Promise<void> {
+    await runAfterRendererShutdown(() => {
+      // This is synchronous so that we can ensure the app will let itself be
+      // quit before we call the function to quit.
+      // eslint-disable-next-line no-sync
+      sendWillQuitSync()
+      quitAndInstallUpdate()
+    })
   }
 
   private async updatePriorityUpdateStatus() {

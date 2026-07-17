@@ -1,4 +1,8 @@
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
+import {
+  spawn,
+  ChildProcessWithoutNullStreams,
+  SpawnOptionsWithoutStdio,
+} from 'child_process'
 import { dirname } from 'path'
 import {
   CLIWorkbenchTool,
@@ -12,11 +16,12 @@ import {
   parseGitHubHelpCatalog,
   parseGitHubReferenceCatalog,
 } from '../../lib/cli-workbench-catalog'
-import { killTree } from '../build-run/kill-tree'
+import { killTreeAndWait } from '../build-run/kill-tree'
 import { resolveCLIWorkbenchTool } from './tool-resolver'
 
 const CatalogOutputCap = 8 * 1024 * 1024
 const CatalogTimeoutMilliseconds = 30_000
+const CatalogTerminationDeadlineMilliseconds = 15_000
 
 interface ICapturedCommand {
   readonly exitCode: number
@@ -26,10 +31,64 @@ interface ICapturedCommand {
   readonly timedOut: boolean
 }
 
+interface IActiveCatalogProcess {
+  readonly child: ChildProcessWithoutNullStreams
+  readonly closed: Promise<void>
+  readonly resolveClosed: () => void
+  forceSettle: () => void
+  exited: boolean
+  termination: Promise<boolean> | null
+}
+
+type SpawnCatalogCommand = (
+  executable: string,
+  args: ReadonlyArray<string>,
+  options: SpawnOptionsWithoutStdio
+) => ChildProcessWithoutNullStreams
+
+export interface ICLIWorkbenchCatalogDependencies {
+  readonly spawn?: SpawnCatalogCommand
+  readonly killTree?: (
+    pid: number,
+    isStillOwned: () => boolean
+  ) => Promise<boolean>
+  readonly resolveTool?: typeof resolveCLIWorkbenchTool
+  readonly catalogTimeoutMilliseconds?: number
+  readonly terminationDeadlineMilliseconds?: number
+}
+
+function logCatalogFailure(message: string, error?: unknown): void {
+  try {
+    log.error(message, error instanceof Error ? error : undefined)
+  } catch {
+    // A diagnostic failure cannot escape a shutdown or timer callback.
+  }
+}
+
 /** Runtime command discovery. No command output is logged or persisted. */
 export class CLIWorkbenchCatalogService {
-  private readonly children = new Set<ChildProcessWithoutNullStreams>()
+  private readonly children = new Set<IActiveCatalogProcess>()
+  private readonly spawnCommand: SpawnCatalogCommand
+  private readonly killProcessTree: (
+    pid: number,
+    isStillOwned: () => boolean
+  ) => Promise<boolean>
+  private readonly resolveTool: typeof resolveCLIWorkbenchTool
+  private readonly catalogTimeoutMilliseconds: number
+  private readonly terminationDeadlineMilliseconds: number
   private activeDiscovery: Promise<ICLIWorkbenchCatalog> | null = null
+  private accepting = true
+
+  public constructor(dependencies: ICLIWorkbenchCatalogDependencies = {}) {
+    this.spawnCommand = dependencies.spawn ?? spawn
+    this.killProcessTree = dependencies.killTree ?? killTreeAndWait
+    this.resolveTool = dependencies.resolveTool ?? resolveCLIWorkbenchTool
+    this.catalogTimeoutMilliseconds =
+      dependencies.catalogTimeoutMilliseconds ?? CatalogTimeoutMilliseconds
+    this.terminationDeadlineMilliseconds =
+      dependencies.terminationDeadlineMilliseconds ??
+      CatalogTerminationDeadlineMilliseconds
+  }
 
   public getCatalog(): Promise<ICLIWorkbenchCatalog> {
     if (this.activeDiscovery !== null) {
@@ -66,13 +125,10 @@ export class CLIWorkbenchCatalogService {
   }
 
   /** Kill catalog probes if the app exits during discovery. */
-  public killAll(): void {
-    for (const child of this.children) {
-      if (child.pid !== undefined) {
-        killTree(child.pid)
-      }
-    }
-    this.children.clear()
+  public async killAll(): Promise<void> {
+    this.accepting = false
+    const children = [...this.children]
+    await Promise.all(children.map(child => this.terminate(child)))
   }
 
   private async discoverTool(
@@ -81,7 +137,7 @@ export class CLIWorkbenchCatalogService {
     let executable: string
     let toolEnv: Record<string, string | undefined>
     try {
-      const resolved = resolveCLIWorkbenchTool(tool)
+      const resolved = this.resolveTool(tool)
       executable = resolved.executable
       toolEnv = resolved.env
     } catch {
@@ -159,10 +215,19 @@ export class CLIWorkbenchCatalogService {
     args: ReadonlyArray<string>,
     toolEnv: Record<string, string | undefined>
   ): Promise<ICapturedCommand> {
+    if (!this.accepting) {
+      return Promise.resolve({
+        exitCode: -1,
+        stdout: '',
+        spawnFailed: true,
+        truncated: false,
+        timedOut: false,
+      })
+    }
     return new Promise(resolve => {
       let child: ChildProcessWithoutNullStreams
       try {
-        child = spawn(executable, [...args], {
+        child = this.spawnCommand(executable, [...args], {
           cwd: dirname(process.execPath),
           env: {
             ...toolEnv,
@@ -190,7 +255,19 @@ export class CLIWorkbenchCatalogService {
         return
       }
 
-      this.children.add(child)
+      let resolveClosed: () => void = () => undefined
+      const closed = new Promise<void>(resolveClose => {
+        resolveClosed = resolveClose
+      })
+      const active: IActiveCatalogProcess = {
+        child,
+        closed,
+        resolveClosed,
+        forceSettle: () => undefined,
+        exited: false,
+        termination: null,
+      }
+      this.children.add(active)
       const stdout = new Array<Buffer>()
       let stdoutBytes = 0
       let totalBytes = 0
@@ -199,21 +276,42 @@ export class CLIWorkbenchCatalogService {
       let timedOut = false
       let finished = false
 
-      const kill = () => {
-        if (child.pid !== undefined) {
-          killTree(child.pid)
+      const finish = (code: number | null) => {
+        if (finished) {
+          return
         }
+        finished = true
+        clearTimeout(timeout)
+        resolve({
+          exitCode: code ?? -1,
+          stdout: Buffer.concat(stdout, stdoutBytes).toString('utf8'),
+          spawnFailed,
+          truncated,
+          timedOut,
+        })
+      }
+      active.forceSettle = () => {
+        timedOut = true
+        finish(null)
+      }
+      const terminate = () => {
+        void this.terminate(active).catch(error =>
+          logCatalogFailure(
+            '[cli-workbench] catalog termination callback failed',
+            error
+          )
+        )
       }
       const timeout = setTimeout(() => {
         timedOut = true
-        kill()
-      }, CatalogTimeoutMilliseconds)
+        terminate()
+      }, this.catalogTimeoutMilliseconds)
 
       child.stdout.on('data', (chunk: Buffer) => {
         totalBytes += chunk.length
         if (totalBytes > CatalogOutputCap) {
           truncated = true
-          kill()
+          terminate()
           return
         }
         stdout.push(chunk)
@@ -223,28 +321,98 @@ export class CLIWorkbenchCatalogService {
         totalBytes += chunk.length
         if (totalBytes > CatalogOutputCap) {
           truncated = true
-          kill()
+          terminate()
         }
       })
       child.once('error', () => {
         spawnFailed = true
       })
+      child.once('exit', () => {
+        active.exited = true
+      })
       child.once('close', code => {
-        if (finished) {
-          return
-        }
-        finished = true
-        clearTimeout(timeout)
-        this.children.delete(child)
-        resolve({
-          exitCode: code ?? -1,
-          stdout: Buffer.concat(stdout, stdoutBytes).toString('utf8'),
-          spawnFailed,
-          truncated,
-          timedOut,
-        })
+        active.exited = true
+        active.resolveClosed()
+        this.children.delete(active)
+        finish(code)
       })
     })
+  }
+
+  private terminate(active: IActiveCatalogProcess): Promise<boolean> {
+    if (active.termination !== null) {
+      return active.termination
+    }
+    active.termination = this.terminateOnce(active)
+      .catch(error => {
+        logCatalogFailure(
+          '[cli-workbench] catalog probe teardown failed',
+          error
+        )
+        return false
+      })
+      .then(closed => {
+        if (!closed) {
+          try {
+            active.forceSettle()
+          } catch (error) {
+            logCatalogFailure(
+              '[cli-workbench] failed to settle a stopped catalog probe',
+              error
+            )
+          }
+        }
+        return closed
+      })
+    return active.termination
+  }
+
+  private async terminateOnce(active: IActiveCatalogProcess): Promise<boolean> {
+    try {
+      active.child.stdin.end()
+    } catch {
+      // The probe may already have closed its stdin pipe.
+    }
+
+    const isStillOwned = () => !active.exited
+    if (active.child.pid !== undefined && isStillOwned()) {
+      let killed = false
+      try {
+        killed = await this.killProcessTree(active.child.pid, isStillOwned)
+      } catch (error) {
+        logCatalogFailure(
+          '[cli-workbench] catalog process-tree termination failed',
+          error
+        )
+      }
+      if (!killed && isStillOwned()) {
+        try {
+          active.child.kill('SIGKILL')
+        } catch {
+          // The exact child may have exited at the fallback boundary.
+        }
+      }
+    }
+
+    let deadline: ReturnType<typeof setTimeout> | null = null
+    const closed = await Promise.race([
+      active.closed.then(() => true),
+      new Promise<false>(resolve => {
+        deadline = setTimeout(
+          () => resolve(false),
+          this.terminationDeadlineMilliseconds
+        )
+      }),
+    ])
+    if (deadline !== null) {
+      clearTimeout(deadline)
+    }
+    if (!closed) {
+      logCatalogFailure(
+        '[cli-workbench] timed out waiting for a catalog probe to close'
+      )
+    }
+    return closed
   }
 }
 

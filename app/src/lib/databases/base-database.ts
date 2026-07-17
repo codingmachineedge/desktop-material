@@ -20,11 +20,11 @@ export abstract class BaseDatabase extends Dexie {
    * upgrade       - An upgrade function to call after upgrading to the given
    *                 version.
    */
-  protected async conditionalVersion(
+  protected conditionalVersion(
     version: number,
     schema: { [key: string]: string | null },
     upgrade?: (t: Transaction) => Promise<void>
-  ) {
+  ): void {
     if (this.schemaVersion != null && this.schemaVersion < version) {
       return
     }
@@ -32,7 +32,7 @@ export abstract class BaseDatabase extends Dexie {
     const dexieVersion = this.version(version).stores(schema)
 
     if (upgrade != null) {
-      await dexieVersion.upgrade(upgrade)
+      dexieVersion.upgrade(upgrade)
     }
   }
 }

@@ -18,11 +18,16 @@ import { matchExistingRepository } from '../repository-matching'
 import {
   BatchCloneJournalVersion,
   CloneDestinationInspection,
+  CurrentBatchCloneJournalVersion,
   FileBatchCloneJournal,
   IBatchCloneJournal,
   IBatchCloneJournalSnapshot,
   inspectCloneDestination,
 } from './batch-clone-journal'
+import {
+  IBatchCloneStagingManager,
+  createBatchCloneRecoveryId,
+} from './batch-clone-staging'
 
 /**
  * Select only completed clone paths which `_addRepositories` actually
@@ -57,12 +62,20 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   private initialized = false
   private journal: IBatchCloneJournal | null
   private writeChain: Promise<void> = Promise.resolve()
+  private maintenanceChain: Promise<void> = Promise.resolve()
   private journalFailureReported = false
+  private journalVersion:
+    | typeof BatchCloneJournalVersion
+    | typeof CurrentBatchCloneJournalVersion = BatchCloneJournalVersion
+  private stagingTargets = new Map<string, string>()
+  private activeCloneControllers = new Map<string, AbortController>()
+  private operationCompletion: Promise<void> | null = null
 
   public constructor(
     private readonly cloningRepositoriesStore: CloningRepositoriesStore,
     journal?: IBatchCloneJournal,
-    private readonly inspectDestination = inspectCloneDestination
+    private readonly inspectDestination = inspectCloneDestination,
+    private readonly stagingManager: IBatchCloneStagingManager | null = null
   ) {
     super()
     this.journal = journal ?? null
@@ -86,6 +99,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
 
       assertSafeBatchCloneItems(snapshot.items)
       this.items = snapshot.items
+      this.journalVersion = snapshot.version
       this.mode = snapshot.mode
       this.source = snapshot.source
       this.generation = snapshot.generation ?? 1
@@ -115,6 +129,12 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       this.pauseRequested = this.paused
       this.emit()
       await this.persist()
+      if (this.stagingManager !== null) {
+        // The loaded snapshot itself is durable proof for terminal items even
+        // when normalizing an interrupted status cannot be written back.
+        await this.cleanupCompletedStaging()
+        await this.cleanupSkippedStaging()
+      }
     } catch (error) {
       log.error('Unable to restore the clone queue journal', error)
     }
@@ -201,17 +221,31 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       )
     }
 
-    this.items = items
+    this.journalVersion =
+      this.stagingManager === null
+        ? BatchCloneJournalVersion
+        : CurrentBatchCloneJournalVersion
+    this.items =
+      this.stagingManager === null
+        ? items.map(({ recoveryId: _recoveryId, ...item }) => item)
+        : items.map(item => ({
+            ...item,
+            recoveryId: createBatchCloneRecoveryId(),
+          }))
+    assertSafeBatchCloneItems(this.items)
     this.mode = mode
     this.source = source
-    this.statuses = new Map(items.map(item => [item.path, { kind: 'pending' }]))
+    this.statuses = new Map(
+      this.items.map(item => [item.path, { kind: 'pending' }])
+    )
+    this.stagingTargets.clear()
     this.cancelRequested = false
     this.pauseRequested = false
     this.paused = false
     this.generation = 1
     this.notifiedGeneration = 0
     this.emit()
-    await this.prepareAndRun(items)
+    await this.prepareAndRun(this.items)
   }
 
   /** Re-run every failed item whose destination is now safe. */
@@ -233,18 +267,23 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     await this.prepareAndRun(failed)
   }
 
-  /**
-   * Pause queue-level scheduling. Active Git processes finish; pending items do
-   * not start until resume is requested.
-   */
-  public requestPause(): void {
+  /** Abort active Git work and retain it as a strictly restartable queue. */
+  public async requestPause(): Promise<void> {
     if (!this.isBusy || this.paused) {
       return
     }
     this.pauseRequested = true
     this.paused = true
+    const operation = this.operationCompletion
+    for (const controller of this.activeCloneControllers.values()) {
+      controller.abort()
+    }
     this.emit()
-    this.schedulePersist()
+    if (operation !== null) {
+      await operation
+    } else {
+      await this.persist()
+    }
   }
 
   /** Resume pending/interrupted work after safely inspecting each destination. */
@@ -267,11 +306,16 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     await this.prepareAndRun(candidates)
   }
 
-  /**
-   * Request cancellation. Items that haven't started are marked skipped;
-   * already in-flight clones finish because Git has no clean abort here.
-   */
-  public requestCancel(): void {
+  /** Abort active Git work and durably discard verified cancelled staging. */
+  public requestCancel(): Promise<void> {
+    const cancellation = this.cancelAndWait()
+    this.maintenanceChain = this.maintenanceChain
+      .catch(() => undefined)
+      .then(() => cancellation)
+    return cancellation
+  }
+
+  private async cancelAndWait(): Promise<void> {
     this.cancelRequested = true
     this.pauseRequested = false
     this.paused = false
@@ -281,15 +325,79 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
         this.statuses.set(item.path, { kind: 'skipped' })
       }
     }
+    const operation = this.operationCompletion
+    for (const controller of this.activeCloneControllers.values()) {
+      controller.abort()
+    }
     this.emit()
-    this.schedulePersist()
+    if (operation !== null) {
+      await operation
+    } else {
+      const durable = await this.persist()
+      if (durable) {
+        await this.cleanupSkippedStaging()
+      }
+    }
   }
 
-  /** Clear completed state. An active/recoverable queue is never discarded. */
-  public dismiss(): void {
+  /**
+   * Clear terminal state only after every app-owned staging root is gone and
+   * the journal clear itself succeeds. Ambiguous roots retain their recovery
+   * identity and remain visible for review.
+   */
+  public async dismiss(): Promise<boolean> {
     if (this.isBusy) {
-      return
+      return false
     }
+    if (this.items.length === 0) {
+      return true
+    }
+    await this.maintenanceChain.catch(() => undefined)
+
+    if (this.journalVersion === CurrentBatchCloneJournalVersion) {
+      if (!(await this.persist()) || this.stagingManager === null) {
+        return false
+      }
+
+      let cleanupSucceeded = true
+      for (const item of this.items) {
+        const status = this.statuses.get(item.path)
+        const cleaned =
+          status?.kind === 'done'
+            ? await this.stagingManager.cleanupPromoted(item)
+            : await this.stagingManager.discard(item)
+        if (!cleaned) {
+          cleanupSucceeded = false
+          if (status?.kind !== 'done') {
+            this.statuses.set(item.path, {
+              kind: 'review',
+              error: new Error(
+                'The staged clone ownership marker changed or could not be removed. The queue was retained for review.'
+              ),
+            })
+          }
+        }
+      }
+      if (!cleanupSucceeded) {
+        this.emit()
+        await this.persist()
+        this.emitError(
+          new Error(
+            'Some staged clone data could not be verified for removal. The clone queue was retained.'
+          )
+        )
+        return false
+      }
+    }
+
+    if (!(await this.clearJournal())) {
+      return false
+    }
+    this.resetState()
+    return true
+  }
+
+  private resetState(): void {
     this.items = []
     this.statuses = new Map<string, IBatchCloneItemStatus>()
     this.running = false
@@ -298,11 +406,13 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     this.cancelRequested = false
     this.generation = 0
     this.notifiedGeneration = 0
+    this.stagingTargets.clear()
+    this.activeCloneControllers.clear()
     this.emit()
-    this.scheduleClear()
   }
 
   public async flush(): Promise<void> {
+    await this.maintenanceChain.catch(() => undefined)
     await this.writeChain.catch(() => undefined)
   }
 
@@ -337,6 +447,46 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   ): Promise<ReadonlyArray<IBatchCloneItem>> {
     const runnable: IBatchCloneItem[] = []
     for (const item of items) {
+      if (item.recoveryId !== undefined) {
+        if (this.stagingManager === null) {
+          this.statuses.set(item.path, {
+            kind: 'review',
+            error: new Error(
+              'This staged clone queue cannot be recovered in the current app session.'
+            ),
+          })
+          continue
+        }
+        const prepared = await this.stagingManager.prepare(item)
+        if (
+          this.cancelRequested ||
+          this.statuses.get(item.path)?.kind === 'skipped'
+        ) {
+          this.statuses.set(item.path, { kind: 'skipped' })
+          continue
+        }
+        if (prepared.kind === 'clone') {
+          this.stagingTargets.set(item.path, prepared.clonePath)
+          this.statuses.set(item.path, { kind: 'pending' })
+          runnable.push(item)
+        } else if (prepared.kind === 'done') {
+          this.statuses.set(item.path, {
+            kind: 'done',
+            progress: 1,
+            description: 'Recovered and promoted a verified staged clone.',
+            ...(prepared.accountKey !== null
+              ? { accountKey: prepared.accountKey }
+              : {}),
+          })
+        } else {
+          this.statuses.set(item.path, {
+            kind: 'review',
+            error: prepared.error,
+          })
+        }
+        continue
+      }
+
       let inspection: CloneDestinationInspection
       try {
         inspection = await this.inspectDestination(item)
@@ -405,18 +555,53 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   private async prepareAndRun(
     items: ReadonlyArray<IBatchCloneItem>
   ): Promise<void> {
-    this.running = true
-    this.emit()
-    await this.persist()
+    let finishOperation: () => void = () => {}
+    const operation = new Promise<void>(resolve => {
+      finishOperation = resolve
+    })
+    this.operationCompletion = operation
 
     try {
-      const runnable = await this.prepareItemsForRun(items)
-      await this.run(runnable)
-    } catch (error) {
-      this.running = false
+      this.running = true
       this.emit()
-      await this.persist()
-      throw error
+      const durable = await this.persist()
+      if (this.journalVersion === CurrentBatchCloneJournalVersion && !durable) {
+        this.running = false
+        this.paused = false
+        for (const item of items) {
+          const kind = this.statuses.get(item.path)?.kind
+          if (
+            kind === 'pending' ||
+            kind === 'interrupted' ||
+            kind === 'failed' ||
+            kind === 'review'
+          ) {
+            this.statuses.set(item.path, {
+              kind: 'review',
+              error: new Error(
+                'Clone recovery state could not be saved, so no staging directory or Git process was started.'
+              ),
+            })
+          }
+        }
+        this.emit()
+        return
+      }
+
+      try {
+        const runnable = await this.prepareItemsForRun(items)
+        await this.run(runnable)
+      } catch (error) {
+        this.running = false
+        this.emit()
+        await this.persist()
+        throw error
+      }
+    } finally {
+      if (this.operationCompletion === operation) {
+        this.operationCompletion = null
+      }
+      finishOperation()
     }
   }
 
@@ -425,7 +610,11 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       this.running = false
       this.paused = false
       this.emit()
-      await this.persist()
+      const durable = await this.persist()
+      if (durable) {
+        await this.cleanupCompletedStaging()
+        await this.cleanupSkippedStaging()
+      }
       return
     }
 
@@ -444,7 +633,11 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       this.pauseRequested = false
     }
     this.emit()
-    await this.persist()
+    const durable = await this.persist()
+    if (durable) {
+      await this.cleanupCompletedStaging()
+      await this.cleanupSkippedStaging()
+    }
   }
 
   private async cloneItem(item: IBatchCloneItem): Promise<void> {
@@ -456,26 +649,65 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       return
     }
 
-    // Items can wait behind other clones for minutes. Reinspect immediately
-    // before invoking Git so a newly-created file, junction, symlink, or clone
-    // is handled safely instead of relying on the earlier queue-wide probe.
-    let inspection: CloneDestinationInspection
-    try {
-      inspection = await this.inspectDestination(item)
-    } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error))
-      log.error(
-        `Unable to reinspect clone destination ${item.path}`,
-        normalizedError
-      )
-      this.setStatus(item.path, {
-        kind: 'review',
-        error: new Error(
-          'The destination could not be inspected safely. Review it manually; Desktop Material will not delete it.'
-        ),
-      })
-      return
+    let clonePath = item.path
+    if (item.recoveryId !== undefined) {
+      const stagedPath = this.stagingTargets.get(item.path)
+      if (
+        this.stagingManager === null ||
+        stagedPath === undefined ||
+        !(await this.stagingManager.reinspect(item, stagedPath))
+      ) {
+        this.setStatus(item.path, {
+          kind: 'review',
+          error: new Error(
+            'The staged clone or final destination changed before Git started and was left unchanged.'
+          ),
+        })
+        return
+      }
+      clonePath = stagedPath
+    } else {
+      // Legacy v1 queues cloned directly into the final path. Keep their
+      // conservative inspection path without ever deleting old partial data.
+      let inspection: CloneDestinationInspection
+      try {
+        inspection = await this.inspectDestination(item)
+      } catch (error) {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error))
+        log.error(
+          `Unable to reinspect clone destination ${item.path}`,
+          normalizedError
+        )
+        this.setStatus(item.path, {
+          kind: 'review',
+          error: new Error(
+            'The destination could not be inspected safely. Review it manually; Desktop Material will not delete it.'
+          ),
+        })
+        return
+      }
+
+      if (inspection === 'matching-repository') {
+        this.setStatus(item.path, {
+          kind: 'done',
+          progress: 1,
+          description: 'Recovered an existing clone with the matching origin.',
+          ...(item.accountKey !== undefined
+            ? { accountKey: item.accountKey }
+            : {}),
+        })
+        return
+      }
+      if (inspection === 'review') {
+        this.setStatus(item.path, {
+          kind: 'review',
+          error: new Error(
+            'The destination is incomplete, contains data, or has a different Git origin. Review or move it; Desktop Material will not delete it.'
+          ),
+        })
+        return
+      }
     }
 
     if (this.cancelRequested) {
@@ -485,87 +717,226 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     if (this.pauseRequested) {
       return
     }
-    if (inspection === 'matching-repository') {
-      this.setStatus(item.path, {
-        kind: 'done',
-        progress: 1,
-        description: 'Recovered an existing clone with the matching origin.',
-        ...(item.accountKey !== undefined
-          ? { accountKey: item.accountKey }
-          : {}),
-      })
-      return
+    const controller = new AbortController()
+    this.activeCloneControllers.set(item.path, controller)
+    if (this.cancelRequested || this.pauseRequested) {
+      controller.abort()
     }
-    if (inspection === 'review') {
-      this.setStatus(item.path, {
-        kind: 'review',
-        error: new Error(
-          'The destination is incomplete, contains data, or has a different Git origin. Review or move it; Desktop Material will not delete it.'
-        ),
-      })
-      return
-    }
-
     this.setStatus(item.path, { kind: 'cloning', progress: 0 }, false)
     await this.persist()
 
+    let aborted = controller.signal.aborted
     let successfulAccountKey: string | null = null
     let success = false
     try {
-      success = await this.cloningRepositoriesStore.clone(
-        item.url,
-        item.path,
-        {
-          defaultBranch: item.defaultBranch,
-          accountKey: item.accountKey,
-        },
-        {
-          onError: error => {
-            this.setStatus(item.path, { kind: 'failed', error })
+      if (!aborted) {
+        success = await this.cloningRepositoriesStore.clone(
+          item.url,
+          clonePath,
+          {
+            defaultBranch: item.defaultBranch,
+            accountKey: item.accountKey,
           },
-          onProgress: progress => {
-            if (this.statuses.get(item.path)?.kind === 'cloning') {
-              // Progress is intentionally memory-only; lifecycle transitions
-              // are journaled without turning every Git progress tick into I/O.
-              this.setStatus(
-                item.path,
-                {
-                  kind: 'cloning',
-                  progress: progress.value,
-                  description: progress.description,
-                },
-                false
-              )
-            }
-          },
-          onSuccess: accountKey => {
-            successfulAccountKey = accountKey
-          },
-        }
-      )
+          {
+            onError: error => {
+              this.setStatus(item.path, { kind: 'failed', error })
+            },
+            onProgress: progress => {
+              if (this.statuses.get(item.path)?.kind === 'cloning') {
+                // Progress is intentionally memory-only; lifecycle transitions
+                // are journaled without turning every Git progress tick into I/O.
+                this.setStatus(
+                  item.path,
+                  {
+                    kind: 'cloning',
+                    progress: progress.value,
+                    description: progress.description,
+                  },
+                  false
+                )
+              }
+            },
+            onSuccess: accountKey => {
+              successfulAccountKey = accountKey
+            },
+            onAbort: () => {
+              aborted = true
+            },
+            displayPath: item.path,
+            signal: controller.signal,
+          }
+        )
+      }
     } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error))
-      log.error(`Unexpected clone failure for ${item.url}`, normalizedError)
-      this.setStatus(item.path, { kind: 'failed', error: normalizedError })
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === 'AbortError')
+      ) {
+        aborted = true
+      } else {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error))
+        log.error(`Unexpected clone failure for ${item.url}`, normalizedError)
+        this.setStatus(item.path, { kind: 'failed', error: normalizedError })
+      }
+    } finally {
+      aborted = aborted || controller.signal.aborted
+      this.activeCloneControllers.delete(item.path)
+    }
+
+    if (aborted) {
+      await this.handleAbortedClone(item)
+      return
     }
 
     if (success) {
-      this.setStatus(item.path, {
-        kind: 'done',
-        progress: 1,
-        ...(successfulAccountKey !== null
-          ? { accountKey: successfulAccountKey }
-          : {}),
-      })
+      if (item.recoveryId !== undefined) {
+        if (this.stagingManager === null) {
+          this.setStatus(item.path, {
+            kind: 'review',
+            error: new Error('The staged clone manager is unavailable.'),
+          })
+          return
+        }
+        const promoted = await this.stagingManager.completeAndPromote(
+          item,
+          clonePath,
+          successfulAccountKey
+        )
+        if (promoted.kind === 'review') {
+          this.setStatus(item.path, {
+            kind: 'review',
+            error: promoted.error,
+          })
+          return
+        }
+        successfulAccountKey = promoted.accountKey
+      }
+      this.setStatus(
+        item.path,
+        {
+          kind: 'done',
+          progress: 1,
+          ...(successfulAccountKey !== null
+            ? { accountKey: successfulAccountKey }
+            : {}),
+        },
+        false
+      )
+      const durable = await this.persist()
+      if (
+        durable &&
+        item.recoveryId !== undefined &&
+        this.stagingManager !== null
+      ) {
+        await this.stagingManager.cleanupPromoted(item)
+      }
     } else if (this.statuses.get(item.path)?.kind !== 'failed') {
       this.setStatus(item.path, { kind: 'failed' })
     }
   }
 
+  private async handleAbortedClone(item: IBatchCloneItem): Promise<void> {
+    if (item.recoveryId === undefined || this.stagingManager === null) {
+      this.setStatus(
+        item.path,
+        {
+          kind: 'review',
+          error: new Error(
+            'The legacy direct clone was interrupted and its destination was left unchanged for review.'
+          ),
+        },
+        false
+      )
+      await this.persist()
+      return
+    }
+
+    let kind: 'skipped' | 'interrupted' = this.cancelRequested
+      ? 'skipped'
+      : 'interrupted'
+    this.setStatus(
+      item.path,
+      {
+        kind,
+        description:
+          kind === 'skipped'
+            ? 'The active clone was cancelled.'
+            : 'The active clone was paused and can be restarted safely.',
+      },
+      false
+    )
+
+    // The terminal/interrupted transition must be durable before the marker
+    // authorizes deleting the partial checkout.
+    if (!(await this.persist())) {
+      this.setStatus(
+        item.path,
+        {
+          kind: 'review',
+          error: new Error(
+            'The interrupted clone state could not be saved. Its staged data was retained for recovery.'
+          ),
+        },
+        false
+      )
+      return
+    }
+
+    // Cancellation can supersede a pause while the interrupted snapshot is
+    // being written. Persist the stronger terminal state before deletion.
+    if (kind === 'interrupted' && this.cancelRequested) {
+      kind = 'skipped'
+      this.setStatus(
+        item.path,
+        {
+          kind,
+          description: 'The active clone was cancelled.',
+        },
+        false
+      )
+      if (!(await this.persist())) {
+        this.setStatus(
+          item.path,
+          {
+            kind: 'review',
+            error: new Error(
+              'The cancelled clone state could not be saved. Its staged data was retained for recovery.'
+            ),
+          },
+          false
+        )
+        return
+      }
+    }
+
+    let discarded = false
+    try {
+      discarded = await this.stagingManager.discard(item)
+    } catch (error) {
+      log.error('Unable to discard an interrupted staged clone', error)
+    }
+    if (discarded) {
+      this.stagingTargets.delete(item.path)
+      return
+    }
+
+    this.setStatus(
+      item.path,
+      {
+        kind: 'review',
+        error: new Error(
+          'The interrupted staged clone could not be verified for removal and was retained for review.'
+        ),
+      },
+      false
+    )
+    await this.persist()
+  }
+
   private snapshot(): IBatchCloneJournalSnapshot {
     return {
-      version: BatchCloneJournalVersion,
+      version: this.journalVersion,
       updatedAt: new Date().toISOString(),
       items: this.items,
       statuses: Array.from(this.statuses.entries()),
@@ -581,32 +952,94 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     void this.persist()
   }
 
-  private persist(): Promise<void> {
+  /** Resolve true only when this exact snapshot was durably saved. */
+  private persist(): Promise<boolean> {
     if (!this.initialized || this.journal === null || this.items.length === 0) {
-      return Promise.resolve()
+      return Promise.resolve(false)
     }
     const snapshot = this.snapshot()
-    this.writeChain = this.writeChain
+    const journal = this.journal
+    const operation = this.writeChain
       .catch(() => undefined)
-      .then(() => this.journal?.save(snapshot))
-      .then(() => {
-        this.journalFailureReported = false
+      .then(async () => {
+        try {
+          await journal.save(snapshot)
+          this.journalFailureReported = false
+          return true
+        } catch (error) {
+          this.reportJournalFailure('persist', error)
+          return false
+        }
       })
-      .catch(error => this.reportJournalFailure('persist', error))
-    return this.writeChain
+    this.writeChain = operation.then(() => undefined)
+    return operation
   }
 
-  private scheduleClear(): void {
+  private clearJournal(): Promise<boolean> {
     if (!this.initialized || this.journal === null) {
-      return
+      return Promise.resolve(false)
     }
-    this.writeChain = this.writeChain
+    const journal = this.journal
+    const operation = this.writeChain
       .catch(() => undefined)
-      .then(() => this.journal?.clear())
-      .then(() => {
-        this.journalFailureReported = false
+      .then(async () => {
+        try {
+          await journal.clear()
+          this.journalFailureReported = false
+          return true
+        } catch (error) {
+          this.reportJournalFailure('clear', error)
+          return false
+        }
       })
-      .catch(error => this.reportJournalFailure('clear', error))
+    this.writeChain = operation.then(() => undefined)
+    return operation
+  }
+
+  private async cleanupCompletedStaging(): Promise<boolean> {
+    if (this.stagingManager === null) {
+      return this.journalVersion !== CurrentBatchCloneJournalVersion
+    }
+    let succeeded = true
+    for (const item of this.items) {
+      if (
+        item.recoveryId !== undefined &&
+        this.statuses.get(item.path)?.kind === 'done' &&
+        !(await this.stagingManager.cleanupPromoted(item))
+      ) {
+        succeeded = false
+      }
+    }
+    return succeeded
+  }
+
+  private async cleanupSkippedStaging(): Promise<boolean> {
+    if (this.stagingManager === null) {
+      return this.journalVersion !== CurrentBatchCloneJournalVersion
+    }
+    let succeeded = true
+    let changed = false
+    for (const item of this.items) {
+      if (
+        item.recoveryId !== undefined &&
+        this.statuses.get(item.path)?.kind === 'skipped' &&
+        !(await this.stagingManager.discard(item))
+      ) {
+        succeeded = false
+        changed = true
+        this.statuses.set(item.path, {
+          kind: 'review',
+          error: new Error(
+            'The cancelled staged clone could not be verified for removal and was retained for review.'
+          ),
+        })
+      }
+    }
+    if (changed) {
+      this.emit()
+      await this.persist()
+    }
+    return succeeded
   }
 
   private reportJournalFailure(operation: string, error: unknown): void {

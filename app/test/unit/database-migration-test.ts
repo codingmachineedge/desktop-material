@@ -17,6 +17,10 @@ class TestDatabase extends BaseDatabase {
     await this.conditionalVersion(2, { items: '++id, name' })
     await this.conditionalVersion(3, { items: '++id, name, status' })
   }
+
+  public configureSynchronously() {
+    this.conditionalVersion(1, { items: '++id' })
+  }
 }
 
 describe('BaseDatabase', () => {
@@ -51,6 +55,22 @@ describe('BaseDatabase', () => {
       const indexes = db.table('items').schema.indexes.map(i => i.name)
       assert.equal(indexes.includes('name'), false)
       assert.equal(indexes.includes('status'), false)
+      db.close()
+    })
+
+    it('surfaces schema registration failures synchronously', () => {
+      const db = new TestDatabase(undefined)
+      const registrationFailure = new Error('registration failed')
+      Object.defineProperty(db, 'version', {
+        value: () => {
+          throw registrationFailure
+        },
+      })
+
+      assert.throws(
+        () => db.configureSynchronously(),
+        error => error === registrationFailure
+      )
       db.close()
     })
   })

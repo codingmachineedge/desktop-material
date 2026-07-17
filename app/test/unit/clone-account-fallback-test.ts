@@ -230,6 +230,35 @@ describe('clone account fallback', () => {
     assert.deepStrictEqual(attempts, [undefined, getAccountKey(second)])
   })
 
+  it('never falls through to another account after an abort race', async () => {
+    const controller = new AbortController()
+    const attempts: Array<string | undefined> = []
+    let accountLoads = 0
+
+    await assert.rejects(
+      cloneWithAccountFallback(
+        'https://github.com/owner/private-repository.git',
+        async () => {
+          accountLoads += 1
+          return [account(1), account(2)]
+        },
+        null,
+        async key => {
+          attempts.push(key)
+          controller.abort()
+          // Git can report an authentication-shaped exit at the same boundary
+          // as process termination. The signal must win over fallback parsing.
+          throw gitError(DugiteError.HTTPSAuthenticationFailed)
+        },
+        controller.signal
+      ),
+      error => error instanceof Error && error.name === 'AbortError'
+    )
+
+    assert.deepStrictEqual(attempts, [undefined])
+    assert.equal(accountLoads, 0)
+  })
+
   it('returns the final authentication ambiguity after exhausting accounts', async () => {
     const first = account(1)
     const second = account(2)

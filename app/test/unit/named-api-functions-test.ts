@@ -17,10 +17,10 @@ import { GitHubRepository } from '../../src/models/github-repository'
 import { Owner } from '../../src/models/owner'
 import { Repository } from '../../src/models/repository'
 
-function fixture() {
+function fixture(endpoint = 'https://api.github.com') {
   const account = new Account(
     'fixture',
-    'https://api.github.test',
+    endpoint,
     'credential-not-persisted',
     [],
     '',
@@ -122,6 +122,55 @@ describe('named API functions', () => {
           body: { password: 'not-stored' },
         }),
       /credential-shaped/
+    )
+  })
+
+  it('validates REST functions against the bound endpoint product catalog', () => {
+    const operationId = 'actions/get-hosted-runners-limits-for-enterprise'
+    const request = {
+      mode: 'rest' as const,
+      method: 'GET' as const,
+      path: 'enterprises/{enterprise}/actions/hosted-runners/limits',
+      bodyText: '',
+    }
+    const dotcom = fixture()
+    assert.throws(
+      () =>
+        createNamedAPIFunctionDefinition({
+          name: 'runner_limits',
+          description: 'Read enterprise hosted runner limits.',
+          operationId,
+          binding: createNamedAPIFunctionBinding(
+            dotcom.repository,
+            dotcom.account
+          ),
+          request,
+        }),
+      /matching REST catalog operation/
+    )
+
+    const ghec = fixture('https://api.acme.ghe.com')
+    const definition = createNamedAPIFunctionDefinition({
+      name: 'runner_limits',
+      description: 'Read enterprise hosted runner limits.',
+      operationId,
+      binding: createNamedAPIFunctionBinding(ghec.repository, ghec.account),
+      request,
+      now: new Date('2026-07-17T00:00:00.000Z'),
+    })
+    assert.equal(
+      definition.template.mode === 'rest'
+        ? definition.template.catalogId
+        : null,
+      'ghec:2026-03-10'
+    )
+    const persisted = JSON.parse(
+      serializeNamedAPIFunctionsDocument([definition])
+    )
+    persisted.functions[0].template.catalogId = 'dotcom:2026-03-10'
+    assert.throws(
+      () => parseNamedAPIFunctionsDocument(JSON.stringify(persisted)),
+      /catalog does not match/
     )
   })
 

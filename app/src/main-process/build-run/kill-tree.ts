@@ -4,19 +4,71 @@ import { win32 } from 'path'
 
 const TaskkillDeadlineMilliseconds = 10_000
 
-function trustedTaskkillPath(): string {
-  const configured = process.env.SystemRoot
-  const systemRoot =
-    configured !== undefined && /^[A-Za-z]:\\Windows$/i.test(configured)
-      ? configured
-      : 'C:\\Windows'
-  const resolved = realpathSync(
-    win32.join(systemRoot, 'System32', 'taskkill.exe')
+export interface ITaskkillPathDependencies {
+  readonly realpath: (path: string) => string
+  readonly isFile: (path: string) => boolean
+}
+
+const DefaultTaskkillPathDependencies: ITaskkillPathDependencies = {
+  realpath: realpathSync,
+  isFile: path => statSync(path).isFile(),
+}
+
+function isValidatedDriveRootedPath(value: string): boolean {
+  if (
+    !/^[A-Za-z]:[\\/](?![\\/])/.test(value) ||
+    /[\u0000-\u001f:"<>|?*]/.test(value.slice(2)) ||
+    /[\\/]{2}/.test(value.slice(3))
+  ) {
+    return false
+  }
+  return !value
+    .slice(3)
+    .split(/[\\/]/)
+    .some(segment => segment === '.' || segment === '..')
+}
+
+/** Resolve taskkill only from a validated Windows installation directory. */
+export function resolveTrustedTaskkillPath(
+  configuredSystemRoot: string | undefined = process.env.SystemRoot,
+  dependencies: ITaskkillPathDependencies = DefaultTaskkillPathDependencies
+): string {
+  const systemRoot = configuredSystemRoot ?? 'C:\\Windows'
+  if (!isValidatedDriveRootedPath(systemRoot)) {
+    throw new Error('The Windows system root is invalid.')
+  }
+
+  const resolvedSystemRoot = dependencies.realpath(systemRoot)
+  const resolvedSystem32 = dependencies.realpath(
+    win32.join(resolvedSystemRoot, 'System32')
   )
-  if (!statSync(resolved).isFile()) {
+  if (
+    !isValidatedDriveRootedPath(resolvedSystemRoot) ||
+    !isValidatedDriveRootedPath(resolvedSystem32) ||
+    win32.relative(resolvedSystemRoot, resolvedSystem32).toLowerCase() !==
+      'system32'
+  ) {
+    throw new Error('The Windows system directory is invalid.')
+  }
+  const resolved = dependencies.realpath(
+    win32.join(resolvedSystem32, 'taskkill.exe')
+  )
+  const relative = win32.relative(resolvedSystem32, resolved)
+  if (
+    relative.toLowerCase() !== 'taskkill.exe' ||
+    !dependencies.isFile(resolved)
+  ) {
     throw new Error('The Windows process-tree terminator is unavailable.')
   }
   return resolved
+}
+
+function stillOwned(isStillOwned: () => boolean): boolean {
+  try {
+    return isStillOwned()
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -31,21 +83,37 @@ export async function killTreeAndWait(
   if (!Number.isInteger(pid) || pid <= 0) {
     return false
   }
+  if (!stillOwned(isStillOwned)) {
+    return true
+  }
 
   if (process.platform === 'win32') {
     return await new Promise(resolve => {
       try {
-        const child = spawn(
-          trustedTaskkillPath(),
-          ['/PID', String(pid), '/T', '/F'],
-          {
-            windowsHide: true,
-            stdio: 'ignore',
-            shell: false,
-          }
-        )
+        const taskkillPath = resolveTrustedTaskkillPath()
+        // Path resolution can touch the filesystem. Recheck immediately before
+        // spawning so a PID which exited during that work is never targeted.
+        if (!stillOwned(isStillOwned)) {
+          resolve(true)
+          return
+        }
+        const child = spawn(taskkillPath, ['/PID', String(pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore',
+          shell: false,
+        })
         let settled = false
-        const deadline = setTimeout(() => {
+        let deadline: ReturnType<typeof setTimeout> | null = null
+        const finish = (ok: boolean) => {
+          if (!settled) {
+            settled = true
+            if (deadline !== null) {
+              clearTimeout(deadline)
+            }
+            resolve(ok)
+          }
+        }
+        deadline = setTimeout(() => {
           try {
             child.kill()
           } catch {
@@ -53,13 +121,6 @@ export async function killTreeAndWait(
           }
           finish(false)
         }, TaskkillDeadlineMilliseconds)
-        const finish = (ok: boolean) => {
-          if (!settled) {
-            settled = true
-            clearTimeout(deadline)
-            resolve(ok)
-          }
-        }
         child.once('error', () => finish(false))
         child.once('close', code => finish(code === 0))
       } catch {
@@ -69,6 +130,9 @@ export async function killTreeAndWait(
   }
 
   // POSIX children are detached process-group leaders in the owning runners.
+  if (!stillOwned(isStillOwned)) {
+    return true
+  }
   try {
     process.kill(-pid, 'SIGTERM')
   } catch {
@@ -79,7 +143,7 @@ export async function killTreeAndWait(
     }
   }
   await new Promise(resolve => setTimeout(resolve, 1_000))
-  if (!isStillOwned()) {
+  if (!stillOwned(isStillOwned)) {
     return true
   }
   try {
@@ -102,7 +166,7 @@ export function killTree(pid: number): void {
     return
   }
   if (process.platform === 'win32') {
-    void killTreeAndWait(pid)
+    void killTreeAndWait(pid).catch(() => undefined)
     return
   }
   try {

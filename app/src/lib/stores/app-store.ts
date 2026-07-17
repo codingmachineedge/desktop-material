@@ -17,6 +17,7 @@ import {
 } from '.'
 import type { CopilotFeature, CopilotModelSelections } from './copilot-store'
 import { CommitMessageGenerationCancelledError } from './copilot-store'
+import { FileBatchCloneStagingManager } from './batch-clone-staging'
 import {
   IBYOKProvider,
   loadBYOKProviders,
@@ -138,6 +139,10 @@ import {
   sendCancelQuittingSync,
   showOpenDialog,
 } from '../../ui/main-process-proxy'
+import {
+  resetRendererShutdown,
+  runAfterRendererShutdown,
+} from '../../ui/lib/renderer-shutdown'
 import {
   API,
   getAccountForEndpoint,
@@ -920,7 +925,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ) {
     super()
 
-    this.batchCloneStore = new BatchCloneStore(this.cloningRepositoriesStore)
+    this.batchCloneStore = new BatchCloneStore(
+      this.cloningRepositoriesStore,
+      undefined,
+      undefined,
+      new FileBatchCloneStagingManager()
+    )
     this.autoCloneStore = new AutoCloneStore({
       getAccounts: () => this.accounts,
       getApiRepositories: () => this.apiRepositoriesStore.getState(),
@@ -930,10 +940,6 @@ export class AppStore extends TypedBaseStore<IAppState> {
       startBackgroundBatch: this.startBackgroundAutoCloneBatch,
       notify: (title, body) =>
         this.postNotification({ kind: 'clone-batch', title, body }),
-    })
-    window.addEventListener('beforeunload', () => {
-      this.autoCloneStore.stop()
-      void this.batchCloneStore.flush()
     })
 
     this.showWelcomeFlow = !hasShownWelcomeFlow()
@@ -7271,17 +7277,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   /** This shouldn't be called directly. See `Dispatcher`. */
   public _dismissBatchClone(): void {
-    this.batchCloneStore.dismiss()
+    void this.batchCloneStore.dismiss()
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
-  public _cancelBatchClone(): void {
-    this.batchCloneStore.requestCancel()
+  public _cancelBatchClone(): Promise<void> {
+    return this.batchCloneStore.requestCancel()
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
-  public _pauseBatchClone(): void {
-    this.batchCloneStore.requestPause()
+  public _pauseBatchClone(): Promise<void> {
+    return this.batchCloneStore.requestPause()
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
@@ -12481,15 +12487,29 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
   }
 
-  public _quitApp(evenIfUpdating: boolean) {
-    if (evenIfUpdating) {
-      sendWillQuitEvenIfUpdatingSync()
-    }
+  /** Stop background producers and durably drain this store's clone journal. */
+  public async flushForShutdown(): Promise<void> {
+    this.autoCloneStore.stop()
+    // A renderer-owned Git child must not outlive the renderer. Persist the
+    // paused/interrupted transition and await process-tree teardown before the
+    // final journal drain; recovery can then restart only app-owned staging.
+    await this.batchCloneStore.requestPause()
+    await this.batchCloneStore.flush()
+  }
 
-    quitApp()
+  public async _quitApp(evenIfUpdating: boolean): Promise<void> {
+    await runAfterRendererShutdown(() => {
+      if (evenIfUpdating) {
+        sendWillQuitEvenIfUpdatingSync()
+      }
+
+      quitApp()
+    })
   }
 
   public _cancelQuittingApp() {
+    resetRendererShutdown()
+    this.autoCloneStore.start()
     sendCancelQuittingSync()
   }
 

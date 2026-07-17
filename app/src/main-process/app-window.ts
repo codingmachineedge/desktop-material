@@ -30,6 +30,12 @@ import {
   IAgentCommandEnvelope,
   IAgentServerStatus,
 } from '../lib/agent-commands'
+import {
+  AppWindowRendererFailure,
+  isFatalRendererLoadFailure,
+} from './renderer-failure'
+
+const rendererUnresponsiveRecoveryDelay = 15_000
 
 export class AppWindow {
   private window: Electron.BrowserWindow
@@ -49,6 +55,7 @@ export class AppWindow {
   private shouldMaximizeOnShow = false
   private quitting = false
   private quittingEvenIfUpdating = false
+  private rendererFailureReported = false
 
   public constructor(public readonly scope: string) {
     const savedWindowState = windowStateKeeper({
@@ -93,6 +100,58 @@ export class AppWindow {
 
     this.window = new BrowserWindow(windowOptions)
     addTrustedIPCSender(this.window.webContents)
+
+    const onRenderProcessGone = (
+      _event: Electron.Event,
+      details: Electron.RenderProcessGoneDetails
+    ) => {
+      if (
+        this.quitting ||
+        this.rendererFailureReported ||
+        details.reason === 'clean-exit'
+      ) {
+        return
+      }
+      this.reportRendererFailure({
+        kind: 'process-gone',
+        reason: details.reason,
+        exitCode: details.exitCode,
+      })
+    }
+    this.window.webContents.on('render-process-gone', onRenderProcessGone)
+    this.addCleanupTask(() =>
+      this.window.webContents.removeListener(
+        'render-process-gone',
+        onRenderProcessGone
+      )
+    )
+
+    let unresponsiveTimer: ReturnType<typeof setTimeout> | null = null
+    const clearUnresponsiveTimer = () => {
+      if (unresponsiveTimer !== null) {
+        clearTimeout(unresponsiveTimer)
+        unresponsiveTimer = null
+      }
+    }
+    const onUnresponsive = () => {
+      if (unresponsiveTimer !== null) {
+        return
+      }
+      unresponsiveTimer = setTimeout(() => {
+        unresponsiveTimer = null
+        this.reportRendererFailure({
+          kind: 'unresponsive',
+          unresponsiveForMilliseconds: rendererUnresponsiveRecoveryDelay,
+        })
+      }, rendererUnresponsiveRecoveryDelay)
+    }
+    this.window.on('unresponsive', onUnresponsive)
+    this.window.on('responsive', clearUnresponsiveTimer)
+    this.addCleanupTask(() => {
+      clearUnresponsiveTimer()
+      this.window.removeListener('unresponsive', onUnresponsive)
+      this.window.removeListener('responsive', clearUnresponsiveTimer)
+    })
 
     this.addCleanupTask(installNotificationCallback(this.window))
 
@@ -178,13 +237,39 @@ export class AppWindow {
     })
 
     this.window.webContents.on('did-finish-load', () => {
-      this.window.webContents.setVisualZoomLevelLimits(1, 1)
+      void this.window.webContents.setVisualZoomLevelLimits(1, 1).catch(() =>
+        this.reportRendererFailure({
+          kind: 'setup-failed',
+          stage: 'zoom-limits',
+        })
+      )
     })
 
-    this.window.webContents.on('did-fail-load', () => {
-      this.window.webContents.openDevTools()
-      this.window.show()
-    })
+    const onDidFailLoad = (
+      _event: Electron.Event,
+      errorCode: number,
+      errorDescription: string,
+      validatedURL: string,
+      isMainFrame: boolean
+    ) => {
+      if (
+        this.quitting ||
+        this.rendererFailureReported ||
+        !isFatalRendererLoadFailure(errorCode, isMainFrame)
+      ) {
+        return
+      }
+      this.reportRendererFailure({
+        kind: 'load-failed',
+        errorCode,
+        errorDescription,
+        validatedURL,
+      })
+    }
+    this.window.webContents.on('did-fail-load', onDidFailLoad)
+    this.addCleanupTask(() =>
+      this.window.webContents.removeListener('did-fail-load', onDidFailLoad)
+    )
 
     const removeRendererReadyListener = ipcMain.on(
       'renderer-ready',
@@ -213,11 +298,18 @@ export class AppWindow {
     // formatting defaults. This is a bit of a hack but it avoids the need to
     // have an IPC round trip to get that information from the main process.
     const localeCountryCode = app.getLocaleCountryCode() ?? ''
-    this.window.loadURL(
-      encodePathAsUrl(__dirname, 'index.html') +
-        `#lc=${encodeURIComponent(localeCountryCode)}` +
-        `&ws=${encodeURIComponent(this.scope)}`
-    )
+    void this.window
+      .loadURL(
+        encodePathAsUrl(__dirname, 'index.html') +
+          `#lc=${encodeURIComponent(localeCountryCode)}` +
+          `&ws=${encodeURIComponent(this.scope)}`
+      )
+      .catch(() =>
+        this.reportRendererFailure({
+          kind: 'setup-failed',
+          stage: 'load-url',
+        })
+      )
 
     const onNativeThemeUpdated = () => {
       ipcWebContents.send(this.window.webContents, 'native-theme-updated')
@@ -242,6 +334,15 @@ export class AppWindow {
     this.emitter.emit('did-load', null)
   }
 
+  private reportRendererFailure(failure: AppWindowRendererFailure) {
+    if (this.quitting || this.rendererFailureReported) {
+      return
+    }
+
+    this.rendererFailureReported = true
+    this.emitter.emit('renderer-failure', failure)
+  }
+
   /** Is the page loaded and has the renderer signalled it's ready? */
   private get rendererLoaded(): boolean {
     return !!this.loadTime && !!this.rendererReadyTime
@@ -253,6 +354,13 @@ export class AppWindow {
 
   public onClosed(fn: () => void) {
     this.window.on('closed', fn)
+  }
+
+  /** Report one non-clean renderer/load failure to the main recovery owner. */
+  public onRendererFailure(
+    fn: (failure: AppWindowRendererFailure) => void
+  ): Disposable {
+    return this.emitter.on('renderer-failure', fn)
   }
 
   /**
@@ -618,9 +726,31 @@ export class AppWindow {
 
   private cleanup() {
     for (const task of this.cleanupTasks.splice(0).reverse()) {
-      task()
+      try {
+        task()
+      } catch (error) {
+        try {
+          log.error(
+            'Unable to clean up an application window listener',
+            error instanceof Error ? error : new Error(String(error))
+          )
+        } catch {
+          // Continue releasing sibling listeners even when diagnostics fail.
+        }
+      }
     }
-    this.emitter.dispose()
+    try {
+      this.emitter.dispose()
+    } catch (error) {
+      try {
+        log.error(
+          'Unable to dispose application window events',
+          error instanceof Error ? error : new Error(String(error))
+        )
+      } catch {
+        // Window teardown is terminal and must remain failure-contained.
+      }
+    }
   }
 }
 

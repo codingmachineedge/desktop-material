@@ -5,7 +5,10 @@ import { RetryAction, RetryActionType } from '../../models/retry-actions'
 import { Account } from '../../models/account'
 
 import { clone as cloneRepo } from '../git'
-import { cloneWithAccountFallback } from '../automation/clone-account-fallback'
+import {
+  cloneWithAccountFallback,
+  isCloneAbortError,
+} from '../automation/clone-account-fallback'
 import { ErrorWithMetadata } from '../error-with-metadata'
 import { BaseStore } from './base-store'
 
@@ -45,12 +48,19 @@ export class CloningRepositoriesStore extends BaseStore {
       readonly onProgress?: (progress: ICloneProgress) => void
       /** Called after clone succeeds with the identity that completed it. */
       readonly onSuccess?: (accountKey: string | null) => void
+      /** User-visible destination when Git writes into an app-owned staging path. */
+      readonly displayPath?: string
+      /** Cancels the owned Git clone and prevents account fallback attempts. */
+      readonly signal?: AbortSignal
+      /** Called for an intentional abort instead of routing a clone error. */
+      readonly onAbort?: () => void
     }
   ): Promise<boolean> {
-    const repository = new CloningRepository(path, url)
+    const displayPath = opts?.displayPath ?? path
+    const repository = new CloningRepository(displayPath, url)
     this._repositories.push(repository)
 
-    const title = `Cloning into ${path}`
+    const title = `Cloning into ${displayPath}`
 
     this.stateByID.set(repository.id, { kind: 'clone', title, value: 0 })
     this.emitUpdate()
@@ -71,13 +81,21 @@ export class CloningRepositoriesStore extends BaseStore {
               opts?.onProgress?.(progress)
               this.emitUpdate()
             },
-            accountKey
-          )
+            accountKey,
+            opts?.signal
+          ),
+        opts?.signal
       )
       repository.accountKey = result.accountKey
       opts?.onSuccess?.(result.accountKey)
     } catch (e) {
       success = false
+
+      if (opts?.signal?.aborted || isCloneAbortError(e)) {
+        opts?.onAbort?.()
+        this.remove(repository)
+        return false
+      }
 
       const retryAction: RetryAction = {
         type: RetryActionType.Clone,

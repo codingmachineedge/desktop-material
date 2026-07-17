@@ -14,7 +14,7 @@ import { planRemediation } from '../../lib/build-run/auto-fix'
 import { planToolchainInstall } from '../../lib/build-run/toolchain-install'
 import { resolveRunEnv } from '../../lib/build-run/resolve-user-path'
 import { assertNever } from '../../lib/fatal-error'
-import { killTree } from './kill-tree'
+import { killTreeAndWait } from './kill-tree'
 import { IElevatedRun, startElevatedRun } from './elevated-runner'
 
 /**
@@ -34,6 +34,7 @@ import { IElevatedRun, startElevatedRun } from './elevated-runner'
 
 /** Number of trailing output characters kept for the auto-fix planner. */
 const TAIL_CAP = 8000
+const RunTerminationDeadlineMilliseconds = 15_000
 
 /** Thrown to unwind a stage when the run was cancelled. */
 class CancelledError extends Error {}
@@ -66,6 +67,8 @@ interface IActiveRun {
   cancelled: boolean
   child: ChildProcessWithoutNullStreams | null
   elevated: IElevatedRun | null
+  completion: Promise<void>
+  cancellation: Promise<void> | null
   cleanup: () => void
 }
 
@@ -143,13 +146,23 @@ export class BuildRunner {
       cancelled: false,
       child: null,
       elevated: null,
+      completion: Promise.resolve(),
+      cancellation: null,
       cleanup: () => {},
     }
     this.runs.set(plan.runId, run)
 
     // A renderer reload or teardown must not orphan live children.
-    const onNavigate = () => this.cancel(plan.runId)
-    const onDestroyed = () => this.cancel(plan.runId)
+    const cancelSafely = () => {
+      void this.cancel(plan.runId).catch(error =>
+        log.error(
+          '[build-run] failed to cancel an owned run',
+          error instanceof Error ? error : undefined
+        )
+      )
+    }
+    const onNavigate = cancelSafely
+    const onDestroyed = cancelSafely
     sender.on('did-start-navigation', onNavigate)
     sender.once('destroyed', onDestroyed)
     run.cleanup = () => {
@@ -161,32 +174,72 @@ export class BuildRunner {
       }
     }
 
-    void this.execute(run)
+    run.completion = this.execute(run)
   }
 
   /** Request cancellation of a run; safe to call for unknown / finished ids. */
   public async cancel(runId: string): Promise<void> {
     const run = this.runs.get(runId)
-    if (run === undefined || run.cancelled) {
+    if (run === undefined) {
       return
     }
-    run.cancelled = true
-    if (run.elevated !== null) {
-      run.elevated.cancel()
-    } else if (run.child?.pid !== undefined) {
-      killTree(run.child.pid)
+
+    if (run.cancellation === null) {
+      run.cancelled = true
+      run.cancellation = this.terminate(run)
+    }
+    await run.cancellation
+    await this.awaitCompletion(run)
+  }
+
+  /** Stop and await every live run before application shutdown continues. */
+  public async killAll(): Promise<void> {
+    await Promise.all([...this.runs.keys()].map(runId => this.cancel(runId)))
+  }
+
+  private async terminate(run: IActiveRun): Promise<void> {
+    const elevated = run.elevated
+    if (elevated !== null) {
+      await elevated.cancel()
+      return
+    }
+
+    const child = run.child
+    if (child?.pid !== undefined) {
+      await killTreeAndWait(
+        child.pid,
+        () => child.exitCode === null && child.signalCode === null
+      )
     }
   }
 
-  /** Kill every live run. Wired to `app.on('will-quit')`. */
-  public killAll(): void {
-    for (const run of this.runs.values()) {
-      run.cancelled = true
-      if (run.elevated !== null) {
-        run.elevated.cancel()
-      } else if (run.child?.pid !== undefined) {
-        killTree(run.child.pid)
-      }
+  private async awaitCompletion(run: IActiveRun): Promise<void> {
+    let deadline: ReturnType<typeof setTimeout> | null = null
+    const timedOut = await Promise.race([
+      run.completion.then(
+        () => false,
+        error => {
+          log.error(
+            `[build-run] owned run ${run.plan.runId} failed during teardown`,
+            error instanceof Error ? error : undefined
+          )
+          return false
+        }
+      ),
+      new Promise<true>(resolve => {
+        deadline = setTimeout(
+          () => resolve(true),
+          RunTerminationDeadlineMilliseconds
+        )
+      }),
+    ])
+    if (deadline !== null) {
+      clearTimeout(deadline)
+    }
+    if (timedOut) {
+      log.error(
+        `[build-run] timed out waiting for owned run ${run.plan.runId} to close`
+      )
     }
   }
 
@@ -461,6 +514,10 @@ export class BuildRunner {
   ): Promise<IExecResult> {
     const exe = await resolveExecutable(command.exe, run.env)
 
+    if (run.cancelled) {
+      return { code: -1, tail: '', spawnError: false }
+    }
+
     return new Promise<IExecResult>(resolve => {
       let child: ChildProcessWithoutNullStreams
       try {
@@ -469,6 +526,9 @@ export class BuildRunner {
           env: run.env,
           windowsHide: true,
           shell: false,
+          // POSIX cancellation targets the owned process group so command
+          // descendants cannot survive a renderer reload or app shutdown.
+          detached: process.platform !== 'win32',
         })
       } catch (err) {
         resolve({

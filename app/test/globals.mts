@@ -55,5 +55,11 @@ mock.module('electron', {
     clipboard: { writeText: () => {} },
     shell: {},
     ipcRenderer: { on: mock.fn(x => {}) },
+    ipcMain: {
+      on: () => {},
+      once: () => {},
+      handle: () => {},
+      removeListener: () => {},
+    },
   },
 })

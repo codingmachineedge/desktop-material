@@ -13,6 +13,7 @@ import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 import {
   BatchCloneJournalVersion,
+  CurrentBatchCloneJournalVersion,
   FileBatchCloneJournal,
   IBatchCloneJournal,
   IBatchCloneJournalSnapshot,
@@ -26,6 +27,11 @@ import {
   BatchCloneStore,
   selectRegisteredBatchClonePaths,
 } from '../../src/lib/stores/batch-clone-store'
+import {
+  BatchCloneStagingCompletion,
+  BatchCloneStagingPreparation,
+  IBatchCloneStagingManager,
+} from '../../src/lib/stores/batch-clone-staging'
 import { CloningRepositoriesStore } from '../../src/lib/stores/cloning-repositories-store'
 import {
   BatchCloneMode,
@@ -38,6 +44,7 @@ import { git } from '../../src/lib/git/core'
 class MemoryJournal implements IBatchCloneJournal {
   public saved: IBatchCloneJournalSnapshot | null
   public saveCount = 0
+  public clearCount = 0
 
   public constructor(snapshot: IBatchCloneJournalSnapshot | null = null) {
     this.saved = snapshot
@@ -54,6 +61,45 @@ class MemoryJournal implements IBatchCloneJournal {
 
   public async clear() {
     this.saved = null
+    this.clearCount += 1
+  }
+}
+
+class FailingJournal extends MemoryJournal {
+  private saveAttempts = 0
+
+  public constructor(
+    snapshot: IBatchCloneJournalSnapshot | null = null,
+    private readonly successfulSaves = 0
+  ) {
+    super(snapshot)
+  }
+
+  public override async save(snapshot: IBatchCloneJournalSnapshot) {
+    this.saveAttempts += 1
+    if (this.saveAttempts > this.successfulSaves) {
+      throw new Error('injected journal failure')
+    }
+    await super.save(snapshot)
+  }
+}
+
+function stagingManager(
+  overrides: Partial<IBatchCloneStagingManager> = {}
+): IBatchCloneStagingManager {
+  return {
+    prepare: async (): Promise<BatchCloneStagingPreparation> => ({
+      kind: 'clone',
+      clonePath: '/staging/checkout',
+    }),
+    reinspect: async () => true,
+    completeAndPromote: async (): Promise<BatchCloneStagingCompletion> => ({
+      kind: 'done',
+      accountKey: null,
+    }),
+    cleanupPromoted: async () => true,
+    discard: async () => true,
+    ...overrides,
   }
 }
 
@@ -94,6 +140,187 @@ describe('batch clone journal and recovery', () => {
     assert.equal(parsed?.version, 1)
     assert.equal(parsed?.statuses[0][1].error?.message, 'boom')
     assert.equal(parseBatchCloneJournal('{broken'), null)
+  })
+
+  it('accepts v2 recovery identities while preserving v1 conservatively', () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: 'a'.repeat(48),
+    }
+    const v2 = {
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[recoveryItem.path, { kind: 'pending' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: true,
+    }
+
+    assert.equal(parseBatchCloneJournal(JSON.stringify(v2))?.version, 2)
+    assert.equal(
+      parseBatchCloneJournal(JSON.stringify({ ...v2, items: [first] })),
+      null
+    )
+    assert.equal(
+      parseBatchCloneJournal(
+        JSON.stringify({
+          ...v2,
+          version: BatchCloneJournalVersion,
+        })
+      ),
+      null
+    )
+  })
+
+  it('does not create staging or invoke Git until the v2 queue is durable', async () => {
+    let prepareCalls = 0
+    let cloneCalls = 0
+    const manager = stagingManager({
+      prepare: async () => {
+        prepareCalls += 1
+        return { kind: 'clone', clonePath: '/staging/checkout' }
+      },
+    })
+    const store = new BatchCloneStore(
+      {
+        clone: async () => {
+          cloneCalls += 1
+          return true
+        },
+      } as unknown as CloningRepositoriesStore,
+      new FailingJournal(),
+      async () => 'empty',
+      manager
+    )
+    await store.initialize()
+
+    await store.startBatch([first], BatchCloneMode.Sequential)
+
+    assert.equal(prepareCalls, 0)
+    assert.equal(cloneCalls, 0)
+    assert.equal(store.getState()?.items[0].recoveryId?.length, 48)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'review')
+  })
+
+  it('retains promotion proof when the done snapshot is not durable', async () => {
+    let cleanupCalls = 0
+    let completionCalls = 0
+    const manager = stagingManager({
+      completeAndPromote: async () => {
+        completionCalls += 1
+        return { kind: 'done', accountKey: 'github.com#fallback' }
+      },
+      cleanupPromoted: async () => {
+        cleanupCalls += 1
+        return true
+      },
+    })
+    // The first four snapshots reach the durable `cloning` state. Both the
+    // per-item `done` save and the final queue save then fail.
+    const journal = new FailingJournal(null, 4)
+    const store = new BatchCloneStore(
+      {
+        clone: async (
+          _url: string,
+          _path: string,
+          _options: CloneOptions,
+          callbacks?: { onSuccess?: (accountKey: string | null) => void }
+        ) => {
+          callbacks?.onSuccess?.('github.com#fallback')
+          return true
+        },
+      } as unknown as CloningRepositoriesStore,
+      journal,
+      async () => 'empty',
+      manager
+    )
+    await store.initialize()
+
+    await store.startBatch([first], BatchCloneMode.Sequential)
+
+    assert.equal(completionCalls, 1)
+    assert.equal(cleanupCalls, 0)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'done')
+    assert.equal(journal.saved?.statuses[0][1].kind, 'cloning')
+  })
+
+  it('retains ambiguous staged roots on dismiss and clears exact roots first', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: 'b'.repeat(48),
+    }
+    const journal = new MemoryJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[recoveryItem.path, { kind: 'failed' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    let allowDiscard = false
+    let discardCalls = 0
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => 'review',
+      stagingManager({
+        discard: async () => {
+          discardCalls += 1
+          return allowDiscard
+        },
+      })
+    )
+    await store.initialize()
+
+    assert.equal(await store.dismiss(), false)
+    assert.equal(discardCalls, 1)
+    assert.equal(journal.clearCount, 0)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'review')
+
+    allowDiscard = true
+    assert.equal(await store.dismiss(), true)
+    assert.equal(discardCalls, 2)
+    assert.equal(journal.clearCount, 1)
+    assert.equal(store.getState(), null)
+  })
+
+  it('durably marks cancellation before discarding skipped staging', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: 'c'.repeat(48),
+    }
+    const journal = new MemoryJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[recoveryItem.path, { kind: 'pending' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: true,
+    })
+    let discardCalls = 0
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => 'empty',
+      stagingManager({
+        discard: async () => {
+          discardCalls += 1
+          assert.equal(journal.saved?.statuses[0][1].kind, 'skipped')
+          return true
+        },
+      })
+    )
+    await store.initialize()
+
+    store.requestCancel()
+    await store.flush()
+
+    assert.equal(discardCalls, 1)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'skipped')
+    assert.equal(journal.saved?.statuses[0][1].kind, 'skipped')
   })
 
   it('never writes credentialed URLs to primary, backup, or quarantine files', async () => {
@@ -322,47 +549,266 @@ describe('batch clone journal and recovery', () => {
     assert.equal(journal.saved?.statuses[0][1].kind, 'interrupted')
   })
 
-  it('pauses pending work, lets the active clone finish, and resumes', async () => {
-    let firstStarted = false
-    let finishFirst: () => void = () =>
-      assert.fail('first clone has not started')
-    const cloned: string[] = []
-    const cloningStore = {
-      clone: async (_url: string, path: string, _options: CloneOptions) => {
-        cloned.push(path)
-        if (path === first.path) {
-          await new Promise<void>(resolve => {
-            finishFirst = resolve
-            firstStarted = true
-          })
+  it('aborts an active clone on pause and relaunches with the same recovery identity', async () => {
+    let firstStarted: () => void = () => {}
+    const started = new Promise<void>(resolve => {
+      firstStarted = resolve
+    })
+    let markAbortObserved: () => void = () => {}
+    const abortObserved = new Promise<void>(resolve => {
+      markAbortObserved = resolve
+    })
+    let releaseProcessClose: () => void = () =>
+      assert.fail('the clone process has not started')
+    const processClosed = new Promise<void>(resolve => {
+      releaseProcessClose = resolve
+    })
+    const clonePaths: string[] = []
+    const preparedRecoveryIds: string[] = []
+    let attempts = 0
+    const journal = new MemoryJournal()
+    const manager = stagingManager({
+      prepare: async item => {
+        assert.ok(item.recoveryId)
+        preparedRecoveryIds.push(item.recoveryId)
+        return {
+          kind: 'clone',
+          clonePath: `/staging/${item.recoveryId}`,
         }
+      },
+      discard: async item => {
+        assert.equal(journal.saved?.statuses[0][1].kind, 'interrupted')
+        assert.equal(item.recoveryId, preparedRecoveryIds[0])
+        return true
+      },
+    })
+    const cloningStore = {
+      clone: async (
+        _url: string,
+        path: string,
+        _options: CloneOptions,
+        callbacks?: {
+          signal?: AbortSignal
+          onAbort?: () => void
+          onSuccess?: (accountKey: string | null) => void
+        }
+      ) => {
+        attempts += 1
+        clonePaths.push(path)
+        if (attempts === 1) {
+          firstStarted()
+          await new Promise<void>(resolve => {
+            const abort = () => {
+              markAbortObserved()
+              void processClosed.then(() => {
+                callbacks?.onAbort?.()
+                resolve()
+              })
+            }
+            if (callbacks?.signal?.aborted) {
+              abort()
+            } else {
+              callbacks?.signal?.addEventListener('abort', abort, {
+                once: true,
+              })
+            }
+          })
+          return false
+        }
+        callbacks?.onSuccess?.(null)
         return true
       },
     } as unknown as CloningRepositoriesStore
-    const journal = new MemoryJournal()
-    const store = new BatchCloneStore(
+    const pausedStore = new BatchCloneStore(
       cloningStore,
       journal,
-      async () => 'empty'
+      async () => 'empty',
+      manager
+    )
+    await pausedStore.initialize()
+
+    const running = pausedStore.startBatch(
+      [first, second],
+      BatchCloneMode.Sequential
+    )
+    await started
+    const recoveryId = pausedStore.getState()?.items[0].recoveryId
+    let pauseResolved = false
+    const pause = pausedStore.requestPause().then(() => {
+      pauseResolved = true
+    })
+    await abortObserved
+    await Promise.resolve()
+    assert.equal(
+      pauseResolved,
+      false,
+      'pause must wait for the owned Git process to close'
+    )
+    releaseProcessClose()
+    await pause
+    await running
+
+    assert.equal(pausedStore.getState()?.isPaused, true)
+    assert.equal(
+      pausedStore.getState()?.statuses.get(first.path)?.kind,
+      'interrupted'
+    )
+    assert.equal(
+      pausedStore.getState()?.statuses.get(second.path)?.kind,
+      'pending'
+    )
+    assert.equal(journal.saved?.statuses[0][1].kind, 'interrupted')
+
+    const relaunchedStore = new BatchCloneStore(
+      cloningStore,
+      journal,
+      async () => 'empty',
+      manager
+    )
+    await relaunchedStore.initialize()
+    assert.equal(relaunchedStore.getState()?.items[0].recoveryId, recoveryId)
+    await relaunchedStore.resume()
+
+    assert.equal(relaunchedStore.getState()?.isDone, true)
+    assert.equal(relaunchedStore.getState()?.items[0].recoveryId, recoveryId)
+    assert.equal(clonePaths[0], clonePaths[1])
+    assert.equal(preparedRecoveryIds[0], preparedRecoveryIds[2])
+    assert.equal(journal.saved?.statuses[1][1].kind, 'done')
+  })
+
+  it('aborts an active clone on cancel before discarding staged data', async () => {
+    let markStarted: () => void = () => {}
+    const started = new Promise<void>(resolve => {
+      markStarted = resolve
+    })
+    let markAbortObserved: () => void = () => {}
+    const abortObserved = new Promise<void>(resolve => {
+      markAbortObserved = resolve
+    })
+    let releaseProcessClose: () => void = () =>
+      assert.fail('the clone process has not started')
+    const processClosed = new Promise<void>(resolve => {
+      releaseProcessClose = resolve
+    })
+    const journal = new MemoryJournal()
+    let discardCalls = 0
+    const manager = stagingManager({
+      discard: async () => {
+        discardCalls += 1
+        assert.equal(journal.saved?.statuses[0][1].kind, 'skipped')
+        return true
+      },
+    })
+    const store = new BatchCloneStore(
+      {
+        clone: async (
+          _url: string,
+          _path: string,
+          _options: CloneOptions,
+          callbacks?: { signal?: AbortSignal; onAbort?: () => void }
+        ) => {
+          markStarted()
+          await new Promise<void>(resolve => {
+            const abort = () => {
+              markAbortObserved()
+              void processClosed.then(() => {
+                callbacks?.onAbort?.()
+                resolve()
+              })
+            }
+            if (callbacks?.signal?.aborted) {
+              abort()
+            } else {
+              callbacks?.signal?.addEventListener('abort', abort, {
+                once: true,
+              })
+            }
+          })
+          return false
+        },
+      } as unknown as CloningRepositoriesStore,
+      journal,
+      async () => 'empty',
+      manager
     )
     await store.initialize()
 
-    const running = store.startBatch([first, second], BatchCloneMode.Sequential)
-    while (!firstStarted) {
-      await new Promise(resolve => setTimeout(resolve, 0))
-    }
-    store.requestPause()
-    finishFirst()
+    const running = store.startBatch([first], BatchCloneMode.Sequential)
+    await started
+    let cancelResolved = false
+    const cancel = store.requestCancel().then(() => {
+      cancelResolved = true
+    })
+    await abortObserved
+    await Promise.resolve()
+    assert.equal(
+      cancelResolved,
+      false,
+      'cancel must wait for the owned Git process to close'
+    )
+    releaseProcessClose()
+    await cancel
     await running
 
-    assert.deepEqual(cloned, [first.path])
-    assert.equal(store.getState()?.isPaused, true)
-    assert.equal(store.getState()?.statuses.get(second.path)?.kind, 'pending')
+    assert.ok(discardCalls >= 1)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'skipped')
+    assert.equal(store.getState()?.isRunning, false)
+    assert.equal(journal.saved?.statuses[0][1].kind, 'skipped')
+  })
 
-    await store.resume()
-    assert.deepEqual(cloned, [first.path, second.path])
-    assert.equal(store.getState()?.isDone, true)
-    assert.equal(journal.saved?.statuses[1][1].kind, 'done')
+  it('retains partial staging when an interrupted snapshot cannot be saved', async () => {
+    let markStarted: () => void = () => {}
+    const started = new Promise<void>(resolve => {
+      markStarted = resolve
+    })
+    // Initial queue, preparation, run, and `cloning` snapshots succeed. The
+    // interrupted snapshot and final queue snapshot both fail.
+    const journal = new FailingJournal(null, 4)
+    let discardCalls = 0
+    const store = new BatchCloneStore(
+      {
+        clone: async (
+          _url: string,
+          _path: string,
+          _options: CloneOptions,
+          callbacks?: { signal?: AbortSignal; onAbort?: () => void }
+        ) => {
+          markStarted()
+          await new Promise<void>(resolve => {
+            const abort = () => {
+              callbacks?.onAbort?.()
+              resolve()
+            }
+            if (callbacks?.signal?.aborted) {
+              abort()
+            } else {
+              callbacks?.signal?.addEventListener('abort', abort, {
+                once: true,
+              })
+            }
+          })
+          return false
+        },
+      } as unknown as CloningRepositoriesStore,
+      journal,
+      async () => 'empty',
+      stagingManager({
+        discard: async () => {
+          discardCalls += 1
+          return true
+        },
+      })
+    )
+    await store.initialize()
+
+    const running = store.startBatch([first], BatchCloneMode.Sequential)
+    await started
+    await store.requestPause()
+    await running
+
+    assert.equal(discardCalls, 0)
+    assert.equal(journal.saved?.statuses[0][1].kind, 'cloning')
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'review')
   })
 
   it('serializes rapid resume requests during destination inspection', async () => {
@@ -536,7 +982,7 @@ describe('batch clone journal and recovery', () => {
       /needs review/i
     )
 
-    store.dismiss()
+    await store.dismiss()
     await store.startBatch([second], BatchCloneMode.Sequential)
     assert.equal(store.getState()?.items[0].path, second.path)
   })

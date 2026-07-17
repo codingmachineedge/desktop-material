@@ -3,13 +3,19 @@ import * as React from 'react'
 import { API } from '../../lib/api'
 import { getAccountForRepository } from '../../lib/get-account-for-repository'
 import {
+  filterGitHubGraphQLOperations,
+  getGitHubGraphQLOperationTemplate,
+  GitHubGraphQLCatalogResolution,
+  IGitHubGraphQLOperation,
+  resolveGitHubGraphQLOperationCatalog,
+} from '../../lib/github-graphql-operation-catalog'
+import {
   filterGitHubAPIOperations,
   getGitHubAPIOperationPath,
-  GitHubAPICatalogCategories,
-  GitHubAPICatalogVersion,
-  GitHubAPIOperations,
+  GitHubAPICatalogResolution,
   IGitHubAPIOperation,
   isNewGitHubAPIOperation,
+  resolveGitHubAPIOperationCatalog,
 } from '../../lib/github-api-operation-catalog'
 import {
   assessGitHubAPIWorkbenchRequest,
@@ -24,6 +30,7 @@ import {
 import { Account, getAccountKey } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
+import { LinkButton } from '../lib/link-button'
 import {
   createNamedAPIFunctionBinding,
   functionBelongsToBinding,
@@ -82,6 +89,12 @@ export interface IGitHubAPIExplorerProps {
   readonly accounts: ReadonlyArray<Account>
   readonly client?: IGitHubAPIExplorerClient
   readonly functionRegistry?: IGitHubAPIFunctionRegistry
+  /** Test seam for product/version-specific operation catalogs. */
+  readonly catalogResolver?: (endpoint: string) => GitHubAPICatalogResolution
+  /** Test seam for product/version-specific GraphQL root schemas. */
+  readonly graphQLCatalogResolver?: (
+    endpoint: string
+  ) => GitHubGraphQLCatalogResolution
 }
 
 export interface IGitHubAPIFunctionRegistry {
@@ -109,6 +122,9 @@ interface IGitHubAPIExplorerState {
   readonly catalogCategory: string
   readonly newOnly: boolean
   readonly selectedOperationId: string | null
+  readonly graphQLCatalogQuery: string
+  readonly graphQLCatalogKind: '' | 'query' | 'mutation'
+  readonly selectedGraphQLOperationId: string | null
   readonly restMethod: GitHubAPIWorkbenchMethod
   readonly restPath: string
   readonly restBody: string
@@ -128,10 +144,6 @@ interface IGitHubAPIExplorerState {
   readonly functionError: string | null
   readonly functionMessage: string | null
 }
-
-const defaultOperation = GitHubAPIOperations.find(
-  operation => operation.id === GitHubAPIExplorerDefaultOperationId
-)
 
 const defaultClient: IGitHubAPIExplorerClient = {
   execute: (account, request, confirmed, signal) =>
@@ -161,6 +173,42 @@ function repositoryContextKey(props: IGitHubAPIExplorerProps): string {
   return `${props.repository.hash}:${
     remote === null ? 'local' : remote.fullName
   }:${account === null ? 'signed-out' : getAccountKey(account)}`
+}
+
+function resolveCatalogForProps(
+  props: IGitHubAPIExplorerProps
+): GitHubAPICatalogResolution | null {
+  const account = getExplorerAccount(props.repository, props.accounts)
+  return account === null
+    ? null
+    : (props.catalogResolver ?? resolveGitHubAPIOperationCatalog)(
+        account.endpoint
+      )
+}
+
+function resolveGraphQLCatalogForProps(
+  props: IGitHubAPIExplorerProps
+): GitHubGraphQLCatalogResolution | null {
+  const account = getExplorerAccount(props.repository, props.accounts)
+  return account === null
+    ? null
+    : (props.graphQLCatalogResolver ?? resolveGitHubGraphQLOperationCatalog)(
+        account.endpoint
+      )
+}
+
+function graphQLOperationSignature(operation: IGitHubGraphQLOperation): string {
+  const args = operation.args
+    .map(
+      argument =>
+        `${argument.name}: ${argument.type}${
+          argument.defaultValue === null ? '' : ` = ${argument.defaultValue}`
+        }`
+    )
+    .join(', ')
+  return `${operation.name}${args.length === 0 ? '' : `(${args})`}: ${
+    operation.returnType
+  }`
 }
 
 function operationPath(
@@ -200,12 +248,21 @@ function graphQLDefaults(repository: Repository): {
 
 function initialState(props: IGitHubAPIExplorerProps): IGitHubAPIExplorerState {
   const graphQL = graphQLDefaults(props.repository)
+  const resolution = resolveCatalogForProps(props)
+  const catalog = resolution?.status === 'available' ? resolution.catalog : null
+  const defaultOperation =
+    catalog?.operations.find(
+      operation => operation.id === GitHubAPIExplorerDefaultOperationId
+    ) ?? catalog?.operations[0]
   return {
     mode: 'rest',
     catalogQuery: '',
     catalogCategory: '',
-    newOnly: true,
+    newOnly: (catalog?.newOperationIds.length ?? 0) > 0,
     selectedOperationId: defaultOperation?.id ?? null,
+    graphQLCatalogQuery: '',
+    graphQLCatalogKind: '',
+    selectedGraphQLOperationId: null,
     restMethod: defaultOperation?.method ?? 'GET',
     restPath:
       defaultOperation === undefined
@@ -318,7 +375,9 @@ export class GitHubAPIExplorer extends React.Component<
       repositoryContextKey(prevProps) !== repositoryContextKey(this.props) ||
       prevProps.accounts !== this.props.accounts ||
       prevProps.client !== this.props.client ||
-      prevProps.functionRegistry !== this.props.functionRegistry
+      prevProps.functionRegistry !== this.props.functionRegistry ||
+      prevProps.catalogResolver !== this.props.catalogResolver ||
+      prevProps.graphQLCatalogResolver !== this.props.graphQLCatalogResolver
     ) {
       this.invalidateExecution()
       this.setState(
@@ -561,12 +620,59 @@ export class GitHubAPIExplorer extends React.Component<
 
   private onOperationClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     const operationId = event.currentTarget.dataset.operationId
-    const operation = GitHubAPIOperations.find(
-      candidate => candidate.id === operationId
-    )
+    const resolution = resolveCatalogForProps(this.props)
+    const operation =
+      resolution?.status === 'available'
+        ? resolution.catalog.operations.find(
+            candidate => candidate.id === operationId
+          )
+        : undefined
     if (operation !== undefined) {
       this.onSelectOperation(operation)
     }
+  }
+
+  private onGraphQLCatalogQueryChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    this.setState({ graphQLCatalogQuery: event.currentTarget.value })
+  }
+
+  private onGraphQLCatalogKindChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    this.setState({
+      graphQLCatalogKind: event.currentTarget.value as
+        | ''
+        | 'query'
+        | 'mutation',
+    })
+  }
+
+  private onGraphQLOperationClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const operationId = event.currentTarget.dataset.operationId
+    const resolution = resolveGraphQLCatalogForProps(this.props)
+    const operation =
+      resolution?.status === 'available'
+        ? resolution.catalog.operations.find(
+            candidate => candidate.id === operationId
+          )
+        : undefined
+    if (operation === undefined) {
+      return
+    }
+    const template = getGitHubGraphQLOperationTemplate(operation)
+    this.setState({
+      mode: 'graphql',
+      selectedGraphQLOperationId: operation.id,
+      graphQLQuery: template.query,
+      graphQLVariables: template.variablesText,
+      graphQLOperationName: template.operationName,
+      response: null,
+      ...this.clearReviewState,
+    })
   }
 
   private onRESTMethodChange = (
@@ -599,6 +705,7 @@ export class GitHubAPIExplorer extends React.Component<
   ) => {
     this.setState({
       graphQLQuery: event.currentTarget.value,
+      selectedGraphQLOperationId: null,
       ...this.clearReviewState,
     })
   }
@@ -617,6 +724,7 @@ export class GitHubAPIExplorer extends React.Component<
   ) => {
     this.setState({
       graphQLOperationName: event.currentTarget.value,
+      selectedGraphQLOperationId: null,
       ...this.clearReviewState,
     })
   }
@@ -871,12 +979,51 @@ export class GitHubAPIExplorer extends React.Component<
     )
   }
 
-  private renderCatalog() {
-    const filtered = filterGitHubAPIOperations({
-      query: this.state.catalogQuery,
-      category: this.state.catalogCategory,
-      newOnly: this.state.newOnly,
-    })
+  private renderRESTCatalog(account: Account) {
+    const resolution = (
+      this.props.catalogResolver ?? resolveGitHubAPIOperationCatalog
+    )(account.endpoint)
+    if (resolution.status !== 'available') {
+      return (
+        <aside
+          className="github-api-explorer-catalog"
+          aria-labelledby="github-api-explorer-catalog-heading"
+        >
+          <header>
+            <div>
+              <h2 id="github-api-explorer-catalog-heading">
+                Operation catalog unavailable
+              </h2>
+              <p>{account.friendlyEndpoint}</p>
+            </div>
+          </header>
+          <div className="github-api-explorer-empty" role="status">
+            <strong>
+              {resolution.status === 'unknown-version'
+                ? 'GitHub Enterprise Server version unknown'
+                : resolution.status === 'unsupported-version'
+                ? `GitHub Enterprise Server ${resolution.detectedVersion} is not cataloged`
+                : 'GitHub endpoint is invalid'}
+            </strong>
+            <span>{resolution.message}</span>
+            <span>
+              The manually guarded request builder remains available. No
+              GitHub.com operation is substituted for this endpoint.
+            </span>
+          </div>
+        </aside>
+      )
+    }
+
+    const catalog = resolution.catalog
+    const filtered = filterGitHubAPIOperations(
+      {
+        query: this.state.catalogQuery,
+        category: this.state.catalogCategory,
+        newOnly: this.state.newOnly,
+      },
+      catalog
+    )
     const visible = filtered.slice(0, GitHubAPIExplorerVisibleOperationCap)
     return (
       <aside
@@ -886,7 +1033,10 @@ export class GitHubAPIExplorer extends React.Component<
         <header>
           <div>
             <h2 id="github-api-explorer-catalog-heading">Operation catalog</h2>
-            <p>GitHub REST API {GitHubAPICatalogVersion}</p>
+            <p>
+              {catalog.label} REST API {catalog.apiVersion} ·{' '}
+              {catalog.inventory.operations.toLocaleString()} operations
+            </p>
           </div>
           <span aria-live="polite">
             {visible.length} of {filtered.length} shown
@@ -911,7 +1061,7 @@ export class GitHubAPIExplorer extends React.Component<
               onChange={this.onCatalogCategoryChange}
             >
               <option value="">All categories</option>
-              {GitHubAPICatalogCategories.map(category => (
+              {catalog.categories.map(category => (
                 <option key={category.name} value={category.name}>
                   {category.name} ({category.count})
                 </option>
@@ -925,7 +1075,12 @@ export class GitHubAPIExplorer extends React.Component<
               disabled={this.state.loading}
               onChange={this.onCatalogScopeChange}
             >
-              <option value="new">New operations</option>
+              <option
+                value="new"
+                disabled={catalog.newOperationIds.length === 0}
+              >
+                New operations
+              </option>
               <option value="all">All operations</option>
             </select>
           </label>
@@ -958,7 +1113,7 @@ export class GitHubAPIExplorer extends React.Component<
                   <span className="github-api-explorer-operation-heading">
                     <strong>{operation.method}</strong>
                     <span>{operation.summary}</span>
-                    {isNewGitHubAPIOperation(operation.id) ? (
+                    {isNewGitHubAPIOperation(operation.id, catalog) ? (
                       <em>New</em>
                     ) : null}
                   </span>
@@ -979,10 +1134,163 @@ export class GitHubAPIExplorer extends React.Component<
     )
   }
 
-  private renderOperationSummary() {
-    const operation = GitHubAPIOperations.find(
-      value => value.id === this.state.selectedOperationId
+  private renderGraphQLCatalog(account: Account) {
+    const resolution = (
+      this.props.graphQLCatalogResolver ?? resolveGitHubGraphQLOperationCatalog
+    )(account.endpoint)
+    if (resolution.status !== 'available') {
+      return (
+        <aside
+          className="github-api-explorer-catalog"
+          aria-labelledby="github-api-explorer-catalog-heading"
+        >
+          <header>
+            <div>
+              <h2 id="github-api-explorer-catalog-heading">
+                GraphQL root schema unavailable
+              </h2>
+              <p>{account.friendlyEndpoint}</p>
+            </div>
+          </header>
+          <div className="github-api-explorer-empty" role="status">
+            <strong>
+              {resolution.status === 'unknown-version'
+                ? 'GitHub Enterprise Server version unknown'
+                : resolution.status === 'unsupported-version'
+                ? `GitHub Enterprise Server ${resolution.detectedVersion} is not cataloged`
+                : 'GitHub endpoint is invalid'}
+            </strong>
+            <span>{resolution.message}</span>
+            <span>
+              The manual GraphQL builder remains available. No GitHub.com schema
+              is substituted for this endpoint.
+            </span>
+          </div>
+        </aside>
+      )
+    }
+
+    const catalog = resolution.catalog
+    const filtered = filterGitHubGraphQLOperations(
+      {
+        query: this.state.graphQLCatalogQuery,
+        kind:
+          this.state.graphQLCatalogKind === ''
+            ? null
+            : this.state.graphQLCatalogKind,
+      },
+      catalog
     )
+    const visible = filtered.slice(0, GitHubAPIExplorerVisibleOperationCap)
+    return (
+      <aside
+        className="github-api-explorer-catalog"
+        aria-labelledby="github-api-explorer-catalog-heading"
+      >
+        <header>
+          <div>
+            <h2 id="github-api-explorer-catalog-heading">
+              GraphQL root operations
+            </h2>
+            <p>
+              {catalog.label} · schema {catalog.snapshotDate} ·{' '}
+              {catalog.inventory.queries} queries ·{' '}
+              {catalog.inventory.mutations} mutations
+            </p>
+          </div>
+          <span aria-live="polite">
+            {visible.length} of {filtered.length} shown
+          </span>
+        </header>
+        <div className="github-api-explorer-filters">
+          <label>
+            Search GraphQL roots
+            <input
+              type="search"
+              value={this.state.graphQLCatalogQuery}
+              disabled={this.state.loading}
+              onChange={this.onGraphQLCatalogQueryChange}
+              placeholder="Name, description, argument, or return type"
+            />
+          </label>
+          <label>
+            Root kind
+            <select
+              value={this.state.graphQLCatalogKind}
+              disabled={this.state.loading}
+              onChange={this.onGraphQLCatalogKindChange}
+            >
+              <option value="">Queries and mutations</option>
+              <option value="query">Queries</option>
+              <option value="mutation">Mutations</option>
+            </select>
+          </label>
+        </div>
+        {visible.length === 0 ? (
+          <div className="github-api-explorer-empty" role="status">
+            <strong>No root operations match these filters.</strong>
+            <span>Try another name, type, argument, or root kind.</span>
+          </div>
+        ) : (
+          <ul
+            className="github-api-explorer-operation-list"
+            aria-label="GitHub GraphQL root operations"
+          >
+            {visible.map(operation => (
+              <li key={operation.id}>
+                <button
+                  type="button"
+                  className={
+                    this.state.selectedGraphQLOperationId === operation.id
+                      ? 'selected'
+                      : undefined
+                  }
+                  aria-pressed={
+                    this.state.selectedGraphQLOperationId === operation.id
+                  }
+                  aria-label={`${operation.kind} ${operation.name}, returns ${operation.returnType}`}
+                  disabled={this.state.loading}
+                  data-operation-id={operation.id}
+                  onClick={this.onGraphQLOperationClick}
+                >
+                  <span className="github-api-explorer-operation-heading">
+                    <strong>{operation.kind.toLocaleUpperCase()}</strong>
+                    <span>{operation.description ?? operation.name}</span>
+                    {operation.deprecated ? <em>Deprecated</em> : null}
+                  </span>
+                  <code>{graphQLOperationSignature(operation)}</code>
+                  <small>{operation.id}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {filtered.length > visible.length ? (
+          <p className="github-api-explorer-capped" role="status">
+            Refine the filters to inspect the remaining{' '}
+            {filtered.length - visible.length} root operations.
+          </p>
+        ) : null}
+      </aside>
+    )
+  }
+
+  private renderCatalog(account: Account) {
+    return this.state.mode === 'graphql'
+      ? this.renderGraphQLCatalog(account)
+      : this.renderRESTCatalog(account)
+  }
+
+  private renderOperationSummary(account: Account) {
+    const resolution = (
+      this.props.catalogResolver ?? resolveGitHubAPIOperationCatalog
+    )(account.endpoint)
+    const operation =
+      resolution.status === 'available'
+        ? resolution.catalog.operations.find(
+            value => value.id === this.state.selectedOperationId
+          )
+        : undefined
     if (operation === undefined) {
       return null
     }
@@ -994,15 +1302,58 @@ export class GitHubAPIExplorer extends React.Component<
         </div>
         <div className="github-api-explorer-operation-flags">
           <span>{operation.category}</span>
-          {operation.cloudOnly ? <span>GitHub.com only</span> : null}
+          {operation.cloudOnly ? <span>GitHub Cloud only</span> : null}
           {operation.deprecated ? <span>Deprecated</span> : null}
+          {operation.deprecationDate === null ? null : (
+            <span>Deprecated {operation.deprecationDate}</span>
+          )}
+          {operation.removalDate === null ? null : (
+            <span>Removal {operation.removalDate}</span>
+          )}
+          {operation.previewed ? <span>Preview API</span> : null}
+          {!operation.enabledForGitHubApps ? (
+            <span>Unavailable to GitHub Apps</span>
+          ) : null}
+          {operation.triggersNotification ? (
+            <span>Triggers notification</span>
+          ) : null}
           {operation.requestBodyRequired ? <span>Body required</span> : null}
+          {operation.requestBodyContentTypes.map(contentType => (
+            <span key={contentType}>{contentType}</span>
+          ))}
+          {operation.servers.map(server => (
+            <span key={server.url}>Server: {server.url}</span>
+          ))}
+          {operation.documentationUrl === null ? null : (
+            <LinkButton uri={operation.documentationUrl}>
+              Official documentation
+            </LinkButton>
+          )}
         </div>
+        <details>
+          <summary>Operation schema and product metadata</summary>
+          <pre>
+            {JSON.stringify(
+              {
+                parameters: operation.parameters,
+                requestBody: {
+                  required: operation.requestBodyRequired,
+                  parameterName: operation.requestBodyParameterName,
+                  contentTypes: operation.requestBodyContentTypes,
+                },
+                previews: operation.previews,
+                servers: operation.servers,
+              },
+              null,
+              2
+            )}
+          </pre>
+        </details>
       </section>
     )
   }
 
-  private renderRESTForm() {
+  private renderRESTForm(account: Account) {
     return (
       <div
         id="github-api-explorer-rest-panel"
@@ -1010,7 +1361,7 @@ export class GitHubAPIExplorer extends React.Component<
         role="tabpanel"
         aria-labelledby="github-api-explorer-rest-tab"
       >
-        {this.renderOperationSummary()}
+        {this.renderOperationSummary(account)}
         <div className="github-api-explorer-rest-target">
           <label>
             REST method
@@ -1050,7 +1401,59 @@ export class GitHubAPIExplorer extends React.Component<
     )
   }
 
-  private renderGraphQLForm() {
+  private renderGraphQLOperationSummary(account: Account) {
+    const resolution = (
+      this.props.graphQLCatalogResolver ?? resolveGitHubGraphQLOperationCatalog
+    )(account.endpoint)
+    const operation =
+      resolution.status === 'available'
+        ? resolution.catalog.operations.find(
+            value => value.id === this.state.selectedGraphQLOperationId
+          )
+        : undefined
+    if (operation === undefined || resolution.status !== 'available') {
+      return null
+    }
+    return (
+      <section className="github-api-explorer-operation-summary">
+        <div>
+          <strong>{operation.description ?? operation.name}</strong>
+          <code>{operation.id}</code>
+        </div>
+        <div className="github-api-explorer-operation-flags">
+          <span>{operation.kind}</span>
+          <span>Returns {operation.returnType}</span>
+          {operation.deprecated ? <span>Deprecated</span> : null}
+          <LinkButton uri={resolution.catalog.sourceUrl}>
+            Official product schema
+          </LinkButton>
+        </div>
+        <details>
+          <summary>Root signature and product provenance</summary>
+          <pre>
+            {JSON.stringify(
+              {
+                signature: graphQLOperationSignature(operation),
+                arguments: operation.args,
+                returnType: operation.returnType,
+                returnKind: operation.returnKind,
+                deprecated: operation.deprecated,
+                deprecationReason: operation.deprecationReason,
+                product: resolution.catalog.label,
+                productVersion: resolution.catalog.productVersion,
+                sourceCommit: resolution.catalog.sourceCommit,
+                sourceSha256: resolution.catalog.sourceSha256,
+              },
+              null,
+              2
+            )}
+          </pre>
+        </details>
+      </section>
+    )
+  }
+
+  private renderGraphQLForm(account: Account) {
     return (
       <div
         id="github-api-explorer-graphql-panel"
@@ -1058,6 +1461,7 @@ export class GitHubAPIExplorer extends React.Component<
         role="tabpanel"
         aria-labelledby="github-api-explorer-graphql-tab"
       >
+        {this.renderGraphQLOperationSummary(account)}
         <label>
           GraphQL query
           <textarea
@@ -1311,7 +1715,7 @@ export class GitHubAPIExplorer extends React.Component<
   private renderWorkspace(account: Account) {
     return (
       <div className="github-api-explorer-layout">
-        {this.renderCatalog()}
+        {this.renderCatalog(account)}
         <section
           className="github-api-explorer-builder"
           aria-labelledby="github-api-explorer-builder-heading"
@@ -1355,8 +1759,8 @@ export class GitHubAPIExplorer extends React.Component<
           </header>
           <form onSubmit={this.onRunRequest}>
             {this.state.mode === 'rest'
-              ? this.renderRESTForm()
-              : this.renderGraphQLForm()}
+              ? this.renderRESTForm(account)
+              : this.renderGraphQLForm(account)}
             <div className="github-api-explorer-actions">
               <Button
                 type="submit"

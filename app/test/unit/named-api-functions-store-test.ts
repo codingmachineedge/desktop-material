@@ -35,7 +35,7 @@ class MemoryStorage {
 function bindingFixture(suffix = 'one') {
   const account = new Account(
     `fixture-${suffix}`,
-    'https://api.github.test',
+    'https://api.github.com',
     'never-written',
     [],
     '',

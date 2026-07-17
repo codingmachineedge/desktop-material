@@ -70,6 +70,9 @@ const verifierPath = resolve(
 const verifierSource = read(
   '.codex/verification/verify_responsive_surface_matrix_cdp.js'
 )
+const fixtureSeederSource = read(
+  '.codex/verification/seed_batch_clone_recovery_fixture.js'
+)
 const verifier = require(verifierPath) as IVerifierModule
 
 const groupPrefixes = new Map([
@@ -85,6 +88,7 @@ const expectedNestedSurfaceIds = [
   'file-history.history',
   'notifications.github',
   'notifications.local',
+  'popup.batch-clone-recovery',
   'preferences.appearance.logo-studio',
   'preferences.copilot.models',
   'preferences.copilot.providers',
@@ -248,6 +252,18 @@ function metadataRows(
         ? catalog.viewportMatrix.map(scenario => ({ scenario }))
         : [],
       capture: pass ? { path: `${id}.png`, sha256: 'a'.repeat(64) } : null,
+      ...(id === 'popup.batch-clone-recovery' && pass
+        ? {
+            fixtureState: {
+              title: 'Clone queue paused',
+              summary: '0 done, 12 interrupted of 12',
+              itemCount: 12,
+              interruptedCount: 12,
+              resumeEnabled: true,
+              hidePresent: true,
+            },
+          }
+        : {}),
     }
   })
 }
@@ -321,6 +337,7 @@ describe('responsive surface smoke catalog', () => {
     }
 
     const externalParents = new Set([
+      'application',
       'popup.FileHistory',
       'notification-centre',
     ])
@@ -375,6 +392,7 @@ describe('responsive surface smoke catalog', () => {
 
   it('covers unique desktop, compact, short, wide, and zoom boundaries', () => {
     assert.equal(catalog.schemaVersion, 1)
+    assert.equal(catalog.viewportMatrix.length, 8)
     const ids = catalog.viewportMatrix.map(scenario => scenario.id)
     assert.equal(new Set(ids).size, ids.length, 'Viewport ids must be unique')
     for (const required of [
@@ -422,6 +440,13 @@ describe('responsive surface smoke catalog', () => {
         0
       ) + catalog.nestedSurfaces.length
     assert.equal(metadata.size, catalogCount)
+    assert.equal(metadata.size, 80)
+    assert.equal(
+      [...metadata.keys()].filter(id => id !== 'popup.batch-clone-recovery')
+        .length,
+      79,
+      'The existing 79-row matrix must remain intact beside the recovery popup.'
+    )
 
     const baseline = verifier.decorateLedger(metadataRows(metadata), metadata)
     verifier.validateLedger(baseline)
@@ -487,6 +512,16 @@ describe('responsive surface smoke catalog', () => {
       index === 0 ? { ...row, evidence: [] } : row
     )
     assert.throws(() => verifier.validateLedger(incompletePass), /Incomplete/)
+
+    const missingRecoveryFixture = baseline.map(row =>
+      row.id === 'popup.batch-clone-recovery'
+        ? { ...row, fixtureState: undefined }
+        : row
+    )
+    assert.throws(
+      () => verifier.validateLedger(missingRecoveryFixture),
+      /fixture state/
+    )
   })
 
   it('binds fixture mutation and every output to the owned Temp root', () => {
@@ -542,5 +577,45 @@ describe('responsive surface smoke catalog', () => {
       /#repository-sidebar \.panel[\s\S]*element\.scrollTop = 0[\s\S]*hasText: fileHistoryProbe/
     )
     assert.match(verifierSource, /for \(const id of metadata\.keys\(\)\)/)
+    assert.match(
+      verifierSource,
+      /auditBatchCloneRecoveryPopup\(page, session, options, ledger\)/
+    )
+    assert.ok(
+      verifierSource.indexOf(
+        'await auditBatchCloneRecoveryPopup(page, session, options, ledger)'
+      ) <
+        verifierSource.indexOf(
+          'await prepareApp(page, options.repositoryPath)'
+        ),
+      'The initially visible recovery popup must be audited before app preparation.'
+    )
+    assert.match(verifierSource, /dialog#batch-clone-progress/)
+    assert.match(verifierSource, /fixtureState\.title !== 'Clone queue paused'/)
+    assert.match(
+      verifierSource,
+      /fixtureState\.interruptedCount !== fixtureState\.itemCount/
+    )
+    assert.match(verifierSource, /!fixtureState\.resumeEnabled/)
+    assert.match(verifierSource, /!fixtureState\.hidePresent/)
+    assert.match(verifierSource, /row = \{ \.\.\.matrixRow, fixtureState \}/)
+    assert.match(
+      verifierSource,
+      /owner\.label\.split\('\.'\)\.includes\('batch-clone-list'\)/
+    )
+    assert.match(verifierSource, /receipt\.lastControl\?\.label !== 'Hide'/)
+    assert.match(
+      verifierSource,
+      /getByRole\('button', \{ name: 'Hide', exact: true \}\)/
+    )
+    assert.match(fixtureSeederSource, /RecoveryIdBytes = 24/)
+    assert.match(fixtureSeederSource, /\^\[a-f\\d\]\{48\}\$/)
+    assert.match(fixtureSeederSource, /version: 2/)
+    assert.match(fixtureSeederSource, /kind: 'interrupted'/)
+    assert.match(fixtureSeederSource, /paused: true/)
+    assert.match(fixtureSeederSource, /source: 'manual'/)
+    assert.match(fixtureSeederSource, /!isWithin\(runRoot, candidate\)/)
+    assert.match(fixtureSeederSource, /openSync\(journalPath, 'wx', 0o600\)/)
+    assert.doesNotMatch(fixtureSeederSource, /(?:ghp_|github_pat_|Bearer )/)
   })
 })

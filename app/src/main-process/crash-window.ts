@@ -5,9 +5,11 @@ import { registerWindowStateChangedEvents } from '../lib/window-state'
 import * as ipcMain from './ipc-main'
 import * as ipcWebContents from './ipc-webcontents'
 import { addTrustedIPCSender } from './trusted-ipc-sender'
+import { isFatalRendererLoadFailure } from './renderer-failure'
 
 const minWidth = 600
 const minHeight = 500
+const crashRendererUnresponsiveDelay = 10_000
 
 /**
  * A wrapper around the BrowserWindow instance for our crash process.
@@ -24,6 +26,9 @@ export class CrashWindow {
 
   private hasFinishedLoading = false
   private hasSentReadyEvent = false
+  private failureReported = false
+  private unresponsiveTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly cleanupTasks = new Array<() => void>()
 
   public constructor(errorType: ErrorType, error: Error) {
     const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -82,36 +87,76 @@ export class CrashWindow {
     })
 
     this.window.webContents.on('did-finish-load', () => {
-      this.window.webContents.setVisualZoomLevelLimits(1, 1)
+      void this.window.webContents
+        .setVisualZoomLevelLimits(1, 1)
+        .catch(error => this.reportFailed('zoom limits failed', error))
     })
 
-    this.window.webContents.on('did-fail-load', () => {
-      log.error('Crash process failed to load')
-      if (__DEV__) {
-        this.window.webContents.openDevTools()
-        this.window.show()
-      } else {
-        this.emitter.emit('did-fail-load', null)
+    this.window.webContents.on(
+      'did-fail-load',
+      (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
+        if (isFatalRendererLoadFailure(errorCode, isMainFrame)) {
+          this.reportFailed(
+            `load failed (${errorCode}: ${
+              /^ERR_[A-Z0-9_]{1,120}$/.test(errorDescription)
+                ? errorDescription
+                : 'ERR_LOAD_FAILED'
+            })`
+          )
+        }
+      }
+    )
+
+    this.window.webContents.on('render-process-gone', (_event, details) => {
+      if (details.reason !== 'clean-exit') {
+        this.reportFailed(
+          `renderer exited (${details.reason}, code ${details.exitCode})`
+        )
       }
     })
 
-    ipcMain.on('crash-ready', () => {
-      log.debug(`Crash process is ready`)
-
-      this.hasSentReadyEvent = true
-
-      this.sendError()
-      this.maybeEmitDidLoad()
+    const clearUnresponsiveTimer = () => {
+      if (this.unresponsiveTimer !== null) {
+        clearTimeout(this.unresponsiveTimer)
+        this.unresponsiveTimer = null
+      }
+    }
+    this.window.on('unresponsive', () => {
+      if (this.unresponsiveTimer !== null) {
+        return
+      }
+      this.unresponsiveTimer = setTimeout(() => {
+        this.unresponsiveTimer = null
+        this.reportFailed('renderer remained unresponsive')
+      }, crashRendererUnresponsiveDelay)
     })
+    this.window.on('responsive', clearUnresponsiveTimer)
+    this.cleanupTasks.push(clearUnresponsiveTimer)
 
-    ipcMain.on('crash-quit', () => {
-      log.debug('Got quit signal from crash process')
-      this.window.close()
-    })
+    this.cleanupTasks.push(
+      ipcMain.on('crash-ready', () => {
+        log.debug(`Crash process is ready`)
+
+        this.hasSentReadyEvent = true
+
+        this.sendError()
+        this.maybeEmitDidLoad()
+      })
+    )
+
+    this.cleanupTasks.push(
+      ipcMain.on('crash-quit', () => {
+        log.debug('Got quit signal from crash process')
+        this.window.close()
+      })
+    )
 
     registerWindowStateChangedEvents(this.window)
 
-    this.window.loadURL(`file://${__dirname}/crash.html`)
+    this.window.once('closed', () => this.cleanup())
+    void this.window
+      .loadURL(`file://${__dirname}/crash.html`)
+      .catch(error => this.reportFailed('load promise rejected', error))
   }
 
   /**
@@ -119,8 +164,51 @@ export class CrashWindow {
    * signalled that it's ready.
    */
   private maybeEmitDidLoad() {
-    if (this.hasFinishedLoading && this.hasSentReadyEvent) {
+    if (
+      !this.failureReported &&
+      this.hasFinishedLoading &&
+      this.hasSentReadyEvent
+    ) {
       this.emitter.emit('did-load', null)
+    }
+  }
+
+  private reportFailed(reason: string, error?: unknown) {
+    if (this.failureReported || this.window.isDestroyed()) {
+      return
+    }
+    this.failureReported = true
+    try {
+      if (error === undefined) {
+        log.error(`Crash process failed: ${reason}`)
+      } else {
+        log.error(
+          `Crash process failed: ${reason}`,
+          error instanceof Error ? error : new Error(String(error))
+        )
+      }
+    } catch {
+      // The recovery signal must not depend on the failed logger.
+    }
+    this.emitter.emit('did-fail-load', null)
+  }
+
+  private cleanup() {
+    for (const task of this.cleanupTasks.splice(0).reverse()) {
+      try {
+        task()
+      } catch (error) {
+        try {
+          log.error('Unable to clean up crash recovery listener', error)
+        } catch {
+          // Continue cleanup when the logging subsystem failed with the app.
+        }
+      }
+    }
+    try {
+      this.emitter.dispose()
+    } catch {
+      // The native recovery coordinator still owns relaunch and quit.
     }
   }
 
@@ -165,7 +253,11 @@ export class CrashWindow {
       error: friendlyError,
     }
 
-    ipcWebContents.send(this.window.webContents, 'error', details)
+    try {
+      ipcWebContents.send(this.window.webContents, 'error', details)
+    } catch (error) {
+      this.reportFailed('error details could not be delivered', error)
+    }
   }
 
   public destroy() {

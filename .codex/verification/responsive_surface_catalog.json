@@ -160,6 +160,14 @@
   },
   "nestedSurfaces": [
     {
+      "id": "popup.batch-clone-recovery",
+      "parentId": "application",
+      "kind": "dialog",
+      "source": "app/src/ui/clone-repository/batch-clone-progress.tsx#BatchCloneProgress",
+      "label": "Paused, interrupted clone recovery popup",
+      "risk": "safe"
+    },
+    {
       "id": "preferences.git.author",
       "parentId": "preferences.Git",
       "kind": "tab",

@@ -53,11 +53,15 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
   }
 
   private onCancel = () => {
-    this.props.dispatcher.cancelBatchClone()
+    void this.props.dispatcher
+      .cancelBatchClone()
+      .catch(error => log.error('Unable to cancel the clone batch', error))
   }
 
   private onPause = () => {
-    this.props.dispatcher.pauseBatchClone()
+    void this.props.dispatcher
+      .pauseBatchClone()
+      .catch(error => log.error('Unable to pause the clone batch', error))
   }
 
   private onResume = () => {
@@ -231,17 +235,22 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
     hasPendingRegistration: boolean
   ) {
     if (!state.isDone) {
-      // Running: allow hiding (clones continue in the sidebar) or cancelling.
+      // Running: allow hiding, aborting for pause, or cancelling the queue.
       return (
         <DialogFooter>
-          <Button onClick={this.onCancel}>Cancel remaining</Button>
+          <Button
+            onClick={this.onCancel}
+            tooltip="Stop active clones and skip queued clones"
+          >
+            Cancel batch
+          </Button>
           {state.isPaused ? (
             <Button
               onClick={this.onResume}
               disabled={state.isRunning}
               tooltip={
                 state.isRunning
-                  ? 'Active clones are finishing before resume is available'
+                  ? 'Active clones are stopping safely before resume is available'
                   : 'Inspect destinations and resume pending clones'
               }
             >
@@ -250,9 +259,9 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
           ) : (
             <Button
               onClick={this.onPause}
-              tooltip="Pause pending clones; active clones will finish"
+              tooltip="Stop active clones and retain them for safe restart"
             >
-              Pause remaining
+              Pause &amp; stop
             </Button>
           )}
           <OkCancelButtonGroup

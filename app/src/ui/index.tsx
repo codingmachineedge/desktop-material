@@ -4,6 +4,7 @@ import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 import * as Path from 'path'
 import { App } from './app'
+import { CrashProofBoundary } from './crash-proof-boundary'
 import {
   Dispatcher,
   externalEditorErrorHandler,
@@ -91,6 +92,10 @@ import { createCredentialHelperTrampolineHandler } from '../lib/trampoline/tramp
 import { installAgentCommandExecutor } from '../lib/agent-command-executor'
 import { getBoolean } from '../lib/local-storage'
 import { getCurrentWindowScope } from '../lib/window-scope'
+import {
+  configureRendererShutdown,
+  prepareRendererShutdown,
+} from './lib/renderer-shutdown'
 
 if (__DEV__) {
   installDevGlobals()
@@ -242,22 +247,45 @@ process.on(
   }
 )
 
+let rendererUnhandledRejectionSink: ((error: Error) => void) | null = null
+let pendingRendererUnhandledRejectionNotice = false
+
 /**
- * Chromium won't crash on an unhandled rejection (similar to how it won't crash
- * on an unhandled error). We've taken the approach that unhandled errors should
- * crash the app and very likely we should do the same thing for unhandled
- * promise rejections but that's a bit too risky to do until we've established
- * some sense of how often it happens. For now this simply stores the last
- * rejection so that we can pass it along with the crash report if the app does
- * crash. Note that this does not prevent the default browser behavior of
- * logging since we're not calling `preventDefault` on the event.
- *
- * See https://developer.mozilla.org/en-US/docs/Web/API/Window/unhandledrejection_event
+ * Keep an unexpected background rejection from disappearing into DevTools.
+ * Reporting retains the original Error, while the in-app notice is deliberately
+ * generic so an arbitrary rejection cannot copy a credential into the UI.
  */
 window.addEventListener('unhandledrejection', ev => {
-  if (enableUnhandledRejectionReporting() && ev.reason instanceof Error) {
-    sendNonFatalException('unhandledRejection', ev.reason)
+  const reportableError =
+    ev.reason instanceof Error
+      ? ev.reason
+      : new Error('The renderer rejected a promise without an Error.')
+  try {
+    log.error('Unhandled renderer promise rejection', reportableError)
+  } catch {
+    // Containment and the user-visible notice still run without diagnostics.
   }
+  try {
+    if (enableUnhandledRejectionReporting()) {
+      sendNonFatalException('unhandledRejection', reportableError)
+    }
+  } catch {
+    // Error reporting cannot become a second unhandled rejection.
+  }
+
+  const notice = new Error(
+    'A background action stopped unexpectedly. Desktop Material contained the error so you can keep working.'
+  )
+  if (rendererUnhandledRejectionSink === null) {
+    pendingRendererUnhandledRejectionNotice = true
+  } else {
+    try {
+      rendererUnhandledRejectionSink(notice)
+    } catch {
+      pendingRendererUnhandledRejectionNotice = true
+    }
+  }
+  ev.preventDefault()
 })
 
 const gitHubUserStore = new GitHubUserStore(
@@ -379,8 +407,8 @@ appStore.onDidUpdate(state => {
   }
 })
 
-profileStore
-  .initialize()
+const profileStoreInitialization = profileStore.initialize()
+profileStoreInitialization
   .then(() => {
     try {
       namedAPIFunctionsStore.migrate()
@@ -392,14 +420,38 @@ profileStore
   })
   .catch(err => log.error('Failed to initialize profile stores', err))
 
-notificationCentreStore
-  .initialize()
-  .catch(err => log.error('Failed to initialize notification centre', err))
+const notificationCentreStoreInitialization =
+  notificationCentreStore.initialize()
+void notificationCentreStoreInitialization.catch(err =>
+  log.error('Failed to initialize notification centre', err)
+)
 
+configureRendererShutdown([
+  {
+    name: 'profile settings',
+    run: async () => {
+      await profileStoreInitialization
+      await profileStore.flush()
+    },
+  },
+  {
+    name: 'notification centre',
+    run: async () => {
+      await notificationCentreStoreInitialization
+      await notificationCentreStore.flush()
+    },
+  },
+  {
+    name: 'clone recovery journal',
+    run: () => appStore.flushForShutdown(),
+  },
+])
+
+// Browser unload cannot be delayed reliably. Renderer-owned normal quit and
+// update-install paths await this same single flight before notifying Electron;
+// this listener is a best-effort backup for operating-system window teardown.
 window.addEventListener('beforeunload', () => {
-  notificationCentreStore
-    .flush()
-    .catch(err => log.error('Failed to flush notification centre', err))
+  void prepareRendererShutdown()
 })
 
 const buildRunStore = new BuildRunStore()
@@ -444,6 +496,28 @@ dispatcher.registerErrorHandler(rebaseConflictsHandler)
 dispatcher.registerErrorHandler(refusedWorkflowUpdate)
 dispatcher.registerErrorHandler(discardChangesHandler)
 dispatcher.registerErrorHandler(secretScanningPushProtectionErrorHandler)
+
+rendererUnhandledRejectionSink = error => {
+  try {
+    void dispatcher.postError(error).catch(postErrorFailure => {
+      try {
+        log.error('Failed to show contained background error', postErrorFailure)
+      } catch {
+        // A notification/reporting failure is terminal for this one notice.
+      }
+    })
+  } catch {
+    // Dispatcher setup can fail synchronously during startup containment.
+  }
+}
+if (pendingRendererUnhandledRejectionNotice) {
+  pendingRendererUnhandledRejectionNotice = false
+  rendererUnhandledRejectionSink(
+    new Error(
+      'A background action stopped during startup. Desktop Material contained the error so you can keep working.'
+    )
+  )
+}
 
 document.body.classList.add(`platform-${process.platform}`)
 
@@ -513,20 +587,22 @@ ipcRenderer.on('cli-action', (_, action) =>
 })(Grid.defaultProps, Grid.propTypes)
 
 ReactDOM.render(
-  <App
-    dispatcher={dispatcher}
-    appStore={appStore}
-    repositoryStateManager={repositoryStateManager}
-    issuesStore={issuesStore}
-    gitHubUserStore={gitHubUserStore}
-    aheadBehindStore={aheadBehindStore}
-    notificationsDebugStore={notificationsDebugStore}
-    repositoryTabsStore={repositoryTabsStore}
-    buildRunStore={buildRunStore}
-    actionsStore={actionsStore}
-    releasesStore={releasesStore}
-    issueWorkflowsStore={issueWorkflowsStore}
-    startTime={startTime}
-  />,
+  <CrashProofBoundary name="Desktop Material" root={true}>
+    <App
+      dispatcher={dispatcher}
+      appStore={appStore}
+      repositoryStateManager={repositoryStateManager}
+      issuesStore={issuesStore}
+      gitHubUserStore={gitHubUserStore}
+      aheadBehindStore={aheadBehindStore}
+      notificationsDebugStore={notificationsDebugStore}
+      repositoryTabsStore={repositoryTabsStore}
+      buildRunStore={buildRunStore}
+      actionsStore={actionsStore}
+      releasesStore={releasesStore}
+      issueWorkflowsStore={issueWorkflowsStore}
+      startTime={startTime}
+    />
+  </CrashProofBoundary>,
   document.getElementById('desktop-app-container')!
 )

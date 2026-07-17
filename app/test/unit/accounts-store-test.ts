@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert'
 import { Account } from '../../src/models/account'
 import { AccountsStore } from '../../src/lib/stores'
+import { getKeyForAccount } from '../../src/lib/auth'
 import { InMemoryStore, AsyncInMemoryStore } from '../helpers/stores'
 
 describe('AccountsStore', () => {
@@ -94,6 +95,128 @@ describe('AccountsStore', () => {
   })
 
   describe('loading persisted users', () => {
+    it('recovers when account metadata cannot be read', async () => {
+      const dataStore = {
+        getItem: () => {
+          throw new Error('simulated read failure')
+        },
+        setItem: () => {},
+      }
+      accountsStore = new AccountsStore(dataStore, new AsyncInMemoryStore())
+      const error = new Promise<Error>(resolve =>
+        accountsStore.onDidError(resolve)
+      )
+
+      assert.deepStrictEqual(await accountsStore.getAll(), [])
+      assert.match(
+        (await error).message,
+        /could not read saved account metadata/
+      )
+    })
+
+    it('repairs malformed account JSON without rejecting initialization', async () => {
+      const dataStore = new InMemoryStore()
+      dataStore.setItem('users', '{"token":"must-not-leak"')
+      accountsStore = new AccountsStore(dataStore, new AsyncInMemoryStore())
+      const error = new Promise<Error>(resolve =>
+        accountsStore.onDidError(resolve)
+      )
+
+      assert.deepStrictEqual(await accountsStore.getAll(), [])
+      assert.equal(dataStore.getItem('users'), '[]')
+      assert.doesNotMatch((await error).message, /must-not-leak/)
+    })
+
+    it('repairs a non-array account payload', async () => {
+      const dataStore = new InMemoryStore()
+      dataStore.setItem('users', JSON.stringify({ login: 'not-an-array' }))
+      accountsStore = new AccountsStore(dataStore, new AsyncInMemoryStore())
+
+      assert.deepStrictEqual(await accountsStore.getAll(), [])
+      assert.equal(dataStore.getItem('users'), '[]')
+    })
+
+    it('keeps valid accounts while removing invalid rows and persisted secrets', async () => {
+      const dataStore = new InMemoryStore()
+      const secureStore = new AsyncInMemoryStore()
+      dataStore.setItem(
+        'users',
+        JSON.stringify([
+          {
+            login: 'safe-account',
+            endpoint: 'https://api.github.com',
+            token: 'persisted-secret',
+            emails: [],
+            avatarURL: '',
+            id: 7,
+            name: 'Safe Account',
+            plan: 'free',
+          },
+          {
+            login: 'broken-account',
+            endpoint: 'not a URL',
+            token: 'another-secret',
+            emails: [],
+            avatarURL: '',
+            id: 8,
+            name: 'Broken Account',
+          },
+        ])
+      )
+      const safeAccount = new Account(
+        'safe-account',
+        'https://api.github.com',
+        '',
+        [],
+        '',
+        7,
+        'Safe Account',
+        'free'
+      )
+      await secureStore.setItem(
+        getKeyForAccount(safeAccount),
+        safeAccount.login,
+        'secure-token'
+      )
+      accountsStore = new AccountsStore(dataStore, secureStore)
+
+      const users = await accountsStore.getAll()
+      assert.equal(users.length, 1)
+      assert.equal(users[0].login, 'safe-account')
+      assert.equal(users[0].token, 'secure-token')
+      const persisted = dataStore.getItem('users')
+      assert.doesNotMatch(persisted, /persisted-secret|another-secret/)
+      assert.doesNotMatch(persisted, /broken-account/)
+    })
+
+    it('keeps an account available when metadata persistence fails', async () => {
+      const dataStore = {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('simulated write failure')
+        },
+      }
+      accountsStore = new AccountsStore(dataStore, new AsyncInMemoryStore())
+      await accountsStore.getAll()
+      const error = new Promise<Error>(resolve =>
+        accountsStore.onDidError(resolve)
+      )
+
+      const account = new Account(
+        'still-in-memory',
+        'https://api.github.com',
+        'secure-token',
+        [],
+        '',
+        11,
+        'Still In Memory',
+        'free'
+      )
+      assert.equal(await accountsStore.addAccount(account), account)
+      assert.equal((await accountsStore.getAll())[0], account)
+      assert.match((await error).message, /could not save account metadata/)
+    })
+
     it('reloads account changes written by another window', async () => {
       const dataStore = new InMemoryStore()
       const secureStore = new AsyncInMemoryStore()

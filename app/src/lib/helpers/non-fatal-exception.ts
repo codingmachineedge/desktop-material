@@ -38,6 +38,8 @@ export type ExceptionKinds =
   | 'PopupNoId'
   | 'FailedToStartPullRequest'
   | 'unhandledRejection'
+  | 'reactErrorBoundary'
+  | 'startupInitialization'
   | 'rebaseConflictsWithBranchAlreadyUpToDate'
   | 'forkCreation'
   | 'NoSuggestedActionsProvided'

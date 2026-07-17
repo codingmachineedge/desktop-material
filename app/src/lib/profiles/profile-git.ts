@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, stat, rm } from 'fs/promises'
+import { appendFile, mkdir, open, readFile, stat, rm } from 'fs/promises'
 import { join } from 'path'
 import { git } from '../git/core'
 import { initGitRepository } from '../git/init'
@@ -8,6 +8,7 @@ import { getCommitDiff } from '../git/diff'
 import { Repository } from '../../models/repository'
 import { Commit } from '../../models/commit'
 import { DiffType, IDiff } from '../../models/diff/diff-data'
+import { CrashSafePersistenceGitIgnorePattern } from '../crash-safe-file'
 import {
   composeProfileCommitMessage,
   IProfileHistoryEntry,
@@ -59,6 +60,8 @@ export async function ensureProfileRepository(
       await clearStaleLock(path)
     }
 
+    await ensureCrashSafePersistenceIgnored(path)
+
     // Git config writes take an exclusive lock, so keep these sequential.
     await setConfigValue(repository, 'user.name', commitAuthorName)
     await setConfigValue(repository, 'user.email', commitAuthorEmail)
@@ -66,6 +69,31 @@ export async function ensureProfileRepository(
   })
 
   return repository
+}
+
+async function ensureCrashSafePersistenceIgnored(path: string): Promise<void> {
+  const infoPath = join(path, '.git', 'info')
+  const excludePath = join(infoPath, 'exclude')
+  await mkdir(infoPath, { recursive: true })
+  const existing = await readFile(excludePath, 'utf8').catch(error => {
+    if (isFileSystemError(error, 'ENOENT')) {
+      return ''
+    }
+    throw error
+  })
+  if (
+    existing
+      .split(/\r?\n/g)
+      .some(line => line.trim() === CrashSafePersistenceGitIgnorePattern)
+  ) {
+    return
+  }
+  const prefix = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
+  await appendFile(
+    excludePath,
+    `${prefix}${CrashSafePersistenceGitIgnorePattern}\n`,
+    'utf8'
+  )
 }
 
 /**
@@ -114,6 +142,15 @@ function isFileExistsError(error: unknown): boolean {
     error !== null &&
     'code' in error &&
     error.code === 'EEXIST'
+  )
+}
+
+function isFileSystemError(error: unknown, code: string): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === code
   )
 }
 

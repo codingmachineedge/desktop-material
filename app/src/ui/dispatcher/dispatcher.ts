@@ -1419,14 +1419,14 @@ export class Dispatcher {
     return this.appStore._retryBatchCloneRegistration()
   }
 
-  /** Cancel a running batch clone (skips items that haven't started). */
-  public cancelBatchClone(): void {
-    this.appStore._cancelBatchClone()
+  /** Abort a running batch clone and skip cancelled staged items. */
+  public cancelBatchClone(): Promise<void> {
+    return this.appStore._cancelBatchClone()
   }
 
-  /** Pause pending queue work. Active clones are allowed to finish. */
-  public pauseBatchClone(): void {
-    this.appStore._pauseBatchClone()
+  /** Abort active clone work and retain it for strict staged restart. */
+  public pauseBatchClone(): Promise<void> {
+    return this.appStore._pauseBatchClone()
   }
 
   /** Resume a paused/recovered clone queue after destination inspection. */
