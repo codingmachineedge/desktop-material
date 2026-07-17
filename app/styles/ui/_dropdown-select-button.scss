@@ -101,8 +101,13 @@
       align-items: normal;
       border-radius: 0;
 
+      // MD3 menus indicate keyboard position with a tonal highlight rather
+      // than a ring; mirror the .selected treatment so DOM focus is never
+      // invisible even if it drifts from the pane's tracked selection.
       &:focus-visible {
         outline: none;
+        background-color: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
       }
 
       .label {

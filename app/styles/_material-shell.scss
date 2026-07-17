@@ -163,7 +163,7 @@ body {
     color: var(--md-sys-color-on-surface);
     display: flex;
     gap: 12px;
-    height: 54px;
+    min-height: 54px;
     overflow: hidden;
     padding: 0 18px 0 14px;
     position: relative;

@@ -82,7 +82,10 @@ export class NotificationListItem extends React.Component<INotificationListItemP
             <Octicon symbol={kindIcons[entry.kind] ?? octicons.info} />
           </span>
           <span className="notification-item-body">
-            <span className="notification-item-title">{entry.title}</span>
+            <span className="notification-item-title">
+              {entry.title}
+              {!entry.read ? <span className="sr-only"> (unread)</span> : null}
+            </span>
             <span className="notification-item-text">{entry.body}</span>
             <span className="notification-item-time">
               <RelativeTime date={new Date(entry.createdAt)} />

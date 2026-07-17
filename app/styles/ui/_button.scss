@@ -11,7 +11,10 @@
   padding: 0 calc(var(--spacing) * 2);
 
   border: 1px solid var(--secondary-button-border-color);
-  height: var(--button-height);
+  // A min-height rather than a fixed height so labels set in a larger custom
+  // interface font grow the button instead of clipping inside the ellipsis
+  // mixin's overflow: hidden.
+  min-height: var(--button-height);
 
   color: var(--secondary-button-text-color);
   background-color: var(--secondary-button-background);
@@ -107,7 +110,8 @@
 .small-button {
   font-size: var(--font-size-sm);
   padding: 0 var(--spacing-half);
-  height: 21px;
+  min-height: 21px;
+  height: auto;
 }
 
 .button-group-item {

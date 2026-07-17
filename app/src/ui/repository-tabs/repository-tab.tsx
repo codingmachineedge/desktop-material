@@ -297,6 +297,7 @@ export class RepositoryTab extends React.Component<
           <input
             className="repository-tab-rename"
             type="text"
+            aria-label={`Rename tab ${this.label}`}
             value={this.state.draftLabel}
             autoFocus={true}
             onChange={this.onRenameChange}

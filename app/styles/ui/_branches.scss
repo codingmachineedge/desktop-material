@@ -239,7 +239,7 @@
       font-size: var(--font-size-sm);
       flex-grow: 1;
       text-align: right;
-      white-space: nowrap;
+      @include ellipsis;
     }
 
     .pinned-branch-indicator {

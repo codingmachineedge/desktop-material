@@ -30,7 +30,7 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    height: 40px;
+    min-height: 40px;
     // 8px inset selection shape (MD3 menu row): rows sit inside a small inline
     // margin so the tonal selection reads as a rounded pill, not a full-bleed bar.
     margin: 0 var(--spacing-half);

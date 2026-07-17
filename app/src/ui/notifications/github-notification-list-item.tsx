@@ -94,6 +94,9 @@ export class GitHubNotificationListItem extends React.Component<IGitHubNotificat
           <span className="notification-item-body">
             <span className="notification-item-title">
               {thread.subject.title}
+              {thread.unread ? (
+                <span className="sr-only"> (unread)</span>
+              ) : null}
             </span>
             <span className="notification-item-text github-notification-repository">
               {thread.repository.full_name}
