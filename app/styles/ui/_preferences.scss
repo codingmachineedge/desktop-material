@@ -422,64 +422,11 @@
       margin-top: var(--spacing);
     }
 
+    // Fill the row; the unified M3 Expressive slider visuals come from the
+    // final `_material-controls.scss` cascade layer so every range control
+    // (appearance zoom, tab style, app identity) reads identically.
     .scaling-slider {
-      appearance: none;
-      -webkit-appearance: none;
       flex: 1;
-      height: 20px;
-      margin: 0;
-      background: transparent;
-      cursor: pointer;
-
-      &::-webkit-slider-runnable-track {
-        height: 4px;
-        border-radius: 999px;
-        background: var(--md-sys-color-surface-variant);
-      }
-
-      &::-moz-range-track {
-        height: 4px;
-        border-radius: 999px;
-        background: var(--md-sys-color-surface-variant);
-      }
-
-      &::-moz-range-progress {
-        height: 4px;
-        border-radius: 999px;
-        background: var(--md-sys-color-primary);
-      }
-
-      &::-webkit-slider-thumb {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 20px;
-        height: 20px;
-        margin-top: -8px;
-        border-radius: 999px;
-        border: 0;
-        background: var(--md-sys-color-primary);
-        transition: box-shadow 200ms var(--emph);
-      }
-
-      &::-moz-range-thumb {
-        width: 20px;
-        height: 20px;
-        border-radius: 999px;
-        border: 0;
-        background: var(--md-sys-color-primary);
-      }
-
-      &:focus-visible {
-        outline: none;
-
-        &::-webkit-slider-thumb {
-          box-shadow: 0 0 0 6px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
-        }
-
-        &::-moz-range-thumb {
-          box-shadow: 0 0 0 6px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
-        }
-      }
     }
 
     .scaling-value {
@@ -1098,10 +1045,11 @@
       }
 
       input[type='range'] {
+        // Layout only; the M3 Expressive treatment comes from the final
+        // `_material-controls.scss` cascade layer.
         grid-column: 1 / -1;
         width: 100%;
         min-width: 0;
-        accent-color: var(--md-sys-color-primary);
       }
     }
 

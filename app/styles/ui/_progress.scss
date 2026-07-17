@@ -16,9 +16,12 @@ progress {
     border-radius: 999px;
   }
 
+  // The determinate track/value now come from the final
+  // `_material-controls.scss` cascade layer (6px, secondary-container). The
+  // indeterminate stripe stays here; its size tracks that 6px height.
   &:indeterminate {
     background-image: -webkit-linear-gradient(-45deg, transparent 33%, var(--md-sys-color-primary) 33%, var(--md-sys-color-primary) 66%, transparent 66%);
-    background-size: 25px 10px, 100% 100%, 100% 100%;
+    background-size: 25px 6px, 100% 100%, 100% 100%;
 
     -webkit-animation: progress-indeterminate-animation 5s linear infinite;
   }

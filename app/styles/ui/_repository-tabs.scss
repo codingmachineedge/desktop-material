@@ -502,9 +502,9 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
 
     input[type='range'] {
+      // Layout only; the M3 Expressive treatment comes from the final
+      // `_material-controls.scss` cascade layer.
       flex: 1;
-      height: 20px;
-      accent-color: var(--md-sys-color-primary);
     }
 
     .tab-style-size-value {

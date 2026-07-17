@@ -1,0 +1,195 @@
+// Material Design 3 native-control layer.
+//
+// Loads LAST (after material-shell) so it wins over upstream control styles.
+// Replaces the remaining browser-native control rendering — checkbox, radio,
+// range slider, progress — with M3 equivalents drawn entirely from the
+// --md-sys-* tokens in _material.scss (light + dark follow automatically).
+
+// ---------------------------------------------------------------- checkbox
+// M3 checkbox: 18px, 2px outline, corner 4px; checked = filled primary with
+// an on-primary check. Indeterminate = primary fill with a dash.
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: none;
+  border: 2px solid var(--md-sys-color-on-surface-variant);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 120ms ease, border-color 120ms ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--md-sys-color-on-surface);
+  }
+
+  &:checked,
+  &:indeterminate {
+    background: var(--md-sys-color-primary);
+    border-color: var(--md-sys-color-primary);
+  }
+
+  &:checked::after,
+  &:indeterminate::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--md-sys-color-on-primary);
+    // check mark
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round' d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")
+      center / 100% 100% no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round' d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")
+      center / 100% 100% no-repeat;
+  }
+
+  &:indeterminate::after {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' d='M6 12h12'/%3E%3C/svg%3E")
+      center / 100% 100% no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' d='M6 12h12'/%3E%3C/svg%3E")
+      center / 100% 100% no-repeat;
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+}
+
+// ------------------------------------------------------------------- radio
+// M3 radio: 20px ring; selected = primary ring + 10px primary dot.
+input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  border: 2px solid var(--md-sys-color-on-surface-variant);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: border-color 120ms ease;
+
+  &::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--md-sys-color-primary);
+    transform: scale(0);
+    transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  &:checked {
+    border-color: var(--md-sys-color-primary);
+
+    &::after {
+      transform: scale(1);
+    }
+  }
+
+  &:hover:not(:disabled):not(:checked) {
+    border-color: var(--md-sys-color-on-surface);
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+}
+
+// ------------------------------------------------------------------ slider
+// M3 Expressive slider: 16px rounded track, narrow vertical bar handle.
+// The filled (active) side is produced by the thumb's oversized left
+// box-shadow clipped by the input's own rounded overflow — pure CSS, no JS.
+input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--md-sys-color-secondary-container);
+  overflow: hidden;
+  cursor: pointer;
+
+  &::-webkit-slider-runnable-track {
+    height: 16px;
+    border-radius: 999px;
+    background: transparent;
+  }
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 6px;
+    height: 16px;
+    border: 0;
+    border-radius: 3px;
+    background: var(--md-sys-color-on-primary);
+    // handle bar reads on both the filled and unfilled side
+    box-shadow: 0 0 0 1.5px var(--md-sys-color-primary), -1000px 0 0 997px var(--md-sys-color-primary);
+    transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  &:active::-webkit-slider-thumb {
+    transform: scaleX(0.7);
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 35%, transparent);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+}
+
+// ---------------------------------------------------------------- progress
+// M3 linear progress: 6px rounded track in secondary-container, primary bar.
+progress {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--md-sys-color-secondary-container);
+
+  &::-webkit-progress-bar {
+    background: var(--md-sys-color-secondary-container);
+    border-radius: 999px;
+  }
+
+  &::-webkit-progress-value {
+    background: var(--md-sys-color-primary);
+    border-radius: 999px;
+    transition: width 200ms ease;
+  }
+}
+
+// M3 buttons: full-radius pills (filled primary for submit/primary, tonal
+// outline-free secondary), overriding the 6px legacy radius in one place.
+.button-component {
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 var(--spacing-double);
+}
