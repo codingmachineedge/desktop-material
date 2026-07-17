@@ -88,11 +88,12 @@ interface IBranchesContainerState {
 
 /**
  * Side-sheet branch row geometry, mirroring the `#foldout-container` rules in
- * `app/styles/ui/_branches.scss`: a 34px icon chip plus 2×8px block padding
- * per row, and the uppercase group header with its block padding. Keep in
- * sync with the SCSS — a shorter virtualized slot makes rows overlap.
+ * `app/styles/ui/_branches.scss`: a 34px icon chip plus 2×10px block padding
+ * per row (v2 prototype inset), and the uppercase group header with its block
+ * padding. Keep in sync with the SCSS — a shorter virtualized slot makes rows
+ * overlap.
  */
-const SheetRowHeight = 50
+const SheetRowHeight = 54
 const SheetGroupHeaderRowHeight = 36
 
 /** The unified Branches and Pull Requests component. */

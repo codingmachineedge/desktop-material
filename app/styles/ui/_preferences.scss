@@ -524,8 +524,8 @@
     }
 
     .account-card {
+      // v2 prototype: a flat filled surface with no outline.
       background: var(--md-sys-color-surface);
-      border: 1px solid var(--md-sys-color-outline-variant);
       border-radius: 18px;
       min-height: 64px;
       padding: 14px 16px;
@@ -570,8 +570,9 @@
         height: 26px;
         padding: 0 10px;
         border-radius: 999px;
-        background: var(--md-sys-color-tertiary-container);
-        color: var(--md-sys-color-on-tertiary-container);
+        // v2 prototype: the active-account chip reads green, not tertiary.
+        background: var(--dm-green-container);
+        color: var(--dm-green);
         font-size: 11.5px;
         font-weight: var(--font-weight-bold);
         white-space: nowrap;

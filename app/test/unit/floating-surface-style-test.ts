@@ -52,9 +52,10 @@ describe('floating surface layout contracts', () => {
       style,
       /\.regex-builder-palette\s*\{[\s\S]*?min-width: 0;[\s\S]*?overflow-x: hidden;/
     )
+    // v2 prototype: content-sized token chips wrap in a contained flex row.
     assert.match(
       style,
-      /\.regex-builder-tokens\s*\{[\s\S]*?min-width: 0;[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(min\(132px, 100%\), 1fr\)\);/
+      /\.regex-builder-tokens\s*\{[\s\S]*?min-width: 0;[\s\S]*?display: flex;[\s\S]*?flex-wrap: wrap;[\s\S]*?overflow-y: auto;/
     )
     assert.match(style, /@media \(max-width: 760px\)/)
     assert.match(style, /@media \(max-width: 620px\)/)

@@ -21,13 +21,15 @@
     align-items: start;
     gap: 10px;
     min-width: 0;
-    padding: 12px;
+    // v2 prototype: roomier notice that springs down on appear.
+    padding: 14px 16px;
     border: 1px solid color-mix(in srgb, var(--md-sys-color-on-error) 22%, transparent);
     border-radius: var(--md-sys-shape-corner-large);
     background: var(--md-sys-color-error);
     box-shadow: var(--md-sys-elevation-level3);
     color: var(--md-sys-color-on-error);
     pointer-events: auto;
+    animation: dmDown calc(340ms * var(--mdur, 1)) var(--spring-fast) both;
   }
 
   .error-notice-icon {

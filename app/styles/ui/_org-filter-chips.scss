@@ -12,14 +12,15 @@ dialog.clone-repository {
     flex: 0 0 auto;
     align-items: center;
     gap: 7px;
-    min-height: 34px;
-    padding: 0 13px;
+    // v2 prototype: a denser owner chip that hugs its leading avatar.
+    min-height: 32px;
+    padding: 0 12px 0 6px;
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: 999px;
     color: var(--md-sys-color-on-surface-variant);
     background: transparent;
     font: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: background-color 180ms ease, border-radius 220ms var(--spring), transform 160ms var(--spring-fast);
@@ -46,8 +47,8 @@ dialog.clone-repository {
   }
 
   .org-avatar {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
   }
 

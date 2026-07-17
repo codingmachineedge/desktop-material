@@ -314,7 +314,8 @@
   // marked by a trailing check_circle (see .current-branch-indicator) and a
   // tinted leading chip, rather than swapping the leading glyph.
   .branches-list-item {
-    padding: 8px;
+    // v2 prototype branch-row inset (matches the repository sheet's 10px 12px).
+    padding: 10px 12px;
 
     .icon {
       width: 34px;

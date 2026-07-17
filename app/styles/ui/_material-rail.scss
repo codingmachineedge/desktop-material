@@ -93,7 +93,7 @@
     overflow: hidden;
     place-items: center;
     position: relative;
-    transition: background-color 300ms var(--emph), color 300ms var(--emph), border-radius 300ms var(--spring);
+    transition: background-color 300ms var(--emph), color 300ms var(--emph), border-radius 300ms var(--spring), transform 260ms var(--spring-fast);
     width: 58px;
   }
 

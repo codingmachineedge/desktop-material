@@ -78,7 +78,8 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 18px 16px 8px;
+      // v2 prototype side-sheet header inset.
+      padding: 20px 20px 12px 20px;
 
       .side-sheet-title {
         flex: 1;

@@ -49,7 +49,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px 18px 12px 20px;
+  // v2 prototype: header inset lines up (22px) with the pattern/flags rows.
+  padding: 20px 22px 12px 22px;
   cursor: move;
   touch-action: none;
 
@@ -264,8 +265,10 @@
   .regex-builder-tokens {
     flex: 1;
     min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr));
+    // v2 prototype: content-sized chips wrapping in a flex row, not a rigid
+    // uniform grid.
+    display: flex;
+    flex-wrap: wrap;
     align-content: flex-start;
     gap: 8px;
     padding: 14px 18px;
@@ -273,12 +276,13 @@
   }
 
   .regex-builder-token {
-    display: flex;
+    display: inline-flex;
     min-width: 0;
     max-width: 100%;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    // v2 prototype: a horizontal chip — mono glyph then muted description.
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
     height: 44px;
     padding: 0 14px;
     border: 0;

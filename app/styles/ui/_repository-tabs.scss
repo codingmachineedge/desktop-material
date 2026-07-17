@@ -9,8 +9,8 @@
   gap: 6px;
   min-height: var(--dm-tab-strip-height, 44px);
   padding: 6px 16px 0 12px;
-  background: var(--md-sys-color-surface-container-low);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  // v2 prototype: the strip is transparent and undivided, reading continuous
+  // with the surface-container workspace behind it.
   user-select: none;
 
   .repository-tab-list {
@@ -171,19 +171,23 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: 999px;
     background: transparent;
     color: inherit;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 120ms ease, background 120ms ease;
+    transition: opacity 120ms ease, background 120ms ease, transform 160ms var(--spring-fast);
 
     &:hover {
       background: var(--md-sys-color-surface-container-highest);
+    }
+
+    &:active {
+      transform: scale(0.8) rotate(90deg);
     }
 
     &:focus-visible {
@@ -877,6 +881,8 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 .popover-component:has(.tab-style-editor) {
   border-radius: 22px;
   box-shadow: var(--md-sys-elevation-level3);
+  // v2 prototype: the popover sits one tonal step up from the base surface.
+  background: var(--md-sys-color-surface-container-low);
 
   .popover-content {
     max-width: calc(100vw - 20px);

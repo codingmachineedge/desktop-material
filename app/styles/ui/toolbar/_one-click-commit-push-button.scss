@@ -1,10 +1,14 @@
 .one-click-commit-push-button {
   > button {
-    border-radius: 999px;
+    // v2 prototype: a rounded-rect at rest that morphs to a full pill on
+    // hover, mirroring the expressive shape morph on the other app-bar chips.
+    border-radius: var(--md-sys-shape-corner-large);
     color: var(--md-sys-color-on-secondary-container);
     background: var(--md-sys-color-secondary-container);
+    transition: background-color 260ms var(--emph), border-radius 320ms var(--spring);
 
     &:hover:not(:disabled) {
+      border-radius: 999px;
       background: color-mix(in srgb, var(--md-sys-color-secondary-container) 88%, var(--md-sys-color-on-secondary-container));
     }
   }
