@@ -792,6 +792,25 @@ unrelated Electron processes were untouched. The foreign OAuth-scope manifest
 remained untracked and byte-identical; the detached release worktree was not
 modified.
 
+## 2026-07-16 final repository integration and cleanup
+
+The integration baseline immediately before this memory-only update is
+`ea76808dca482d2ce6f78c1fb5de27a6dc6f2462`. Both previously untracked run
+manifests are committed. Detached worktree commit
+`991b57bc1b098e78e4ae43b1ac0b1b76fb74ebe3` is merged into `main`, and the
+superseded Pull All stash commit
+`183ee8648e77be6b43b3899d3b81c4361099504a` is retained as merged history
+without replacing the newer published implementation. Both integration merges
+preserved tree `28e5840b55d989cc8ef0514f1f3c2ca5673a41b8` exactly.
+
+The stash was dropped after its commit became reachable from `main`. The clean
+detached worktree at
+`C:\Users\Administrator\.codex\worktrees\3e3c\desktop-material`, its empty
+parent directory, and stale worktree metadata were removed. The final audit at
+that baseline reported zero dirty files, zero stashes, no unmerged local or
+remote branches, one local branch (`main`), one remote branch (`origin/main`),
+one canonical worktree, and `0/0` divergence between `main` and `origin/main`.
+
 ## Maintenance constraints
 
 - Keep account identity on `endpoint#id`; never collapse provider accounts by
