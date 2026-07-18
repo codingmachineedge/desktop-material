@@ -30,9 +30,11 @@ describe('repository commit-rewrite responsive styles', () => {
       styles,
       /@media \(max-width: 700px\)[\s\S]*\.repository-commit-rewrite-row-controls,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/
     )
+    // The 190px minimum yields to the pane via min(100%, …) so panes
+    // narrower than the control column scroll-free instead of clipping.
     assert.match(
       styles,
-      /\.repository-commit-rewrite-row-controls[\s\S]*grid-template-columns: minmax\(190px, 1fr\) auto auto;/
+      /\.repository-commit-rewrite-row-controls[\s\S]*grid-template-columns: minmax\(min\(100%, 190px\), 1fr\) auto auto;/
     )
   })
 })

@@ -127,8 +127,9 @@ describe('branch empty states', () => {
       null
     )
 
+    // The label is title-cased under __DARWIN__, so match case-insensitively.
     const createBranchButton = screen.getByRole('button', {
-      name: 'Create new branch',
+      name: /create new branch/i,
     })
 
     fireEvent.click(createBranchButton)
@@ -147,7 +148,7 @@ describe('branch empty states', () => {
     )
 
     const createPullRequestButton = screen.getByRole('button', {
-      name: 'Create pull request',
+      name: /create pull request/i,
     })
 
     fireEvent.click(createPullRequestButton)
