@@ -385,6 +385,9 @@ export function showMaterialContextMenu(
       <MaterialContextMenu
         items={items}
         position={lastPointerPosition}
+        // The imperative mount owns teardown; there is no parent component
+        // whose instance method could carry this callback.
+        // eslint-disable-next-line react/jsx-no-bind
         onResolve={cleanup}
       />,
       host
