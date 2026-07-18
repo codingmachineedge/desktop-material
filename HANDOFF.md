@@ -62,6 +62,13 @@ awesome-compose, traefik) was cloned and driven through
   probing, at least one positive-score profile, shell-free argv commands,
   and deterministic ranking for every repo; it skips itself entirely in CI.
 
+The sync pill also gained its missing state: **diverged** (ahead and behind
+at once) now renders the pull shape in the amber family
+(`--dm-sync-diverged-bg/on` over new `--dm-amber-on-container` tokens in
+both themes) instead of borrowing the pull tone, so the pill signals that a
+push will follow the offered pull. The post-shell style contract covers the
+new state alongside the original five.
+
 ## 2026-07-17 Docker builds, sync-pill vibes, auto-build-on-pull, and list typography
 
 The three urgent goals previously recorded at the top of this handoff are

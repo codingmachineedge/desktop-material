@@ -116,11 +116,14 @@ type ActionInProgress = 'push' | 'pull' | 'fetch' | 'force push'
  * The visual state of the sync pill. Each state maps to a
  * `push-pull-button--<state>` modifier class so the pill background can
  * follow the action it offers (see the sync-pill vibes in _material-shell).
+ * `diverged` is the pull shape shown when the branch is both ahead and
+ * behind, so the pill can signal that a push will follow the pull.
  */
 type SyncPillState =
   | 'fetch'
   | 'pull'
   | 'push'
+  | 'diverged'
   | 'publish'
   | 'force-push'
   | 'progress'
@@ -645,9 +648,13 @@ export class PushPullButton extends React.Component<
       dropdownItemTypes.push(DropdownItemType.ForcePush)
     }
 
+    // Ahead and behind at once diverges from the remote: the action is still
+    // a pull, but the pill signals that a push will follow.
+    const state: SyncPillState = aheadBehind.ahead > 0 ? 'diverged' : 'pull'
+
     return (
       <ToolbarDropdown
-        {...this.defaultDropdownProps('pull')}
+        {...this.defaultDropdownProps(state)}
         title={title}
         description={renderLastFetched(lastFetched)}
         icon={octicons.arrowDown}

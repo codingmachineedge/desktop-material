@@ -51,6 +51,7 @@
   --dm-green-on-container: #0b3d1c;
   --dm-amber: #9a6700;
   --dm-amber-container: #ffe9b8;
+  --dm-amber-on-container: #5c4400;
   // Terminal log accents. The Build & Run panel is an inverse-surface card
   // (dark in light theme), so these are bright and read on that dark card;
   // the dark block re-declares them dark for the light card in dark theme.
@@ -125,6 +126,8 @@ body {
   --dm-sync-pull-on: var(--md-sys-color-on-secondary-container);
   --dm-sync-push-bg: var(--md-sys-color-primary-container);
   --dm-sync-push-on: var(--md-sys-color-on-primary-container);
+  --dm-sync-diverged-bg: var(--dm-amber-container);
+  --dm-sync-diverged-on: var(--dm-amber-on-container);
   --dm-sync-publish-bg: var(--dm-green-container);
   --dm-sync-publish-on: var(--dm-green-on-container);
   --dm-sync-force-push-bg: var(--md-sys-color-error-container);
@@ -164,6 +167,7 @@ body.theme-dark {
   --dm-green-on-container: #b9f0c0;
   --dm-amber: #d8a739;
   --dm-amber-container: #3d2e00;
+  --dm-amber-on-container: #ffe08a;
   // Terminal log accents (dark theme): the inverse-surface card is light
   // here, so the accents are dark to keep AA contrast on it.
   --dm-term-stderr: #a30f0f;
@@ -185,6 +189,8 @@ body.theme-dark {
   --dm-sync-pull-on: var(--md-sys-color-on-secondary-container);
   --dm-sync-push-bg: var(--md-sys-color-primary-container);
   --dm-sync-push-on: var(--md-sys-color-on-primary-container);
+  --dm-sync-diverged-bg: var(--dm-amber-container);
+  --dm-sync-diverged-on: var(--dm-amber-on-container);
   --dm-sync-publish-bg: var(--dm-green-container);
   --dm-sync-publish-on: var(--dm-green-on-container);
   --dm-sync-force-push-bg: var(--md-sys-color-error-container);

@@ -416,6 +416,16 @@ body {
     }
   }
 
+  // Diverged (ahead and behind at once): the pull shape in the amber family
+  // signals that a push will follow the offered pull.
+  .toolbar-dropdown.push-pull-button--diverged {
+    background: var(--dm-sync-diverged-bg);
+
+    > .toolbar-button > button {
+      color: var(--dm-sync-diverged-on);
+    }
+  }
+
   .toolbar-dropdown.push-pull-button--force-push {
     background: var(--dm-sync-force-push-bg);
 

@@ -287,12 +287,33 @@ describe('post-shell MD3 style contracts', () => {
 
     // The component tags every state with a modifier on both pill shapes.
     assert.match(button, /`push-pull-button--\$\{state\}`/)
-    for (const state of ['fetch', 'pull', 'push', 'publish', 'force-push']) {
+    for (const state of [
+      'fetch',
+      'pull',
+      'push',
+      'diverged',
+      'publish',
+      'force-push',
+    ]) {
       assert.match(button, new RegExp(`'${state}'`))
     }
 
+    // Diverged (ahead and behind) takes its own tone on the pull shape.
+    assert.match(
+      button,
+      /aheadBehind\.ahead > 0 \? 'diverged' : 'pull'/,
+      'the pull shape derives the diverged state'
+    )
+
     // Every state token pairs a background with its on-color, in both themes.
-    for (const state of ['fetch', 'pull', 'push', 'publish', 'force-push']) {
+    for (const state of [
+      'fetch',
+      'pull',
+      'push',
+      'diverged',
+      'publish',
+      'force-push',
+    ]) {
       const bg = new RegExp(`--dm-sync-${state}-bg:`, 'g')
       const on = new RegExp(`--dm-sync-${state}-on:`, 'g')
       assert.equal(tokens.match(bg)?.length, 2, `--dm-sync-${state}-bg themes`)
@@ -304,7 +325,7 @@ describe('post-shell MD3 style contracts', () => {
       shell,
       /\.push-pull-button\.push-pull-button--fetch > button\s*\{[\s\S]*?background: var\(--dm-sync-fetch-bg\);/
     )
-    for (const state of ['publish', 'pull', 'push', 'force-push']) {
+    for (const state of ['publish', 'pull', 'push', 'diverged', 'force-push']) {
       assert.match(
         shell,
         new RegExp(
