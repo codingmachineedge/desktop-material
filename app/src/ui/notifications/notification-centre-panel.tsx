@@ -692,6 +692,13 @@ export class NotificationCentrePanel extends React.Component<
     this.props.dispatcher.showPopup({ type: PopupType.NotificationHistory })
   }
 
+  private onOpenAutomations = (entry: INotificationEntry) => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.NotificationAutomations,
+      entry,
+    })
+  }
+
   private onToggleRead = (entry: INotificationEntry) => {
     const selectedLocalIds = new Set(this.state.selectedLocalIds)
     selectedLocalIds.delete(entry.id)
@@ -1304,6 +1311,7 @@ export class NotificationCentrePanel extends React.Component<
             onActivate={this.onActivate}
             onToggleRead={this.onToggleRead}
             onDelete={this.onDelete}
+            onOpenAutomations={this.onOpenAutomations}
           />
         ))}
       </ol>

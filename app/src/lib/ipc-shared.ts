@@ -68,6 +68,11 @@ import {
   IGitHubReleaseAssetUploadRequest,
   IGitHubReleaseTransferProgressEvent,
 } from './github-release-transfer'
+import {
+  INotificationAutomationRunRequest,
+  INotificationCommandResult,
+  INotificationWebhookResult,
+} from './notifications/automation/notification-automation'
 
 /**
  * Defines the simplex IPC channel names we use from the renderer
@@ -263,6 +268,12 @@ export type RequestResponseChannels = {
   'request-notifications-permission': () => Promise<boolean>
   'start-build-run': (plan: IBuildRunPlan) => Promise<void>
   'cancel-build-run': (runId: string) => Promise<void>
+  'notification-automation-run-webhook': (
+    request: INotificationAutomationRunRequest
+  ) => Promise<INotificationWebhookResult>
+  'notification-automation-run-command': (
+    request: INotificationAutomationRunRequest
+  ) => Promise<INotificationCommandResult>
   'opencode-detect': () => Promise<IOpencodeStatus>
   'opencode-install': (
     request: IOpencodeInstallRequest

@@ -125,6 +125,7 @@ import { ManualConflictResolution } from '../../models/manual-conflict-resolutio
 import { Popup, PopupType } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
 import { INotificationInput } from '../../models/notification-centre'
+import { INotificationAutomationRule } from '../../lib/notifications/automation/notification-automation'
 import { ErrorPresentationStyle } from '../../models/error-presentation'
 import {
   PullRequest,
@@ -434,6 +435,61 @@ export class Dispatcher {
    */
   public postNotification(input: INotificationInput): void {
     this.appStore.postNotification(input)
+  }
+
+  // --- Notification automations ----------------------------------------------
+
+  /**
+   * The current automation rules. Every rule loads disarmed; arming is a
+   * deliberate `setNotificationAutomationRuleEnabled` call per session.
+   */
+  public getNotificationAutomationRules(): Promise<
+    ReadonlyArray<INotificationAutomationRule>
+  > {
+    return this.appStore.getNotificationAutomationRules()
+  }
+
+  /** Create or replace an automation rule (always saved disarmed by callers). */
+  public saveNotificationAutomationRule(
+    rule: INotificationAutomationRule
+  ): Promise<void> {
+    return this.appStore._saveNotificationAutomationRule(rule)
+  }
+
+  /** Remove an automation rule. */
+  public removeNotificationAutomationRule(id: string): Promise<void> {
+    return this.appStore._removeNotificationAutomationRule(id)
+  }
+
+  /** Arm or disarm an automation rule for the current session. */
+  public setNotificationAutomationRuleEnabled(
+    id: string,
+    enabled: boolean
+  ): Promise<void> {
+    return this.appStore._setNotificationAutomationRuleEnabled(id, enabled)
+  }
+
+  /** Load a page of automation-history commits. */
+  public getNotificationAutomationHistory(
+    skip?: number,
+    limit?: number
+  ): Promise<IProfileHistoryPage> {
+    return this.appStore.getNotificationAutomationHistory(skip, limit)
+  }
+
+  /** Undo the latest automation change. */
+  public undoLastNotificationAutomationChange(): Promise<void> {
+    return this.appStore.undoLastNotificationAutomationChange()
+  }
+
+  /** Redo the latest automation undo. */
+  public redoLastNotificationAutomationChange(): Promise<void> {
+    return this.appStore.redoLastNotificationAutomationChange()
+  }
+
+  /** Restore the automation rules to a prior commit. */
+  public restoreNotificationAutomationsTo(sha: string): Promise<void> {
+    return this.appStore.restoreNotificationAutomationsTo(sha)
   }
 
   public setAutomationSettings(settings: IAutomationSettingsState): void {

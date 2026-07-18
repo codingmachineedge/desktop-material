@@ -155,6 +155,8 @@ import {
   sendCancelQuittingSync,
   sendVerboseLoggingEnabled,
   showOpenDialog,
+  runNotificationAutomationWebhook,
+  runNotificationAutomationCommand,
 } from '../../ui/main-process-proxy'
 import {
   resetRendererShutdown,
@@ -516,12 +518,18 @@ import {
   getNotificationsEnabled,
 } from './notifications-store'
 import { NotificationCentreStore } from './notification-centre-store'
+import { NotificationAutomationStore } from './notification-automation-store'
 import { LogStore } from './log-store'
 import { setLogSinkVerbose } from '../logging/renderer/log-sink'
 import {
   INotificationEntry,
   INotificationInput,
 } from '../../models/notification-centre'
+import {
+  INotificationAutomationRule,
+  NotificationAutomationReceiptPrefix,
+} from '../notifications/automation/notification-automation'
+import { evaluateNotificationAutomations } from '../notifications/automation/evaluate'
 import {
   dismissErrorNotice,
   enqueueErrorNotice,
@@ -972,9 +980,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
     private readonly notificationsStore: NotificationsStore,
     private readonly copilotStore: CopilotStore,
     private readonly notificationCentreStore: NotificationCentreStore,
+    private readonly notificationAutomationStore: NotificationAutomationStore,
     private readonly logStore: LogStore
   ) {
     super()
+
+    // Fire user-defined automations for genuinely new notifications. The trigger
+    // is installed here (rather than inside the Electron-free notification store)
+    // because running an action requires rule storage and main-process IPC.
+    this.notificationCentreStore.setAutomationTrigger(entry =>
+      this.runNotificationAutomations(entry)
+    )
 
     this.batchCloneStore = new BatchCloneStore(
       this.cloningRepositoriesStore,
@@ -6493,6 +6509,138 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Restore the notification log to a prior commit and re-read from disk. */
   public restoreNotificationsTo(sha: string): Promise<void> {
     return this.notificationCentreStore.restoreTo(sha)
+  }
+
+  // --- Notification automations ----------------------------------------------
+
+  /**
+   * The current automation rules. Every rule loads disarmed (enabled: false);
+   * arming is a deliberate per-session `_setNotificationAutomationRuleEnabled`
+   * call (see NotificationAutomationStore for the untrusted-on-load rationale).
+   */
+  public getNotificationAutomationRules(): Promise<
+    ReadonlyArray<INotificationAutomationRule>
+  > {
+    return this.notificationAutomationStore.getRules()
+  }
+
+  /** Create or replace an automation rule. */
+  public _saveNotificationAutomationRule(
+    rule: INotificationAutomationRule
+  ): Promise<void> {
+    return this.notificationAutomationStore.saveRule(rule)
+  }
+
+  /** Remove an automation rule. */
+  public _removeNotificationAutomationRule(id: string): Promise<void> {
+    return this.notificationAutomationStore.removeRule(id)
+  }
+
+  /** Arm or disarm an automation rule for the current session. */
+  public _setNotificationAutomationRuleEnabled(
+    id: string,
+    enabled: boolean
+  ): Promise<void> {
+    return this.notificationAutomationStore.setRuleEnabled(id, enabled)
+  }
+
+  /** Load a page of automation-history commits. */
+  public getNotificationAutomationHistory(
+    skip?: number,
+    limit?: number
+  ): Promise<IProfileHistoryPage> {
+    return this.notificationAutomationStore.getHistory(skip, limit)
+  }
+
+  /** Undo the latest automation change and re-read the rules from disk. */
+  public undoLastNotificationAutomationChange(): Promise<void> {
+    return this.notificationAutomationStore.undoLastChange()
+  }
+
+  /** Redo the latest automation undo and re-read the rules from disk. */
+  public redoLastNotificationAutomationChange(): Promise<void> {
+    return this.notificationAutomationStore.redoLastChange()
+  }
+
+  /** Restore the automation rules to a prior commit and re-read from disk. */
+  public restoreNotificationAutomationsTo(sha: string): Promise<void> {
+    return this.notificationAutomationStore.restoreTo(sha)
+  }
+
+  /**
+   * Evaluate the armed rules against a freshly inserted notification and run the
+   * matching actions in the main process. Never throws into the post path
+   * (mirrors the automation scheduler discipline): every failure is logged and,
+   * where possible, surfaced as a receipt notification.
+   *
+   * The loop guard lives in {@link evaluateNotificationAutomations}, which
+   * returns nothing for an automation receipt, so a run can never trigger on the
+   * `info` notification a previous run posted.
+   */
+  private runNotificationAutomations(entry: INotificationEntry): void {
+    this.notificationAutomationStore
+      .getRules()
+      .then(async rules => {
+        const matches = evaluateNotificationAutomations(rules, entry)
+        for (const rule of matches) {
+          // Re-check the armed flag at fire time; rules can be disarmed between
+          // load and dispatch.
+          if (!rule.enabled) {
+            continue
+          }
+          await this.runNotificationAutomation(rule, entry)
+        }
+      })
+      .catch(err =>
+        log.error('Failed to evaluate notification automations', err)
+      )
+  }
+
+  private async runNotificationAutomation(
+    rule: INotificationAutomationRule,
+    entry: INotificationEntry
+  ): Promise<void> {
+    try {
+      if (rule.action.type === 'webhook') {
+        const result = await runNotificationAutomationWebhook({ rule, entry })
+        this.postAutomationReceipt(
+          rule,
+          result.ok
+            ? `Webhook responded ${result.status ?? ''}`.trim()
+            : `Webhook failed: ${result.reason ?? `status ${result.status}`}`
+        )
+      } else {
+        const result = await runNotificationAutomationCommand({ rule, entry })
+        this.postAutomationReceipt(
+          rule,
+          result.ok
+            ? `Command exited ${result.code ?? 0}`
+            : `Command failed: ${result.reason ?? `exit ${result.code}`}`
+        )
+      }
+    } catch (err) {
+      log.error(`Notification automation "${rule.name}" failed to run`, err)
+      this.postAutomationReceipt(
+        rule,
+        `Could not run: ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
+  }
+
+  /**
+   * Record what an automation did as an `info` notification. The
+   * {@link NotificationAutomationReceiptPrefix} title marks it as a receipt so
+   * the evaluator skips it and never fires an automation on it.
+   */
+  private postAutomationReceipt(
+    rule: INotificationAutomationRule,
+    body: string
+  ): void {
+    this.postNotification({
+      kind: 'info',
+      title: `${NotificationAutomationReceiptPrefix}${rule.name}`,
+      body,
+    })
   }
 
   /** Load a page of log-history commits. */

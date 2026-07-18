@@ -40,6 +40,7 @@ import {
   RepositoryTabsStore,
   BuildRunStore,
   NotificationCentreStore,
+  NotificationAutomationStore,
   LogStore,
   ActionsStore,
   GitHubReleasesStore,
@@ -364,6 +365,7 @@ const notificationsDebugStore = new NotificationsDebugStore(
 )
 
 const notificationCentreStore = new NotificationCentreStore()
+const notificationAutomationStore = new NotificationAutomationStore()
 
 const logStore = new LogStore()
 registerLogSink((level, message) => {
@@ -384,6 +386,7 @@ const appStore = new AppStore(
   notificationsStore,
   copilotStore,
   notificationCentreStore,
+  notificationAutomationStore,
   logStore
 )
 

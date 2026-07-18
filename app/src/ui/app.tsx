@@ -101,6 +101,7 @@ import { UpdateAvailable, renderBanner } from './banners'
 import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
+import { NotificationAutomationsDialog } from './notifications/notification-automations-dialog'
 import { LogHistoryDialog } from './log-history/log-history-dialog'
 import { FileHistory } from './file-history'
 import { SparseCheckoutManager } from './sparse-checkout'
@@ -2275,6 +2276,16 @@ export class App extends React.Component<IAppProps, IAppState> {
           <NotificationHistoryDialog
             key="notification-history"
             dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.NotificationAutomations:
+        return (
+          <NotificationAutomationsDialog
+            key="notification-automations"
+            dispatcher={this.props.dispatcher}
+            entry={popup.entry}
+            repositories={this.state.repositories}
             onDismissed={onPopupDismissedFn}
           />
         )

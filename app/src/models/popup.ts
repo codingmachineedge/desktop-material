@@ -36,6 +36,7 @@ import { MergeAllMode } from '../lib/automation/merge-all'
 import { IGitHubPullRequestTarget } from '../lib/github-pull-request'
 import { IGitModulesEntry } from '../lib/git/gitmodules'
 import { BuildStageKind } from '../lib/build-run/types'
+import { INotificationEntry } from './notification-centre'
 
 /**
  * The captured failure context handed to the "Fix with opencode" dialog. Built
@@ -61,6 +62,7 @@ export enum PopupType {
   Preferences = 'Preferences',
   SettingsHistory = 'SettingsHistory',
   NotificationHistory = 'NotificationHistory',
+  NotificationAutomations = 'NotificationAutomations',
   LogHistory = 'LogHistory',
   FileHistory = 'FileHistory',
   CreateGitHubIssue = 'CreateGitHubIssue',
@@ -211,6 +213,7 @@ export type PopupDetail =
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
   | { type: PopupType.SettingsHistory }
   | { type: PopupType.NotificationHistory }
+  | { type: PopupType.NotificationAutomations; entry?: INotificationEntry }
   | { type: PopupType.LogHistory }
   | { type: PopupType.FileHistory; repository: Repository; path: string }
   | { type: PopupType.CreateGitHubIssue; repository: Repository }

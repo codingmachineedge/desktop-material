@@ -1,0 +1,296 @@
+// Notification-automation builder. Reachable only from a notification row's
+// context menu; every rule is armed deliberately and per-session, so the arm
+// controls and the safety banner are styled to read as intentional switches
+// rather than incidental checkboxes.
+
+.notification-automations-dialog {
+  #notification-automations {
+    width: min(560px, calc(100vw - var(--spacing-double)));
+  }
+
+  .notification-automations-content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--spacing);
+  }
+}
+
+.notification-automations-safety {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--spacing-half);
+  padding: var(--spacing);
+  border-radius: 12px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+
+  .octicon {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+  }
+
+  strong {
+    display: block;
+  }
+
+  p {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.notification-automations-list-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--spacing-half);
+}
+
+.notification-automations-filter-bar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-half);
+
+  .notification-automations-search {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 200px;
+    flex-direction: column;
+    gap: 2px;
+
+    input {
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+}
+
+.notification-automations-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--spacing-half);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-automation-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--spacing-half);
+  padding: var(--spacing-half);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+
+  &.armed {
+    border-color: var(--md-sys-color-error);
+    background: color-mix(in srgb, var(--md-sys-color-error) 8%, transparent);
+  }
+}
+
+.notification-automation-arm {
+  flex: none;
+  padding-top: 2px;
+
+  input {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+}
+
+.notification-automation-body {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-automation-name {
+  font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.notification-automation-summary {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.notification-automation-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+
+  &.armed {
+    color: var(--md-sys-color-error);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .octicon {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.notification-automation-row-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.notification-automations-list-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.notification-automations-editor {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--spacing);
+  padding-top: var(--spacing);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+  }
+}
+
+.notification-automations-fieldset {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--spacing-half);
+  margin: 0;
+  padding: var(--spacing-half);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+
+  legend {
+    padding: 0 4px;
+    font-weight: var(--font-weight-bold);
+  }
+}
+
+.notification-automations-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+
+  > span {
+    font-weight: var(--font-weight-bold);
+  }
+
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: var(--font-family-monospace);
+  }
+
+  small {
+    color: var(--md-sys-color-on-surface-variant);
+    overflow-wrap: anywhere;
+  }
+}
+
+.notification-automations-inline-error {
+  color: var(--md-sys-color-error);
+}
+
+.notification-automations-legend code,
+.notification-automations-args code {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--md-sys-color-surface-container-high);
+  font-family: var(--font-family-monospace);
+  font-size: 11px;
+}
+
+.notification-automations-pattern-row {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+
+  input {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
+
+.notification-automations-kind-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 4px;
+}
+
+.notification-automations-kind {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+
+  span {
+    overflow-wrap: anywhere;
+  }
+}
+
+.notification-automations-args {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+
+  .notification-automations-args-label {
+    font-weight: var(--font-weight-bold);
+  }
+}
+
+.notification-automations-arg-row {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+
+  input {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+.notification-automations-empty {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: var(--spacing);
+  color: var(--md-sys-color-on-surface-variant);
+
+  span {
+    overflow-wrap: anywhere;
+  }
+}

@@ -140,6 +140,8 @@ describe('IPC channel contract', () => {
     'request-notifications-permission',
     'start-build-run',
     'cancel-build-run',
+    'notification-automation-run-webhook',
+    'notification-automation-run-command',
     'opencode-detect',
     'opencode-install',
     'opencode-run-fix',

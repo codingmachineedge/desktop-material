@@ -15,6 +15,11 @@ describe('hasModalPopup', () => {
     assert.equal(hasModalPopup([preferences, history]), true)
   })
 
+  it('keeps the notification-automation builder modal so arming is deliberate', () => {
+    const automations: Popup = { type: PopupType.NotificationAutomations }
+    assert.equal(hasModalPopup([automations]), true)
+  })
+
   it('keeps Pull all non-modal while repository work continues', () => {
     const pullAll: Popup = { type: PopupType.PullAllRepositories }
     assert.equal(hasModalPopup([pullAll]), false)

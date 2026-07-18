@@ -61,5 +61,16 @@ mock.module('electron', {
       handle: () => {},
       removeListener: () => {},
     },
+    // Present so main-process modules that reference these as values (e.g. the
+    // notification-automation and release-transfer runners) link under ESM.
+    // Tests inject their own transports; touching these throws clearly.
+    net: {
+      request: () => {
+        throw new Error('electron.net.request is not available in tests')
+      },
+    },
+    session: {
+      fromPartition: () => ({}),
+    },
   },
 })

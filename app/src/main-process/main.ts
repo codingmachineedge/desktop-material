@@ -71,6 +71,7 @@ import {
 } from './actions-transfer'
 import { updateGitHubReleaseTransferAccounts } from './github-release-transfer'
 import { registerGitHubReleaseTransferIPC } from './github-release-transfer-ipc'
+import { registerNotificationAutomationIpc } from './notification-automation-runner'
 import {
   releaseAllCompletedActionsArtifactDownloads,
   releaseCompletedActionsArtifactDownload,
@@ -730,6 +731,7 @@ app.on('ready', () => {
   registerBuildRunIpc()
   registerCLIWorkbenchIpc()
   registerGitHubReleaseTransferIPC(ipcMain)
+  registerNotificationAutomationIpc()
 
   ipcMain.on('update-accounts', (event, accounts) => {
     updateAccounts(accounts)

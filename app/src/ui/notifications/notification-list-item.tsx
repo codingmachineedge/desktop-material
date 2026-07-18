@@ -7,6 +7,7 @@ import {
   INotificationEntry,
   NotificationCentreKind,
 } from '../../models/notification-centre'
+import { IMenuItem, showContextualMenu } from '../../lib/menu-item'
 
 interface INotificationListItemProps {
   readonly entry: INotificationEntry
@@ -21,6 +22,30 @@ interface INotificationListItemProps {
   /** Toggle the read/unread state without activating the action. */
   readonly onToggleRead: (entry: INotificationEntry) => void
   readonly onDelete: (entry: INotificationEntry) => void
+  /**
+   * Open the notification-automation builder scoped to this entry. When
+   * omitted the row exposes no context menu — this is the sole, deliberately
+   * hidden entry point into the automation feature.
+   */
+  readonly onOpenAutomations?: (entry: INotificationEntry) => void
+}
+
+/**
+ * The items surfaced by right-clicking a notification row. The automation
+ * builder is intentionally reachable only from here (there is no command
+ * palette or app-menu entry), so an armed rule can never fire behind a user
+ * who never opened this menu.
+ */
+export function buildNotificationRowContextMenuItems(
+  entry: INotificationEntry,
+  onOpenAutomations: (entry: INotificationEntry) => void
+): ReadonlyArray<IMenuItem> {
+  return [
+    {
+      label: __DARWIN__ ? 'Automations…' : 'Automations…',
+      action: () => onOpenAutomations(entry),
+    },
+  ]
 }
 
 /** The octicon shown in each notification's kind chip. */
@@ -55,6 +80,17 @@ export class NotificationListItem extends React.Component<INotificationListItemP
     this.props.onToggleSelected(this.props.entry, event.currentTarget.checked)
   }
 
+  private onContextMenu = (event: React.MouseEvent) => {
+    const { onOpenAutomations, entry } = this.props
+    if (onOpenAutomations === undefined) {
+      return
+    }
+    event.preventDefault()
+    showContextualMenu(
+      buildNotificationRowContextMenuItems(entry, onOpenAutomations)
+    )
+  }
+
   public render() {
     const { entry, selected, selectionDisabled } = this.props
     const className = classNames('notification-item', `kind-${entry.kind}`, {
@@ -63,7 +99,7 @@ export class NotificationListItem extends React.Component<INotificationListItemP
     })
 
     return (
-      <li className={className}>
+      <li className={className} onContextMenu={this.onContextMenu}>
         <label className="notification-item-selection">
           <input
             type="checkbox"

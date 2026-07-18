@@ -435,6 +435,18 @@ export const startBuildRun = invokeProxy('start-build-run', 1)
 /** Request cancellation of an in-flight Build & Run. */
 export const cancelBuildRun = invokeProxy('cancel-build-run', 1)
 
+/** Ask the main process to run a notification automation's webhook action. */
+export const runNotificationAutomationWebhook = invokeProxy(
+  'notification-automation-run-webhook',
+  1
+)
+
+/** Ask the main process to run a notification automation's command action. */
+export const runNotificationAutomationCommand = invokeProxy(
+  'notification-automation-run-command',
+  1
+)
+
 /** Subscribe to streamed Build & Run log lines pushed from the main process. */
 export function onBuildRunLog(
   handler: (event: Electron.IpcRendererEvent, log: IBuildRunLogEvent) => void

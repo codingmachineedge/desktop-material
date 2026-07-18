@@ -63,6 +63,14 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
   private open = false
   private enabled = false
 
+  /**
+   * Optional hook invoked once for every freshly inserted (non-deduped) entry.
+   * The notification automation trigger is wired here rather than reaching into
+   * Electron from this store, keeping it renderer-agnostic. Never allowed to
+   * throw into the post path.
+   */
+  private automationTrigger: ((entry: INotificationEntry) => void) | null = null
+
   /** Serializes file writes so the last write always reflects final state. */
   private writeChain: Promise<void> = Promise.resolve()
 
@@ -141,9 +149,37 @@ export class NotificationCentreStore extends TypedBaseStore<INotificationCentreS
     this.entries = entries
     this.emitState()
 
+    // Only a genuinely new entry drives automations; a coalesced duplicate does
+    // not re-fire (the storm guard also guards the automation trigger).
+    if (!deduped) {
+      this.fireAutomationTrigger(entry)
+    }
+
     const verb = deduped ? 'Update' : 'Add'
     const prunedNote = pruned > 0 ? ` (pruned ${pruned})` : ''
     await this.persist(`${verb} notification: ${entry.title}${prunedNote}`)
+  }
+
+  /**
+   * Install (or clear) the automation trigger. Wired from the app store, which
+   * owns rule storage and the Electron IPC used to run actions.
+   */
+  public setAutomationTrigger(
+    trigger: ((entry: INotificationEntry) => void) | null
+  ): void {
+    this.automationTrigger = trigger
+  }
+
+  private fireAutomationTrigger(entry: INotificationEntry): void {
+    const trigger = this.automationTrigger
+    if (trigger === null) {
+      return
+    }
+    try {
+      trigger(entry)
+    } catch (err) {
+      log.error('Notification automation trigger failed', err)
+    }
   }
 
   /** Mark a single notification as read. */
