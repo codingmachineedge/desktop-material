@@ -122,6 +122,9 @@ interface ICommitListProps {
    */
   readonly onCreateBranch?: (commit: CommitOneLine) => void
 
+  /** Callback to create a new worktree checked out at the given commit. */
+  readonly onCreateWorktreeFromCommit?: (commit: CommitOneLine) => void
+
   /**
    * Callback to fire to checkout the selected commit in the current
    * repository
@@ -896,6 +899,15 @@ export class CommitList extends React.Component<
           }
         },
         enabled: this.props.onCreateBranch !== undefined,
+      },
+      {
+        label: __DARWIN__
+          ? 'Create Worktree from Commit…'
+          : 'Create worktree from commit…',
+        action: () => {
+          this.props.onCreateWorktreeFromCommit?.(commit)
+        },
+        enabled: this.props.onCreateWorktreeFromCommit !== undefined,
       },
       {
         label: 'Create Tag…',

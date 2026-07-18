@@ -21,6 +21,13 @@ interface IAddWorktreeDialogProps {
   readonly initialBranchName?: string
   readonly initialWorktreeName?: string
   readonly allBranches: ReadonlyArray<Branch>
+
+  /**
+   * When set, the worktree is anchored at this commit-ish: a new branch is
+   * created at it inside the new worktree (History right-click → create
+   * worktree from commit). The branch name must not already exist.
+   */
+  readonly commitish?: string
 }
 
 interface IAddWorktreeDialogState {
@@ -91,7 +98,15 @@ export class AddWorktreeDialog extends React.Component<
     )
 
     try {
-      if (branch?.type === BranchType.Remote) {
+      if (this.props.commitish !== undefined) {
+        // Commit-anchored worktree: always a new branch created at the
+        // anchoring commit, so the checkout is never detached and never
+        // repurposes an existing branch.
+        await addWorktree(this.props.repository, fullPath, {
+          createBranch: effectiveBranchName,
+          commitish: this.props.commitish,
+        })
+      } else if (branch?.type === BranchType.Remote) {
         // Remote branch: create a new local branch from the remote ref
         await addWorktree(this.props.repository, fullPath, {
           createBranch: branch.nameWithoutRemote,
@@ -142,6 +157,30 @@ export class AddWorktreeDialog extends React.Component<
 
     const branch = this.props.allBranches.find(b => b.name === effectiveName)
 
+    if (this.props.commitish !== undefined) {
+      const shortCommitish = /^[0-9a-f]{40}$/i.test(this.props.commitish)
+        ? this.props.commitish.slice(0, 8)
+        : this.props.commitish
+
+      return (
+        <Row>
+          <p className="branch-status-hint">
+            {branch ? (
+              <>
+                Branch <Ref>{effectiveName}</Ref> already exists — choose a new
+                branch name to create at commit <Ref>{shortCommitish}</Ref>.
+              </>
+            ) : (
+              <>
+                Will create branch <Ref>{effectiveName}</Ref> at commit{' '}
+                <Ref>{shortCommitish}</Ref> in the new worktree.
+              </>
+            )}
+          </p>
+        </Row>
+      )
+    }
+
     if (!branch) {
       return null
     }
@@ -177,10 +216,15 @@ export class AddWorktreeDialog extends React.Component<
   }
 
   public render() {
+    const effectiveBranchName = this.getEffectiveBranchName()
+    const commitAnchoredNameCollision =
+      this.props.commitish !== undefined &&
+      this.props.allBranches.some(b => b.name === effectiveBranchName)
     const disabled =
       this.state.fullPath === null ||
       this.state.creating ||
-      this.getEffectiveBranchName().length === 0
+      effectiveBranchName.length === 0 ||
+      commitAnchoredNameCollision
     const branchPlaceholder = sanitizedRefName(this.state.worktreeName)
 
     return (

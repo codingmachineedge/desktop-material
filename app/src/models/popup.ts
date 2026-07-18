@@ -610,6 +610,12 @@ export type PopupDetail =
       repository: Repository
       initialBranchName?: string
       initialWorktreeName?: string
+      /**
+       * Anchors the worktree at this commit-ish: a new branch is created at
+       * it inside the new worktree (right-click a History commit → create
+       * worktree from commit).
+       */
+      commitish?: string
     }
   | {
       type: PopupType.RenameWorktree

@@ -721,6 +721,7 @@ export class CompareSidebar extends React.Component<
           onCommitsSelected={this.onCommitsSelected}
           onScroll={this.onScroll}
           onCreateBranch={this.onCreateBranch}
+          onCreateWorktreeFromCommit={this.onCreateWorktreeFromCommit}
           onCheckoutCommit={this.onCheckoutCommit}
           onCreateTag={this.onCreateTag}
           onDeleteTag={this.onDeleteTag}
@@ -1087,6 +1088,17 @@ export class CompareSidebar extends React.Component<
       type: PopupType.CreateBranch,
       repository,
       targetCommit: commit,
+    })
+  }
+
+  private onCreateWorktreeFromCommit = (commit: CommitOneLine) => {
+    const { repository, dispatcher } = this.props
+
+    dispatcher.showPopup({
+      type: PopupType.AddWorktree,
+      repository,
+      commitish: commit.sha,
+      initialWorktreeName: `commit-${commit.sha.slice(0, 8)}`,
     })
   }
 
