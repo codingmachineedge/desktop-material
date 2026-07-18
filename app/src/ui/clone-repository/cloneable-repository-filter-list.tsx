@@ -115,6 +115,18 @@ interface ICloneableRepositoryFilterListProps {
 
   /** Bumped when probe results land so visible rows re-render. */
   readonly submoduleBadgeVersion?: number
+
+  /**
+   * Overrides the virtualized row height. The clone dialog's Material rows
+   * paint taller than the compact default, and the hit-testing height must
+   * match the painted height exactly or clicks land beside the cursor.
+   */
+  readonly rowHeight?:
+    | number
+    | ((info: {
+        readonly index: unknown
+        readonly item: ICloneableRepositoryListItem | null
+      }) => number)
 }
 
 const RowHeight = 31
@@ -329,7 +341,7 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
     return (
       <SectionFilterList<ICloneableRepositoryListItem>
         className={'clone-github-repo'}
-        rowHeight={RowHeight}
+        rowHeight={this.props.rowHeight ?? RowHeight}
         filterListId={this.props.filterListId ?? 'clone-repositories'}
         filterListLabel={this.props.filterListLabel ?? 'Clone'}
         selectedItem={selectedListItem}

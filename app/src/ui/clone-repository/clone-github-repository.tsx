@@ -7,6 +7,11 @@ import { Row } from '../lib/row'
 import { Button } from '../lib/button'
 import { IAPIOrganization, IAPIRepository } from '../../lib/api'
 import { CloneableRepositoryFilterList } from './cloneable-repository-filter-list'
+import {
+  ICloneableRepositoryListItem,
+  RepositoryVisibilityFilter,
+} from './group-repositories'
+import classNames from 'classnames'
 import { ClickSource } from '../lib/list'
 import { AccountPicker } from '../account-picker'
 import { RadioGroup } from '../lib/radio-group'
@@ -137,9 +142,43 @@ interface ICloneGithubRepositoryProps {
 
   /** Bumped when probe results land so visible rows re-render. */
   readonly submoduleBadgeVersion?: number
+
+  /** The visibility scope narrowing the repository list. */
+  readonly visibilityFilter: RepositoryVisibilityFilter
+
+  /** Called when the user picks a visibility scope chip. */
+  readonly onVisibilityFilterChanged: (
+    filter: RepositoryVisibilityFilter
+  ) => void
 }
 
+const VisibilityFilterLabels: ReadonlyArray<{
+  readonly key: RepositoryVisibilityFilter
+  readonly label: string
+}> = [
+  { key: 'all', label: 'All' },
+  { key: 'public', label: 'Public' },
+  { key: 'private', label: 'Private' },
+  { key: 'forked', label: 'Forked' },
+]
+
+/**
+ * The painted heights of the Material clone-dialog list rows (34px icon chip
+ * plus 8px vertical padding) and group headers. The virtualized list must be
+ * told these exact values or its pointer hit-testing drifts away from the
+ * rows the user sees.
+ */
+const CloneDialogRowHeight = 50
+const CloneDialogGroupHeaderHeight = 34
+
 export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepositoryProps> {
+  private getCloneRowHeight = ({
+    item,
+  }: {
+    readonly index: unknown
+    readonly item: ICloneableRepositoryListItem | null
+  }) => (item === null ? CloneDialogGroupHeaderHeight : CloneDialogRowHeight)
+
   private renderAccountPicker = () => {
     return (
       <AccountPicker
@@ -153,6 +192,44 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
 
   private renderBatchModeContents = (mode: BatchCloneMode) =>
     mode === BatchCloneMode.Parallel ? 'Parallel' : 'One at a time'
+
+  private onVisibilityChipClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const key = event.currentTarget.dataset.visibility
+    const entry = VisibilityFilterLabels.find(value => value.key === key)
+    if (entry !== undefined) {
+      this.props.onVisibilityFilterChanged(entry.key)
+    }
+  }
+
+  private renderVisibilityChips() {
+    const selected = this.props.visibilityFilter
+
+    return (
+      <div
+        className="org-filter-chips visibility-filter-chips"
+        role="group"
+        aria-label="Filter repositories by visibility"
+      >
+        <span className="org-filter-eyebrow">Visibility</span>
+        {VisibilityFilterLabels.map(({ key, label }) => (
+          <button
+            type="button"
+            key={key}
+            data-visibility={key}
+            className={classNames('org-filter-chip', {
+              selected: selected === key,
+            })}
+            aria-pressed={selected === key}
+            onClick={this.onVisibilityChipClick}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   private onAutoCloneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.props.onAutoCloneNewRepositoriesChanged(event.currentTarget.checked)
@@ -227,6 +304,7 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
           loading={this.props.organizationsLoading}
           onSelect={this.props.onSelectedOrganizationChanged}
         />
+        {this.renderVisibilityChips()}
         {this.props.repositoryError !== null && (
           <div className="org-repositories-error" role="alert">
             <span>We couldn't refresh this account's repositories.</span>
@@ -266,6 +344,7 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
             onProbeSubmodules={this.props.onProbeSubmodules}
             onShowSubmodules={this.props.onShowSubmodules}
             submoduleBadgeVersion={this.props.submoduleBadgeVersion}
+            rowHeight={this.getCloneRowHeight}
           />
         </Row>
 

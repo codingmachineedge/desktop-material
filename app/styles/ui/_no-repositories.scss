@@ -197,20 +197,24 @@
     }
   }
 
+  // Large screens used to scale this view with the CSS `zoom` property, but
+  // zoom desynchronizes the virtualized repository list's pointer math from
+  // its painted rows — clicks land beside the row under the cursor. Grow the
+  // typography instead; hit-testing stays 1:1 with layout.
   @media screen and (min-width: 1366px) {
-    zoom: 1.2;
-  }
+    font-size: 1.1em;
 
-  @media screen and (min-width: 1400px) {
-    zoom: 1.3;
+    header h1 {
+      font-size: 2.2em;
+    }
   }
 
   @media screen and (min-width: 1600px) {
-    zoom: 1.4;
-  }
+    font-size: 1.2em;
 
-  @media screen and (min-width: 1800px) {
-    zoom: 1.5;
+    header h1 {
+      font-size: 2.4em;
+    }
   }
 }
 

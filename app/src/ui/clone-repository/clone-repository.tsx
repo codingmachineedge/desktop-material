@@ -46,6 +46,10 @@ import {
   buildBatchCloneItems,
 } from '../../models/batch-clone'
 import { mergeOrganizationRepositories } from './org-filter-chips'
+import {
+  RepositoryVisibilityFilter,
+  filterRepositoriesByVisibility,
+} from './group-repositories'
 import { PopupType } from '../../models/popup'
 import { PreferencesTab } from '../../models/preferences'
 import { getPreferredGenericCloneAccountKey } from '../../lib/automation/clone-account-fallback'
@@ -197,6 +201,13 @@ interface ICloneRepositoryState {
   readonly submoduleBadgeVersion: number
 
   /**
+   * A submodule clone URL waiting for the URL tab to become selected. The
+   * tab switch round-trips through the dispatcher, so the URL must only be
+   * applied once props.selectedTab has actually changed.
+   */
+  readonly pendingSubmoduleCloneUrl: string | null
+
+  /**
    * The persisted state of the CloneGitHubRepository component for
    * the GitHub.com account.
    */
@@ -269,6 +280,9 @@ interface IGitHubTabState extends IBaseTabState {
 
   /** Organization login currently filtering this tab, or all repositories. */
   readonly selectedOrganization: string | null
+
+  /** Visibility scope (all/public/private/forked) filtering this tab. */
+  readonly visibilityFilter: RepositoryVisibilityFilter
 }
 
 /** The component for cloning a repository. */
@@ -323,12 +337,14 @@ export class CloneRepository extends React.Component<
       cloneDepth: '1',
       autoCloneNewRepositories: false,
       submoduleBadgeVersion: 0,
+      pendingSubmoduleCloneUrl: null,
       dotComTabState: {
         kind: 'dotComTabState',
         filterText: '',
         selectedItem: null,
         checkedUrls: new Set<string>(),
         selectedOrganization: null,
+        visibilityFilter: 'all',
         ...initialBaseTabState,
       },
       enterpriseTabState: {
@@ -337,6 +353,7 @@ export class CloneRepository extends React.Component<
         selectedItem: null,
         checkedUrls: new Set<string>(),
         selectedOrganization: null,
+        visibilityFilter: 'all',
         ...initialBaseTabState,
       },
       providerTabState: {
@@ -345,6 +362,7 @@ export class CloneRepository extends React.Component<
         selectedItem: null,
         checkedUrls: new Set<string>(),
         selectedOrganization: null,
+        visibilityFilter: 'all',
         ...initialBaseTabState,
       },
       urlTabState: {
@@ -363,6 +381,15 @@ export class CloneRepository extends React.Component<
       this.syncAutoCloneState(false, () =>
         this.validatePath(this.props.selectedTab)
       )
+    }
+
+    const pendingSubmoduleUrl = this.state.pendingSubmoduleCloneUrl
+    if (
+      pendingSubmoduleUrl !== null &&
+      this.props.selectedTab === CloneRepositoryTab.Generic
+    ) {
+      this.setState({ pendingSubmoduleCloneUrl: null })
+      this.updateUrl(pendingSubmoduleUrl)
     }
 
     if (prevProps.initialURL !== this.props.initialURL) {
@@ -755,13 +782,20 @@ export class CloneRepository extends React.Component<
                 organization.login.toLowerCase()
               )
             : undefined
-          const visibleRepositories =
+          const mergedRepositories =
             repositories === null || organization === null
               ? repositories
               : mergeOrganizationRepositories(
                   repositories,
                   organizationState?.repositories ?? [],
                   organization.login
+                )
+          const visibleRepositories =
+            mergedRepositories === null
+              ? null
+              : filterRepositoriesByVisibility(
+                  mergedRepositories,
+                  tabState.visibilityFilter
                 )
           const loading =
             accountState === undefined ? false : accountState.loading
@@ -783,6 +817,8 @@ export class CloneRepository extends React.Component<
               selectedOrganization={tabState.selectedOrganization}
               organizationError={organizationState?.error ?? null}
               onSelectedOrganizationChanged={this.onSelectedOrganizationChanged}
+              visibilityFilter={tabState.visibilityFilter}
+              onVisibilityFilterChanged={this.onVisibilityFilterChanged}
               onRefreshOrganization={this.onRefreshOrganization}
               onRefreshRepositories={this.props.onRefreshRepositories}
               filterText={tabState.filterText}
@@ -885,10 +921,20 @@ export class CloneRepository extends React.Component<
   /**
    * Take a submodule's resolved URL into this already-open clone dialog's URL
    * tab instead of opening a second clone dialog on the popup stack.
+   *
+   * updateUrl writes into the tab that is selected *at call time*, and the
+   * tab switch round-trips through the dispatcher, so the URL is parked in
+   * state and applied from componentDidUpdate once the URL tab is actually
+   * selected — otherwise it would land in the previous tab's state and the
+   * URL field would appear empty.
    */
   private onCloneSubmoduleUrl = (url: string) => {
+    if (this.props.selectedTab === CloneRepositoryTab.Generic) {
+      this.updateUrl(url)
+      return
+    }
+    this.setState({ pendingSubmoduleCloneUrl: url })
     this.props.onTabSelected(CloneRepositoryTab.Generic)
-    this.updateUrl(url)
   }
 
   private onSelectedAccountChanged = (account: Account) => {
@@ -905,6 +951,7 @@ export class CloneRepository extends React.Component<
         {
           selectedAccount: account,
           selectedOrganization: null,
+          visibilityFilter: 'all',
           selectedItem: null,
           checkedUrls: new Set<string>(),
           url: '',
@@ -920,6 +967,13 @@ export class CloneRepository extends React.Component<
           })
         }
       )
+    }
+  }
+
+  private onVisibilityFilterChanged = (filter: RepositoryVisibilityFilter) => {
+    const tab = this.props.selectedTab
+    if (tab !== CloneRepositoryTab.Generic) {
+      this.setGitHubTabState({ visibilityFilter: filter }, tab)
     }
   }
 
