@@ -1,0 +1,32 @@
+<svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The small robot-kit box is lifted out of the big box and stands on its own shelf as a complete project">
+  <defs>
+    <marker id="arrowc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d4ed8"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="698" height="378" rx="16" fill="#f8fafc" stroke="#d0d7de" stroke-width="2"/>
+  <text x="350" y="44" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1f2328">The little box can live on its own</text>
+
+  <!-- big box with empty spot -->
+  <rect x="52" y="96" width="276" height="26" rx="8" fill="#fcd34d" stroke="#b45309" stroke-width="3"/>
+  <rect x="60" y="122" width="260" height="196" rx="12" fill="#fde68a" stroke="#b45309" stroke-width="3"/>
+  <text x="190" y="152" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#7c2d12">big-project</text>
+  <rect x="112" y="176" width="156" height="112" rx="10" fill="none" stroke="#1d4ed8" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <text x="190" y="238" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1d4ed8">the box was here</text>
+
+  <!-- arrow -->
+  <line x1="336" y1="216" x2="416" y2="216" stroke="#1d4ed8" stroke-width="3" marker-end="url(#arrowc)"/>
+
+  <!-- standalone box on shelf -->
+  <rect x="440" y="292" width="216" height="14" rx="4" fill="#92400e"/>
+  <rect x="466" y="162" width="164" height="24" rx="8" fill="#93c5fd" stroke="#1d4ed8" stroke-width="3"/>
+  <rect x="474" y="186" width="148" height="106" rx="10" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="3"/>
+  <rect x="492" y="212" width="112" height="44" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <text x="548" y="232" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">robot-kit</text>
+  <text x="548" y="249" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#57606a">on its own</text>
+  <!-- sparkles -->
+  <path d="M 448 150 l 5 12 l 12 5 l -12 5 l -5 12 l -5 -12 l -12 -5 l 12 -5 z" fill="#f59e0b"/>
+  <path d="M 652 190 l 4 10 l 10 4 l -10 4 l -4 10 l -4 -10 l -10 -4 l 10 -4 z" fill="#f59e0b"/>
+
+  <text x="350" y="352" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#1f2328">Cloned on its own, the submodule is just a normal, complete project.</text>
+</svg>

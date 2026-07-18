@@ -53,6 +53,7 @@ for details and the manual-download path.
 | [User Guide](User-Guide) | Task-oriented walkthrough for the Material welcome, appearance scopes, adaptive toolbar, accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
 | [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 58 named visual functions and states, with automated missing/duplicate coverage checks. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
+| [Submodules](Submodules) | The simplest page in the wiki — what submodules are (toy boxes inside toy boxes), pre-clone badges, the Submodule Manager, configuration, fixes, and submodule vs subtree, all in pictures. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
 | [Developer Guide](Developer-Guide) | Architecture for contributors — Electron windows, store/dispatcher flow, dugite, profile repos, agent server, CLI routing, and SCSS tokens. |
 | [Agent API](Agent-API) | Shipped MCP, local REST, stdio proxy, and CLI access for safe AI-agent control. |

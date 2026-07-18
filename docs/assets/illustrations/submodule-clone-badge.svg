@@ -1,0 +1,47 @@
+<svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A clone list where big-project shows a badge with the number 2, opening a details card that lists both submodules with Clone as repository buttons">
+  <defs>
+    <marker id="arrowb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0969da"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="698" height="398" rx="16" fill="#f8fafc" stroke="#d0d7de" stroke-width="2"/>
+  <text x="350" y="44" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1f2328">Little badges tell you before you clone</text>
+
+  <!-- clone list card -->
+  <rect x="40" y="76" width="280" height="256" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+  <text x="60" y="106" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">Clone a repository</text>
+  <line x1="40" y1="120" x2="320" y2="120" stroke="#d0d7de" stroke-width="2"/>
+  <!-- row 1 with badge -->
+  <text x="60" y="152" font-family="sans-serif" font-size="15" fill="#1f2328">big-project</text>
+  <rect x="200" y="134" width="56" height="26" rx="13" fill="#ddf4ff" stroke="#0969da" stroke-width="2"/>
+  <rect x="211" y="142" width="11" height="11" rx="2" fill="none" stroke="#0969da" stroke-width="2"/>
+  <text x="240" y="153" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#0969da">2</text>
+  <line x1="40" y1="176" x2="320" y2="176" stroke="#eaeef2" stroke-width="2"/>
+  <!-- row 2 -->
+  <text x="60" y="208" font-family="sans-serif" font-size="15" fill="#1f2328">tiny-site</text>
+  <line x1="40" y1="232" x2="320" y2="232" stroke="#eaeef2" stroke-width="2"/>
+  <!-- row 3 -->
+  <text x="60" y="264" font-family="sans-serif" font-size="15" fill="#1f2328">notes</text>
+  <text x="60" y="312" font-family="sans-serif" font-size="14" fill="#57606a">a badge = boxes inside</text>
+
+  <!-- arrow -->
+  <path d="M 262 147 C 320 120, 340 120, 386 138" fill="none" stroke="#0969da" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#arrowb)"/>
+
+  <!-- details card -->
+  <rect x="380" y="76" width="290" height="256" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+  <text x="400" y="106" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">Repository submodules</text>
+  <line x1="380" y1="120" x2="670" y2="120" stroke="#d0d7de" stroke-width="2"/>
+  <text x="400" y="146" font-family="sans-serif" font-size="14" fill="#57606a">big-project has 2 submodules.</text>
+  <!-- submodule row 1 -->
+  <rect x="396" y="162" width="258" height="64" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="410" y="188" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">toys/robot-kit</text>
+  <rect x="410" y="198" width="170" height="22" rx="11" fill="#1f883d"/>
+  <text x="495" y="214" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#ffffff">Clone as repository</text>
+  <!-- submodule row 2 -->
+  <rect x="396" y="238" width="258" height="64" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="410" y="264" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">toys/blocks</text>
+  <rect x="410" y="274" width="170" height="22" rx="11" fill="#1f883d"/>
+  <text x="495" y="290" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#ffffff">Clone as repository</text>
+
+  <text x="350" y="372" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#1f2328">Click the number badge to peek inside before anything downloads.</text>
+</svg>

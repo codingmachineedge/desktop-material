@@ -52,3 +52,42 @@ describe('wiki function screenshot catalog', () => {
     }
   })
 })
+
+const submodulesGuidePath = join(root, 'docs', 'wiki', 'Submodules.md')
+const illustrationDirectory = join(root, 'docs', 'assets', 'illustrations')
+const rawIllustrationPrefix =
+  'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/'
+
+describe('wiki submodules guide', () => {
+  it('links the beginner submodule guide from the wiki home and user guide', () => {
+    for (const file of ['Home.md', 'User-Guide.md']) {
+      const markdown = readFileSync(join(root, 'docs', 'wiki', file), 'utf8')
+      assert.match(markdown, /\[Submodules\]\(Submodules\)/)
+    }
+  })
+
+  it('renders every tracked illustration exactly once from raw main', () => {
+    const guide = readFileSync(submodulesGuidePath, 'utf8')
+    const renderedAssets = [
+      ...guide.matchAll(/!\[[^\]]+\]\((https:\/\/[^)]+\.svg)\)/g),
+    ].map(([, url]) => {
+      assert.ok(url.startsWith(rawIllustrationPrefix), url)
+      return url.slice(rawIllustrationPrefix.length)
+    })
+    const assets = readdirSync(illustrationDirectory)
+      .filter(name => name.endsWith('.svg'))
+      .sort()
+
+    assert.ok(assets.length > 0, 'expected tracked submodule illustrations')
+    assert.equal(new Set(renderedAssets).size, renderedAssets.length)
+    assert.deepEqual([...renderedAssets].sort(), assets)
+    for (const asset of renderedAssets) {
+      assert.ok(existsSync(join(illustrationDirectory, asset)), asset)
+    }
+  })
+
+  it('reuses the tracked Add Submodule screenshot', () => {
+    const guide = readFileSync(submodulesGuidePath, 'utf8')
+    assert.ok(guide.includes(`${rawImagePrefix}add-submodule-dialog.png`))
+  })
+})

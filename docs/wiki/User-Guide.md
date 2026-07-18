@@ -824,7 +824,11 @@ list.
   Enterprise, GitLab, or Bitbucket with the appropriate exact account, or enter an HTTPS, SSH, or
   local Git URL. Review the repository-relative checkout path and optional branch; Desktop rechecks
   duplicate/occupied destinations immediately before Git, reports bounded clone progress, and lets
-  you cancel the running operation before refreshing the managed list.
+  you cancel the running operation before refreshing the managed list. The same managed list opens
+  as the Submodule Manager from the Tools tab's **Nested repositories** category, and clone-list
+  rows show a submodule badge whose details dialog can clone any submodule as its own repository.
+  New to submodules? The beginner-friendly [Submodules](Submodules) page walks the whole workflow
+  in plain words and pictures.
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution. Build & Run discovers common nested projects across Node, Deno, Rust, Go, .NET, Python, JVM, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; choose a profile by its displayed project folder when several projects share a language or toolchain.
 - Open **Repository tools** for the full set of named, reviewed Git functions. Diagnostics cover the
   status summary, repository health check, commit-signature audit, branch sync overview, contributor
@@ -898,4 +902,4 @@ returns provider credentials. See [Agent API](Agent-API) for command and securit
 
 ---
 
-**Next:** [Automation](Automation) · [Regex Guide](Regex-Guide) · [Developer Guide](Developer-Guide)
+**Next:** [Automation](Automation) · [Submodules](Submodules) · [Regex Guide](Regex-Guide) · [Developer Guide](Developer-Guide)

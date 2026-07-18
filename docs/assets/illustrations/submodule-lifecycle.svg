@@ -1,0 +1,41 @@
+<svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three panels: clone brings an empty box, init gives it a name tag, update fills it with the right toys">
+  <defs>
+    <marker id="arrowl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="698" height="378" rx="16" fill="#f8fafc" stroke="#d0d7de" stroke-width="2"/>
+  <text x="350" y="44" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1f2328">Three steps bring a submodule to life</text>
+
+  <!-- panel 1: clone -->
+  <rect x="40" y="70" width="190" height="230" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+  <text x="135" y="100" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1f2328">1. Clone</text>
+  <rect x="75" y="126" width="120" height="90" rx="10" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <text x="135" y="176" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1d4ed8">empty</text>
+  <text x="135" y="248" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">The box arrives,</text>
+  <text x="135" y="268" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">still empty.</text>
+
+  <line x1="236" y1="180" x2="256" y2="180" stroke="#57606a" stroke-width="3" marker-end="url(#arrowl)"/>
+
+  <!-- panel 2: init -->
+  <rect x="262" y="70" width="190" height="230" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+  <text x="357" y="100" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1f2328">2. Init</text>
+  <rect x="297" y="126" width="120" height="90" rx="10" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="2.5"/>
+  <rect x="312" y="150" width="90" height="38" rx="5" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <text x="357" y="174" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1f2328">robot-kit</text>
+  <text x="357" y="248" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">It gets its</text>
+  <text x="357" y="268" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">name tag.</text>
+
+  <line x1="458" y1="180" x2="478" y2="180" stroke="#57606a" stroke-width="3" marker-end="url(#arrowl)"/>
+
+  <!-- panel 3: update -->
+  <rect x="484" y="70" width="190" height="230" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+  <text x="579" y="100" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1f2328">3. Update</text>
+  <rect x="519" y="126" width="120" height="90" rx="10" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="2.5"/>
+  <circle cx="551" cy="188" r="16" fill="#ef4444" stroke="#b91c1c" stroke-width="2.5"/>
+  <rect x="577" y="172" width="32" height="32" rx="6" fill="#22c55e" stroke="#15803d" stroke-width="2.5"/>
+  <text x="579" y="248" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">The right toys</text>
+  <text x="579" y="268" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">go in.</text>
+
+  <text x="350" y="344" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#1f2328">The Clone and Update buttons do all three steps for you.</text>
+</svg>

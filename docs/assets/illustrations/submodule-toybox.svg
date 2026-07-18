@@ -1,0 +1,31 @@
+<svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A big toy box labelled my-project holding loose toys and a smaller labelled toy box called robot-kit">
+  <rect x="1" y="1" width="698" height="398" rx="16" fill="#f8fafc" stroke="#d0d7de" stroke-width="2"/>
+  <text x="350" y="46" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1f2328">A toy box that lives inside another toy box</text>
+
+  <!-- big box rim -->
+  <rect x="58" y="96" width="584" height="34" rx="10" fill="#fcd34d" stroke="#b45309" stroke-width="3"/>
+  <text x="350" y="119" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#7c2d12">my-project — your repository (project folder)</text>
+  <!-- big box body -->
+  <rect x="70" y="130" width="560" height="210" rx="12" fill="#fde68a" stroke="#b45309" stroke-width="3"/>
+
+  <!-- your files (toys) -->
+  <text x="205" y="180" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#7c2d12">your own files</text>
+  <circle cx="150" cy="285" r="28" fill="#ef4444" stroke="#b91c1c" stroke-width="3"/>
+  <rect x="196" y="257" width="52" height="52" rx="8" fill="#22c55e" stroke="#15803d" stroke-width="3"/>
+  <rect x="258" y="281" width="44" height="30" rx="6" fill="#a78bfa" stroke="#6d28d9" stroke-width="3"/>
+
+  <!-- small box -->
+  <rect x="372" y="158" width="216" height="26" rx="8" fill="#93c5fd" stroke="#1d4ed8" stroke-width="3"/>
+  <rect x="380" y="184" width="200" height="136" rx="10" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="3"/>
+  <!-- its label -->
+  <rect x="402" y="204" width="156" height="46" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <text x="480" y="224" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">robot-kit</text>
+  <text x="480" y="242" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#57606a">a submodule</text>
+  <!-- its own list -->
+  <rect x="430" y="262" width="100" height="46" rx="4" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <line x1="440" y1="275" x2="520" y2="275" stroke="#94a3b8" stroke-width="3"/>
+  <line x1="440" y1="285" x2="520" y2="285" stroke="#94a3b8" stroke-width="3"/>
+  <line x1="440" y1="295" x2="500" y2="295" stroke="#94a3b8" stroke-width="3"/>
+
+  <text x="350" y="372" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#1f2328">The small box keeps its own label and its own list of what is inside.</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A luggage tag for the robot-kit box with the old address crossed out, a new address written in, a branch line, and three small setting chips">
+  <rect x="1" y="1" width="698" height="398" rx="16" fill="#f8fafc" stroke="#d0d7de" stroke-width="2"/>
+  <text x="350" y="44" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1f2328">Change the label on the box</text>
+
+  <!-- string to the tag -->
+  <path d="M 60 70 C 90 120, 100 130, 122 142" fill="none" stroke="#92400e" stroke-width="3"/>
+  <!-- luggage tag -->
+  <rect x="100" y="90" width="500" height="240" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="3"/>
+  <circle cx="130" cy="120" r="10" fill="#f8fafc" stroke="#64748b" stroke-width="3"/>
+  <text x="160" y="126" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1f2328">robot-kit — where does it come from?</text>
+
+  <text x="130" y="164" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">Remote URL</text>
+  <text x="150" y="192" font-family="sans-serif" font-size="15" fill="#94a3b8">old-toyshop.example/robot-kit</text>
+  <line x1="146" y1="187" x2="368" y2="187" stroke="#dc2626" stroke-width="2.5"/>
+  <text x="150" y="220" font-family="sans-serif" font-size="15" font-weight="bold" fill="#116329">github.com/toys/robot-kit</text>
+  <polyline points="346,212 353,219 366,204" fill="none" stroke="#116329" stroke-width="3"/>
+
+  <text x="130" y="256" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1f2328">Branch</text>
+  <text x="206" y="256" font-family="sans-serif" font-size="15" fill="#1f2328">main</text>
+  <text x="266" y="256" font-family="sans-serif" font-size="14" fill="#57606a">(empty = follow the shop's front shelf)</text>
+
+  <rect x="130" y="276" width="150" height="28" rx="14" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="205" y="295" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">Update: checkout</text>
+  <rect x="290" y="276" width="130" height="28" rx="14" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="355" y="295" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">Ignore: none</text>
+  <rect x="430" y="276" width="150" height="28" rx="14" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="505" y="295" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#1f2328">Shallow: default</text>
+
+  <text x="350" y="360" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#1f2328">Configure rewrites the address tag. Save, and the box knows its new home.</text>
+</svg>
