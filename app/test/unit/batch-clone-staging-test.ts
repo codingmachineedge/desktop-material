@@ -148,6 +148,63 @@ describe('batch clone staging and recovery', () => {
     }
   })
 
+  it('cleans an owned staged checkout after adopting a matching destination', async () => {
+    const root = await temporaryRoot('desktop-material-clone-adopted-')
+    try {
+      const item = itemFor(root, '9')
+      const manager = new FileBatchCloneStagingManager()
+      const prepared = await manager.prepare(item)
+      assert.equal(prepared.kind, 'clone')
+      if (prepared.kind !== 'clone') {
+        return
+      }
+
+      await mkdir(prepared.clonePath)
+      await writeFile(join(prepared.clonePath, 'partial-download'), 'partial')
+      await initializeRepository(item.path, item.url)
+
+      assert.equal(await manager.cleanupPromoted(item), true)
+      assert.equal(
+        await doesNotExist(getBatchCloneStagingPaths(item).recoveryRootPath),
+        true
+      )
+      assert.equal(await doesNotExist(item.path), false)
+      assert.equal(
+        await readFile(join(item.path, 'README.md'), 'utf8'),
+        'staged clone\n'
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('retains owned staging when an adopted destination does not match', async () => {
+    const root = await temporaryRoot('desktop-material-clone-adopt-refused-')
+    try {
+      const item = itemFor(root, '8')
+      const manager = new FileBatchCloneStagingManager()
+      const prepared = await manager.prepare(item)
+      assert.equal(prepared.kind, 'clone')
+      if (prepared.kind !== 'clone') {
+        return
+      }
+
+      await mkdir(prepared.clonePath)
+      const partialPath = join(prepared.clonePath, 'partial-download')
+      await writeFile(partialPath, 'keep')
+      await initializeRepository(
+        item.path,
+        'https://github.com/desktop-material/different.git'
+      )
+
+      assert.equal(await manager.cleanupPromoted(item), false)
+      assert.equal(await readFile(partialPath, 'utf8'), 'keep')
+      assert.equal(await doesNotExist(item.path), false)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('accepts a successful empty repository clone', async () => {
     const root = await temporaryRoot('desktop-material-clone-empty-')
     try {

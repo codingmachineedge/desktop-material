@@ -28,6 +28,8 @@ const fullSHA = /^[0-9a-f]{40}$/i
 const ProfileLockRetryMs = 25
 const ProfileLockWaitMs = 5000
 const ProfileLockStaleMs = 30000
+const ProfileHistoryScanBatchSize = 100
+const ProfileTabsPath = 'tabs.json'
 
 /** Construct a lightweight Repository model pointing at a profile directory. */
 export function profileRepository(path: string): Repository {
@@ -314,19 +316,10 @@ export class ProfileCommitQueue {
 /** Restricts a history read to commits relevant to one profile subject. */
 export interface IProfileHistoryFilter {
   /**
-   * Show only commits whose `tabs.json` diff added or removed a line matching
-   * this tab id. See {@link getProfileHistory} for the best-effort caveat.
+   * Show only commits where this tab's serialized object or presence differs
+   * from its first parent. The id is always compared as a literal string.
    */
   readonly tabId: string
-}
-
-/**
- * Escape a literal string for use as a git basic (POSIX) regular expression,
- * the flavour `git log -G` uses by default. Tab ids are UUIDs today and contain
- * no metacharacters, but escaping keeps the pickaxe correct for any future id.
- */
-function escapeBasicRegex(value: string): string {
-  return value.replace(/[.*[\]\\^$]/g, '\\$&')
 }
 
 /** Return one bounded, newest-first page of the profile repository's history. */
@@ -342,36 +335,220 @@ export async function getProfileHistory(
     Math.max(1, normalizeNonNegativeInteger(limit))
   )
 
-  // A tab scope is best-effort: every tab shares tabs.json, so the pickaxe only
-  // surfaces commits whose tabs.json diff added or removed a line matching the
-  // tab id (opening, closing, reordering, or switching to the tab). A change
-  // that only edits an existing tab's style leaves the id line as unchanged
-  // context and will not appear. getCommits appends its own trailing '--', so
-  // the extra pathspec here is a harmless literal that matches nothing.
-  const scopedArgs =
-    filter === undefined
-      ? []
-      : ['-G', escapeBasicRegex(filter.tabId), '--', 'tabs.json']
+  if (filter !== undefined) {
+    return getTabProfileHistory(
+      repository,
+      normalizedSkip,
+      normalizedLimit,
+      filter.tabId
+    )
+  }
 
   const [commits, allCommits] = await Promise.all([
-    getCommits(repository, 'HEAD', normalizedLimit, normalizedSkip, scopedArgs),
-    getCommits(repository, 'HEAD', undefined, undefined, scopedArgs),
+    getCommits(repository, 'HEAD', normalizedLimit, normalizedSkip),
+    getCommits(repository, 'HEAD'),
   ])
   const total = allCommits.length
 
-  // undo/redo replay trailers across the whole profile timeline, so their
-  // availability is only meaningful for an unfiltered read. A scoped view is
-  // read-only and never offers them.
-  const traversal =
-    filter === undefined ? buildProfileHistoryTraversal(allCommits) : null
+  const traversal = buildProfileHistoryTraversal(allCommits)
 
   return {
     entries: commits.map(toProfileHistoryEntry),
     total,
     hasMore: normalizedSkip + commits.length < total,
-    canUndo: traversal !== null && traversal.undoable.length > 0,
-    canRedo: traversal !== null && traversal.redoable.length > 0,
+    canUndo: traversal.undoable.length > 0,
+    canRedo: traversal.redoable.length > 0,
   }
+}
+
+/**
+ * Return an exact tab-scoped page without retaining the complete timeline.
+ *
+ * The pathspec first removes commits that cannot have changed a tab object.
+ * Candidate commits are then processed in fixed-size batches. For each commit
+ * we batch-read `tabs.json` at that commit and its first parent, find the tab by
+ * literal id, and compare `JSON.stringify` output. This catches style and label
+ * edits where the id line itself is unchanged while excluding changes to other
+ * tabs, active-tab state, and array order.
+ *
+ * The complete candidate history still has to be scanned to produce the exact
+ * `total`, but only one batch of commits/blobs and the requested page are held
+ * at a time. Profile repositories are linear in normal operation; first-parent
+ * comparison also gives merge commits an unambiguous commit boundary.
+ */
+async function getTabProfileHistory(
+  repository: Repository,
+  skip: number,
+  limit: number,
+  tabId: string
+): Promise<IProfileHistoryPage> {
+  const entries = new Array<IProfileHistoryEntry>()
+  let candidateSkip = 0
+  let total = 0
+
+  while (true) {
+    // getCommits appends its own trailing `--`; after this explicit separator
+    // that becomes a harmless second literal pathspec.
+    const candidates = await getCommits(
+      repository,
+      'HEAD',
+      ProfileHistoryScanBatchSize,
+      candidateSkip,
+      ['--full-history', '--', ProfileTabsPath]
+    )
+    if (candidates.length === 0) {
+      break
+    }
+
+    const snapshots = await readProfileTabsSnapshots(repository, candidates)
+    for (const commit of candidates) {
+      const current = serializedTabAtSnapshot(snapshots.get(commit.sha), tabId)
+      const parentSha = commit.parentSHAs[0]
+      const parent =
+        parentSha === undefined
+          ? null
+          : serializedTabAtSnapshot(snapshots.get(parentSha), tabId)
+
+      if (current === parent) {
+        continue
+      }
+
+      if (total >= skip && entries.length < limit) {
+        entries.push(toProfileHistoryEntry(commit))
+      }
+      total++
+    }
+
+    candidateSkip += candidates.length
+    if (candidates.length < ProfileHistoryScanBatchSize) {
+      break
+    }
+  }
+
+  return {
+    entries,
+    total,
+    hasMore: skip + entries.length < total,
+    // Scoped history is intentionally read-only because mutations apply to
+    // the whole profile rather than to a single tab.
+    canUndo: false,
+    canRedo: false,
+  }
+}
+
+/** Read current and first-parent tabs.json blobs with one Git process. */
+async function readProfileTabsSnapshots(
+  repository: Repository,
+  commits: ReadonlyArray<Commit>
+): Promise<ReadonlyMap<string, string | null>> {
+  const refs = new Set<string>()
+  for (const commit of commits) {
+    refs.add(commit.sha)
+    const parentSha = commit.parentSHAs[0]
+    if (parentSha !== undefined) {
+      refs.add(parentSha)
+    }
+  }
+
+  const orderedRefs = [...refs]
+  const result = await git(
+    ['cat-file', '--batch'],
+    repository.path,
+    'profileTabsHistorySnapshots',
+    {
+      encoding: 'buffer',
+      stdin: `${orderedRefs
+        .map(ref => `${ref}:${ProfileTabsPath}`)
+        .join('\n')}\n`,
+    }
+  )
+
+  return parseProfileTabsSnapshots(result.stdout, orderedRefs)
+}
+
+/** Parse `git cat-file --batch` output in request order. */
+function parseProfileTabsSnapshots(
+  output: Buffer,
+  refs: ReadonlyArray<string>
+): ReadonlyMap<string, string | null> {
+  const snapshots = new Map<string, string | null>()
+  let offset = 0
+
+  for (const ref of refs) {
+    const headerEnd = output.indexOf(0x0a, offset)
+    if (headerEnd < 0) {
+      throw new Error('Unexpected end of profile tabs history batch')
+    }
+
+    const header = output.toString('utf8', offset, headerEnd)
+    offset = headerEnd + 1
+    if (header.endsWith(' missing')) {
+      snapshots.set(ref, null)
+      continue
+    }
+
+    const match = /^[0-9a-f]+ blob ([0-9]+)$/.exec(header)
+    if (match === null) {
+      throw new Error(`Unexpected profile tabs history object: ${header}`)
+    }
+
+    const size = Number(match[1])
+    const contentEnd = offset + size
+    if (
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
+      contentEnd >= output.length ||
+      output[contentEnd] !== 0x0a
+    ) {
+      throw new Error('Invalid profile tabs history object size')
+    }
+
+    snapshots.set(ref, output.toString('utf8', offset, contentEnd))
+    offset = contentEnd + 1
+  }
+
+  return snapshots
+}
+
+/** Return the selected tab object's exact JSON serialization, or absence. */
+function serializedTabAtSnapshot(
+  contents: string | null | undefined,
+  tabId: string
+): string | null {
+  if (contents === null || contents === undefined) {
+    return null
+  }
+
+  let file: unknown
+  try {
+    file = JSON.parse(contents)
+  } catch {
+    return null
+  }
+
+  if (!isRecord(file)) {
+    return null
+  }
+
+  const states = [
+    file,
+    ...(isRecord(file.windows) ? Object.values(file.windows) : []),
+  ]
+  for (const state of states) {
+    if (!isRecord(state) || !Array.isArray(state.tabs)) {
+      continue
+    }
+    const tab = state.tabs.find(value => isRecord(value) && value.id === tabId)
+    if (tab !== undefined) {
+      return JSON.stringify(tab)
+    }
+  }
+
+  return null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Load changed paths for a commit only when its row is expanded. */

@@ -13,6 +13,7 @@ import {
   validateSSHWorkingCopyDefinition,
 } from '../../lib/ssh/ssh-working-copy'
 import { Button } from '../lib/button'
+import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { Select } from '../lib/select'
 import { TextBox } from '../lib/text-box'
 import { Octicon } from '../octicons'
@@ -41,6 +42,7 @@ interface ISSHWorkingCopyDraft {
   readonly authenticationReference: string
   readonly destinationPath: string
   readonly sourceRemoteName: string
+  readonly deployOnPush: boolean
 }
 
 interface ISSHWorkingCopyManagerState {
@@ -68,6 +70,7 @@ const createDraft = (sourceRemoteName = ''): ISSHWorkingCopyDraft => ({
   authenticationReference: '',
   destinationPath: '',
   sourceRemoteName,
+  deployOnPush: false,
 })
 
 const createDraftFromDefinition = (
@@ -81,6 +84,7 @@ const createDraftFromDefinition = (
   authenticationReference: definition.authenticationReference ?? '',
   destinationPath: definition.destinationPath,
   sourceRemoteName: definition.sourceRemoteName ?? '',
+  deployOnPush: definition.deployOnPush ?? false,
 })
 
 const operationLabels: Record<SSHWorkingCopyAction, string> = {
@@ -90,6 +94,7 @@ const operationLabels: Record<SSHWorkingCopyAction, string> = {
   fetch: 'Fetching remote working copy',
   pull: 'Pulling remote working copy',
   push: 'Pushing remote working copy',
+  deploy: 'Deploying Docker Compose',
 }
 
 /** Manage a canonical checkout on one SSH host without persisting its secrets. */
@@ -149,6 +154,9 @@ export class SSHWorkingCopyManager extends React.Component<
     this.updateDraft({ destinationPath })
   private onSourceRemoteChanged = (event: React.FormEvent<HTMLSelectElement>) =>
     this.updateDraft({ sourceRemoteName: event.currentTarget.value })
+  private onDeployOnPushChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => this.updateDraft({ deployOnPush: event.currentTarget.checked })
 
   private onSavedHostChanged = (event: React.FormEvent<HTMLSelectElement>) => {
     const id = event.currentTarget.value
@@ -182,6 +190,7 @@ export class SSHWorkingCopyManager extends React.Component<
       authenticationReference: this.state.draft.authenticationReference,
       destinationPath: this.state.draft.destinationPath,
       sourceRemoteName: this.state.draft.sourceRemoteName,
+      deployOnPush: this.state.draft.deployOnPush,
     })
   }
 
@@ -346,6 +355,7 @@ export class SSHWorkingCopyManager extends React.Component<
   private onFetch = () => this.runAction('fetch')
   private onPull = () => this.runAction('pull')
   private onPush = () => this.runAction('push')
+  private onDeploy = () => this.runAction('deploy')
   private onCancelOperation = () => {
     this.operationAbortController?.abort()
     this.setState({ status: 'Cancelling SSH operation…' })
@@ -446,7 +456,7 @@ export class SSHWorkingCopyManager extends React.Component<
           />
           <Select
             className="ssh-source-remote"
-            label="Source remote to clone"
+            label="Source remote to clone and deploy"
             value={draft.sourceRemoteName}
             disabled={busy || sourceRemotes.length === 0}
             onChange={this.onSourceRemoteChanged}
@@ -472,6 +482,22 @@ export class SSHWorkingCopyManager extends React.Component<
           here. The SSH host must already be able to access that source; Desktop
           does not forward your local SSH agent. Removing a host removes only
           this non-secret metadata.
+        </p>
+
+        <Checkbox
+          className="ssh-deploy-on-push"
+          label="Deploy Docker Compose after pushes to this source remote"
+          value={
+            draft.deployOnPush ? CheckboxValue.On : CheckboxValue.Off
+          }
+          disabled={busy || sourceRemotes.length === 0}
+          onChange={this.onDeployOnPushChanged}
+        />
+        <p className="ssh-working-copy-deploy-note">
+          Opt in to fast-forward the matching checked-out branch on this host,
+          then run <code>docker compose up --detach --build</code>. Desktop
+          refuses branch mismatches and non-fast-forward updates; remote command
+          output is bounded and redacted before it is shown.
         </p>
 
         <div className="ssh-working-copy-metadata-actions">
@@ -504,6 +530,9 @@ export class SSHWorkingCopyManager extends React.Component<
           </Button>
           <Button disabled={busy} onClick={this.onPush}>
             Push
+          </Button>
+          <Button disabled={busy} onClick={this.onDeploy}>
+            <Octicon symbol={octicons.container} /> Deploy Docker now
           </Button>
           {runningAction !== null && (
             <Button onClick={this.onCancelOperation}>

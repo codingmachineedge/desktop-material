@@ -8,7 +8,7 @@ import {
 } from '../../src/lib/api'
 import { APIError } from '../../src/lib/http'
 import {
-  GitHubNotificationsMaxItems,
+  GitHubNotificationsClearConcurrency,
   GitHubNotificationsStore,
   IGitHubNotificationsAPI,
   githubNotificationsError,
@@ -168,7 +168,7 @@ describe('GitHubNotificationsStore', () => {
     store.dispose()
   })
 
-  it('caps pagination and de-duplicates thread ids', async () => {
+  it('loads every page automatically and de-duplicates thread ids without truncation', async () => {
     const calls = new Array<number>()
     const store = new GitHubNotificationsStore([account('first', 1)], () => ({
       fetchNotifications: async options => {
@@ -180,24 +180,130 @@ describe('GitHubNotificationsStore', () => {
         if (options.page === 2) {
           items[0] = notification('0')
         }
-        return page(items, { hasNextPage: true })
+        return page(items, { hasNextPage: options.page < 5 })
       },
       ...inertMutations,
     }))
 
     await store.start()
-    await store.loadMore()
-    await store.loadMore()
-    await store.loadMore()
-    await store.loadMore()
 
-    assert.deepEqual(calls, [1, 2, 3, 4])
-    assert(store.getState().notifications.length <= GitHubNotificationsMaxItems)
+    assert.deepEqual(calls, [1, 2, 3, 4, 5])
+    assert.equal(store.getState().notifications.length, 249)
     assert.equal(
       new Set(store.getState().notifications.map(item => item.id)).size,
       store.getState().notifications.length
     )
-    assert.equal(store.getState().hasMore, false)
+    assert.deepEqual(
+      store
+        .getState()
+        .notifications.slice(0, 3)
+        .map(item => item.id),
+      ['0', '1', '2']
+    )
+    assert.deepEqual(
+      store
+        .getState()
+        .notifications.slice(-3)
+        .map(item => item.id),
+      ['247', '248', '249']
+    )
+    store.dispose()
+  })
+
+  it('clears the complete inbox with bounded concurrency and retains failures in order', async () => {
+    const items = Array.from({ length: 11 }, (_, index) =>
+      notification(String(index))
+    )
+    const calls = new Array<string>()
+    let active = 0
+    let maximumActive = 0
+    const store = new GitHubNotificationsStore([account('first', 1)], () => ({
+      fetchNotifications: async () => page(items),
+      markNotificationThreadRead: async () => {},
+      markNotificationThreadDone: async id => {
+        calls.push(id)
+        active++
+        maximumActive = Math.max(maximumActive, active)
+        await new Promise<void>(resolve => setImmediate(resolve))
+        active--
+        if (id === '3' || id === '8') {
+          throw new Error('fixture failure')
+        }
+      },
+    }))
+
+    await store.start()
+    const result = await store.markAllThreadsDone()
+
+    assert.equal(result.attempted, 11)
+    assert.equal(result.cleared, 9)
+    assert.deepEqual(result.failedIds, ['3', '8'])
+    assert.equal(result.canceled, false)
+    assert.equal(new Set(calls).size, 11)
+    assert(maximumActive > 1)
+    assert(maximumActive <= GitHubNotificationsClearConcurrency)
+    assert.deepEqual(
+      store.getState().notifications.map(item => item.id),
+      ['3', '8']
+    )
+    assert.match(
+      store.getState().error?.message ?? '',
+      /2 GitHub notifications/
+    )
+    assert.equal(store.getState().clearingAll, false)
+    store.dispose()
+  })
+
+  it('aborts a clear-all operation when the account context changes', async () => {
+    const first = account('first', 1)
+    const second = account('second', 2)
+    const signals = new Array<AbortSignal>()
+    const store = new GitHubNotificationsStore([first, second], selected => ({
+      fetchNotifications: async () =>
+        page(
+          selected.id === first.id
+            ? Array.from({ length: 8 }, (_, index) =>
+                notification(`first-${index}`)
+              )
+            : [notification('second')]
+        ),
+      markNotificationThreadRead: async () => {},
+      markNotificationThreadDone: async (_id, signal) => {
+        if (selected.id !== first.id || signal === undefined) {
+          return
+        }
+        signals.push(signal)
+        await new Promise<void>((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true }
+          )
+        })
+      },
+    }))
+
+    await store.start()
+    const clearing = store.markAllThreadsDone()
+    for (
+      let attempt = 0;
+      attempt < 10 && signals.length < GitHubNotificationsClearConcurrency;
+      attempt++
+    ) {
+      await Promise.resolve()
+    }
+    assert.equal(signals.length, GitHubNotificationsClearConcurrency)
+
+    await store.selectAccount(getAccountKey(second))
+    const result = await clearing
+
+    assert.equal(result.canceled, true)
+    assert(signals.every(signal => signal.aborted))
+    assert.deepEqual(
+      store.getState().notifications.map(item => item.id),
+      ['second']
+    )
+    assert.equal(store.getState().clearingAll, false)
     store.dispose()
   })
 

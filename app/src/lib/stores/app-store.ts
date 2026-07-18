@@ -533,6 +533,10 @@ import {
 } from '../../models/multi-commit-operation'
 import { reorder } from '../git/reorder'
 import { UseWindowsOpenSSHKey } from '../ssh/ssh'
+import {
+  loadSSHDockerDeploymentsForPush,
+  runSSHWorkingCopyAction,
+} from '../ssh/ssh-working-copy'
 import { isConflictsFlow } from '../multi-commit-operation'
 import { clamp } from '../clamp'
 import { EndpointToken } from '../endpoint-token'
@@ -7075,6 +7079,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       const remoteName = branch.upstreamRemoteName || remote.name
+      const pushedBranchName = branch.upstreamWithoutRemote ?? branch.name
 
       const pushTitle = `Pushing to ${remoteName}`
 
@@ -7206,6 +7211,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
           await this.refreshBranchProtectionState(repository)
 
           await this._refreshRepository(repository)
+
+          await this.deployDockerAfterPush(
+            repository,
+            remoteName,
+            pushedBranchName
+          )
         },
         { retryAction }
       )
@@ -7223,6 +7234,63 @@ export class AppStore extends TypedBaseStore<IAppState> {
         options
       )
     })
+  }
+
+  /**
+   * Run only explicitly enabled Docker deployments whose saved SSH checkout
+   * follows the remote that was just pushed. A deployment failure is reported
+   * independently and never rewrites a successful Git push as a push failure.
+   */
+  private async deployDockerAfterPush(
+    repository: Repository,
+    remoteName: string,
+    branchName: string
+  ): Promise<void> {
+    const deployments = loadSSHDockerDeploymentsForPush(
+      repository.path,
+      remoteName
+    )
+
+    for (const deployment of deployments) {
+      this.updatePushPullFetchProgress(repository, {
+        kind: 'generic',
+        title: `Deploying Docker to ${deployment.label}`,
+        description: `Fast-forwarding ${branchName} over SSH`,
+        value: 1,
+      })
+
+      try {
+        await runSSHWorkingCopyAction(
+          repository.path,
+          deployment,
+          'deploy',
+          undefined,
+          undefined,
+          branchName
+        )
+        this.postNotification({
+          kind: 'info',
+          title: 'Docker deployment complete',
+          body: `${repository.name} deployed to ${deployment.label} after pushing ${branchName}.`,
+          repositoryId: repository.id,
+          action: { kind: 'open-repository', repositoryId: repository.id },
+        })
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'SSH deployment failed.'
+        log.error(
+          `Docker deployment to ${deployment.label} failed after push`,
+          new Error(message)
+        )
+        this.postNotification({
+          kind: 'app-error',
+          title: 'Docker deployment failed',
+          body: `${deployment.label}: ${message.slice(0, 600)}`,
+          repositoryId: repository.id,
+          action: { kind: 'open-repository', repositoryId: repository.id },
+        })
+      }
+    }
   }
 
   private async withIsCommitting(
@@ -7845,8 +7913,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
-  public _dismissBatchClone(): void {
-    void this.batchCloneStore.dismiss()
+  public _dismissBatchClone(): Promise<boolean> {
+    return this.batchCloneStore.dismiss()
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */

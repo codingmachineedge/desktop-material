@@ -95,6 +95,41 @@ class ToggleJournal extends MemoryJournal {
   }
 }
 
+class DeferredJournal extends MemoryJournal {
+  private deferredSave:
+    | {
+        readonly started: () => void
+        readonly blocked: Promise<void>
+      }
+    | undefined
+
+  public deferNextSave(): {
+    readonly started: Promise<void>
+    readonly release: () => void
+  } {
+    let markStarted: () => void = () => {}
+    const started = new Promise<void>(resolve => {
+      markStarted = resolve
+    })
+    let release: () => void = () => {}
+    const blocked = new Promise<void>(resolve => {
+      release = resolve
+    })
+    this.deferredSave = { started: markStarted, blocked }
+    return { started, release }
+  }
+
+  public override async save(snapshot: IBatchCloneJournalSnapshot) {
+    const deferred = this.deferredSave
+    this.deferredSave = undefined
+    if (deferred !== undefined) {
+      deferred.started()
+      await deferred.blocked
+    }
+    await super.save(snapshot)
+  }
+}
+
 function stagingManager(
   overrides: Partial<IBatchCloneStagingManager> = {}
 ): IBatchCloneStagingManager {
@@ -975,6 +1010,31 @@ describe('batch clone journal and recovery', () => {
     assert.equal(attempts, 3)
   })
 
+  it('retries a journal clear through a transient file lock', async () => {
+    const temporaryRoot = await mkdtemp(
+      join(tmpdir(), 'desktop-material-clone-clear-retry-')
+    )
+    try {
+      let attempts = 0
+      const journal = new FileBatchCloneJournal(temporaryRoot, {
+        readText: async () => null,
+        writeText: async () => undefined,
+        clear: async () => {
+          attempts += 1
+          if (attempts < 3) {
+            throw Object.assign(new Error('locked'), { code: 'EBUSY' })
+          }
+        },
+      })
+
+      await journal.clear()
+
+      assert.equal(attempts, 3)
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true })
+    }
+  })
+
   it('does not retry a non-transient journal write failure', async () => {
     let attempts = 0
     const journal = new FileBatchCloneJournal('/user-data', {
@@ -1035,6 +1095,148 @@ describe('batch clone journal and recovery', () => {
     assert.ok(discardCalls >= 1)
   })
 
+  it('cleans only skipped staging represented by each durable snapshot', async () => {
+    const firstRecoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: '1'.repeat(48),
+    }
+    const secondRecoveryItem: IBatchCloneItem = {
+      ...second,
+      recoveryId: '2'.repeat(48),
+    }
+    const journal = new DeferredJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [firstRecoveryItem, secondRecoveryItem],
+      statuses: [
+        [first.path, { kind: 'review' }],
+        [second.path, { kind: 'review' }],
+      ],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    const discarded: string[] = []
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => 'review',
+      stagingManager({
+        discard: async item => {
+          discarded.push(item.path)
+          if (item.path === first.path) {
+            const durableStatuses = new Map(journal.saved?.statuses ?? [])
+            assert.equal(durableStatuses.get(first.path)?.kind, 'skipped')
+            assert.equal(durableStatuses.get(second.path)?.kind, 'review')
+          }
+          return true
+        },
+      })
+    )
+    await store.initialize()
+
+    const deferred = journal.deferNextSave()
+    const firstSkip = store.skipItem(first.path)
+    await deferred.started
+    const secondSkip = store.skipItem(second.path)
+    deferred.release()
+    await Promise.all([firstSkip, secondSkip])
+
+    assert.deepEqual(discarded, [first.path, second.path])
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'skipped')
+    assert.equal(store.getState()?.statuses.get(second.path)?.kind, 'skipped')
+  })
+
+  it('serializes skip and adoption while a journal save is deferred', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: '3'.repeat(48),
+    }
+    const journal = new DeferredJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[first.path, { kind: 'review' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    let inspections = 0
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => {
+        inspections += 1
+        return 'matching-repository'
+      },
+      stagingManager()
+    )
+    await store.initialize()
+
+    const deferred = journal.deferNextSave()
+    const skip = store.skipItem(first.path)
+    await deferred.started
+    const adopt = store.adoptExistingItem(first.path)
+    deferred.release()
+    await Promise.all([skip, adopt])
+
+    assert.equal(inspections, 0)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'skipped')
+  })
+
+  it('serializes adoption with destination recheck and ignores stale work', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: '4'.repeat(48),
+    }
+    const journal = new MemoryJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[first.path, { kind: 'review' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    let markInspectionStarted: () => void = () => {}
+    const inspectionStarted = new Promise<void>(resolve => {
+      markInspectionStarted = resolve
+    })
+    let finishInspection: () => void = () => {}
+    const inspectionBlocked = new Promise<void>(resolve => {
+      finishInspection = resolve
+    })
+    let inspections = 0
+    let cloneCalls = 0
+    const store = new BatchCloneStore(
+      {
+        clone: async () => {
+          cloneCalls += 1
+          return true
+        },
+      } as unknown as CloningRepositoriesStore,
+      journal,
+      async () => {
+        inspections += 1
+        markInspectionStarted()
+        await inspectionBlocked
+        return 'matching-repository'
+      },
+      stagingManager()
+    )
+    await store.initialize()
+
+    const adoption = store.adoptExistingItem(first.path)
+    await inspectionStarted
+    const recheck = store.resume()
+    finishInspection()
+    await Promise.all([adoption, recheck])
+
+    assert.equal(inspections, 1)
+    assert.equal(cloneCalls, 0)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'done')
+  })
+
   it('adopts an existing matching folder from review without touching it', async () => {
     const recoveryItem: IBatchCloneItem = {
       ...first,
@@ -1049,14 +1251,14 @@ describe('batch clone journal and recovery', () => {
       source: 'manual',
       paused: false,
     })
-    let discardCalls = 0
+    let cleanupCalls = 0
     const store = new BatchCloneStore(
       {} as CloningRepositoriesStore,
       journal,
       async () => 'matching-repository',
       stagingManager({
-        discard: async () => {
-          discardCalls += 1
+        cleanupPromoted: async () => {
+          cleanupCalls += 1
           return true
         },
       })
@@ -1068,7 +1270,10 @@ describe('batch clone journal and recovery', () => {
     const status = store.getState()?.statuses.get(first.path)
     assert.equal(status?.kind, 'done')
     assert.equal(status?.finalized, undefined)
-    assert.equal(discardCalls, 1)
+    assert.equal(cleanupCalls, 1)
+    assert.equal(await store.dismiss(), true)
+    assert.equal(cleanupCalls, 2)
+    assert.equal(store.getState(), null)
   })
 
   it('keeps a non-matching folder in review when adoption is attempted', async () => {

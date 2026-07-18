@@ -23,6 +23,7 @@ import {
 } from '../../models/batch-clone'
 import { git } from '../git/core'
 import { urlsMatch } from '../repository-matching'
+import { inspectCloneDestination } from './batch-clone-journal'
 
 export const BatchCloneStagingVersion = 1
 export const BatchCloneStagingDirectoryName =
@@ -325,8 +326,17 @@ export class FileBatchCloneStagingManager implements IBatchCloneStagingManager {
         return false
       }
       const marker = await readStagingMarker(item, paths)
-      if (marker === null || !marker.cloneCompleted) {
+      if (marker === null) {
         return false
+      }
+      if (!marker.cloneCompleted) {
+        // Adoption records `done` before removing staging so a crash can retry
+        // safely. Only an independently reverified matching destination lets
+        // an unpromoted owned root take this cleanup path.
+        if ((await inspectCloneDestination(item)) !== 'matching-repository') {
+          return false
+        }
+        return await this.discardOwnedRoot(item, paths, marker, true)
       }
       if ((await lstatOrNull(paths.checkoutPath)) !== null) {
         return false
@@ -558,12 +568,16 @@ export class FileBatchCloneStagingManager implements IBatchCloneStagingManager {
   private async discardOwnedRoot(
     item: IBatchCloneItem,
     paths: IBatchCloneStagingPaths,
-    marker: IBatchCloneStagingMarker
+    marker: IBatchCloneStagingMarker,
+    allowVerifiedDestination = false
   ): Promise<boolean> {
+    const finalEntry = await lstatOrNull(item.path)
     if (
       marker.recoveryId !== item.recoveryId ||
       !(await isCanonicalOrdinaryDirectory(paths.recoveryRootPath)) ||
-      (await lstatOrNull(item.path)) !== null
+      (allowVerifiedDestination
+        ? finalEntry === null || !isOrdinaryDirectory(finalEntry)
+        : finalEntry !== null)
     ) {
       return false
     }

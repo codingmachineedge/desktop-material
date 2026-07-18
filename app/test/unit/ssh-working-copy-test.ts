@@ -9,6 +9,7 @@ import {
   getSSHWorkingCopyStorageKey,
   ISSHWorkingCopyDefinition,
   ISSHWorkingCopyStorage,
+  loadSSHDockerDeploymentsForPush,
   loadSSHWorkingCopies,
   quotePOSIXShellWord,
   sanitizeSSHWorkingCopyOutput,
@@ -44,6 +45,7 @@ const definition: ISSHWorkingCopyDefinition = {
   authenticationReference: resolve('fixtures', 'id_ed25519'),
   destinationPath: "/srv/work/project's canonical checkout",
   sourceRemoteName: 'origin',
+  deployOnPush: true,
 }
 
 describe('SSH working-copy safety boundary', () => {
@@ -91,6 +93,17 @@ describe('SSH working-copy safety boundary', () => {
     )
     assert.match(command, /test|\[ -e/)
 
+    const renamedRemoteCommand = buildSSHWorkingCopyCommand(
+      { ...definition, sourceRemoteName: 'upstream' },
+      'clone',
+      'ssh://git@example.test/team/project.git'
+    )
+    assert.match(renamedRemoteCommand, /remote='upstream'/)
+    assert.match(
+      renamedRemoteCommand,
+      /remote rename origin "\$remote"/
+    )
+
     const args = buildSSHWorkingCopyArguments(definition, 'status')
     assert.deepEqual(args.slice(-3, -1), ['--', definition.host])
     assert.ok(args.includes('ForwardAgent=no'))
@@ -108,6 +121,45 @@ describe('SSH working-copy safety boundary', () => {
     assert.equal(
       args.some(value => /ProxyCommand/i.test(value)),
       false
+    )
+  })
+
+  it('fast-forwards the exact pushed branch before a bounded Docker Compose deployment', () => {
+    const command = buildSSHWorkingCopyCommand(
+      definition,
+      'deploy',
+      undefined,
+      'feature/docker-deploy'
+    )
+
+    assert.match(command, /symbolic-ref --quiet --short HEAD/)
+    assert.match(command, /check-ref-format --branch "\$expected"/)
+    assert.match(command, /"\$branch" != "\$expected"/)
+    assert.match(command, /fetch --prune -- "\$remote" "\$branch"/)
+    assert.match(command, /merge --ff-only --/)
+    assert.match(command, /docker compose up --detach --build/)
+    assert.doesNotMatch(
+      command,
+      /\bgit(?:\s+-C\s+"\$destination")?\s+(?:reset|checkout)\b|--force\b/
+    )
+
+    assert.throws(
+      () =>
+        buildSSHWorkingCopyCommand(
+          definition,
+          'deploy',
+          undefined,
+          'main\nmalicious'
+        ),
+      /not safe to deploy/
+    )
+    assert.throws(
+      () =>
+        buildSSHWorkingCopyCommand(
+          { ...definition, sourceRemoteName: null },
+          'deploy'
+        ),
+      /source remote/
     )
   })
 
@@ -161,6 +213,35 @@ describe('SSH working-copy safety boundary', () => {
     parsed.definitions[0].password = 'must-not-load'
     storage.setItem(key, JSON.stringify(parsed))
     assert.deepEqual(loadSSHWorkingCopies(repositoryPath, storage), [])
+  })
+
+  it('selects only enabled Docker targets following the pushed remote', () => {
+    const storage = new MemoryStorage()
+    const repositoryPath = resolve('repositories', 'deploy-project')
+    const disabled = {
+      ...definition,
+      id: '2'.repeat(32),
+      deployOnPush: false,
+    }
+    const otherRemote = {
+      ...definition,
+      id: '3'.repeat(32),
+      sourceRemoteName: 'upstream',
+    }
+    saveSSHWorkingCopies(
+      repositoryPath,
+      [definition, disabled, otherRemote],
+      storage
+    )
+
+    assert.deepEqual(
+      loadSSHDockerDeploymentsForPush(repositoryPath, 'origin', storage),
+      [definition]
+    )
+    assert.deepEqual(
+      loadSSHDockerDeploymentsForPush(repositoryPath, 'missing', storage),
+      []
+    )
   })
 
   it('isolates remembered passwords by user, host, and port', () => {

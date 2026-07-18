@@ -1696,8 +1696,8 @@ export class Dispatcher {
   }
 
   /** Dismiss the batch clone popup and clear its state. */
-  public dismissBatchClone(): void {
-    this.appStore._dismissBatchClone()
+  public dismissBatchClone(): Promise<boolean> {
+    return this.appStore._dismissBatchClone()
   }
 
   /** Changes the repository alias to a new name. */
@@ -6069,8 +6069,8 @@ export class Dispatcher {
    *
    * @param evenIfUpdating Whether to quit even if the app is updating.
    */
-  public quitApp(evenIfUpdating: boolean) {
-    this.appStore._quitApp(evenIfUpdating)
+  public quitApp(evenIfUpdating: boolean): Promise<void> {
+    return this.appStore._quitApp(evenIfUpdating)
   }
 
   /**

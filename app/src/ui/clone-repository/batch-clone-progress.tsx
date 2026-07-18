@@ -33,6 +33,7 @@ interface IBatchCloneProgressProps {
  * once the batch has finished with failures.
  */
 export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps> {
+  private dismissalInProgress = false
   private checkIsTopMostDialog = isTopMostDialog(
     () => {},
     () => {}
@@ -84,9 +85,20 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
       .catch(error => log.error('Unable to skip a clone item', error))
   }
 
-  private onDone = () => {
-    this.props.dispatcher.dismissBatchClone()
-    this.props.onDismissed()
+  private onDone = async () => {
+    if (this.dismissalInProgress) {
+      return
+    }
+    this.dismissalInProgress = true
+    try {
+      if (await this.props.dispatcher.dismissBatchClone()) {
+        this.props.onDismissed()
+      }
+    } catch (error) {
+      log.error('Unable to dismiss the clone batch', error)
+    } finally {
+      this.dismissalInProgress = false
+    }
   }
 
   private renderStatusIcon(status: IBatchCloneItemStatus | undefined) {

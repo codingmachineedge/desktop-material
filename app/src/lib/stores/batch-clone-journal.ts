@@ -147,33 +147,24 @@ export class FileBatchCloneJournal implements IBatchCloneJournal {
       // Serialize once: invalid input is a programming error, not a retryable
       // condition, so only the write itself is retried below.
       const serialized = serializeBatchCloneJournal(snapshot)
-      for (let attempt = 0; ; attempt++) {
-        try {
-          await this.persistence.writeText(this.path, serialized, {
-            backupPath: this.backupPath,
-            maxPreviousBytes: MaxBatchCloneJournalBytes,
-            validatePrevious: isBatchCloneJournal,
-          })
-          return
-        } catch (error) {
-          if (
-            attempt >= BatchCloneJournalWriteRetries ||
-            !isTransientJournalWriteError(error)
-          ) {
-            throw error
-          }
-          await delay(BatchCloneJournalRetryBaseDelayMs * (attempt + 1))
-        }
-      }
+      await retryTransientJournalOperation(async () => {
+        await this.persistence.writeText(this.path, serialized, {
+          backupPath: this.backupPath,
+          maxPreviousBytes: MaxBatchCloneJournalBytes,
+          validatePrevious: isBatchCloneJournal,
+        })
+      })
     })
   }
 
   public clear(): Promise<void> {
     return this.enqueue(async () => {
-      await this.persistence.clear(this.path, {
-        backupPath: this.backupPath,
+      await retryTransientJournalOperation(async () => {
+        await this.persistence.clear(this.path, {
+          backupPath: this.backupPath,
+        })
+        await this.removeLegacyTemporaryFiles()
       })
-      await this.removeLegacyTemporaryFiles()
     })
   }
 
@@ -269,6 +260,25 @@ export class FileBatchCloneJournal implements IBatchCloneJournal {
           }
         })
       }
+    }
+  }
+}
+
+async function retryTransientJournalOperation(
+  operation: () => Promise<void>
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await operation()
+      return
+    } catch (error) {
+      if (
+        attempt >= BatchCloneJournalWriteRetries ||
+        !isTransientJournalWriteError(error)
+      ) {
+        throw error
+      }
+      await delay(BatchCloneJournalRetryBaseDelayMs * (attempt + 1))
     }
   }
 }

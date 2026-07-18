@@ -80,12 +80,18 @@ describe('SSH Working Copy manager', () => {
     fireEvent.change(screen.getByLabelText('Remote destination path'), {
       target: { value: '/srv/work/project' },
     })
+    fireEvent.click(
+      screen.getByLabelText(
+        'Deploy Docker Compose after pushes to this source remote'
+      )
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Save host metadata' }))
     assert.ok(screen.getByText(/metadata saved/i))
     const serialized = [...storage.values.values()].join('')
     assert.doesNotMatch(serialized, /ssh:\/\/git@example\.test/)
     assert.doesNotMatch(serialized, /password|passphrase|sourceUrl/i)
+    assert.match(serialized, /"deployOnPush":true/)
 
     fireEvent.click(screen.getByRole('button', { name: /Clone/ }))
     await waitFor(() => assert.equal(calls.length, 1))
@@ -94,6 +100,11 @@ describe('SSH Working Copy manager', () => {
     assert.equal(calls[0].definition.destinationPath, '/srv/work/project')
     assert.equal(calls[0].signal?.aborted, false)
     assert.ok(await screen.findByLabelText('SSH command output'))
+
+    fireEvent.click(screen.getByRole('button', { name: /Deploy Docker now/ }))
+    await waitFor(() => assert.equal(calls.length, 2))
+    assert.equal(calls[1].action, 'deploy')
+    assert.equal(calls[1].sourceUrl, undefined)
   })
 
   it('never offers credential-bearing local remotes as clone sources', () => {

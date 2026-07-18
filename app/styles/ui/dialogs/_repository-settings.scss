@@ -521,6 +521,23 @@
         padding: var(--spacing);
       }
 
+      .ssh-deploy-on-push {
+        min-width: 0;
+
+        label {
+          overflow-wrap: anywhere;
+        }
+      }
+
+      .ssh-working-copy-deploy-note {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: var(--font-size-sm);
+        line-height: 1.45;
+        margin-top: calc(-1 * var(--spacing-half));
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
       .ssh-working-copy-metadata-actions,
       .ssh-working-copy-command-actions {
         display: flex;

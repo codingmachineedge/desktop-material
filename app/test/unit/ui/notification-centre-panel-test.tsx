@@ -184,7 +184,11 @@ describe('NotificationCentrePanel', () => {
       screen.queryByRole('button', { name: 'Notification history' }),
       null
     )
-    assert.equal(screen.queryByRole('button', { name: 'Clear all' }), null)
+    assert.equal(
+      (screen.getByRole('button', { name: 'Clear all' }) as HTMLButtonElement)
+        .disabled,
+      true
+    )
 
     fireEvent.click(screen.getByRole('tab', { name: 'Local' }))
     assert.equal(
@@ -403,7 +407,63 @@ describe('NotificationCentrePanel', () => {
     assert.deepEqual(dones, ['alpha'])
   })
 
-  it('loads bounded pages across accounts and supports exact read and done actions', async () => {
+  it('confirms and clears every fully loaded GitHub notification', async () => {
+    const selected = account('first', 1)
+    const dones = new Array<string>()
+    const api: IGitHubNotificationsAPI = {
+      fetchNotifications: async options =>
+        options.page === 1
+          ? page([notification('alpha')], { hasNextPage: true })
+          : page([notification('beta')]),
+      markNotificationThreadRead: async () => {},
+      markNotificationThreadDone: async id => {
+        dones.push(id)
+      },
+    }
+    const store = new GitHubNotificationsStore([selected], () => api)
+
+    render(
+      <NotificationCentrePanel
+        dispatcher={dispatcher}
+        entries={[]}
+        unreadCount={0}
+        repositories={[]}
+        accounts={[selected]}
+        githubNotificationsStore={store}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'GitHub' }))
+    await waitFor(() => assert.ok(screen.getByText('Notification beta')))
+
+    const trigger = screen.getByRole('button', { name: 'Clear all' })
+    fireEvent.click(trigger)
+    assert.deepEqual(dones, [])
+    const confirmation = screen.getByRole('alertdialog', {
+      name: 'Clear every GitHub notification?',
+    })
+    assert.ok(within(confirmation).getByText(/marks all 2 notifications done/))
+    assert.equal(document.activeElement, confirmation)
+
+    // Only the confirmation owns the destructive action.
+    fireEvent.click(trigger)
+    assert.deepEqual(dones, [])
+    fireEvent.click(
+      within(confirmation).getByRole('button', { name: 'Clear all' })
+    )
+
+    await waitFor(() => assert.equal(dones.length, 2))
+    assert.deepEqual(new Set(dones), new Set(['alpha', 'beta']))
+    await waitFor(() =>
+      assert.ok(screen.getByText('No unread GitHub notifications'))
+    )
+    assert.equal(
+      document.activeElement,
+      screen.getByRole('tab', { name: 'GitHub' })
+    )
+  })
+
+  it('loads all pages across accounts and supports exact read and done actions', async () => {
     const first = account('first', 1)
     const second = account('second', 2)
     const thirdParty = account('third-party', 3, 'gitlab')
@@ -454,7 +514,10 @@ describe('NotificationCentrePanel', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'GitHub' }))
     await waitFor(() =>
-      assert.ok(screen.getByText(/A very long notification title/))
+      assert.equal(
+        screen.getAllByText(/A very long notification title/).length,
+        2
+      )
     )
 
     const accountSelect = screen.getByRole('combobox', {
@@ -470,10 +533,18 @@ describe('NotificationCentrePanel', () => {
     assert.equal(fetches[0].options.perPage, 50)
     assert.equal(fetches[0].options.includeRead, false)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+    assert.ok(
+      screen.getByRole('alertdialog', {
+        name: 'Clear every GitHub notification?',
+      })
+    )
     fireEvent.change(accountSelect, {
       target: { value: `${second.endpoint}#2` },
     })
     await waitFor(() => assert.equal(fetches.at(-1)?.login, 'second'))
+    assert.equal(screen.queryByRole('alertdialog'), null)
+    assert.deepEqual(dones, [])
 
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Participating only' })
@@ -491,9 +562,9 @@ describe('NotificationCentrePanel', () => {
       screen.getByRole('tab', { name: 'All' })
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     await waitFor(() => assert.equal(fetches.at(-1)?.options.page, 2))
     assert.ok(screen.getByText(/second-2/))
+    assert.equal(screen.queryByRole('button', { name: 'Load more' }), null)
 
     const markRead = screen.getByRole('button', {
       name: /Mark as read:.*second-1/,

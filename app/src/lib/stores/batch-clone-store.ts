@@ -70,6 +70,9 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   private stagingTargets = new Map<string, string>()
   private activeCloneControllers = new Map<string, AbortController>()
   private operationCompletion: Promise<void> | null = null
+  private itemResolutionChains = new Map<string, Promise<void>>()
+  private dismissal: Promise<boolean> | null = null
+  private dismissing = false
 
   public constructor(
     private readonly cloningRepositoriesStore: CloningRepositoriesStore,
@@ -128,12 +131,13 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
         )
       this.pauseRequested = this.paused
       this.emit()
-      await this.persist()
+      const normalizedSnapshot = await this.persist()
       if (this.stagingManager !== null) {
         // The loaded snapshot itself is durable proof for terminal items even
         // when normalizing an interrupted status cannot be written back.
-        await this.cleanupCompletedStaging()
-        await this.cleanupSkippedStaging()
+        const cleanupSnapshot = normalizedSnapshot ?? snapshot
+        await this.cleanupCompletedStaging(cleanupSnapshot)
+        await this.cleanupSkippedStaging(cleanupSnapshot)
       }
     } catch (error) {
       log.error('Unable to restore the clone queue journal', error)
@@ -251,7 +255,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
 
   /** Re-run every failed item whose destination is now safe. */
   public async retryFailed(): Promise<void> {
-    if (this.running) {
+    if (this.running || this.dismissing) {
       return
     }
     const failed = this.items.filter(
@@ -289,7 +293,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
 
   /** Resume pending/interrupted work after safely inspecting each destination. */
   public async resume(): Promise<void> {
-    if (this.running) {
+    if (this.running || this.dismissing) {
       return
     }
 
@@ -313,22 +317,28 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
    * is never touched; only app-owned staging for the skipped item is discarded.
    */
   public async skipItem(path: string): Promise<void> {
-    if (this.running) {
+    if (this.running || this.dismissing) {
       return
     }
-    const kind = this.statuses.get(path)?.kind
-    if (
-      kind !== 'review' &&
-      kind !== 'failed' &&
-      kind !== 'interrupted' &&
-      kind !== 'pending'
-    ) {
-      return
-    }
-    this.setStatus(path, { kind: 'skipped' }, false)
-    if (await this.persist()) {
-      await this.cleanupSkippedStaging()
-    }
+    await this.resolveItem(path, async () => {
+      const kind = this.statuses.get(path)?.kind
+      if (
+        kind !== 'review' &&
+        kind !== 'failed' &&
+        kind !== 'interrupted' &&
+        kind !== 'pending'
+      ) {
+        return
+      }
+      this.setStatus(path, { kind: 'skipped' }, false)
+      const durableSnapshot = await this.persist()
+      if (
+        durableSnapshot !== null &&
+        this.statuses.get(path)?.kind === 'skipped'
+      ) {
+        await this.cleanupSkippedStaging(durableSnapshot, new Set([path]))
+      }
+    })
   }
 
   /**
@@ -338,68 +348,81 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
    * left in review with a clearer explanation.
    */
   public async adoptExistingItem(path: string): Promise<void> {
-    if (this.running) {
+    if (this.running || this.dismissing) {
       return
     }
-    const item = this.items.find(candidate => candidate.path === path)
-    if (item === undefined || this.statuses.get(path)?.kind !== 'review') {
-      return
-    }
+    await this.resolveItem(path, async () => {
+      const item = this.items.find(candidate => candidate.path === path)
+      if (item === undefined || this.statuses.get(path)?.kind !== 'review') {
+        return
+      }
 
-    let inspection: CloneDestinationInspection
-    try {
-      inspection = await this.inspectDestination(item)
-    } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error))
-      log.error(
-        `Unable to inspect existing clone folder ${item.path}`,
-        normalizedError
+      let inspection: CloneDestinationInspection
+      try {
+        inspection = await this.inspectDestination(item)
+      } catch (error) {
+        if (this.statuses.get(path)?.kind !== 'review') {
+          return
+        }
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error))
+        log.error(
+          `Unable to inspect existing clone folder ${item.path}`,
+          normalizedError
+        )
+        this.setStatus(path, {
+          kind: 'review',
+          error: new Error(
+            'The existing folder could not be inspected safely. Review it manually; Desktop Material will not delete it.'
+          ),
+        })
+        await this.persist()
+        return
+      }
+
+      // Skip, cancel, or another resolution may have won while the filesystem
+      // inspection was in flight. Never publish that stale result.
+      if (this.statuses.get(path)?.kind !== 'review') {
+        return
+      }
+      if (inspection !== 'matching-repository') {
+        this.setStatus(path, {
+          kind: 'review',
+          error: new Error(
+            inspection === 'empty'
+              ? 'The folder is now empty, so there is nothing to adopt. Use Recheck destinations to clone it again.'
+              : 'The existing folder is not a matching clone of this repository and was left unchanged. Skip it or move it aside and recheck.'
+          ),
+        })
+        await this.persist()
+        return
+      }
+
+      this.setStatus(
+        path,
+        {
+          kind: 'done',
+          progress: 1,
+          description: 'Adopted the existing clone with the matching origin.',
+          ...(item.accountKey !== undefined
+            ? { accountKey: item.accountKey }
+            : {}),
+        },
+        false
       )
-      this.setStatus(path, {
-        kind: 'review',
-        error: new Error(
-          'The existing folder could not be inspected safely. Review it manually; Desktop Material will not delete it.'
-        ),
-      })
-      await this.persist()
-      return
-    }
-
-    if (inspection !== 'matching-repository') {
-      this.setStatus(path, {
-        kind: 'review',
-        error: new Error(
-          inspection === 'empty'
-            ? 'The folder is now empty, so there is nothing to adopt. Use Recheck destinations to clone it again.'
-            : 'The existing folder is not a matching clone of this repository and was left unchanged. Skip it or move it aside and recheck.'
-        ),
-      })
-      await this.persist()
-      return
-    }
-
-    this.setStatus(
-      path,
-      {
-        kind: 'done',
-        progress: 1,
-        description: 'Adopted the existing clone with the matching origin.',
-        ...(item.accountKey !== undefined
-          ? { accountKey: item.accountKey }
-          : {}),
-      },
-      false
-    )
-    if (
-      (await this.persist()) &&
-      item.recoveryId !== undefined &&
-      this.stagingManager !== null
-    ) {
-      // The user-visible folder is adopted, so the app-owned staged copy is
-      // redundant. A failed discard is not fatal; cleanup retries on dismiss.
-      await this.stagingManager.discard(item)
-    }
+      const durableSnapshot = await this.persist()
+      if (
+        durableSnapshot !== null &&
+        item.recoveryId !== undefined &&
+        this.stagingManager !== null &&
+        this.statuses.get(path)?.kind === 'done'
+      ) {
+        // A durable `done` snapshot authorizes cleanup. cleanupPromoted also
+        // recognizes a verified matching destination with an unpromoted owned
+        // root, so a crash or transient failure can retry this exact adoption.
+        await this.cleanupCompletedStaging(durableSnapshot, new Set([path]))
+      }
+    })
   }
 
   /** Abort active Git work and durably discard verified cancelled staging. */
@@ -429,9 +452,10 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     if (operation !== null) {
       await operation
     } else {
-      const durable = await this.persist()
-      if (durable) {
-        await this.cleanupSkippedStaging()
+      await this.waitForItemResolutions()
+      const durableSnapshot = await this.persist()
+      if (durableSnapshot !== null) {
+        await this.cleanupSkippedStaging(durableSnapshot)
       }
     }
   }
@@ -441,56 +465,91 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
    * the journal clear itself succeeds. Ambiguous roots retain their recovery
    * identity and remain visible for review.
    */
-  public async dismiss(): Promise<boolean> {
+  public dismiss(): Promise<boolean> {
+    if (this.dismissal !== null) {
+      return this.dismissal
+    }
+    const operation = this.dismissUnlocked()
+    this.dismissal = operation
+    void operation.then(
+      () => {
+        if (this.dismissal === operation) {
+          this.dismissal = null
+        }
+      },
+      () => {
+        if (this.dismissal === operation) {
+          this.dismissal = null
+        }
+      }
+    )
+    return operation
+  }
+
+  private async dismissUnlocked(): Promise<boolean> {
     if (this.isBusy) {
       return false
     }
     if (this.items.length === 0) {
       return true
     }
-    await this.maintenanceChain.catch(() => undefined)
-
-    if (this.journalVersion === CurrentBatchCloneJournalVersion) {
-      if (!(await this.persist()) || this.stagingManager === null) {
+    this.dismissing = true
+    try {
+      await this.maintenanceChain.catch(() => undefined)
+      await this.waitForItemResolutions()
+      if (this.isBusy) {
         return false
       }
+      if (this.items.length === 0) {
+        return true
+      }
 
-      let cleanupSucceeded = true
-      for (const item of this.items) {
-        const status = this.statuses.get(item.path)
-        const cleaned =
-          status?.kind === 'done'
-            ? await this.stagingManager.cleanupPromoted(item)
-            : await this.stagingManager.discard(item)
-        if (!cleaned) {
-          cleanupSucceeded = false
-          if (status?.kind !== 'done') {
-            this.statuses.set(item.path, {
-              kind: 'review',
-              error: new Error(
-                'The staged clone ownership marker changed or could not be removed. The queue was retained for review.'
-              ),
-            })
+      if (this.journalVersion === CurrentBatchCloneJournalVersion) {
+        const durableSnapshot = await this.persist()
+        if (durableSnapshot === null || this.stagingManager === null) {
+          return false
+        }
+
+        const durableStatuses = new Map(durableSnapshot.statuses)
+        let cleanupSucceeded = true
+        for (const item of durableSnapshot.items) {
+          const status = durableStatuses.get(item.path)
+          const cleaned =
+            status?.kind === 'done'
+              ? await this.stagingManager.cleanupPromoted(item)
+              : await this.stagingManager.discard(item)
+          if (!cleaned) {
+            cleanupSucceeded = false
+            if (status?.kind !== 'done') {
+              this.statuses.set(item.path, {
+                kind: 'review',
+                error: new Error(
+                  'The staged clone ownership marker changed or could not be removed. The queue was retained for review.'
+                ),
+              })
+            }
           }
         }
-      }
-      if (!cleanupSucceeded) {
-        this.emit()
-        await this.persist()
-        this.emitError(
-          new Error(
-            'Some staged clone data could not be verified for removal. The clone queue was retained.'
+        if (!cleanupSucceeded) {
+          this.emit()
+          await this.persist()
+          this.emitError(
+            new Error(
+              'Some staged clone data could not be verified for removal. The clone queue was retained.'
+            )
           )
-        )
+          return false
+        }
+      }
+
+      if (!(await this.clearJournal())) {
         return false
       }
+      this.resetState()
+      return true
+    } finally {
+      this.dismissing = false
     }
-
-    if (!(await this.clearJournal())) {
-      return false
-    }
-    this.resetState()
-    return true
   }
 
   private resetState(): void {
@@ -504,6 +563,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     this.notifiedGeneration = 0
     this.stagingTargets.clear()
     this.activeCloneControllers.clear()
+    this.itemResolutionChains.clear()
     this.emit()
   }
 
@@ -543,99 +603,132 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   ): Promise<ReadonlyArray<IBatchCloneItem>> {
     const runnable: IBatchCloneItem[] = []
     for (const item of items) {
-      if (item.recoveryId !== undefined) {
-        if (this.stagingManager === null) {
+      const shouldRun = await this.resolveItem(item.path, async () => {
+        const initialKind = this.statuses.get(item.path)?.kind
+        if (
+          initialKind !== 'pending' &&
+          initialKind !== 'interrupted' &&
+          initialKind !== 'review' &&
+          initialKind !== 'failed'
+        ) {
+          return false
+        }
+
+        if (item.recoveryId !== undefined) {
+          if (this.stagingManager === null) {
+            this.statuses.set(item.path, {
+              kind: 'review',
+              error: new Error(
+                'This staged clone queue cannot be recovered in the current app session.'
+              ),
+            })
+            return false
+          }
+          const prepared = await this.stagingManager.prepare(item)
+          if (
+            this.cancelRequested ||
+            this.statuses.get(item.path)?.kind === 'skipped'
+          ) {
+            this.statuses.set(item.path, { kind: 'skipped' })
+            return false
+          }
+          // Another explicit resolution cannot mutate this item while its
+          // per-path chain is held. Still revalidate cancellation and the
+          // original unresolved state after every filesystem await.
+          const currentKind = this.statuses.get(item.path)?.kind
+          if (currentKind !== initialKind) {
+            return false
+          }
+          if (prepared.kind === 'clone') {
+            this.stagingTargets.set(item.path, prepared.clonePath)
+            this.statuses.set(item.path, { kind: 'pending' })
+            return true
+          }
+          if (prepared.kind === 'done') {
+            this.statuses.set(item.path, {
+              kind: 'done',
+              progress: 1,
+              description: 'Recovered and promoted a verified staged clone.',
+              ...(prepared.accountKey !== null
+                ? { accountKey: prepared.accountKey }
+                : {}),
+            })
+          } else {
+            this.statuses.set(item.path, {
+              kind: 'review',
+              error: prepared.error,
+            })
+          }
+          return false
+        }
+
+        let inspection: CloneDestinationInspection
+        try {
+          inspection = await this.inspectDestination(item)
+        } catch (error) {
+          if (
+            this.cancelRequested ||
+            this.statuses.get(item.path)?.kind === 'skipped'
+          ) {
+            this.statuses.set(item.path, { kind: 'skipped' })
+            return false
+          }
+          const currentKind = this.statuses.get(item.path)?.kind
+          if (currentKind !== initialKind) {
+            return false
+          }
+          const normalizedError =
+            error instanceof Error ? error : new Error(String(error))
+          log.error(
+            `Unable to inspect clone destination ${item.path}`,
+            normalizedError
+          )
           this.statuses.set(item.path, {
             kind: 'review',
             error: new Error(
-              'This staged clone queue cannot be recovered in the current app session.'
+              'The destination could not be inspected safely. Review it manually; Desktop Material will not delete it.'
             ),
           })
-          continue
+          return false
         }
-        const prepared = await this.stagingManager.prepare(item)
+        // Cancellation can arrive while an asynchronous filesystem/Git probe
+        // is in flight. Never let that stale result resurrect a skipped item.
         if (
           this.cancelRequested ||
           this.statuses.get(item.path)?.kind === 'skipped'
         ) {
           this.statuses.set(item.path, { kind: 'skipped' })
-          continue
+          return false
         }
-        if (prepared.kind === 'clone') {
-          this.stagingTargets.set(item.path, prepared.clonePath)
+        if (this.statuses.get(item.path)?.kind !== initialKind) {
+          return false
+        }
+        if (inspection === 'empty') {
           this.statuses.set(item.path, { kind: 'pending' })
-          runnable.push(item)
-        } else if (prepared.kind === 'done') {
+          return true
+        }
+        if (inspection === 'matching-repository') {
           this.statuses.set(item.path, {
             kind: 'done',
             progress: 1,
-            description: 'Recovered and promoted a verified staged clone.',
-            ...(prepared.accountKey !== null
-              ? { accountKey: prepared.accountKey }
+            description:
+              'Recovered an existing clone with the matching origin.',
+            ...(item.accountKey !== undefined
+              ? { accountKey: item.accountKey }
               : {}),
           })
         } else {
           this.statuses.set(item.path, {
             kind: 'review',
-            error: prepared.error,
+            error: new Error(
+              'The destination is incomplete, contains data, or has a different Git origin. Review or move it; Desktop Material will not delete it.'
+            ),
           })
         }
-        continue
-      }
-
-      let inspection: CloneDestinationInspection
-      try {
-        inspection = await this.inspectDestination(item)
-      } catch (error) {
-        if (
-          this.cancelRequested ||
-          this.statuses.get(item.path)?.kind === 'skipped'
-        ) {
-          this.statuses.set(item.path, { kind: 'skipped' })
-          continue
-        }
-        const normalizedError =
-          error instanceof Error ? error : new Error(String(error))
-        log.error(
-          `Unable to inspect clone destination ${item.path}`,
-          normalizedError
-        )
-        this.statuses.set(item.path, {
-          kind: 'review',
-          error: new Error(
-            'The destination could not be inspected safely. Review it manually; Desktop Material will not delete it.'
-          ),
-        })
-        continue
-      }
-      // Cancellation can arrive while an asynchronous filesystem/Git probe is
-      // in flight. Never let that stale result resurrect a skipped item.
-      if (
-        this.cancelRequested ||
-        this.statuses.get(item.path)?.kind === 'skipped'
-      ) {
-        this.statuses.set(item.path, { kind: 'skipped' })
-        continue
-      }
-      if (inspection === 'empty') {
-        this.statuses.set(item.path, { kind: 'pending' })
+        return false
+      })
+      if (shouldRun) {
         runnable.push(item)
-      } else if (inspection === 'matching-repository') {
-        this.statuses.set(item.path, {
-          kind: 'done',
-          progress: 1,
-          description: 'Recovered an existing clone with the matching origin.',
-          ...(item.accountKey !== undefined
-            ? { accountKey: item.accountKey }
-            : {}),
-        })
-      } else {
-        this.statuses.set(item.path, {
-          kind: 'review',
-          error: new Error(
-            'The destination is incomplete, contains data, or has a different Git origin. Review or move it; Desktop Material will not delete it.'
-          ),
-        })
       }
     }
     this.emit()
@@ -706,10 +799,10 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       this.running = false
       this.paused = false
       this.emit()
-      const durable = await this.persist()
-      if (durable) {
-        await this.cleanupCompletedStaging()
-        await this.cleanupSkippedStaging()
+      const durableSnapshot = await this.persist()
+      if (durableSnapshot !== null) {
+        await this.cleanupCompletedStaging(durableSnapshot)
+        await this.cleanupSkippedStaging(durableSnapshot)
       }
       return
     }
@@ -729,10 +822,10 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       this.pauseRequested = false
     }
     this.emit()
-    const durable = await this.persist()
-    if (durable) {
-      await this.cleanupCompletedStaging()
-      await this.cleanupSkippedStaging()
+    const durableSnapshot = await this.persist()
+    if (durableSnapshot !== null) {
+      await this.cleanupCompletedStaging(durableSnapshot)
+      await this.cleanupSkippedStaging(durableSnapshot)
     }
   }
 
@@ -929,13 +1022,16 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
         },
         false
       )
-      const durable = await this.persist()
+      const durableSnapshot = await this.persist()
       if (
-        durable &&
+        durableSnapshot !== null &&
         item.recoveryId !== undefined &&
         this.stagingManager !== null
       ) {
-        await this.stagingManager.cleanupPromoted(item)
+        await this.cleanupCompletedStaging(
+          durableSnapshot,
+          new Set([item.path])
+        )
       }
     } else if (this.statuses.get(item.path)?.kind !== 'failed') {
       this.setStatus(item.path, { kind: 'failed' })
@@ -1058,10 +1154,10 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     void this.persist()
   }
 
-  /** Resolve true only when this exact snapshot was durably saved. */
-  private persist(): Promise<boolean> {
+  /** Return the exact snapshot which was durably saved, or null on failure. */
+  private persist(): Promise<IBatchCloneJournalSnapshot | null> {
     if (!this.initialized || this.journal === null || this.items.length === 0) {
-      return Promise.resolve(false)
+      return Promise.resolve(null)
     }
     const snapshot = this.snapshot()
     const journal = this.journal
@@ -1071,10 +1167,10 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
         try {
           await journal.save(snapshot)
           this.markRecoveryAvailable()
-          return true
+          return snapshot
         } catch (error) {
           this.reportJournalFailure('persist', error)
-          return false
+          return null
         }
       })
     this.writeChain = operation.then(() => undefined)
@@ -1102,15 +1198,20 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     return operation
   }
 
-  private async cleanupCompletedStaging(): Promise<boolean> {
+  private async cleanupCompletedStaging(
+    durableSnapshot: IBatchCloneJournalSnapshot,
+    paths?: ReadonlySet<string>
+  ): Promise<boolean> {
     if (this.stagingManager === null) {
       return this.journalVersion !== CurrentBatchCloneJournalVersion
     }
+    const durableStatuses = new Map(durableSnapshot.statuses)
     let succeeded = true
-    for (const item of this.items) {
+    for (const item of durableSnapshot.items) {
       if (
+        (paths === undefined || paths.has(item.path)) &&
         item.recoveryId !== undefined &&
-        this.statuses.get(item.path)?.kind === 'done' &&
+        durableStatuses.get(item.path)?.kind === 'done' &&
         !(await this.stagingManager.cleanupPromoted(item))
       ) {
         succeeded = false
@@ -1119,26 +1220,33 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     return succeeded
   }
 
-  private async cleanupSkippedStaging(): Promise<boolean> {
+  private async cleanupSkippedStaging(
+    durableSnapshot: IBatchCloneJournalSnapshot,
+    paths?: ReadonlySet<string>
+  ): Promise<boolean> {
     if (this.stagingManager === null) {
       return this.journalVersion !== CurrentBatchCloneJournalVersion
     }
+    const durableStatuses = new Map(durableSnapshot.statuses)
     let succeeded = true
     let changed = false
-    for (const item of this.items) {
+    for (const item of durableSnapshot.items) {
       if (
+        (paths === undefined || paths.has(item.path)) &&
         item.recoveryId !== undefined &&
-        this.statuses.get(item.path)?.kind === 'skipped' &&
+        durableStatuses.get(item.path)?.kind === 'skipped' &&
         !(await this.stagingManager.discard(item))
       ) {
         succeeded = false
-        changed = true
-        this.statuses.set(item.path, {
-          kind: 'review',
-          error: new Error(
-            'The cancelled staged clone could not be verified for removal and was retained for review.'
-          ),
-        })
+        if (this.statuses.get(item.path)?.kind === 'skipped') {
+          changed = true
+          this.statuses.set(item.path, {
+            kind: 'review',
+            error: new Error(
+              'The cancelled staged clone could not be verified for removal and was retained for review.'
+            ),
+          })
+        }
       }
     }
     if (changed) {
@@ -1146,6 +1254,30 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       await this.persist()
     }
     return succeeded
+  }
+
+  /** Serialize every explicit resolution for one destination path. */
+  private resolveItem<T>(path: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.itemResolutionChains.get(path) ?? Promise.resolve()
+    const operation = previous.then(action)
+    const tail = operation.then(
+      () => undefined,
+      () => undefined
+    )
+    this.itemResolutionChains.set(path, tail)
+    void tail.then(() => {
+      if (this.itemResolutionChains.get(path) === tail) {
+        this.itemResolutionChains.delete(path)
+      }
+    })
+    return operation
+  }
+
+  /** Wait until every resolution which began before dismissal/cancel settles. */
+  private async waitForItemResolutions(): Promise<void> {
+    while (this.itemResolutionChains.size > 0) {
+      await Promise.all(this.itemResolutionChains.values())
+    }
   }
 
   /**

@@ -35,7 +35,8 @@
   }
 
   input,
-  textarea {
+  textarea,
+  select {
     width: 100%;
     max-width: 100%;
     border: 1px solid var(--md-sys-color-outline);
@@ -54,6 +55,11 @@
   input {
     min-height: 40px;
     padding: 8px 10px;
+  }
+
+  select {
+    min-height: 40px;
+    padding: 8px 28px 8px 10px;
   }
 
   textarea {
@@ -121,6 +127,58 @@
   overflow-wrap: anywhere;
 }
 
+.github-releases-overview {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(4, minmax(105px, 0.7fr)) minmax(210px, 1.5fr);
+  gap: 9px;
+}
+
+.github-release-metric {
+  display: grid;
+  min-height: 82px;
+  align-content: center;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container-low);
+
+  > span,
+  > small {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+  }
+
+  > strong {
+    font-size: 20px;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+
+  &.published {
+    border-color: color-mix(in srgb, var(--md-sys-color-primary) 32%, var(--md-sys-color-outline-variant));
+  }
+
+  &.prerelease {
+    border-color: color-mix(in srgb, var(--md-sys-color-secondary) 42%, var(--md-sys-color-outline-variant));
+  }
+
+  &.draft {
+    border-color: color-mix(in srgb, var(--md-sys-color-tertiary) 42%, var(--md-sys-color-outline-variant));
+  }
+
+  &.latest {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+
+    > span,
+    > small {
+      color: var(--md-sys-color-on-primary-container);
+    }
+  }
+}
+
 .github-releases-layout {
   display: grid;
   min-height: 0;
@@ -160,6 +218,144 @@
   span {
     color: var(--md-sys-color-on-surface-variant);
     font-size: 10px;
+  }
+}
+
+.github-releases-filter-area {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 9px;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container);
+}
+
+.github-releases-filter-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 0.38fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.github-releases-status-filter select {
+  width: 100%;
+}
+
+.github-releases-search,
+.github-releases-search-field {
+  display: flex;
+  min-width: 0;
+}
+
+.github-releases-search {
+  flex-direction: column;
+  gap: 6px;
+
+  > label {
+    display: block;
+  }
+}
+
+.github-releases-search-field {
+  gap: 5px;
+  align-items: center;
+
+  input {
+    min-width: 72px;
+    flex: 1 1 auto;
+  }
+
+  .filter-mode-control {
+    flex: 0 1 auto;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
+  }
+
+  .filter-regex-builder-button {
+    padding-inline: 9px;
+  }
+}
+
+.github-releases-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+
+  > span {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 9px;
+  }
+}
+
+.github-releases-filter-error {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 9px;
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+  font-size: 10px;
+}
+
+.github-releases-list-empty,
+.github-releases-loading {
+  display: grid;
+  min-height: 116px;
+  place-content: center;
+  gap: 5px;
+  padding: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
+
+  strong {
+    color: var(--md-sys-color-on-surface);
+    font-size: 13px;
+  }
+
+  > span,
+  div > span {
+    font-size: 10px;
+  }
+
+  .button-component {
+    justify-self: center;
+    margin-top: 4px;
+  }
+}
+
+.github-releases-loading {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-content: stretch;
+  text-align: left;
+
+  > div {
+    display: grid;
+    gap: 3px;
+  }
+
+  &.compact {
+    min-height: 80px;
+    padding: 10px;
+  }
+}
+
+.github-releases-loading-indicator {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--md-sys-color-surface-container-highest);
+  border-top-color: var(--md-sys-color-primary);
+  border-radius: 50%;
+  animation: github-releases-spin 850ms linear infinite;
+}
+
+@keyframes github-releases-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -204,25 +400,68 @@
 }
 
 .github-release-row-title,
-.github-release-row-tag {
+.github-release-row-tag,
+.github-release-row-date {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .github-release-row-title {
-  grid-column: 1 / -1;
   font-size: 12px;
   font-weight: 650;
 }
 
 .github-release-row-tag,
-.github-release-row-state {
+.github-release-row-state,
+.github-release-row-date {
   font-size: 10px;
 }
 
-.github-release-row-state {
+.github-release-row-badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
   justify-self: end;
+  justify-content: flex-end;
+}
+
+.github-release-row-state,
+.github-release-latest-badge,
+.github-release-asset-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.github-release-row-state {
+  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-secondary-container);
+}
+
+.status-draft .github-release-row-state {
+  color: var(--md-sys-color-on-tertiary-container);
+  background: var(--md-sys-color-tertiary-container);
+}
+
+.status-published .github-release-row-state {
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+}
+
+.github-release-latest-badge {
+  color: var(--md-sys-color-on-primary);
+  background: var(--md-sys-color-primary);
+}
+
+.github-release-row-date {
+  justify-self: end;
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .github-releases-pagination {
@@ -261,6 +500,13 @@
   }
 }
 
+.github-release-state-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 .github-release-state {
   display: inline-block;
   padding: 3px 8px;
@@ -273,6 +519,65 @@
   &.draft {
     color: var(--md-sys-color-on-tertiary-container);
     background: var(--md-sys-color-tertiary-container);
+  }
+
+  &.published {
+    color: var(--md-sys-color-on-primary-container);
+    background: var(--md-sys-color-primary-container);
+  }
+}
+
+.github-release-provider-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 5px 11px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 999px;
+  color: var(--md-sys-color-primary);
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+}
+
+.github-release-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+
+  > div {
+    display: grid;
+    gap: 3px;
+    padding: 9px 10px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 11px;
+    background: var(--md-sys-color-surface-container-lowest);
+  }
+
+  dt {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 9px;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -447,6 +752,11 @@
   }
 }
 
+.github-release-asset .github-release-asset-state {
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+}
+
 .github-releases-status {
   display: grid;
   flex: 0 0 auto;
@@ -480,8 +790,17 @@
 }
 
 .github-releases-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
   color: var(--md-sys-color-on-error-container);
   background: var(--md-sys-color-error-container);
+
+  > span {
+    flex: 1 1 220px;
+  }
 }
 
 .github-releases-message {
@@ -528,6 +847,30 @@
     grid-template-columns: minmax(180px, 0.36fr) minmax(0, 1fr);
   }
 
+  .github-releases-overview {
+    grid-template-columns: repeat(3, minmax(105px, 1fr));
+  }
+
+  .github-release-metric.latest {
+    grid-column: span 2;
+  }
+
+  .github-releases-filter-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .github-releases-search-field {
+    flex-wrap: wrap;
+
+    .filter-mode-control {
+      width: 100%;
+    }
+
+    .filter-mode-control-cluster {
+      justify-content: flex-start;
+    }
+  }
+
   .github-release-asset-list {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -545,8 +888,16 @@
     overflow: visible;
   }
 
+  .github-releases-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .github-release-metric.latest {
+    grid-column: span 2;
+  }
+
   .github-releases-list-panel {
-    max-height: 300px;
+    max-height: 420px;
   }
 
   .github-release-detail,
@@ -559,10 +910,20 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .github-release-metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .github-releases-header-actions,
   .github-releases-account {
     width: 100%;
     max-width: none;
     justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .github-releases-loading-indicator {
+    animation: none;
   }
 }

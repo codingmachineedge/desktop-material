@@ -51,4 +51,28 @@ describe('renderer shutdown wiring', () => {
       /async quitAndInstallUpdate[\s\S]*?await runAfterRendererShutdown\(\(\) => \{[\s\S]*?sendWillQuitSync\(\)[\s\S]*?quitAndInstallUpdate\(\)/
     )
   })
+
+  it('does not cancel an accepted update quit when its dialog unmounts', async () => {
+    const [dialog, dispatcher] = await Promise.all([
+      readSource('ui/installing-update/installing-update.tsx'),
+      readSource('ui/dispatcher/dispatcher.ts'),
+    ])
+
+    assert.match(
+      dialog,
+      /requestQuit[\s\S]*?this\.quitRequested = true[\s\S]*?await this\.props\.dispatcher\.quitApp\(evenIfUpdating\)/
+    )
+    assert.match(
+      dialog,
+      /componentWillUnmount[\s\S]*?if \(!this\.quitRequested\) \{[\s\S]*?cancelQuittingApp\(\)/
+    )
+    assert.match(
+      dialog,
+      /onQuitAnywayButtonClicked[\s\S]*?this\.requestQuit\(true\)/
+    )
+    assert.match(
+      dispatcher,
+      /quitApp\(evenIfUpdating: boolean\): Promise<void> \{[\s\S]*?return this\.appStore\._quitApp\(evenIfUpdating\)/
+    )
+  })
 })

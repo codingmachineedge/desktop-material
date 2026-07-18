@@ -27,12 +27,28 @@ interface IInstallingUpdateProps {
  */
 export class InstallingUpdate extends React.Component<IInstallingUpdateProps> {
   private updateStoreEventHandle: Disposable | null = null
+  /** An accepted quit must not be cancelled when the dialog unmounts. */
+  private quitRequested = false
+
+  private requestQuit = async (evenIfUpdating: boolean): Promise<void> => {
+    this.quitRequested = true
+    try {
+      await this.props.dispatcher.quitApp(evenIfUpdating)
+    } catch (error) {
+      // If the terminal action could not be prepared, a later dismissal is a
+      // genuine cancellation again rather than an accepted quit.
+      this.quitRequested = false
+      throw error
+    }
+  }
 
   private onUpdateStateChanged = (updateState: IUpdateState) => {
     // If the update is not being downloaded (`UpdateStatus.UpdateAvailable`),
     // i.e. if it's already downloaded or not available, close the window.
     if (updateState.status !== UpdateStatus.UpdateAvailable) {
-      this.props.dispatcher.quitApp(false)
+      void this.requestQuit(false).catch(error =>
+        log.error('Unable to quit after the update state changed', error)
+      )
     }
   }
 
@@ -51,14 +67,18 @@ export class InstallingUpdate extends React.Component<IInstallingUpdateProps> {
       this.updateStoreEventHandle = null
     }
 
-    // This will ensure the app doesn't try to quit after the update is
-    // installed once the dialog is closed (explicitly or implicitly, by
-    // opening another dialog on top of this one).
-    this.props.dispatcher.cancelQuittingApp()
+    // A dismissed/cancelled dialog stops a pending quit, but an affirmative
+    // Quit anyway may unmount this component while the bounded renderer drain
+    // is still running. Do not reset that accepted terminal action.
+    if (!this.quitRequested) {
+      this.props.dispatcher.cancelQuittingApp()
+    }
   }
 
   private onQuitAnywayButtonClicked = () => {
-    this.props.dispatcher.quitApp(true)
+    void this.requestQuit(true).catch(error =>
+      log.error('Unable to quit while an update is in progress', error)
+    )
   }
 
   public render() {

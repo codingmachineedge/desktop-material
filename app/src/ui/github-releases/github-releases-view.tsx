@@ -18,12 +18,23 @@ import {
   normalizeGitHubReleaseDraft,
 } from '../../lib/github-releases'
 import { IGitHubReleaseTransferProgressEvent } from '../../lib/github-release-transfer'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { Button } from '../lib/button'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import { LinkButton } from '../lib/link-button'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import {
   showItemInFolder,
   showOpenDialog,
   showSaveDialog,
 } from '../main-process-proxy'
+
+const ReleasesSearchFilterId = 'github-releases-search'
+
+type ReleaseStatusFilter = 'all' | 'published' | 'prerelease' | 'draft'
 
 type BusyOperation =
   | 'releases'
@@ -35,6 +46,18 @@ type BusyOperation =
   | 'upload'
   | 'download'
   | 'delete-asset'
+
+const BusyOperationLabels: Record<BusyOperation, string> = {
+  releases: 'Loading releases…',
+  assets: 'Loading release assets…',
+  create: 'Creating release draft…',
+  update: 'Updating release metadata…',
+  publish: 'Publishing release…',
+  delete: 'Deleting release…',
+  upload: 'Uploading release asset…',
+  download: 'Downloading release asset…',
+  'delete-asset': 'Deleting release asset…',
+}
 
 interface IReleaseEditorState extends IGitHubReleaseDraft {
   readonly mode: 'create' | 'edit'
@@ -95,11 +118,16 @@ interface IGitHubReleasesViewState {
   readonly nextReleasePage: number | null
   readonly releasesCapped: boolean
   readonly selectedReleaseId: number | null
+  readonly search: string
+  readonly searchMode: FilterMode
+  readonly searchCaseSensitive: boolean
+  readonly statusFilter: ReleaseStatusFilter
   readonly assets: ReadonlyArray<IGitHubReleaseAsset>
   readonly assetPage: number
   readonly nextAssetPage: number | null
   readonly assetsCapped: boolean
   readonly busy: BusyOperation | null
+  readonly failedOperation: 'releases' | 'assets' | null
   readonly message: string | null
   readonly error: string | null
   readonly editor: IReleaseEditorState | null
@@ -132,11 +160,16 @@ function initialState(
     nextReleasePage: null,
     releasesCapped: false,
     selectedReleaseId: null,
+    search: '',
+    searchMode: readPersistedFilterMode(ReleasesSearchFilterId),
+    searchCaseSensitive: false,
+    statusFilter: 'all',
     assets: [],
     assetPage: 0,
     nextAssetPage: null,
     assetsCapped: false,
     busy: null,
+    failedOperation: null,
     message: null,
     error: null,
     editor: null,
@@ -164,6 +197,34 @@ function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`
   }
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function releaseStatus(
+  release: IGitHubRelease
+): Exclude<ReleaseStatusFilter, 'all'> {
+  if (release.draft) {
+    return 'draft'
+  }
+  return release.prerelease ? 'prerelease' : 'published'
+}
+
+function releaseStatusLabel(release: IGitHubRelease): string {
+  switch (releaseStatus(release)) {
+    case 'draft':
+      return 'Draft'
+    case 'prerelease':
+      return 'Pre-release'
+    case 'published':
+      return 'Published'
+  }
 }
 
 function appendUnique<T extends { readonly id: number }>(
@@ -238,6 +299,7 @@ export class GitHubReleasesView extends React.Component<
     this.operationController = controller
     this.setState({
       busy: operation,
+      failedOperation: null,
       error: null,
       message: null,
       progress: null,
@@ -299,6 +361,7 @@ export class GitHubReleasesView extends React.Component<
           releasesCapped: result.capped,
           selectedReleaseId,
           busy: null,
+          failedOperation: null,
           error: null,
           message:
             completedMessage ??
@@ -317,6 +380,7 @@ export class GitHubReleasesView extends React.Component<
         const canceled = (error as Error)?.name === 'AbortError'
         this.setState({
           busy: null,
+          failedOperation: canceled ? null : 'releases',
           error: canceled ? null : errorMessage(error),
           message: canceled ? 'Release loading canceled.' : null,
         })
@@ -363,6 +427,7 @@ export class GitHubReleasesView extends React.Component<
         nextAssetPage: result.nextPage,
         assetsCapped: result.capped,
         busy: null,
+        failedOperation: null,
         error: null,
         message: completedMessage ?? null,
       })
@@ -371,6 +436,7 @@ export class GitHubReleasesView extends React.Component<
         const canceled = (error as Error)?.name === 'AbortError'
         this.setState({
           busy: null,
+          failedOperation: canceled ? null : 'assets',
           error: canceled ? null : errorMessage(error),
           message: canceled ? 'Asset loading canceled.' : null,
         })
@@ -416,6 +482,110 @@ export class GitHubReleasesView extends React.Component<
   private loadMoreReleases = () => void this.loadReleases(false)
 
   private refreshReleases = () => void this.loadReleases(true)
+
+  private retryFailedOperation = () => {
+    if (this.state.failedOperation === 'assets') {
+      const releaseId = this.state.selectedReleaseId
+      if (releaseId !== null) {
+        void this.loadAssets(releaseId, true)
+      }
+      return
+    }
+    void this.loadReleases(true)
+  }
+
+  private updateSearch = (event: React.ChangeEvent<HTMLInputElement>) =>
+    this.setState({ search: event.currentTarget.value })
+
+  private updateStatusFilter = (event: React.ChangeEvent<HTMLSelectElement>) =>
+    this.setState({
+      statusFilter: event.currentTarget.value as ReleaseStatusFilter,
+    })
+
+  private onSearchModeChange = (searchMode: FilterMode) => {
+    persistFilterMode(ReleasesSearchFilterId, searchMode)
+    this.setState({ searchMode })
+  }
+
+  private onSearchCaseSensitiveChange = (searchCaseSensitive: boolean) =>
+    this.setState({ searchCaseSensitive })
+
+  private onSearchPatternApply = (search: string) => this.setState({ search })
+
+  private clearReleaseFilters = () =>
+    this.setState({ search: '', statusFilter: 'all' })
+
+  private getSearchSampleItems = () =>
+    this.state.releases.map(
+      release => `${release.name || release.tagName} ${release.tagName}`
+    )
+
+  private getVisibleReleases(): {
+    readonly releases: ReadonlyArray<IGitHubRelease>
+    readonly regexError: string | null
+  } {
+    const { releases, statusFilter, search } = this.state
+    const matchingStatus =
+      statusFilter === 'all'
+        ? releases
+        : releases.filter(release => releaseStatus(release) === statusFilter)
+    const query = search.trim()
+    if (query.length === 0) {
+      return { releases: matchingStatus, regexError: null }
+    }
+
+    const { results, regexError } = matchWithMode(
+      query,
+      matchingStatus,
+      release => [
+        `${release.name} ${release.tagName}`,
+        [
+          release.body,
+          release.targetCommitish,
+          release.authorLogin,
+          ...release.assets.flatMap(asset => [
+            asset.name,
+            asset.label,
+            asset.contentType,
+          ]),
+        ].join(' '),
+      ],
+      {
+        mode: this.state.searchMode,
+        caseSensitive: this.state.searchCaseSensitive,
+      }
+    )
+    return { releases: results.map(match => match.item), regexError }
+  }
+
+  private latestStableRelease(): IGitHubRelease | null {
+    let latest: IGitHubRelease | null = null
+    for (const release of this.state.releases) {
+      if (releaseStatus(release) !== 'published') {
+        continue
+      }
+      const releaseTime = (release.publishedAt ?? release.createdAt).getTime()
+      const latestTime =
+        latest === null
+          ? Number.NEGATIVE_INFINITY
+          : (latest.publishedAt ?? latest.createdAt).getTime()
+      if (releaseTime > latestTime) {
+        latest = release
+      }
+    }
+    return latest
+  }
+
+  private releaseUrl(release: IGitHubRelease): string | null {
+    const baseUrl = this.props.repository.gitHubRepository?.htmlURL
+    if (baseUrl === null || baseUrl === undefined) {
+      return null
+    }
+    const releasesUrl = `${baseUrl.replace(/\/+$/, '')}/releases`
+    return release.draft
+      ? releasesUrl
+      : `${releasesUrl}/tag/${encodeURIComponent(release.tagName)}`
+  }
 
   private preventSubmit = (event: React.FormEvent<HTMLFormElement>) =>
     event.preventDefault()
@@ -1066,7 +1236,75 @@ export class GitHubReleasesView extends React.Component<
     )
   }
 
+  private renderOverview() {
+    const counts = { published: 0, prerelease: 0, draft: 0 }
+    let assetCount = 0
+    let downloadCount = 0
+    for (const release of this.state.releases) {
+      counts[releaseStatus(release)]++
+      assetCount += release.assets.length
+      downloadCount += release.assets.reduce(
+        (sum, asset) => sum + asset.downloadCount,
+        0
+      )
+    }
+    const latestStable = this.latestStableRelease()
+
+    return (
+      <section
+        className="github-releases-overview"
+        aria-label="Loaded release summary"
+      >
+        <article className="github-release-metric">
+          <span>Loaded releases</span>
+          <strong>{this.state.releases.length}</strong>
+          <small>
+            {assetCount} {assetCount === 1 ? 'asset' : 'assets'} ·{' '}
+            {downloadCount} downloads
+          </small>
+        </article>
+        <article className="github-release-metric published">
+          <span>Published</span>
+          <strong>{counts.published}</strong>
+          <small>Stable releases</small>
+        </article>
+        <article className="github-release-metric prerelease">
+          <span>Pre-releases</span>
+          <strong>{counts.prerelease}</strong>
+          <small>Published previews</small>
+        </article>
+        <article className="github-release-metric draft">
+          <span>Drafts</span>
+          <strong>{counts.draft}</strong>
+          <small>Not yet published</small>
+        </article>
+        <article className="github-release-metric latest">
+          <span>Latest stable</span>
+          <strong>
+            {latestStable === null ? 'None loaded' : latestStable.tagName}
+          </strong>
+          <small>
+            {latestStable === null
+              ? 'No stable release is in the loaded results.'
+              : `${formatDate(
+                  latestStable.publishedAt ?? latestStable.createdAt
+                )} · newest stable in loaded results`}
+          </small>
+        </article>
+      </section>
+    )
+  }
+
   private renderReleaseList() {
+    const { releases: visibleReleases, regexError } = this.getVisibleReleases()
+    const latestStableId = this.latestStableRelease()?.id ?? null
+    const hasFilters =
+      this.state.search.trim().length > 0 || this.state.statusFilter !== 'all'
+    const initiallyLoading =
+      this.state.releases.length === 0 &&
+      this.state.releasePage === 0 &&
+      this.state.busy === 'releases'
+
     return (
       <section
         className="github-releases-list-panel"
@@ -1075,25 +1313,116 @@ export class GitHubReleasesView extends React.Component<
         <div className="github-releases-panel-heading">
           <div>
             <h2 id="github-releases-list-title">Repository releases</h2>
-            <span>{this.state.releases.length} loaded</span>
+            <span>
+              {visibleReleases.length} of {this.state.releases.length} shown
+            </span>
           </div>
           <Button disabled={this.state.busy !== null} onClick={this.openCreate}>
             New draft
           </Button>
         </div>
-        {this.state.releases.length === 0 && this.state.busy !== 'releases' ? (
-          <p className="github-releases-empty-copy">
-            Create an unpublished draft to start the first release.
-          </p>
+        {this.state.releases.length > 0 && (
+          <div className="github-releases-filter-area">
+            <div className="github-releases-filter-toolbar">
+              <div className="github-releases-search">
+                <label htmlFor="github-releases-search">
+                  Search loaded releases
+                </label>
+                <div className="github-releases-search-field">
+                  <input
+                    id="github-releases-search"
+                    type="search"
+                    value={this.state.search}
+                    maxLength={256}
+                    placeholder="Name, tag, notes, author, or asset"
+                    onChange={this.updateSearch}
+                  />
+                  <FilterModeControl
+                    mode={this.state.searchMode}
+                    caseSensitive={this.state.searchCaseSensitive}
+                    onModeChange={this.onSearchModeChange}
+                    onCaseSensitiveChange={this.onSearchCaseSensitiveChange}
+                    regexBuilderTarget="Releases"
+                    getSampleItems={this.getSearchSampleItems}
+                    filterText={this.state.search}
+                    onRegexPatternApply={this.onSearchPatternApply}
+                  />
+                </div>
+              </div>
+              <label className="github-releases-status-filter">
+                Status
+                <select
+                  aria-label="Release status"
+                  value={this.state.statusFilter}
+                  onChange={this.updateStatusFilter}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="published">Published</option>
+                  <option value="prerelease">Pre-releases</option>
+                  <option value="draft">Drafts</option>
+                </select>
+              </label>
+            </div>
+            <div className="github-releases-filter-summary">
+              <span>
+                Filtering the {this.state.releases.length} loaded releases
+              </span>
+              {hasFilters && (
+                <Button onClick={this.clearReleaseFilters}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
+            {regexError !== null && (
+              <p className="github-releases-filter-error" role="alert">
+                Invalid release search pattern: {regexError}
+              </p>
+            )}
+          </div>
+        )}
+        {initiallyLoading ? (
+          <div className="github-releases-loading" role="status">
+            <span
+              className="github-releases-loading-indicator"
+              aria-hidden={true}
+            />
+            <div>
+              <strong>Loading releases…</strong>
+              <span>Fetching release metadata from the selected provider.</span>
+            </div>
+          </div>
+        ) : this.state.releases.length === 0 ? (
+          <div className="github-releases-list-empty" role="status">
+            <strong>
+              {this.state.failedOperation === 'releases'
+                ? 'Releases could not be loaded'
+                : 'No releases yet'}
+            </strong>
+            <span>
+              {this.state.failedOperation === 'releases'
+                ? 'Retry the provider request from the error message above.'
+                : 'Create an unpublished draft to start the first release.'}
+            </span>
+          </div>
+        ) : visibleReleases.length === 0 ? (
+          <div className="github-releases-list-empty" role="status">
+            <strong>No loaded releases match</strong>
+            <span>Adjust the search or status filter to see a release.</span>
+            <Button onClick={this.clearReleaseFilters}>Clear filters</Button>
+          </div>
         ) : (
           <div className="github-releases-list">
-            {this.state.releases.map(release => {
+            {visibleReleases.map(release => {
               const selected = release.id === this.state.selectedReleaseId
+              const status = releaseStatus(release)
+              const date = release.publishedAt ?? release.createdAt
               return (
                 <button
                   type="button"
                   value={release.id}
-                  className={`github-release-row${selected ? ' selected' : ''}`}
+                  className={`github-release-row status-${status}${
+                    selected ? ' selected' : ''
+                  }`}
                   aria-current={selected ? 'true' : undefined}
                   disabled={this.state.busy !== null}
                   onClick={this.selectReleaseFromButton}
@@ -1102,15 +1431,21 @@ export class GitHubReleasesView extends React.Component<
                   <span className="github-release-row-title">
                     {release.name || release.tagName}
                   </span>
+                  <span className="github-release-row-badges">
+                    {release.id === latestStableId && (
+                      <span className="github-release-latest-badge">
+                        Latest stable
+                      </span>
+                    )}
+                    <span className="github-release-row-state">
+                      {releaseStatusLabel(release)}
+                    </span>
+                  </span>
                   <span className="github-release-row-tag">
                     {release.tagName}
                   </span>
-                  <span className="github-release-row-state">
-                    {release.draft
-                      ? 'Draft'
-                      : release.prerelease
-                      ? 'Pre-release'
-                      : 'Published'}
+                  <span className="github-release-row-date">
+                    {release.draft ? 'Created' : 'Published'} {formatDate(date)}
                   </span>
                 </button>
               )
@@ -1401,7 +1736,18 @@ export class GitHubReleasesView extends React.Component<
           </Button>
         </div>
         {this.renderUpload()}
-        {this.state.assets.length === 0 && this.state.busy !== 'assets' ? (
+        {this.state.assets.length === 0 && this.state.busy === 'assets' ? (
+          <div className="github-releases-loading compact" role="status">
+            <span
+              className="github-releases-loading-indicator"
+              aria-hidden={true}
+            />
+            <div>
+              <strong>Loading assets…</strong>
+              <span>Fetching files and download metadata.</span>
+            </div>
+          </div>
+        ) : this.state.assets.length === 0 ? (
           <p className="github-releases-empty-copy">No assets are attached.</p>
         ) : (
           <div className="github-release-asset-list">
@@ -1410,15 +1756,21 @@ export class GitHubReleasesView extends React.Component<
                 <div className="github-release-asset-heading">
                   <div>
                     <h4>{asset.name}</h4>
-                    <span>
-                      {asset.label || asset.contentType || 'Release asset'}
-                    </span>
+                    <span>{asset.label || 'Release asset'}</span>
                   </div>
-                  <span>{formatBytes(asset.sizeInBytes)}</span>
+                  <span className="github-release-asset-state">Uploaded</span>
                 </div>
                 <dl>
+                  <dt>File size</dt>
+                  <dd>{formatBytes(asset.sizeInBytes)}</dd>
+                  <dt>Content type</dt>
+                  <dd>{asset.contentType || 'Not supplied'}</dd>
                   <dt>Downloads</dt>
                   <dd>{asset.downloadCount}</dd>
+                  <dt>Uploaded</dt>
+                  <dd>{formatDate(asset.createdAt)}</dd>
+                  <dt>Updated</dt>
+                  <dd>{formatDate(asset.updatedAt)}</dd>
                   <dt>Digest</dt>
                   <dd className="digest">
                     {asset.digest ?? 'Not supplied by GitHub'}
@@ -1483,6 +1835,13 @@ export class GitHubReleasesView extends React.Component<
         </section>
       )
     }
+    const status = releaseStatus(release)
+    const latestStable = this.latestStableRelease()?.id === release.id
+    const releaseUrl = this.releaseUrl(release)
+    const downloadCount = this.state.assets.reduce(
+      (sum, asset) => sum + asset.downloadCount,
+      0
+    )
     return (
       <section
         className="github-release-detail"
@@ -1490,15 +1849,20 @@ export class GitHubReleasesView extends React.Component<
       >
         <header>
           <div>
-            <span
-              className={`github-release-state ${release.draft ? 'draft' : ''}`}
-            >
-              {release.draft
-                ? 'Unpublished draft'
-                : release.prerelease
-                ? 'Published pre-release'
-                : 'Published release'}
-            </span>
+            <div className="github-release-state-row">
+              <span className={`github-release-state ${status}`}>
+                {release.draft
+                  ? 'Unpublished draft'
+                  : release.prerelease
+                  ? 'Published pre-release'
+                  : 'Published release'}
+              </span>
+              {latestStable && (
+                <span className="github-release-latest-badge">
+                  Latest stable
+                </span>
+              )}
+            </div>
             <h2 id="release-detail-title">{release.name || release.tagName}</h2>
             <p>
               <strong>{release.tagName}</strong> targets{' '}
@@ -1506,6 +1870,15 @@ export class GitHubReleasesView extends React.Component<
             </p>
           </div>
           <div className="github-releases-controls">
+            {releaseUrl !== null && (
+              <LinkButton
+                uri={releaseUrl}
+                className="github-release-provider-link"
+                disabled={this.state.busy !== null}
+              >
+                {release.draft ? 'Open Releases page' : 'Open release page'}
+              </LinkButton>
+            )}
             <Button disabled={this.state.busy !== null} onClick={this.openEdit}>
               Edit
             </Button>
@@ -1526,6 +1899,38 @@ export class GitHubReleasesView extends React.Component<
             </Button>
           </div>
         </header>
+        <dl className="github-release-metadata" aria-label="Release metadata">
+          <div>
+            <dt>Status</dt>
+            <dd>{releaseStatusLabel(release)}</dd>
+          </div>
+          <div>
+            <dt>Author</dt>
+            <dd>@{release.authorLogin}</dd>
+          </div>
+          <div>
+            <dt>Created</dt>
+            <dd>{formatDate(release.createdAt)}</dd>
+          </div>
+          <div>
+            <dt>Published</dt>
+            <dd>
+              {release.publishedAt === null
+                ? 'Not published'
+                : formatDate(release.publishedAt)}
+            </dd>
+          </div>
+          <div>
+            <dt>Target</dt>
+            <dd>{release.targetCommitish}</dd>
+          </div>
+          <div>
+            <dt>Loaded assets</dt>
+            <dd>
+              {this.state.assets.length} · {downloadCount} downloads
+            </dd>
+          </div>
+        </dl>
         <div className="github-release-notes">
           <h3>Release notes</h3>
           <p>{release.body || 'No release notes were provided.'}</p>
@@ -1541,7 +1946,7 @@ export class GitHubReleasesView extends React.Component<
       <div className="github-releases-status" aria-live="polite">
         {this.state.busy !== null && (
           <div className="github-releases-busy" role="status">
-            <span>Working: {this.state.busy.replace('-', ' ')}</span>
+            <span>{BusyOperationLabels[this.state.busy]}</span>
             <Button onClick={this.cancelOperation}>Cancel</Button>
           </div>
         )}
@@ -1559,9 +1964,19 @@ export class GitHubReleasesView extends React.Component<
           </div>
         )}
         {this.state.error !== null && (
-          <p className="github-releases-error" role="alert">
-            {this.state.error}
-          </p>
+          <div className="github-releases-error" role="alert">
+            <span>{this.state.error}</span>
+            {this.state.failedOperation !== null && (
+              <Button
+                disabled={this.state.busy !== null}
+                onClick={this.retryFailedOperation}
+              >
+                {this.state.failedOperation === 'assets'
+                  ? 'Retry assets'
+                  : 'Retry releases'}
+              </Button>
+            )}
+          </div>
         )}
         {this.state.message !== null && (
           <p className="github-releases-message" role="status">
@@ -1587,7 +2002,10 @@ export class GitHubReleasesView extends React.Component<
         <header className="github-releases-header">
           <div>
             <h1>Releases</h1>
-            <p>Publish reviewed release metadata and manage verified assets.</p>
+            <p>
+              Review release health, publish approved metadata, and manage
+              verified assets.
+            </p>
           </div>
           <div className="github-releases-header-actions">
             {this.renderAvailability()}
@@ -1604,10 +2022,13 @@ export class GitHubReleasesView extends React.Component<
         </header>
         {this.renderOperationStatus()}
         {this.state.availability === 'available' && (
-          <div className="github-releases-layout">
-            {this.renderReleaseList()}
-            {this.renderDetail()}
-          </div>
+          <>
+            {this.state.releases.length > 0 && this.renderOverview()}
+            <div className="github-releases-layout">
+              {this.renderReleaseList()}
+              {this.renderDetail()}
+            </div>
+          </>
         )}
       </main>
     )

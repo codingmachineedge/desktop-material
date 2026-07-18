@@ -31,10 +31,8 @@ export interface IGitHubNotificationsState {
   readonly participating: boolean
   readonly notifications: ReadonlyArray<IAPINotificationThread>
   readonly loading: boolean
-  readonly loadingMore: boolean
-  readonly hasMore: boolean
-  readonly page: number
   readonly busyThreadId: string | null
+  readonly clearingAll: boolean
   readonly error: IGitHubNotificationsError | null
   readonly lastModified: string | null
   readonly lastUpdated: Date | null
@@ -60,9 +58,14 @@ export type GitHubNotificationsAPIFactory = (
 ) => IGitHubNotificationsAPI
 
 export const GitHubNotificationsPageSize = 50
-export const GitHubNotificationsMaxPages = 4
-export const GitHubNotificationsMaxItems =
-  GitHubNotificationsPageSize * GitHubNotificationsMaxPages
+export const GitHubNotificationsClearConcurrency = 4
+
+export interface IGitHubNotificationsClearResult {
+  readonly attempted: number
+  readonly cleared: number
+  readonly failedIds: ReadonlyArray<string>
+  readonly canceled: boolean
+}
 
 const createState = (
   selectedAccountKey: string | null
@@ -72,10 +75,8 @@ const createState = (
   participating: false,
   notifications: [],
   loading: false,
-  loadingMore: false,
-  hasMore: false,
-  page: 0,
   busyThreadId: null,
+  clearingAll: false,
   error: null,
   lastModified: null,
   lastUpdated: null,
@@ -187,7 +188,7 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
     }
     this.active = false
     this.cancelContext()
-    this.update({ loading: false, loadingMore: false, busyThreadId: null })
+    this.update({ loading: false, busyThreadId: null, clearingAll: false })
   }
 
   public dispose(): void {
@@ -242,7 +243,11 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
   }
 
   public async refresh(force: boolean = false): Promise<void> {
-    if (!this.active || this.state.selectedAccountKey === null) {
+    if (
+      !this.active ||
+      this.state.selectedAccountKey === null ||
+      this.state.clearingAll
+    ) {
       return
     }
     if (
@@ -252,20 +257,7 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
     ) {
       return
     }
-    await this.loadPage(1, true)
-  }
-
-  public async loadMore(): Promise<void> {
-    if (
-      !this.active ||
-      !this.state.hasMore ||
-      this.state.loading ||
-      this.state.loadingMore ||
-      this.state.page >= GitHubNotificationsMaxPages
-    ) {
-      return
-    }
-    await this.loadPage(this.state.page + 1, false)
+    await this.loadAllPages()
   }
 
   public async markThreadRead(threadId: string): Promise<boolean> {
@@ -281,6 +273,120 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
       return true
     }
     return this.mutateThread(threadId, 'done')
+  }
+
+  /**
+   * Mark every thread in the fully loaded inbox done. Successful mutations are
+   * removed in one state update; failed mutations remain in their original
+   * order so the user can retry them. Context changes abort all in-flight work
+   * and prevent stale results from updating the replacement inbox.
+   */
+  public async markAllThreadsDone(): Promise<IGitHubNotificationsClearResult> {
+    const account = this.accountForKey(this.state.selectedAccountKey)
+    const ids = this.state.notifications.map(item => item.id)
+    if (
+      !this.active ||
+      account === null ||
+      this.state.loading ||
+      this.state.busyThreadId !== null ||
+      this.state.clearingAll
+    ) {
+      return {
+        attempted: 0,
+        cleared: 0,
+        failedIds: [],
+        canceled: true,
+      }
+    }
+    if (ids.length === 0) {
+      return {
+        attempted: 0,
+        cleared: 0,
+        failedIds: [],
+        canceled: false,
+      }
+    }
+
+    const contextGeneration = this.contextGeneration
+    const accountKey = getAccountKey(account)
+    const api = this.apiFactory(account)
+    const succeeded = new Set<string>()
+    const failed = new Set<string>()
+    let nextIndex = 0
+    this.update({ clearingAll: true, error: null })
+
+    const worker = async () => {
+      while (this.ownsClearAll(contextGeneration, accountKey)) {
+        const index = nextIndex++
+        const id = ids[index]
+        if (id === undefined) {
+          return
+        }
+
+        const controller = new AbortController()
+        this.mutationControllers.add(controller)
+        try {
+          await api.markNotificationThreadDone(id, controller.signal)
+          if (!this.ownsClearAll(contextGeneration, accountKey)) {
+            return
+          }
+          succeeded.add(id)
+        } catch (error) {
+          if (
+            !this.ownsClearAll(contextGeneration, accountKey) ||
+            isAbortError(error)
+          ) {
+            return
+          }
+          failed.add(id)
+        } finally {
+          this.mutationControllers.delete(controller)
+        }
+      }
+    }
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(ids.length, GitHubNotificationsClearConcurrency) },
+        worker
+      )
+    )
+
+    if (!this.ownsClearAll(contextGeneration, accountKey)) {
+      return {
+        attempted: ids.length,
+        cleared: succeeded.size,
+        failedIds: [...failed],
+        canceled: true,
+      }
+    }
+
+    const failedIds = ids.filter(id => failed.has(id))
+    const failedCount = failedIds.length
+    this.update({
+      notifications: this.state.notifications.filter(
+        item => !succeeded.has(item.id)
+      ),
+      clearingAll: false,
+      error:
+        failedCount === 0
+          ? null
+          : {
+              kind: 'unknown',
+              message: `${failedCount} GitHub notification${
+                failedCount === 1 ? '' : 's'
+              } could not be marked done. ${
+                failedCount === 1 ? 'It remains' : 'They remain'
+              } in the inbox so you can retry.`,
+              rateLimitReset: null,
+            },
+    })
+    return {
+      attempted: ids.length,
+      cleared: succeeded.size,
+      failedIds,
+      canceled: false,
+    }
   }
 
   private githubAccounts(accounts: ReadonlyArray<Account>) {
@@ -340,7 +446,12 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
     this.mutationControllers.clear()
   }
 
-  private async loadPage(page: number, replace: boolean): Promise<void> {
+  /**
+   * Load the complete selected GitHub inbox. GitHub bounds each response page,
+   * so a refresh follows every advertised next page instead of making older
+   * notifications depend on a manual "Load more" action or an item ceiling.
+   */
+  private async loadAllPages(): Promise<void> {
     const account = this.accountForKey(this.state.selectedAccountKey)
     if (account === null) {
       return
@@ -352,51 +463,60 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
     const controller = new AbortController()
     this.loadController = controller
     this.update({
-      loading: replace,
-      loadingMore: !replace,
+      loading: true,
       error: null,
     })
 
     try {
-      const result = await this.apiFactory(account).fetchNotifications({
-        includeRead: this.state.filter === 'all',
-        participating: this.state.participating,
-        page,
-        perPage: GitHubNotificationsPageSize,
-        lastModified: replace ? this.state.lastModified : null,
-        signal: controller.signal,
-      })
-      if (!this.ownsLoad(contextGeneration, requestId, controller)) {
-        return
+      const api = this.apiFactory(account)
+      let page = 1
+      let notifications: ReadonlyArray<IAPINotificationThread> = []
+      let lastModified = this.state.lastModified
+      let pollIntervalSeconds: number | null = null
+      let notModified = false
+
+      while (true) {
+        const result = await api.fetchNotifications({
+          includeRead: this.state.filter === 'all',
+          participating: this.state.participating,
+          page,
+          perPage: GitHubNotificationsPageSize,
+          lastModified: page === 1 ? this.state.lastModified : null,
+          signal: controller.signal,
+        })
+        if (!this.ownsLoad(contextGeneration, requestId, controller)) {
+          return
+        }
+
+        if (page === 1) {
+          lastModified = result.lastModified ?? lastModified
+          pollIntervalSeconds = result.pollIntervalSeconds
+          if (result.notModified) {
+            notModified = true
+            break
+          }
+        }
+
+        notifications = this.mergeNotifications(
+          notifications,
+          result.notifications
+        )
+        if (!result.hasNextPage) {
+          break
+        }
+        page++
       }
 
-      const notifications = result.notModified
-        ? this.state.notifications
-        : replace
-        ? result.notifications.slice(0, GitHubNotificationsMaxItems)
-        : this.mergeNotifications(
-            this.state.notifications,
-            result.notifications
-          ).slice(0, GitHubNotificationsMaxItems)
-      const currentPage = result.notModified ? this.state.page : page
-      const hasMore =
-        !result.notModified &&
-        result.hasNextPage &&
-        currentPage < GitHubNotificationsMaxPages &&
-        notifications.length < GitHubNotificationsMaxItems
       const updatedAt = this.now()
       const nextRefreshAt =
-        result.pollIntervalSeconds === null
+        pollIntervalSeconds === null
           ? null
-          : new Date(updatedAt.getTime() + result.pollIntervalSeconds * 1000)
+          : new Date(updatedAt.getTime() + pollIntervalSeconds * 1000)
       this.update({
-        notifications,
-        page: currentPage,
-        hasMore,
+        notifications: notModified ? this.state.notifications : notifications,
         loading: false,
-        loadingMore: false,
         error: null,
-        lastModified: result.lastModified ?? this.state.lastModified,
+        lastModified,
         lastUpdated: updatedAt,
         nextRefreshAt,
       })
@@ -409,7 +529,6 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
       }
       this.update({
         loading: false,
-        loadingMore: false,
         error: githubNotificationsError(error),
       })
     } finally {
@@ -447,7 +566,11 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
     action: 'read' | 'done'
   ): Promise<boolean> {
     const account = this.accountForKey(this.state.selectedAccountKey)
-    if (account === null || this.state.busyThreadId !== null) {
+    if (
+      account === null ||
+      this.state.busyThreadId !== null ||
+      this.state.clearingAll
+    ) {
       return false
     }
 
@@ -513,6 +636,15 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
       threadId === this.state.busyThreadId &&
       this.mutationControllers.has(controller) &&
       !controller.signal.aborted
+    )
+  }
+
+  private ownsClearAll(contextGeneration: number, accountKey: string): boolean {
+    return (
+      this.active &&
+      contextGeneration === this.contextGeneration &&
+      accountKey === this.state.selectedAccountKey &&
+      this.state.clearingAll
     )
   }
 }

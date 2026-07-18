@@ -11,7 +11,7 @@ import {
   IBatchCloneState,
 } from '../../../src/models/batch-clone'
 import { SubmoduleFetchStage } from '../../../src/models/progress'
-import { fireEvent, render, screen } from '../../helpers/ui/render'
+import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 
 // The Dialog component sends an IPC message and opens the native <dialog> on
 // mount; neither is wired in jsdom, so stub them for the lifetime of each test.
@@ -167,5 +167,52 @@ describe('BatchCloneProgress rows', () => {
       '.batch-clone-item progress'
     )
     assert.equal(progress?.hasAttribute('value'), false)
+  })
+
+  it('keeps Done open until durable batch dismissal succeeds', async () => {
+    let finishSuccessfulDismissal: (result: boolean) => void = () => {}
+    const successfulDismissal = new Promise<boolean>(resolve => {
+      finishSuccessfulDismissal = resolve
+    })
+    let dismissalCalls = 0
+    let dismissed = 0
+    const dismissalDispatcher = {
+      dismissBatchClone: () => {
+        dismissalCalls += 1
+        return dismissalCalls === 1
+          ? Promise.resolve(false)
+          : successfulDismissal
+      },
+    } as unknown as Dispatcher
+
+    render(
+      <BatchCloneProgress
+        dispatcher={dismissalDispatcher}
+        onDismissed={() => {
+          dismissed += 1
+        }}
+        batchCloneState={{
+          ...stateWith({ kind: 'failed' }),
+          isRunning: false,
+          isDone: true,
+          overallProgress: 1,
+        }}
+        isTopMost={true}
+      />
+    )
+
+    const done = screen.getByRole('button', { name: 'Done' })
+    fireEvent.click(done)
+    await waitFor(() => assert.equal(dismissalCalls, 1))
+    await Promise.resolve()
+    assert.equal(dismissed, 0)
+    assert.ok(screen.getByRole('button', { name: 'Done' }))
+
+    fireEvent.click(done)
+    fireEvent.click(done)
+    assert.equal(dismissalCalls, 2, 'repeat activation is ignored in flight')
+    finishSuccessfulDismissal(true)
+    await waitFor(() => assert.equal(dismissed, 1))
+    assert.equal(dismissalCalls, 2)
   })
 })

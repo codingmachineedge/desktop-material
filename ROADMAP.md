@@ -12,7 +12,8 @@ implementation details and historical test receipts stay in
 - Secure LAN agent access with QR pairing, per-device vault tokens,
   revocation, and the Docker-hosted mobile console (timeouts aligned to the
   agent's 65-second command budget).
-- SSH working-copy management with vault-only credential storage, plus the
+- SSH working-copy management with vault-only credential storage and opt-in,
+  fast-forward-only Docker Compose deployment after matching app pushes, plus the
   verified one-line Windows installer on README, wiki, and Pages (with a
   copy button and celebration pulse).
 - Submodules everywhere: clone-list badges with a pre-clone details dialog

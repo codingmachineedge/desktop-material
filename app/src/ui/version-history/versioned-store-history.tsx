@@ -628,7 +628,7 @@ export class VersionedStoreHistory extends React.Component<
                 {this.renderFileChips(entry.sha)}
               </span>
             </span>
-            {index === 0 ? (
+            {index === 0 && !this.isReadOnly ? (
               <span className="versioned-store-history-head">HEAD</span>
             ) : null}
           </button>

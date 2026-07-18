@@ -24,4 +24,13 @@ describe('GitHub Releases responsive Material styles', () => {
     assert.match(styles, /--md-sys-color-error-container/)
     assert.match(styles, /\.destructive/)
   })
+
+  it('styles the dashboard, filters, metadata, and resilient loading states', () => {
+    assert.match(styles, /\.github-releases-overview/)
+    assert.match(styles, /\.github-release-metric\.latest/)
+    assert.match(styles, /\.github-releases-filter-toolbar/)
+    assert.match(styles, /\.github-release-metadata/)
+    assert.match(styles, /\.github-releases-loading-indicator/)
+    assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
+  })
 })

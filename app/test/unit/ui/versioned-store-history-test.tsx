@@ -232,6 +232,7 @@ describe('versioned store history', () => {
       screen.queryByRole('button', { name: /Restore Snapshot/i }),
       null
     )
+    assert.equal(screen.queryByText('HEAD'), null)
   })
 
   it('filters the shared timeline with substring and regex modes', async () => {

@@ -90,6 +90,22 @@ describe('NotificationCentreStore bulk mutations', () => {
     await store.deleteMany(new Set(['missing']))
     assert.deepEqual(descriptions, ['Delete 2 notifications'])
   })
+
+  it('clears the complete retained list in one persisted action', async () => {
+    const { store, harness, descriptions } = createHarness([
+      entry('newest', false),
+      entry('middle', true),
+      entry('oldest', false),
+    ])
+
+    await store.clearAll()
+
+    assert.deepEqual(harness.entries, [])
+    assert.deepEqual(descriptions, ['Clear all notifications'])
+
+    await store.clearAll()
+    assert.deepEqual(descriptions, ['Clear all notifications'])
+  })
 })
 
 describe('NotificationCentreStore crash-safe recovery', () => {

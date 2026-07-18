@@ -102,6 +102,7 @@ export class NotificationCentrePanel extends React.Component<
   private doneReturnFocus: HTMLButtonElement | null = null
   private clearConfirmation: HTMLDivElement | null = null
   private clearReturnFocus: HTMLButtonElement | null = null
+  private clearSource: NotificationSource | null = null
   private bulkConfirmation: HTMLDivElement | null = null
   private bulkReturnFocus: HTMLButtonElement | null = null
   private selectAllCheckbox: HTMLInputElement | null = null
@@ -155,8 +156,24 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private onGitHubState = (github: IGitHubNotificationsState) => {
+    const contextChanged =
+      github.selectedAccountKey !== this.state.github.selectedAccountKey ||
+      github.filter !== this.state.github.filter ||
+      github.participating !== this.state.github.participating
+    if (
+      contextChanged &&
+      this.state.source === 'github' &&
+      this.state.confirmingClear
+    ) {
+      this.clearReturnFocus = null
+      this.clearSource = null
+    }
     this.setState(state => ({
       github,
+      confirmingClear:
+        contextChanged && state.source === 'github'
+          ? false
+          : state.confirmingClear,
       confirmingDone:
         state.confirmingDone !== null &&
         github.notifications.some(item => item.id === state.confirmingDone?.id)
@@ -183,6 +200,7 @@ export class NotificationCentrePanel extends React.Component<
 
   private onClose = () => {
     this.doneReturnFocus = null
+    this.clearSource = null
     this.githubStore.stop()
     this.props.dispatcher.setNotificationCentreOpen(false)
   }
@@ -192,6 +210,7 @@ export class NotificationCentrePanel extends React.Component<
       return
     }
     this.doneReturnFocus = null
+    this.clearSource = null
     this.setState(
       {
         source,
@@ -245,7 +264,7 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private restoreFocus(returnFocus: HTMLButtonElement | null) {
-    if (returnFocus?.isConnected) {
+    if (returnFocus?.isConnected && !returnFocus.disabled) {
       returnFocus.focus()
     } else {
       const tab =
@@ -498,6 +517,7 @@ export class NotificationCentrePanel extends React.Component<
   // never silently clear (the confirmation button owns the destructive path).
   private onRequestClearAll = (event: React.MouseEvent<HTMLButtonElement>) => {
     this.clearReturnFocus = event.currentTarget
+    this.clearSource = this.state.source
     this.setState({ confirmingClear: true }, () =>
       this.clearConfirmation?.focus()
     )
@@ -507,21 +527,31 @@ export class NotificationCentrePanel extends React.Component<
     if (!this.state.confirmingClear) {
       return
     }
+    const source = this.clearSource ?? this.state.source
     const returnFocus = this.clearReturnFocus
     this.clearReturnFocus = null
+    this.clearSource = null
     this.setState({
       confirmingClear: false,
-      selectedLocalIds: new Set<string>(),
+      bulkBusy: true,
+      selectedLocalIds:
+        source === 'local' ? new Set<string>() : this.state.selectedLocalIds,
+      selectedGitHubIds:
+        source === 'github' ? new Set<string>() : this.state.selectedGitHubIds,
     })
     try {
-      await this.props.dispatcher.clearAllNotifications()
+      if (source === 'local') {
+        await this.props.dispatcher.clearAllNotifications()
+      } else {
+        await this.githubStore.markAllThreadsDone()
+      }
     } catch (error) {
       await this.props.dispatcher.postError(
         error instanceof Error ? error : new Error(String(error))
       )
     } finally {
-      if (this.mounted) {
-        this.restoreFocus(returnFocus)
+      if (this.mounted && this.state.source === source) {
+        this.setState({ bulkBusy: false }, () => this.restoreFocus(returnFocus))
       }
     }
   }
@@ -529,6 +559,7 @@ export class NotificationCentrePanel extends React.Component<
   private onCancelClearAll = () => {
     const returnFocus = this.clearReturnFocus
     this.clearReturnFocus = null
+    this.clearSource = null
     this.setState({ confirmingClear: false }, () =>
       this.restoreFocus(returnFocus)
     )
@@ -789,10 +820,6 @@ export class NotificationCentrePanel extends React.Component<
 
   private onRefreshGitHub = () => {
     void this.githubStore.refresh()
-  }
-
-  private onLoadMore = () => {
-    void this.githubStore.loadMore()
   }
 
   private onActivateGitHub = (thread: IAPINotificationThread) => {
@@ -1087,6 +1114,8 @@ export class NotificationCentrePanel extends React.Component<
 
   private renderBulkToolbar() {
     const local = this.state.source === 'local'
+    const busy =
+      this.state.bulkBusy || (!local && this.state.github.clearingAll)
     const selected = this.currentSelectedIds
     const selectedEntries = this.props.entries.filter(entry =>
       this.state.selectedLocalIds.has(entry.id)
@@ -1098,7 +1127,10 @@ export class NotificationCentrePanel extends React.Component<
       ? selectedEntries.some(entry => !entry.read)
       : selectedThreads.some(thread => thread.unread)
     const canMarkUnread = selectedEntries.some(entry => entry.read)
-    const disabled = selected.size === 0 || this.state.bulkBusy
+    const disabled = selected.size === 0 || busy
+    const clearCount = local
+      ? this.props.entries.length
+      : this.state.github.notifications.length
     return (
       <div className="notification-centre-bulk-toolbar">
         <label className="notification-centre-select-all">
@@ -1106,7 +1138,7 @@ export class NotificationCentrePanel extends React.Component<
             ref={this.onSelectAllCheckboxRef}
             type="checkbox"
             checked={this.allVisibleSelected}
-            disabled={this.visibleIds.length === 0 || this.state.bulkBusy}
+            disabled={this.visibleIds.length === 0 || busy}
             aria-label="Select all visible notifications"
             onChange={this.onSelectAllVisible}
           />
@@ -1140,16 +1172,16 @@ export class NotificationCentrePanel extends React.Component<
           >
             {local ? 'Delete selected' : 'Mark selected done'}
           </button>
-          {local ? (
-            <button
-              type="button"
-              className="clear-all"
-              disabled={this.props.entries.length === 0 || this.state.bulkBusy}
-              onClick={this.onRequestClearAll}
-            >
-              Clear all
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="clear-all"
+            disabled={
+              clearCount === 0 || busy || (!local && this.state.github.loading)
+            }
+            onClick={this.onRequestClearAll}
+          >
+            Clear all
+          </button>
         </div>
       </div>
     )
@@ -1159,6 +1191,10 @@ export class NotificationCentrePanel extends React.Component<
     if (!this.state.confirmingClear) {
       return null
     }
+    const local = this.state.source === 'local'
+    const count = local
+      ? this.props.entries.length
+      : this.state.github.notifications.length
     return (
       <div
         className="notification-centre-confirmation"
@@ -1170,12 +1206,18 @@ export class NotificationCentrePanel extends React.Component<
         ref={this.onClearConfirmationRef}
       >
         <strong id="notification-centre-clear-title">
-          Clear every Local notification?
+          {local
+            ? 'Clear every Local notification?'
+            : 'Clear every GitHub notification?'}
         </strong>
         <span id="notification-centre-clear-description">
-          This removes {this.props.entries.length} notification
-          {this.props.entries.length === 1 ? '' : 's'} from the current list.
-          Notification history can restore them later.
+          {local
+            ? `This removes ${count} notification${
+                count === 1 ? '' : 's'
+              } from the current list. Notification history can restore them later.`
+            : `This marks all ${count} notification${
+                count === 1 ? '' : 's'
+              } done and removes them from the selected GitHub inbox. Any failures stay visible so you can retry.`}
         </span>
         <span className="notification-centre-confirmation-actions">
           <button type="button" onClick={this.onCancelClearAll}>
@@ -1469,16 +1511,6 @@ export class NotificationCentrePanel extends React.Component<
             />
           ))}
         </ol>
-        {github.hasMore || github.loadingMore ? (
-          <button
-            type="button"
-            className="github-notifications-load-more"
-            disabled={github.loadingMore}
-            onClick={this.onLoadMore}
-          >
-            {github.loadingMore ? 'Loading…' : 'Load more'}
-          </button>
-        ) : null}
       </>
     )
   }
@@ -1538,7 +1570,7 @@ export class NotificationCentrePanel extends React.Component<
             aria-busy={
               source === 'github' &&
               (this.state.github.loading ||
-                this.state.github.loadingMore ||
+                this.state.github.clearingAll ||
                 this.state.github.busyThreadId !== null)
             }
             tabIndex={0}

@@ -468,7 +468,18 @@ test.describe('Auto-update', () => {
 
       await quitBtn.click()
 
-      // Poll the OS to confirm the renderer process exited
+      // Poll the OS to confirm the renderer process exited.
+      //
+      // "Quit anyway" does not terminate the renderer immediately. The renderer
+      // first drains its durable shutdown tasks (RendererShutdownCoordinator in
+      // app/src/ui/lib/renderer-shutdown.ts, a hard 10s cap) and only *then*
+      // sends the `quit-app` IPC that closes the window and tears the renderer
+      // process down. Under CI load that drain can approach its 10s cap — the
+      // clone-recovery-journal task pauses and flushes a disk/Git-bound store —
+      // and window teardown adds more on top. A 10s poll therefore raced the
+      // app's own shutdown budget and produced false "waiting on the predicate"
+      // timeouts. Allow well beyond the internal cap so a slow-but-healthy quit
+      // is not reported as a failure; a genuine hang still fails, just later.
       await expect
         .poll(
           () => {
@@ -479,7 +490,7 @@ test.describe('Auto-update', () => {
               return true
             }
           },
-          { timeout: 10000, intervals: [200] }
+          { timeout: 30000, intervals: [200] }
         )
         .toBe(true)
 

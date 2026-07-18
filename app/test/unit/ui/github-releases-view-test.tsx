@@ -17,7 +17,13 @@ import {
 import { IGitHubReleaseTransferProgressEvent } from '../../../src/lib/github-release-transfer'
 import { updateEndpointVersion } from '../../../src/lib/endpoint-capabilities'
 import { GitHubReleasesView } from '../../../src/ui/github-releases'
-import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '../../helpers/ui/render'
 
 const repositoryPath = resolve('release-fixtures', 'material')
 const uploadAssetPath = resolve('release-fixtures', 'build', 'desktop.exe')
@@ -174,6 +180,189 @@ describe('GitHub Releases view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load more releases' }))
     await waitFor(() => assert.ok(screen.getByText('Earlier')))
     assert.deepEqual(pages, [1, 2])
+  })
+
+  it('summarizes, filters, and exposes rich metadata for loaded releases', async () => {
+    const stable = {
+      ...draft,
+      id: 8,
+      tagName: 'v0.9.0',
+      name: 'Stable Material',
+      draft: false,
+      publishedAt: new Date('2026-07-12T12:00:00Z'),
+      authorLogin: 'release-bot',
+    }
+    const preview = {
+      ...draft,
+      id: 9,
+      tagName: 'v1.1.0-beta.1',
+      name: 'Material Preview',
+      body: 'Preview channel notes',
+      draft: false,
+      prerelease: true,
+      publishedAt: new Date('2026-07-13T08:00:00Z'),
+      assets: [],
+    }
+    const linkedRemote = new GitHubRepository(
+      'material',
+      new Owner('desktop', 'https://api.github.com', 1),
+      1,
+      false,
+      'https://github.com/desktop/material'
+    )
+    const linkedRepository = new Repository(
+      repositoryPath,
+      1,
+      linkedRemote,
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      getAccountKey(account)
+    )
+    const store = fakeStore({
+      list: async () => ({
+        releases: [draft, preview, stable],
+        page: 1,
+        nextPage: null,
+        capped: false,
+      }),
+    })
+    render(
+      <GitHubReleasesView
+        repository={linkedRepository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Desktop Material 1.0' }))
+    )
+    const summary = screen.getByRole('region', {
+      name: 'Loaded release summary',
+    })
+    assert.ok(within(summary).getByText('v0.9.0'))
+    assert.match(
+      within(summary).getByText('Published').closest('article')?.textContent ??
+        '',
+      /Published1Stable releases/
+    )
+    assert.match(
+      within(summary).getByText('Pre-releases').closest('article')
+        ?.textContent ?? '',
+      /Pre-releases1Published previews/
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Stable Material/ }))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Stable Material' }))
+    )
+    const metadata = screen.getByLabelText('Release metadata')
+    assert.match(metadata.textContent ?? '', /StatusPublished/)
+    assert.match(metadata.textContent ?? '', /Author@release-bot/)
+    assert.match(metadata.textContent ?? '', /Loaded assets1 · 3 downloads/)
+    assert.ok(screen.getByText('application/octet-stream'))
+    assert.equal(
+      screen
+        .getByRole('link', { name: 'Open release page' })
+        .getAttribute('href'),
+      'https://github.com/desktop/material/releases/tag/v0.9.0'
+    )
+
+    fireEvent.change(screen.getByLabelText('Search loaded releases'), {
+      target: { value: 'Preview' },
+    })
+    assert.ok(screen.getByRole('button', { name: /Material Preview/ }))
+    assert.equal(
+      screen.queryByRole('button', { name: /Stable Material/ }),
+      null
+    )
+
+    fireEvent.change(screen.getByLabelText('Search loaded releases'), {
+      target: { value: '' },
+    })
+    fireEvent.change(screen.getByLabelText('Release status'), {
+      target: { value: 'draft' },
+    })
+    assert.ok(screen.getByRole('button', { name: /Desktop Material 1.0/ }))
+    assert.equal(
+      screen.queryByRole('button', { name: /Material Preview/ }),
+      null
+    )
+  })
+
+  it('shows loading and a retryable provider error before recovering', async () => {
+    let rejectInitial!: (error: Error) => void
+    const initialRequest = new Promise<never>((_resolve, reject) => {
+      rejectInitial = reject
+    })
+    let calls = 0
+    const store = fakeStore({
+      list: async () => {
+        calls++
+        if (calls === 1) {
+          return await initialRequest
+        }
+        return {
+          releases: [draft],
+          page: 1,
+          nextPage: null,
+          capped: false,
+        }
+      },
+    })
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getAllByText('Loading releases…').length >= 1)
+    )
+    rejectInitial(new Error('Provider temporarily unavailable'))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('alert').textContent?.includes('temporarily'))
+    )
+    assert.ok(screen.getByText('Releases could not be loaded'))
+    fireEvent.click(screen.getByRole('button', { name: 'Retry releases' }))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Desktop Material 1.0' }))
+    )
+    assert.equal(calls, 2)
+  })
+
+  it('distinguishes a loaded repository with no releases', async () => {
+    const store = fakeStore({
+      list: async () => ({
+        releases: [],
+        page: 1,
+        nextPage: null,
+        capped: false,
+      }),
+    })
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+
+    await waitFor(() => assert.ok(screen.getByText('No releases yet')))
+    assert.ok(
+      screen.getByText(
+        'Create an unpublished draft to start the first release.'
+      )
+    )
+    assert.equal(
+      screen.queryByRole('region', { name: 'Loaded release summary' }),
+      null
+    )
   })
 
   it('creates only an unpublished draft after an explicit metadata review', async () => {

@@ -613,10 +613,14 @@ keep local app events separate from GitHub inbox items:
   all** opens an inline confirmation and the notification history can restore the removed entries
   later.
 - **GitHub** uses an explicit account selector with **All**, **Unread**, and **Participating only**
-  controls. Search loaded titles, repositories, types, and reasons; select all visible matches;
-  then mark them read or done in bulk. Changing account, source, filter, or search safely resets the
-  scoped selection. When no account is signed in, the complete **No signed-in accounts** state
-  remains visible and tells you to sign in before refreshing the inbox.
+  controls. Refresh follows every available 50-item API page automatically, so older entries no
+  longer stop at 50 or require **Load more**. Search the complete fetched titles, repositories,
+  types, and reasons; select all visible matches; then mark them read or done in bulk. **Clear all**
+  names the exact fetched count and requires confirmation before marking the complete selected
+  GitHub inbox done with bounded concurrency. Any failed threads stay visible for retry. Changing
+  account, source, filter, or search safely cancels stale work and resets the scoped selection. When
+  no account is signed in, the complete **No signed-in accounts** state remains visible and tells
+  you to sign in before refreshing the inbox.
 
 The account, filters, and empty state are part of the guided inbox workflow rather than a `gh`
 command or GitHub API search screen.
@@ -820,6 +824,14 @@ list.
   lock/repair/remove/prune worktree operations from the Worktrees view. Remote names and URLs wrap
   only when genuinely long; before a field/control column becomes unreadable, each row changes to a
   single-column layout with fetch/push controls and actions in keyboard order.
+- In the same **Remote** settings page, save a non-secret SSH working-copy definition and keep its
+  password or key passphrase in the operating-system credential vault. Turn on **Deploy Docker
+  Compose after pushes to this source remote** to deploy only after Desktop Material successfully
+  pushes that named remote. The SSH checkout must already be on the pushed branch; the app fetches
+  that exact branch, requires a fast-forward merge, and then runs
+  `docker compose up --detach --build`. A mismatched branch or non-fast-forward update stops without
+  a reset, force operation, or automatic checkout. **Deploy Docker now** runs the same bounded,
+  output-redacted SSH recipe on demand.
 - Open **Repository settings → Submodules** and choose **Add submodule…** to browse GitHub.com,
   Enterprise, GitLab, or Bitbucket with the appropriate exact account, or enter an HTTPS, SSH, or
   local Git URL. Review the repository-relative checkout path and optional branch; Desktop rechecks

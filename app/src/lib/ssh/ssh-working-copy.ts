@@ -23,6 +23,7 @@ export type SSHWorkingCopyAction =
   | 'fetch'
   | 'pull'
   | 'push'
+  | 'deploy'
 
 /**
  * Non-secret metadata for one working copy hosted over SSH. Passwords and key
@@ -40,6 +41,8 @@ export interface ISSHWorkingCopyDefinition {
   readonly destinationPath: string
   /** The local named remote. Its URL is resolved transiently at clone time. */
   readonly sourceRemoteName: string | null
+  /** Fast-forward this checkout and deploy Docker Compose after a matching push. */
+  readonly deployOnPush?: boolean
 }
 
 export interface ISSHWorkingCopyResult {
@@ -67,6 +70,7 @@ const definitionKeys = new Set([
   'authenticationReference',
   'destinationPath',
   'sourceRemoteName',
+  'deployOnPush',
 ])
 
 const hasControlCharacters = (value: string): boolean =>
@@ -202,6 +206,21 @@ const validateSourceRemoteName = (value: string | null): string | null => {
 export function validateSSHWorkingCopyDefinition(
   definition: ISSHWorkingCopyDefinition
 ): ISSHWorkingCopyDefinition {
+  if (
+    definition.deployOnPush !== undefined &&
+    typeof definition.deployOnPush !== 'boolean'
+  ) {
+    throw new Error('Deploy-after-push must be enabled or disabled.')
+  }
+  const sourceRemoteName = validateSourceRemoteName(
+    definition.sourceRemoteName
+  )
+  if (definition.deployOnPush === true && sourceRemoteName === null) {
+    throw new Error(
+      'Choose a source remote before enabling Docker deployment after push.'
+    )
+  }
+
   return {
     id: validateIdentifier(definition.id),
     label: validateLabel(definition.label),
@@ -214,7 +233,8 @@ export function validateSSHWorkingCopyDefinition(
     destinationPath: validateSSHRemoteDestinationPath(
       definition.destinationPath
     ),
-    sourceRemoteName: validateSourceRemoteName(definition.sourceRemoteName),
+    sourceRemoteName,
+    ...(definition.deployOnPush === true ? { deployOnPush: true } : {}),
   }
 }
 
@@ -266,7 +286,9 @@ const parseStoredDefinition = (
       typeof value.authenticationReference !== 'string') ||
     typeof value.destinationPath !== 'string' ||
     (value.sourceRemoteName !== null &&
-      typeof value.sourceRemoteName !== 'string')
+      typeof value.sourceRemoteName !== 'string') ||
+    (value.deployOnPush !== undefined &&
+      typeof value.deployOnPush !== 'boolean')
   ) {
     return null
   }
@@ -341,6 +363,22 @@ export function saveSSHWorkingCopies(
   storage.setItem(getSSHWorkingCopyStorageKey(repositoryPath), serialized)
 }
 
+/** Enabled SSH Docker targets whose configured source is the pushed remote. */
+export function loadSSHDockerDeploymentsForPush(
+  repositoryPath: string,
+  remoteName: string,
+  storage: ISSHWorkingCopyStorage = localStorage
+): ReadonlyArray<ISSHWorkingCopyDefinition> {
+  if (remoteName.length === 0) {
+    return []
+  }
+  return loadSSHWorkingCopies(repositoryPath, storage).filter(
+    definition =>
+      definition.deployOnPush === true &&
+      definition.sourceRemoteName === remoteName
+  )
+}
+
 /** Quote one value as a literal POSIX shell word for the remote shell. */
 export const quotePOSIXShellWord = (value: string): string =>
   `'${value.replace(/'/g, `'"'"'`)}'`
@@ -394,7 +432,8 @@ export function validateSSHCloneSourceUrl(value: string): string {
 export function buildSSHWorkingCopyCommand(
   definition: ISSHWorkingCopyDefinition,
   action: SSHWorkingCopyAction,
-  sourceUrl?: string
+  sourceUrl?: string,
+  expectedBranch?: string
 ): string {
   const validated = validateSSHWorkingCopyDefinition(definition)
   const destination = quotePOSIXShellWord(validated.destinationPath)
@@ -409,7 +448,10 @@ export function buildSSHWorkingCopyCommand(
         )
       }
       const source = quotePOSIXShellWord(validateSSHCloneSourceUrl(sourceUrl))
-      return `set -eu; destination=${destination}; parent=$(dirname "$destination"); mkdir -p "$parent"; if [ -e "$destination" ]; then printf 'Remote destination already exists.\\n' >&2; exit 17; fi; git clone -- ${source} "$destination"`
+      const remote = quotePOSIXShellWord(
+        validated.sourceRemoteName ?? 'origin'
+      )
+      return `set -eu; destination=${destination}; remote=${remote}; parent=$(dirname "$destination"); mkdir -p "$parent"; if [ -e "$destination" ]; then printf 'Remote destination already exists.\\n' >&2; exit 17; fi; git clone -- ${source} "$destination"; if [ "$remote" != origin ]; then git -C "$destination" remote rename origin "$remote"; fi`
     }
     case 'status':
       return `set -eu; git -C ${destination} status --short --branch`
@@ -419,13 +461,32 @@ export function buildSSHWorkingCopyCommand(
       return `set -eu; git -C ${destination} pull --ff-only`
     case 'push':
       return `set -eu; git -C ${destination} push`
+    case 'deploy': {
+      if (validated.sourceRemoteName === null) {
+        throw new Error(
+          'Choose the source remote that the SSH deployment should follow.'
+        )
+      }
+      if (
+        expectedBranch !== undefined &&
+        (expectedBranch.length === 0 ||
+          expectedBranch.length > 1024 ||
+          /[\u0000-\u001f\u007f]/.test(expectedBranch))
+      ) {
+        throw new Error('The pushed branch is not safe to deploy over SSH.')
+      }
+      const remote = quotePOSIXShellWord(validated.sourceRemoteName)
+      const expected = quotePOSIXShellWord(expectedBranch ?? '')
+      return `set -eu; destination=${destination}; remote=${remote}; expected=${expected}; branch=$(git -C "$destination" symbolic-ref --quiet --short HEAD); if [ -n "$expected" ]; then git check-ref-format --branch "$expected" >/dev/null; if [ "$branch" != "$expected" ]; then printf 'Remote checkout branch does not match the pushed branch.\n' >&2; exit 18; fi; fi; git -C "$destination" fetch --prune -- "$remote" "$branch"; git -C "$destination" merge --ff-only -- "refs/remotes/$remote/$branch"; cd "$destination"; docker compose up --detach --build`
+    }
   }
 }
 
 export function buildSSHWorkingCopyArguments(
   definition: ISSHWorkingCopyDefinition,
   action: SSHWorkingCopyAction,
-  sourceUrl?: string
+  sourceUrl?: string,
+  expectedBranch?: string
 ): ReadonlyArray<string> {
   const validated = validateSSHWorkingCopyDefinition(definition)
   const args = [
@@ -466,7 +527,7 @@ export function buildSSHWorkingCopyArguments(
   args.push(
     '--',
     validated.host,
-    buildSSHWorkingCopyCommand(validated, action, sourceUrl)
+    buildSSHWorkingCopyCommand(validated, action, sourceUrl, expectedBranch)
   )
   return args
 }
@@ -497,7 +558,11 @@ const isRawSSHAuthenticationFailure = (error: unknown): boolean =>
   )
 
 const getActionTimeout = (action: SSHWorkingCopyAction): number =>
-  action === 'test' || action === 'status' ? 30_000 : 180_000
+  action === 'test' || action === 'status'
+    ? 30_000
+    : action === 'deploy'
+    ? 600_000
+    : 180_000
 
 /**
  * Execute one bounded SSH operation. Dynamic connection values are argv items,
@@ -509,9 +574,15 @@ export async function runSSHWorkingCopyAction(
   definition: ISSHWorkingCopyDefinition,
   action: SSHWorkingCopyAction,
   sourceUrl?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  expectedBranch?: string
 ): Promise<ISSHWorkingCopyResult> {
-  const args = buildSSHWorkingCopyArguments(definition, action, sourceUrl)
+  const args = buildSSHWorkingCopyArguments(
+    definition,
+    action,
+    sourceUrl,
+    expectedBranch
+  )
   const executable = await getSSHExecutable()
 
   return withTrampolineEnv(
