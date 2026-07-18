@@ -1115,7 +1115,10 @@ export class NotificationCentrePanel extends React.Component<
   private renderBulkToolbar() {
     const local = this.state.source === 'local'
     const busy =
-      this.state.bulkBusy || (!local && this.state.github.clearingAll)
+      this.state.bulkBusy ||
+      (!local &&
+        (this.state.github.clearingAll ||
+          this.state.github.busyThreadId !== null))
     const selected = this.currentSelectedIds
     const selectedEntries = this.props.entries.filter(entry =>
       this.state.selectedLocalIds.has(entry.id)

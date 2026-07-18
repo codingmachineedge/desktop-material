@@ -266,7 +266,9 @@ export class GitHubReleasesView extends React.Component<
       prevProps.accounts !== this.props.accounts
     ) {
       this.resetForProps()
+      return
     }
+    this.reconcileSelectionWithVisibleReleases()
   }
 
   public componentWillUnmount() {
@@ -370,7 +372,12 @@ export class GitHubReleasesView extends React.Component<
               : null),
         },
         () => {
-          if (selectedReleaseId !== null) {
+          if (
+            selectedReleaseId !== null &&
+            this.getVisibleReleases().releases.some(
+              release => release.id === selectedReleaseId
+            )
+          ) {
             void this.loadAssets(selectedReleaseId, true, completedMessage)
           }
         }
@@ -556,6 +563,36 @@ export class GitHubReleasesView extends React.Component<
       }
     )
     return { releases: results.map(match => match.item), regexError }
+  }
+
+  /**
+   * Filters must not leave a hidden release selected in the adjacent detail
+   * pane, where its edit and destructive actions would otherwise remain live.
+   * Wait for an in-flight operation to settle before clearing its context.
+   */
+  private reconcileSelectionWithVisibleReleases() {
+    const selectedReleaseId = this.state.selectedReleaseId
+    if (selectedReleaseId === null || this.state.busy !== null) {
+      return
+    }
+    const visible = this.getVisibleReleases().releases
+    if (visible.some(release => release.id === selectedReleaseId)) {
+      return
+    }
+
+    const assetsFailed = this.state.failedOperation === 'assets'
+    this.setState({
+      selectedReleaseId: null,
+      assets: [],
+      assetPage: 0,
+      nextAssetPage: null,
+      assetsCapped: false,
+      failedOperation: assetsFailed ? null : this.state.failedOperation,
+      error: assetsFailed ? null : this.state.error,
+      editor: this.state.editor?.mode === 'edit' ? null : this.state.editor,
+      upload: null,
+      confirmation: null,
+    })
   }
 
   private latestStableRelease(): IGitHubRelease | null {

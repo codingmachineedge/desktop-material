@@ -463,6 +463,49 @@ describe('NotificationCentrePanel', () => {
     )
   })
 
+  it('disables Clear all while an exact GitHub thread mutation is pending', async () => {
+    const selected = account('first', 1)
+    let resolveRead!: () => void
+    const pendingRead = new Promise<void>(resolve => {
+      resolveRead = resolve
+    })
+    const store = new GitHubNotificationsStore([selected], () => ({
+      fetchNotifications: async () => page([notification('alpha')]),
+      markNotificationThreadRead: async () => pendingRead,
+      markNotificationThreadDone: async () => {},
+    }))
+
+    render(
+      <NotificationCentrePanel
+        dispatcher={dispatcher}
+        entries={[]}
+        unreadCount={0}
+        repositories={[]}
+        accounts={[selected]}
+        githubNotificationsStore={store}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'GitHub' }))
+    await waitFor(() => assert.ok(screen.getByText('Notification alpha')))
+    const clearAll = screen.getByRole('button', { name: 'Clear all' })
+    assert.equal((clearAll as HTMLButtonElement).disabled, false)
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Mark as read: Notification alpha',
+      })
+    )
+    await waitFor(() =>
+      assert.equal((clearAll as HTMLButtonElement).disabled, true)
+    )
+
+    resolveRead()
+    await waitFor(() =>
+      assert.equal((clearAll as HTMLButtonElement).disabled, false)
+    )
+  })
+
   it('loads all pages across accounts and supports exact read and done actions', async () => {
     const first = account('first', 1)
     const second = account('second', 2)

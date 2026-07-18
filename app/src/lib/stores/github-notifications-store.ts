@@ -312,17 +312,24 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
     const api = this.apiFactory(account)
     const succeeded = new Set<string>()
     const failed = new Set<string>()
+    const attempted = new Set<string>()
+    let globalError: IGitHubNotificationsError | null = null
+    let stopDequeuing = false
     let nextIndex = 0
     this.update({ clearingAll: true, error: null })
 
     const worker = async () => {
-      while (this.ownsClearAll(contextGeneration, accountKey)) {
+      while (
+        this.ownsClearAll(contextGeneration, accountKey) &&
+        !stopDequeuing
+      ) {
         const index = nextIndex++
         const id = ids[index]
         if (id === undefined) {
           return
         }
 
+        attempted.add(id)
         const controller = new AbortController()
         this.mutationControllers.add(controller)
         try {
@@ -339,6 +346,14 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
             return
           }
           failed.add(id)
+          const mappedError = githubNotificationsError(error)
+          if (
+            mappedError.kind === 'authentication' ||
+            mappedError.kind === 'rate-limit'
+          ) {
+            globalError ??= mappedError
+            stopDequeuing = true
+          }
         } finally {
           this.mutationControllers.delete(controller)
         }
@@ -354,7 +369,7 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
 
     if (!this.ownsClearAll(contextGeneration, accountKey)) {
       return {
-        attempted: ids.length,
+        attempted: attempted.size,
         cleared: succeeded.size,
         failedIds: [...failed],
         canceled: true,
@@ -369,7 +384,9 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
       ),
       clearingAll: false,
       error:
-        failedCount === 0
+        globalError !== null
+          ? globalError
+          : failedCount === 0
           ? null
           : {
               kind: 'unknown',
@@ -382,7 +399,7 @@ export class GitHubNotificationsStore extends TypedBaseStore<IGitHubNotification
             },
     })
     return {
-      attempted: ids.length,
+      attempted: attempted.size,
       cleared: succeeded.size,
       failedIds,
       canceled: false,

@@ -539,7 +539,7 @@
   font-weight: 650;
   text-decoration: none;
 
-  &:hover,
+  &:not([aria-disabled='true']):hover,
   &:focus-visible {
     background: var(--md-sys-color-surface-container-high);
   }

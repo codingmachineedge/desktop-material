@@ -279,6 +279,17 @@ describe('GitHub Releases view', () => {
       screen.queryByRole('button', { name: /Stable Material/ }),
       null
     )
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('heading', { name: 'Select or create a release' })
+      )
+    )
+    assert.equal(screen.queryByRole('button', { name: 'Review delete' }), null)
+
+    fireEvent.click(screen.getByRole('button', { name: /Material Preview/ }))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Material Preview' }))
+    )
 
     fireEvent.change(screen.getByLabelText('Search loaded releases'), {
       target: { value: '' },
@@ -290,6 +301,11 @@ describe('GitHub Releases view', () => {
     assert.equal(
       screen.queryByRole('button', { name: /Material Preview/ }),
       null
+    )
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('heading', { name: 'Select or create a release' })
+      )
     )
   })
 

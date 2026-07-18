@@ -254,6 +254,58 @@ describe('GitHubNotificationsStore', () => {
     store.dispose()
   })
 
+  for (const fixture of [
+    {
+      label: 'authentication',
+      error: new APIError(new Response(null, { status: 401 }), null),
+      kind: 'authentication',
+    },
+    {
+      label: 'rate-limit',
+      error: new APIError(new Response(null, { status: 429 }), null),
+      kind: 'rate-limit',
+    },
+  ] as const) {
+    it(`stops clear-all dequeueing after a global ${fixture.label} failure`, async () => {
+      const items = Array.from({ length: 8 }, (_, index) =>
+        notification(String(index))
+      )
+      const calls = new Array<string>()
+      const inFlight = deferred<void>()
+      const store = new GitHubNotificationsStore([account('first', 1)], () => ({
+        fetchNotifications: async () => page(items),
+        markNotificationThreadRead: async () => {},
+        markNotificationThreadDone: async id => {
+          calls.push(id)
+          if (id === '0') {
+            throw fixture.error
+          }
+          await inFlight.promise
+        },
+      }))
+
+      await store.start()
+      const clearing = store.markAllThreadsDone()
+      await Promise.resolve()
+
+      assert.deepEqual(calls, ['0', '1', '2', '3'])
+      inFlight.resolve(undefined)
+      const result = await clearing
+
+      assert.equal(result.attempted, GitHubNotificationsClearConcurrency)
+      assert.equal(result.cleared, 3)
+      assert.deepEqual(result.failedIds, ['0'])
+      assert.equal(result.canceled, false)
+      assert.deepEqual(
+        store.getState().notifications.map(item => item.id),
+        ['0', '4', '5', '6', '7']
+      )
+      assert.equal(store.getState().error?.kind, fixture.kind)
+      assert.equal(store.getState().clearingAll, false)
+      store.dispose()
+    })
+  }
+
   it('aborts a clear-all operation when the account context changes', async () => {
     const first = account('first', 1)
     const second = account('second', 2)

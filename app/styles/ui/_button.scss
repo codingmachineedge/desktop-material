@@ -98,7 +98,7 @@
 
   &[aria-disabled='true'] {
     opacity: 0.6;
-    cursor: default;
+    cursor: default !important;
     text-decoration: none;
   }
 

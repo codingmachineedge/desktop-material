@@ -150,6 +150,9 @@ describe('path text and link button surfaces', () => {
 
     assert.equal(link.getAttribute('href'), 'https://example.com/docs')
     assert.equal(button.getAttribute('role'), 'button')
+    assert.equal(link.getAttribute('aria-disabled'), null)
+    assert.equal(disabledLink.getAttribute('aria-disabled'), 'true')
+    assert.equal((disabledLink as HTMLAnchorElement).tabIndex, -1)
     assert.equal(hoverCount, 1)
     assert.deepEqual(openedUrls, ['https://example.com/docs'])
     assert.equal(callbackClicks, 1)

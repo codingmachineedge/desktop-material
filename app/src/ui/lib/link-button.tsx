@@ -44,6 +44,7 @@ export class LinkButton extends React.Component<ILinkButtonProps, {}> {
 
   public render() {
     const href = this.props.uri || ''
+    const disabled = this.props.disabled === true
     /**
      * If this component is to open something external like a link, it should
      * have the role of link as is default by the <a> tag. If this component is
@@ -69,8 +70,9 @@ export class LinkButton extends React.Component<ILinkButtonProps, {}> {
         onFocus={this.props.onMouseOver}
         onBlur={this.props.onMouseOut}
         onClick={this.onClick}
-        tabIndex={this.props.tabIndex}
+        tabIndex={disabled ? -1 : this.props.tabIndex}
         aria-label={this.props.ariaLabel}
+        aria-disabled={disabled || undefined}
         role={role}
       >
         {tooltip && (
