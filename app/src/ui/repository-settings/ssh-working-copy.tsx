@@ -1,6 +1,7 @@
 import * as React from 'react'
 
 import { IRemoteConfiguration } from '../../models/remote'
+import { getRemotePushURL } from '../../lib/git/remote'
 import {
   createSSHWorkingCopyId,
   ISSHWorkingCopyDefinition,
@@ -10,6 +11,7 @@ import {
   runSSHWorkingCopyAction,
   saveSSHWorkingCopies,
   SSHWorkingCopyAction,
+  validateSSHCloneSourceUrl,
   validateSSHWorkingCopyDefinition,
 } from '../../lib/ssh/ssh-working-copy'
 import { Button } from '../lib/button'
@@ -24,6 +26,10 @@ interface ISSHWorkingCopyManagerProps {
   readonly sourceRemotes: ReadonlyArray<IRemoteConfiguration>
   readonly disabled: boolean
   readonly storage?: ISSHWorkingCopyStorage
+  readonly resolveRemotePushUrl?: (
+    repositoryPath: string,
+    remoteName: string
+  ) => Promise<string | null>
   readonly runAction?: (
     repositoryPath: string,
     definition: ISSHWorkingCopyDefinition,
@@ -54,12 +60,21 @@ interface ISSHWorkingCopyManagerState {
   readonly output: string
 }
 
+const getCredentialFreePushUrl = (
+  remote: IRemoteConfiguration
+): string | null => {
+  const url = remote.pushUrl ?? remote.fetchUrl
+  const hasCredentials =
+    remote.pushUrl === null
+      ? remote.fetchUrlHasCredentials
+      : remote.pushUrlHasCredentials
+  return !hasCredentials && url.length > 0 ? url : null
+}
+
 const getCredentialFreeRemotes = (
   remotes: ReadonlyArray<IRemoteConfiguration>
 ): ReadonlyArray<IRemoteConfiguration> =>
-  remotes.filter(
-    remote => !remote.fetchUrlHasCredentials && remote.fetchUrl.length > 0
-  )
+  remotes.filter(remote => getCredentialFreePushUrl(remote) !== null)
 
 const createDraft = (sourceRemoteName = ''): ISSHWorkingCopyDraft => ({
   id: createSSHWorkingCopyId(),
@@ -154,9 +169,8 @@ export class SSHWorkingCopyManager extends React.Component<
     this.updateDraft({ destinationPath })
   private onSourceRemoteChanged = (event: React.FormEvent<HTMLSelectElement>) =>
     this.updateDraft({ sourceRemoteName: event.currentTarget.value })
-  private onDeployOnPushChanged = (
-    event: React.FormEvent<HTMLInputElement>
-  ) => this.updateDraft({ deployOnPush: event.currentTarget.checked })
+  private onDeployOnPushChanged = (event: React.FormEvent<HTMLInputElement>) =>
+    this.updateDraft({ deployOnPush: event.currentTarget.checked })
 
   private onSavedHostChanged = (event: React.FormEvent<HTMLSelectElement>) => {
     const id = event.currentTarget.value
@@ -181,6 +195,16 @@ export class SSHWorkingCopyManager extends React.Component<
 
   private createDefinition(): ISSHWorkingCopyDefinition {
     const portText = this.state.draft.port.trim()
+    if (this.state.draft.deployOnPush) {
+      const source = this.props.sourceRemotes.find(
+        remote => remote.name === this.state.draft.sourceRemoteName
+      )
+      if (source === undefined || getCredentialFreePushUrl(source) === null) {
+        throw new Error(
+          'Choose a current source remote whose push URL has no embedded credentials before enabling Docker deployment.'
+        )
+      }
+    }
     return validateSSHWorkingCopyDefinition({
       id: this.state.draft.id,
       label: this.state.draft.label,
@@ -280,16 +304,33 @@ export class SSHWorkingCopyManager extends React.Component<
     let sourceUrl: string | undefined
     try {
       definition = this.createDefinition()
-      if (action === 'clone') {
+      if (action === 'clone' || action === 'deploy') {
         const source = this.props.sourceRemotes.find(
           remote => remote.name === definition.sourceRemoteName
         )
-        if (source === undefined || source.fetchUrlHasCredentials) {
+        const pushUrl =
+          source === undefined ? null : getCredentialFreePushUrl(source)
+        if (source === undefined || pushUrl === null) {
           throw new Error(
-            'Choose a current source remote without embedded credentials before cloning.'
+            `Choose a current source remote whose push URL has no embedded credentials before ${
+              action === 'clone' ? 'cloning' : 'deploying'
+            }.`
           )
         }
-        sourceUrl = source.fetchUrl
+        const resolveRemotePushUrl =
+          this.props.resolveRemotePushUrl ??
+          ((repositoryPath: string, remoteName: string) =>
+            getRemotePushURL({ path: repositoryPath }, remoteName))
+        const resolvedPushUrl = await resolveRemotePushUrl(
+          this.props.repositoryPath,
+          source.name
+        )
+        if (resolvedPushUrl === null) {
+          throw new Error(
+            'The selected source remote push URL could not be resolved.'
+          )
+        }
+        sourceUrl = validateSSHCloneSourceUrl(resolvedPushUrl)
       }
     } catch (error) {
       this.setState({
@@ -487,9 +528,7 @@ export class SSHWorkingCopyManager extends React.Component<
         <Checkbox
           className="ssh-deploy-on-push"
           label="Deploy Docker Compose after pushes to this source remote"
-          value={
-            draft.deployOnPush ? CheckboxValue.On : CheckboxValue.Off
-          }
+          value={draft.deployOnPush ? CheckboxValue.On : CheckboxValue.Off}
           disabled={busy || sourceRemotes.length === 0}
           onChange={this.onDeployOnPushChanged}
         />

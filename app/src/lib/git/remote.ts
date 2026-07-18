@@ -87,6 +87,31 @@ export async function getRemoteURL(
 }
 
 /**
+ * Get the URL Git will use when pushing to the named remote. This honors an
+ * explicit push URL and otherwise falls back to the fetch URL, matching
+ * `git push <remote>` without performing any network operation.
+ *
+ * Returns null if the remote could not be found.
+ */
+export async function getRemotePushURL(
+  repository: Pick<Repository, 'path'>,
+  name: string
+): Promise<string | null> {
+  const result = await git(
+    ['remote', 'get-url', '--push', '--', name],
+    repository.path,
+    'getRemotePushURL',
+    { successExitCodes: new Set([0, 2, 128]) }
+  )
+
+  if (result.exitCode !== 0) {
+    return null
+  }
+
+  return result.stdout.trim()
+}
+
+/**
  * Update the HEAD ref of the remote, which is the default branch.
  *
  * @param isBackgroundTask Whether the fetch is being performed as a

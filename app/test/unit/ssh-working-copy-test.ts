@@ -99,10 +99,7 @@ describe('SSH working-copy safety boundary', () => {
       'ssh://git@example.test/team/project.git'
     )
     assert.match(renamedRemoteCommand, /remote='upstream'/)
-    assert.match(
-      renamedRemoteCommand,
-      /remote rename origin "\$remote"/
-    )
+    assert.match(renamedRemoteCommand, /remote rename origin "\$remote"/)
 
     const args = buildSSHWorkingCopyArguments(definition, 'status')
     assert.deepEqual(args.slice(-3, -1), ['--', definition.host])
@@ -125,19 +122,39 @@ describe('SSH working-copy safety boundary', () => {
   })
 
   it('fast-forwards the exact pushed branch before a bounded Docker Compose deployment', () => {
+    const sourceUrl = 'ssh://git@example.test/team/project.git'
     const command = buildSSHWorkingCopyCommand(
       definition,
       'deploy',
-      undefined,
+      sourceUrl,
       'feature/docker-deploy'
     )
 
     assert.match(command, /symbolic-ref --quiet --short HEAD/)
+    assert.match(command, /remote get-url -- "\$remote"/)
+    assert.match(
+      command,
+      /source='ssh:\/\/git@example\.test\/team\/project\.git'/
+    )
+    assert.match(command, /"\$actual_source" != "\$source"/)
     assert.match(command, /check-ref-format --branch "\$expected"/)
     assert.match(command, /"\$branch" != "\$expected"/)
-    assert.match(command, /fetch --prune -- "\$remote" "\$branch"/)
+    assert.match(
+      command,
+      /fetch --prune -- "\$remote" "\+refs\/heads\/\$branch:\$remote_ref"/
+    )
+    assert.match(command, /merge-base --is-ancestor HEAD "\$remote_ref"/)
     assert.match(command, /merge --ff-only --/)
+    assert.match(command, /"\$head" != "\$remote_head"/)
     assert.match(command, /docker compose up --detach --build/)
+    assert.ok(
+      command.indexOf('merge-base --is-ancestor') <
+        command.indexOf('docker compose')
+    )
+    assert.ok(
+      command.indexOf('"$head" != "$remote_head"') <
+        command.indexOf('docker compose')
+    )
     assert.doesNotMatch(
       command,
       /\bgit(?:\s+-C\s+"\$destination")?\s+(?:reset|checkout)\b|--force\b/
@@ -148,7 +165,7 @@ describe('SSH working-copy safety boundary', () => {
         buildSSHWorkingCopyCommand(
           definition,
           'deploy',
-          undefined,
+          sourceUrl,
           'main\nmalicious'
         ),
       /not safe to deploy/
@@ -160,6 +177,20 @@ describe('SSH working-copy safety boundary', () => {
           'deploy'
         ),
       /source remote/
+    )
+    assert.throws(
+      () => buildSSHWorkingCopyCommand(definition, 'deploy'),
+      /credential-free source remote URL/
+    )
+    assert.throws(
+      () =>
+        buildSSHWorkingCopyCommand(
+          definition,
+          'deploy',
+          'https://user:secret@example.test/team/project.git',
+          'main'
+        ),
+      /without embedded credentials/
     )
   })
 

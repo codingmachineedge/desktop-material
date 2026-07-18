@@ -4,6 +4,7 @@ import { realpath } from 'fs/promises'
 import { Repository } from '../../../src/models/repository'
 import {
   getRemotes,
+  getRemotePushURL,
   addRemote,
   removeRemote,
   setRemoteURL,
@@ -182,6 +183,24 @@ describe('git/remote', () => {
 
       assert(result !== null)
       assert.equal(result.name, 'origin')
+    })
+  })
+
+  describe('getRemotePushURL', () => {
+    it('returns the exact configured push URL and falls back to the fetch URL', async t => {
+      const repository = await setupEmptyRepository(t)
+      const fetchUrl = 'ssh://git@fetch.example.invalid/team/project.git'
+      const pushUrl = 'ssh://git@push.example.invalid/team/project.git'
+      await addRemote(repository, 'origin', fetchUrl)
+
+      assert.equal(await getRemotePushURL(repository, 'origin'), fetchUrl)
+
+      await exec(
+        ['remote', 'set-url', '--push', 'origin', pushUrl],
+        repository.path
+      )
+      assert.equal(await getRemotePushURL(repository, 'origin'), pushUrl)
+      assert.equal(await getRemotePushURL(repository, 'missing'), null)
     })
   })
 

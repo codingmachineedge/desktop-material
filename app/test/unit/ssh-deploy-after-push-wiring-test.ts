@@ -15,10 +15,7 @@ describe('SSH Docker deployment after push wiring', () => {
       'await this._refreshRepository(repository)',
       abortedGuard
     )
-    const deploy = source.indexOf(
-      'await this.deployDockerAfterPush(',
-      refresh
-    )
+    const deploy = source.indexOf('await this.deployDockerAfterPush(', refresh)
 
     assert.ok(performPush >= 0)
     assert.ok(abortedGuard > performPush)
@@ -40,11 +37,34 @@ describe('SSH Docker deployment after push wiring', () => {
     const nextMethod = source.indexOf('\n  private async ', deployMethod + 1)
     const implementation = source.slice(deployMethod, nextMethod)
     assert.match(implementation, /loadSSHDockerDeploymentsForPush/)
+    assert.match(implementation, /getRemotePushURL\(repository, remoteName\)/)
     assert.match(
       implementation,
-      /runSSHWorkingCopyAction\([\s\S]*?'deploy'[\s\S]*?branchName/
+      /runSSHWorkingCopyAction\([\s\S]*?'deploy'[\s\S]*?pushedRemoteUrl[\s\S]*?branchName/
     )
     assert.match(implementation, /catch \(error\)/)
     assert.match(implementation, /title: 'Docker deployment failed'/)
+
+    const scheduledPush = source.indexOf('private async performScheduledPush')
+    const scheduledPushCall = source.indexOf('await pushRepo(', scheduledPush)
+    const scheduledRefresh = source.indexOf(
+      'await this._refreshRepository(repository)',
+      scheduledPushCall
+    )
+    const scheduledDeploy = source.indexOf(
+      'await this.deployDockerAfterPush(',
+      scheduledRefresh
+    )
+    const scheduledEnd = source.indexOf('\n  private async ', scheduledPush + 1)
+
+    assert.ok(scheduledPush >= 0)
+    assert.ok(scheduledPushCall > scheduledPush)
+    assert.ok(scheduledRefresh > scheduledPushCall)
+    assert.ok(scheduledDeploy > scheduledRefresh)
+    assert.ok(scheduledDeploy < scheduledEnd)
+    assert.match(
+      source.slice(scheduledDeploy, scheduledDeploy + 180),
+      /repository,[\s\S]*?remoteName,[\s\S]*?pushedBranchName/
+    )
   })
 })

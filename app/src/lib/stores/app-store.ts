@@ -292,6 +292,7 @@ import {
   getBranchMergeBaseDiff,
   checkoutCommit,
   getRemoteURL,
+  getRemotePushURL,
   getGlobalConfigPath,
   getFilesDiffText,
   isMergeHeadSet,
@@ -2912,6 +2913,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       throw new Error('Another network operation is already in progress.')
     }
     const remoteName = tip.branch.upstreamRemoteName ?? remote.name
+    const pushedBranchName = tip.branch.upstreamWithoutRemote ?? tip.branch.name
     const safeRemote: IRemote = { name: remoteName, url: remote.url }
     const gitStore = this.gitStoreCache.get(repository)
 
@@ -2926,6 +2928,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       )
       gitStore.clearTagsToPush()
       await this._refreshRepository(repository)
+      await this.deployDockerAfterPush(repository, remoteName, pushedBranchName)
     })
   }
 
@@ -7250,6 +7253,23 @@ export class AppStore extends TypedBaseStore<IAppState> {
       repository.path,
       remoteName
     )
+    let pushedRemoteUrl: string | null = null
+    let remoteUrlError: Error | null = null
+
+    if (deployments.length > 0) {
+      try {
+        pushedRemoteUrl = await getRemotePushURL(repository, remoteName)
+        if (pushedRemoteUrl === null) {
+          remoteUrlError = new Error(
+            'The pushed remote URL could not be resolved for deployment.'
+          )
+        }
+      } catch {
+        remoteUrlError = new Error(
+          'The pushed remote URL could not be resolved for deployment.'
+        )
+      }
+    }
 
     for (const deployment of deployments) {
       this.updatePushPullFetchProgress(repository, {
@@ -7260,11 +7280,19 @@ export class AppStore extends TypedBaseStore<IAppState> {
       })
 
       try {
+        if (remoteUrlError !== null || pushedRemoteUrl === null) {
+          throw (
+            remoteUrlError ??
+            new Error(
+              'The pushed remote URL could not be resolved for deployment.'
+            )
+          )
+        }
         await runSSHWorkingCopyAction(
           repository.path,
           deployment,
           'deploy',
-          undefined,
+          pushedRemoteUrl,
           undefined,
           branchName
         )

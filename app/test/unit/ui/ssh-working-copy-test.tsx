@@ -32,7 +32,7 @@ const sourceRemotes = [
     name: 'origin',
     fetchUrl: 'ssh://git@example.test/team/project.git',
     fetchUrlHasCredentials: false,
-    pushUrl: null,
+    pushUrl: 'ssh://git@push.example.test/team/project.git',
     pushUrlHasCredentials: false,
     prune: 'inherit' as const,
     defaultBranch: 'main',
@@ -54,6 +54,12 @@ describe('SSH Working Copy manager', () => {
         sourceRemotes={sourceRemotes}
         disabled={false}
         storage={storage}
+        resolveRemotePushUrl={async (_, remoteName) => {
+          const remote = sourceRemotes.find(
+            candidate => candidate.name === remoteName
+          )
+          return remote?.pushUrl ?? remote?.fetchUrl ?? null
+        }}
         runAction={async (_, definition, action, sourceUrl, signal) => {
           calls.push({ definition, action, sourceUrl, signal })
           return { stdout: '## main...origin/main\n', stderr: '' }
@@ -96,7 +102,7 @@ describe('SSH Working Copy manager', () => {
     fireEvent.click(screen.getByRole('button', { name: /Clone/ }))
     await waitFor(() => assert.equal(calls.length, 1))
     assert.equal(calls[0].action, 'clone')
-    assert.equal(calls[0].sourceUrl, sourceRemotes[0].fetchUrl)
+    assert.equal(calls[0].sourceUrl, sourceRemotes[0].pushUrl)
     assert.equal(calls[0].definition.destinationPath, '/srv/work/project')
     assert.equal(calls[0].signal?.aborted, false)
     assert.ok(await screen.findByLabelText('SSH command output'))
@@ -104,7 +110,10 @@ describe('SSH Working Copy manager', () => {
     fireEvent.click(screen.getByRole('button', { name: /Deploy Docker now/ }))
     await waitFor(() => assert.equal(calls.length, 2))
     assert.equal(calls[1].action, 'deploy')
-    assert.equal(calls[1].sourceUrl, undefined)
+    assert.equal(
+      calls[1].sourceUrl,
+      'ssh://git@push.example.test/team/project.git'
+    )
   })
 
   it('never offers credential-bearing local remotes as clone sources', () => {
@@ -114,7 +123,7 @@ describe('SSH Working Copy manager', () => {
         sourceRemotes={[
           {
             ...sourceRemotes[0],
-            fetchUrlHasCredentials: true,
+            pushUrlHasCredentials: true,
           },
         ]}
         disabled={false}

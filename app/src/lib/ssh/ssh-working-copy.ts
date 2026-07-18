@@ -212,9 +212,7 @@ export function validateSSHWorkingCopyDefinition(
   ) {
     throw new Error('Deploy-after-push must be enabled or disabled.')
   }
-  const sourceRemoteName = validateSourceRemoteName(
-    definition.sourceRemoteName
-  )
+  const sourceRemoteName = validateSourceRemoteName(definition.sourceRemoteName)
   if (definition.deployOnPush === true && sourceRemoteName === null) {
     throw new Error(
       'Choose a source remote before enabling Docker deployment after push.'
@@ -448,9 +446,7 @@ export function buildSSHWorkingCopyCommand(
         )
       }
       const source = quotePOSIXShellWord(validateSSHCloneSourceUrl(sourceUrl))
-      const remote = quotePOSIXShellWord(
-        validated.sourceRemoteName ?? 'origin'
-      )
+      const remote = quotePOSIXShellWord(validated.sourceRemoteName ?? 'origin')
       return `set -eu; destination=${destination}; remote=${remote}; parent=$(dirname "$destination"); mkdir -p "$parent"; if [ -e "$destination" ]; then printf 'Remote destination already exists.\\n' >&2; exit 17; fi; git clone -- ${source} "$destination"; if [ "$remote" != origin ]; then git -C "$destination" remote rename origin "$remote"; fi`
     }
     case 'status':
@@ -467,6 +463,11 @@ export function buildSSHWorkingCopyCommand(
           'Choose the source remote that the SSH deployment should follow.'
         )
       }
+      if (sourceUrl === undefined) {
+        throw new Error(
+          'Resolve a credential-free source remote URL before deploying.'
+        )
+      }
       if (
         expectedBranch !== undefined &&
         (expectedBranch.length === 0 ||
@@ -476,8 +477,9 @@ export function buildSSHWorkingCopyCommand(
         throw new Error('The pushed branch is not safe to deploy over SSH.')
       }
       const remote = quotePOSIXShellWord(validated.sourceRemoteName)
+      const source = quotePOSIXShellWord(validateSSHCloneSourceUrl(sourceUrl))
       const expected = quotePOSIXShellWord(expectedBranch ?? '')
-      return `set -eu; destination=${destination}; remote=${remote}; expected=${expected}; branch=$(git -C "$destination" symbolic-ref --quiet --short HEAD); if [ -n "$expected" ]; then git check-ref-format --branch "$expected" >/dev/null; if [ "$branch" != "$expected" ]; then printf 'Remote checkout branch does not match the pushed branch.\n' >&2; exit 18; fi; fi; git -C "$destination" fetch --prune -- "$remote" "$branch"; git -C "$destination" merge --ff-only -- "refs/remotes/$remote/$branch"; cd "$destination"; docker compose up --detach --build`
+      return `set -eu; destination=${destination}; remote=${remote}; source=${source}; expected=${expected}; branch=$(git -C "$destination" symbolic-ref --quiet --short HEAD); git check-ref-format --branch "$branch" >/dev/null; if [ -n "$expected" ]; then git check-ref-format --branch "$expected" >/dev/null; if [ "$branch" != "$expected" ]; then printf 'Remote checkout branch does not match the pushed branch.\n' >&2; exit 18; fi; fi; actual_source=$(git -C "$destination" remote get-url -- "$remote"); if [ "$actual_source" != "$source" ]; then printf 'Remote checkout source does not match the pushed repository.\n' >&2; exit 19; fi; remote_ref="refs/remotes/$remote/$branch"; git -C "$destination" fetch --prune -- "$remote" "+refs/heads/$branch:$remote_ref"; if ! git -C "$destination" merge-base --is-ancestor HEAD "$remote_ref"; then printf 'Remote checkout contains commits outside the fetched branch.\n' >&2; exit 20; fi; git -C "$destination" merge --ff-only -- "$remote_ref"; head=$(git -C "$destination" rev-parse --verify HEAD); remote_head=$(git -C "$destination" rev-parse --verify "$remote_ref"); if [ "$head" != "$remote_head" ]; then printf 'Remote checkout did not reach the fetched branch exactly.\n' >&2; exit 20; fi; cd "$destination"; docker compose up --detach --build`
     }
   }
 }
