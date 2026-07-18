@@ -84,6 +84,17 @@ class FailingJournal extends MemoryJournal {
   }
 }
 
+class ToggleJournal extends MemoryJournal {
+  public failSaves = true
+
+  public override async save(snapshot: IBatchCloneJournalSnapshot) {
+    if (this.failSaves) {
+      throw new Error('injected journal failure')
+    }
+    await super.save(snapshot)
+  }
+}
+
 function stagingManager(
   overrides: Partial<IBatchCloneStagingManager> = {}
 ): IBatchCloneStagingManager {
@@ -909,6 +920,179 @@ describe('batch clone journal and recovery', () => {
     assert.equal(inspections, 2)
     assert.equal(cloneCalls, 0)
     assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'review')
+  })
+
+  it('degrades journal write failures to a soft, non-modal recovery notice', async () => {
+    const journal = new ToggleJournal()
+    let modalErrors = 0
+    const store = new BatchCloneStore(
+      {
+        clone: async () => true,
+      } as unknown as CloningRepositoriesStore,
+      journal,
+      async () => 'empty'
+    )
+    store.onDidError(() => {
+      modalErrors += 1
+    })
+    await store.initialize()
+    await store.startBatch([first], BatchCloneMode.Sequential)
+
+    // No modal error is raised; the failure is surfaced only as soft state.
+    assert.equal(modalErrors, 0)
+    assert.equal(store.getState()?.recoveryUnavailable, true)
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'done')
+
+    // A later successful write clears the notice again.
+    journal.failSaves = false
+    await store.markFinalized([first.path])
+    assert.equal(store.getState()?.recoveryUnavailable, false)
+  })
+
+  it('retries a journal write through a transient file lock', async () => {
+    let attempts = 0
+    const journal = new FileBatchCloneJournal('/user-data', {
+      readText: async () => null,
+      clear: async () => undefined,
+      writeText: async () => {
+        attempts += 1
+        if (attempts < 3) {
+          throw Object.assign(new Error('locked'), { code: 'EPERM' })
+        }
+      },
+    })
+
+    await journal.save({
+      version: BatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [first],
+      statuses: [[first.path, { kind: 'pending' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+
+    assert.equal(attempts, 3)
+  })
+
+  it('does not retry a non-transient journal write failure', async () => {
+    let attempts = 0
+    const journal = new FileBatchCloneJournal('/user-data', {
+      readText: async () => null,
+      clear: async () => undefined,
+      writeText: async () => {
+        attempts += 1
+        throw Object.assign(new Error('no space'), { code: 'ENOSPC' })
+      },
+    })
+
+    await assert.rejects(
+      journal.save({
+        version: BatchCloneJournalVersion,
+        updatedAt: '2026-07-17T00:00:00.000Z',
+        items: [first],
+        statuses: [[first.path, { kind: 'pending' }]],
+        mode: BatchCloneMode.Sequential,
+        source: 'manual',
+        paused: false,
+      })
+    )
+
+    assert.equal(attempts, 1)
+  })
+
+  it('skips a single review item and discards only its staging', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: 'e'.repeat(48),
+    }
+    const journal = new MemoryJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[recoveryItem.path, { kind: 'review' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    let discardCalls = 0
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => 'review',
+      stagingManager({
+        discard: async () => {
+          discardCalls += 1
+          return true
+        },
+      })
+    )
+    await store.initialize()
+
+    await store.skipItem(first.path)
+
+    assert.equal(store.getState()?.statuses.get(first.path)?.kind, 'skipped')
+    assert.ok(discardCalls >= 1)
+  })
+
+  it('adopts an existing matching folder from review without touching it', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: 'f'.repeat(48),
+    }
+    const journal = new MemoryJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[recoveryItem.path, { kind: 'review' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    let discardCalls = 0
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => 'matching-repository',
+      stagingManager({
+        discard: async () => {
+          discardCalls += 1
+          return true
+        },
+      })
+    )
+    await store.initialize()
+
+    await store.adoptExistingItem(first.path)
+
+    const status = store.getState()?.statuses.get(first.path)
+    assert.equal(status?.kind, 'done')
+    assert.equal(status?.finalized, undefined)
+    assert.equal(discardCalls, 1)
+  })
+
+  it('keeps a non-matching folder in review when adoption is attempted', async () => {
+    const journal = new MemoryJournal({
+      version: BatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [first],
+      statuses: [[first.path, { kind: 'review' }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+    })
+    const store = new BatchCloneStore(
+      {} as CloningRepositoriesStore,
+      journal,
+      async () => 'review'
+    )
+    await store.initialize()
+
+    await store.adoptExistingItem(first.path)
+
+    const status = store.getState()?.statuses.get(first.path)
+    assert.equal(status?.kind, 'review')
+    assert.match(status?.error?.message ?? '', /not a matching clone/i)
   })
 
   it('requires review for occupied or mismatched destinations', async () => {

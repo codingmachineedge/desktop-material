@@ -2273,6 +2273,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           <SettingsHistoryDialog
             key="settings-history"
             dispatcher={this.props.dispatcher}
+            scope={popup.scope}
             onDismissed={onPopupDismissedFn}
           />
         )

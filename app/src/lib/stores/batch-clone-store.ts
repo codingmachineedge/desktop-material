@@ -63,7 +63,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   private journal: IBatchCloneJournal | null
   private writeChain: Promise<void> = Promise.resolve()
   private maintenanceChain: Promise<void> = Promise.resolve()
-  private journalFailureReported = false
+  private recoveryUnavailable = false
   private journalVersion:
     | typeof BatchCloneJournalVersion
     | typeof CurrentBatchCloneJournalVersion = BatchCloneJournalVersion
@@ -155,6 +155,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       isPaused: this.paused,
       overallProgress: computeBatchCloneProgress(this.items, this.statuses),
       isDone: !this.running && isBatchCloneDone(this.items, this.statuses),
+      recoveryUnavailable: this.recoveryUnavailable,
     }
   }
 
@@ -304,6 +305,101 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     }
     this.generation += 1
     await this.prepareAndRun(candidates)
+  }
+
+  /**
+   * Resolve a single unfinished item by skipping it, so the rest of the batch
+   * can complete without reviewing every occupied destination. The destination
+   * is never touched; only app-owned staging for the skipped item is discarded.
+   */
+  public async skipItem(path: string): Promise<void> {
+    if (this.running) {
+      return
+    }
+    const kind = this.statuses.get(path)?.kind
+    if (
+      kind !== 'review' &&
+      kind !== 'failed' &&
+      kind !== 'interrupted' &&
+      kind !== 'pending'
+    ) {
+      return
+    }
+    this.setStatus(path, { kind: 'skipped' }, false)
+    if (await this.persist()) {
+      await this.cleanupSkippedStaging()
+    }
+  }
+
+  /**
+   * Adopt the folder already at a review item's destination when it is a Git
+   * repository whose origin matches this queue item. The existing data is never
+   * modified: a matching repository is registered as done, and anything else is
+   * left in review with a clearer explanation.
+   */
+  public async adoptExistingItem(path: string): Promise<void> {
+    if (this.running) {
+      return
+    }
+    const item = this.items.find(candidate => candidate.path === path)
+    if (item === undefined || this.statuses.get(path)?.kind !== 'review') {
+      return
+    }
+
+    let inspection: CloneDestinationInspection
+    try {
+      inspection = await this.inspectDestination(item)
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error))
+      log.error(
+        `Unable to inspect existing clone folder ${item.path}`,
+        normalizedError
+      )
+      this.setStatus(path, {
+        kind: 'review',
+        error: new Error(
+          'The existing folder could not be inspected safely. Review it manually; Desktop Material will not delete it.'
+        ),
+      })
+      await this.persist()
+      return
+    }
+
+    if (inspection !== 'matching-repository') {
+      this.setStatus(path, {
+        kind: 'review',
+        error: new Error(
+          inspection === 'empty'
+            ? 'The folder is now empty, so there is nothing to adopt. Use Recheck destinations to clone it again.'
+            : 'The existing folder is not a matching clone of this repository and was left unchanged. Skip it or move it aside and recheck.'
+        ),
+      })
+      await this.persist()
+      return
+    }
+
+    this.setStatus(
+      path,
+      {
+        kind: 'done',
+        progress: 1,
+        description: 'Adopted the existing clone with the matching origin.',
+        ...(item.accountKey !== undefined
+          ? { accountKey: item.accountKey }
+          : {}),
+      },
+      false
+    )
+    if (
+      (await this.persist()) &&
+      item.recoveryId !== undefined &&
+      this.stagingManager !== null
+    ) {
+      // The user-visible folder is adopted, so the app-owned staged copy is
+      // redundant. A failed discard is not fatal; cleanup retries on dismiss.
+      await this.stagingManager.discard(item)
+    }
   }
 
   /** Abort active Git work and durably discard verified cancelled staging. */
@@ -974,7 +1070,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       .then(async () => {
         try {
           await journal.save(snapshot)
-          this.journalFailureReported = false
+          this.markRecoveryAvailable()
           return true
         } catch (error) {
           this.reportJournalFailure('persist', error)
@@ -995,7 +1091,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
       .then(async () => {
         try {
           await journal.clear()
-          this.journalFailureReported = false
+          this.markRecoveryAvailable()
           return true
         } catch (error) {
           this.reportJournalFailure('clear', error)
@@ -1052,17 +1148,32 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
     return succeeded
   }
 
+  /**
+   * A journal write failed. Crash recovery degrades gracefully: the clone keeps
+   * running, the failure is logged once per outage, and the state carries a soft
+   * `recoveryUnavailable` flag the progress dialog renders inline. The next state
+   * transition re-attempts the write (and the journal itself retries transient
+   * file locks), so no modal error interrupts an otherwise-healthy clone.
+   */
   private reportJournalFailure(operation: string, error: unknown): void {
     const normalizedError =
       error instanceof Error ? error : new Error(String(error))
-    log.error(`Unable to ${operation} clone queue journal`, normalizedError)
-    if (!this.journalFailureReported) {
-      this.journalFailureReported = true
-      this.emitError(
-        new Error(
-          'Clone recovery state could not be saved. Cloning can continue, but crash recovery may be unavailable until storage access is restored.'
-        )
+    if (!this.recoveryUnavailable) {
+      log.error(
+        `Unable to ${operation} clone queue journal; crash recovery is temporarily unavailable but cloning continues`,
+        normalizedError
       )
+      this.recoveryUnavailable = true
+      this.emit()
+    }
+  }
+
+  /** Clear the soft recovery-unavailable notice once a write succeeds again. */
+  private markRecoveryAvailable(): void {
+    if (this.recoveryUnavailable) {
+      log.info('Clone queue crash recovery resumed after a transient failure')
+      this.recoveryUnavailable = false
+      this.emit()
     }
   }
 }

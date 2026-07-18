@@ -41,6 +41,40 @@ export type SupportedBatchCloneJournalVersion =
 export const MaxBatchCloneJournalBytes = 2 * 1024 * 1024
 export const MaxBatchCloneJournalStatusTextLength = 8192
 
+/** Attempts (after the first) a journal write makes before surfacing failure. */
+export const BatchCloneJournalWriteRetries = 3
+const BatchCloneJournalRetryBaseDelayMs = 20
+
+/**
+ * File-lock/permission errors that are usually momentary on Windows — an
+ * antivirus scan or the Search indexer briefly holding a handle in the user
+ * data directory. A short opportunistic retry clears them without ever
+ * surfacing a scary error while a clone is otherwise healthy.
+ */
+const TransientJournalWriteErrorCodes = new Set([
+  'EPERM',
+  'EACCES',
+  'EBUSY',
+  'ETXTBSY',
+  'EMFILE',
+  'ENFILE',
+])
+
+function isTransientJournalWriteError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    TransientJournalWriteErrorCodes.has(
+      String((error as { readonly code?: unknown }).code)
+    )
+  )
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 export interface IBatchCloneJournalSnapshot {
   readonly version: SupportedBatchCloneJournalVersion
   readonly updatedAt: string
@@ -110,12 +144,27 @@ export class FileBatchCloneJournal implements IBatchCloneJournal {
 
   public save(snapshot: IBatchCloneJournalSnapshot): Promise<void> {
     return this.enqueue(async () => {
+      // Serialize once: invalid input is a programming error, not a retryable
+      // condition, so only the write itself is retried below.
       const serialized = serializeBatchCloneJournal(snapshot)
-      await this.persistence.writeText(this.path, serialized, {
-        backupPath: this.backupPath,
-        maxPreviousBytes: MaxBatchCloneJournalBytes,
-        validatePrevious: isBatchCloneJournal,
-      })
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await this.persistence.writeText(this.path, serialized, {
+            backupPath: this.backupPath,
+            maxPreviousBytes: MaxBatchCloneJournalBytes,
+            validatePrevious: isBatchCloneJournal,
+          })
+          return
+        } catch (error) {
+          if (
+            attempt >= BatchCloneJournalWriteRetries ||
+            !isTransientJournalWriteError(error)
+          ) {
+            throw error
+          }
+          await delay(BatchCloneJournalRetryBaseDelayMs * (attempt + 1))
+        }
+      }
     })
   }
 

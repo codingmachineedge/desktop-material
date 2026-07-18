@@ -126,7 +126,7 @@ import {
   IRemoteManagementSnapshot,
 } from '../../models/remote'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
-import { Popup, PopupType } from '../../models/popup'
+import { Popup, PopupType, SettingsHistoryScope } from '../../models/popup'
 import { IProfileHistoryPage } from '../../models/profile'
 import { INotificationInput } from '../../models/notification-centre'
 import { INotificationAutomationRule } from '../../lib/notifications/automation/notification-automation'
@@ -300,6 +300,13 @@ function parseOverrideCommand(override: string | undefined): ICommand | null {
   return { exe, args, label: trimmed }
 }
 
+/** Translate a settings-history UI scope into a profile-store history filter. */
+function settingsHistoryFilter(
+  scope: SettingsHistoryScope | undefined
+): { readonly tabId: string } | undefined {
+  return scope?.kind === 'tab' ? { tabId: scope.tabId } : undefined
+}
+
 /**
  * The Dispatcher acts as the hub for state. The StateHub if you will. It
  * decouples the consumer of state from where/how it is stored.
@@ -392,12 +399,20 @@ export class Dispatcher {
     )
   }
 
-  /** Load a newest-first page of commits from the active settings profile. */
+  /**
+   * Load a newest-first page of commits from the active settings profile. An
+   * optional scope narrows the page to a single tab's history.
+   */
   public getSettingsHistory(
     skip?: number,
-    limit?: number
+    limit?: number,
+    scope?: SettingsHistoryScope
   ): Promise<IProfileHistoryPage> {
-    return this.profileStore.getSettingsHistory(skip, limit)
+    return this.profileStore.getSettingsHistory(
+      skip,
+      limit,
+      settingsHistoryFilter(scope)
+    )
   }
 
   /** Local Git repository that owns the active profile's settings history. */
@@ -411,8 +426,16 @@ export class Dispatcher {
   }
 
   /** Load a unified settings-profile diff, optionally narrowed to one file. */
-  public getSettingsHistoryDiff(sha: string, file?: string): Promise<string> {
-    return this.profileStore.getSettingsHistoryDiff(sha, file)
+  public getSettingsHistoryDiff(
+    sha: string,
+    file?: string,
+    scope?: SettingsHistoryScope
+  ): Promise<string> {
+    return this.profileStore.getSettingsHistoryDiff(
+      sha,
+      file,
+      settingsHistoryFilter(scope)
+    )
   }
 
   /** Append an undo commit and reload every profile-backed renderer surface. */
@@ -1650,6 +1673,16 @@ export class Dispatcher {
   /** Resume a paused/recovered clone queue after destination inspection. */
   public resumeBatchClone(): Promise<void> {
     return this.appStore._resumeBatchClone()
+  }
+
+  /** Skip a single unresolved batch item without touching its destination. */
+  public skipBatchCloneItem(path: string): Promise<void> {
+    return this.appStore._skipBatchCloneItem(path)
+  }
+
+  /** Adopt the existing folder at a review item when its origin matches. */
+  public adoptBatchCloneItem(path: string): Promise<void> {
+    return this.appStore._adoptBatchCloneItem(path)
   }
 
   /** Configure app-lifetime background auto-clone for one account. */

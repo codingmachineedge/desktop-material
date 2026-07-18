@@ -183,6 +183,20 @@ interface IBasePopup {
   readonly id?: number
 }
 
+/**
+ * Narrows the settings-history viewer to a single subject instead of the whole
+ * profile. Absent scope means the full-profile history (undo/redo/restore
+ * enabled); a scope makes the view read-only, since those mutations act on the
+ * entire profile and cannot be applied to one tab in isolation.
+ */
+export type SettingsHistoryScope = {
+  readonly kind: 'tab'
+  /** The stable tab id used to filter the profile repository's history. */
+  readonly tabId: string
+  /** The tab's display label, shown in the scoped dialog title. */
+  readonly label: string
+}
+
 export type PopupDetail =
   | { type: PopupType.RenameBranch; repository: Repository; branch: Branch }
   | {
@@ -212,7 +226,7 @@ export type PopupDetail =
       selection: DiffSelection
     }
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
-  | { type: PopupType.SettingsHistory }
+  | { type: PopupType.SettingsHistory; scope?: SettingsHistoryScope }
   | { type: PopupType.NotificationHistory }
   | { type: PopupType.NotificationAutomations; entry?: INotificationEntry }
   | { type: PopupType.LogHistory }

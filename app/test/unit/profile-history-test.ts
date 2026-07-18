@@ -128,6 +128,60 @@ describe('profile git history', () => {
     )
   })
 
+  it('scopes history to one tab with a best-effort tabs.json pickaxe', async t => {
+    const repository = await createProfileRepository(t)
+
+    // A settings-only commit must never leak into a tab-scoped page.
+    await writeSettings(repository, { 'tab-size': '2' })
+    await commitAllChanges(repository, 'Initialize profile')
+
+    const writeTabs = (ids: ReadonlyArray<string>) =>
+      writeFile(
+        join(repository.path, 'tabs.json'),
+        JSON.stringify(
+          {
+            version: 1,
+            tabs: ids.map(id => ({ id, titleStyle: null })),
+            activeTabId: null,
+          },
+          null,
+          2
+        )
+      )
+
+    await writeTabs(['alpha-tab-id'])
+    await commitAllChanges(repository, 'Open alpha tab')
+
+    await writeTabs(['alpha-tab-id', 'beta-tab-id'])
+    await commitAllChanges(repository, 'Open beta tab')
+
+    const alpha = await getProfileHistory(repository, 0, 50, {
+      tabId: 'alpha-tab-id',
+    })
+    assert.deepEqual(
+      alpha.entries.map(entry => entry.summary),
+      ['Open alpha tab']
+    )
+    assert.equal(alpha.total, 1)
+    assert.equal(alpha.hasMore, false)
+    // A scoped view is read-only: profile-wide undo/redo are never offered.
+    assert.equal(alpha.canUndo, false)
+    assert.equal(alpha.canRedo, false)
+
+    const beta = await getProfileHistory(repository, 0, 50, {
+      tabId: 'beta-tab-id',
+    })
+    assert.deepEqual(
+      beta.entries.map(entry => entry.summary),
+      ['Open beta tab']
+    )
+
+    // The unfiltered read still returns the whole timeline with mutations.
+    const full = await getProfileHistory(repository)
+    assert.equal(full.total, 3)
+    assert.equal(full.canUndo, true)
+  })
+
   it('undoes, redoes, and restores only by appending trailer-linked commits', async t => {
     const repository = await createProfileRepository(t)
     await writeSettings(repository, { 'tab-size': '2' })

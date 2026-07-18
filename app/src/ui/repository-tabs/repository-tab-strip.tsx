@@ -231,6 +231,7 @@ export class RepositoryTabStrip extends React.Component<
     const anchor = event.currentTarget as HTMLElement
     const { tabs } = this.state.tabs
     const index = tabs.findIndex(t => t.id === tab.id)
+    const label = this.labelForTab(tab)
     const profilePath = this.props.dispatcher.getActiveProfileRepositoryPath()
 
     showContextualMenu([
@@ -259,10 +260,15 @@ export class RepositoryTabStrip extends React.Component<
         action: () => this.openStyleEditor(tab, anchor),
       },
       {
-        label: 'View Appearance and Tab History…',
+        // Keep the "View Appearance and Tab History" phrase (contract-tested)
+        // while making the per-tab scoping explicit in the label.
+        label: `View Appearance and Tab History for "${label}"…`,
         icon: octicons.history,
         action: () =>
-          this.props.dispatcher.showPopup({ type: PopupType.SettingsHistory }),
+          this.props.dispatcher.showPopup({
+            type: PopupType.SettingsHistory,
+            scope: { kind: 'tab', tabId: tab.id, label },
+          }),
       },
       {
         label:

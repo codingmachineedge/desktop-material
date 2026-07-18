@@ -7865,6 +7865,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     await this.finalizeBatchClone()
   }
 
+  /** Skip a single unresolved batch item so the queue can finish. */
+  public async _skipBatchCloneItem(path: string): Promise<void> {
+    await this.batchCloneStore.skipItem(path)
+    await this.finalizeBatchClone()
+  }
+
+  /** Adopt the existing folder at a review item when it already matches. */
+  public async _adoptBatchCloneItem(path: string): Promise<void> {
+    await this.batchCloneStore.adoptExistingItem(path)
+    await this.finalizeBatchClone()
+  }
+
   /** Configure account-scoped automatic clone without tying it to a dialog. */
   public _configureAutoClone(
     account: Account,

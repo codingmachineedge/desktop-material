@@ -99,6 +99,29 @@ dialog.clone-repository {
 }
 
 dialog#batch-clone-progress {
+  // A soft, inline notice that crash-recovery journaling is briefly failing.
+  // Cloning is unaffected, so this stays a status banner rather than an error.
+  .batch-clone-recovery-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-half);
+    margin-bottom: var(--spacing);
+    padding: var(--spacing-half) var(--spacing);
+    border-radius: 12px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
+
+    .octicon {
+      flex-shrink: 0;
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
+      fill: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
   .batch-clone-overall {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -193,6 +216,18 @@ dialog#batch-clone-progress {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      // Per-row resolution buttons for a repository that needs review.
+      .item-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-half);
+        margin-top: 2px;
+
+        .button-component {
+          font-size: var(--font-size-sm);
+        }
       }
 
       // The stage/percent line and the speed/ETA readout beneath the bar.

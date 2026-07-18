@@ -266,6 +266,7 @@ describe('batch-clone model', () => {
       isPaused: false,
       overallProgress: 1,
       isDone: true,
+      recoveryUnavailable: false,
       ...overrides,
     })
 

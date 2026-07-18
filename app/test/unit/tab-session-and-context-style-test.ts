@@ -56,6 +56,8 @@ describe('tab session, folder drop, and customization context contracts', () => 
     assert.match(appSource, /Profile Git history:/)
     assert.match(appSource, /RepositorySettingsTab\.Appearance/)
     assert.match(tabStrip, /View Appearance and Tab History/)
+    // The per-tab entry scopes the history popup to just that tab.
+    assert.match(tabStrip, /scope: \{ kind: 'tab', tabId: tab\.id, label \}/)
     assert.match(tabStrip, /Profile Git history:/)
     assert.match(brand, /data-customization-surface="app-identity"/)
   })

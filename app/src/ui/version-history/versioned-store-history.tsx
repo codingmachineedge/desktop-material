@@ -44,9 +44,11 @@ export interface IVersionedStoreHistorySource {
   ) => Promise<IVersionHistoryPage>
   readonly getFiles: (sha: string) => Promise<ReadonlyArray<string>>
   readonly getDiff: (sha: string, file?: string) => Promise<string>
-  readonly undoLastChange: () => Promise<void>
-  readonly redoLastChange: () => Promise<void>
-  readonly restoreTo: (sha: string) => Promise<void>
+  // The mutating operations are omitted by read-only sources (e.g. a scoped
+  // view whose subject cannot be mutated in isolation). See `readOnly` below.
+  readonly undoLastChange?: () => Promise<void>
+  readonly redoLastChange?: () => Promise<void>
+  readonly restoreTo?: (sha: string) => Promise<void>
 }
 
 export interface IVersionedStoreHistoryProps {
@@ -59,6 +61,12 @@ export interface IVersionedStoreHistoryProps {
   readonly source: IVersionedStoreHistorySource
   readonly onStoreMutated?: () => Promise<void> | void
   readonly onDismissed: () => void
+  /**
+   * Render an inspect-only timeline: hide undo, redo, and restore. Used for
+   * scoped views whose subject cannot be mutated without affecting the rest of
+   * the profile. Defaults to false so full-profile callers are unchanged.
+   */
+  readonly readOnly?: boolean
 }
 
 type VersionHistoryOperation = 'undo' | 'redo' | 'restore'
@@ -397,14 +405,33 @@ export class VersionedStoreHistory extends React.Component<
     }
   }
 
-  private undo = () =>
-    this.runOperation('undo', () => this.props.source.undoLastChange())
+  private get isReadOnly(): boolean {
+    return this.props.readOnly === true
+  }
 
-  private redo = () =>
-    this.runOperation('redo', () => this.props.source.redoLastChange())
+  private undo = () => {
+    const undoLastChange = this.props.source.undoLastChange
+    if (this.isReadOnly || undoLastChange === undefined) {
+      return
+    }
+    this.runOperation('undo', () => undoLastChange())
+  }
 
-  private restore = (sha: string) =>
-    this.runOperation('restore', () => this.props.source.restoreTo(sha))
+  private redo = () => {
+    const redoLastChange = this.props.source.redoLastChange
+    if (this.isReadOnly || redoLastChange === undefined) {
+      return
+    }
+    this.runOperation('redo', () => redoLastChange())
+  }
+
+  private restore = (sha: string) => {
+    const restoreTo = this.props.source.restoreTo
+    if (this.isReadOnly || restoreTo === undefined) {
+      return
+    }
+    this.runOperation('restore', () => restoreTo(sha))
+  }
 
   private confirmRestore = (sha: string) => {
     this.setState({ confirmRestoreSha: sha })
@@ -518,20 +545,24 @@ export class VersionedStoreHistory extends React.Component<
 
     return (
       <div className="versioned-store-history-toolbar">
-        <Button
-          className="versioned-store-history-undo"
-          onClick={this.undo}
-          disabled={busy || page === null || !page.canUndo}
-        >
-          <Octicon symbol={octicons.undo} /> Undo
-        </Button>
-        <Button
-          className="versioned-store-history-redo"
-          onClick={this.redo}
-          disabled={busy || page === null || !page.canRedo}
-        >
-          <Octicon symbol={octicons.redo} /> Redo
-        </Button>
+        {this.isReadOnly ? null : (
+          <>
+            <Button
+              className="versioned-store-history-undo"
+              onClick={this.undo}
+              disabled={busy || page === null || !page.canUndo}
+            >
+              <Octicon symbol={octicons.undo} /> Undo
+            </Button>
+            <Button
+              className="versioned-store-history-redo"
+              onClick={this.redo}
+              disabled={busy || page === null || !page.canRedo}
+            >
+              <Octicon symbol={octicons.redo} /> Redo
+            </Button>
+          </>
+        )}
         <span className="versioned-store-history-count">
           {page?.total ?? 0} {page?.total === 1 ? 'commit' : 'commits'}
         </span>
@@ -601,19 +632,21 @@ export class VersionedStoreHistory extends React.Component<
               <span className="versioned-store-history-head">HEAD</span>
             ) : null}
           </button>
-          <Button
-            className="versioned-store-history-restore"
-            size="small"
-            ariaLabel={`Restore ${entry.summary}`}
-            tooltip="Restore to this point"
-            disabled={busy}
-            // eslint-disable-next-line react/jsx-no-bind
-            onClick={() => this.confirmRestore(entry.sha)}
-          >
-            <Octicon symbol={octicons.history} />
-          </Button>
+          {this.isReadOnly ? null : (
+            <Button
+              className="versioned-store-history-restore"
+              size="small"
+              ariaLabel={`Restore ${entry.summary}`}
+              tooltip="Restore to this point"
+              disabled={busy}
+              // eslint-disable-next-line react/jsx-no-bind
+              onClick={() => this.confirmRestore(entry.sha)}
+            >
+              <Octicon symbol={octicons.history} />
+            </Button>
+          )}
         </div>
-        {confirming ? (
+        {confirming && !this.isReadOnly ? (
           <div
             className="versioned-store-history-restore-confirmation"
             role="group"

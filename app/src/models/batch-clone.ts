@@ -122,6 +122,13 @@ export interface IBatchCloneState {
 
   /** True once every item has reached a terminal status. */
   readonly isDone: boolean
+
+  /**
+   * True while the crash-recovery journal cannot be written (for example a
+   * transient Windows/antivirus file lock). Cloning continues; this only drives
+   * a soft inline notice rather than a modal error.
+   */
+  readonly recoveryUnavailable: boolean
 }
 
 /** A single input row describing a repository the user wants to clone. */

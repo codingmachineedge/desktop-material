@@ -311,30 +311,66 @@ export class ProfileCommitQueue {
   }
 }
 
+/** Restricts a history read to commits relevant to one profile subject. */
+export interface IProfileHistoryFilter {
+  /**
+   * Show only commits whose `tabs.json` diff added or removed a line matching
+   * this tab id. See {@link getProfileHistory} for the best-effort caveat.
+   */
+  readonly tabId: string
+}
+
+/**
+ * Escape a literal string for use as a git basic (POSIX) regular expression,
+ * the flavour `git log -G` uses by default. Tab ids are UUIDs today and contain
+ * no metacharacters, but escaping keeps the pickaxe correct for any future id.
+ */
+function escapeBasicRegex(value: string): string {
+  return value.replace(/[.*[\]\\^$]/g, '\\$&')
+}
+
 /** Return one bounded, newest-first page of the profile repository's history. */
 export async function getProfileHistory(
   repository: Repository,
   skip: number = 0,
-  limit: number = ProfileHistoryPageSize
+  limit: number = ProfileHistoryPageSize,
+  filter?: IProfileHistoryFilter
 ): Promise<IProfileHistoryPage> {
   const normalizedSkip = normalizeNonNegativeInteger(skip)
   const normalizedLimit = Math.min(
     ProfileHistoryPageSize,
     Math.max(1, normalizeNonNegativeInteger(limit))
   )
+
+  // A tab scope is best-effort: every tab shares tabs.json, so the pickaxe only
+  // surfaces commits whose tabs.json diff added or removed a line matching the
+  // tab id (opening, closing, reordering, or switching to the tab). A change
+  // that only edits an existing tab's style leaves the id line as unchanged
+  // context and will not appear. getCommits appends its own trailing '--', so
+  // the extra pathspec here is a harmless literal that matches nothing.
+  const scopedArgs =
+    filter === undefined
+      ? []
+      : ['-G', escapeBasicRegex(filter.tabId), '--', 'tabs.json']
+
   const [commits, allCommits] = await Promise.all([
-    getCommits(repository, 'HEAD', normalizedLimit, normalizedSkip),
-    getCommits(repository, 'HEAD'),
+    getCommits(repository, 'HEAD', normalizedLimit, normalizedSkip, scopedArgs),
+    getCommits(repository, 'HEAD', undefined, undefined, scopedArgs),
   ])
-  const traversal = buildProfileHistoryTraversal(allCommits)
   const total = allCommits.length
+
+  // undo/redo replay trailers across the whole profile timeline, so their
+  // availability is only meaningful for an unfiltered read. A scoped view is
+  // read-only and never offers them.
+  const traversal =
+    filter === undefined ? buildProfileHistoryTraversal(allCommits) : null
 
   return {
     entries: commits.map(toProfileHistoryEntry),
     total,
     hasMore: normalizedSkip + commits.length < total,
-    canUndo: traversal.undoable.length > 0,
-    canRedo: traversal.redoable.length > 0,
+    canUndo: traversal !== null && traversal.undoable.length > 0,
+    canRedo: traversal !== null && traversal.redoable.length > 0,
   }
 }
 

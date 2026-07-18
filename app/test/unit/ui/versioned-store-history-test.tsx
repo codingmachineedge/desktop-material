@@ -201,6 +201,39 @@ describe('versioned store history', () => {
     )
   })
 
+  it('hides undo, redo, and restore in read-only mode', async () => {
+    // A read-only source may omit the mutating handlers entirely.
+    const source: IVersionedStoreHistorySource = {
+      getHistory: () =>
+        Promise.resolve(
+          historyPage([historyEntry('11111111', 'Snapshot')], false)
+        ),
+      getFiles: () => Promise.resolve([]),
+      getDiff: () => Promise.resolve(''),
+    }
+
+    render(
+      <VersionedStoreHistory
+        title="Appearance history — Alpha"
+        timelineLabel="Tab appearance timeline"
+        description="Read only"
+        source={source}
+        readOnly={true}
+        onDismissed={() => {}}
+      />
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('option', { name: /Snapshot/i }))
+    )
+    assert.equal(screen.queryByRole('button', { name: 'Undo' }), null)
+    assert.equal(screen.queryByRole('button', { name: 'Redo' }), null)
+    assert.equal(
+      screen.queryByRole('button', { name: /Restore Snapshot/i }),
+      null
+    )
+  })
+
   it('filters the shared timeline with substring and regex modes', async () => {
     const entries = [
       historyEntry('11111111', 'Changed theme'),

@@ -11,7 +11,7 @@ import {
   IBatchCloneState,
 } from '../../../src/models/batch-clone'
 import { SubmoduleFetchStage } from '../../../src/models/progress'
-import { render } from '../../helpers/ui/render'
+import { fireEvent, render, screen } from '../../helpers/ui/render'
 
 // The Dialog component sends an IPC message and opens the native <dialog> on
 // mount; neither is wired in jsdom, so stub them for the lifetime of each test.
@@ -62,6 +62,7 @@ function stateWith(status: IBatchCloneItemStatus): IBatchCloneState {
     source: 'manual',
     overallProgress: status.progress ?? 0,
     isDone: false,
+    recoveryUnavailable: false,
   }
 }
 
@@ -95,6 +96,58 @@ describe('BatchCloneProgress rows', () => {
     const meta = view.baseElement.querySelector('.batch-clone-item .meta')
     assert.ok(meta?.textContent?.includes('MiB/s'))
     assert.ok(meta?.textContent?.includes('~1m 30s left'))
+  })
+
+  it('offers per-row Use existing folder and Skip actions for review items', () => {
+    const adopted: string[] = []
+    const skipped: string[] = []
+    const reviewDispatcher = {
+      adoptBatchCloneItem: async (path: string) => {
+        adopted.push(path)
+      },
+      skipBatchCloneItem: async (path: string) => {
+        skipped.push(path)
+      },
+    } as unknown as Dispatcher
+
+    render(
+      <BatchCloneProgress
+        dispatcher={reviewDispatcher}
+        onDismissed={() => {}}
+        batchCloneState={stateWith({
+          kind: 'review',
+          error: new Error('The final clone destination is occupied.'),
+        })}
+        isTopMost={true}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use existing folder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+
+    assert.deepEqual(adopted, [item.path])
+    assert.deepEqual(skipped, [item.path])
+  })
+
+  it('shows a soft recovery notice without a modal when journaling is unavailable', () => {
+    const view = renderState({
+      ...stateWith({ kind: 'cloning', progress: 0.3 }),
+      recoveryUnavailable: true,
+    })
+
+    const notice = view.baseElement.querySelector(
+      '.batch-clone-recovery-notice'
+    )
+    assert.ok(notice)
+    assert.match(notice?.textContent ?? '', /Crash recovery is paused/i)
+  })
+
+  it('hides the recovery notice when journaling is healthy', () => {
+    const view = renderState(stateWith({ kind: 'cloning', progress: 0.3 }))
+    assert.equal(
+      view.baseElement.querySelector('.batch-clone-recovery-notice'),
+      null
+    )
   })
 
   it('labels the submodule-fetch phase with an indeterminate bar', () => {

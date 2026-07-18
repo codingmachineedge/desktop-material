@@ -70,6 +70,20 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
     this.props.dispatcher.resumeBatchClone()
   }
 
+  private onUseExistingFolder = (path: string) => {
+    void this.props.dispatcher
+      .adoptBatchCloneItem(path)
+      .catch(error =>
+        log.error('Unable to adopt an existing clone folder', error)
+      )
+  }
+
+  private onSkipItem = (path: string) => {
+    void this.props.dispatcher
+      .skipBatchCloneItem(path)
+      .catch(error => log.error('Unable to skip a clone item', error))
+  }
+
   private onDone = () => {
     this.props.dispatcher.dismissBatchClone()
     this.props.onDismissed()
@@ -185,6 +199,24 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
               {status.error.message}
             </TooltippedContent>
           )}
+          {kind === 'review' && (
+            <div className="item-actions">
+              <Button
+                // eslint-disable-next-line react/jsx-no-bind
+                onClick={() => this.onUseExistingFolder(item.path)}
+                tooltip="Adopt the folder already here when it is a matching clone; it is never overwritten"
+              >
+                Use existing folder
+              </Button>
+              <Button
+                // eslint-disable-next-line react/jsx-no-bind
+                onClick={() => this.onSkipItem(item.path)}
+                tooltip="Leave this destination untouched and finish the rest of the batch"
+              >
+                Skip
+              </Button>
+            </div>
+          )}
           {kind === 'done' && status?.finalized !== true && (
             <div className="error">
               Cloned successfully, but not yet added to the repository list.
@@ -246,6 +278,16 @@ export class BatchCloneProgress extends React.Component<IBatchCloneProgressProps
         }
       >
         <DialogContent>
+          {state.recoveryUnavailable && (
+            <div className="batch-clone-recovery-notice" role="status">
+              <Octicon symbol={octicons.alert} />
+              <span>
+                Crash recovery is paused because the recovery file can't be
+                saved right now. Cloning continues, and recovery resumes
+                automatically once storage is available again.
+              </span>
+            </div>
+          )}
           <div className="batch-clone-overall">
             <div className="summary">
               {summary.done} done

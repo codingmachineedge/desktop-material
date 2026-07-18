@@ -19,6 +19,7 @@ import {
   getProfileCommitDiff,
   getProfileCommitFiles,
   getProfileHistory,
+  IProfileHistoryFilter,
   ProfileCommitQueue,
   redoLastProfileChange,
   restoreProfileTo,
@@ -144,10 +145,14 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
     return this.repositoriesByKey.get(this.activeProfileKey)?.path ?? null
   }
 
-  /** Load one newest-first, 50-entry maximum page of settings history. */
+  /**
+   * Load one newest-first, 50-entry maximum page of settings history. An
+   * optional filter narrows the page to a single subject (e.g. one tab).
+   */
   public async getSettingsHistory(
     skip: number = 0,
-    limit: number = ProfileHistoryPageSize
+    limit: number = ProfileHistoryPageSize,
+    filter?: IProfileHistoryFilter
   ): Promise<IProfileHistoryPage> {
     if (!this.enabled) {
       return emptyHistoryPage()
@@ -162,7 +167,7 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
       }
 
       await this.flushUnlocked(key)
-      return getProfileHistory(repository, skip, limit)
+      return getProfileHistory(repository, skip, limit, filter)
     })
   }
 
@@ -187,10 +192,15 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
     })
   }
 
-  /** Lazily load a unified diff for a commit, optionally narrowed to one path. */
+  /**
+   * Lazily load a unified diff for a commit, optionally narrowed to one path. A
+   * tab filter forces the diff to `tabs.json`, keeping the scoped view focused
+   * on tab state even when the commit also touched profile settings.
+   */
   public async getSettingsHistoryDiff(
     sha: string,
-    file?: string
+    file?: string,
+    filter?: IProfileHistoryFilter
   ): Promise<string> {
     if (!this.enabled) {
       return ''
@@ -205,7 +215,8 @@ export class ProfileStore extends TypedBaseStore<IProfileState> {
       }
 
       await this.flushUnlocked(key)
-      return getProfileCommitDiff(repository, sha, file)
+      const scopedFile = filter !== undefined ? 'tabs.json' : file
+      return getProfileCommitDiff(repository, sha, scopedFile)
     })
   }
 
