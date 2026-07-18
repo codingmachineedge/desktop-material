@@ -740,8 +740,10 @@ async function captureSection(railLabel, name, settleMs = 2500) {
   const done = await evaluate(`(() => {
     const rail = document.querySelector('nav.repository-rail')
     if (!rail) return false
-    const target = [...rail.querySelectorAll('button')].find(button =>
-      (button.textContent ?? '').trim() === ${JSON.stringify(railLabel)})
+    const target = [...rail.querySelectorAll('button')].find(button => {
+      const label = button.getAttribute('aria-label') ?? button.textContent ?? ''
+      return label.trim() === ${JSON.stringify(railLabel)}
+    })
     if (!target) return false
     target.click()
     return true

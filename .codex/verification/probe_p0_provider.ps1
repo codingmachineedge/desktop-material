@@ -53,17 +53,15 @@ if (
 ) {
   throw 'Provider GitHub API Explorer custom-pattern contract failed.'
 }
-$releases = @(Invoke-RestMethod -Method Get -Uri "$repo/releases?per_page=30&page=1" -Headers $headers)
-$releaseAssets = @(
-  Invoke-RestMethod -Method Get -Uri "$repo/releases/$([int]$releases[0].id)/assets?per_page=100&page=1" -Headers $headers
-)
+$releases = Invoke-RestMethod -Method Get -Uri "$repo/releases?per_page=30&page=1" -Headers $headers
+$releaseAssets = Invoke-RestMethod -Method Get -Uri "$repo/releases/$([int]$releases[0].id)/assets?per_page=100&page=1" -Headers $headers
 if (
-  $releases.Count -ne 3 -or
+  @($releases).Count -ne 3 -or
   [bool]$releases[0].draft -or
   [bool]$releases[0].prerelease -or
   -not [bool]$releases[1].prerelease -or
   -not [bool]$releases[2].draft -or
-  $releaseAssets.Count -ne 2
+  @($releaseAssets).Count -ne 2
 ) {
   throw 'Provider Releases dashboard contract failed.'
 }
@@ -156,8 +154,8 @@ try {
   cors = 'pass'
   repository = [string]$repository.full_name
   customPatterns = @($customPatterns).Count
-  releases = $releases.Count
-  releaseAssets = $releaseAssets.Count
+  releases = @($releases).Count
+  releaseAssets = @($releaseAssets).Count
   branchRules = $rules.Count
   workflows = [int]$workflows.total_count
   runs = [int]$runsPage1.total_count
