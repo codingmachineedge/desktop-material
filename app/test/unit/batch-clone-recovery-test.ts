@@ -332,6 +332,49 @@ describe('batch clone journal and recovery', () => {
     assert.equal(store.getState(), null)
   })
 
+  it('does not replace a queue while its durable dismissal is in flight', async () => {
+    const recoveryItem: IBatchCloneItem = {
+      ...first,
+      recoveryId: '7'.repeat(48),
+    }
+    const journal = new DeferredJournal({
+      version: CurrentBatchCloneJournalVersion,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      items: [recoveryItem],
+      statuses: [[recoveryItem.path, { kind: 'done', finalized: true }]],
+      mode: BatchCloneMode.Sequential,
+      source: 'manual',
+      paused: false,
+      generation: 1,
+      notifiedGeneration: 1,
+    })
+    const store = new BatchCloneStore(
+      {
+        clone: async () => assert.fail('a replacement clone must not start'),
+      } as unknown as CloningRepositoriesStore,
+      journal,
+      async () => 'empty',
+      stagingManager()
+    )
+    await store.initialize()
+
+    const deferred = journal.deferNextSave()
+    const dismissal = store.dismiss()
+    await deferred.started
+
+    assert.equal(store.requiresAttention, true)
+    await assert.rejects(
+      store.startBatch([second], BatchCloneMode.Sequential),
+      /already active or needs review/i
+    )
+    assert.equal(store.getState()?.items[0].path, recoveryItem.path)
+
+    deferred.release()
+    assert.equal(await dismissal, true)
+    assert.equal(journal.clearCount, 1)
+    assert.equal(store.getState(), null)
+  })
+
   it('durably marks cancellation before discarding skipped staging', async () => {
     const recoveryItem: IBatchCloneItem = {
       ...first,

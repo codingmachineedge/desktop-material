@@ -323,11 +323,38 @@ export interface IProfileHistoryFilter {
 }
 
 /** Return one bounded, newest-first page of the profile repository's history. */
-export async function getProfileHistory(
+export function getProfileHistory(
   repository: Repository,
   skip: number = 0,
   limit: number = ProfileHistoryPageSize,
   filter?: IProfileHistoryFilter
+): Promise<IProfileHistoryPage> {
+  return getProfileHistoryInternal(repository, skip, limit, filter)
+}
+
+/** Exercise a deterministic cross-window write between scan batches in tests. */
+export function getProfileHistoryWithBatchObserverForTesting(
+  repository: Repository,
+  skip: number,
+  limit: number,
+  filter: IProfileHistoryFilter,
+  onTabHistoryBatch: (batchIndex: number) => Promise<void>
+): Promise<IProfileHistoryPage> {
+  return getProfileHistoryInternal(
+    repository,
+    skip,
+    limit,
+    filter,
+    onTabHistoryBatch
+  )
+}
+
+async function getProfileHistoryInternal(
+  repository: Repository,
+  skip: number,
+  limit: number,
+  filter?: IProfileHistoryFilter,
+  onTabHistoryBatch?: (batchIndex: number) => Promise<void>
 ): Promise<IProfileHistoryPage> {
   const normalizedSkip = normalizeNonNegativeInteger(skip)
   const normalizedLimit = Math.min(
@@ -336,11 +363,17 @@ export async function getProfileHistory(
   )
 
   if (filter !== undefined) {
+    const revision = await resolveProfileHistoryRevision(repository)
+    if (revision === null) {
+      return emptyProfileHistoryPage()
+    }
     return getTabProfileHistory(
       repository,
+      revision,
       normalizedSkip,
       normalizedLimit,
-      filter.tabId
+      filter.tabId,
+      onTabHistoryBatch
     )
   }
 
@@ -361,6 +394,24 @@ export async function getProfileHistory(
   }
 }
 
+/** Pin a batched history read to one immutable repository boundary. */
+async function resolveProfileHistoryRevision(
+  repository: Repository
+): Promise<string | null> {
+  const [head] = await getCommits(repository, 'HEAD', 1)
+  return head?.sha ?? null
+}
+
+function emptyProfileHistoryPage(): IProfileHistoryPage {
+  return {
+    entries: [],
+    total: 0,
+    hasMore: false,
+    canUndo: false,
+    canRedo: false,
+  }
+}
+
 /**
  * Return an exact tab-scoped page without retaining the complete timeline.
  *
@@ -378,9 +429,11 @@ export async function getProfileHistory(
  */
 async function getTabProfileHistory(
   repository: Repository,
+  revision: string,
   skip: number,
   limit: number,
-  tabId: string
+  tabId: string,
+  onBatch?: (batchIndex: number) => Promise<void>
 ): Promise<IProfileHistoryPage> {
   const entries = new Array<IProfileHistoryEntry>()
   let candidateSkip = 0
@@ -391,7 +444,7 @@ async function getTabProfileHistory(
     // that becomes a harmless second literal pathspec.
     const candidates = await getCommits(
       repository,
-      'HEAD',
+      revision,
       ProfileHistoryScanBatchSize,
       candidateSkip,
       ['--full-history', '--', ProfileTabsPath]
@@ -418,6 +471,8 @@ async function getTabProfileHistory(
       }
       total++
     }
+
+    await onBatch?.(candidateSkip / ProfileHistoryScanBatchSize)
 
     candidateSkip += candidates.length
     if (candidates.length < ProfileHistoryScanBatchSize) {

@@ -36,7 +36,9 @@ interface IRecordingDispatcher extends ISettingsHistoryDispatcher {
   readonly requestedFiles: Array<string>
 }
 
-function recordingDispatcher(): IRecordingDispatcher {
+function recordingDispatcher(
+  page: IProfileHistoryPage = historyPage()
+): IRecordingDispatcher {
   const historyScopes: Array<SettingsHistoryScope | undefined> = []
   const requestedFiles: Array<string> = []
   return {
@@ -44,7 +46,7 @@ function recordingDispatcher(): IRecordingDispatcher {
     requestedFiles,
     getSettingsHistory: (_skip, _limit, scope) => {
       historyScopes.push(scope)
-      return Promise.resolve(historyPage())
+      return Promise.resolve(page)
     },
     // Both files change in the commit; the scoped view must only inspect tabs.
     getSettingsHistoryFiles: sha => {
@@ -107,5 +109,24 @@ describe('settings history dialog', () => {
     await waitFor(() => assert.ok(screen.getByRole('button', { name: 'Undo' })))
     assert.ok(screen.getByText('Settings history'))
     assert.deepEqual(dispatcher.historyScopes, [undefined])
+  })
+
+  it('does not promise reorder-only commits in an empty scoped history', async () => {
+    const dispatcher = recordingDispatcher({
+      ...historyPage(),
+      entries: [],
+      total: 0,
+    })
+
+    render(
+      <SettingsHistoryDialog
+        dispatcher={dispatcher}
+        scope={{ kind: 'tab', tabId: 'alpha-tab-id', label: 'Alpha repo' }}
+        onDismissed={() => {}}
+      />
+    )
+
+    const description = await screen.findByText(/saved properties/i)
+    assert.doesNotMatch(description.textContent ?? '', /reorder/i)
   })
 })

@@ -172,6 +172,7 @@ export class BatchCloneStore extends TypedBaseStore<IBatchCloneState | null> {
   /** True while replacing the queue would hide unfinished or failed work. */
   public get requiresAttention(): boolean {
     return (
+      this.dismissing ||
       batchCloneNeedsAttention(this.getState()) ||
       this.completionNotificationPending
     )

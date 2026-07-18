@@ -64,7 +64,7 @@ export function SettingsHistoryDialog(props: ISettingsHistoryDialogProps) {
         timelineLabel="Tab appearance timeline"
         description="Inspect this tab's appearance and session history. Undo, redo, and restore apply to the whole profile and stay on the full history view."
         emptyTitle="No history for this tab yet"
-        emptyDescription="Opening, closing, or reordering this tab will appear here."
+        emptyDescription="Opening, closing, or changing this tab's saved properties will appear here."
         source={source}
         readOnly={true}
         onDismissed={props.onDismissed}
