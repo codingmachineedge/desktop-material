@@ -6,6 +6,7 @@ import {
   githubReleaseTransferFailureMessage,
   GitHubReleaseTransferError,
   IGitHubReleaseAssetDownloadRequest,
+  IGitHubReleaseAssetUploadRange,
   IGitHubReleaseAssetUploadRequest,
   IGitHubReleaseTransferProgressEvent,
 } from './github-release-transfer'
@@ -132,7 +133,8 @@ export async function uploadGitHubReleaseAssetThroughMainProcess(
   name: string,
   label: string | null,
   signal: AbortSignal,
-  onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void
+  onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void,
+  range?: IGitHubReleaseAssetUploadRange
 ) {
   const request: IGitHubReleaseAssetUploadRequest = {
     operationId: operationId(),
@@ -144,6 +146,7 @@ export async function uploadGitHubReleaseAssetThroughMainProcess(
     sourcePath,
     name,
     label,
+    ...(range !== undefined ? { range } : {}),
   }
   return await invokeTransfer<{
     readonly ok: true

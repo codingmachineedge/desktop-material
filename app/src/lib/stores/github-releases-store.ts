@@ -20,6 +20,7 @@ import {
 } from '../github-releases'
 import {
   GitHubReleaseTransferError,
+  IGitHubReleaseAssetUploadRange,
   IGitHubReleaseTransferProgressEvent,
 } from '../github-release-transfer'
 import { APIError } from '../http'
@@ -726,7 +727,8 @@ export class GitHubReleasesStore {
     name: string,
     label: string | null,
     signal: AbortSignal,
-    onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void
+    onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void,
+    range?: IGitHubReleaseAssetUploadRange
   ) {
     return this.run(
       repository,
@@ -748,7 +750,8 @@ export class GitHubReleasesStore {
           name,
           label,
           requestSignal,
-          onProgress
+          onProgress,
+          range
         )
       }
     )

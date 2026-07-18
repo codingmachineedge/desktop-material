@@ -201,13 +201,21 @@ describe('main-process GitHub release transfer', () => {
         | {
             url: string
             headers: Readonly<Record<string, string>>
-            body: Uint8Array
+            body: Buffer
+            length: number
           }
         | undefined
       const dependencies: IGitHubReleaseTransferDependencies = {
         fetch: async () => new Response(null, { status: 500 }),
-        upload: async (url, headers, body) => {
-          request = { url, headers, body }
+        // Read the streamed source back from disk to prove the exact file bytes
+        // reach the fetcher without ever being buffered by the transfer.
+        upload: async (url, headers, uploadSource) => {
+          request = {
+            url,
+            headers,
+            body: await readFile(uploadSource.path),
+            length: uploadSource.length,
+          }
           return new Response(JSON.stringify(uploadedAsset()), { status: 201 })
         },
         redirects: noRedirects,
@@ -228,13 +236,92 @@ describe('main-process GitHub release transfer', () => {
         new Headers(request?.headers).get('Authorization'),
         'Bearer selected-account-token'
       )
-      assert.deepEqual(Buffer.from(request?.body ?? []), bytes)
+      assert.equal(
+        new Headers(request?.headers).get('Content-Length'),
+        String(bytes.byteLength)
+      )
+      assert.deepEqual(request?.body, bytes)
+      assert.equal(request?.length, bytes.byteLength)
       if (result.ok) {
         assert.equal(result.localDigest, digest)
+        assert.equal(result.bytes, bytes.byteLength)
       }
       assert.deepEqual(
         sender.sent.map(progress => progress.transferredBytes),
         [0, bytes.byteLength]
+      )
+    })
+  })
+
+  it('uploads only the requested byte range for a split part', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'huge.bin')
+      const first = Buffer.from('AAAAAAAA'.repeat(8))
+      const second = Buffer.from('BBBBBBBB'.repeat(8))
+      await writeFile(source, Buffer.concat([first, second]))
+      const secondDigest = `sha256:${createHash('sha256')
+        .update(second)
+        .digest('hex')}`
+      let request:
+        | {
+            body: Buffer
+            length: number
+            offset: number
+            contentLength: string | null
+          }
+        | undefined
+      const dependencies: IGitHubReleaseTransferDependencies = {
+        fetch: async () => new Response(null, { status: 500 }),
+        // Slice the streamed range back out of the file to prove exactly the
+        // second part's bytes — and only those — reach the fetcher.
+        upload: async (_url, headers, uploadSource) => {
+          const fileBytes = await readFile(uploadSource.path)
+          request = {
+            body: fileBytes.subarray(
+              uploadSource.offset,
+              uploadSource.offset + uploadSource.length
+            ),
+            length: uploadSource.length,
+            offset: uploadSource.offset,
+            contentLength: new Headers(headers).get('Content-Length'),
+          }
+          return new Response(
+            JSON.stringify({
+              ...uploadedAsset(),
+              size: second.byteLength,
+              digest: secondDigest,
+            }),
+            { status: 201 }
+          )
+        },
+        redirects: noRedirects,
+      }
+      const sender = new TestSender(9)
+      const result = await handleGitHubReleaseAssetUpload(
+        sender,
+        uploadRequest(source, {
+          range: { offset: first.byteLength, length: second.byteLength },
+        }),
+        dependencies
+      )
+
+      assert.equal(result.ok, true)
+      assert.equal(request?.offset, first.byteLength)
+      assert.equal(request?.length, second.byteLength)
+      assert.equal(request?.contentLength, String(second.byteLength))
+      assert.deepEqual(request?.body, second)
+      if (result.ok) {
+        // The digest and byte count cover exactly the uploaded range.
+        assert.equal(result.localDigest, secondDigest)
+        assert.equal(result.bytes, second.byteLength)
+      }
+      assert.deepEqual(
+        sender.sent.map(progress => progress.transferredBytes),
+        [0, second.byteLength]
+      )
+      assert.deepEqual(
+        sender.sent.map(progress => progress.totalBytes),
+        [second.byteLength, second.byteLength]
       )
     })
   })
@@ -281,7 +368,7 @@ describe('main-process GitHub release transfer', () => {
       await writeFile(source, bytes)
       const dependencies: IGitHubReleaseTransferDependencies = {
         fetch: async () => new Response(bytes),
-        upload: async (_url, _headers, _body, signal) =>
+        upload: async (_url, _headers, _source, signal) =>
           await new Promise<Response>((_resolve, reject) => {
             signal.addEventListener('abort', () =>
               reject(new DOMException('canceled', 'AbortError'))

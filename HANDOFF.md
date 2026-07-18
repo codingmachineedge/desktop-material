@@ -69,6 +69,50 @@ both themes) instead of borrowing the pull tone, so the pill signals that a
 push will follow the offered pull. The post-shell style contract covers the
 new state alongside the original five.
 
+## 2026-07-18 Cheap LFS — 2 GiB streamed uploads and auto-split larger files
+
+- **Streamed uploads:** the release-asset upload path no longer buffers the
+  whole file in RAM — it streams from disk with backpressure, hashing while
+  streaming, Content-Length from the validated stat size, redirect handling
+  unchanged. The per-asset cap rose from 128 MiB to **2 GiB** (GitHub's real
+  release-asset limit). The `ReleaseUploadFetcher` contract now takes a
+  streamable `{ path, offset, length }` source instead of a `Uint8Array`.
+- **Auto-split:** a file larger than 2 GiB is split into `partNNN` assets
+  (each ≤ 2 GiB), uploaded via byte-range streaming into the same release,
+  with the mutation review re-fetched before each part. The pointer format
+  is back-compatible: single-asset pointers are byte-for-byte unchanged;
+  multi-part pointers append one `part <sha256> <size> <name>` line per
+  part, and parsing validates that the parts' sizes sum to the whole-file
+  size. Materialize downloads and verifies each part, concatenates in order
+  while streaming the whole-file digest, verifies digest+size, then
+  atomically replaces the pointer — any failure leaves the pointer intact.
+
+## 2026-07-18 Clone progress — stage, %, speed, ETA, submodule phase
+
+The clone progress experience was enriched from a bare bar into a Material
+readout: the git **stage** (Receiving objects / Resolving deltas / Checking
+out) with a numeric percentage, **transfer speed** and a derived **ETA**
+(rolling-window rate in the store), and a distinct **Fetching submodules**
+phase (indeterminate) that was previously an opaque pin near 100%. The git
+progress parser now captures the throughput segment it used to discard;
+multi-clone rows surface each repo's stage/description/percent, not just a
+bar.
+
+## 2026-07-18 Notification automations (context-menu-only, safety-gated)
+
+A right-click **Automations…** entry on any notification row (the only
+entry point) opens a builder for rules that fire a **webhook** or a **local
+command** when a matching notification arrives. Non-negotiable safety, all
+verified: every rule is **disabled by default** and its `enabled` flag is
+**re-clamped to false on load**, so a rule restored/synced/imported through
+its Git-backed store can never fire until deliberately armed in the current
+session; webhooks run main-process-only on an isolated session with the
+full SSRF guard set (manual redirects, https-only, credentials omit,
+bounded response, content templated into the body never the URL); commands
+run `shell:false` with every substituted argument re-validated against the
+argv allowlist (refused, never escaped); and a receipt loop-guard stops an
+automation firing on its own follow-up notification.
+
 ## 2026-07-18 Build & Run — fix errors with opencode
 
 When a Build & Run stage fails, the panel now offers **Fix with opencode**:

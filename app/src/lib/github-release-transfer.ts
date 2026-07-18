@@ -23,12 +23,23 @@ export interface IGitHubReleaseAssetDownloadRequest
   readonly destination: string
 }
 
+/**
+ * A contiguous byte range of the source file to upload as one asset. Absent for
+ * a whole-file upload; present when a file larger than the per-asset cap is
+ * split into parts, so part K uploads exactly `[offset, offset + length)`.
+ */
+export interface IGitHubReleaseAssetUploadRange {
+  readonly offset: number
+  readonly length: number
+}
+
 export interface IGitHubReleaseAssetUploadRequest
   extends IGitHubReleaseTransferBaseRequest {
   readonly releaseId: number
   readonly sourcePath: string
   readonly name: string
   readonly label: string | null
+  readonly range?: IGitHubReleaseAssetUploadRange
 }
 
 export interface IGitHubReleaseTransferProgressEvent {
@@ -122,7 +133,7 @@ export function githubReleaseTransferFailureMessage(
       return 'The release asset could not be saved at the selected destination.'
     case 'too-large':
       return `The release asset exceeds the app’s ${
-        direction === 'upload' ? '128 MiB upload' : '5 GiB download'
+        direction === 'upload' ? '2 GiB upload' : '5 GiB download'
       } safety limit.`
     case 'size-mismatch':
       return 'The release asset did not match its advertised size.'

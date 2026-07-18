@@ -211,7 +211,7 @@ describe('CheapLfs panel', () => {
     assert.equal(dispatcher.pinCalls[0].absoluteFilePath, pickedFile('big.psd'))
   })
 
-  it('rejects a file above the 128 MiB cap before calling the dispatcher', async () => {
+  it('splits a file above the 2 GiB cap and pins it after review', async () => {
     const dispatcher = new FakeCheapLfsDispatcher([])
     render(
       <CheapLfs
@@ -219,7 +219,7 @@ describe('CheapLfs panel', () => {
         accounts={[]}
         dispatcher={dispatcher}
         chooseFileToPin={async () => pickedFile('huge.bin')}
-        statFileSize={async () => 200 * 1024 * 1024}
+        statFileSize={async () => 3 * 1024 * 1024 * 1024}
       />
     )
     await screen.findByText(
@@ -230,9 +230,17 @@ describe('CheapLfs panel', () => {
     await screen.findByLabelText('Tracked file path')
     fireEvent.click(screen.getByRole('button', { name: 'Review pin' }))
 
-    await screen.findByText(/larger than the 128 MiB cheap LFS upload limit/i)
-    assert.equal(screen.queryByRole('button', { name: 'Pin file' }), null)
-    assert.equal(dispatcher.pinCalls.length, 0)
+    // The review notes the split into parts and the pin still proceeds; the
+    // split itself is exercised in the operations unit tests.
+    await screen.findByText(/split into 2 parts/i)
+    fireEvent.click(await screen.findByRole('button', { name: 'Pin file' }))
+
+    await waitFor(() => assert.equal(dispatcher.pinCalls.length, 1))
+    assert.equal(dispatcher.pinCalls[0].trackedRelativePath, 'huge.bin')
+    assert.equal(
+      dispatcher.pinCalls[0].absoluteFilePath,
+      pickedFile('huge.bin')
+    )
   })
 
   it('rejects an unsafe tracked path before calling the dispatcher', async () => {

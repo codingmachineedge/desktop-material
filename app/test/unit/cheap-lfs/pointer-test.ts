@@ -5,6 +5,7 @@ import {
   ICheapLfsPointer,
   isCheapLfsPointerText,
   parseCheapLfsPointer,
+  planFileParts,
   serializeCheapLfsPointer,
   validateCheapLfsTrackedPath,
 } from '../../../src/lib/cheap-lfs/pointer'
@@ -20,6 +21,18 @@ const pointer: ICheapLfsPointer = {
   sha256: 'a'.repeat(64),
 }
 
+const multiPartPointer: ICheapLfsPointer = {
+  version: CHEAP_LFS_POINTER_VERSION,
+  releaseTag: 'v2.0.0',
+  assetName: 'huge.bin',
+  sizeInBytes: 30,
+  sha256: 'a'.repeat(64),
+  parts: [
+    { name: 'huge.bin.part001', sizeInBytes: 10, sha256: 'b'.repeat(64) },
+    { name: 'huge.bin.part002', sizeInBytes: 20, sha256: 'c'.repeat(64) },
+  ],
+}
+
 describe('cheap LFS pointer', () => {
   it('round-trips a serialized pointer and ends with a trailing newline', () => {
     const text = serializeCheapLfsPointer(pointer)
@@ -31,6 +44,94 @@ describe('cheap LFS pointer', () => {
   it('preserves an asset name that contains spaces', () => {
     const parsed = parseCheapLfsPointer(serializeCheapLfsPointer(pointer))
     assert.equal(parsed?.assetName, 'game assets.bin')
+  })
+
+  it('parses an old single-asset pointer as one with no parts (back-compat)', () => {
+    const parsed = parseCheapLfsPointer(serializeCheapLfsPointer(pointer))
+    assert.deepEqual(parsed, pointer)
+    assert.equal(parsed?.parts, undefined)
+  })
+
+  it('round-trips a multi-part pointer with its parts serialized in order', () => {
+    const text = serializeCheapLfsPointer(multiPartPointer)
+    assert.equal(text.endsWith('\n'), true)
+    // The five head lines are unchanged; part lines follow them, in order.
+    const lines = text.trimEnd().split('\n')
+    assert.deepEqual(lines.slice(0, 5), [
+      `version ${CHEAP_LFS_POINTER_VERSION}`,
+      'release-tag v2.0.0',
+      'asset-name huge.bin',
+      'size 30',
+      `sha256 ${'a'.repeat(64)}`,
+    ])
+    assert.deepEqual(lines.slice(5), [
+      `part ${'b'.repeat(64)} 10 huge.bin.part001`,
+      `part ${'c'.repeat(64)} 20 huge.bin.part002`,
+    ])
+    assert.deepEqual(parseCheapLfsPointer(text), multiPartPointer)
+  })
+
+  it('preserves a part name that contains spaces', () => {
+    const spaced: ICheapLfsPointer = {
+      ...multiPartPointer,
+      assetName: 'game assets.bin',
+      sizeInBytes: 30,
+      parts: [
+        {
+          name: 'game assets.bin.part001',
+          sizeInBytes: 30,
+          sha256: 'b'.repeat(64),
+        },
+      ],
+    }
+    assert.deepEqual(
+      parseCheapLfsPointer(serializeCheapLfsPointer(spaced)),
+      spaced
+    )
+  })
+
+  it('rejects a multi-part pointer whose parts do not sum to the whole size', () => {
+    const bad = serializeCheapLfsPointer({
+      ...multiPartPointer,
+      sizeInBytes: 31,
+    })
+    assert.equal(parseCheapLfsPointer(bad), null)
+  })
+
+  it('rejects a part line with a malformed sha256, size, or empty name', () => {
+    const head = [
+      `version ${CHEAP_LFS_POINTER_VERSION}`,
+      'release-tag v2.0.0',
+      'asset-name huge.bin',
+      'size 30',
+      `sha256 ${'a'.repeat(64)}`,
+    ]
+    const rejected: ReadonlyArray<string> = [
+      // sha256 that is not 64 hex characters.
+      [...head, 'part deadbeef 30 huge.bin.part001'].join('\n'),
+      // Non-integer part size.
+      [...head, `part ${'b'.repeat(64)} 3.0 huge.bin.part001`].join('\n'),
+      // Empty part name.
+      [...head, `part ${'b'.repeat(64)} 30 `].join('\n'),
+    ]
+    for (const text of rejected) {
+      assert.equal(parseCheapLfsPointer(`${text}\n`), null, text)
+    }
+  })
+
+  it('plans file parts with a remainder final part', () => {
+    assert.deepEqual(planFileParts(10, 4), [
+      { index: 0, offset: 0, length: 4 },
+      { index: 1, offset: 4, length: 4 },
+      { index: 2, offset: 8, length: 2 },
+    ])
+    // A file within a single part is the N=1 whole-file case.
+    assert.deepEqual(planFileParts(3, 4), [{ index: 0, offset: 0, length: 3 }])
+    // An exact multiple ends with a full final part.
+    assert.deepEqual(planFileParts(8, 4), [
+      { index: 0, offset: 0, length: 4 },
+      { index: 1, offset: 4, length: 4 },
+    ])
   })
 
   it('tolerates CRLF line endings, a leading BOM, and surrounding whitespace', () => {

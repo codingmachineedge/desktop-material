@@ -120,13 +120,13 @@ describe('GitHub release transfer loopback GHES fixture', () => {
       upload: async (
         url: string,
         headers: Readonly<Record<string, string>>,
-        body: Uint8Array,
+        source: { readonly path: string; readonly length: number },
         signal: AbortSignal
       ) =>
         await fetch(url, {
           method: 'POST',
           headers,
-          body,
+          body: await readFile(source.path),
           redirect: 'manual',
           signal,
         }),

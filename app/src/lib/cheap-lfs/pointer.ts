@@ -13,45 +13,125 @@
 /** Version marker written on the first line of every pointer. */
 export const CHEAP_LFS_POINTER_VERSION = 'desktop-material/cheap-lfs/v1'
 
-/** Pointers are minuscule; refuse to parse anything larger as a guard. */
-const MaximumPointerTextBytes = 4096
+/**
+ * The per-part upload size a whole file is split into when it exceeds a single
+ * release asset. Must mirror `GitHubReleaseAssetMaximumUploadBytes` (2 GiB) —
+ * each part is uploaded as its own asset, so every part must fit the per-asset
+ * upload cap. Kept as a literal here so this module stays import-free.
+ */
+export const CHEAP_LFS_PART_SIZE_BYTES = 2 * 1024 * 1024 * 1024
+
+/**
+ * Pointers are small, but a multi-part pointer for a very large file lists one
+ * line per part, so the guard is generous rather than tiny. A part line is well
+ * under 350 bytes, so this still bounds the text far below any real binary.
+ */
+const MaximumPointerTextBytes = 512 * 1024
 
 const sha256Hex = /^[a-f0-9]{64}$/
 const nonNegativeInteger = /^(?:0|[1-9][0-9]*)$/
+// `part <64-hex sha256> <size> <name>` — sha256 and size sit in fixed leading
+// positions so the trailing name may itself contain spaces.
+const partLine = /^([a-f0-9]{64}) (0|[1-9][0-9]*) (.+)$/
 const controlCharacters = /[\u0000-\u001f]/
+
+/** One uploaded part of a whole file that was split across release assets. */
+export interface ICheapLfsPointerPart {
+  readonly name: string
+  readonly sizeInBytes: number
+  readonly sha256: string
+}
 
 export interface ICheapLfsPointer {
   readonly version: string
   readonly releaseTag: string
   readonly assetName: string
+  /** The whole file's byte size (the sum of every part when split). */
   readonly sizeInBytes: number
+  /** The whole file's SHA-256. */
   readonly sha256: string
+  /**
+   * Present only when the file was split across multiple release assets. A
+   * single-asset pointer omits this entirely and parses byte-for-byte as the
+   * original v1 five-line form. Parts are listed in file order.
+   */
+  readonly parts?: ReadonlyArray<ICheapLfsPointerPart>
+}
+
+/** One planned byte range of a file, used to drive a split upload or hash. */
+export interface ICheapLfsPartPlan {
+  readonly index: number
+  readonly offset: number
+  readonly length: number
 }
 
 /**
- * Serialize a pointer to its canonical five-line `key value` form with a
- * trailing newline. Always written with `\n` line endings so the committed
- * bytes are stable regardless of the platform or `core.autocrlf`.
+ * Split a total byte size into contiguous ranges of at most `partSize`, with
+ * the final range holding the remainder. A file that fits in a single part
+ * yields one whole-file range, so the single-asset flow is simply the N=1 case.
+ */
+export function planFileParts(
+  totalSize: number,
+  partSize: number
+): ReadonlyArray<ICheapLfsPartPlan> {
+  if (
+    !Number.isSafeInteger(totalSize) ||
+    totalSize < 0 ||
+    !Number.isSafeInteger(partSize) ||
+    partSize < 1
+  ) {
+    throw new Error('Cheap LFS cannot plan parts for these sizes.')
+  }
+  if (totalSize <= partSize) {
+    return [{ index: 0, offset: 0, length: totalSize }]
+  }
+  const plans = new Array<ICheapLfsPartPlan>()
+  let offset = 0
+  let index = 0
+  while (offset < totalSize) {
+    const length = Math.min(partSize, totalSize - offset)
+    plans.push({ index, offset, length })
+    offset += length
+    index++
+  }
+  return plans
+}
+
+/**
+ * Serialize a pointer to its canonical `key value` form with a trailing
+ * newline. A single-asset pointer is the original five lines, byte-for-byte. A
+ * split pointer appends one deterministic `part <sha256> <size> <name>` line
+ * per part, in file order, after those five. Always written with `\n` line
+ * endings so the committed bytes are stable regardless of the platform or
+ * `core.autocrlf`.
  */
 export function serializeCheapLfsPointer(pointer: ICheapLfsPointer): string {
-  return (
-    [
-      `version ${pointer.version}`,
-      `release-tag ${pointer.releaseTag}`,
-      `asset-name ${pointer.assetName}`,
-      `size ${pointer.sizeInBytes}`,
-      `sha256 ${pointer.sha256}`,
-    ].join('\n') + '\n'
-  )
+  const lines = [
+    `version ${pointer.version}`,
+    `release-tag ${pointer.releaseTag}`,
+    `asset-name ${pointer.assetName}`,
+    `size ${pointer.sizeInBytes}`,
+    `sha256 ${pointer.sha256}`,
+  ]
+  if (pointer.parts !== undefined) {
+    for (const part of pointer.parts) {
+      lines.push(`part ${part.sha256} ${part.sizeInBytes} ${part.name}`)
+    }
+  }
+  return lines.join('\n') + '\n'
 }
 
 /**
  * Parse pointer text, tolerating surrounding whitespace, a leading BOM, and
  * CRLF line endings. Returns `null` on any malformation rather than throwing so
  * callers can cheaply distinguish "not a pointer" from a real parse of a valid
- * one. Field order is not significant, but every field must appear exactly once
- * and satisfy its format (correct version, 64-hex SHA-256, non-negative integer
- * size, and non-empty whitespace-free tag / non-empty asset name).
+ * one. The five head fields may appear in any order but must each appear
+ * exactly once and satisfy their format (correct version, 64-hex SHA-256,
+ * non-negative integer size, non-empty whitespace-free tag / non-empty asset
+ * name). Optional `part <sha256> <size> <name>` lines follow; when present each
+ * must have a 64-hex SHA-256, a non-negative integer size, and a non-empty
+ * name, and their sizes must sum exactly to the head `size` (the whole file).
+ * Old single-asset pointers have no part lines and parse with no `parts`.
  */
 export function parseCheapLfsPointer(text: string): ICheapLfsPointer | null {
   if (typeof text !== 'string' || text.length > MaximumPointerTextBytes) {
@@ -61,16 +141,25 @@ export function parseCheapLfsPointer(text: string): ICheapLfsPointer | null {
     return null
   }
 
-  const lines = text
+  const allLines = text
     .replace(/^\uFEFF/, '')
     .trim()
     .split(/\r?\n/)
-  if (lines.length !== 5) {
+  const headLines = new Array<string>()
+  const partTexts = new Array<string>()
+  for (const line of allLines) {
+    if (line.startsWith('part ')) {
+      partTexts.push(line.slice('part '.length))
+    } else {
+      headLines.push(line)
+    }
+  }
+  if (headLines.length !== 5) {
     return null
   }
 
   const fields = new Map<string, string>()
-  for (const line of lines) {
+  for (const line of headLines) {
     const separator = line.indexOf(' ')
     if (separator <= 0) {
       return null
@@ -112,7 +201,33 @@ export function parseCheapLfsPointer(text: string): ICheapLfsPointer | null {
     return null
   }
 
-  return { version, releaseTag, assetName, sizeInBytes, sha256 }
+  if (partTexts.length === 0) {
+    return { version, releaseTag, assetName, sizeInBytes, sha256 }
+  }
+
+  const parts = new Array<ICheapLfsPointerPart>()
+  let partsTotal = 0
+  for (const partText of partTexts) {
+    const match = partLine.exec(partText)
+    if (match === null || match[3].length > 255) {
+      return null
+    }
+    const partSize = Number(match[2])
+    if (!Number.isSafeInteger(partSize) || partSize < 0) {
+      return null
+    }
+    partsTotal += partSize
+    if (!Number.isSafeInteger(partsTotal)) {
+      return null
+    }
+    parts.push({ name: match[3], sizeInBytes: partSize, sha256: match[1] })
+  }
+  // Every byte of the whole file must be accounted for by exactly the parts.
+  if (partsTotal !== sizeInBytes) {
+    return null
+  }
+
+  return { version, releaseTag, assetName, sizeInBytes, sha256, parts }
 }
 
 /**

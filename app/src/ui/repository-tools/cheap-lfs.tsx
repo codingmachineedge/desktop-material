@@ -9,8 +9,11 @@ import {
   ICheapLfsPinResult,
   ICheapLfsPointerEntry,
 } from '../../lib/cheap-lfs/operations'
-import { validateCheapLfsTrackedPath } from '../../lib/cheap-lfs/pointer'
-import { GitHubReleaseAssetMaximumUploadBytes } from '../../lib/github-releases'
+import {
+  CHEAP_LFS_PART_SIZE_BYTES,
+  planFileParts,
+  validateCheapLfsTrackedPath,
+} from '../../lib/cheap-lfs/pointer'
 import { IGitHubReleaseTransferProgressEvent } from '../../lib/github-release-transfer'
 import { getGitHubReleasesAccount } from '../../lib/stores/github-releases-store'
 import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
@@ -450,14 +453,8 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
       })
       return
     }
-    if (pin.sizeInBytes > GitHubReleaseAssetMaximumUploadBytes) {
-      this.setState({
-        error: `This file is ${formatBytes(
-          pin.sizeInBytes
-        )} — larger than the 128 MiB cheap LFS upload limit. Store it another way.`,
-      })
-      return
-    }
+    // Files larger than the per-asset cap are no longer rejected; they are split
+    // into parts during the pin, so the review step just proceeds.
     this.setState({
       pin: { ...pin, trackedRelativePath: normalized, reviewing: true },
       error: null,
@@ -625,6 +622,16 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
             <dt>Size</dt>
             <dd>{formatBytes(pin.sizeInBytes)}</dd>
           </dl>
+          {pin.sizeInBytes > CHEAP_LFS_PART_SIZE_BYTES && (
+            <p className="cheap-lfs-split-note" role="status">
+              This file is larger than the{' '}
+              {formatBytes(CHEAP_LFS_PART_SIZE_BYTES)} per-asset limit, so it
+              will be split into{' '}
+              {planFileParts(pin.sizeInBytes, CHEAP_LFS_PART_SIZE_BYTES).length}{' '}
+              parts uploaded as separate release assets. The pointer records
+              every part so materialize rebuilds the original file.
+            </p>
+          )}
           <p>
             The file uploads to the release; the pointer replaces it in your
             working tree. Commit the pointer to share it.
@@ -693,8 +700,10 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
           />
         </label>
         <p className="cheap-lfs-pin-help">
-          Files up to 128 MiB can be pinned. If the tag has no release yet, an
-          unpublished draft is created for the asset.
+          Files up to 2 GiB upload as a single asset; larger files are split
+          automatically into 2 GiB parts, each stored as its own release asset
+          and recorded in the pointer. If the tag has no release yet, an
+          unpublished draft is created for the assets.
         </p>
         <div className="repository-tool-controls">
           <Button onClick={this.reviewPin}>Review pin</Button>

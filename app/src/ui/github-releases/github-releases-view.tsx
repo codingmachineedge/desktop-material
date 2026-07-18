@@ -1371,9 +1371,7 @@ export class GitHubReleasesView extends React.Component<
                 onChange={this.onUploadText}
               />
             </label>
-            <p>
-              Uploads are limited to 128 MiB and sent only to this provider.
-            </p>
+            <p>Uploads are limited to 2 GiB and sent only to this provider.</p>
             <div className="github-releases-controls">
               <Button onClick={this.reviewUpload}>Review upload</Button>
               <Button onClick={this.closeUpload}>Cancel</Button>

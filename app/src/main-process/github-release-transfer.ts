@@ -1,5 +1,6 @@
 import { net, session } from 'electron'
 import { createHash } from 'crypto'
+import { createReadStream } from 'fs'
 import { isAbsolute, resolve } from 'path'
 import { lstat, open } from 'fs/promises'
 import { EndpointToken } from '../lib/endpoint-token'
@@ -39,10 +40,23 @@ import {
 } from './actions-transfer-redirect'
 
 type ReleaseFetcher = IActionsTransferDependencies['fetch']
+
+/**
+ * A validated upload body streamed from disk. The asset is never buffered in
+ * memory, so only the source path, the range start `offset` (0 for a whole-file
+ * upload), and the exact byte `length` of that range (used verbatim as the
+ * Content-Length) cross this seam.
+ */
+interface IReleaseUploadSource {
+  readonly path: string
+  readonly offset: number
+  readonly length: number
+}
+
 type ReleaseUploadFetcher = (
   url: string,
   headers: Readonly<Record<string, string>>,
-  body: Uint8Array,
+  source: IReleaseUploadSource,
   signal: AbortSignal
 ) => Promise<Response>
 
@@ -382,10 +396,37 @@ function uploadEndpoint(endpoint: URL): URL {
   return upload
 }
 
+function validateUploadRange(
+  value: unknown,
+  fileSize: number
+): { readonly offset: number; readonly length: number } {
+  // A whole-file upload has no range: it covers the entire validated file.
+  if (value === undefined || value === null) {
+    return { offset: 0, length: fileSize }
+  }
+  if (typeof value !== 'object') {
+    throw new ReleaseTransferFailure('invalid-request')
+  }
+  const { offset, length } = value as Record<string, unknown>
+  if (
+    typeof offset !== 'number' ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    typeof length !== 'number' ||
+    !Number.isSafeInteger(length) ||
+    length < 1 ||
+    offset + length > fileSize
+  ) {
+    throw new ReleaseTransferFailure('source')
+  }
+  return { offset, length }
+}
+
 async function readUploadSource(
   sourcePath: unknown,
+  range: unknown,
   signal: AbortSignal
-): Promise<{ readonly bytes: Uint8Array; readonly digest: string }> {
+): Promise<IReleaseUploadSource & { readonly digest: string }> {
   if (
     typeof sourcePath !== 'string' ||
     sourcePath.length === 0 ||
@@ -404,7 +445,11 @@ async function readUploadSource(
   ) {
     throw new ReleaseTransferFailure('source')
   }
-  if (before.size > GitHubReleaseAssetMaximumUploadBytes) {
+  // The range (whole file when absent) is what this upload sends; the per-asset
+  // cap applies to the part length, not the whole file, so a split file's
+  // individual parts pass even though the file itself is larger than the cap.
+  const { offset, length } = validateUploadRange(range, before.size)
+  if (length > GitHubReleaseAssetMaximumUploadBytes) {
     throw new ReleaseTransferFailure('too-large')
   }
   throwIfAborted(signal)
@@ -418,24 +463,47 @@ async function readUploadSource(
       !opened.isFile() ||
       opened.size !== before.size ||
       opened.dev !== before.dev ||
-      opened.ino !== before.ino
+      opened.ino !== before.ino ||
+      offset + length > opened.size
     ) {
       throw new ReleaseTransferFailure('source')
     }
-    const bytes = await handle.readFile()
+    // Stream only the [offset, offset + length) range through the hash so a
+    // multi-gigabyte part is never read into memory to compute its digest.
+    const hash = createHash('sha256')
+    let streamed = 0
+    const stream = createReadStream('', {
+      fd: handle.fd,
+      autoClose: false,
+      start: offset,
+      end: offset + length - 1,
+    })
+    const cancel = () => stream.destroy(abortError())
+    signal.addEventListener('abort', cancel, { once: true })
+    try {
+      for await (const chunk of stream) {
+        throwIfAborted(signal)
+        streamed += (chunk as Buffer).byteLength
+        hash.update(chunk as Buffer)
+      }
+    } finally {
+      signal.removeEventListener('abort', cancel)
+    }
     throwIfAborted(signal)
     const after = await handle.stat()
     if (
       after.size !== opened.size ||
       after.dev !== opened.dev ||
       after.ino !== opened.ino ||
-      bytes.byteLength !== opened.size
+      streamed !== length
     ) {
       throw new ReleaseTransferFailure('source')
     }
     return {
-      bytes,
-      digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+      path,
+      offset,
+      length,
+      digest: `sha256:${hash.digest('hex')}`,
     }
   } finally {
     await handle.close().catch(() => undefined)
@@ -546,6 +614,7 @@ export async function handleGitHubReleaseAssetUpload(
     const label = normalizeGitHubReleaseAssetLabel(request.label ?? '')
     const source = await readUploadSource(
       request.sourcePath,
+      request.range,
       active.controller.signal
     )
     sendProgress(
@@ -554,7 +623,7 @@ export async function handleGitHubReleaseAssetUpload(
         operationId: request.operationId,
         direction: 'upload',
         transferredBytes: 0,
-        totalBytes: source.bytes.byteLength,
+        totalBytes: source.length,
       },
       active
     )
@@ -572,14 +641,14 @@ export async function handleGitHubReleaseAssetUpload(
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${base.token}`,
         'Content-Type': 'application/octet-stream',
-        'Content-Length': String(source.bytes.byteLength),
+        'Content-Length': String(source.length),
         'User-Agent': 'DesktopMaterial-ReleasesTransfer',
       }
     )
     const response = await dependencies.upload(
       url.toString(),
       Object.fromEntries(headers.entries()),
-      source.bytes,
+      source,
       active.controller.signal
     )
     throwIfAborted(active.controller.signal)
@@ -594,7 +663,7 @@ export async function handleGitHubReleaseAssetUpload(
     const asset = parseGitHubReleaseAsset(
       await boundedGitHubReleaseResponse(response, active.controller.signal)
     )
-    if (asset.name !== name || asset.sizeInBytes !== source.bytes.byteLength) {
+    if (asset.name !== name || asset.sizeInBytes !== source.length) {
       throw new ReleaseTransferFailure('invalid-response')
     }
     if (asset.digest !== null && asset.digest !== source.digest) {
@@ -605,15 +674,15 @@ export async function handleGitHubReleaseAssetUpload(
       {
         operationId: request.operationId,
         direction: 'upload',
-        transferredBytes: source.bytes.byteLength,
-        totalBytes: source.bytes.byteLength,
+        transferredBytes: source.length,
+        totalBytes: source.length,
       },
       active
     )
     return {
       ok: true,
       asset,
-      bytes: source.bytes.byteLength,
+      bytes: source.length,
       localDigest: source.digest,
     }
   } catch (error) {
@@ -652,7 +721,7 @@ export const createElectronGitHubReleaseUploadFetcher =
       options: Electron.ClientRequestConstructorOptions
     ) => Electron.ClientRequest = options => net.request(options)
   ): ReleaseUploadFetcher =>
-  async (url, headers, body, signal) =>
+  async (url, headers, source, signal) =>
     await new Promise<Response>((resolvePromise, rejectPromise) => {
       if (signal.aborted) {
         rejectPromise(abortError())
@@ -669,17 +738,29 @@ export const createElectronGitHubReleaseUploadFetcher =
         referrerPolicy: 'no-referrer',
         cache: 'no-store',
       })
+      // Re-read the validated range from disk so the body is streamed, never
+      // buffered — a ~2 GiB part must not be materialized in memory.
+      const body = createReadStream(source.path, {
+        start: source.offset,
+        end: source.offset + source.length - 1,
+      })
+      let uploadedBytes = 0
       let settled = false
       const settle = (callback: () => void) => {
         if (!settled) {
           settled = true
           signal.removeEventListener('abort', onAbort)
+          body.destroy()
           callback()
         }
       }
       const onAbort = () => {
         request.abort()
         settle(() => rejectPromise(abortError()))
+      }
+      const failSource = () => {
+        request.abort()
+        settle(() => rejectPromise(new ReleaseTransferFailure('source')))
       }
       signal.addEventListener('abort', onAbort, { once: true })
       request.on('redirect', status => {
@@ -714,13 +795,43 @@ export const createElectronGitHubReleaseUploadFetcher =
         response.on('error', error => settle(() => rejectPromise(error)))
       })
       request.on('error', error => settle(() => rejectPromise(error)))
-      try {
-        request.write(Buffer.from(body))
+      body.on('data', (chunk: Buffer) => {
+        if (settled) {
+          return
+        }
+        uploadedBytes += chunk.byteLength
+        // A file that grew after validation would overrun the declared
+        // Content-Length; fail closed rather than send a corrupt body.
+        if (uploadedBytes > source.length) {
+          failSource()
+          return
+        }
+        // Honor Writable backpressure so slow networks never buffer the whole
+        // asset in the request's internal queue. Electron's ClientRequest is a
+        // Writable at runtime (write() returns a boolean and it emits 'drain'),
+        // but its typings don't surface that, so view it as one here.
+        const writableRequest = request as unknown as import('stream').Writable
+        if (!writableRequest.write(chunk)) {
+          body.pause()
+          writableRequest.once('drain', () => {
+            if (!settled) {
+              body.resume()
+            }
+          })
+        }
+      })
+      body.on('end', () => {
+        if (settled) {
+          return
+        }
+        // A file that shrank after validation would under-run Content-Length.
+        if (uploadedBytes !== source.length) {
+          failSource()
+          return
+        }
         request.end()
-      } catch (error) {
-        request.abort()
-        settle(() => rejectPromise(error))
-      }
+      })
+      body.on('error', () => failSource())
     })
 
 const defaultDependencies: IGitHubReleaseTransferDependencies = {

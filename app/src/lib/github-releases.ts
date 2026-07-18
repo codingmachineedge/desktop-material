@@ -10,8 +10,8 @@ export const GitHubReleaseAssetPageSize = 100
 /** Keep one release's asset browser bounded to 500 records. */
 export const GitHubReleaseAssetMaximumPages = 5
 
-/** Asset uploads are buffered by the isolated main-process transfer. */
-export const GitHubReleaseAssetMaximumUploadBytes = 128 * 1024 * 1024
+/** Asset uploads are streamed from disk by the isolated main-process transfer. */
+export const GitHubReleaseAssetMaximumUploadBytes = 2 * 1024 * 1024 * 1024
 
 /** Downloads are streamed, but unexpectedly large assets are still rejected. */
 export const GitHubReleaseAssetMaximumDownloadBytes = 5 * 1024 * 1024 * 1024
