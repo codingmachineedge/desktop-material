@@ -15,6 +15,7 @@ The [Guided Feature Gallery](Feature-Gallery) is the canonical 63-function visua
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
+- [Install on Windows](#install-on-windows)
 - [Material first run](#material-first-run)
 - [Signing in](#signing-in)
 - [Repository tabs](#repository-tabs)
@@ -34,6 +35,38 @@ catalogued function or state owns one distinct screenshot rather than borrowing 
 - [Repository power tools](#repository-power-tools)
 - [Multi-window workflows](#multi-window-workflows)
 - [Agent access and CLI](#agent-access-and-cli)
+
+---
+
+## Install on Windows
+
+Desktop Material's automated releases currently provide an x64 per-user
+installer. Open Windows PowerShell 5.1 or PowerShell 7 as your normal user and
+run:
+
+```powershell
+Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
+```
+
+The command loads the
+[tracked installer script](https://github.com/codingmachineedge/desktop-material/blob/main/script/install-windows.ps1)
+from this repository. The script then:
+
+1. queries `codingmachineedge/desktop-material` for its newest non-draft,
+   non-prerelease GitHub release;
+2. requires exactly one installer matching the native Windows architecture and
+   validates that its HTTPS URL belongs to this repository;
+3. checks the reported byte count and GitHub SHA-256 release-asset digest, then
+   requires any Authenticode signature to be valid;
+4. runs the per-user Squirrel installer silently with `/S`; and
+5. removes the installer from its unique, bounded temporary directory.
+
+The current automated workflow publishes unsigned x64 installers. The script
+warns about the missing signature after verifying the GitHub digest, and it
+stops rather than selecting a different package on ARM64 or 32-bit Windows. To
+inspect or download the asset yourself, use the
+[latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest).
+Review the tracked script before running any remote command.
 
 ---
 

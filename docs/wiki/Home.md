@@ -26,10 +26,30 @@ into named app functions rather than a searchable command or endpoint catalogue.
 
 ---
 
+## Install on Windows
+
+The automated release currently supports x64 Windows. From Windows PowerShell
+5.1 or PowerShell 7, run this one line in a normal, non-administrator shell:
+
+```powershell
+Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
+```
+
+The [tracked script](https://github.com/codingmachineedge/desktop-material/blob/main/script/install-windows.ps1)
+resolves the newest published release from this exact repository, requires the
+matching GitHub SHA-256 asset digest, checks any Authenticode signature, installs
+silently for the current user, and cleans up its temporary download. Current
+builds are unsigned; the script reports that fact and refuses an unsupported
+architecture or an unverified download. See the [User Guide](User-Guide#install-on-windows)
+for details and the manual-download path.
+
+---
+
 ## Contents
 
 | Page | What it covers |
 | --- | --- |
+| [Install on Windows](User-Guide#install-on-windows) | Fully automatic PowerShell install, integrity checks, architecture limits, and manual download. |
 | [User Guide](User-Guide) | Task-oriented walkthrough for the Material welcome, appearance scopes, adaptive toolbar, accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
 | [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 58 named visual functions and states, with automated missing/duplicate coverage checks. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |

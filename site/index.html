@@ -179,6 +179,7 @@
         </a>
         <nav class="appbar-actions" aria-label="Primary navigation">
           <div class="nav-links">
+            <a href="#install">Install</a>
             <a href="#features">Features</a>
             <a href="#screenshots">Screenshots</a>
             <a href="https://github.com/codingmachineedge/desktop-material/wiki"
@@ -223,23 +224,20 @@
                 workflows in one calm desktop surface.
               </p>
               <div class="hero-cta">
+                <a class="btn btn-filled" href="#install">
+                  <svg class="material-icon" aria-hidden="true">
+                    <use href="#icon-download"></use>
+                  </svg>
+                  Install on Windows
+                </a>
                 <a
-                  class="btn btn-filled"
+                  class="btn btn-tonal"
                   href="https://github.com/codingmachineedge/desktop-material"
                 >
                   <svg class="material-icon" aria-hidden="true">
                     <use href="#icon-open-new"></use>
                   </svg>
                   Explore the source
-                </a>
-                <a
-                  class="btn btn-tonal"
-                  href="https://github.com/codingmachineedge/desktop-material/wiki"
-                >
-                  <svg class="material-icon" aria-hidden="true">
-                    <use href="#icon-guide"></use>
-                  </svg>
-                  Read the guide
                 </a>
               </div>
               <div class="hero-meta" aria-label="Project details">
@@ -299,6 +297,55 @@
               <small>Settings history stays local and Git-backed.</small>
             </li>
           </ul>
+        </div>
+      </section>
+
+      <!-- ================= Install ================= -->
+      <section class="install" id="install" aria-labelledby="install-title">
+        <div class="wrap">
+          <div class="install-copy">
+            <span class="eyebrow">Automatic Windows install</span>
+            <h2 class="section-title" id="install-title">
+              Get the newest verified release in one line
+            </h2>
+            <p class="section-sub">
+              Open Windows PowerShell 5.1 or PowerShell 7 as your normal user.
+              The tracked installer resolves this repository's latest release,
+              verifies GitHub's SHA-256 asset digest and any Authenticode
+              signature, installs silently, and cleans up its temporary
+              download.
+            </p>
+            <pre
+              class="install-command"
+              aria-label="PowerShell install command"
+            ><code>Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression</code></pre>
+            <p class="install-note">
+              Current automated builds are unsigned and x64 only. The script
+              reports the unsigned status after digest verification and stops on
+              an unsupported architecture or unverified download. Review remote
+              code before running it.
+            </p>
+            <div class="hero-cta install-links">
+              <a
+                class="btn btn-filled"
+                href="https://github.com/codingmachineedge/desktop-material/blob/main/script/install-windows.ps1"
+              >
+                <svg class="material-icon" aria-hidden="true">
+                  <use href="#icon-guide"></use>
+                </svg>
+                Review the installer
+              </a>
+              <a
+                class="btn btn-tonal"
+                href="https://github.com/codingmachineedge/desktop-material/releases/latest"
+              >
+                <svg class="material-icon" aria-hidden="true">
+                  <use href="#icon-download"></use>
+                </svg>
+                Manual download
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -1116,6 +1116,58 @@ h1.hero-title {
 }
 
 /* Tonal section containers */
+.install {
+  padding-bottom: 0;
+}
+
+.install > .wrap {
+  padding-block: clamp(40px, 6vw, 68px);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: clamp(30px, 4vw, 44px);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.install-copy {
+  margin-inline: clamp(22px, 4vw, 56px);
+}
+
+.install .section-sub {
+  max-width: 74ch;
+  margin-bottom: 24px;
+}
+
+.install-command {
+  max-width: 100%;
+  margin: 0 0 18px;
+  padding: 20px 22px;
+  overflow-x: auto;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-medium);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  text-align: left;
+}
+
+.install-command code {
+  font-family: ui-monospace, 'Cascadia Code', 'SFMono-Regular', Consolas,
+    monospace;
+  font-size: clamp(0.78rem, 1.5vw, 0.94rem);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.install .install-note {
+  max-width: 74ch;
+  margin: 0 0 26px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.95rem;
+}
+
+.install-links {
+  margin-bottom: 0;
+}
+
 .features {
   background: transparent;
 }
@@ -1349,6 +1401,7 @@ footer {
     display: none;
   }
 
+  .install > .wrap,
   .features > .wrap,
   #screenshots > .wrap {
     border-radius: 30px;

@@ -201,6 +201,27 @@ set.
 
 </details>
 
+## Install on Windows
+
+Desktop Material's automated releases currently provide a per-user x64 Windows
+installer. Run this one line in Windows PowerShell 5.1 or PowerShell 7; it does
+not require an administrator shell:
+
+```powershell
+Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
+```
+
+The [tracked installer script](script/install-windows.ps1) asks GitHub for this
+exact repository's newest published release, accepts only the installer for the
+native architecture, verifies its release-asset size and GitHub SHA-256 digest,
+checks any Authenticode signature, runs the Squirrel installer silently with
+`/S`, and removes its controlled temporary directory. The current release
+workflow publishes unsigned x64 builds, so the script reports that status and
+stops on ARM64 until an ARM64 asset is available. Review the script before
+running any remote command, or use the
+[latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest)
+for a manual download.
+
 ## Building
 
 Full instructions live in [`docs/contributing/setup.md`](docs/contributing/setup.md). In short, with Node 24.15.0:
