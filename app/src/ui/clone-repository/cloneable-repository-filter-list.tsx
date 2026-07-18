@@ -11,6 +11,7 @@ import memoizeOne from 'memoize-one'
 import { Button } from '../lib/button'
 import { IMatches } from '../../lib/fuzzy-find'
 import { Octicon, syncClockwise } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 import { HighlightText } from '../lib/highlight-text'
 import { ClickSource } from '../lib/list'
 import { LinkButton } from '../lib/link-button'
@@ -99,6 +100,21 @@ interface ICloneableRepositoryFilterListProps {
   readonly filterListId?: string
   readonly filterListLabel?: string
   readonly placeholderText?: string
+
+  /**
+   * Returns the known submodule count for a clone URL, or undefined while
+   * the repository hasn't been probed yet. Enables the per-row badge.
+   */
+  readonly getSubmoduleCount?: (url: string) => number | undefined
+
+  /** Requests a lazy `.gitmodules` probe for a row as it becomes visible. */
+  readonly onProbeSubmodules?: (repository: IAPIRepository) => void
+
+  /** Called when the user clicks a row's highlighted submodule badge. */
+  readonly onShowSubmodules?: (repository: IAPIRepository) => void
+
+  /** Bumped when probe results land so visible rows re-render. */
+  readonly submoduleBadgeVersion?: number
 }
 
 const RowHeight = 31
@@ -153,6 +169,12 @@ interface ICloneableRepositoryListItemProps {
   readonly matches: IMatches
   readonly checked: boolean
   readonly onToggleItemChecked?: (url: string) => void
+
+  /** The probed submodule count, or undefined while unknown. */
+  readonly submoduleCount?: number
+
+  /** Called with the row's clone URL when the submodule badge is clicked. */
+  readonly onShowSubmodules?: (url: string) => void
 }
 
 /**
@@ -169,6 +191,43 @@ class CloneableRepositoryListItem extends React.PureComponent<ICloneableReposito
 
   private onCheckboxChange = () => {
     this.props.onToggleItemChecked?.(this.props.item.url)
+  }
+
+  private onSubmoduleBadgeClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    // The badge opens the submodule details dialog; it must not double as
+    // selecting (or cloning) the row itself.
+    event.stopPropagation()
+    this.props.onShowSubmodules?.(this.props.item.url)
+  }
+
+  private renderSubmoduleBadge() {
+    const { item, submoduleCount, onShowSubmodules } = this.props
+
+    if (
+      submoduleCount === undefined ||
+      submoduleCount === 0 ||
+      onShowSubmodules === undefined
+    ) {
+      return null
+    }
+
+    const label = `View ${submoduleCount} ${
+      submoduleCount === 1 ? 'submodule' : 'submodules'
+    } of ${item.text[0]}`
+
+    return (
+      <button
+        type="button"
+        className="submodule-badge"
+        onClick={this.onSubmoduleBadgeClick}
+        aria-label={label}
+      >
+        <Octicon symbol={octicons.fileSubmodule} />
+        {submoduleCount}
+      </button>
+    )
   }
 
   public render() {
@@ -199,6 +258,7 @@ class CloneableRepositoryListItem extends React.PureComponent<ICloneableReposito
         >
           <HighlightText text={item.text[0]} highlight={matches.title} />
         </TooltippedContent>
+        {this.renderSubmoduleBadge()}
         {item.archived && <div className="archived">Archived</div>}
       </div>
     )
@@ -276,7 +336,11 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
         renderItem={this.renderItem}
         renderGroupHeader={this.renderGroupHeader}
         onSelectionChanged={this.onSelectionChanged}
-        invalidationProps={{ groups, checkedUrls: this.props.checkedUrls }}
+        invalidationProps={{
+          groups,
+          checkedUrls: this.props.checkedUrls,
+          submoduleBadgeVersion: this.props.submoduleBadgeVersion,
+        }}
         groups={groups}
         filterText={this.props.filterText}
         onFilterTextChanged={this.props.onFilterTextChanged}
@@ -339,7 +403,20 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
     item: ICloneableRepositoryListItem,
     matches: IMatches
   ) => {
-    const { onToggleItemChecked, checkedUrls } = this.props
+    const { onToggleItemChecked, checkedUrls, getSubmoduleCount } = this.props
+    const submoduleCount = getSubmoduleCount?.(item.url)
+
+    // The list virtualizes rows, so a row rendering means it's visible —
+    // exactly when a lazy, cached `.gitmodules` probe should be requested.
+    if (submoduleCount === undefined && this.props.onProbeSubmodules) {
+      const repository =
+        this.props.repositories === null
+          ? null
+          : findRepositoryForListItem(this.props.repositories, item)
+      if (repository !== null) {
+        this.props.onProbeSubmodules(repository)
+      }
+    }
 
     return (
       <CloneableRepositoryListItem
@@ -347,8 +424,24 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
         matches={matches}
         checked={checkedUrls?.has(item.url) === true}
         onToggleItemChecked={onToggleItemChecked}
+        submoduleCount={submoduleCount}
+        onShowSubmodules={
+          this.props.onShowSubmodules ? this.onShowSubmodulesForUrl : undefined
+        }
       />
     )
+  }
+
+  private onShowSubmodulesForUrl = (url: string) => {
+    const { repositories, onShowSubmodules } = this.props
+    if (repositories === null || onShowSubmodules === undefined) {
+      return
+    }
+
+    const repository = repositories.find(r => r.clone_url === url) || null
+    if (repository !== null) {
+      onShowSubmodules(repository)
+    }
   }
 
   private onSelectAllChange = (event: React.FormEvent<HTMLInputElement>) => {

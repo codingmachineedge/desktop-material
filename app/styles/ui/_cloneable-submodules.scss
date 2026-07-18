@@ -1,0 +1,92 @@
+// The pre-clone "Repository submodules" dialog: the `.gitmodules` entries a
+// hosted repository declares, each cloneable on its own as a standalone
+// repository. Row language mirrors the submodule manager's list rows.
+#cloneable-submodules {
+  width: min(640px, calc(100vw - 40px));
+
+  .cloneable-submodules-summary {
+    margin: 0 0 12px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .cloneable-submodule-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cloneable-submodule-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing);
+    padding: 12px 14px;
+    background: var(--md-sys-color-surface-container);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-large);
+
+    .button-component {
+      flex-shrink: 0;
+    }
+  }
+
+  .cloneable-submodule-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .cloneable-submodule-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cloneable-submodule-icon {
+    color: var(--md-sys-color-on-surface-variant);
+    flex-shrink: 0;
+  }
+
+  .cloneable-submodule-path {
+    font-size: 13.5px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--md-sys-color-on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cloneable-submodule-branch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-size: 11.5px;
+    color: var(--md-sys-color-on-surface-variant);
+
+    .octicon {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  .cloneable-submodule-url {
+    font-size: 11.5px;
+    color: var(--md-sys-color-on-surface-variant);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+// The standalone submodule manager dialog; its content styles are shared with
+// the Repository Settings tab in dialogs/_repository-settings.scss.
+#submodule-manager {
+  width: min(720px, calc(100vw - 40px));
+}

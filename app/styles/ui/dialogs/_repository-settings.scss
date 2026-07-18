@@ -453,6 +453,7 @@
       border-radius: var(--md-sys-shape-corner-large);
       display: grid;
       gap: var(--spacing);
+      max-width: 100%;
       min-width: 0;
       overflow: hidden;
       padding: var(--spacing-double);
@@ -460,11 +461,19 @@
       > header {
         display: grid;
         gap: var(--spacing-half);
+        min-width: 0;
 
         > div {
           align-items: center;
           display: flex;
           gap: var(--spacing-half);
+          min-width: 0;
+        }
+
+        h3,
+        p {
+          min-width: 0;
+          overflow-wrap: anywhere;
         }
 
         p {
@@ -476,16 +485,20 @@
 
       .ssh-working-copy-picker {
         display: grid;
+        min-width: 0;
         grid-template-columns: minmax(min(100%, 240px), 0.5fr);
       }
 
       .ssh-working-copy-fields {
         display: grid;
         gap: var(--spacing);
+        min-width: 0;
         grid-template-columns: repeat(2, minmax(min(100%, 180px), 1fr));
 
         .text-box-component,
         .select-component {
+          max-width: 100%;
+          min-width: 0;
           width: 100%;
         }
 
@@ -498,11 +511,13 @@
       }
 
       .ssh-working-copy-security-note {
+        min-width: 0;
         background: var(--md-sys-color-tertiary-container);
         border-radius: var(--md-sys-shape-corner-medium);
         color: var(--md-sys-color-on-tertiary-container);
         font-size: var(--font-size-sm);
         line-height: 1.45;
+        overflow-wrap: anywhere;
         padding: var(--spacing);
       }
 
@@ -517,7 +532,10 @@
           display: inline-flex;
           gap: var(--spacing-half);
           height: auto;
+          max-width: 100%;
+          min-width: 0;
           min-height: 32px;
+          overflow-wrap: anywhere;
           white-space: normal;
         }
       }
@@ -529,13 +547,19 @@
       .ssh-working-copy-results {
         display: grid;
         gap: var(--spacing-half);
+        max-width: 100%;
+        min-width: 0;
 
         > p:first-child {
           color: var(--md-sys-color-on-surface-variant);
           font-size: var(--font-size-sm);
+          overflow-wrap: anywhere;
         }
 
         pre {
+          box-sizing: border-box;
+          max-width: 100%;
+          min-width: 0;
           background: var(--md-sys-color-surface-container-lowest);
           border: 1px solid var(--md-sys-color-outline-variant);
           border-radius: var(--md-sys-shape-corner-medium);
@@ -750,9 +774,14 @@
       }
     }
   }
+}
 
-  // MD3 Submodules tab — surface cards + list rows, sharing the section
-  // language of the Build & Run and gitignore tabs.
+// MD3 Submodules tab — surface cards + list rows, sharing the section
+// language of the Build & Run and gitignore tabs. Scoped to both the settings
+// dialog and the standalone submodule manager, which render the same
+// component.
+#repository-settings,
+#submodule-manager {
   .submodules-settings {
     display: flex;
     flex-direction: column;
@@ -817,6 +846,35 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    // --- Cloned / not-cloned summary chips --------------------------------
+    .submodules-summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .submodules-summary-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    .submodules-summary-cloned {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    .submodules-summary-uncloned {
+      background: var(--md-sys-color-tertiary-container);
+      color: var(--md-sys-color-on-tertiary-container);
     }
 
     // --- Submodule list ---------------------------------------------------
@@ -959,7 +1017,9 @@
       }
     }
   }
+}
 
+#repository-settings {
   // Collapse the vertical label rail into one row of accessible icon buttons.
   // The text remains in the DOM as each button's accessible name.
   @container repository-settings-dialog (max-width: 520px) {

@@ -87,6 +87,7 @@ type RepositoryToolsHubToolID =
   | 'shallow-history'
   | 'export-artifacts'
   | 'bundle-import'
+  | 'submodule-manager'
 
 type RepositoryToolsHubCategory =
   | RepositoryToolCategory
@@ -204,6 +205,20 @@ const RepositoryToolsHubEntries: ReadonlyArray<IRepositoryToolsHubEntry> = [
     HubCategoryOrder.indexOf(right.category)
 )
 
+/**
+ * The submodule manager hub entry. Listed only when the current repository
+ * actually declares submodules (cloned or not), so repositories without
+ * submodules never see it.
+ */
+const SubmoduleManagerHubEntry: IRepositoryToolsHubEntry = {
+  id: 'submodule-manager',
+  title: 'Submodule manager',
+  description:
+    'Review, clone, update, sync, add, and remove the submodules declared by this repository — managed in place, not as separate repositories.',
+  category: 'Maintenance',
+  icon: octicons.fileSubmodule,
+}
+
 const RepositoryToolsHubCategories: ReadonlyArray<RepositoryToolsHubCategoryFilter> =
   ['All', ...HubCategoryOrder]
 
@@ -250,6 +265,15 @@ export interface IRepositoryToolsProps {
   readonly chooseBundleToImport?: () => Promise<string | null>
   readonly chooseFileToBlame?: () => Promise<string | null>
   readonly revealArchive?: (path: string) => Promise<void>
+
+  /**
+   * How many submodules the repository declares, or null/undefined while
+   * unknown. The submodule manager entry is listed only for a positive count.
+   */
+  readonly submoduleCount?: number | null
+
+  /** Opens the standalone submodule manager for this repository. */
+  readonly onOpenSubmoduleManager?: () => void
 }
 
 type OperationStatus =
@@ -487,7 +511,7 @@ export class RepositoryTools extends React.Component<
   }
 
   private onHubToolClicked = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const entry = RepositoryToolsHubEntries.find(
+    const entry = this.getAllHubEntries().find(
       candidate => candidate.id === event.currentTarget.dataset.hubTool
     )
     if (entry !== undefined) {
@@ -495,9 +519,31 @@ export class RepositoryTools extends React.Component<
     }
   }
 
+  /**
+   * The complete hub catalog for this repository: the static entries plus the
+   * submodule manager when the repository actually declares submodules.
+   */
+  private getAllHubEntries(): ReadonlyArray<IRepositoryToolsHubEntry> {
+    const { submoduleCount, onOpenSubmoduleManager } = this.props
+    if (
+      onOpenSubmoduleManager === undefined ||
+      submoduleCount === undefined ||
+      submoduleCount === null ||
+      submoduleCount === 0
+    ) {
+      return RepositoryToolsHubEntries
+    }
+
+    return [...RepositoryToolsHubEntries, SubmoduleManagerHubEntry].sort(
+      (left, right) =>
+        HubCategoryOrder.indexOf(left.category) -
+        HubCategoryOrder.indexOf(right.category)
+    )
+  }
+
   private getVisibleHubEntries(): ReadonlyArray<IRepositoryToolsHubEntry> {
     const filter = this.state.toolFilter.trim().toLowerCase()
-    return RepositoryToolsHubEntries.filter(entry => {
+    return this.getAllHubEntries().filter(entry => {
       if (
         this.state.toolCategory !== 'All' &&
         entry.category !== this.state.toolCategory
@@ -1095,6 +1141,55 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderSubmoduleManager() {
+    const { submoduleCount, onOpenSubmoduleManager } = this.props
+    if (
+      onOpenSubmoduleManager === undefined ||
+      submoduleCount === undefined ||
+      submoduleCount === null ||
+      submoduleCount === 0
+    ) {
+      return null
+    }
+
+    return (
+      <section
+        className="repository-tools-category"
+        aria-labelledby="repository-tools-submodules-title"
+      >
+        <h2 id="repository-tools-submodules-title">Maintenance</h2>
+        <div className="repository-tools-card-grid">
+          <article className="repository-tool-card">
+            <div>
+              <div className="repository-tool-card-heading">
+                <Octicon
+                  symbol={octicons.fileSubmodule}
+                  className="repository-tool-card-icon"
+                />
+                <h3>Submodule manager</h3>
+              </div>
+              <p>
+                This repository declares {submoduleCount}{' '}
+                {submoduleCount === 1 ? 'submodule' : 'submodules'}. Manage them
+                in place — clone the ones that aren't downloaded yet, update or
+                sync the ones that are, add new ones, or remove them — without
+                adding each submodule as a separate repository.
+              </p>
+              {this.renderDetailChips(
+                'Maintenance',
+                'writes repository',
+                'git · submodule'
+              )}
+            </div>
+            <Button onClick={onOpenSubmoduleManager}>
+              {__DARWIN__ ? 'Open Submodule Manager' : 'Open submodule manager'}
+            </Button>
+          </article>
+        </div>
+      </section>
+    )
+  }
+
   private renderExport() {
     return (
       <section
@@ -1663,6 +1758,7 @@ export class RepositoryTools extends React.Component<
       >
         {this.renderSelectedOperation()}
         {this.renderInspection()}
+        {selected === 'submodule-manager' && this.renderSubmoduleManager()}
         {selected === 'export-artifacts' && this.renderExport()}
         <div
           className="repository-tools-panel"

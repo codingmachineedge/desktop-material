@@ -183,6 +183,33 @@ export class Submodules extends React.Component<
     })
   }
 
+  private renderSummary(): JSX.Element | null {
+    const { submodules } = this.state
+    if (submodules === null || submodules.length === 0) {
+      return null
+    }
+
+    const uncloned = submodules.filter(s => s.status === 'uninitialized').length
+    const cloned = submodules.length - uncloned
+
+    return (
+      <div className="submodules-summary" role="status">
+        <span className="submodules-summary-chip">
+          {submodules.length}{' '}
+          {submodules.length === 1 ? 'submodule' : 'submodules'}
+        </span>
+        <span className="submodules-summary-chip submodules-summary-cloned">
+          {cloned} cloned
+        </span>
+        {uncloned > 0 && (
+          <span className="submodules-summary-chip submodules-summary-uncloned">
+            {uncloned} not cloned
+          </span>
+        )}
+      </div>
+    )
+  }
+
   private renderStatusPill(submodule: IManagedSubmodule): JSX.Element {
     const className = `submodule-status submodule-status-${submodule.status}`
     return <span className={className}>{STATUS_LABEL[submodule.status]}</span>
@@ -267,6 +294,7 @@ export class Submodules extends React.Component<
                 )}
               </div>
             </div>
+            {this.renderSummary()}
             {this.state.error !== null && (
               <p className="submodules-error">{this.state.error}</p>
             )}
@@ -353,9 +381,13 @@ function SubmoduleRow(props: ISubmoduleRowProps) {
           type="button"
           disabled={isBusy}
           onClick={onUpdate}
-          tooltip="Initialize and update this submodule"
+          tooltip={
+            submodule.status === 'uninitialized'
+              ? 'Clone this submodule into the working tree'
+              : 'Initialize and update this submodule'
+          }
         >
-          Update
+          {submodule.status === 'uninitialized' ? 'Clone' : 'Update'}
         </Button>
         <Button
           type="button"

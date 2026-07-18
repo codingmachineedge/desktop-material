@@ -49,6 +49,42 @@
       border-radius: var(--border-radius);
       text-transform: uppercase;
     }
+
+    // Highlighted submodule-count chip beside the repository name. A real
+    // button (opens the submodule details dialog) drawn from the M3 tertiary
+    // tokens so it stands out from the selection state.
+    .submodule-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      margin-left: var(--spacing-half);
+      padding: 1px 8px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--md-sys-color-tertiary-container);
+      color: var(--md-sys-color-on-tertiary-container);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 16px;
+      cursor: pointer;
+
+      .octicon {
+        width: 12px;
+        height: 12px;
+        fill: currentColor;
+      }
+
+      &:hover {
+        background: var(--md-sys-color-tertiary);
+        color: var(--md-sys-color-on-tertiary);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--md-sys-color-primary);
+        outline-offset: 1px;
+      }
+    }
   }
 }
 

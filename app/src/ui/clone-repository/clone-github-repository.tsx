@@ -125,6 +125,18 @@ interface ICloneGithubRepositoryProps {
 
   /** Called when the automatic new-repository clone setting changes. */
   readonly onAutoCloneNewRepositoriesChanged: (enabled: boolean) => void
+
+  /** Returns the probed submodule count for a clone URL, if known. */
+  readonly getSubmoduleCount?: (url: string) => number | undefined
+
+  /** Requests a lazy `.gitmodules` probe for a visible repository row. */
+  readonly onProbeSubmodules?: (repository: IAPIRepository) => void
+
+  /** Called when the user clicks a row's submodule badge. */
+  readonly onShowSubmodules?: (repository: IAPIRepository) => void
+
+  /** Bumped when probe results land so visible rows re-render. */
+  readonly submoduleBadgeVersion?: number
 }
 
 export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepositoryProps> {
@@ -250,6 +262,10 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
             checkedUrls={this.props.checkedUrls}
             onToggleItemChecked={this.props.onToggleItemChecked}
             onToggleAllItemsChecked={this.props.onToggleAllItemsChecked}
+            getSubmoduleCount={this.props.getSubmoduleCount}
+            onProbeSubmodules={this.props.onProbeSubmodules}
+            onShowSubmodules={this.props.onShowSubmodules}
+            submoduleBadgeVersion={this.props.submoduleBadgeVersion}
           />
         </Row>
 

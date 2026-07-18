@@ -30,6 +30,7 @@ import type { IBYOKModel, IBYOKProvider } from '../lib/copilot/byok'
 import { WorktreeEntry } from './worktree'
 import { MergeAllMode } from '../lib/automation/merge-all'
 import { IGitHubPullRequestTarget } from '../lib/github-pull-request'
+import { IGitModulesEntry } from '../lib/git/gitmodules'
 
 export enum PopupType {
   RenameBranch = 'RenameBranch',
@@ -47,6 +48,8 @@ export enum PopupType {
   SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
   AddSubmodule = 'AddSubmodule',
+  CloneableSubmodules = 'CloneableSubmodules',
+  SubmoduleManager = 'SubmoduleManager',
   AddRepository = 'AddRepository',
   CreateRepository = 'CreateRepository',
   CloneRepository = 'CloneRepository',
@@ -230,6 +233,24 @@ export type PopupDetail =
       type: PopupType.AddSubmodule
       repository: Repository
       onAdded: () => void | Promise<void>
+    }
+  | {
+      type: PopupType.CloneableSubmodules
+      /** The `owner/name` (or friendly name) of the inspected repository. */
+      parentName: string
+      /** The clone URL relative submodule URLs are resolved against. */
+      parentCloneUrl: string
+      /** The parsed `.gitmodules` entries of the inspected repository. */
+      entries: ReadonlyArray<IGitModulesEntry>
+      /**
+       * Overrides how a per-submodule clone is launched, letting an already
+       * open clone dialog take the URL instead of opening a second dialog.
+       */
+      onCloneUrl?: (url: string) => void
+    }
+  | {
+      type: PopupType.SubmoduleManager
+      repository: Repository
     }
   | { type: PopupType.AddRepository; path?: string }
   | { type: PopupType.CreateRepository; path?: string }

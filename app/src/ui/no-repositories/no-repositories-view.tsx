@@ -8,11 +8,13 @@ import {
   WelcomeLeftBottomImageUri,
 } from '../welcome/welcome'
 import { IAccountRepositories } from '../../lib/stores/api-repositories-store'
-import { Account, accountEquals } from '../../models/account'
+import { Account, accountEquals, getAccountKey } from '../../models/account'
 import { CloneableRepositoryFilterList } from '../clone-repository/cloneable-repository-filter-list'
-import { IAPIRepository } from '../../lib/api'
+import { API, IAPIRepository } from '../../lib/api'
 import { ClickSource } from '../lib/list'
 import { AccountPicker } from '../account-picker'
+import { GitModulesProbe } from '../../lib/submodules/gitmodules-probe'
+import { IGitModulesEntry } from '../../lib/git/gitmodules'
 
 interface INoRepositoriesProps {
   /** A function to call when the user chooses to create a repository. */
@@ -56,6 +58,15 @@ interface INoRepositoriesProps {
    * available for cloning.
    */
   readonly onRefreshRepositories: (account: Account) => void
+
+  /**
+   * Called when the user clicks a repository row's submodule badge with the
+   * probed `.gitmodules` entries for that repository.
+   */
+  readonly onShowRepositorySubmodules?: (
+    repository: IAPIRepository,
+    entries: ReadonlyArray<IGitModulesEntry>
+  ) => void
 }
 interface INoRepositoriesState {
   readonly selectedAccount: Account | undefined
@@ -67,6 +78,9 @@ interface INoRepositoriesState {
    * The current filter text in the GitHub.com clone tab
    */
   readonly filterText: string
+
+  /** Bumped when a `.gitmodules` probe lands so visible rows re-render. */
+  readonly submoduleBadgeVersion: number
 }
 
 /**
@@ -81,6 +95,11 @@ export class NoRepositoriesView extends React.Component<
     return this.state.selectedAccount ?? this.props.accounts.at(0)
   }
 
+  /** Lazy per-account `.gitmodules` probes backing the submodule badges. */
+  private readonly submoduleProbes = new Map<string, GitModulesProbe>()
+
+  private hasUnmounted = false
+
   public constructor(props: INoRepositoriesProps) {
     super(props)
 
@@ -88,6 +107,73 @@ export class NoRepositoriesView extends React.Component<
       selectedRepository: null,
       selectedAccount: props.accounts.at(0),
       filterText: '',
+      submoduleBadgeVersion: 0,
+    }
+  }
+
+  public componentWillUnmount() {
+    this.hasUnmounted = true
+  }
+
+  private onSubmoduleProbeUpdated = () => {
+    if (!this.hasUnmounted) {
+      this.setState(previous => ({
+        submoduleBadgeVersion: previous.submoduleBadgeVersion + 1,
+      }))
+    }
+  }
+
+  private getSubmoduleProbe(account: Account): GitModulesProbe {
+    const key = getAccountKey(account)
+    const existing = this.submoduleProbes.get(key)
+    if (existing !== undefined) {
+      return existing
+    }
+
+    const api = API.fromAccount(account)
+    const probe = new GitModulesProbe(async (owner, name) => {
+      try {
+        return await api.fetchWorkflowFileContent(owner, name, '.gitmodules')
+      } catch {
+        // No .gitmodules (404) and unreadable both mean "no badge".
+        return null
+      }
+    }, this.onSubmoduleProbeUpdated)
+
+    this.submoduleProbes.set(key, probe)
+    return probe
+  }
+
+  private onProbeSubmodules = (repository: IAPIRepository) => {
+    const account = this.selectedAccount
+    if (account !== undefined) {
+      this.getSubmoduleProbe(account).probe({
+        cloneUrl: repository.clone_url,
+        ownerLogin: repository.owner.login,
+        name: repository.name,
+      })
+    }
+  }
+
+  private getSubmoduleCountForUrl = (url: string): number | undefined => {
+    const account = this.selectedAccount
+    if (account === undefined) {
+      return undefined
+    }
+    return this.submoduleProbes.get(getAccountKey(account))?.getCachedCount(url)
+  }
+
+  private onShowSubmodules = (repository: IAPIRepository) => {
+    const account = this.selectedAccount
+    if (account === undefined) {
+      return
+    }
+
+    const entries = this.getSubmoduleProbe(account).getCachedEntries(
+      repository.clone_url
+    )
+    if (entries !== undefined && entries.length > 0) {
+      this.props.onShowRepositorySubmodules?.(repository, entries)
     }
   }
 
@@ -222,6 +308,14 @@ export class NoRepositoriesView extends React.Component<
           onSelectionChanged={this.onSelectionChanged}
           onFilterTextChanged={this.onFilterTextChanged}
           onItemClicked={this.onItemClicked}
+          getSubmoduleCount={this.getSubmoduleCountForUrl}
+          onProbeSubmodules={this.onProbeSubmodules}
+          onShowSubmodules={
+            this.props.onShowRepositorySubmodules
+              ? this.onShowSubmodules
+              : undefined
+          }
+          submoduleBadgeVersion={this.state.submoduleBadgeVersion}
         />
         {this.renderCloneSelectedRepositoryButton(selectedItem)}
       </>

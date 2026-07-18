@@ -55,6 +55,7 @@ import { Repository } from '../../models/repository'
 import { CloningRepository } from '../../models/cloning-repository'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import { GitModulesProbe } from '../../lib/submodules/gitmodules-probe'
 
 interface ICloneRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -192,6 +193,9 @@ interface ICloneRepositoryState {
   /** Whether newly discovered repositories should be cloned automatically. */
   readonly autoCloneNewRepositories: boolean
 
+  /** Bumped when a `.gitmodules` probe lands so visible rows re-render. */
+  readonly submoduleBadgeVersion: number
+
   /**
    * The persisted state of the CloneGitHubRepository component for
    * the GitHub.com account.
@@ -295,6 +299,9 @@ export class CloneRepository extends React.Component<
         : accounts.filter(account => accountMatchesCloneTab(tab, account))
   )
 
+  /** Lazy per-account `.gitmodules` probes backing the submodule badges. */
+  private readonly submoduleProbes = new Map<string, GitModulesProbe>()
+
   public constructor(props: ICloneRepositoryProps) {
     super(props)
 
@@ -315,6 +322,7 @@ export class CloneRepository extends React.Component<
       shallowClone: false,
       cloneDepth: '1',
       autoCloneNewRepositories: false,
+      submoduleBadgeVersion: 0,
       dotComTabState: {
         kind: 'dotComTabState',
         filterText: '',
@@ -791,6 +799,10 @@ export class CloneRepository extends React.Component<
               onAutoCloneNewRepositoriesChanged={
                 this.onAutoCloneNewRepositoriesChanged
               }
+              getSubmoduleCount={this.getSubmoduleCountForUrl}
+              onProbeSubmodules={this.onProbeSubmodules}
+              onShowSubmodules={this.onShowSubmodules}
+              submoduleBadgeVersion={this.state.submoduleBadgeVersion}
             />
           )
         }
@@ -798,6 +810,85 @@ export class CloneRepository extends React.Component<
       default:
         return assertNever(tab, `Unknown tab: ${tab}`)
     }
+  }
+
+  private onSubmoduleProbeUpdated = () => {
+    if (!this.hasUnmounted) {
+      this.setState(previous => ({
+        submoduleBadgeVersion: previous.submoduleBadgeVersion + 1,
+      }))
+    }
+  }
+
+  private getSubmoduleProbe(account: Account): GitModulesProbe {
+    const key = getAccountKey(account)
+    const existing = this.submoduleProbes.get(key)
+    if (existing !== undefined) {
+      return existing
+    }
+
+    const api = API.fromAccount(account)
+    const probe = new GitModulesProbe(async (owner, name) => {
+      try {
+        return await api.fetchWorkflowFileContent(owner, name, '.gitmodules')
+      } catch {
+        // No .gitmodules (404) and unreadable both mean "no badge".
+        return null
+      }
+    }, this.onSubmoduleProbeUpdated)
+
+    this.submoduleProbes.set(key, probe)
+    return probe
+  }
+
+  private onProbeSubmodules = (repository: IAPIRepository) => {
+    const account = this.getAccountForTab(this.props.selectedTab)
+    if (account !== null) {
+      this.getSubmoduleProbe(account).probe({
+        cloneUrl: repository.clone_url,
+        ownerLogin: repository.owner.login,
+        name: repository.name,
+      })
+    }
+  }
+
+  private getSubmoduleCountForUrl = (url: string): number | undefined => {
+    const account = this.getAccountForTab(this.props.selectedTab)
+    if (account === null) {
+      return undefined
+    }
+    return this.submoduleProbes.get(getAccountKey(account))?.getCachedCount(url)
+  }
+
+  private onShowSubmodules = (repository: IAPIRepository) => {
+    const account = this.getAccountForTab(this.props.selectedTab)
+    if (account === null) {
+      return
+    }
+
+    const entries = this.getSubmoduleProbe(account).getCachedEntries(
+      repository.clone_url
+    )
+    if (entries === undefined || entries.length === 0) {
+      return
+    }
+
+    this.props.dispatcher.showPopup({
+      type: PopupType.CloneableSubmodules,
+      parentName: `${repository.owner.login}/${repository.name}`,
+      parentCloneUrl: repository.clone_url,
+      entries,
+      onCloneUrl: this.onCloneSubmoduleUrl,
+    })
+  }
+
+  /**
+   * Take a submodule's resolved URL into this already-open clone dialog's URL
+   * tab instead of opening a second clone dialog on the popup stack.
+   */
+  private onCloneSubmoduleUrl = (url: string) => {
+    this.props.onTabSelected(CloneRepositoryTab.Generic)
+    this.updateUrl(url)
   }
 
   private onSelectedAccountChanged = (account: Account) => {

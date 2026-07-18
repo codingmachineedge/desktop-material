@@ -182,6 +182,12 @@ interface IRepositoryViewState {
 
   /** Whether the floating account-switcher menu is open */
   readonly isAccountSwitcherOpen: boolean
+
+  /**
+   * How many submodules the repository declares (cloned or not), or null
+   * while unknown. Gates the tools hub's submodule manager entry.
+   */
+  readonly submoduleCount: number | null
 }
 
 export class RepositoryView extends React.Component<
@@ -201,6 +207,7 @@ export class RepositoryView extends React.Component<
 
   private focusHistoryNeeded: boolean = false
   private focusChangesNeeded: boolean = false
+  private repositoryViewUnmounted = false
 
   public constructor(props: IRepositoryViewProps) {
     super(props)
@@ -209,7 +216,35 @@ export class RepositoryView extends React.Component<
       changesListScrollTop: 0,
       compareListScrollTop: 0,
       isAccountSwitcherOpen: false,
+      submoduleCount: null,
     }
+  }
+
+  private loadSubmoduleCount = async () => {
+    const repository = this.props.repository
+    try {
+      const submodules = await this.props.dispatcher.getSubmodules(repository)
+      if (
+        !this.repositoryViewUnmounted &&
+        this.props.repository.hash === repository.hash
+      ) {
+        this.setState({ submoduleCount: submodules.length })
+      }
+    } catch {
+      if (
+        !this.repositoryViewUnmounted &&
+        this.props.repository.hash === repository.hash
+      ) {
+        this.setState({ submoduleCount: null })
+      }
+    }
+  }
+
+  private onOpenSubmoduleManager = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.SubmoduleManager,
+      repository: this.props.repository,
+    })
   }
 
   private supportsGitHubActions() {
@@ -1042,6 +1077,8 @@ export class RepositoryView extends React.Component<
         <RepositoryTools
           repositoryPath={this.props.repository.path}
           onRefreshRepository={this.refreshRepository}
+          submoduleCount={this.state.submoduleCount}
+          onOpenSubmoduleManager={this.onOpenSubmoduleManager}
         />
       )
     } else {
@@ -1075,13 +1112,20 @@ export class RepositoryView extends React.Component<
 
   public componentDidMount() {
     window.addEventListener('keydown', this.onGlobalKeyDown)
+    this.loadSubmoduleCount()
   }
 
   public componentWillUnmount() {
     window.removeEventListener('keydown', this.onGlobalKeyDown)
+    this.repositoryViewUnmounted = true
   }
 
-  public componentDidUpdate(): void {
+  public componentDidUpdate(prevProps: IRepositoryViewProps): void {
+    if (prevProps.repository.hash !== this.props.repository.hash) {
+      this.setState({ submoduleCount: null })
+      this.loadSubmoduleCount()
+    }
+
     if (this.focusChangesNeeded) {
       this.focusChangesNeeded = false
       this.changesSidebarRef.current?.focus()

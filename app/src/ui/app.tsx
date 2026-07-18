@@ -136,7 +136,13 @@ import {
 import { AppError } from './app-error'
 import { MissingRepository } from './missing-repository'
 import { AddExistingRepository, CreateRepository } from './add-repository'
-import { CloneRepository, BatchCloneProgress } from './clone-repository'
+import {
+  CloneRepository,
+  BatchCloneProgress,
+  CloneableSubmodulesDialog,
+} from './clone-repository'
+import { SubmoduleManagerDialog } from './submodules/submodule-manager-dialog'
+import { IGitModulesEntry } from '../lib/git/gitmodules'
 import {
   ExportRepositoriesDialog,
   ImportRepositoriesDialog,
@@ -272,7 +278,10 @@ import {
 import { GenerateCommitMessageOverrideWarning } from './generate-commit-message/generate-commit-message-override-warning'
 import { CopilotDisclaimer } from './copilot/copilot-disclaimer'
 import { CopilotConflictResolutionAlwaysNudge } from './multi-commit-operation/dialog/copilot-conflict-resolution-always-nudge'
-import { IAPICreatePushProtectionBypassResponse } from '../lib/api'
+import {
+  IAPICreatePushProtectionBypassResponse,
+  IAPIRepository,
+} from '../lib/api'
 import {
   BypassPushProtectionDialog,
   BypassReason,
@@ -1006,6 +1015,18 @@ export class App extends React.Component<IAppProps, IAppState> {
   private showCreateRepository = () => {
     this.props.dispatcher.showPopup({
       type: PopupType.CreateRepository,
+    })
+  }
+
+  private onShowRepositorySubmodules = (
+    repository: IAPIRepository,
+    entries: ReadonlyArray<IGitModulesEntry>
+  ) => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.CloneableSubmodules,
+      parentName: `${repository.owner.login}/${repository.name}`,
+      parentCloneUrl: repository.clone_url,
+      entries,
     })
   }
 
@@ -2447,6 +2468,26 @@ export class App extends React.Component<IAppProps, IAppState> {
             apiRepositories={this.state.apiRepositories}
             onRefreshRepositories={this.onRefreshRepositories}
             onAdded={popup.onAdded}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.CloneableSubmodules:
+        return (
+          <CloneableSubmodulesDialog
+            key={`cloneable-submodules-${popup.parentCloneUrl}`}
+            parentName={popup.parentName}
+            parentCloneUrl={popup.parentCloneUrl}
+            entries={popup.entries}
+            onCloneUrl={popup.onCloneUrl ?? this.showCloneRepo}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.SubmoduleManager:
+        return (
+          <SubmoduleManagerDialog
+            key={`submodule-manager-${popup.repository.hash}`}
+            repository={popup.repository}
+            dispatcher={this.props.dispatcher}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -4865,6 +4906,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           tutorialPaused={this.isTutorialPaused()}
           apiRepositories={this.state.apiRepositories}
           onRefreshRepositories={this.onRefreshRepositories}
+          onShowRepositorySubmodules={this.onShowRepositorySubmodules}
         />
       )
     }

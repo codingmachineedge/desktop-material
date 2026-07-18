@@ -25,6 +25,7 @@ import {
 } from '../../models/submodule-add'
 import { resolveSafeRepositoryPath } from './worktree-path-guard'
 import { validateEmptyFolder } from '../path-validation'
+import { IGitModulesEntry, parseGitModules } from './gitmodules'
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
@@ -287,17 +288,11 @@ export type SubmoduleStatusKind =
   | 'out-of-date'
   | 'conflicted'
 
-/** A single `[submodule "…"]` stanza parsed from a `.gitmodules` file. */
-export interface IGitModulesEntry {
-  /** The logical submodule name (the quoted section header). */
-  readonly name: string
-  /** The path within the working tree the submodule is checked out to. */
-  readonly path: string
-  /** The remote URL the submodule is cloned from. */
-  readonly url: string
-  /** The tracked branch, or null when none is configured. */
-  readonly branch: string | null
-}
+// The pure `.gitmodules` helpers live in ./gitmodules so UI surfaces and
+// node-only tests can use them without importing this dugite-backed module;
+// they are re-exported here for the existing consumers.
+export { parseGitModules, resolveSubmoduleCloneUrl } from './gitmodules'
+export type { IGitModulesEntry } from './gitmodules'
 
 /** A single line of parsed `git submodule status` output. */
 export interface ISubmoduleStatusEntry {
@@ -330,76 +325,6 @@ export interface IManagedSubmodule {
   readonly describe: string | null
   /** The working-tree state relative to the superproject index. */
   readonly status: SubmoduleStatusKind
-}
-
-/**
- * Parse the contents of a `.gitmodules` file into its constituent entries.
- *
- * The format is a git-config style INI file: one `[submodule "name"]` header
- * per submodule followed by indented `key = value` pairs. Only the `path`,
- * `url` and (optional) `branch` keys are surfaced. Entries missing a `path`
- * are skipped since they cannot be reconciled against working-tree status.
- */
-export function parseGitModules(
-  contents: string
-): ReadonlyArray<IGitModulesEntry> {
-  const entries = new Array<IGitModulesEntry>()
-
-  let name: string | null = null
-  let path: string | null = null
-  let url: string | null = null
-  let branch: string | null = null
-
-  const flush = () => {
-    if (name !== null && path !== null) {
-      entries.push({ name, path, url: url ?? '', branch })
-    }
-    name = null
-    path = null
-    url = null
-    branch = null
-  }
-
-  for (const rawLine of contents.split(/\r?\n/)) {
-    const line = rawLine.trim()
-
-    if (line.length === 0 || line.startsWith('#') || line.startsWith(';')) {
-      continue
-    }
-
-    const header = /^\[submodule "(.+)"\]$/.exec(line)
-    if (header !== null) {
-      // Starting a new stanza — commit the one we were building.
-      flush()
-      name = header[1]
-      continue
-    }
-
-    if (name === null) {
-      // A key outside of any `[submodule "…"]` header; ignore it.
-      continue
-    }
-
-    const kv = /^(\w+)\s*=\s*(.*)$/.exec(line)
-    if (kv === null) {
-      continue
-    }
-
-    const key = kv[1].toLowerCase()
-    const value = kv[2].trim()
-
-    if (key === 'path') {
-      path = value
-    } else if (key === 'url') {
-      url = value
-    } else if (key === 'branch') {
-      branch = value.length > 0 ? value : null
-    }
-  }
-
-  flush()
-
-  return entries
 }
 
 /** Map a leading `git submodule status` character to a status kind. */
