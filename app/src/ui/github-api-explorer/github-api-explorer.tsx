@@ -375,6 +375,7 @@ export class GitHubAPIExplorer extends React.Component<
   private generation = 0
   private functionLoadGeneration = 0
   private executionController: AbortController | null = null
+  private readonly functionNameInput = React.createRef<HTMLInputElement>()
   private functionRegistrySubscription: {
     readonly dispose: () => void
   } | null = null
@@ -703,8 +704,7 @@ export class GitHubAPIExplorer extends React.Component<
     this.setState({ catalogPage: Number(event.currentTarget.value) })
   }
 
-  private onOperationClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const operationId = event.currentTarget.dataset.operationId
+  private selectOperationById(operationId: string | undefined): boolean {
     const resolution = resolveCatalogForProps(this.props)
     const operation =
       resolution?.status === 'available'
@@ -712,8 +712,29 @@ export class GitHubAPIExplorer extends React.Component<
             candidate => candidate.id === operationId
           )
         : undefined
-    if (operation !== undefined) {
-      this.onSelectOperation(operation)
+    if (operation === undefined) {
+      return false
+    }
+    this.onSelectOperation(operation)
+    return true
+  }
+
+  private focusFunctionEditor() {
+    // The save-as-function form is the primary surface at the top of the
+    // Explorer; focusing its name field both reveals it (browser focus scrolls
+    // it into view) and lands the caret where naming a new function begins.
+    this.functionNameInput.current?.focus()
+  }
+
+  private onOperationClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    this.selectOperationById(event.currentTarget.dataset.operationId)
+  }
+
+  private onCreateFunctionFromOperation = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    if (this.selectOperationById(event.currentTarget.dataset.operationId)) {
+      this.focusFunctionEditor()
     }
   }
 
@@ -789,10 +810,7 @@ export class GitHubAPIExplorer extends React.Component<
     this.setState({ graphQLCatalogPage: Number(event.currentTarget.value) })
   }
 
-  private onGraphQLOperationClick = (
-    event: React.MouseEvent<HTMLButtonElement>
-  ) => {
-    const operationId = event.currentTarget.dataset.operationId
+  private selectGraphQLOperationById(operationId: string | undefined): boolean {
     const resolution = resolveGraphQLCatalogForProps(this.props)
     const operation =
       resolution?.status === 'available'
@@ -801,7 +819,7 @@ export class GitHubAPIExplorer extends React.Component<
           )
         : undefined
     if (operation === undefined) {
-      return
+      return false
     }
     const template = getGitHubGraphQLOperationTemplate(operation)
     this.setState({
@@ -813,6 +831,23 @@ export class GitHubAPIExplorer extends React.Component<
       response: null,
       ...this.clearReviewState,
     })
+    return true
+  }
+
+  private onGraphQLOperationClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    this.selectGraphQLOperationById(event.currentTarget.dataset.operationId)
+  }
+
+  private onCreateFunctionFromGraphQLOperation = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    if (
+      this.selectGraphQLOperationById(event.currentTarget.dataset.operationId)
+    ) {
+      this.focusFunctionEditor()
+    }
   }
 
   private onRESTMethodChange = (
@@ -1219,7 +1254,9 @@ export class GitHubAPIExplorer extends React.Component<
       >
         <header>
           <div>
-            <h2 id="github-api-explorer-catalog-heading">Operation catalog</h2>
+            <h2 id="github-api-explorer-catalog-heading">
+              Add a function from an operation
+            </h2>
             <p>
               {catalog.label} REST API {catalog.apiVersion} ·{' '}
               {catalog.inventory.operations.toLocaleString()} operations
@@ -1321,6 +1358,16 @@ export class GitHubAPIExplorer extends React.Component<
                   <code>{operation.path}</code>
                   <small>{operation.id}</small>
                 </button>
+                <button
+                  type="button"
+                  className="github-api-explorer-operation-create"
+                  disabled={this.state.loading}
+                  data-operation-id={operation.id}
+                  onClick={this.onCreateFunctionFromOperation}
+                  aria-label={`Create a function from ${operation.summary}`}
+                >
+                  Create function
+                </button>
               </li>
             ))}
           </ul>
@@ -1420,7 +1467,7 @@ export class GitHubAPIExplorer extends React.Component<
         <header>
           <div>
             <h2 id="github-api-explorer-catalog-heading">
-              GraphQL root operations
+              Add a function from a GraphQL root
             </h2>
             <p>
               {catalog.label} · schema {catalog.snapshotDate} ·{' '}
@@ -1506,6 +1553,16 @@ export class GitHubAPIExplorer extends React.Component<
                   </span>
                   <code>{graphQLOperationSignature(operation)}</code>
                   <small>{operation.id}</small>
+                </button>
+                <button
+                  type="button"
+                  className="github-api-explorer-operation-create"
+                  disabled={this.state.loading}
+                  data-operation-id={operation.id}
+                  onClick={this.onCreateFunctionFromGraphQLOperation}
+                  aria-label={`Create a function from ${operation.kind} ${operation.name}`}
+                >
+                  Create function
                 </button>
               </li>
             ))}
@@ -1760,10 +1817,10 @@ export class GitHubAPIExplorer extends React.Component<
       >
         <header>
           <div>
-            <h2 id="github-api-functions-heading">App functions</h2>
+            <h2 id="github-api-functions-heading">API functions</h2>
             <p>
-              Extend the app and local agent with validated, repository-bound
-              API operations. Credentials stay in the selected account.
+              Saved, runnable GitHub API calls — bound to this repository and
+              account, with mutations gated by review.
             </p>
           </div>
           <span>{functions.length} for this repository</span>
@@ -1775,6 +1832,7 @@ export class GitHubAPIExplorer extends React.Component<
           <label>
             Function name
             <input
+              ref={this.functionNameInput}
               value={this.state.functionName}
               disabled={!registryAvailable || this.state.loading}
               maxLength={64}
@@ -1814,8 +1872,8 @@ export class GitHubAPIExplorer extends React.Component<
           </p>
         ) : functions.length === 0 ? (
           <p className="github-api-functions-unavailable" role="status">
-            No functions yet. Choose a catalog operation or validated GraphQL
-            template, then add the current request.
+            No functions yet. Pick an operation below to start one, or build a
+            manual request and save it here.
           </p>
         ) : (
           <ul aria-label="Named API functions">
@@ -1963,87 +2021,100 @@ export class GitHubAPIExplorer extends React.Component<
     )
   }
 
-  private renderWorkspace(account: Account) {
+  private renderBuilder(account: Account) {
     return (
-      <div className="github-api-explorer-layout">
-        {this.renderCatalog(account)}
-        <section
-          className="github-api-explorer-builder"
-          aria-labelledby="github-api-explorer-builder-heading"
-        >
-          <header>
-            <div>
-              <h2 id="github-api-explorer-builder-heading">Request builder</h2>
-              <p>
-                Relative requests stay on {account.friendlyEndpoint} as @
-                {account.login}.
-              </p>
-            </div>
-            <div
-              className="github-api-explorer-tabs"
-              role="tablist"
-              aria-label="GitHub API request type"
+      <section
+        className="github-api-explorer-builder"
+        aria-labelledby="github-api-explorer-builder-heading"
+      >
+        <header>
+          <div>
+            <h2 id="github-api-explorer-builder-heading">Manual request</h2>
+            <p>
+              Advanced fallback: build any request by hand — the only surface
+              when no operation catalog is published. Relative requests stay on{' '}
+              {account.friendlyEndpoint} as @{account.login}.
+            </p>
+          </div>
+          <div
+            className="github-api-explorer-tabs"
+            role="tablist"
+            aria-label="GitHub API request type"
+          >
+            <button
+              id="github-api-explorer-rest-tab"
+              type="button"
+              role="tab"
+              aria-selected={this.state.mode === 'rest'}
+              aria-controls="github-api-explorer-rest-panel"
+              disabled={this.state.loading}
+              onClick={this.onSelectRESTMode}
             >
-              <button
-                id="github-api-explorer-rest-tab"
-                type="button"
-                role="tab"
-                aria-selected={this.state.mode === 'rest'}
-                aria-controls="github-api-explorer-rest-panel"
-                disabled={this.state.loading}
-                onClick={this.onSelectRESTMode}
-              >
-                REST
-              </button>
-              <button
-                id="github-api-explorer-graphql-tab"
-                type="button"
-                role="tab"
-                aria-selected={this.state.mode === 'graphql'}
-                aria-controls="github-api-explorer-graphql-panel"
-                disabled={this.state.loading}
-                onClick={this.onSelectGraphQLMode}
-              >
-                GraphQL
-              </button>
-            </div>
-          </header>
-          <form onSubmit={this.onRunRequest}>
-            {this.state.mode === 'rest'
-              ? this.renderRESTForm(account)
-              : this.renderGraphQLForm(account)}
-            <div className="github-api-explorer-actions">
-              <Button
-                type="submit"
-                className="primary"
-                disabled={this.state.loading}
-              >
-                Run request
-              </Button>
-              {this.state.loading ? (
-                <Button onClick={this.onCancelRequest}>Cancel request</Button>
-              ) : null}
-            </div>
-          </form>
-          {this.renderNamedFunctions(account)}
-          {this.renderReview(account)}
-          {this.state.loading ? (
-            <div className="github-api-explorer-loading" role="status">
-              Running request…
-            </div>
-          ) : null}
-          {this.state.error === null ? null : (
-            <div className="github-api-explorer-error" role="alert">
-              {this.state.error}
-            </div>
-          )}
-          {this.state.message === null ? null : (
-            <div className="github-api-explorer-message" role="status">
-              {this.state.message}
-            </div>
-          )}
-          {this.renderResponse()}
-        </section>
+              REST
+            </button>
+            <button
+              id="github-api-explorer-graphql-tab"
+              type="button"
+              role="tab"
+              aria-selected={this.state.mode === 'graphql'}
+              aria-controls="github-api-explorer-graphql-panel"
+              disabled={this.state.loading}
+              onClick={this.onSelectGraphQLMode}
+            >
+              GraphQL
+            </button>
+          </div>
+        </header>
+        <form onSubmit={this.onRunRequest}>
+          {this.state.mode === 'rest'
+            ? this.renderRESTForm(account)
+            : this.renderGraphQLForm(account)}
+          <div className="github-api-explorer-actions">
+            <Button
+              type="submit"
+              className="primary"
+              disabled={this.state.loading}
+            >
+              Run request
+            </Button>
+            {this.state.loading ? (
+              <Button onClick={this.onCancelRequest}>Cancel request</Button>
+            ) : null}
+          </div>
+        </form>
+      </section>
+    )
+  }
+
+  private renderWorkspace(account: Account) {
+    // Functions-first: the saved runnable-function registry is the primary
+    // surface; the operation picker and the manual builder below feed it. The
+    // review gate, status, and response render once here so they follow either
+    // trigger (a saved function or a manual request) unchanged.
+    return (
+      <div className="github-api-explorer-workspace">
+        {this.renderNamedFunctions(account)}
+        <div className="github-api-explorer-layout">
+          {this.renderCatalog(account)}
+          {this.renderBuilder(account)}
+        </div>
+        {this.renderReview(account)}
+        {this.state.loading ? (
+          <div className="github-api-explorer-loading" role="status">
+            Running request…
+          </div>
+        ) : null}
+        {this.state.error === null ? null : (
+          <div className="github-api-explorer-error" role="alert">
+            {this.state.error}
+          </div>
+        )}
+        {this.state.message === null ? null : (
+          <div className="github-api-explorer-message" role="status">
+            {this.state.message}
+          </div>
+        )}
+        {this.renderResponse()}
       </div>
     )
   }

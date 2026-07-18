@@ -220,6 +220,55 @@ describe('GitHub API Explorer app functions', () => {
     )
   })
 
+  it('creates a function from a catalog operation in one step', async () => {
+    const registry = new FunctionRegistry()
+    const client = new ExplorerClient()
+    render(
+      <GitHubAPIExplorer
+        repository={repository}
+        accounts={[account]}
+        client={client}
+        functionRegistry={registry}
+      />
+    )
+
+    // Overwrite the prefilled builder so the one-click affordance is observable.
+    fireEvent.change(screen.getByLabelText('REST API path'), {
+      target: { value: 'manual/override' },
+    })
+
+    // The operation picker offers a direct "make this a function" action per row.
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /create a function from list repository custom patterns/i,
+      })
+    )
+
+    // One click prefills the manual builder from the operation...
+    assert.equal(
+      (screen.getByLabelText('REST API path') as HTMLInputElement).value,
+      'repos/desktop/material/secret-scanning/custom-patterns'
+    )
+    // ...and lands focus in the save-as-function form at the top of the surface.
+    assert.equal(document.activeElement, screen.getByLabelText('Function name'))
+
+    // Naming and saving persists a runnable function bound to this operation.
+    fireEvent.change(screen.getByLabelText('Function name'), {
+      target: { value: 'list_patterns' },
+    })
+    fireEvent.change(screen.getByLabelText('Function description'), {
+      target: { value: 'List custom secret scanning patterns.' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Add current request as function' })
+    )
+    await waitFor(() => assert.equal(registry.functions.length, 1))
+    assert.equal(
+      registry.functions[0].operationId,
+      'secret-scanning/list-repo-custom-patterns'
+    )
+  })
+
   it('routes mutation functions through the existing interactive review', async () => {
     const registry = new FunctionRegistry()
     const client = new ExplorerClient()

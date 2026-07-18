@@ -69,6 +69,27 @@ both themes) instead of borrowing the pull tone, so the pill signals that a
 push will follow the offered pull. The post-shell style contract covers the
 new state alongside the original five.
 
+## 2026-07-18 GitHub API Explorer — functions-first
+
+The Explorer was reorganized from a browse-first catalog into a
+functions-first surface (presentation only — no execution, review,
+redaction, scoping, or persistence machinery changed):
+
+- The saved runnable-function registry ("App functions") is now the
+  primary surface at the top, retitled **API functions** with copy that
+  frames them as saved, repo/account-bound, review-gated calls.
+- The descriptive operation lists are reframed as a secondary **operation
+  picker** ("Add a function from an operation" / "…from a GraphQL root"),
+  and each row gained a one-click **Create function** button that
+  prefills the builder and focuses the save-as-function form, so browsing
+  an operation flows straight into creating a runnable function.
+- The raw request builder is relabeled **Manual request** and kept as the
+  always-available fallback — still the only surface when a catalog is
+  unavailable (fail-closed GHES).
+- Every guard chokepoint is unchanged: mutation review, response
+  bounding/redaction, and endpoint/account scoping all still gate every
+  request.
+
 ## 2026-07-18 Release-backed "cheap LFS"
 
 A new **Large files & storage** tools-hub category hosts a cheap-LFS panel:

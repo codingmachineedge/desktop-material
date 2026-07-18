@@ -119,15 +119,30 @@
   text-align: right;
 }
 
+// The functions-first workspace scrolls as one column: the API functions
+// registry sits on top, the operation picker + manual builder below it, then
+// the shared review/response. The header stays pinned by the Explorer's own
+// `overflow: hidden`.
+.github-api-explorer-workspace {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .github-api-explorer-layout {
   display: grid;
   width: 100%;
   max-width: 100%;
   min-height: 0;
-  flex: 1 1 auto;
   grid-template-columns: minmax(260px, 0.38fr) minmax(0, 1fr);
   gap: 14px;
-  overflow: hidden;
 }
 
 .github-api-explorer-catalog,
@@ -141,6 +156,9 @@
 .github-api-explorer-catalog {
   display: flex;
   min-height: 0;
+  // Keep the picker compact so the primary functions registry stays in view;
+  // the operation list scrolls internally within this bound.
+  max-height: 60vh;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
@@ -206,10 +224,13 @@
   list-style: none;
 
   li {
+    display: grid;
     min-width: 0;
+    gap: 4px;
   }
 
-  button {
+  // The prefill card button — everything except the compact create action.
+  button:not(.github-api-explorer-operation-create) {
     display: grid;
     width: 100%;
     max-width: 100%;
@@ -257,6 +278,37 @@
     small {
       color: var(--md-sys-color-on-surface-variant);
       font-size: 9px;
+    }
+  }
+
+  // One-click "make this a function": prefills the builder and jumps to the
+  // save-as-function form. Kept visually secondary to the prefill card.
+  .github-api-explorer-operation-create {
+    justify-self: start;
+    min-height: 28px;
+    padding: 4px 11px;
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: 999px;
+    color: var(--md-sys-color-on-surface);
+    background: var(--md-sys-color-surface-container);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 650;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--md-sys-color-on-primary-container);
+      background: var(--md-sys-color-primary-container);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
     }
   }
 }
@@ -447,7 +499,6 @@
   max-width: 100%;
   min-width: 0;
   gap: 12px;
-  margin-top: 16px;
   padding: 14px;
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 16px;
