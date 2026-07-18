@@ -1,4 +1,7 @@
 import { invokeContextualMenu } from '../ui/main-process-proxy'
+// Side-effect import: installs the capture-phase pointer tracking at startup so
+// the Material context menu opens at the cursor on the very first right-click.
+import './context-menu-pointer'
 
 /** An octicon-style symbol descriptor rendered before a menu item's label. */
 export interface IMenuItemIcon {

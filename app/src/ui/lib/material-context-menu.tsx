@@ -2,6 +2,7 @@ import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 import classNames from 'classnames'
 import { IMenuItem } from '../../lib/menu-item'
+import { getLastPointerPosition } from '../../lib/context-menu-pointer'
 import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { FilterModeControl } from './filter-mode-control'
 import { persistFilterMode, readPersistedFilterMode } from './filter-list-mode'
@@ -19,21 +20,6 @@ import * as octicons from '../octicons/octicons.generated'
 
 /** The persistence id for the context-menu filter's mode. */
 const ContextMenuFilterListId = 'material-context-menu'
-
-let lastPointerPosition = { x: 0, y: 0 }
-let pointerTrackingInstalled = false
-
-function installPointerTracking() {
-  if (pointerTrackingInstalled || typeof window === 'undefined') {
-    return
-  }
-  pointerTrackingInstalled = true
-  const record = (event: MouseEvent) => {
-    lastPointerPosition = { x: event.clientX, y: event.clientY }
-  }
-  window.addEventListener('mousedown', record, true)
-  window.addEventListener('contextmenu', record, true)
-}
 
 /** Execute a predefined edit role against the focused element. */
 function performRole(role: NonNullable<IMenuItem['role']>) {
@@ -433,8 +419,6 @@ class MaterialContextMenu extends React.Component<
 export function showMaterialContextMenu(
   items: ReadonlyArray<IMenuItem>
 ): Promise<IMenuItem | null> {
-  installPointerTracking()
-
   return new Promise(resolve => {
     const host = document.createElement('div')
     host.className = 'material-context-menu-host'
@@ -454,7 +438,7 @@ export function showMaterialContextMenu(
     ReactDOM.render(
       <MaterialContextMenu
         items={items}
-        position={lastPointerPosition}
+        position={getLastPointerPosition()}
         // The imperative mount owns teardown; there is no parent component
         // whose instance method could carry this callback.
         // eslint-disable-next-line react/jsx-no-bind
