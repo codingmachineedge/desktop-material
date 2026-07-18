@@ -124,6 +124,7 @@ function fakeStore(overrides: Record<string, unknown> = {}) {
         reviewedAsset === null ? null : `asset-${reviewedAsset.id}`,
     }),
     createDraft: async () => draft,
+    create: async () => draft,
     update: async () => draft,
     publish: async () => ({ ...draft, draft: false }),
     delete: async () => undefined,
@@ -381,15 +382,20 @@ describe('GitHub Releases view', () => {
     )
   })
 
-  it('creates only an unpublished draft after an explicit metadata review', async () => {
+  it('creates a public release by default after an explicit metadata review', async () => {
     const created = new Array<Record<string, unknown>>()
     const store = fakeStore({
-      createDraft: async (
+      create: async (
         _repository: Repository,
-        value: Record<string, unknown>
+        value: Record<string, unknown>,
+        publishImmediately: boolean
       ) => {
-        created.push(value)
-        return { ...draft, tagName: String(value.tagName) }
+        created.push({ ...value, publishImmediately })
+        return {
+          ...draft,
+          tagName: String(value.tagName),
+          draft: !publishImmediately,
+        }
       },
     })
     render(
@@ -400,9 +406,9 @@ describe('GitHub Releases view', () => {
       />
     )
     await waitFor(() =>
-      assert.ok(screen.getByRole('button', { name: 'New draft' }))
+      assert.ok(screen.getByRole('button', { name: 'New release' }))
     )
-    fireEvent.click(screen.getByRole('button', { name: 'New draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'New release' }))
     fireEvent.change(screen.getByLabelText('Tag'), {
       target: { value: 'v2.0.0' },
     })
@@ -412,13 +418,48 @@ describe('GitHub Releases view', () => {
     fireEvent.change(screen.getByLabelText('Release name'), {
       target: { value: 'Desktop Material 2.0' },
     })
+    assert.equal(
+      screen.getByLabelText<HTMLInputElement>('Publish immediately').checked,
+      true
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
     assert.equal(created.length, 0)
     assert.ok(screen.getByRole('region', { name: 'Release review' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Create draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Publish release' }))
     await waitFor(() => assert.equal(created.length, 1))
     assert.equal(created[0].tagName, 'v2.0.0')
     assert.equal(created[0].targetCommitish, 'release/v2')
+    assert.equal(created[0].publishImmediately, true)
+    await waitFor(() => assert.ok(screen.getByText('Published v2.0.0.')))
+  })
+
+  it('still creates an unpublished draft when publish immediately is off', async () => {
+    const publicationChoices = new Array<boolean>()
+    const store = fakeStore({
+      create: async (
+        _repository: Repository,
+        _value: Record<string, unknown>,
+        publishImmediately: boolean
+      ) => {
+        publicationChoices.push(publishImmediately)
+        return draft
+      },
+    })
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'New release' }))
+    fireEvent.change(screen.getByLabelText('Tag'), {
+      target: { value: 'v2.1.0' },
+    })
+    fireEvent.click(screen.getByLabelText('Publish immediately'))
+    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create draft' }))
+    await waitFor(() => assert.deepEqual(publicationChoices, [false]))
   })
 
   it('edits release metadata only after review and preserves completion status', async () => {

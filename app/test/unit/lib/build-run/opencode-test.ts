@@ -101,6 +101,7 @@ describe('mergeOpencodeRepoConfig', () => {
     const parsed = JSON.parse(merged.text!)
     assert.equal(parsed.permission.edit, 'allow')
     assert.equal(parsed.permission.bash, 'allow')
+    assert.equal(parsed.permission.question, 'deny')
     assert.equal(parsed.permission.external_directory, 'deny')
   })
 
@@ -124,7 +125,18 @@ describe('mergeOpencodeRepoConfig', () => {
     assert.equal(parsed.permission.edit, 'ask')
     // Missing scoped permissions are filled in.
     assert.equal(parsed.permission.bash, 'allow')
+    assert.equal(parsed.permission.question, 'deny')
     assert.equal(parsed.permission.external_directory, 'deny')
+  })
+
+  it('forces question denial because detached build repairs cannot answer', () => {
+    const existing = JSON.stringify({
+      permission: { question: 'ask', edit: 'ask' },
+    })
+    const merged = mergeOpencodeRepoConfig(existing)
+    const parsed = JSON.parse(merged.text!)
+    assert.equal(parsed.permission.question, 'deny')
+    assert.equal(parsed.permission.edit, 'ask')
   })
 
   it('reports no change when the scoped permissions are already present', () => {

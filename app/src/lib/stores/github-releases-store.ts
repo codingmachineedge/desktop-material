@@ -67,7 +67,7 @@ export class GitHubReleasesError extends Error {
 const operationLabels: Readonly<Record<GitHubReleaseOperation, string>> = {
   list: 'load releases',
   'list-assets': 'load release assets',
-  create: 'create the release draft',
+  create: 'create the release',
   update: 'update the release',
   publish: 'publish the release',
   delete: 'delete the release',
@@ -240,6 +240,13 @@ export interface IGitHubReleasesAPI {
     owner: string,
     name: string,
     draft: IGitHubReleaseDraft,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease>
+  createRelease(
+    owner: string,
+    name: string,
+    draft: IGitHubReleaseDraft,
+    publishImmediately: boolean,
     signal?: AbortSignal
   ): Promise<IGitHubRelease>
   updateRelease(
@@ -597,6 +604,23 @@ export class GitHubReleasesStore {
         context.repository.owner.login,
         context.repository.name,
         draft,
+        requestSignal
+      )
+    )
+  }
+
+  public create(
+    repository: Repository,
+    draft: IGitHubReleaseDraft,
+    publishImmediately: boolean,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    return this.run(repository, 'create', signal, (context, requestSignal) =>
+      context.api.createRelease(
+        context.repository.owner.login,
+        context.repository.name,
+        draft,
+        publishImmediately,
         requestSignal
       )
     )

@@ -7,6 +7,9 @@ import { envForRemoteOperation } from './environment'
 import { Branch } from '../../models/branch'
 
 export type PushOptions = {
+  /** Stable account identity to force for this push. Never a token. */
+  readonly accountKey?: string
+
   /**
    * Force-push the branch without losing changes in the remote that
    * haven't been fetched.
@@ -75,6 +78,7 @@ export async function push(
 
   let opts: IGitStringExecutionOptions = {
     env: await envForRemoteOperation(remote.url),
+    credentialAccountKey: options?.accountKey,
     interceptHooks: ['pre-push'],
     onHookProgress: options?.onHookProgress,
     onHookFailure: options?.onHookFailure,

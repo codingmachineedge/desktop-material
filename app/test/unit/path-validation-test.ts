@@ -3,7 +3,10 @@ import assert from 'node:assert'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { createTempDirectory } from '../helpers/temp'
-import { validateEmptyFolder } from '../../src/lib/path-validation'
+import {
+  NonEmptyCloneFolderError,
+  validateEmptyFolder,
+} from '../../src/lib/path-validation'
 
 describe('validateEmptyFolder', () => {
   it('rejects a null path', async () => {
@@ -31,6 +34,7 @@ describe('validateEmptyFolder', () => {
     const result = await validateEmptyFolder(tempDir)
     assert.ok(result instanceof Error)
     assert.match(result.message, /contains files/)
+    assert(result instanceof NonEmptyCloneFolderError)
   })
 
   it('rejects a path that refers to a file', async t => {

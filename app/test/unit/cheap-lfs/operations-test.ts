@@ -126,6 +126,10 @@ function fakeAPI(
     }),
     fetchReleaseAsset: async () => asset,
     createReleaseDraft: async () => release,
+    createRelease: async (_owner, _name, _draft, publishImmediately) => ({
+      ...release,
+      draft: !publishImmediately,
+    }),
     updateRelease: async () => release,
     publishRelease: async () => ({ ...release, draft: false }),
     deleteRelease: async () => undefined,

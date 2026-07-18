@@ -36,6 +36,8 @@ export interface IOpencodeReRunObserver {
     readonly activeRunId: string | null
   }
   onDidUpdate(fn: (repositoryId: number | null) => void): Disposable
+  setPanelOpen(repositoryId: number, panelOpen: boolean): void
+  setPanelMinimized(repositoryId: number, panelMinimized: boolean): void
 }
 
 /** The dialog's flow state. */
@@ -113,6 +115,7 @@ export class OpencodeFixDialog extends React.Component<
   private storeSubscription: Disposable | null = null
   private logRef = React.createRef<HTMLDivElement>()
   private phaseBefore: BuildRunViewPhase = 'failed'
+  private runDetachedToBuildPanel = false
 
   public constructor(props: IOpencodeFixDialogProps) {
     super(props)
@@ -144,7 +147,9 @@ export class OpencodeFixDialog extends React.Component<
   }
 
   public componentWillUnmount() {
-    this.abortController?.abort()
+    if (!this.runDetachedToBuildPanel) {
+      this.abortController?.abort()
+    }
     this.abortController = null
     this.disposeStoreSubscription()
   }
@@ -216,6 +221,10 @@ export class OpencodeFixDialog extends React.Component<
       logLines: [],
       outcome: null,
     })
+    this.props.buildRunStore.setPanelOpen(this.props.repository.id, true)
+    this.props.buildRunStore.setPanelMinimized(this.props.repository.id, false)
+    this.runDetachedToBuildPanel = true
+    this.props.onDismissed()
     try {
       const { failure } = this.props
       const { phaseBefore } = await this.props.dispatcher.runOpencodeFix(
@@ -230,23 +239,12 @@ export class OpencodeFixDialog extends React.Component<
         this.onLog,
         controller.signal
       )
-      if (controller.signal.aborted) {
-        this.disposeStoreSubscription()
-        this.setState({ status: 'ready' })
-        return
-      }
       this.phaseBefore = phaseBefore
-      // The re-run is now in flight (or already terminal for a fast failure);
-      // evaluate immediately, then let the store subscription finalize it.
-      this.setState({ status: 'verifying' }, this.evaluateReRun)
     } catch (e) {
-      this.disposeStoreSubscription()
-      this.setState({
-        status: 'ready',
-        error: e instanceof Error ? e.message : String(e),
-      })
+      log.error('Detached opencode Build & Run repair failed', e)
     } finally {
       this.abortController = null
+      this.disposeStoreSubscription()
     }
   }
 

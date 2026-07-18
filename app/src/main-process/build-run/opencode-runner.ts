@@ -137,7 +137,8 @@ export class OpencodeRunner {
 
   /**
    * Launch `opencode run` to fix the failed build. Ensures the scoped repo
-   * config when auto-approving, spawns with the metacharacter-free argv, writes
+   * config (including non-interactive question handling), spawns with the
+   * metacharacter-free argv, writes
    * the prompt to stdin, and streams output to `onLog`. Resolves `ok: true` once
    * the process exits without a spawn error — never interpreting the exit code
    * as fix-success (that is the caller's re-run job).
@@ -148,25 +149,23 @@ export class OpencodeRunner {
     signal: AbortSignal,
     env: Record<string, string> = resolveRunEnv()
   ): Promise<IOpencodeRunResult> {
-    if (run.autoApprove) {
-      try {
-        const ensured = await ensureOpencodeRepoConfig(run.repoPath)
-        if (ensured.malformed) {
-          onLog(
-            'meta',
-            'Existing opencode.json could not be parsed; leaving it untouched.'
-          )
-        } else if (ensured.written) {
-          onLog('meta', 'Wrote repo-scoped opencode.json permission block.')
-        }
-      } catch (err) {
+    try {
+      const ensured = await ensureOpencodeRepoConfig(run.repoPath)
+      if (ensured.malformed) {
         onLog(
           'meta',
-          `Could not write opencode.json: ${
-            err instanceof Error ? err.message : String(err)
-          }`
+          'Existing opencode.json could not be parsed; leaving it untouched.'
         )
+      } else if (ensured.written) {
+        onLog('meta', 'Wrote repo-scoped opencode.json permission block.')
       }
+    } catch (err) {
+      onLog(
+        'meta',
+        `Could not write opencode.json: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      )
     }
 
     const args = buildOpencodeRunArgs({

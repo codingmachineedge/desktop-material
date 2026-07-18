@@ -143,7 +143,7 @@ describe('GitHub Releases API', () => {
     )
   })
 
-  it('creates drafts and publishes only through separate exact mutations', async () => {
+  it('creates reviewed public releases or drafts with the requested state', async () => {
     const api = new API('https://api.github.com', 'secret-token')
     const requests = new Array<{
       method: string
@@ -156,7 +156,6 @@ describe('GitHub Releases API', () => {
       async (method: string, path: string, options?: { body?: Object }) => {
         requests.push({ method, path, body: options?.body })
         const published =
-          method === 'PATCH' &&
           (options?.body as { draft?: boolean })?.draft === false
         return new Response(
           JSON.stringify({
@@ -175,6 +174,18 @@ describe('GitHub Releases API', () => {
       body: ' Notes ',
       prerelease: false,
     })
+    await api.createRelease(
+      'desktop',
+      'material',
+      {
+        tagName: 'v2.0.0',
+        targetCommitish: 'main',
+        name: 'Public',
+        body: 'Published directly',
+        prerelease: false,
+      },
+      true
+    )
     await api.publishRelease('desktop', 'material', 42)
 
     assert.deepEqual(requests[0], {
@@ -190,6 +201,18 @@ describe('GitHub Releases API', () => {
       },
     })
     assert.deepEqual(requests[1], {
+      method: 'POST',
+      path: 'repos/desktop/material/releases',
+      body: {
+        tag_name: 'v2.0.0',
+        target_commitish: 'main',
+        name: 'Public',
+        body: 'Published directly',
+        draft: false,
+        prerelease: false,
+      },
+    })
+    assert.deepEqual(requests[2], {
       method: 'PATCH',
       path: 'repos/desktop/material/releases/42',
       body: { draft: false },

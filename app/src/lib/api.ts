@@ -3532,11 +3532,12 @@ export class API {
     )
   }
 
-  /** Create an unpublished release draft. Publishing is a separate review. */
-  public async createReleaseDraft(
+  /** Create a reviewed release, either public immediately or as a draft. */
+  public async createRelease(
     owner: string,
     name: string,
     draft: IGitHubReleaseDraft,
+    publishImmediately: boolean,
     signal?: AbortSignal
   ): Promise<IGitHubRelease> {
     const safeOwner = validateGitHubReleaseRepositoryPart(owner, 'owner')
@@ -3551,7 +3552,7 @@ export class API {
         target_commitish: safeDraft.targetCommitish,
         name: safeDraft.name,
         body: safeDraft.body,
-        draft: true,
+        draft: !publishImmediately,
         prerelease: safeDraft.prerelease,
       },
       customHeaders: { Accept: 'application/vnd.github+json' },
@@ -3560,12 +3561,23 @@ export class API {
     const release = parseGitHubRelease(
       await boundedGitHubReleaseResponse(response, signal)
     )
-    if (!release.draft) {
+    if (release.draft === publishImmediately) {
       throw new Error(
-        'GitHub did not create the release as an unpublished draft.'
+        publishImmediately
+          ? 'GitHub did not create the release as published.'
+          : 'GitHub did not create the release as an unpublished draft.'
       )
     }
     return release
+  }
+
+  public createReleaseDraft(
+    owner: string,
+    name: string,
+    draft: IGitHubReleaseDraft,
+    signal?: AbortSignal
+  ): Promise<IGitHubRelease> {
+    return this.createRelease(owner, name, draft, false, signal)
   }
 
   /** Update reviewed metadata without changing draft publication state. */

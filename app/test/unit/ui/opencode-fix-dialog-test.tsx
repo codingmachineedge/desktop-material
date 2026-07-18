@@ -67,6 +67,8 @@ function fakeStore(phase: BuildRunViewPhase): IOpencodeReRunObserver {
   return {
     getStateForRepository: () => ({ phase, activeRunId: null }),
     onDidUpdate: () => new Disposable(() => {}),
+    setPanelOpen: () => {},
+    setPanelMinimized: () => {},
   }
 }
 
@@ -192,17 +194,22 @@ describe('OpencodeFixDialog', () => {
     assert.equal(runCalls.length, 0)
   })
 
-  it('runs with auto-approve off by default and reports a fixed build', async () => {
+  it('runs with auto-approve off by default and moves output to the build panel', async () => {
     const runCalls: IRunFixCall[] = []
     const dispatcher = fakeDispatcher({ detect: installedAndAuthed, runCalls })
+    let dismissed = 0
 
-    renderDialog({ dispatcher, buildRunStore: fakeStore('succeeded') })
+    renderDialog({
+      dispatcher,
+      buildRunStore: fakeStore('succeeded'),
+      onDismissed: () => dismissed++,
+    })
 
     fireEvent.click(
       await screen.findByRole('button', { name: /^run opencode$/i })
     )
 
-    await screen.findByText(/fixed — the build now succeeds/i)
+    await waitFor(() => assert.equal(dismissed, 1))
     assert.equal(runCalls.length, 1)
     assert.equal(runCalls[0].autoApprove, false)
     assert.equal(runCalls[0].stageKind, 'build')
@@ -240,20 +247,24 @@ describe('OpencodeFixDialog', () => {
     assert.equal(runCalls[0].autoApprove, true)
   })
 
-  it('judges success from the re-run, not opencode exit code, when the build still fails', async () => {
+  it('dismisses the launch dialog while a still-failing repair continues in the build panel', async () => {
+    let dismissed = 0
     const dispatcher = fakeDispatcher({
       detect: installedAndAuthed,
       // opencode reports ok:true, but the re-run still fails — must not claim fixed.
       runResult: { phaseBefore: 'failed', ok: true },
     })
 
-    renderDialog({ dispatcher, buildRunStore: fakeStore('failed') })
+    renderDialog({
+      dispatcher,
+      buildRunStore: fakeStore('failed'),
+      onDismissed: () => dismissed++,
+    })
 
     fireEvent.click(
       await screen.findByRole('button', { name: /^run opencode$/i })
     )
 
-    await screen.findByText(/the build still fails/i)
-    assert.equal(screen.queryByText(/fixed — the build now succeeds/i), null)
+    await waitFor(() => assert.equal(dismissed, 1))
   })
 })

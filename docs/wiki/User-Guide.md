@@ -67,6 +67,15 @@ warns about the missing signature after verifying the GitHub digest, and it
 stops rather than selecting a different package on ARM64 or 32-bit Windows. To
 inspect or download the asset yourself, use the
 [latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest).
+
+## Creating a GitHub release
+
+Open **Repository → Release Manager** and select **New release**. Enter the tag,
+target, name, and notes. **Publish immediately** is enabled by default; leave it
+enabled, select **Review changes**, verify that Publication says **Publish
+immediately**, and select **Publish release**. Desktop Material sends one direct
+public-release request rather than creating a draft first. Turn **Publish
+immediately** off only when you intentionally want an unpublished draft.
 Review the tracked script before running any remote command.
 
 ---

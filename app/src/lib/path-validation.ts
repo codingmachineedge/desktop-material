@@ -1,5 +1,8 @@
 import { readdir } from 'fs/promises'
 
+/** Clone destination already has contents but may be an addable repository. */
+export class NonEmptyCloneFolderError extends Error {}
+
 /**
  * Validate that a path is a suitable clone destination: it must either not exist
  * yet or be an empty directory. Returns `null` when the path is usable, or an
@@ -24,7 +27,7 @@ export async function validateEmptyFolder(
       return null
     }
 
-    return new Error(
+    return new NonEmptyCloneFolderError(
       'This folder contains files. Git can only clone to empty folders.'
     )
   } catch (error) {

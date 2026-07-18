@@ -81,7 +81,10 @@ export function buildOpencodeFixPrompt({
     '',
     'Diagnose the failure and fix the errors in this repository. Make the ' +
       'smallest changes that resolve them, then stop. Do not run destructive ' +
-      'commands or touch files outside this repository.',
+      'commands or touch files outside this repository. This is an unattended ' +
+      'Build & Run repair, so do not ask the user questions. When details are ' +
+      'ambiguous, make the safest minimal reasonable choice and explain it in ' +
+      'your output.',
   ].join('\n')
 }
 
@@ -98,6 +101,7 @@ export function buildOpencodeRepoConfig(): string {
       permission: {
         edit: 'allow',
         bash: 'allow',
+        question: 'deny',
         external_directory: 'deny',
       },
     },
@@ -110,6 +114,7 @@ export function buildOpencodeRepoConfig(): string {
 const REPO_PERMISSION_DEFAULTS: Readonly<Record<string, string>> = {
   edit: 'allow',
   bash: 'allow',
+  question: 'deny',
   external_directory: 'deny',
 }
 
@@ -170,6 +175,13 @@ export function mergeOpencodeRepoConfig(
       permission[key] = value
       changed = true
     }
+  }
+  // A detached Build & Run repair has no modal/TUI answer surface. Always
+  // disable the question tool for this repository-scoped automation so an
+  // explicit global `ask` preference cannot leave the repair hanging.
+  if (permission.question !== 'deny') {
+    permission.question = 'deny'
+    changed = true
   }
   next.permission = permission
 

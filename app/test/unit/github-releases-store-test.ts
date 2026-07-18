@@ -126,6 +126,10 @@ function fakeAPI(
     }),
     fetchReleaseAsset: async () => asset,
     createReleaseDraft: async () => release,
+    createRelease: async (_owner, _name, _draft, publishImmediately) => ({
+      ...release,
+      draft: !publishImmediately,
+    }),
     updateRelease: async () => release,
     publishRelease: async () => ({
       ...release,
@@ -289,6 +293,10 @@ describe('GitHub Releases store', () => {
             calls.push('create')
             return release
           },
+          createRelease: async () => {
+            calls.push('create-public')
+            return { ...release, draft: false }
+          },
           updateRelease: async () => {
             calls.push('update')
             return release
@@ -313,6 +321,17 @@ describe('GitHub Releases store', () => {
       body: 'Notes',
       prerelease: false,
     })
+    await store.create(
+      repository,
+      {
+        tagName: 'v1.1.0',
+        targetCommitish: 'main',
+        name: 'Public',
+        body: 'Notes',
+        prerelease: false,
+      },
+      true
+    )
     await store.update(
       repository,
       store.createMutationReview(repository, release),
@@ -348,6 +367,7 @@ describe('GitHub Releases store', () => {
     )
     assert.deepEqual(calls, [
       'create',
+      'create-public',
       'update',
       'publish',
       'delete-asset',

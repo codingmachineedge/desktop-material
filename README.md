@@ -131,7 +131,7 @@ maintenance acceptance items are complete.
 **Guided GitHub workflows**
 - Compose pull requests with repository templates and metadata, then inspect, update, review, close/reopen, or merge the exact reviewed pull request through a fail-closed lifecycle
 - Browse paginated Actions artifacts, download with bounded redirect and digest checks, and inspect the effective rules that apply to the current branch
-- Use the repository Releases dashboard to compare loaded, stable, prerelease, and draft counts; search and status-filter the loaded catalog; inspect authors, publish dates, targets, asset types, digests, and download totals; and keep the existing bounded create, publish, edit, delete, upload, and download workflows. Browse, search, filter, inspect, edit, comment on, close, or reopen Issues through repository/account-bound review state
+- Use the repository Releases dashboard to compare loaded, stable, prerelease, and draft counts; search and status-filter the catalog; inspect authors, dates, targets, asset types, digests, and download totals; create reviewed releases publicly in one operation or save them as drafts; and keep bounded edit, publish, delete, upload, and download workflows. Browse, search, filter, inspect, edit, comment on, close, or reopen Issues through repository/account-bound review state
 - Use the repository-contextual GitHub API Explorer, bound to the selected account and provider host, to search all 1,206 REST operations, isolate exactly the 10 additions since the prior pinned 2026-03-10 catalog, switch between REST and GraphQL, review mutations before they run, and inspect bounded, credential-redacted responses
 
 **Fully Material, everywhere**
