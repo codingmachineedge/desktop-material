@@ -158,6 +158,55 @@ function nullableText(
   return value === null ? null : boundedText(value, label, maximumLength, true)
 }
 
+// Remove control characters that are unsafe in free-form multi-line text while
+// keeping tab, newline, and carriage return — release notes are markdown and
+// legitimately contain those. Written as a codepoint scan rather than a regex
+// literal so the source carries no raw control bytes.
+function stripUnsafeControlCharacters(value: string): string {
+  let out = ''
+  for (const ch of value) {
+    const code = ch.codePointAt(0)!
+    const isSafeWhitespace = code === 9 || code === 10 || code === 13
+    const isControl = code <= 0x1f || code === 0x7f
+    if (!isControl || isSafeWhitespace) {
+      out += ch
+    }
+  }
+  return out
+}
+
+// Sanitize an untrusted, free-form multi-line display field (a release
+// name/body from the API). Unlike boundedText, a non-string, an over-long
+// value, or one with unusual characters is coerced rather than thrown: one
+// malformed release body must never fail the entire releases load.
+function sanitizeMultilineText(value: unknown, maximumLength: number): string {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  const stripped = stripUnsafeControlCharacters(value)
+  return stripped.length > maximumLength
+    ? stripped.slice(0, maximumLength)
+    : stripped
+}
+
+// Normalize a user-supplied multi-line field (a release draft's body) before it
+// is sent to GitHub: trim, keep tab/newline/CR, drop the remaining control
+// characters, and reject only when it is not text or exceeds the length cap.
+function normalizeMultilineField(
+  value: unknown,
+  label: string,
+  maximumLength: number
+): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${label} must be text.`)
+  }
+  const cleaned = stripUnsafeControlCharacters(value).trim()
+  if (cleaned.length > maximumLength) {
+    throw new Error(`${label} is too long.`)
+  }
+  return cleaned
+}
+
 function date(value: unknown, label: string): Date {
   if (typeof value !== 'string' || value.length > 64) {
     throw new Error(`GitHub returned an invalid ${label}.`)
@@ -248,7 +297,7 @@ function parseRelease(value: unknown): IGitHubRelease {
       1024
     ),
     name: nullableText(input.name, 'release name', 1024) ?? '',
-    body: nullableText(input.body, 'release notes', 125_000) ?? '',
+    body: sanitizeMultilineText(input.body, 125_000),
     draft: input.draft,
     prerelease: input.prerelease,
     createdAt: date(input.created_at, 'release creation date'),
@@ -433,7 +482,7 @@ export function normalizeGitHubReleaseDraft(
       false
     ),
     name: normalizeField(value.name, 'Release name', 1024, true),
-    body: normalizeField(value.body, 'Release notes', 125_000, true),
+    body: normalizeMultilineField(value.body, 'Release notes', 125_000),
     prerelease: value.prerelease === true,
   }
 }
