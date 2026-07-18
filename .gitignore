@@ -156,8 +156,6 @@ dist
 # ──── end Desktop Material: Node ────  (dm-template:node)
 
 # ──── Desktop Material: Build artifacts ────  (dm-template:build-artifacts)
-.bundle/
-vendor/bundle/
 dist/
 build/
 .next/
