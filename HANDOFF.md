@@ -77,6 +77,10 @@ provenance rather than current status.
   checks. Both user-supplied ZIPs remain untouched. The final audit has one
   `main` worktree, only local/remote `main`, no stash, and `0/0` divergence
   before this receipt commit.
+- The live GitHub wiki was updated from `docs/wiki` at
+  `1d047329ed647d96e0bb42ed9374d89a9dbd59d2`, while preserving its remote-only
+  `Images` directory. The exact remote SHA was verified and the clean temporary
+  publish clone was sent to the Recycle Bin.
 
 ## 2026-07-18 multi-account push owner routing
 
