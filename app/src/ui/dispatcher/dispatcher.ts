@@ -96,6 +96,10 @@ import type {
   PullAllProgressListener,
   IPullAllResult,
 } from '../../lib/automation/pull-all'
+import type {
+  CommitPushAllProgressListener,
+  ICommitPushAllResult,
+} from '../../lib/automation/commit-push-all'
 
 import { Account } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
@@ -1469,6 +1473,17 @@ export class Dispatcher {
     return this.appStore._pullAllRepositories(onProgress)
   }
 
+  /**
+   * Pull, commit all local changes, then push every repository that has work,
+   * applying the same user-confirmed commit message to each.
+   */
+  public commitAndPushAllRepositories(
+    message: string,
+    onProgress?: CommitPushAllProgressListener
+  ): Promise<ReadonlyArray<ICommitPushAllResult>> {
+    return this.appStore._commitAndPushAllRepositories(message, onProgress)
+  }
+
   /** Fetch a specific refspec for the repository. */
   public fetchRefspec(
     repository: Repository,
@@ -1574,6 +1589,11 @@ export class Dispatcher {
 
       const addedRepository = addedRepositories[0]
       await this.selectRepository(addedRepository)
+
+      // Detect point: a freshly-cloned repository may carry committed cheap-LFS
+      // pointers to auto-materialize. Fire-and-forget; the app store no-ops when
+      // the feature is off, no account is selected, or there are no pointers.
+      void this.appStore.maybeAutoMaterializeCheapLfs(addedRepository)
 
       if (isRepositoryWithForkedGitHubRepository(addedRepository)) {
         this.showPopup({
@@ -2597,6 +2617,21 @@ export class Dispatcher {
     repository: Repository
   ): Promise<ReadonlyArray<ICheapLfsPointerEntry>> {
     return this.appStore._listCheapLfsPointers(repository)
+  }
+
+  /**
+   * Materialize every committed cheap-LFS pointer in the working tree as one
+   * cancelable background batch (the manual "Materialize all" control). Shares
+   * the automatic detector's run, so it is a no-op while one is already in
+   * flight for the repository.
+   */
+  public materializeAllCheapLfsPointers(repository: Repository): Promise<void> {
+    return this.appStore._materializeAllCheapLfsPointers(repository)
+  }
+
+  /** Cancel an in-flight automatic or manual cheap-LFS materialize batch. */
+  public cancelAutoMaterializeCheapLfs(repository: Repository): void {
+    this.appStore._cancelAutoMaterializeCheapLfs(repository)
   }
 
   /** Add a submodule at the given path, optionally tracking a branch. */

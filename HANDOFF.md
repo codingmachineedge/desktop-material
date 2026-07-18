@@ -69,6 +69,32 @@ both themes) instead of borrowing the pull tone, so the pill signals that a
 push will follow the offered pull. The post-shell style contract covers the
 new state alongside the original five.
 
+## 2026-07-18 Cheap-LFS automation and Commit & push all
+
+- **Auto-materialize on detect (default on).** After a clone, a pull that
+  brought pointers, a fetch, or on repo open, committed cheap-LFS pointers
+  are automatically downloaded and reassembled into their real bytes —
+  gated on a Releases-capable account, cancelable via a per-repo
+  AbortController (also the re-entrancy guard), with a `cheap-lfs`
+  completion notification. A manual **Materialize all** button in the
+  Large files & storage panel runs the same batch with inline progress.
+- **Auto-pin large files on commit (default on).** At commit time, any
+  selected file over the ~100 MB push-size threshold that isn't already a
+  pointer is pinned to the release (splitting >2 GiB) and committed as a
+  pointer, so oversized files never break a push. A pin failure **aborts
+  the commit** (emitError + return false before `createCommit`) rather
+  than committing a half-pinned tree; a notification lists what was
+  pinned. Gated on `getGitHubReleasesAvailability === 'available'`.
+- **Repo-list "Commit & push all (pull first)".** A button next to
+  Pull all opens a confirmation dialog listing the affected (non-clean)
+  repositories and a required, user-confirmed commit message, then runs a
+  bounded worker pool (concurrency 3, order-preserving) that per repo
+  skips-if-clean, pulls first (conflicts isolate the repo as failed, never
+  auto-resolved), commits all local changes with the user's identity/
+  signing/hooks (not the bot-author path), and pushes (never forced).
+  Per-repo failures are isolated so one repo never blocks the batch;
+  progress uses the persistent PullAll-style run.
+
 ## 2026-07-18 Account, clone, and Releases fixes
 
 - **Auto-switch account to the repo owner.** On selecting a repository the

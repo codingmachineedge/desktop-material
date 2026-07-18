@@ -18,6 +18,7 @@ import {
 } from '../github-release-transfer'
 import {
   getGitHubReleasesAccount,
+  GitHubReleasesAvailability,
   GitHubReleasesError,
   IGitHubReleaseMutationReview,
 } from '../stores/github-releases-store'
@@ -886,4 +887,251 @@ export async function listCheapLfsPointers(
     }
   }
   return entries
+}
+
+/**
+ * Whether the automatic materialize-on-detect flow should run: the per-repo
+ * preference must be enabled (its back-compat default is on) and a
+ * Releases-capable account must be selected for the repository. Pure so the
+ * detector's gating is unit-testable without an app store.
+ */
+export function shouldAutoMaterializeCheapLfs(
+  autoMaterializeEnabled: boolean,
+  releasesAccount: Account | null
+): boolean {
+  return autoMaterializeEnabled && releasesAccount !== null
+}
+
+/**
+ * Whether the automatic pin-large-files-on-commit flow should run: the per-repo
+ * preference must be enabled (its back-compat default is on) and the repository
+ * must have a Releases-capable account available (excludes non-GitHub repos and
+ * signed-out or unsupported endpoints). Pure so the commit gate is unit-testable
+ * without an app store.
+ */
+export function shouldAutoPinLargeFilesOnCommit(
+  autoPinEnabled: boolean,
+  availability: GitHubReleasesAvailability
+): boolean {
+  return autoPinEnabled && availability === 'available'
+}
+
+/** Cumulative progress across a batch materialize or auto-pin of many files. */
+export interface ICheapLfsBatchProgress {
+  /** Files whose transfer has finished (succeeded or failed). */
+  readonly completedFiles: number
+  /** Total files in the batch. */
+  readonly totalFiles: number
+  /** The file currently transferring, or `null` between files. */
+  readonly currentPath: string | null
+  /** Bytes transferred so far across the whole batch. */
+  readonly transferredBytes: number
+  /** Sum of every file's byte size in the batch. */
+  readonly totalBytes: number
+}
+
+/** One pointer that could not be materialized during a batch. */
+export interface ICheapLfsMaterializeFailure {
+  readonly relativePath: string
+  readonly message: string
+}
+
+/** The outcome of a batch materialize; never surfaced as a thrown error. */
+export interface ICheapLfsBatchMaterializeResult {
+  readonly materialized: ReadonlyArray<ICheapLfsMaterializeResult>
+  readonly failures: ReadonlyArray<ICheapLfsMaterializeFailure>
+  readonly totalBytes: number
+  /** True when the batch stopped early because its signal was aborted. */
+  readonly canceled: boolean
+}
+
+/**
+ * Materialize a set of committed pointers in sequence under one shared abort
+ * signal, reporting cumulative progress over the whole batch. A per-pointer
+ * failure is recorded and the remaining pointers still run; only cancellation
+ * (an `AbortError`) stops the batch early. This never throws — the caller reads
+ * the returned summary — so it is safe to drive from a fire-and-forget hook.
+ */
+export async function materializeCheapLfsPointers(
+  entries: ReadonlyArray<ICheapLfsPointerEntry>,
+  materialize: (
+    relativePath: string,
+    signal: AbortSignal,
+    onProgress: (progress: IGitHubReleaseTransferProgressEvent) => void
+  ) => Promise<ICheapLfsMaterializeResult>,
+  signal: AbortSignal,
+  onProgress?: (progress: ICheapLfsBatchProgress) => void
+): Promise<ICheapLfsBatchMaterializeResult> {
+  const totalBytes = entries.reduce(
+    (sum, entry) => sum + entry.pointer.sizeInBytes,
+    0
+  )
+  const materialized = new Array<ICheapLfsMaterializeResult>()
+  const failures = new Array<ICheapLfsMaterializeFailure>()
+  let completedBytes = 0
+  let completedFiles = 0
+  let canceled = false
+
+  for (const entry of entries) {
+    if (signal.aborted) {
+      canceled = true
+      break
+    }
+    const transferredBefore = completedBytes
+    try {
+      const result = await materialize(entry.relativePath, signal, progress =>
+        onProgress?.({
+          completedFiles,
+          totalFiles: entries.length,
+          currentPath: entry.relativePath,
+          transferredBytes: transferredBefore + progress.transferredBytes,
+          totalBytes,
+        })
+      )
+      materialized.push(result)
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') {
+        canceled = true
+        break
+      }
+      failures.push({
+        relativePath: entry.relativePath,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+    completedBytes += entry.pointer.sizeInBytes
+    completedFiles++
+    onProgress?.({
+      completedFiles,
+      totalFiles: entries.length,
+      currentPath: null,
+      transferredBytes: completedBytes,
+      totalBytes,
+    })
+  }
+
+  return { materialized, failures, totalBytes, canceled }
+}
+
+/** One selected file large enough to require an automatic pin before commit. */
+export interface ICheapLfsAutoPinTarget {
+  readonly relativePath: string
+  readonly absolutePath: string
+  readonly sizeInBytes: number
+}
+
+/** One file pinned automatically as part of a commit. */
+export interface ICheapLfsAutoPinnedFile {
+  readonly relativePath: string
+  readonly sizeInBytes: number
+  readonly result: ICheapLfsPinResult
+}
+
+/** The disk and transfer seams the auto-pin-on-commit flow depends on. */
+export interface ICheapLfsAutoPinDependencies {
+  /** Byte size of a working-tree file (stat). */
+  readonly statSize: (absolutePath: string) => Promise<number>
+  /** First bytes of a working-tree file, used to classify it as a pointer. */
+  readonly readPointerText: (absolutePath: string) => Promise<string>
+  /** Upload one file as a release asset and replace it with a pointer. */
+  readonly pin: (
+    target: ICheapLfsAutoPinTarget,
+    signal: AbortSignal | undefined,
+    onProgress: (progress: IGitHubReleaseTransferProgressEvent) => void
+  ) => Promise<ICheapLfsPinResult>
+}
+
+/**
+ * Choose which of `selectedRelativePaths` must be pinned before committing:
+ * every selected file strictly larger than `thresholdBytes` that is not already
+ * a cheap-LFS pointer. Files at or under the threshold, files that cannot be
+ * stat'd (deletions, vanished paths), and files that already hold a committed
+ * pointer are skipped.
+ */
+export async function selectCheapLfsAutoPinTargets(
+  repository: Repository,
+  selectedRelativePaths: ReadonlyArray<string>,
+  thresholdBytes: number,
+  deps: Pick<ICheapLfsAutoPinDependencies, 'statSize' | 'readPointerText'>
+): Promise<ReadonlyArray<ICheapLfsAutoPinTarget>> {
+  const targets = new Array<ICheapLfsAutoPinTarget>()
+  for (const relativePath of selectedRelativePaths) {
+    const validated = validateCheapLfsTrackedPath(relativePath)
+    if (validated === null) {
+      continue
+    }
+    const absolutePath = join(repository.path, validated)
+    let sizeInBytes: number
+    try {
+      sizeInBytes = await deps.statSize(absolutePath)
+    } catch {
+      continue
+    }
+    if (sizeInBytes <= thresholdBytes) {
+      continue
+    }
+    // A committed pointer is tiny, so an over-threshold file is almost never one
+    // — but classify anyway so a mis-sized pointer is never re-pinned.
+    try {
+      if (
+        parseCheapLfsPointer(await deps.readPointerText(absolutePath)) !== null
+      ) {
+        continue
+      }
+    } catch {
+      // Unreadable as bounded text means it is certainly not a pointer; pin it.
+    }
+    targets.push({ relativePath: validated, absolutePath, sizeInBytes })
+  }
+  return targets
+}
+
+/**
+ * Pin every over-threshold selected file before a commit so the working tree
+ * holds committable pointers instead of unpushable large binaries. Pins run in
+ * sequence; the FIRST failure re-throws so the caller can abort the commit
+ * without ever committing a half-pinned tree. Returns the files it pinned, in
+ * order (empty when nothing qualified). The caller must re-read status after a
+ * non-empty result so the committed content is the pointer, not the binary.
+ */
+export async function autoPinLargeFilesForCommit(
+  repository: Repository,
+  selectedRelativePaths: ReadonlyArray<string>,
+  thresholdBytes: number,
+  deps: ICheapLfsAutoPinDependencies,
+  signal?: AbortSignal,
+  onProgress?: (progress: ICheapLfsBatchProgress) => void
+): Promise<ReadonlyArray<ICheapLfsAutoPinnedFile>> {
+  const targets = await selectCheapLfsAutoPinTargets(
+    repository,
+    selectedRelativePaths,
+    thresholdBytes,
+    deps
+  )
+  const totalBytes = targets.reduce(
+    (sum, target) => sum + target.sizeInBytes,
+    0
+  )
+  const pinned = new Array<ICheapLfsAutoPinnedFile>()
+  let completedBytes = 0
+  for (let index = 0; index < targets.length; index++) {
+    const target = targets[index]
+    const transferredBefore = completedBytes
+    const result = await deps.pin(target, signal, progress =>
+      onProgress?.({
+        completedFiles: index,
+        totalFiles: targets.length,
+        currentPath: target.relativePath,
+        transferredBytes: transferredBefore + progress.transferredBytes,
+        totalBytes,
+      })
+    )
+    pinned.push({
+      relativePath: target.relativePath,
+      sizeInBytes: target.sizeInBytes,
+      result,
+    })
+    completedBytes += target.sizeInBytes
+  }
+  return pinned
 }

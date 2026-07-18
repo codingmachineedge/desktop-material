@@ -241,6 +241,24 @@ export class BuildRunSettings extends React.Component<
     })
   }
 
+  private onAutoMaterializeCheapLfsChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onPreferencesChanged({
+      ...this.props.preferences,
+      autoMaterializeCheapLfs: event.currentTarget.checked,
+    })
+  }
+
+  private onAutoPinLargeFilesOnCommitChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onPreferencesChanged({
+      ...this.props.preferences,
+      autoPinLargeFilesOnCommit: event.currentTarget.checked,
+    })
+  }
+
   private renderProfileLabel(profile: IBuildProfile): JSX.Element {
     const location = profile.cwd.length === 0 ? 'repository root' : profile.cwd
     const reasons =
@@ -443,6 +461,22 @@ export class BuildRunSettings extends React.Component<
       </span>
     )
 
+    const autoPinLabel = (
+      <span className="build-run-toggle-label">
+        {__DARWIN__
+          ? 'Pin Large Files to a Release When Committing'
+          : 'Pin large files to a release when committing'}
+        <ToggledtippedContent
+          className="build-run-toggle-tip"
+          ariaLabel="About pinning large files on commit"
+          ariaLiveMessage="When you commit a file larger than about 100 MB, upload it to a GitHub release and commit only a small pointer in its place, so the push stays under GitHub's file size limit. Needs the repository's GitHub account signed in. If a pin fails the commit is aborted rather than committing a half-pinned tree."
+          tooltip="When you commit a file over ~100 MB, it is uploaded to a GitHub release and committed as a small pointer, keeping the push under GitHub's file size limit. Requires the repository's GitHub account. A failed pin aborts the commit rather than committing a half-pinned tree."
+        >
+          <Octicon symbol={octicons.info} />
+        </ToggledtippedContent>
+      </span>
+    )
+
     return (
       <section className="build-run-section">
         <h3 className="build-run-section-title">
@@ -519,6 +553,28 @@ export class BuildRunSettings extends React.Component<
             }
             onChange={this.onOpencodeAutoApproveChanged}
           />
+          <Checkbox
+            label={
+              __DARWIN__
+                ? 'Download Large Files After Cloning'
+                : 'Download large files after cloning'
+            }
+            value={
+              prefs.autoMaterializeCheapLfs ?? true
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onAutoMaterializeCheapLfsChanged}
+          />
+          <Checkbox
+            label={autoPinLabel}
+            value={
+              prefs.autoPinLargeFilesOnCommit ?? true
+                ? CheckboxValue.On
+                : CheckboxValue.Off
+            }
+            onChange={this.onAutoPinLargeFilesOnCommitChanged}
+          />
         </div>
         <p className="build-run-section-description">
           Auto-ignore adds the profile's build-output patterns to{' '}
@@ -526,6 +582,10 @@ export class BuildRunSettings extends React.Component<
           so it is idempotent and reversible from the Ignored files tab.
           Building after a pull starts the selected profile (for example a
           Docker image or app build) only when the pull brings new commits.
+          Pinning large files uploads any committed file over ~100&nbsp;MB to a
+          GitHub release and commits a small pointer in its place, so the push
+          stays under GitHub's file size limit; downloading large files restores
+          those pointers to their real bytes after cloning or pulling.
         </p>
       </section>
     )

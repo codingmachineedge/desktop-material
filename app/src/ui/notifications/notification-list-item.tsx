@@ -58,6 +58,7 @@ const kindIcons: Record<NotificationCentreKind, OcticonSymbol> = {
   'auto-commit': octicons.gitCommit,
   'merge-all': octicons.gitMerge,
   'auto-pull': octicons.arrowDown,
+  'cheap-lfs': octicons.fileBinary,
   info: octicons.info,
 }
 

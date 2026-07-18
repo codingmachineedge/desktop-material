@@ -11,6 +11,7 @@ export type NotificationCentreKind =
   | 'auto-commit'
   | 'merge-all'
   | 'auto-pull'
+  | 'cheap-lfs'
   | 'info'
 
 /** An optional action performed when a notification row is clicked. */
@@ -254,6 +255,7 @@ const notificationKinds: ReadonlySet<NotificationCentreKind> =
     'auto-commit',
     'merge-all',
     'auto-pull',
+    'cheap-lfs',
     'info',
   ])
 

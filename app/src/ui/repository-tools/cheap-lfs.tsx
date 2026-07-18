@@ -375,6 +375,91 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     }
   }
 
+  /**
+   * Materialize every loaded pointer sequentially under one cancelable
+   * operation — the manual "Materialize all" control. Runs the same per-file
+   * materialize the automatic detector uses, records per-file failures without
+   * stopping the batch, and reloads the list once at the end.
+   */
+  private materializeAll = async () => {
+    const targets = this.state.pointers
+    if (targets.length === 0) {
+      return
+    }
+    const operation = this.startOperation('materialize')
+    if (operation === null) {
+      return
+    }
+    this.lastProgressAt = 0
+    let materialized = 0
+    let failed = 0
+    let canceled = false
+    try {
+      for (const entry of targets) {
+        if (!this.isCurrent(operation.generation, operation.controller)) {
+          return
+        }
+        if (operation.controller.signal.aborted) {
+          canceled = true
+          break
+        }
+        this.setState({ materializingPath: entry.relativePath })
+        try {
+          await this.props.dispatcher.materializePointer(
+            this.props.repository,
+            entry.relativePath,
+            operation.controller.signal,
+            progress =>
+              this.updateProgress(
+                operation.generation,
+                operation.controller,
+                progress
+              )
+          )
+          materialized++
+        } catch (error) {
+          if ((error as Error)?.name === 'AbortError') {
+            canceled = true
+            break
+          }
+          failed++
+        }
+      }
+      if (!this.isCurrent(operation.generation, operation.controller)) {
+        return
+      }
+      this.finishOperation(operation.controller)
+      const failedSuffix =
+        failed > 0
+          ? `; ${failed} failed and ${
+              failed === 1 ? 'was' : 'were'
+            } left as pointers`
+          : ''
+      this.setState(
+        { busy: null, progress: null },
+        () =>
+          void this.loadPointers(
+            `${
+              canceled ? 'Canceled after materializing' : 'Materialized'
+            } ${materialized} of ${targets.length} pinned ${
+              targets.length === 1 ? 'file' : 'files'
+            }${failedSuffix}.`
+          )
+      )
+    } catch (error) {
+      if (this.isCurrent(operation.generation, operation.controller)) {
+        this.setState({
+          busy: null,
+          progress: null,
+          materializingPath: null,
+          error: errorMessage(error),
+        })
+      }
+    } finally {
+      this.finishOperation(operation.controller)
+    }
+  }
+
   private choosePinFile = async () => {
     if (this.state.busy !== null) {
       return
@@ -758,6 +843,14 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
               onClick={this.choosePinFile}
             >
               Pin a large file…
+            </Button>
+            <Button
+              disabled={
+                this.state.busy !== null || this.state.pointers.length === 0
+              }
+              onClick={this.materializeAll}
+            >
+              Materialize all
             </Button>
             <Button disabled={this.state.busy !== null} onClick={this.refresh}>
               Refresh

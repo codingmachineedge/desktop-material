@@ -33,6 +33,7 @@ const kindLabels: Readonly<Record<NotificationCentreKind, string>> = {
   'auto-commit': 'Automatic commits',
   'merge-all': 'Merge all',
   'auto-pull': 'Automatic pulls',
+  'cheap-lfs': 'Large files',
   info: 'Information',
 }
 

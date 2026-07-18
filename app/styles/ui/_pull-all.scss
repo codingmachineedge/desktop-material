@@ -1,4 +1,7 @@
-#pull-all-repositories {
+// The commit-and-push-all progress view reuses the pull-all layout and status
+// pills, so both dialog ids share these rules.
+#pull-all-repositories,
+#commit-push-all-repositories {
   min-width: 0;
   width: min(760px, 90vw);
 
@@ -159,12 +162,15 @@
     padding: 2px 10px;
     text-transform: capitalize;
 
-    &.pulled {
+    &.pulled,
+    &.done {
       background: var(--md-sys-color-secondary-container);
       color: var(--md-sys-color-on-secondary-container);
     }
 
-    &.pulling {
+    &.pulling,
+    &.committing,
+    &.pushing {
       background: var(--md-sys-color-primary-container);
       color: var(--md-sys-color-on-primary-container);
     }

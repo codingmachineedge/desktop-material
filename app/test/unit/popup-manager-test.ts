@@ -25,6 +25,11 @@ describe('hasModalPopup', () => {
     assert.equal(hasModalPopup([pullAll]), false)
   })
 
+  it('keeps Commit and push all modal so the batch is deliberately confirmed', () => {
+    const commitPushAll: Popup = { type: PopupType.CommitAndPushAll }
+    assert.equal(hasModalPopup([commitPushAll]), true)
+  })
+
   it('keeps the log history manager non-modal while work continues', () => {
     const logHistory: Popup = { type: PopupType.LogHistory }
     assert.equal(hasModalPopup([logHistory]), false)

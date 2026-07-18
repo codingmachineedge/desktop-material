@@ -4,7 +4,16 @@ import { Repository } from '../models/repository'
 import { stat } from 'fs/promises'
 import { join } from 'path'
 
-const ReceiveLimit = 100 * 1024 * 1024 // 100 MiB
+/** GitHub rejects a push containing any single file larger than this. */
+export const ReceiveLimit = 100 * 1024 * 1024 // 100 MiB
+
+/**
+ * The size at which the auto-pin-on-commit feature moves a selected file to a
+ * GitHub Release asset instead of committing it directly. A file strictly over
+ * this size cannot be pushed, so pinning it (committing only a small pointer) is
+ * what keeps the repository pushable. Anchored to {@link ReceiveLimit}.
+ */
+export const CheapLfsPinThresholdBytes = ReceiveLimit
 
 /**
  * Retrieve paths of working directory files that are larger than a given Megabyte size.

@@ -20,18 +20,26 @@ import { CommitMessageGenerationCancelledError } from './copilot-store'
 import { FileBatchCloneStagingManager } from './batch-clone-staging'
 import {
   getGitHubReleasesAccount,
+  getGitHubReleasesAvailability,
   GitHubReleasesError,
   GitHubReleasesStore,
 } from './github-releases-store'
 import {
+  autoPinLargeFilesForCommit,
+  defaultCheapLfsFileSystem,
+  ICheapLfsAutoPinnedFile,
   ICheapLfsMaterializeResult,
   ICheapLfsPinOptions,
   ICheapLfsPinResult,
   ICheapLfsPointerEntry,
   listCheapLfsPointers,
+  materializeCheapLfsPointers,
   materializePointer,
   pinFileToRelease,
+  shouldAutoMaterializeCheapLfs,
+  shouldAutoPinLargeFilesOnCommit,
 } from '../cheap-lfs/operations'
+import { CheapLfsPinThresholdBytes } from '../large-files'
 import { IGitHubRelease } from '../github-releases'
 import { IGitHubReleaseTransferProgressEvent } from '../github-release-transfer'
 import {
@@ -417,6 +425,14 @@ import {
   runBoundedPullAll,
 } from '../automation/pull-all'
 import {
+  commitPushAllRepository,
+  CommitPushAllProgressListener,
+  ICommitPushAllRepositoryActions,
+  ICommitPushAllResult,
+  isCommitPushAllRepositoryClean,
+  runBoundedCommitPushAll,
+} from '../automation/commit-push-all'
+import {
   PullAllFallbackSuccessDetail,
   pullWithAccountFallback,
 } from '../automation/pull-all-account-fallback'
@@ -463,7 +479,11 @@ import {
   isValidTutorialStep,
 } from '../../models/tutorial-step'
 import { OnboardingTutorialAssessor } from './helpers/tutorial-assessor'
-import { getConflictedFiles, getUntrackedFiles } from '../status'
+import {
+  getConflictedFiles,
+  getUntrackedFiles,
+  hasConflictedFiles,
+} from '../status'
 import { isBranchPushable } from '../helpers/push-control'
 import {
   findAssociatedPullRequest,
@@ -474,7 +494,10 @@ import { createTutorialRepository } from './helpers/create-tutorial-repository'
 import { sendNonFatalException } from '../helpers/non-fatal-exception'
 import { getDefaultDir } from '../../ui/lib/default-dir'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
-import { IBuildRunPreferences } from '../../models/build-run-preferences'
+import {
+  defaultBuildRunPreferences,
+  IBuildRunPreferences,
+} from '../../models/build-run-preferences'
 import { RepositoryIndicatorUpdater } from './helpers/repository-indicator-updater'
 import { isAttributableEmailFor } from '../email'
 import { TrashNameLabel } from '../../ui/lib/context-menu'
@@ -771,6 +794,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private currentBackgroundFetcher: BackgroundFetcher | null = null
   private currentAutomationScheduler: AutomationScheduler | null = null
   private readonly mergeAllControllers = new Map<number, AbortController>()
+
+  /**
+   * The abort controller for each repository's in-flight automatic cheap-LFS
+   * materialize. Its presence is also the re-entrancy guard: a second detect
+   * hook for the same repository returns early instead of starting a second run.
+   */
+  private readonly cheapLfsMaterializeControllers = new Map<
+    number,
+    AbortController
+  >()
 
   private currentBranchPruner: BranchPruner | null = null
 
@@ -2680,6 +2713,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.addUpstreamRemoteIfNeeded(repository)
 
+    // Detect point: opening a repository may reveal committed cheap-LFS
+    // pointers to auto-materialize. Re-entrant, so re-check the selection.
+    void this.maybeAutoMaterializeCheapLfs(repository, {
+      requireSelected: true,
+    })
+
     return this.repositoryWithRefreshedGitHubRepository(repository)
   }
 
@@ -4415,13 +4454,51 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<boolean> {
     const state = this.repositoryStateCache.get(repository)
     const files = state.changesState.workingDirectory.files
-    const selectedFiles = files.filter(file => {
+    let selectedFiles = files.filter(file => {
       return file.selection.getSelectionType() !== DiffSelectionType.None
     })
 
     const gitStore = this.gitStoreCache.get(repository)
 
     return this.withIsCommitting(repository, async () => {
+      // Auto-pin any selected file too large to push to a GitHub Release before
+      // committing, so the tree holds a committable pointer instead of an
+      // unpushable binary. A pin failure aborts the commit — a half-pinned tree
+      // must never become a commit.
+      let pinned: ReadonlyArray<ICheapLfsAutoPinnedFile>
+      try {
+        pinned = await this.autoPinLargeFilesBeforeCommit(
+          repository,
+          selectedFiles
+        )
+      } catch (error) {
+        this.emitError(
+          error instanceof Error ? error : new Error(String(error))
+        )
+        await this._refreshRepository(repository)
+        return false
+      }
+
+      if (pinned.length > 0) {
+        // Re-read status so the just-written pointer content — not the original
+        // binary — is what gets staged and committed for each pinned file.
+        await this._loadStatus(repository)
+        const pinnedPaths = new Set(pinned.map(file => file.relativePath))
+        const originalSelectedPaths = new Set(selectedFiles.map(f => f.path))
+        const refreshedFiles =
+          this.repositoryStateCache.get(repository).changesState
+            .workingDirectory.files
+        selectedFiles = refreshedFiles
+          .filter(file => originalSelectedPaths.has(file.path))
+          .map(file =>
+            pinnedPaths.has(file.path) ? file.withIncludeAll(true) : file
+          )
+          .filter(
+            file => file.selection.getSelectionType() !== DiffSelectionType.None
+          )
+        this.postCheapLfsPinNotification(repository, pinned)
+      }
+
       const result = await gitStore.performFailableOperation(
         async () => {
           const message = await formatCommitMessage(repository, context)
@@ -7371,6 +7448,133 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
   }
 
+  /**
+   * Commit and push every repository that has local work, pulling first. Clean
+   * repositories are skipped, and each repository's failure is isolated so a
+   * single conflict or network error never aborts the whole batch. The user's
+   * commit identity, signing, and hooks are used — never the automation
+   * bot-author path — and pushes are never forced.
+   */
+  public async _commitAndPushAllRepositories(
+    message: string,
+    onProgress?: CommitPushAllProgressListener
+  ): Promise<ReadonlyArray<ICommitPushAllResult>> {
+    const summary = message.trim()
+    if (summary.length === 0) {
+      throw new Error(
+        'A commit message is required to commit and push all repositories.'
+      )
+    }
+
+    const repositories = await this.repositoriesStore.getAll()
+    const repositoriesById = new Map(repositories.map(repo => [repo.id, repo]))
+
+    return runBoundedCommitPushAll(
+      repositories.map(repository => ({
+        id: repository.id,
+        name: repository.name,
+      })),
+      async (candidate, reportProgress) => {
+        const repository = repositoriesById.get(candidate.id)
+        if (repository === undefined) {
+          return { status: 'skipped', detail: 'Repository was removed.' }
+        }
+        if (repository.missing) {
+          return { status: 'skipped', detail: 'Repository is missing.' }
+        }
+        return commitPushAllRepository(
+          this.buildCommitPushAllActions(repository, summary),
+          reportProgress
+        )
+      },
+      3,
+      onProgress
+    )
+  }
+
+  private buildCommitPushAllActions(
+    repository: Repository,
+    summary: string
+  ): ICommitPushAllRepositoryActions {
+    return {
+      isClean: () => {
+        const state = this.localRepositoryStateLookup.get(repository.id)
+        return isCommitPushAllRepositoryClean(
+          state === undefined
+            ? undefined
+            : {
+                changedFilesCount: state.changedFilesCount,
+                ahead: state.aheadBehind?.ahead ?? 0,
+                behind: state.aheadBehind?.behind ?? 0,
+              }
+        )
+      },
+      // Reuse the conflict-safe Pull all pull, which throws (isolated as a
+      // failure) on a merge conflict so a conflicted tree is never committed.
+      pull: async report => {
+        await this.performPullAllRepository(repository, report)
+      },
+      commitAll: report =>
+        this.commitAllChangesForCommitPushAll(repository, summary, report),
+      push: report => this.pushForCommitPushAll(repository, report),
+    }
+  }
+
+  private async commitAllChangesForCommitPushAll(
+    repository: Repository,
+    summary: string,
+    report: (detail: string) => void
+  ): Promise<boolean> {
+    report('Reading the working directory.')
+    await this._refreshRepository(repository)
+
+    const state = this.repositoryStateCache.get(repository)
+    if (hasConflictedFiles(state.changesState.workingDirectory)) {
+      throw new Error(
+        'Repository has merge conflicts. Resolve them before committing.'
+      )
+    }
+
+    const files = state.changesState.workingDirectory.files
+    if (files.length === 0) {
+      return false
+    }
+
+    await this._changeIncludeAllFiles(repository, true)
+    const includedState = this.repositoryStateCache.get(repository)
+    const includedFiles = includedState.changesState.workingDirectory.files
+    const context: ICommitContext = { summary, description: null }
+    const message = await formatCommitMessage(repository, context)
+
+    report(`Committing ${files.length} change${files.length === 1 ? '' : 's'}.`)
+    const committed = await this.withIsCommitting(repository, async () => {
+      await createCommit(repository, message, includedFiles, {
+        noVerify: includedState.skipCommitHooks,
+        signOff: includedState.signOffCommits,
+        onHookFailure: async () => 'abort',
+      })
+      return true
+    })
+
+    if (!committed) {
+      throw new Error('Another commit is already in progress.')
+    }
+
+    await this._refreshRepository(repository)
+    return true
+  }
+
+  private async pushForCommitPushAll(
+    repository: Repository,
+    report: (detail: string) => void
+  ): Promise<void> {
+    report('Pushing to the upstream remote.')
+    // Reuse the scheduler push: raw pushRepo (no force, user identity/hooks)
+    // that throws on failure so a push error is isolated per repository instead
+    // of raising a global error dialog or publishing an unpublished repo.
+    await this.performScheduledPush(repository)
+  }
+
   /** This shouldn't be called directly. See `Dispatcher`. */
   private async performPull(repository: Repository): Promise<void> {
     return this.withPushPullFetch(repository, async () => {
@@ -7520,6 +7724,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
           await this.refreshBranchProtectionState(repository)
 
           await this._refreshRepository(repository)
+
+          // Detect point: a pull that brought new commits may have added
+          // cheap-LFS pointers to the working tree; the detector scans cheaply
+          // and no-ops when there are none.
+          void this.maybeAutoMaterializeCheapLfs(repository)
         } finally {
           this.updatePushPullFetchProgress(repository, null)
         }
@@ -7705,6 +7914,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
       // twice after recovery.
       if (registrationComplete) {
         this.statsStore.recordCloneRepository()
+      }
+
+      // Detect point: each freshly-registered clone may carry committed
+      // cheap-LFS pointers to auto-materialize. Fire-and-forget per repository.
+      for (const registered of addedRepositories) {
+        void this.maybeAutoMaterializeCheapLfs(registered)
       }
     }
 
@@ -8124,6 +8339,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
           if (repository.gitHubRepository != null) {
             this._refreshIssues(repository.gitHubRepository)
           }
+          // Detect point: a user-initiated fetch that refreshed the working
+          // tree may have surfaced new cheap-LFS pointers. The detector's cheap
+          // scan is the "only if new pointers appeared" guard.
+          void this.maybeAutoMaterializeCheapLfs(repository)
         }
       }
     })
@@ -9924,6 +10143,227 @@ export class AppStore extends TypedBaseStore<IAppState> {
     repository: Repository
   ): Promise<ReadonlyArray<ICheapLfsPointerEntry>> {
     return listCheapLfsPointers(repository)
+  }
+
+  /**
+   * Detect and download committed cheap-LFS pointers back into their real bytes
+   * after a clone, pull, fetch, or repository open. Runs only when the per-repo
+   * preference is enabled (default on) and a Releases-capable account is
+   * selected; skips silently otherwise. The batch is cancelable, reports
+   * cumulative progress that survives navigation (the run is keyed by repository
+   * id), and posts a summary notification. Fire-and-forget: this never throws.
+   *
+   * @param options.requireSelected  Re-check `selectedRepository` before running
+   *   (the repository-open detect point is re-entrant and may fire after the
+   *   selection has already moved on).
+   */
+  public async maybeAutoMaterializeCheapLfs(
+    repository: Repository,
+    options: { readonly requireSelected?: boolean } = {}
+  ): Promise<void> {
+    try {
+      const prefs = repository.buildRunPreferences ?? defaultBuildRunPreferences
+      const account = getGitHubReleasesAccount(repository, this.accounts)
+      if (
+        !shouldAutoMaterializeCheapLfs(
+          prefs.autoMaterializeCheapLfs !== false,
+          account
+        )
+      ) {
+        return
+      }
+      // Re-entrancy guard: never run two batches for the same repository at once.
+      if (this.cheapLfsMaterializeControllers.has(repository.id)) {
+        return
+      }
+      const entries = await listCheapLfsPointers(repository)
+      if (entries.length === 0) {
+        return
+      }
+      if (options.requireSelected && this.selectedRepository !== repository) {
+        return
+      }
+      await this.runCheapLfsMaterialize(repository, entries)
+    } catch (error) {
+      log.error('Automatic cheap LFS materialize failed', error)
+    }
+  }
+
+  /**
+   * Materialize an explicit set of pointers under one shared, cancelable abort
+   * controller keyed by repository id (so a concurrent auto-run and this manual
+   * run cannot collide), refresh the repository once at the end, and post a
+   * summary notification. Shared by the automatic detector and the "Materialize
+   * all" control in the Large files & storage panel.
+   */
+  private async runCheapLfsMaterialize(
+    repository: Repository,
+    entries: ReadonlyArray<ICheapLfsPointerEntry>
+  ): Promise<void> {
+    if (this.cheapLfsMaterializeControllers.has(repository.id)) {
+      return
+    }
+    const controller = new AbortController()
+    this.cheapLfsMaterializeControllers.set(repository.id, controller)
+    try {
+      const summary = await materializeCheapLfsPointers(
+        entries,
+        (relativePath, signal, onProgress) =>
+          materializePointer(
+            this.githubReleasesStore,
+            repository,
+            this.requireCheapLfsAccount(repository),
+            relativePath,
+            signal,
+            onProgress
+          ),
+        controller.signal
+      )
+      await this._refreshRepository(repository)
+      this.postCheapLfsMaterializeNotification(repository, summary)
+    } finally {
+      if (
+        this.cheapLfsMaterializeControllers.get(repository.id) === controller
+      ) {
+        this.cheapLfsMaterializeControllers.delete(repository.id)
+      }
+    }
+  }
+
+  /** Post a notification summarising a batch materialize's count and bytes. */
+  private postCheapLfsMaterializeNotification(
+    repository: Repository,
+    summary: {
+      readonly materialized: ReadonlyArray<ICheapLfsMaterializeResult>
+      readonly failures: ReadonlyArray<{ readonly relativePath: string }>
+      readonly canceled: boolean
+    }
+  ): void {
+    if (summary.materialized.length === 0 && summary.failures.length === 0) {
+      return
+    }
+    const bytes = summary.materialized.reduce((sum, r) => sum + r.bytes, 0)
+    const files = summary.materialized.length
+    const failed = summary.failures.length
+    const megabytes = (bytes / (1024 * 1024)).toFixed(1)
+    const canceledSuffix = summary.canceled ? ' (canceled)' : ''
+    const failedSuffix =
+      failed > 0
+        ? ` ${failed} ${
+            failed === 1 ? 'file' : 'files'
+          } failed and were left as pointers.`
+        : ''
+    this.postNotification({
+      kind: 'cheap-lfs',
+      title: __DARWIN__ ? 'Large Files Downloaded' : 'Large files downloaded',
+      body: `Materialized ${files} ${
+        files === 1 ? 'file' : 'files'
+      } (${megabytes} MiB)${canceledSuffix} in ${
+        repository.name
+      }.${failedSuffix}`,
+      repositoryId: repository.id,
+      action: { kind: 'open-repository', repositoryId: repository.id },
+    })
+  }
+
+  /**
+   * This shouldn't be called directly. See `Dispatcher`.
+   *
+   * Materialize every committed pointer in the working tree as one cancelable
+   * batch — the manual "Materialize all" control. Returns the batch summary so
+   * the panel can report the result.
+   */
+  public async _materializeAllCheapLfsPointers(
+    repository: Repository
+  ): Promise<void> {
+    const entries = await listCheapLfsPointers(repository)
+    if (entries.length === 0) {
+      return
+    }
+    await this.runCheapLfsMaterialize(repository, entries)
+  }
+
+  /**
+   * This shouldn't be called directly. See `Dispatcher`.
+   *
+   * Cancel an in-flight automatic (or manual) cheap-LFS materialize for a
+   * repository. A no-op when nothing is running.
+   */
+  public _cancelAutoMaterializeCheapLfs(repository: Repository): void {
+    this.cheapLfsMaterializeControllers.get(repository.id)?.abort()
+  }
+
+  /**
+   * Pin every selected file over the push-size threshold to a GitHub Release
+   * before a commit, replacing it in the working tree with a small pointer.
+   * Runs only when the per-repo preference is enabled (default on) and a
+   * Releases-capable account is selected. The FIRST pin failure re-throws so
+   * `_commitIncludedChanges` can abort the commit without a half-pinned
+   * tree; returns the files it pinned otherwise (empty when none qualified).
+   */
+  private autoPinLargeFilesBeforeCommit(
+    repository: Repository,
+    selectedFiles: ReadonlyArray<WorkingDirectoryFileChange>
+  ): Promise<ReadonlyArray<ICheapLfsAutoPinnedFile>> {
+    const prefs = repository.buildRunPreferences ?? defaultBuildRunPreferences
+    const availability = getGitHubReleasesAvailability(
+      repository,
+      this.accounts
+    )
+    if (
+      !shouldAutoPinLargeFilesOnCommit(
+        prefs.autoPinLargeFilesOnCommit !== false,
+        availability
+      )
+    ) {
+      return Promise.resolve([])
+    }
+    return autoPinLargeFilesForCommit(
+      repository,
+      selectedFiles.map(file => file.path),
+      CheapLfsPinThresholdBytes,
+      {
+        statSize: defaultCheapLfsFileSystem.statSize,
+        readPointerText: defaultCheapLfsFileSystem.readPointerText,
+        pin: (target, signal, onProgress) =>
+          pinFileToRelease(
+            this.githubReleasesStore,
+            repository,
+            this.requireCheapLfsAccount(repository),
+            {
+              absoluteFilePath: target.absolutePath,
+              trackedRelativePath: target.relativePath,
+              // The manual pin control defaults to this tag too, so automatic
+              // and manual pins share one release per repository.
+              releaseTag: 'assets',
+            },
+            signal,
+            onProgress
+          ),
+      }
+    )
+  }
+
+  /** Post a notification listing the files auto-pinned before a commit. */
+  private postCheapLfsPinNotification(
+    repository: Repository,
+    pinned: ReadonlyArray<ICheapLfsAutoPinnedFile>
+  ): void {
+    if (pinned.length === 0) {
+      return
+    }
+    const bytes = pinned.reduce((sum, file) => sum + file.sizeInBytes, 0)
+    const megabytes = (bytes / (1024 * 1024)).toFixed(1)
+    const names = pinned.map(file => file.relativePath).join(', ')
+    this.postNotification({
+      kind: 'cheap-lfs',
+      title: __DARWIN__ ? 'Large Files Pinned' : 'Large files pinned',
+      body: `Pinned ${pinned.length} ${
+        pinned.length === 1 ? 'file' : 'files'
+      } (${megabytes} MiB) to a release before committing: ${names}.`,
+      repositoryId: repository.id,
+      action: { kind: 'open-repository', repositoryId: repository.id },
+    })
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */

@@ -267,6 +267,26 @@ describe('notification-centre model', () => {
       assert.deepEqual(parsed?.entries, entries)
     })
 
+    it('accepts the cheap-lfs kind', () => {
+      const entries: ReadonlyArray<INotificationEntry> = [
+        shapeNotificationEntry(
+          {
+            kind: 'cheap-lfs',
+            title: 'Large files downloaded',
+            body: 'Materialized 2 files (3.0 MiB) in material.',
+            repositoryId: 5,
+            action: { kind: 'open-repository', repositoryId: 5 },
+          },
+          'cl-1',
+          new Date('2026-07-11T10:00:00.000Z')
+        ),
+      ]
+      const parsed = parseNotificationLog(serializeNotificationLog(entries))
+      assert.notEqual(parsed, null)
+      assert.equal(parsed?.entries[0].kind, 'cheap-lfs')
+      assert.deepEqual(parsed?.entries, entries)
+    })
+
     it('returns null for invalid JSON', () => {
       assert.equal(parseNotificationLog('{not json'), null)
     })

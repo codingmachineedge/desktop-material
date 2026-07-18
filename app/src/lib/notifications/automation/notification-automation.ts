@@ -123,6 +123,7 @@ const notificationKinds: ReadonlySet<NotificationCentreKind> =
     'auto-commit',
     'merge-all',
     'auto-pull',
+    'cheap-lfs',
     'info',
   ])
 

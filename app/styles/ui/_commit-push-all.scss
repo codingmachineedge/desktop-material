@@ -1,0 +1,42 @@
+// Confirmation-phase styles for the commit-and-push-all dialog. The running
+// phase reuses the shared progress styles in `_pull-all.scss`.
+#commit-push-all-repositories {
+  .commit-push-all-intro {
+    margin-top: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .commit-push-all-empty {
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .commit-push-all-affected {
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+    margin-top: var(--spacing);
+    max-height: min(40vh, 280px);
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--spacing);
+
+    &:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+      outline-offset: 2px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: var(--spacing-double);
+    }
+
+    li {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .commit-push-all-affected-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 var(--spacing);
+  }
+}

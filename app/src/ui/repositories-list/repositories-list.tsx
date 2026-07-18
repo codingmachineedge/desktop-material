@@ -664,6 +664,12 @@ export class RepositoriesList extends React.Component<
           <Octicon symbol={octicons.arrowDown} /> Pull all
         </Button>
         <Button
+          className="commit-push-all-repositories-button"
+          onClick={this.onCommitAndPushAllRepositories}
+        >
+          <Octicon symbol={octicons.arrowUp} /> Commit &amp; push all
+        </Button>
+        <Button
           className="new-repository-button"
           onClick={this.onNewRepositoryButtonClick}
           ariaExpanded={this.state.newRepositoryMenuExpanded}
@@ -679,6 +685,12 @@ export class RepositoriesList extends React.Component<
   private onPullAllRepositories = () => {
     this.props.dispatcher.showPopup({
       type: PopupType.PullAllRepositories,
+    })
+  }
+
+  private onCommitAndPushAllRepositories = () => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.CommitAndPushAll,
     })
   }
 

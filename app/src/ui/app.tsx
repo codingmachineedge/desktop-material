@@ -125,6 +125,8 @@ import { CrashProofBoundary } from './crash-proof-boundary'
 import { Button } from './lib/button'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
+import { CommitAndPushAllDialog } from './commit-push-all'
+import { isCommitPushAllRepositoryClean } from '../lib/automation/commit-push-all'
 import { EditCopilotBYOKProviderDialog } from './copilot/edit-byok-provider-dialog'
 import { EditCopilotBYOKModelDialog } from './copilot/edit-byok-model-dialog'
 import { ConfirmDeleteCopilotBYOKProviderDialog } from './copilot/confirm-delete-byok-provider-dialog'
@@ -2492,6 +2494,33 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
           />
         )
+      case PopupType.CommitAndPushAll: {
+        const lookup = this.state.localRepositoryStateLookup
+        const affectedRepositories = this.state.repositories
+          .filter((r): r is Repository => r instanceof Repository)
+          .filter(r => {
+            const state = lookup.get(r.id)
+            return !isCommitPushAllRepositoryClean(
+              state === undefined
+                ? undefined
+                : {
+                    changedFilesCount: state.changedFilesCount,
+                    ahead: state.aheadBehind?.ahead ?? 0,
+                    behind: state.aheadBehind?.behind ?? 0,
+                  }
+            )
+          })
+          .map(r => ({ id: r.id, name: r.name }))
+
+        return (
+          <CommitAndPushAllDialog
+            key="commit-push-all-repositories"
+            dispatcher={this.props.dispatcher}
+            affectedRepositories={affectedRepositories}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
       case PopupType.RepositorySettings: {
         const repository = popup.repository
         const state = this.props.repositoryStateManager.get(repository)

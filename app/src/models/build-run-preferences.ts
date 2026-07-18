@@ -54,6 +54,28 @@ export interface IBuildRunPreferences {
   readonly opencodeAutoApprove?: boolean
 
   /**
+   * Automatically download (materialize) committed cheap-LFS pointers back into
+   * their real bytes after cloning, pulling, or opening the repository. Gated on
+   * a Releases-capable account being selected, cancelable, and posts a summary
+   * notification. Optional for back-compat with preferences persisted before
+   * this field existed; treat an absent value as enabled (see
+   * {@link defaultBuildRunPreferences}).
+   */
+  readonly autoMaterializeCheapLfs?: boolean
+
+  /**
+   * Automatically pin a large file to a GitHub Release when committing it, so
+   * only a small pointer is committed and the push stays under GitHub's file
+   * size limit. Applies to selected files strictly over the cheap-LFS pin
+   * threshold (`CheapLfsPinThresholdBytes`); a failed pin aborts the commit rather
+   * than committing a half-pinned tree. Gated on a Releases-capable account.
+   * Optional for back-compat with preferences persisted before this field
+   * existed; treat an absent value as enabled (see
+   * {@link defaultBuildRunPreferences}).
+   */
+  readonly autoPinLargeFilesOnCommit?: boolean
+
+  /**
    * Per-profile command-line overrides. A blank / absent value for a stage
    * means "use the detected command". Stored as raw command-line strings; the
    * dispatcher tokenises them into an argv array (never a shell string).
@@ -76,4 +98,6 @@ export const defaultBuildRunPreferences: IBuildRunPreferences = {
   autoBuildOnPull: false,
   offerOpencodeAutoFix: true,
   opencodeAutoApprove: false,
+  autoMaterializeCheapLfs: true,
+  autoPinLargeFilesOnCommit: true,
 }
