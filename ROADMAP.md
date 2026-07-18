@@ -1,10 +1,45 @@
 # Desktop Material roadmap
 
-Updated: **July 16, 2026**
+Updated: **July 18, 2026**
 
-Desktop Material's feature roadmap is complete through **M19**. This file is
-the compact public source of truth; implementation details and historical test
-receipts stay in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
+Desktop Material's feature roadmap is complete through **M19**, plus the
+**M20 platform wave** below. This file is the compact public source of truth;
+implementation details and historical test receipts stay in
+[`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
+
+## M20 — Platform wave (July 17–18, 2026) — **Complete**
+
+- Secure LAN agent access with QR pairing, per-device vault tokens,
+  revocation, and the Docker-hosted mobile console (timeouts aligned to the
+  agent's 65-second command budget).
+- SSH working-copy management with vault-only credential storage, plus the
+  verified one-line Windows installer on README, wiki, and Pages (with a
+  copy button and celebration pulse).
+- Submodules everywhere: clone-list badges with a pre-clone details dialog
+  (clone any submodule as its own repository), the in-place Submodule
+  Manager on the repo page with search and status chips, and
+  worktree-from-commit on the History right-click menu.
+- Material in-app context menus with per-action icons and type-to-filter,
+  the Ctrl+F master command palette, Actions Runs/Workflows/Caches tabs
+  with per-tab filter bars, clone visibility chips (public/private/forked),
+  real account switching, and OAuth-scope re-authorization for Releases.
+- Compact-window clipping fixes across dialogs and the tools hub, pointer
+  hit-testing fixes in the clone surfaces, and a full 63-image gallery
+  refresh captured from this build.
+
+## Next up (queued)
+
+- Per-repository Appearance revamp: standalone photo-editor-grade logo
+  studio, full color chooser, and Word-grade typography — each element in
+  its own Git-backed history store.
+- Regex builder on **every** search/filter bar (including the Actions job
+  log) with per-bar customizable appearance.
+- Submodule config manager, per-submodule row decoration, a git subtree
+  manager, and beginner-simple submodule documentation.
+- Notification-triggered webhook/script automation builder (context-menu
+  entry), release-backed large-file storage, an in-app log viewer with
+  verbose mode and Git-backed log history, tools-catalog reorganization,
+  and Easter eggs.
 
 ## Milestones
 

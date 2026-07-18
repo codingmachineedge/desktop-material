@@ -420,6 +420,9 @@ async function closeAllDialogs() {
     }
     await sleep(600)
   }
+  // Custom overlays (e.g. the job log viewer) close via their own button.
+  await clickText('Close', { optional: true })
+  await sleep(400)
 }
 
 /** Move hover state away so tooltips don't pollute captures. */
@@ -827,6 +830,667 @@ scene('actions-caches', async () => {
   await sleep(2500)
   await parkPointer()
   await capture('material-actions-cache-manager')
+})
+
+/** Click a tab-strip / app-bar control by aria-label prefix. */
+async function clickAria(prefix, options = {}) {
+  const clicked = await evaluate(`(() => {
+    const target = [...document.querySelectorAll('button')].find(button =>
+      (button.getAttribute('aria-label') ?? '').startsWith(${JSON.stringify(
+        prefix
+      )}))
+    if (!target) return false
+    target.click()
+    return true
+  })()`)
+  if (!clicked && options.optional !== true) {
+    fail(`No control labeled ${prefix}.`)
+  }
+  return clicked
+}
+
+scene('notification-center', async () => {
+  await ensureRepository()
+  await clickAria('Notifications')
+  await sleep(1500)
+  await parkPointer()
+  await capture('material-notification-center')
+})
+
+scene('notification-bulk', async () => {
+  await ensureRepository()
+  const open = await evaluate(
+    `document.querySelector('[class*=notification-centre], [class*=notification-center]') !== null`
+  )
+  if (!open) {
+    await clickAria('Notifications')
+    await sleep(1200)
+  }
+  await clickText('Local', { optional: true })
+  await sleep(900)
+  await evaluate(`(() => {
+    for (const box of [...document.querySelectorAll(
+      '[class*=notification] input[type=checkbox]'
+    )].slice(0, 2)) {
+      box.click()
+    }
+    return true
+  })()`)
+  await sleep(700)
+  await parkPointer()
+  await capture('material-notification-bulk-actions')
+})
+
+scene('notification-github', async () => {
+  await ensureRepository()
+  const open = await evaluate(
+    `document.querySelector('[class*=notification-centre], [class*=notification-center]') !== null`
+  )
+  if (!open) {
+    await clickAria('Notifications')
+    await sleep(1200)
+  }
+  await clickText('GitHub', { optional: true })
+  await sleep(1500)
+  await parkPointer()
+  await capture('material-github-notifications')
+  await pressEscape(1)
+})
+
+scene('tab-search', async () => {
+  await ensureRepository()
+  await clickAria('Search tabs')
+  await sleep(1000)
+  await parkPointer()
+  await capture('material-tab-search')
+  await pressEscape(1)
+})
+
+scene('tab-arrange', async () => {
+  await ensureRepository()
+  await clickAria('Arrange tabs')
+  await sleep(1000)
+  await parkPointer()
+  await capture('material-tab-arrange')
+  await pressEscape(1)
+})
+
+scene('tab-style', async () => {
+  await ensureRepository()
+  await clickAria('Customize tab appearance')
+  await sleep(1200)
+  await parkPointer()
+  await capture('material-tab-appearance-word')
+  await pressEscape(1)
+})
+
+scene('app-identity', async () => {
+  await ensureRepository()
+  await clickSelector('.app-brand-container button, [data-customization-scope="profile"] button', {
+    optional: true,
+  })
+  const opened = await evaluate(
+    `document.querySelector('[class*=app-identity], [class*=identity-editor]') !== null`
+  )
+  if (!opened) {
+    await clickSelector('.app-brand-container', { optional: true })
+    await sleep(1200)
+  }
+  await sleep(1200)
+  await parkPointer()
+  await capture('material-app-identity-workspace')
+  await pressEscape(1)
+})
+
+scene('multi-window-menu', async () => {
+  await ensureRepository()
+  ;(await clickAria('Open a repository in a new tab', { optional: true })) ||
+    (await clickAria('Open in a new window', { optional: true })) ||
+    (await clickAria('Windows', { optional: true }))
+  await sleep(1200)
+  await parkPointer()
+  await capture('material-multi-window-menu')
+  await pressEscape(1)
+})
+
+scene('toolbar-overflow', async () => {
+  await ensureRepository()
+  await menuEvent('show-changes')
+  await setViewport(720, 687)
+  await sleep(900)
+  ;(await clickAria('More', { optional: true })) ||
+    (await clickText('More', { optional: true }))
+  await sleep(900)
+  await parkPointer()
+  await capture('material-toolbar-overflow')
+  await pressEscape(1)
+  await setViewport()
+})
+
+scene('scale-200', async () => {
+  await ensureRepository()
+  await menuEvent('show-changes')
+  await setViewport(640, 480)
+  for (let index = 0; index < 4; index++) {
+    await menuEvent('zoom-in')
+  }
+  await sleep(1200)
+  await capture('material-scale-200-autofit')
+  await menuEvent('zoom-reset')
+  await setViewport()
+})
+
+scene('history-power-tools', async () => {
+  await ensureRepository()
+  await menuEvent('show-history')
+  await sleep(1200)
+  await ensureCommitList()
+  await evaluate(`(() => {
+    const graph = document.querySelector('[aria-label*=graph i], [aria-label*=ancestry i]')
+    if (graph instanceof HTMLElement) graph.click()
+    return true
+  })()`)
+  await setInput(
+    'input[placeholder*="Search commits"]',
+    'provider'
+  )
+  await sleep(1400)
+  await parkPointer()
+  await capture('material-history-power-tools')
+  await setInput('input[placeholder*="Search commits"]', '')
+})
+
+/** Open Repository settings on a named tab. */
+async function openRepositorySettingsTab(tabLabel) {
+  await ensureRepository()
+  await menuEvent('show-repository-settings')
+  await waitFor(
+    `document.querySelector('#repository-settings') !== null`,
+    'repository settings'
+  )
+  await sleep(700)
+  if (tabLabel !== null) {
+    await clickText(tabLabel, { within: '#repository-settings' })
+    await sleep(900)
+  }
+}
+
+scene('remote-manager', async () => {
+  await openRepositorySettingsTab('Remote')
+  await sleep(1200)
+  await parkPointer()
+  await capture('material-remote-manager')
+  await closeAllDialogs()
+})
+
+scene('add-submodule', async () => {
+  await openRepositorySettingsTab('Submodules')
+  await clickText('Add submodule…', { within: '#repository-settings' })
+  await sleep(1500)
+  await parkPointer()
+  await capture('add-submodule-dialog')
+  await closeAllDialogs()
+})
+
+scene('logo-studio', async () => {
+  await openRepositorySettingsTab('Appearance')
+  await sleep(1000)
+  await evaluate(`(() => {
+    const studio = document.querySelector('.repository-logo-studio')
+    if (studio instanceof HTMLElement) studio.scrollIntoView({ block: 'center' })
+    return true
+  })()`)
+  await sleep(600)
+  await parkPointer()
+  await capture('material-repository-logo-studio')
+  await closeAllDialogs()
+})
+
+scene('stash-manager', async () => {
+  await ensureRepository()
+  fs.writeFileSync(
+    path.join(fixturePath, 'stash-note.md'),
+    '# Stash fixture\n\nStashed change for the manager surface.\n'
+  )
+  await menuEvent('show-changes')
+  await sleep(1800)
+  await menuEvent('stash-all-changes')
+  await sleep(2500)
+  await menuEvent('show-stashed-changes')
+  await sleep(1500)
+  await parkPointer()
+  await capture('material-stash-manager')
+})
+
+scene('rebase-review', async () => {
+  await ensureRepository()
+  await menuEvent('rebase-branch')
+  await sleep(1500)
+  await clickText('main', { optional: true })
+  await sleep(1200)
+  await parkPointer()
+  await capture('material-rebase-review')
+  await closeAllDialogs()
+})
+
+scene('pull-request-compose', async () => {
+  await ensureRepository()
+  await menuEvent('preview-pull-request')
+  await sleep(2500)
+  await parkPointer()
+  await capture('material-native-pull-request')
+  await closeAllDialogs()
+})
+
+scene('pull-request-open', async () => {
+  await ensureRepository()
+  await menuEvent('open-pull-request')
+  await sleep(2500)
+  await parkPointer()
+  await capture('material-create-pull-request')
+  await closeAllDialogs()
+})
+
+scene('shallow-clone-dialog', async () => {
+  await ensureRepository()
+  await menuEvent('clone-repository')
+  await waitFor(
+    `document.querySelector('dialog.clone-repository') !== null`,
+    'clone dialog'
+  )
+  await clickText('URL', { within: 'dialog.clone-repository' })
+  await sleep(700)
+  await setInput(
+    'dialog.clone-repository input[type="text"]',
+    'http://localhost:57520/material-fixture-owner/material-fixture.git'
+  )
+  await sleep(1500)
+  await evaluate(`(() => {
+    const box = [...document.querySelectorAll(
+      'dialog.clone-repository input[type=checkbox]'
+    )].find(x => !x.checked)
+    if (box) box.click()
+    return true
+  })()`)
+  await sleep(900)
+  await parkPointer()
+  await capture('material-shallow-clone')
+  // The reviewed state: depth field visible with its bounded value focused.
+  await evaluate(`(() => {
+    const field = [...document.querySelectorAll(
+      'dialog.clone-repository input'
+    )].find(x => x.value === '1')
+    if (field instanceof HTMLElement) field.focus()
+    return true
+  })()`)
+  await sleep(500)
+  await capture('material-shallow-clone-safe')
+  await closeAllDialogs()
+})
+
+scene('sparse-checkout-safe', async () => {
+  await ensureRepository()
+  await menuEvent('manage-sparse-checkout')
+  await sleep(1500)
+  const input = await evaluate(`(() => {
+    const field = [...document.querySelectorAll('dialog input[type=text], dialog textarea')]
+      .find(x => x.closest('dialog')?.open)
+    return field !== null && field !== undefined
+  })()`)
+  if (input) {
+    await evaluate(`(() => {
+      const field = [...document.querySelectorAll('dialog input[type=text], dialog textarea')]
+        .find(x => x.closest('dialog')?.open)
+      if (!field) return false
+      const proto = field instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(field, 'docs/')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    await sleep(900)
+  }
+  await parkPointer()
+  await capture('material-sparse-checkout-safe')
+  await closeAllDialogs()
+})
+
+scene('pull-all', async () => {
+  await ensureRepository()
+  await menuEvent('choose-repository')
+  await sleep(1200)
+  await clickText('Pull all', { optional: true })
+  await sleep(2500)
+  await parkPointer()
+  await capture('material-pull-all-account-fallback')
+  await closeAllDialogs()
+  await pressEscape(1)
+})
+
+scene('clone-fallback', async () => {
+  await ensureRepository()
+  await menuEvent('clone-repository')
+  await waitFor(
+    `document.querySelector('dialog.clone-repository') !== null`,
+    'clone dialog'
+  )
+  await clickText('URL', { within: 'dialog.clone-repository' })
+  await sleep(700)
+  await setInput(
+    'dialog.clone-repository input[type="text"]',
+    'http://localhost:57520/material-fixture-owner/material-fixture.git'
+  )
+  await sleep(2200)
+  await parkPointer()
+  await capture('material-clone-account-fallback')
+  await closeAllDialogs()
+})
+
+scene('regex-builder', async () => {
+  await ensureRepository()
+  await menuEvent('show-history')
+  await sleep(1200)
+  await ensureCommitList()
+  await clickAria('Search filters', { optional: true })
+  await sleep(700)
+  ;(await clickText('Regex builder', { optional: true })) ||
+    (await clickAria('Regex builder', { optional: true })) ||
+    (await clickAria('Open regex builder', { optional: true }))
+  await sleep(1500)
+  await parkPointer()
+  await capture('regex-builder')
+  await closeAllDialogs()
+})
+
+scene('history-deepen', async () => {
+  await ensureRepository()
+  await menuEvent('show-repository-tools')
+  await sleep(1500)
+  await clickText('Deepen a shallow repository', { optional: true })
+  await sleep(1200)
+  ;(await clickText('Fetch 25 older commits', { optional: true })) ||
+    (await clickText('Deepen by 25', { optional: true })) ||
+    (await clickText('Deepen', { optional: true }))
+  await sleep(3500)
+  await parkPointer()
+  await capture('material-history-deepen')
+})
+
+scene('history-deepening', async () => {
+  await ensureRepository()
+  await menuEvent('show-repository-tools')
+  await sleep(1200)
+  await clickText('Deepen a shallow repository', { optional: true })
+  await sleep(1000)
+  ;(await clickText('Fetch all remaining history', { optional: true })) ||
+    (await clickText('Fetch all history', { optional: true })) ||
+    (await clickText('Unshallow', { optional: true }))
+  await sleep(4500)
+  await parkPointer()
+  await capture('material-history-deepening')
+})
+
+/** Ensure a workflow run's details pane is open in the Actions tab. */
+async function openFirstRun(index = 0) {
+  await captureSection('Actions', null, 2500)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const detailsOpen = await evaluate(`(() =>
+      [...document.querySelectorAll('.actions-view h2, .actions-view h3')]
+        .some(h => /jobs|attempt/i.test(h.textContent ?? '')) ||
+      document.querySelector('[class*=run-details]') !== null
+    )()`)
+    if (detailsOpen) {
+      return
+    }
+    await evaluate(`(() => {
+      const rows = [...document.querySelectorAll('button.actions-run-select')]
+      const row = rows[${index}] ?? rows[0]
+      if (row instanceof HTMLElement) row.click()
+      return true
+    })()`)
+    await sleep(3000)
+  }
+}
+
+scene('actions-artifacts', async () => {
+  await openFirstRun()
+  await evaluate(`(() => {
+    const artifacts = [...document.querySelectorAll('h2, h3, h4')]
+      .find(h => /artifact/i.test(h.textContent ?? ''))
+    if (artifacts instanceof HTMLElement) artifacts.scrollIntoView({ block: 'start' })
+    return true
+  })()`)
+  await sleep(1200)
+  await parkPointer()
+  await capture('material-actions-artifacts')
+})
+
+scene('actions-artifact-download', async () => {
+  await openFirstRun()
+  await evaluate(`(() => {
+    const digest = [...document.querySelectorAll('*')]
+      .find(e => e.children.length === 0 && /sha256/i.test(e.textContent ?? ''))
+    if (digest instanceof HTMLElement) digest.scrollIntoView({ block: 'center' })
+    return true
+  })()`)
+  await sleep(1000)
+  await parkPointer()
+  await capture('material-actions-artifact-download')
+})
+
+scene('actions-artifact-page-two', async () => {
+  await openFirstRun()
+  for (let round = 0; round < 3; round++) {
+    const more = await clickText('Load more artifacts', { optional: true })
+    if (!more) {
+      break
+    }
+    await sleep(2200)
+  }
+  await evaluate(`(() => {
+    const sentinel = [...document.querySelectorAll('*')]
+      .find(e => e.children.length === 0 && /sentinel/i.test(e.textContent ?? ''))
+    if (sentinel instanceof HTMLElement) sentinel.scrollIntoView({ block: 'center' })
+    return true
+  })()`)
+  await sleep(900)
+  await parkPointer()
+  await capture('material-actions-artifact-page-two')
+  await capture('material-actions-artifacts-headless')
+})
+
+scene('actions-sentinel', async () => {
+  await captureSection('Actions', null, 2500)
+  for (let round = 0; round < 4; round++) {
+    const more = await clickText('Load more runs', { optional: true })
+    if (!more) {
+      break
+    }
+    await sleep(2500)
+  }
+  await evaluate(`(() => {
+    const column = document.querySelector('.actions-run-column')
+    if (column instanceof HTMLElement) column.scrollTop = column.scrollHeight
+    const main = document.querySelector('.actions-view')
+    if (main instanceof HTMLElement) main.scrollTop = main.scrollHeight
+    return true
+  })()`)
+  await sleep(900)
+  await parkPointer()
+  await capture('material-actions-sentinel-headless')
+})
+
+scene('actions-job-log', async () => {
+  await captureSection('Actions', null, 2500)
+  // Not every synthetic run serves logs; walk runs until the viewer has
+  // real content instead of the transfer error.
+  for (let index = 0; index < 4; index++) {
+    await evaluate(`(() => {
+      const rows = [...document.querySelectorAll('button.actions-run-select')]
+      const row = rows[${index}]
+      if (row instanceof HTMLElement) row.click()
+      return true
+    })()`)
+    await sleep(2500)
+    const openedLog =
+      (await clickText('View logs', { optional: true })) ||
+      (await clickAria('View logs', { optional: true }))
+    if (!openedLog) {
+      continue
+    }
+    await sleep(2500)
+    const failed = await evaluate(
+      `/could not transfer/i.test(document.body.textContent ?? '')`
+    )
+    if (!failed) {
+      break
+    }
+    await clickText('Close', { optional: true })
+    await sleep(700)
+  }
+  await parkPointer()
+  await capture('material-actions-job-log')
+  await closeAllDialogs()
+})
+
+scene('actions-cancel', async () => {
+  await captureSection('Actions', null, 2500)
+  for (let round = 0; round < 4; round++) {
+    const found = await evaluate(`(() => {
+      return [...document.querySelectorAll('.actions-view button')]
+        .some(b => /cancel/i.test(b.getAttribute('aria-label') ?? b.textContent ?? ''))
+    })()`)
+    if (found) {
+      break
+    }
+    const more = await clickText('Load more runs', { optional: true })
+    if (!more) {
+      break
+    }
+    await sleep(2500)
+  }
+  const requested = await evaluate(`(() => {
+    const cancel = [...document.querySelectorAll('.actions-view button')]
+      .find(b => /cancel/i.test(b.getAttribute('aria-label') ?? b.textContent ?? ''))
+    if (cancel instanceof HTMLElement) { cancel.click(); return true }
+    return false
+  })()`)
+  if (!requested) {
+    process.stdout.write('WARN no cancellable run found\n')
+    return
+  }
+  await sleep(1500)
+  await parkPointer()
+  await capture('material-actions-cancel')
+  ;(await clickText('Keep running', { optional: true })) ||
+    (await clickText('Go back', { optional: true })) ||
+    (await closeAllDialogs())
+})
+
+scene('actions-pending-deployments', async () => {
+  await captureSection('Actions', null, 2500)
+  await evaluate(`(() => {
+    const waiting = [...document.querySelectorAll('.actions-run-column .list-item, .actions-run-column li, .actions-run-column article')]
+      .find(r => /waiting|pending|review/i.test(r.textContent ?? ''))
+    if (waiting instanceof HTMLElement) { waiting.click(); return true }
+    return false
+  })()`)
+  await sleep(2500)
+  ;(await clickText('Review deployments', { optional: true })) ||
+    (await clickText('Review pending deployments', { optional: true }))
+  await sleep(1800)
+  await parkPointer()
+  await capture('material-actions-pending-deployments')
+  await closeAllDialogs()
+})
+
+// "Raw" scenes assume the Actions run details pane is already open and
+// capture its states without re-navigating (section re-entry can toggle
+// the selection away).
+scene('raw-artifacts', async () => {
+  await evaluate(`(() => {
+    const h = [...document.querySelectorAll('h2, h3')].find(x => /artifact/i.test(x.textContent ?? ''))
+    if (h instanceof HTMLElement) h.scrollIntoView({ block: 'start' })
+    return true
+  })()`)
+  await sleep(900)
+  await parkPointer()
+  await capture('material-actions-artifacts')
+})
+
+scene('raw-digest', async () => {
+  await evaluate(`(() => {
+    const digest = [...document.querySelectorAll('*')]
+      .find(e => e.children.length === 0 && /sha-?256/i.test(e.textContent ?? ''))
+    if (digest instanceof HTMLElement) digest.scrollIntoView({ block: 'center' })
+    return true
+  })()`)
+  await sleep(800)
+  await parkPointer()
+  await capture('material-actions-artifact-download')
+})
+
+scene('raw-artifact-pages', async () => {
+  for (let round = 0; round < 3; round++) {
+    const more = await clickText('Load more artifacts', { optional: true })
+    if (!more) {
+      break
+    }
+    await sleep(2200)
+  }
+  await evaluate(`(() => {
+    const sentinel = [...document.querySelectorAll('*')]
+      .find(e => e.children.length === 0 && /sentinel/i.test(e.textContent ?? ''))
+    if (sentinel instanceof HTMLElement) sentinel.scrollIntoView({ block: 'center' })
+    return true
+  })()`)
+  await sleep(800)
+  await parkPointer()
+  await capture('material-actions-artifact-page-two')
+  // The headless-evidence variant shows the same bounded inventory from the
+  // top of the artifacts list rather than the sentinel row.
+  await evaluate(`(() => {
+    const h = [...document.querySelectorAll('h2, h3')].find(x => /artifact/i.test(x.textContent ?? ''))
+    if (h instanceof HTMLElement) h.scrollIntoView({ block: 'start' })
+    return true
+  })()`)
+  await sleep(700)
+  await capture('material-actions-artifacts-headless')
+})
+
+scene('raw-job-log', async () => {
+  await clickText('View logs', { optional: true })
+  await sleep(2500)
+  await parkPointer()
+  await capture('material-actions-job-log')
+  await clickText('Close', { optional: true })
+  await sleep(600)
+})
+
+scene('raw-deployments', async () => {
+  ;(await clickText('Review deployments', { optional: true })) ||
+    (await clickText('Review pending deployments', { optional: true })) ||
+    (await evaluate(`(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /deployment/i.test(x.textContent ?? ''))
+      if (b instanceof HTMLElement) { b.click(); return true }
+      return false
+    })()`))
+  await sleep(1800)
+  await parkPointer()
+  await capture('material-actions-pending-deployments')
+  await closeAllDialogs()
+})
+
+scene('merge-all', async () => {
+  await ensureRepository()
+  await menuEvent('show-worktrees')
+  await sleep(1500)
+  await clickText('Merge all worktrees', { optional: true })
+  await sleep(2500)
+  await parkPointer()
+  await capture('material-branch-merge-all')
+  await closeAllDialogs()
+  await pressEscape(1)
 })
 
 async function main() {

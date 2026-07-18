@@ -316,9 +316,13 @@ class ProviderState:
             "run_attempt": INSPECTOR_LATEST_ATTEMPT if inspector else 1,
             "head_branch": branch,
             "head_sha": HEAD_SHA,
-            "status": "completed",
+            # The second fixture run stays in progress so cancellation review
+            # surfaces (run cancel button + confirmation) are capturable.
+            "status": "in_progress" if index == 1 else "completed",
             "conclusion": (
-                "neutral"
+                None
+                if index == 1
+                else "neutral"
                 if inspector and self.fork_approved
                 else "action_required"
                 if inspector
