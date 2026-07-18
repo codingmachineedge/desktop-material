@@ -44,7 +44,7 @@ describe('repository + branch side sheets v2 styles', () => {
     assert.match(branchesContainer, /export const SheetRowHeight = 42/)
     // The geometry comment stays accurate: 10px padding × 2 around a 22px line.
     assert.match(branchesContainer, /10 \+ 22 \+ 10 = 42/)
-    assert.match(branchesContainer, /rowHeight=\{SheetRowHeight\}/)
+    assert.match(branchesContainer, /rowHeight=\{this\.getSheetRowHeight\}/)
     assert.match(
       branchList,
       /rowHeight=\{this\.props\.rowHeight \?\? RowHeight\}/

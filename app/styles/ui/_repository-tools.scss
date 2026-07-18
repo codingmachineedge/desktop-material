@@ -725,12 +725,17 @@
 }
 
 // 300px sidebar: search field, category chips, and the scrollable tool list.
+// The rail keeps its 300px basis, but `flex-shrink` stays enabled so a pane
+// narrower than the rail squeezes it instead of pushing the detail column
+// through the card's `overflow: hidden` edge.
 .repository-tools-sidebar {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: 10px;
+  max-width: 100%;
   min-height: 0;
+  min-width: 0;
   padding: 4px 0 20px 24px;
   width: 300px;
 }
@@ -743,7 +748,9 @@
   display: flex;
   flex: none;
   gap: 8px;
-  height: 44px;
+  height: auto;
+  max-width: 100%;
+  min-height: 44px;
   padding: 0 14px;
   transition: background-color 220ms var(--emph);
 
@@ -792,8 +799,11 @@
   font: inherit;
   font-size: 12px;
   font-weight: 600;
-  height: 30px;
-  padding: 0 12px;
+  height: auto;
+  max-width: 100%;
+  min-height: 30px;
+  overflow-wrap: anywhere;
+  padding: 3px 12px;
   transition: background-color 220ms var(--emph), border-color 220ms var(--emph), color 220ms var(--emph);
 
   &:hover {
@@ -1030,9 +1040,11 @@
   font-family: var(--font-family-monospace);
   font-size: 11.5px;
   font-weight: 600;
-  height: 26px;
+  height: auto;
+  max-width: 100%;
+  min-height: 26px;
   overflow-wrap: anywhere;
-  padding: 0 10px;
+  padding: 3px 10px;
 }
 
 .repository-tool-write-button {
@@ -1387,7 +1399,7 @@
 .repository-commit-rewrite-row-controls {
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(190px, 1fr) auto auto;
+  grid-template-columns: minmax(min(100%, 190px), 1fr) auto auto;
 }
 
 .repository-commit-rewrite-confirmation,
@@ -1535,8 +1547,28 @@
     padding: 8px;
   }
 
+  // Release the card's height cap: below this height the flex-none header can
+  // consume the whole capped card, leaving the tool list and results a
+  // zero-height strip behind `overflow: hidden`. Letting the card grow to its
+  // content hands the scroll to the pane's outer scrollport
+  // (`.repository-tools` is `overflow-y: auto`), so everything stays
+  // reachable.
   .repository-tools-modal {
     border-radius: 16px;
+    height: auto;
+    max-height: none;
+  }
+
+  // With the card auto-height, size the interior flex regions to their
+  // content instead of asking them to split a height that no longer exists.
+  .repository-tools-layout {
+    flex: none;
+  }
+
+  // `auto` basis: the detail column still fills the row's width above the
+  // stacked breakpoint, but sizes to its content vertically once stacked.
+  .repository-tools-results-column {
+    flex: 1 1 auto;
   }
 
   .repository-tools-header {
@@ -1548,6 +1580,7 @@
   }
 
   .repository-tools-functions {
+    flex: none;
     max-height: 96px;
   }
 }

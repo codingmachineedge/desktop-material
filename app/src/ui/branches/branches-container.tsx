@@ -95,14 +95,7 @@ interface IBranchesContainerState {
   } | null
 }
 
-/**
- * Side-sheet branch row geometry, mirroring the `#foldout-container` rules in
- * `app/styles/ui/_branches.scss`: a 34px icon chip plus 2×10px block padding
- * per row (v2 prototype inset), and the uppercase group header with its block
- * padding. Keep in sync with the SCSS — a shorter virtualized slot makes rows
- * overlap.
- */
-const SheetRowHeight = 54
+/** Group headers use their own compact slot inside the virtualized sheet. */
 const SheetGroupHeaderRowHeight = 36
 
 /** The unified Branches and Pull Requests component. */
@@ -334,7 +327,6 @@ export class BranchesContainer extends React.Component<
         return (
           <BranchList
             repository={this.props.repository}
-            rowHeight={SheetRowHeight}
             defaultBranch={this.props.defaultBranch}
             currentBranch={this.props.currentBranch}
             allBranches={this.props.allBranches}

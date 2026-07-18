@@ -684,6 +684,28 @@ dialog {
       display: inline-block;
     }
   }
+
+  // SSH prompts can contain a full user/host identity or identity-file path.
+  // Keep those untrusted-length labels inside the compact dialog while the
+  // shared fieldset/content owners handle vertical scrolling.
+  &#ssh-user-password,
+  &#ssh-key-passphrase,
+  &#add-ssh-host {
+    width: min(520px, calc(100vw - var(--spacing-double)));
+
+    .dialog-content,
+    .row-component,
+    .password-text-box,
+    .text-box-component {
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    label,
+    p {
+      overflow-wrap: anywhere;
+    }
+  }
 }
 
 .warning-helper-text {
