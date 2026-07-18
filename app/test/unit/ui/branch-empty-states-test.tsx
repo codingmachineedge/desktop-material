@@ -119,16 +119,16 @@ describe('branch empty states', () => {
       />
     )
 
-    assert.ok(screen.getByText("You're all set!"))
+    assert.ok(screen.getByText('No open pull requests'))
     assert.ok(screen.getByText('No open pull requests in'))
     assert.ok(screen.getByText('desktop'))
     assert.notEqual(
-      view.container.querySelector('.no-pull-requests .blankslate-image'),
+      view.container.querySelector('.no-pull-requests .no-pull-requests-icon'),
       null
     )
 
     const createBranchButton = screen.getByRole('button', {
-      name: 'create a new branch',
+      name: 'Create new branch',
     })
 
     fireEvent.click(createBranchButton)
@@ -147,7 +147,7 @@ describe('branch empty states', () => {
     )
 
     const createPullRequestButton = screen.getByRole('button', {
-      name: 'create a pull request',
+      name: 'Create pull request',
     })
 
     fireEvent.click(createPullRequestButton)

@@ -93,17 +93,17 @@ describe('sheet and pill geometry contracts', () => {
     const style = read('app', 'styles', 'ui', '_branches.scss')
 
     // Dialog consumers keep the default 30px; the sheet passes its own
-    // geometry: 34px chip + 2×10px padding (v2 prototype inset).
+    // geometry: a 22px content line + 2×10px padding (v2 prototype inset).
     assert.match(branchList, /const RowHeight = 30/)
     assert.match(
       branchList,
       /rowHeight=\{this\.props\.rowHeight \?\? RowHeight\}/
     )
-    assert.match(container, /const SheetRowHeight = 54/)
+    assert.match(container, /const SheetRowHeight = 42/)
     assert.match(container, /rowHeight=\{this\.getSheetRowHeight\}/)
     assert.match(
       style,
-      /#foldout-container[\s\S]*?\.branches-list-item \{[\s\S]*?padding: 10px 12px;[\s\S]*?height: 34px;/
+      /#foldout-container[\s\S]*?\.branches-list-item \{[\s\S]*?padding: 10px 12px;[\s\S]*?\.icon \{[\s\S]*?width: 19px;[\s\S]*?height: 19px;/
     )
   })
 })

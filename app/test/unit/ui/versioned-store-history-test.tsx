@@ -149,7 +149,7 @@ describe('versioned store history', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     await waitFor(() => assert.equal(historyCalls, 2))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Undo last' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     await waitFor(() => {
       assert.equal(historyCalls, 3)
       assert.equal(screen.getAllByText('Undo snapshot').length, 2)
