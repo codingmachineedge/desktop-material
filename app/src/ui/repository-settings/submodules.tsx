@@ -9,6 +9,11 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { PopupType } from '../../models/popup'
+import { TextBox } from '../lib/text-box'
+import {
+  SubmoduleStatusFilter,
+  filterSubmodules,
+} from '../../lib/submodules/submodule-filter'
 
 interface ISubmodulesProps {
   readonly repository: Repository
@@ -33,7 +38,24 @@ interface ISubmodulesState {
 
   /** The most recent operation error, surfaced inline. */
   readonly error: string | null
+
+  /** Free-text query narrowing the list by name, path, or URL. */
+  readonly filterText: string
+
+  /** Status scope narrowing the list. */
+  readonly statusFilter: SubmoduleStatusFilter
 }
+
+const StatusFilterLabels: ReadonlyArray<{
+  readonly key: SubmoduleStatusFilter
+  readonly label: string
+}> = [
+  { key: 'all', label: 'All' },
+  { key: 'cloned', label: 'Cloned' },
+  { key: 'uncloned', label: 'Not cloned' },
+  { key: 'out-of-date', label: 'Out of date' },
+  { key: 'conflicted', label: 'Conflicted' },
+]
 
 /** The user-facing label for each submodule status kind. */
 const STATUS_LABEL: Record<SubmoduleStatusKind, string> = {
@@ -66,6 +88,20 @@ export class Submodules extends React.Component<
       isBusyGlobal: false,
       progress: null,
       error: null,
+      filterText: '',
+      statusFilter: 'all',
+    }
+  }
+
+  private onFilterTextChanged = (filterText: string) => {
+    this.setState({ filterText })
+  }
+
+  private onStatusChipClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const key = event.currentTarget.dataset.statusFilter
+    const entry = StatusFilterLabels.find(value => value.key === key)
+    if (entry !== undefined) {
+      this.setState({ statusFilter: entry.key })
     }
   }
 
@@ -232,8 +268,49 @@ export class Submodules extends React.Component<
     )
   }
 
+  private renderFilterControls(): JSX.Element | null {
+    const { submodules } = this.state
+    if (submodules === null || submodules.length === 0) {
+      return null
+    }
+
+    return (
+      <div className="submodules-filter-row">
+        <TextBox
+          className="submodules-filter-text"
+          placeholder="Search submodules by name, path, or URL"
+          ariaLabel="Search submodules"
+          value={this.state.filterText}
+          onValueChanged={this.onFilterTextChanged}
+        />
+        <div
+          className="submodules-filter-chips"
+          role="group"
+          aria-label="Filter submodules by status"
+        >
+          {StatusFilterLabels.map(({ key, label }) => (
+            <button
+              type="button"
+              key={key}
+              data-status-filter={key}
+              className={
+                this.state.statusFilter === key
+                  ? 'submodules-filter-chip selected'
+                  : 'submodules-filter-chip'
+              }
+              aria-pressed={this.state.statusFilter === key}
+              onClick={this.onStatusChipClick}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   private renderList(): JSX.Element {
-    const { submodules, isLoading } = this.state
+    const { submodules, isLoading, filterText, statusFilter } = this.state
 
     if (isLoading && submodules === null) {
       return (
@@ -251,10 +328,18 @@ export class Submodules extends React.Component<
       )
     }
 
+    const visible = filterSubmodules(submodules, filterText, statusFilter)
+
+    if (visible.length === 0) {
+      return (
+        <p className="submodules-empty">
+          No submodules match the current search and status filter.
+        </p>
+      )
+    }
+
     return (
-      <ul className="submodule-list">
-        {submodules.map(s => this.renderRow(s))}
-      </ul>
+      <ul className="submodule-list">{visible.map(s => this.renderRow(s))}</ul>
     )
   }
 
@@ -295,6 +380,7 @@ export class Submodules extends React.Component<
               </div>
             </div>
             {this.renderSummary()}
+            {this.renderFilterControls()}
             {this.state.error !== null && (
               <p className="submodules-error">{this.state.error}</p>
             )}

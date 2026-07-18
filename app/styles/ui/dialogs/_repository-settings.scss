@@ -877,6 +877,49 @@
       color: var(--md-sys-color-on-tertiary-container);
     }
 
+    // --- Search + status filter -------------------------------------------
+    .submodules-filter-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .submodules-filter-text {
+        max-width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .submodules-filter-chips {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .submodules-filter-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 11.5px;
+      font-weight: var(--font-weight-semibold);
+      cursor: pointer;
+
+      &.selected {
+        background: var(--md-sys-color-secondary-container);
+        border-color: var(--md-sys-color-secondary-container);
+        color: var(--md-sys-color-on-secondary-container);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--md-sys-color-primary);
+        outline-offset: 1px;
+      }
+    }
+
     // --- Submodule list ---------------------------------------------------
     .submodule-list {
       list-style: none;

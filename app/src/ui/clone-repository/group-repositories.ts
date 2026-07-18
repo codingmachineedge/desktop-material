@@ -1,4 +1,24 @@
 import { IAPIRepository } from '../../lib/api'
+
+/** The clone-list visibility scopes a repository list can be narrowed to. */
+export type RepositoryVisibilityFilter = 'all' | 'public' | 'private' | 'forked'
+
+/** Narrow a repository list to one visibility scope. */
+export function filterRepositoriesByVisibility(
+  repositories: ReadonlyArray<IAPIRepository>,
+  filter: RepositoryVisibilityFilter
+): ReadonlyArray<IAPIRepository> {
+  switch (filter) {
+    case 'all':
+      return repositories
+    case 'public':
+      return repositories.filter(r => !r.private)
+    case 'private':
+      return repositories.filter(r => r.private)
+    case 'forked':
+      return repositories.filter(r => r.fork)
+  }
+}
 import { IFilterListGroup, IFilterListItem } from '../lib/filter-list'
 import { OcticonSymbol } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
