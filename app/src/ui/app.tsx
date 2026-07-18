@@ -100,6 +100,7 @@ import { UpdateAvailable, renderBanner } from './banners'
 import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
+import { LogHistoryDialog } from './log-history/log-history-dialog'
 import { FileHistory } from './file-history'
 import { SparseCheckoutManager } from './sparse-checkout'
 import { BranchRulesInspector } from './branch-rules'
@@ -645,6 +646,10 @@ export class App extends React.Component<IAppProps, IAppState> {
       case 'show-settings-history':
         return this.props.dispatcher.showPopup({
           type: PopupType.SettingsHistory,
+        })
+      case 'view-log-history':
+        return this.props.dispatcher.showPopup({
+          type: PopupType.LogHistory,
         })
       case 'open-working-directory':
         return this.openCurrentRepositoryWorkingDirectory()
@@ -2217,6 +2222,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             uncommittedChangesStrategy={this.state.uncommittedChangesStrategy}
             selectedExternalEditor={this.state.selectedExternalEditor}
             useWindowsOpenSSH={this.state.useWindowsOpenSSH}
+            verboseLogging={this.state.verboseLogging}
             showCommitLengthWarning={this.state.showCommitLengthWarning}
             notificationsEnabled={this.state.notificationsEnabled}
             errorPresentationStyle={this.state.errorPresentationStyle}
@@ -2264,6 +2270,14 @@ export class App extends React.Component<IAppProps, IAppState> {
         return (
           <NotificationHistoryDialog
             key="notification-history"
+            dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.LogHistory:
+        return (
+          <LogHistoryDialog
+            key="log-history"
             dispatcher={this.props.dispatcher}
             onDismissed={onPopupDismissedFn}
           />

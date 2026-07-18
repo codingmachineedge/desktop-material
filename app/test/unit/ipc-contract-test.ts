@@ -45,6 +45,7 @@ describe('IPC channel contract', () => {
     'unsafe-open-directory',
     'menu-event',
     'log',
+    'set-verbose-logging',
     'will-quit',
     'will-quit-even-if-updating',
     'cancel-quitting',

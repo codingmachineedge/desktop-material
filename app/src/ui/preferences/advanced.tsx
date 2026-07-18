@@ -8,10 +8,12 @@ import { isWindowsOpenSSHAvailable } from '../../lib/ssh/ssh'
 
 interface IAdvancedPreferencesProps {
   readonly useWindowsOpenSSH: boolean
+  readonly verboseLogging: boolean
   readonly optOutOfUsageTracking: boolean
   readonly useExternalCredentialHelper: boolean
   readonly repositoryIndicatorsEnabled: boolean
   readonly onUseWindowsOpenSSHChanged: (checked: boolean) => void
+  readonly onVerboseLoggingChanged: (checked: boolean) => void
   readonly onOptOutofReportingChanged: (checked: boolean) => void
   readonly onUseExternalCredentialHelperChanged: (checked: boolean) => void
   readonly onRepositoryIndicatorsEnabledChanged: (enabled: boolean) => void
@@ -75,6 +77,12 @@ export class Advanced extends React.Component<
     this.props.onUseWindowsOpenSSHChanged(event.currentTarget.checked)
   }
 
+  private onVerboseLoggingChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onVerboseLoggingChanged(event.currentTarget.checked)
+  }
+
   private reportDesktopUsageLabel() {
     return (
       <span>
@@ -126,6 +134,26 @@ export class Advanced extends React.Component<
             />
           </div>
         )}
+        <div className="advanced-section">
+          <h2>Logging</h2>
+          <Checkbox
+            label="Verbose logging (debug level)"
+            value={
+              this.props.verboseLogging ? CheckboxValue.On : CheckboxValue.Off
+            }
+            onChange={this.onVerboseLoggingChanged}
+            ariaDescribedBy="verbose-logging-description"
+          />
+          <div
+            id="verbose-logging-description"
+            className="settings-description"
+          >
+            <p>
+              Write debug-level messages to the log files and the log history.
+              Turn this on when collecting diagnostics for an issue.
+            </p>
+          </div>
+        </div>
         <h2>Network and credentials</h2>
         {this.renderSSHSettings()}
         <div className="advanced-section">

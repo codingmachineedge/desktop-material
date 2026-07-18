@@ -97,6 +97,7 @@ interface IPreferencesProps {
   readonly repository: Repository | null
   readonly onDismissed: () => void
   readonly useWindowsOpenSSH: boolean
+  readonly verboseLogging: boolean
   readonly showCommitLengthWarning: boolean
   readonly notificationsEnabled: boolean
   readonly errorPresentationStyle: ErrorPresentationStyle
@@ -151,6 +152,7 @@ interface IPreferencesState {
   readonly initialDefaultBranch: string | null
   readonly disallowedCharactersMessage: string | null
   readonly useWindowsOpenSSH: boolean
+  readonly verboseLogging: boolean
   readonly showCommitLengthWarning: boolean
   readonly notificationsEnabled: boolean
   readonly errorPresentationStyle: ErrorPresentationStyle
@@ -261,6 +263,7 @@ export class Preferences extends React.Component<
       branchPresetScript:
         this.props.branchPresetScript ?? DefaultCustomIntegration,
       useWindowsOpenSSH: false,
+      verboseLogging: false,
       showCommitLengthWarning: false,
       notificationsEnabled: true,
       errorPresentationStyle: this.props.errorPresentationStyle,
@@ -354,6 +357,7 @@ export class Preferences extends React.Component<
       initialCommitterEmail,
       initialDefaultBranch,
       useWindowsOpenSSH: this.props.useWindowsOpenSSH,
+      verboseLogging: this.props.verboseLogging,
       showCommitLengthWarning: this.props.showCommitLengthWarning,
       notificationsEnabled: this.props.notificationsEnabled,
       errorPresentationStyle: this.props.errorPresentationStyle,
@@ -827,10 +831,12 @@ export class Preferences extends React.Component<
         View = (
           <Advanced
             useWindowsOpenSSH={this.state.useWindowsOpenSSH}
+            verboseLogging={this.state.verboseLogging}
             optOutOfUsageTracking={this.state.optOutOfUsageTracking}
             useExternalCredentialHelper={this.state.useExternalCredentialHelper}
             repositoryIndicatorsEnabled={this.state.repositoryIndicatorsEnabled}
             onUseWindowsOpenSSHChanged={this.onUseWindowsOpenSSHChanged}
+            onVerboseLoggingChanged={this.onVerboseLoggingChanged}
             onOptOutofReportingChanged={this.onOptOutofReportingChanged}
             onUseExternalCredentialHelperChanged={
               this.onUseExternalCredentialHelperChanged
@@ -901,6 +907,10 @@ export class Preferences extends React.Component<
 
   private onUseWindowsOpenSSHChanged = (useWindowsOpenSSH: boolean) => {
     this.setState({ useWindowsOpenSSH })
+  }
+
+  private onVerboseLoggingChanged = (verboseLogging: boolean) => {
+    this.setState({ verboseLogging })
   }
 
   private onShowCommitLengthWarningChanged = (
@@ -1241,6 +1251,7 @@ export class Preferences extends React.Component<
     }
 
     dispatcher.setUseWindowsOpenSSH(this.state.useWindowsOpenSSH)
+    dispatcher.setVerboseLogging(this.state.verboseLogging)
     dispatcher.setShowCommitLengthWarning(this.state.showCommitLengthWarning)
     dispatcher.setNotificationsEnabled(this.state.notificationsEnabled)
     dispatcher.setErrorPresentationStyle(this.state.errorPresentationStyle)

@@ -7,6 +7,21 @@ import memoizeOne from 'memoize-one'
 import { mkdir } from 'fs/promises'
 import { DesktopFileTransport } from './desktop-file-transport'
 
+let fileTransport: DesktopFileTransport | null = null
+let fileTransportLevel: LogLevel = 'info'
+
+/**
+ * Change the file transport's level at runtime (used by the verbose logging
+ * preference). Applies immediately once winston has been initialized and is
+ * otherwise picked up during initialization.
+ */
+export function setLogLevel(level: LogLevel) {
+  fileTransportLevel = level
+  if (fileTransport !== null) {
+    fileTransport.level = level
+  }
+}
+
 /**
  * Initializes winston and returns a subset of the available log level
  * methods (debug, info, error). This method should only be called once
@@ -19,11 +34,12 @@ function initializeWinston(path: string): winston.LogMethod {
 
   const fileLogger = new DesktopFileTransport({
     logDirectory: path,
-    level: 'info',
+    level: fileTransportLevel,
     format: winston.format.printf(
       ({ level, message }) => `${timestamp()} - ${level}: ${message}`
     ),
   })
+  fileTransport = fileLogger
 
   // The file transport shouldn't emit anything but just in case it does we want
   // a listener or else it'll bubble to an unhandled exception.

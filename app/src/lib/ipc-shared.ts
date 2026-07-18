@@ -108,6 +108,7 @@ export type RequestChannels = {
   'unsafe-open-directory': (path: string) => void
   'menu-event': (name: MenuEvent) => void
   log: (level: LogLevel, message: string) => void
+  'set-verbose-logging': (verbose: boolean) => void
   'will-quit': () => void
   'will-quit-even-if-updating': () => void
   'cancel-quitting': () => void

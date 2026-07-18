@@ -78,6 +78,9 @@ export const updateMenuState = sendProxy('update-menu-state', 1)
 /** Tell the main process that the renderer is ready. */
 export const sendReady = sendProxy('renderer-ready', 1)
 
+/** Tell the main process whether verbose (debug) file logging is enabled. */
+export const sendVerboseLoggingEnabled = sendProxy('set-verbose-logging', 1)
+
 /** Tell the main process to execute (i.e. simulate a click of) the menu item. */
 export const executeMenuItem = (item: ExecutableMenuItem) =>
   executeMenuItemById(item.id)

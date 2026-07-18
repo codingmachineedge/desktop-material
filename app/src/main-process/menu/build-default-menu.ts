@@ -652,12 +652,18 @@ export function buildDefaultMenuTemplate({
     },
   }
 
+  const viewLogHistoryItem: Electron.MenuItemConstructorOptions = {
+    label: __DARWIN__ ? 'View Log History' : '&View log history',
+    click: emit('view-log-history'),
+  }
+
   const helpItems = [
     submitIssueItem,
     contactSupportItem,
     showUserGuides,
     showKeyboardShortcuts,
     showLogsItem,
+    viewLogHistoryItem,
   ]
 
   helpItems.push(...buildTestMenu())

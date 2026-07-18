@@ -22,6 +22,7 @@ export type MenuEvent =
   | 'stash-all-changes'
   | 'show-preferences'
   | 'show-settings-history'
+  | 'view-log-history'
   | 'choose-repository'
   | 'open-working-directory'
   | 'update-branch-with-contribution-target-branch'

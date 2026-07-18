@@ -296,6 +296,9 @@ export interface IAppState {
   /** Whether or not the app should use Windows' OpenSSH client */
   readonly useWindowsOpenSSH: boolean
 
+  /** Whether debug-level lines reach the log file and the log history */
+  readonly verboseLogging: boolean
+
   /** Whether or not the app should show the commit length warning */
   readonly showCommitLengthWarning: boolean
 

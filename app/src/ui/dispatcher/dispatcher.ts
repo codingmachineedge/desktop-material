@@ -532,6 +532,39 @@ export class Dispatcher {
     return this.appStore.restoreNotificationsTo(sha)
   }
 
+  /** Load a newest-first page of log-history commits. */
+  public getLogHistory(
+    skip?: number,
+    limit?: number
+  ): Promise<IProfileHistoryPage> {
+    return this.appStore.getLogHistory(skip, limit)
+  }
+
+  /** Load the paths changed by a log-history commit. */
+  public getLogHistoryFiles(sha: string): Promise<ReadonlyArray<string>> {
+    return this.appStore.getLogHistoryFiles(sha)
+  }
+
+  /** Load a unified log-history diff, optionally narrowed to a file. */
+  public getLogHistoryDiff(sha: string, file?: string): Promise<string> {
+    return this.appStore.getLogHistoryDiff(sha, file)
+  }
+
+  /** Undo the latest log change (appends a linked revert commit). */
+  public undoLastLogChange(): Promise<void> {
+    return this.appStore.undoLastLogChange()
+  }
+
+  /** Redo the latest log undo (appends a linked revert commit). */
+  public redoLastLogChange(): Promise<void> {
+    return this.appStore.redoLastLogChange()
+  }
+
+  /** Restore the log file to a prior commit. */
+  public restoreLogsTo(sha: string): Promise<void> {
+    return this.appStore.restoreLogsTo(sha)
+  }
+
   private async reloadProfileBackedState(): Promise<void> {
     await this.appStore._reloadProfileBackedSettings()
     let namedFunctionError: Error | null = null
@@ -4371,6 +4404,10 @@ export class Dispatcher {
 
   public setUseWindowsOpenSSH(useWindowsOpenSSH: boolean) {
     this.appStore._setUseWindowsOpenSSH(useWindowsOpenSSH)
+  }
+
+  public setVerboseLogging(verboseLogging: boolean) {
+    this.appStore._setVerboseLogging(verboseLogging)
   }
 
   public setShowCommitLengthWarning(showCommitLengthWarning: boolean) {

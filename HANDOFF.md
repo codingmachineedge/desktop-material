@@ -69,6 +69,28 @@ both themes) instead of borrowing the pull tone, so the pill signals that a
 push will follow the offered pull. The post-shell style contract covers the
 new state alongside the original five.
 
+## 2026-07-18 In-app log viewer, verbose logging, Git-backed log history
+
+Logging is now a first-class, inspectable surface:
+
+- A renderer `LogStore` (modeled on the notification-centre store) tees
+  every logged line into a Git-backed repository at
+  `<userData>/log-history/` tracking `app.log` (working file capped at the
+  last 5000 lines; full history stays in Git), with debounced
+  "Capture log activity" commits, undo/redo/restore, and the shared
+  history surface.
+- A dependency-free log sink hook in the renderer logging shim forwards
+  every formatted line; debug lines flow only when verbose logging is on.
+- New **Verbose logging (debug level)** checkbox in Advanced preferences,
+  persisted and plumbed over a new `set-verbose-logging` IPC channel so
+  the main process raises the previously hardcoded winston file-transport
+  level from `info` to `debug` at runtime.
+- New non-modal **Log history** dialog (`PopupType.LogHistory`) — a thin
+  wrapper over the shared `VersionedStoreHistory` panel, so timeline,
+  diffs, undo/redo/restore, and the FilterModeControl search (with the
+  regex builder) come standard. Reachable from Help → View Log History
+  and the command palette ("View log history").
+
 ## 2026-07-18 Regex builder on every filter bar
 
 Every persistent search/filter surface in the app now carries the shared

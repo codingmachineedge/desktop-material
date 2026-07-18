@@ -24,7 +24,7 @@ import {
 } from './squirrel-updater'
 import { fatalError } from '../lib/fatal-error'
 
-import { log as writeLog } from './log'
+import { log as writeLog, setLogLevel } from './log'
 import { UNSAFE_openDirectory } from './shell'
 import { reportError } from './exception-reporting'
 import {
@@ -1015,6 +1015,10 @@ app.on('ready', () => {
   })
 
   ipcMain.on('log', (_, level, message) => writeLog(level, message))
+
+  ipcMain.on('set-verbose-logging', (_, verbose) =>
+    setLogLevel(verbose ? 'debug' : 'info')
+  )
 
   ipcMain.on('uncaught-exception', (_, error) => handleUncaughtException(error))
 

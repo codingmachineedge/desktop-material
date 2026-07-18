@@ -20,6 +20,11 @@ describe('hasModalPopup', () => {
     assert.equal(hasModalPopup([pullAll]), false)
   })
 
+  it('keeps the log history manager non-modal while work continues', () => {
+    const logHistory: Popup = { type: PopupType.LogHistory }
+    assert.equal(hasModalPopup([logHistory]), false)
+  })
+
   it('keeps sparse checkout non-modal while repository work continues', () => {
     const sparseCheckout: Popup = {
       type: PopupType.SparseCheckout,

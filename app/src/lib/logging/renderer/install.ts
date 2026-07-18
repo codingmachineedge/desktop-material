@@ -1,5 +1,6 @@
 import { LogLevel } from '../log-level'
 import { formatLogMessage } from '../format-log-message'
+import { forwardToLogSink } from './log-sink'
 import { sendProxy } from '../../../ui/main-process-proxy'
 
 const g = global as any
@@ -8,10 +9,13 @@ const ipcLog = sendProxy('log', 2)
 /**
  * Dispatches the given log entry to the main process where it will be picked
  * written to all log transports. See initializeWinston in logger.ts for more
- * details about what transports we set up.
+ * details about what transports we set up. The formatted line is also teed to
+ * the registered log sink (the Git-backed log history store).
  */
 function log(level: LogLevel, message: string, error?: Error) {
-  ipcLog(level, formatLogMessage(`[${__PROCESS_KIND__}] ${message}`, error))
+  const formatted = formatLogMessage(`[${__PROCESS_KIND__}] ${message}`, error)
+  ipcLog(level, formatted)
+  forwardToLogSink(level, formatted)
 }
 
 g.log = {

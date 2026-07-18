@@ -40,6 +40,7 @@ export enum PopupType {
   Preferences = 'Preferences',
   SettingsHistory = 'SettingsHistory',
   NotificationHistory = 'NotificationHistory',
+  LogHistory = 'LogHistory',
   FileHistory = 'FileHistory',
   CreateGitHubIssue = 'CreateGitHubIssue',
   CreateGitHubPullRequest = 'CreateGitHubPullRequest',
@@ -185,6 +186,7 @@ export type PopupDetail =
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
   | { type: PopupType.SettingsHistory }
   | { type: PopupType.NotificationHistory }
+  | { type: PopupType.LogHistory }
   | { type: PopupType.FileHistory; repository: Repository; path: string }
   | { type: PopupType.CreateGitHubIssue; repository: Repository }
   | {
@@ -671,6 +673,7 @@ export type Popup = IBasePopup & PopupDetail
 const nonModalHistoryPopupTypes = new Set<PopupType>([
   PopupType.SettingsHistory,
   PopupType.NotificationHistory,
+  PopupType.LogHistory,
   PopupType.FileHistory,
   PopupType.BranchRules,
   PopupType.SparseCheckout,

@@ -1,4 +1,5 @@
 import '../lib/logging/renderer/install'
+import { registerLogSink } from '../lib/logging/renderer/log-sink'
 
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
@@ -39,6 +40,7 @@ import {
   RepositoryTabsStore,
   BuildRunStore,
   NotificationCentreStore,
+  LogStore,
   ActionsStore,
   GitHubReleasesStore,
   GitHubIssuesStore,
@@ -363,6 +365,11 @@ const notificationsDebugStore = new NotificationsDebugStore(
 
 const notificationCentreStore = new NotificationCentreStore()
 
+const logStore = new LogStore()
+registerLogSink((level, message) => {
+  void logStore.append(level, message).catch(() => undefined)
+})
+
 const appStore = new AppStore(
   gitHubUserStore,
   cloningRepositoriesStore,
@@ -376,7 +383,8 @@ const appStore = new AppStore(
   apiRepositoriesStore,
   notificationsStore,
   copilotStore,
-  notificationCentreStore
+  notificationCentreStore,
+  logStore
 )
 
 let lastEnsuredRepositoryId: number | null = null
@@ -428,6 +436,11 @@ void notificationCentreStoreInitialization.catch(err =>
   log.error('Failed to initialize notification centre', err)
 )
 
+const logStoreInitialization = logStore.initialize()
+void logStoreInitialization.catch(err =>
+  log.error('Failed to initialize log store', err)
+)
+
 configureRendererShutdown([
   {
     name: 'profile settings',
@@ -441,6 +454,13 @@ configureRendererShutdown([
     run: async () => {
       await notificationCentreStoreInitialization
       await notificationCentreStore.flush()
+    },
+  },
+  {
+    name: 'log history',
+    run: async () => {
+      await logStoreInitialization
+      await logStore.flush()
     },
   },
   {

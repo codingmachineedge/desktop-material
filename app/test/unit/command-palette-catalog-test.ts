@@ -27,6 +27,7 @@ describe('command palette catalog', () => {
       'create-worktree',
       'show-preferences',
       'show-repository-tools',
+      'view-log-history',
       'palette:find-in-view',
     ]) {
       assert.ok(events.has(required), required)

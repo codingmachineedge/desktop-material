@@ -137,6 +137,7 @@ import {
   sendWillQuitEvenIfUpdatingSync,
   quitApp,
   sendCancelQuittingSync,
+  sendVerboseLoggingEnabled,
   showOpenDialog,
 } from '../../ui/main-process-proxy'
 import {
@@ -483,6 +484,8 @@ import {
   getNotificationsEnabled,
 } from './notifications-store'
 import { NotificationCentreStore } from './notification-centre-store'
+import { LogStore } from './log-store'
+import { setLogSinkVerbose } from '../logging/renderer/log-sink'
 import {
   INotificationEntry,
   INotificationInput,
@@ -658,6 +661,7 @@ const showRecentRepositoriesKey = 'show-recent-repositories'
 const showBranchNameInRepoListKey = 'show-branch-name-in-repo-list'
 const repositoryIndicatorsEnabledKey = 'enable-repository-indicators'
 const branchSortOrderKey = 'branch-sort-order'
+const verboseLoggingKey = 'verboseLogging'
 
 // background fetching should occur hourly when Desktop is active, but this
 // lower interval ensures user interactions like switching repositories and
@@ -847,6 +851,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   private useWindowsOpenSSH: boolean = false
 
+  /** Whether debug-level lines reach the log file and the log history. */
+  private verboseLogging: boolean = false
+
   private showCommitLengthWarning: boolean = showCommitLengthWarningDefault
 
   private hasUserViewedStash = false
@@ -929,7 +936,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     private readonly apiRepositoriesStore: ApiRepositoriesStore,
     private readonly notificationsStore: NotificationsStore,
     private readonly copilotStore: CopilotStore,
-    private readonly notificationCentreStore: NotificationCentreStore
+    private readonly notificationCentreStore: NotificationCentreStore,
+    private readonly logStore: LogStore
   ) {
     super()
 
@@ -963,6 +971,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         this.useWindowsOpenSSH = useWindowsOpenSSH
       }
     }
+
+    this.verboseLogging = getBoolean(verboseLoggingKey, false)
+    this.applyVerboseLogging()
 
     this.gitStoreCache = new GitStoreCache(
       shell,
@@ -1627,6 +1638,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       showBranchNameInRepoList: this.showBranchNameInRepoList,
       apiRepositories: this.apiRepositoriesStore.getState(),
       useWindowsOpenSSH: this.useWindowsOpenSSH,
+      verboseLogging: this.verboseLogging,
       showCommitLengthWarning: this.showCommitLengthWarning,
       optOutOfUsageTracking: this.statsStore.getOptOut(),
       currentOnboardingTutorialStep: this.currentOnboardingTutorialStep,
@@ -4984,6 +4996,20 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.emitUpdate()
   }
 
+  public _setVerboseLogging(verboseLogging: boolean) {
+    setBoolean(verboseLoggingKey, verboseLogging)
+    this.verboseLogging = verboseLogging
+    this.applyVerboseLogging()
+
+    this.emitUpdate()
+  }
+
+  /** Sync the shim tee and the main-process file transport with the setting. */
+  private applyVerboseLogging() {
+    setLogSinkVerbose(this.verboseLogging)
+    sendVerboseLoggingEnabled(this.verboseLogging)
+  }
+
   public _setShowCommitLengthWarning(showCommitLengthWarning: boolean) {
     setBoolean(showCommitLengthWarningKey, showCommitLengthWarning)
     this.showCommitLengthWarning = showCommitLengthWarning
@@ -6431,6 +6457,39 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Restore the notification log to a prior commit and re-read from disk. */
   public restoreNotificationsTo(sha: string): Promise<void> {
     return this.notificationCentreStore.restoreTo(sha)
+  }
+
+  /** Load a page of log-history commits. */
+  public getLogHistory(
+    skip?: number,
+    limit?: number
+  ): Promise<IProfileHistoryPage> {
+    return this.logStore.getHistory(skip, limit)
+  }
+
+  /** Load the paths changed by a log-history commit. */
+  public getLogHistoryFiles(sha: string): Promise<ReadonlyArray<string>> {
+    return this.logStore.getHistoryFiles(sha)
+  }
+
+  /** Load a unified log-history diff, optionally narrowed to a file. */
+  public getLogHistoryDiff(sha: string, file?: string): Promise<string> {
+    return this.logStore.getHistoryDiff(sha, file)
+  }
+
+  /** Undo the latest log change and re-read the log from disk. */
+  public undoLastLogChange(): Promise<void> {
+    return this.logStore.undoLastChange()
+  }
+
+  /** Redo the latest log undo and re-read the log from disk. */
+  public redoLastLogChange(): Promise<void> {
+    return this.logStore.redoLastChange()
+  }
+
+  /** Restore the log file to a prior commit and re-read from disk. */
+  public restoreLogsTo(sha: string): Promise<void> {
+    return this.logStore.restoreTo(sha)
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */

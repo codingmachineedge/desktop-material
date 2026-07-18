@@ -222,6 +222,12 @@ export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
     keywords: 'versioned appearance',
   },
   {
+    event: 'view-log-history',
+    title: 'View log history',
+    group: 'App',
+    keywords: 'logs debug verbose diagnostics',
+  },
+  {
     event: 'export-repository-list',
     title: 'Export the repository list',
     group: 'App',
