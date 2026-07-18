@@ -1136,9 +1136,18 @@ h1.hero-title {
   margin-bottom: 24px;
 }
 
-.install-command {
-  max-width: 100%;
+.install-command-shell {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
   margin: 0 0 18px;
+}
+
+.install-command {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
   padding: 20px 22px;
   overflow-x: auto;
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -1146,6 +1155,75 @@ h1.hero-title {
   background: var(--md-sys-color-surface-container-highest);
   color: var(--md-sys-color-on-surface);
   text-align: left;
+}
+
+.install-copy-button {
+  flex: none;
+  align-self: center;
+  transition:
+    background-color 200ms ease,
+    transform 200ms ease;
+}
+
+.install-copy-button.copied {
+  background: var(--md-sys-color-tertiary);
+  color: var(--md-sys-color-on-tertiary);
+  animation: copy-flash 700ms ease;
+}
+
+@keyframes copy-flash {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.12);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+}
+
+/* One celebratory pulse across every element when the command is copied. */
+@keyframes copy-celebrate-pulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-2px) scale(1.015);
+  }
+}
+
+body.copy-celebrate * {
+  animation-name: copy-celebrate-pulse;
+  animation-duration: 900ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+body.copy-celebrate *:nth-child(2n) {
+  animation-delay: 60ms;
+}
+
+body.copy-celebrate *:nth-child(3n) {
+  animation-delay: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.copy-celebrate * {
+    animation: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .install-command-shell {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .install-copy-button {
+    align-self: stretch;
+  }
 }
 
 .install-command code {

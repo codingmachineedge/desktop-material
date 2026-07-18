@@ -315,10 +315,23 @@
               signature, installs silently, and cleans up its temporary
               download.
             </p>
-            <pre
-              class="install-command"
-              aria-label="PowerShell install command"
-            ><code>Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression</code></pre>
+            <div class="install-command-shell">
+              <pre
+                class="install-command"
+                aria-label="PowerShell install command"
+              ><code id="install-command-text">Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression</code></pre>
+              <button
+                type="button"
+                class="btn btn-filled install-copy-button"
+                id="install-copy-button"
+                aria-label="Copy the install command to the clipboard"
+              >
+                <svg class="material-icon" aria-hidden="true">
+                  <use href="#icon-guide"></use>
+                </svg>
+                <span id="install-copy-label">Copy</span>
+              </button>
+            </div>
             <p class="install-note">
               Current automated builds are unsigned and x64 only. The script
               reports the unsigned status after digest verification and stops on
@@ -1982,6 +1995,52 @@
         </div>
       </div>
     </footer>
+
+    <!-- ================= Install command copy ================= -->
+    <script>
+      ;(function () {
+        var button = document.getElementById('install-copy-button')
+        var label = document.getElementById('install-copy-label')
+        var command = document.getElementById('install-command-text')
+        if (!button || !label || !command) return
+
+        var resetTimer = null
+        button.addEventListener('click', function () {
+          var text = command.textContent || ''
+          var copied = function () {
+            label.textContent = 'Copied!'
+            button.classList.add('copied')
+            var reduceMotion = window.matchMedia(
+              '(prefers-reduced-motion: reduce)'
+            ).matches
+            if (!reduceMotion) {
+              // One celebratory pulse across every element on the page.
+              document.body.classList.remove('copy-celebrate')
+              void document.body.offsetWidth
+              document.body.classList.add('copy-celebrate')
+            }
+            if (resetTimer) clearTimeout(resetTimer)
+            resetTimer = setTimeout(function () {
+              label.textContent = 'Copy'
+              button.classList.remove('copied')
+              document.body.classList.remove('copy-celebrate')
+            }, 1400)
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(copied, copied)
+          } else {
+            var range = document.createRange()
+            range.selectNodeContents(command)
+            var selection = window.getSelection()
+            selection.removeAllRanges()
+            selection.addRange(range)
+            document.execCommand('copy')
+            selection.removeAllRanges()
+            copied()
+          }
+        })
+      })()
+    </script>
 
     <!-- ================= Theme toggle ================= -->
     <script>
