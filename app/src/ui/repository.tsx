@@ -451,6 +451,12 @@ export class RepositoryView extends React.Component<
     }))
   }
 
+  /** Rail switcher selection actually switches the active identity. */
+  private onSwitchAccount = (account: Account) => {
+    this.props.dispatcher.promoteAccount(account)
+    this.onCloseAccountSwitcher()
+  }
+
   private onCloseAccountSwitcher = () => {
     this.setState({ isAccountSwitcherOpen: false })
     this.railAvatarButtonRef.current?.focus()
@@ -574,7 +580,7 @@ export class RepositoryView extends React.Component<
         selectedAccount={this.props.accounts[0] ?? null}
         anchorRef={this.railAvatarButtonRef}
         onClose={this.onCloseAccountSwitcher}
-        onSelectAccount={this.onShowAccounts}
+        onSelectAccount={this.onSwitchAccount}
         onAddAccount={this.onAddAccount}
       />
     )

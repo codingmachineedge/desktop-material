@@ -1989,6 +1989,11 @@ export class Dispatcher {
     return this.appStore._removeAccount(account)
   }
 
+  /** Make the given signed-in account the active identity. */
+  public promoteAccount(account: Account): Promise<void> {
+    return this.appStore._promoteAccount(account)
+  }
+
   /**
    * Ask the dispatcher to apply a transformation function to the current
    * state of the application menu.

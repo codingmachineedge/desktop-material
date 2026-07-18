@@ -39,6 +39,7 @@ describe('Accounts preferences', () => {
         onEnterpriseSignIn={() => {}}
         onProviderSignIn={async () => accounts[0]}
         onLogout={() => {}}
+        onMakeActive={() => {}}
       />
     )
 
@@ -88,6 +89,7 @@ describe('Accounts preferences', () => {
         onEnterpriseSignIn={() => {}}
         onProviderSignIn={async () => accounts[0]}
         onLogout={() => {}}
+        onMakeActive={() => {}}
       />
     )
 

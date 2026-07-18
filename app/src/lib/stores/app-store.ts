@@ -154,6 +154,10 @@ import {
   deleteToken,
   IAPICreatePushProtectionBypassResponse,
 } from '../api'
+import {
+  missingRequiredScopes,
+  parseGrantedScopes,
+} from '../oauth-scope-validation'
 import { findAccountForRemoteURL } from '../find-account'
 import { shell } from '../app-shell'
 import {
@@ -908,6 +912,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private readonly batchCloneStore: BatchCloneStore
   private batchCloneState: IBatchCloneState | null = null
   private readonly autoCloneStore: AutoCloneStore
+
+  /** Accounts already audited for missing OAuth scopes this session. */
+  private readonly scopeAuditedAccounts = new Set<string>()
 
   public constructor(
     private readonly gitHubUserStore: GitHubUserStore,
@@ -3207,8 +3214,53 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.emitUpdateNow()
 
     this.accountsStore.refresh()
+    void this.auditAccountOAuthScopes()
 
     this.updateMenuLabelsForSelectedRepository()
+  }
+
+  /**
+   * Detect signed-in GitHub accounts whose tokens predate the scopes the
+   * app's current features need (e.g. Releases requires the full `repo`
+   * grant) and offer a re-authorization once per account per session.
+   */
+  private async auditAccountOAuthScopes(): Promise<void> {
+    const accounts = await this.accountsStore.getAll()
+
+    for (const account of accounts) {
+      if (account.provider !== undefined && account.provider !== 'github') {
+        continue
+      }
+      const key = getAccountKey(account)
+      if (this.scopeAuditedAccounts.has(key)) {
+        continue
+      }
+      this.scopeAuditedAccounts.add(key)
+
+      try {
+        const api = API.fromAccount(account)
+        const header = await api.fetchGrantedOAuthScopes()
+        if (header === null || header.length === 0) {
+          // Fine-grained tokens and some proxies report no scopes; there is
+          // nothing reliable to compare against.
+          continue
+        }
+        const missing = missingRequiredScopes(parseGrantedScopes(header))
+        if (missing.length > 0) {
+          this._showPopup({
+            type: PopupType.InsufficientOAuthScopes,
+            account,
+            missingScopes: missing,
+          })
+          return
+        }
+      } catch (e) {
+        log.debug(
+          `Scope audit for ${account.login} failed; skipping until next launch`,
+          e
+        )
+      }
+    }
   }
 
   /**
@@ -9914,6 +9966,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
     await this.accountsStore.removeAccount(account)
     await deleteToken(account)
+  }
+
+  /** Make the given signed-in account the active identity. */
+  public async _promoteAccount(account: Account) {
+    log.info(
+      `[AppStore] promoting account ${account.login} to the active identity`
+    )
+    await this.accountsStore.promoteAccount(account)
   }
 
   private async _addAccount(account: Account): Promise<void> {

@@ -3991,6 +3991,19 @@ export class API {
     }
   }
 
+  /**
+   * The classic OAuth scopes GitHub reports as granted for this token, from
+   * the X-OAuth-Scopes response header. Null when the endpoint does not
+   * report scopes (e.g. fine-grained tokens or non-GitHub providers).
+   */
+  public async fetchGrantedOAuthScopes(): Promise<string | null> {
+    const response = await this.ghRequest('GET', 'user')
+    if (!response.ok) {
+      await parsedResponse<unknown>(response)
+    }
+    return response.headers.get('x-oauth-scopes')
+  }
+
   /** Fetch a workflow YAML file as raw text. */
   public async fetchWorkflowFileContent(
     owner: string,

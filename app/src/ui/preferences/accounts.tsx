@@ -32,6 +32,9 @@ interface IAccountsProps {
     token: string
   ) => Promise<Account>
   readonly onLogout: (account: Account) => void
+
+  /** Called when the user makes the given signed-in account active. */
+  readonly onMakeActive: (account: Account) => void
 }
 
 interface IAccountsState {
@@ -275,7 +278,11 @@ export class Accounts extends React.Component<IAccountsProps, IAccountsState> {
       <>
         <div className="account-card-list">
           {dotComAccounts.map((account, index) =>
-            this.renderAccount(account, index === 0)
+            this.renderAccount(account, {
+              active: index === 0,
+              canMakeActive: dotComAccounts.length > 1,
+              preferredFocus: index === 0,
+            })
           )}
         </div>
         {dotComAccounts.length === 0 ? (
@@ -295,7 +302,12 @@ export class Accounts extends React.Component<IAccountsProps, IAccountsState> {
     return (
       <>
         <div className="account-card-list">
-          {enterpriseAccounts.map(account => this.renderAccount(account))}
+          {enterpriseAccounts.map((account, index) =>
+            this.renderAccount(account, {
+              active: index === 0,
+              canMakeActive: enterpriseAccounts.length > 1,
+            })
+          )}
         </div>
         {enterpriseAccounts.length === 0 ? (
           this.renderSignIn(SignInType.Enterprise)
@@ -308,7 +320,23 @@ export class Accounts extends React.Component<IAccountsProps, IAccountsState> {
     )
   }
 
-  private renderAccount(account: Account, preferredFocus = false) {
+  private makeActive = (account: Account) => {
+    return () => this.props.onMakeActive(account)
+  }
+
+  private renderAccount(
+    account: Account,
+    options: {
+      readonly active?: boolean
+      readonly canMakeActive?: boolean
+      readonly preferredFocus?: boolean
+    } = {}
+  ) {
+    const {
+      active = false,
+      canMakeActive = false,
+      preferredFocus = false,
+    } = options
     const avatarUser: IAvatarUser = {
       name: account.name,
       email: lookupPreferredEmail(account),
@@ -343,7 +371,7 @@ export class Accounts extends React.Component<IAccountsProps, IAccountsState> {
               </>
             )}
           </div>
-          {preferredFocus && (
+          {active && (
             <span className="account-active-chip">
               <Octicon
                 className="account-active-check"
@@ -353,6 +381,15 @@ export class Accounts extends React.Component<IAccountsProps, IAccountsState> {
             </span>
           )}
         </div>
+        {!active && canMakeActive && (
+          <Button
+            onClick={this.makeActive(account)}
+            className="make-active-button"
+            tooltip="Use this account for repository operations"
+          >
+            {__DARWIN__ ? 'Make Active' : 'Make active'}
+          </Button>
+        )}
         <Button onClick={this.logout(account)} className={className}>
           {__DARWIN__ ? 'Sign Out' : 'Sign out'}
         </Button>

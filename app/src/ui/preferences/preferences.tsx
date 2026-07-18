@@ -575,6 +575,10 @@ export class Preferences extends React.Component<
     this.props.dispatcher.removeAccount(account)
   }
 
+  private onMakeActive = (account: Account) => {
+    this.props.dispatcher.promoteAccount(account)
+  }
+
   private renderDisallowedCharactersError() {
     const message = this.state.disallowedCharactersMessage
     if (message != null) {
@@ -615,6 +619,7 @@ export class Preferences extends React.Component<
             onEnterpriseSignIn={this.onEnterpriseSignIn}
             onProviderSignIn={this.onProviderSignIn}
             onLogout={this.onLogout}
+            onMakeActive={this.onMakeActive}
           />
         )
         break

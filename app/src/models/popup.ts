@@ -102,6 +102,7 @@ export enum PopupType {
   WarningBeforeReset = 'WarningBeforeReset',
   WarnResetToPushedCommit = 'WarnResetToPushedCommit',
   InvalidatedToken = 'InvalidatedToken',
+  InsufficientOAuthScopes = 'InsufficientOAuthScopes',
   AddSSHHost = 'AddSSHHost',
   SSHKeyPassphrase = 'SSHKeyPassphrase',
   SSHUserPassword = 'SSHUserPassword',
@@ -454,6 +455,11 @@ export type PopupDetail =
       type: PopupType.ConfirmDeletePushedTag
       repository: Repository
       tagName: string
+    }
+  | {
+      type: PopupType.InsufficientOAuthScopes
+      account: Account
+      missingScopes: ReadonlyArray<string>
     }
   | {
       type: PopupType.InvalidatedToken

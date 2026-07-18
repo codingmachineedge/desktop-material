@@ -271,6 +271,32 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
     return account
   }
 
+  /**
+   * Move the given account ahead of its peers so every surface that
+   * resolves a single account (clone tabs, blankslate, API operations)
+   * treats it as the active identity. GitHub.com accounts stay ahead of
+   * Enterprise accounts; within each class the promoted account leads.
+   */
+  public async promoteAccount(account: Account): Promise<void> {
+    await this.loadingPromise
+
+    const key = getAccountKey(account)
+    const index = this.accounts.findIndex(
+      candidate => getAccountKey(candidate) === key
+    )
+    if (index === -1) {
+      return
+    }
+
+    const promoted = this.accounts[index]
+    const remaining = this.accounts.filter(
+      candidate => getAccountKey(candidate) !== key
+    )
+    this.accounts = sortAccounts([promoted, ...remaining])
+
+    this.save()
+  }
+
   /** Refresh all accounts by fetching their latest info from the API. */
   public async refresh(): Promise<void> {
     this.accounts = await Promise.all(

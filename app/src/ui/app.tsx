@@ -143,6 +143,7 @@ import {
 } from './clone-repository'
 import { SubmoduleManagerDialog } from './submodules/submodule-manager-dialog'
 import { IGitModulesEntry } from '../lib/git/gitmodules'
+import { InsufficientScopesDialog } from './insufficient-scopes/insufficient-scopes-dialog'
 import {
   ExportRepositoriesDialog,
   ImportRepositoriesDialog,
@@ -1016,6 +1017,14 @@ export class App extends React.Component<IAppProps, IAppState> {
     this.props.dispatcher.showPopup({
       type: PopupType.CreateRepository,
     })
+  }
+
+  private onReauthorizeAccount = (account: Account) => {
+    if (isDotComAccount(account)) {
+      this.props.dispatcher.showDotComSignInDialog()
+    } else {
+      this.props.dispatcher.showEnterpriseSignInDialog()
+    }
   }
 
   private onShowRepositorySubmodules = (
@@ -3230,6 +3239,16 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         )
       }
+      case PopupType.InsufficientOAuthScopes:
+        return (
+          <InsufficientScopesDialog
+            key="insufficient-oauth-scopes"
+            account={popup.account}
+            missingScopes={popup.missingScopes}
+            onSignInAgain={this.onReauthorizeAccount}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       case PopupType.InvalidatedToken: {
         return (
           <InvalidatedToken
