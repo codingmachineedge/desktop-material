@@ -33,6 +33,17 @@
         color: var(--md-sys-color-on-surface-variant);
       }
     }
+
+    // Trailing filter-mode cluster (shared .filter-mode-control styling).
+    .command-palette-filter-modes {
+      display: flex;
+      flex: none;
+      min-width: 0;
+    }
+
+    .filter-mode-control-cluster {
+      flex-wrap: nowrap;
+    }
   }
 
   .command-palette-results {

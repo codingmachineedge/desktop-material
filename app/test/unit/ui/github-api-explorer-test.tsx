@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { resolve } from 'node:path'
-import { describe, it } from 'node:test'
+import { beforeEach, describe, it } from 'node:test'
 import * as React from 'react'
 import * as semver from 'semver'
 
@@ -124,6 +124,9 @@ const selectedAccount = account('fixture-bot', 42)
 const selectedRepository = repository(selectedAccount)
 
 describe('GitHub API Explorer', () => {
+  // Catalog filter modes persist per surface; keep each test on the default.
+  beforeEach(() => localStorage.clear())
+
   it('starts on the exact ten new operations and prefills repository coordinates', () => {
     render(
       <GitHubAPIExplorer
@@ -516,6 +519,12 @@ describe('GitHub API Explorer', () => {
       (screen.getByLabelText('Catalog scope') as HTMLSelectElement).value,
       'all'
     )
+    // Exact-id lookups use substring mode; fuzzy would also keep near misses.
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
+    )
     fireEvent.change(screen.getByLabelText('Search operations'), {
       target: { value: 'actions/create-hosted-runner-for-enterprise' },
     })
@@ -729,6 +738,12 @@ describe('GitHub API Explorer', () => {
       screen.getByText(
         /GitHub Enterprise Server 3.21 · schema 2026-07-16 · 24 queries · 236 mutations/
       )
+    )
+    // Exact-name lookups use substring mode; fuzzy would also keep near misses.
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
     )
     fireEvent.change(screen.getByLabelText('Search GraphQL roots'), {
       target: { value: 'addEnterpriseAdmin' },

@@ -32,10 +32,16 @@ import {
   ICatalogPage,
   paginateCatalogItems,
 } from '../../lib/catalog-pagination'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { Account, getAccountKey } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
 import { CatalogPagination } from '../lib/catalog-pagination'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { LinkButton } from '../lib/link-button'
 import {
   createNamedAPIFunctionBinding,
@@ -51,6 +57,8 @@ export const GitHubAPIExplorerDefaultPageSize = DefaultCatalogPageSize
 export const GitHubAPIExplorerResponseCharacterCap = 128 * 1024
 
 const GitHubAPIExplorerHeaderValueCap = 1024
+const RESTCatalogFilterId = 'github-api-explorer-rest-catalog'
+const GraphQLCatalogFilterId = 'github-api-explorer-graphql-catalog'
 const restMethods: ReadonlyArray<GitHubAPIWorkbenchMethod> = [
   'GET',
   'HEAD',
@@ -125,12 +133,16 @@ interface IGitHubAPIExplorerReview {
 interface IGitHubAPIExplorerState {
   readonly mode: GitHubAPIExplorerMode
   readonly catalogQuery: string
+  readonly catalogQueryMode: FilterMode
+  readonly catalogQueryCaseSensitive: boolean
   readonly catalogCategory: string
   readonly newOnly: boolean
   readonly catalogPage: number
   readonly catalogPageSize: number
   readonly selectedOperationId: string | null
   readonly graphQLCatalogQuery: string
+  readonly graphQLCatalogQueryMode: FilterMode
+  readonly graphQLCatalogQueryCaseSensitive: boolean
   readonly graphQLCatalogKind: '' | 'query' | 'mutation'
   readonly graphQLCatalogPage: number
   readonly graphQLCatalogPageSize: number
@@ -267,12 +279,16 @@ function initialState(props: IGitHubAPIExplorerProps): IGitHubAPIExplorerState {
   return {
     mode: 'rest',
     catalogQuery: '',
+    catalogQueryMode: readPersistedFilterMode(RESTCatalogFilterId),
+    catalogQueryCaseSensitive: false,
     catalogCategory: '',
     newOnly: (catalog?.newOperationIds.length ?? 0) > 0,
     catalogPage: 1,
     catalogPageSize: GitHubAPIExplorerDefaultPageSize,
     selectedOperationId: defaultOperation?.id ?? null,
     graphQLCatalogQuery: '',
+    graphQLCatalogQueryMode: readPersistedFilterMode(GraphQLCatalogFilterId),
+    graphQLCatalogQueryCaseSensitive: false,
     graphQLCatalogKind: '',
     graphQLCatalogPage: 1,
     graphQLCatalogPageSize: GitHubAPIExplorerDefaultPageSize,
@@ -620,6 +636,31 @@ export class GitHubAPIExplorer extends React.Component<
     this.setState({ catalogQuery: event.currentTarget.value, catalogPage: 1 })
   }
 
+  private onCatalogQueryModeChange = (catalogQueryMode: FilterMode) => {
+    persistFilterMode(RESTCatalogFilterId, catalogQueryMode)
+    this.setState({ catalogQueryMode, catalogPage: 1 })
+  }
+
+  private onCatalogQueryCaseSensitiveChange = (
+    catalogQueryCaseSensitive: boolean
+  ) => {
+    this.setState({ catalogQueryCaseSensitive, catalogPage: 1 })
+  }
+
+  private onCatalogQueryPatternApply = (catalogQuery: string) => {
+    this.setState({ catalogQuery, catalogPage: 1 })
+  }
+
+  private getCatalogQuerySampleItems = (): ReadonlyArray<string> => {
+    const resolution = resolveCatalogForProps(this.props)
+    if (resolution?.status !== 'available') {
+      return []
+    }
+    return resolution.catalog.operations
+      .slice(0, 50)
+      .map(operation => `${operation.method} ${operation.path}`)
+  }
+
   private onCatalogCategoryChange = (
     event: React.ChangeEvent<HTMLSelectElement>
   ) => {
@@ -683,6 +724,33 @@ export class GitHubAPIExplorer extends React.Component<
       graphQLCatalogQuery: event.currentTarget.value,
       graphQLCatalogPage: 1,
     })
+  }
+
+  private onGraphQLCatalogQueryModeChange = (
+    graphQLCatalogQueryMode: FilterMode
+  ) => {
+    persistFilterMode(GraphQLCatalogFilterId, graphQLCatalogQueryMode)
+    this.setState({ graphQLCatalogQueryMode, graphQLCatalogPage: 1 })
+  }
+
+  private onGraphQLCatalogQueryCaseSensitiveChange = (
+    graphQLCatalogQueryCaseSensitive: boolean
+  ) => {
+    this.setState({ graphQLCatalogQueryCaseSensitive, graphQLCatalogPage: 1 })
+  }
+
+  private onGraphQLCatalogQueryPatternApply = (graphQLCatalogQuery: string) => {
+    this.setState({ graphQLCatalogQuery, graphQLCatalogPage: 1 })
+  }
+
+  private getGraphQLCatalogQuerySampleItems = (): ReadonlyArray<string> => {
+    const resolution = resolveGraphQLCatalogForProps(this.props)
+    if (resolution?.status !== 'available') {
+      return []
+    }
+    return resolution.catalog.operations
+      .slice(0, 50)
+      .map(operation => graphQLOperationSignature(operation))
   }
 
   private onGraphQLCatalogKindChange = (
@@ -1111,14 +1179,34 @@ export class GitHubAPIExplorer extends React.Component<
     }
 
     const catalog = resolution.catalog
-    const filtered = filterGitHubAPIOperations(
+    const scoped = filterGitHubAPIOperations(
       {
-        query: this.state.catalogQuery,
+        query: '',
         category: this.state.catalogCategory,
         newOnly: this.state.newOnly,
       },
       catalog
     )
+    const query = this.state.catalogQuery.trim()
+    // Two keys so fuzzy mode (which only scores the first two) still matches on
+    // path, id, and category: they are folded into the "subtitle" key.
+    const filtered =
+      query.length === 0
+        ? scoped
+        : matchWithMode(
+            query,
+            scoped,
+            operation => [
+              `${operation.method} ${operation.summary}`,
+              `${operation.path} ${operation.id} ${operation.category} ${
+                operation.subcategory ?? ''
+              }`,
+            ],
+            {
+              mode: this.state.catalogQueryMode,
+              caseSensitive: this.state.catalogQueryCaseSensitive,
+            }
+          ).results.map(match => match.item)
     const { page, items: visible } = paginateCatalogItems(
       filtered,
       this.state.catalogPage,
@@ -1144,16 +1232,28 @@ export class GitHubAPIExplorer extends React.Component<
           </span>
         </header>
         <div className="github-api-explorer-filters">
-          <label>
-            Search operations
-            <input
-              type="search"
-              value={this.state.catalogQuery}
-              disabled={this.state.loading}
-              onChange={this.onCatalogQueryChange}
-              placeholder="Method, path, summary, or ID"
+          <div className="github-api-explorer-search">
+            <label>
+              Search operations
+              <input
+                type="search"
+                value={this.state.catalogQuery}
+                disabled={this.state.loading}
+                onChange={this.onCatalogQueryChange}
+                placeholder="Method, path, summary, or ID"
+              />
+            </label>
+            <FilterModeControl
+              mode={this.state.catalogQueryMode}
+              caseSensitive={this.state.catalogQueryCaseSensitive}
+              onModeChange={this.onCatalogQueryModeChange}
+              onCaseSensitiveChange={this.onCatalogQueryCaseSensitiveChange}
+              regexBuilderTarget="REST operations"
+              getSampleItems={this.getCatalogQuerySampleItems}
+              filterText={this.state.catalogQuery}
+              onRegexPatternApply={this.onCatalogQueryPatternApply}
             />
-          </label>
+          </div>
           <label>
             Category
             <select
@@ -1277,9 +1377,9 @@ export class GitHubAPIExplorer extends React.Component<
     }
 
     const catalog = resolution.catalog
-    const filtered = filterGitHubGraphQLOperations(
+    const scoped = filterGitHubGraphQLOperations(
       {
-        query: this.state.graphQLCatalogQuery,
+        query: '',
         kind:
           this.state.graphQLCatalogKind === ''
             ? null
@@ -1287,6 +1387,26 @@ export class GitHubAPIExplorer extends React.Component<
       },
       catalog
     )
+    const query = this.state.graphQLCatalogQuery.trim()
+    // Two keys so fuzzy mode (which only scores the first two) still matches on
+    // the id, description, and full signature folded into the "subtitle" key.
+    const filtered =
+      query.length === 0
+        ? scoped
+        : matchWithMode(
+            query,
+            scoped,
+            operation => [
+              `${operation.kind} ${operation.name}`,
+              `${operation.id} ${
+                operation.description ?? ''
+              } ${graphQLOperationSignature(operation)}`,
+            ],
+            {
+              mode: this.state.graphQLCatalogQueryMode,
+              caseSensitive: this.state.graphQLCatalogQueryCaseSensitive,
+            }
+          ).results.map(match => match.item)
     const { page, items: visible } = paginateCatalogItems(
       filtered,
       this.state.graphQLCatalogPage,
@@ -1315,16 +1435,30 @@ export class GitHubAPIExplorer extends React.Component<
           </span>
         </header>
         <div className="github-api-explorer-filters">
-          <label>
-            Search GraphQL roots
-            <input
-              type="search"
-              value={this.state.graphQLCatalogQuery}
-              disabled={this.state.loading}
-              onChange={this.onGraphQLCatalogQueryChange}
-              placeholder="Name, description, argument, or return type"
+          <div className="github-api-explorer-search">
+            <label>
+              Search GraphQL roots
+              <input
+                type="search"
+                value={this.state.graphQLCatalogQuery}
+                disabled={this.state.loading}
+                onChange={this.onGraphQLCatalogQueryChange}
+                placeholder="Name, description, argument, or return type"
+              />
+            </label>
+            <FilterModeControl
+              mode={this.state.graphQLCatalogQueryMode}
+              caseSensitive={this.state.graphQLCatalogQueryCaseSensitive}
+              onModeChange={this.onGraphQLCatalogQueryModeChange}
+              onCaseSensitiveChange={
+                this.onGraphQLCatalogQueryCaseSensitiveChange
+              }
+              regexBuilderTarget="GraphQL roots"
+              getSampleItems={this.getGraphQLCatalogQuerySampleItems}
+              filterText={this.state.graphQLCatalogQuery}
+              onRegexPatternApply={this.onGraphQLCatalogQueryPatternApply}
             />
-          </label>
+          </div>
           <label>
             Root kind
             <select

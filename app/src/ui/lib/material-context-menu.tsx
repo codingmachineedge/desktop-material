@@ -2,6 +2,9 @@ import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 import classNames from 'classnames'
 import { IMenuItem } from '../../lib/menu-item'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from './filter-mode-control'
+import { persistFilterMode, readPersistedFilterMode } from './filter-list-mode'
 import { Octicon, OcticonSymbol } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 
@@ -13,6 +16,9 @@ import * as octicons from '../octicons/octicons.generated'
  * icons, a type-to-filter bar, checkbox items, and one-level submenu
  * expansion. Resolves with the chosen item, or null when dismissed.
  */
+
+/** The persistence id for the context-menu filter's mode. */
+const ContextMenuFilterListId = 'material-context-menu'
 
 let lastPointerPosition = { x: 0, y: 0 }
 let pointerTrackingInstalled = false
@@ -58,6 +64,8 @@ interface IMaterialContextMenuProps {
 
 interface IMaterialContextMenuState {
   readonly filterText: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
   readonly highlightedIndex: number
   readonly expandedSubmenus: ReadonlySet<number>
 }
@@ -80,6 +88,8 @@ class MaterialContextMenu extends React.Component<
     super(props)
     this.state = {
       filterText: '',
+      filterMode: readPersistedFilterMode(ContextMenuFilterListId),
+      filterCaseSensitive: false,
       highlightedIndex: -1,
       expandedSubmenus: new Set(),
     }
@@ -105,9 +115,22 @@ class MaterialContextMenu extends React.Component<
     }
   }
 
+  /**
+   * Test a single menu label against the filter under the current mode. An
+   * invalid regex matches everything (matchWithMode's passthrough) so the
+   * menu stays usable while a pattern is still being typed.
+   */
+  private labelMatches(query: string, label: string): boolean {
+    const { results } = matchWithMode(query, [label], key => [key], {
+      mode: this.state.filterMode,
+      caseSensitive: this.state.filterCaseSensitive,
+    })
+    return results.length > 0
+  }
+
   /** The flattened, filter-narrowed rows in display order. */
   private getVisibleRows(): ReadonlyArray<IVisibleRow> {
-    const query = this.state.filterText.trim().toLowerCase()
+    const query = this.state.filterText.trim()
     const rows: IVisibleRow[] = []
 
     this.props.items.forEach((item, index) => {
@@ -120,13 +143,11 @@ class MaterialContextMenu extends React.Component<
 
       const label = item.label ?? ''
       const submenu = item.submenu ?? []
-      const selfMatches =
-        query.length === 0 || label.toLowerCase().includes(query)
+      const selfMatches = query.length === 0 || this.labelMatches(query, label)
       const matchingChildren = submenu.filter(
         child =>
           child.type !== 'separator' &&
-          (query.length === 0 ||
-            (child.label ?? '').toLowerCase().includes(query))
+          (query.length === 0 || this.labelMatches(query, child.label ?? ''))
       )
 
       if (!selfMatches && matchingChildren.length === 0) {
@@ -175,7 +196,46 @@ class MaterialContextMenu extends React.Component<
     this.setState({ filterText: event.target.value, highlightedIndex: -1 })
   }
 
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(ContextMenuFilterListId, filterMode)
+    this.setState({ filterMode, highlightedIndex: -1 })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive, highlightedIndex: -1 })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({ filterText: pattern, highlightedIndex: -1 })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> => {
+    const labels = new Array<string>()
+    for (const item of this.props.items) {
+      if (item.type !== 'separator' && item.label !== undefined) {
+        labels.push(item.label)
+      }
+      for (const child of item.submenu ?? []) {
+        if (child.type !== 'separator' && child.label !== undefined) {
+          labels.push(child.label)
+        }
+      }
+    }
+    return labels
+  }
+
   private onKeyDown = (event: React.KeyboardEvent) => {
+    // Keys pressed inside the filter-mode cluster (or the regex-builder
+    // overlay it hosts) must not drive the menu's own navigation: Enter on a
+    // mode button should cycle the mode, not activate the highlighted row,
+    // and Escape inside the builder should close only the builder.
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.closest('.filter-mode-control') !== null
+    ) {
+      return
+    }
+
     const rows = this.getVisibleRows()
     const selectable = rows
       .map((row, ix) => (this.isSelectable(row) ? ix : -1))
@@ -341,6 +401,16 @@ class MaterialContextMenu extends React.Component<
               value={this.state.filterText}
               onChange={this.onFilterChanged}
               spellCheck={false}
+            />
+            <FilterModeControl
+              mode={this.state.filterMode}
+              caseSensitive={this.state.filterCaseSensitive}
+              onModeChange={this.onFilterModeChanged}
+              onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+              regexBuilderTarget="Menu actions"
+              getSampleItems={this.getFilterSampleItems}
+              filterText={this.state.filterText}
+              onRegexPatternApply={this.onRegexPatternApply}
             />
           </div>
           <div className="context-menu-items" role="presentation">

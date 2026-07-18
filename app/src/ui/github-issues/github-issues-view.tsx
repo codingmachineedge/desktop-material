@@ -21,8 +21,16 @@ import {
   normalizeGitHubIssueComment,
   normalizeGitHubIssueUpdate,
 } from '../../lib/github-issues'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { Dispatcher } from '../dispatcher'
 import { Button } from '../lib/button'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
+
+const IssuesSearchFilterId = 'github-issues-search'
 
 type BusyOperation = 'issues' | 'detail' | 'comments' | 'mutation'
 
@@ -64,6 +72,8 @@ interface IGitHubIssuesViewState {
   readonly repositoryKey: string
   readonly availability: GitHubIssuesAvailability
   readonly query: IGitHubIssueQuery
+  readonly searchMode: FilterMode
+  readonly searchCaseSensitive: boolean
   readonly issues: ReadonlyArray<IGitHubIssue>
   readonly nextIssuePage: number | null
   readonly issuesCapped: boolean
@@ -110,6 +120,8 @@ function initialState(props: IGitHubIssuesViewProps): IGitHubIssuesViewState {
     repositoryKey: repositoryKey(props.repository),
     availability: getGitHubIssuesAvailability(props.repository, props.accounts),
     query: defaultQuery,
+    searchMode: readPersistedFilterMode(IssuesSearchFilterId),
+    searchCaseSensitive: false,
     issues: [],
     nextIssuePage: null,
     issuesCapped: false,
@@ -446,6 +458,42 @@ export class GitHubIssuesView extends React.Component<
         page: 1,
       },
     })
+
+  private onSearchModeChange = (searchMode: FilterMode) => {
+    persistFilterMode(IssuesSearchFilterId, searchMode)
+    this.setState({ searchMode })
+  }
+
+  private onSearchCaseSensitiveChange = (searchCaseSensitive: boolean) =>
+    this.setState({ searchCaseSensitive })
+
+  private onSearchPatternApply = (pattern: string) =>
+    this.setState({
+      query: { ...this.state.query, search: pattern, page: 1 },
+    })
+
+  private getSearchSampleItems = () =>
+    this.state.issues.map(issue => `#${issue.number} ${issue.title}`)
+
+  /**
+   * Narrow the loaded issue page live with the current filter mode. The search
+   * text itself is still sent to GitHub verbatim when filters are applied.
+   */
+  private getVisibleIssues(): ReadonlyArray<IGitHubIssue> {
+    const { issues, query, searchMode, searchCaseSensitive } = this.state
+    const search = query.search.trim()
+    if (search.length === 0) {
+      return issues
+    }
+
+    const { results } = matchWithMode(
+      search,
+      issues,
+      issue => [issue.title, `#${issue.number} ${issue.body}`],
+      { mode: searchMode, caseSensitive: searchCaseSensitive }
+    )
+    return results.map(match => match.item)
+  }
 
   private updateStateFilter = (event: React.ChangeEvent<HTMLSelectElement>) =>
     this.setState({
@@ -796,16 +844,28 @@ export class GitHubIssuesView extends React.Component<
     const metadata = this.state.metadata
     return (
       <form className="github-issues-filters" onSubmit={this.applyFilters}>
-        <label className="github-issues-search">
-          Search title and description
-          <input
-            type="search"
-            value={this.state.query.search}
-            maxLength={256}
-            placeholder="Search this repository"
-            onChange={this.updateSearch}
+        <div className="github-issues-search">
+          <label>
+            Search title and description
+            <input
+              type="search"
+              value={this.state.query.search}
+              maxLength={256}
+              placeholder="Search this repository"
+              onChange={this.updateSearch}
+            />
+          </label>
+          <FilterModeControl
+            mode={this.state.searchMode}
+            caseSensitive={this.state.searchCaseSensitive}
+            onModeChange={this.onSearchModeChange}
+            onCaseSensitiveChange={this.onSearchCaseSensitiveChange}
+            regexBuilderTarget="Issues"
+            getSampleItems={this.getSearchSampleItems}
+            filterText={this.state.query.search}
+            onRegexPatternApply={this.onSearchPatternApply}
           />
-        </label>
+        </div>
         <label>
           State
           <select
@@ -916,6 +976,7 @@ export class GitHubIssuesView extends React.Component<
   }
 
   private renderIssueList() {
+    const issues = this.getVisibleIssues()
     return (
       <section
         className="github-issues-list-panel"
@@ -925,12 +986,12 @@ export class GitHubIssuesView extends React.Component<
           <div>
             <h2 id="issue-list-title">Repository issues</h2>
             <span>
-              {this.state.issues.length} on page {this.state.query.page}
+              {issues.length} on page {this.state.query.page}
             </span>
           </div>
         </div>
         <ul className="github-issues-list">
-          {this.state.issues.map(issue => {
+          {issues.map(issue => {
             const selected = issue.number === this.state.selectedIssue?.number
             return (
               <li key={issue.id}>

@@ -8,9 +8,18 @@ import {
   IParsedContent,
 } from '../../lib/actions-log-parser/actions-log-parser-objects'
 import { APIError } from '../../lib/http'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { Button } from '../lib/button'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { LinkButton } from '../lib/link-button'
 import { trapActionsDialogFocus } from './actions-dialog-focus'
+
+/** localStorage key used to persist the find-in-log filter mode. */
+const JobLogFilterListId = 'actions-job-log'
 
 interface IJobLogViewerProps {
   readonly job: IActionsJob
@@ -22,6 +31,8 @@ interface IJobLogViewerProps {
 
 interface IJobLogViewerState {
   readonly search: string
+  readonly searchMode: FilterMode
+  readonly searchCaseSensitive: boolean
   readonly match: number
   readonly collapsedGroups: ReadonlySet<number>
 }
@@ -70,22 +81,44 @@ export class JobLogViewer extends React.Component<
   )
   private getVisibleLines = memoizeOne(getVisibleActionsLogLines)
   private findMatches = memoizeOne(
-    (lines: ReadonlyArray<ILogLineTemplateData>, search: string) => {
-      const normalized = search.trim().toLowerCase()
-      if (!normalized) {
-        return []
+    (
+      lines: ReadonlyArray<ILogLineTemplateData>,
+      search: string,
+      mode: FilterMode,
+      caseSensitive: boolean
+    ) => {
+      const query = search.trim()
+      if (query.length === 0) {
+        return { matches: [], regexError: null }
       }
-      return lines
-        .map((line, index) => ({ line, index }))
-        .filter(({ line }) =>
-          getActionsLogLineText(line).toLowerCase().includes(normalized)
-        )
+      const { results, regexError } = matchWithMode(
+        query,
+        lines.map((line, index) => ({ line, index })),
+        ({ line }) => [getActionsLogLineText(line)],
+        { mode, caseSensitive }
+      )
+      if (regexError !== null) {
+        // An invalid pattern passes every line through matchWithMode; treating
+        // that as "every line matches" would make navigation meaningless.
+        return { matches: [], regexError }
+      }
+      // Fuzzy results are score-sorted; Previous/Next should walk line order.
+      return {
+        matches: results.map(r => r.item).sort((a, b) => a.index - b.index),
+        regexError: null,
+      }
     }
   )
 
   public constructor(props: IJobLogViewerProps) {
     super(props)
-    this.state = { search: '', match: 0, collapsedGroups: new Set() }
+    this.state = {
+      search: '',
+      searchMode: readPersistedFilterMode(JobLogFilterListId),
+      searchCaseSensitive: false,
+      match: 0,
+      collapsedGroups: new Set(),
+    }
   }
 
   public componentDidMount() {
@@ -107,6 +140,15 @@ export class JobLogViewer extends React.Component<
   }
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    // Keys pressed inside the regex builder overlay belong to the builder: it
+    // dismisses itself on Escape via a window-level listener that would never
+    // fire past this handler's stopPropagation.
+    if (
+      event.target instanceof Element &&
+      event.target.closest('.regex-builder-overlay') !== null
+    ) {
+      return
+    }
     event.stopPropagation()
     trapActionsDialogFocus(event, event.currentTarget)
     if (event.key === 'Escape') {
@@ -125,8 +167,17 @@ export class JobLogViewer extends React.Component<
     )
   }
 
+  private getSearchResult(lines: ReadonlyArray<ILogLineTemplateData>) {
+    return this.findMatches(
+      lines,
+      this.state.search,
+      this.state.searchMode,
+      this.state.searchCaseSensitive
+    )
+  }
+
   private getMatches(lines: ReadonlyArray<ILogLineTemplateData>) {
-    return this.findMatches(lines, this.state.search)
+    return this.getSearchResult(lines).matches
   }
 
   private onSearch = (event: React.FormEvent<HTMLInputElement>) =>
@@ -134,6 +185,20 @@ export class JobLogViewer extends React.Component<
       { search: event.currentTarget.value, match: 0 },
       this.scrollToMatch
     )
+
+  private onSearchModeChange = (searchMode: FilterMode) => {
+    persistFilterMode(JobLogFilterListId, searchMode)
+    this.setState({ searchMode, match: 0 }, this.scrollToMatch)
+  }
+
+  private onSearchCaseSensitiveChange = (searchCaseSensitive: boolean) =>
+    this.setState({ searchCaseSensitive, match: 0 }, this.scrollToMatch)
+
+  private onSearchPatternApply = (search: string) =>
+    this.setState({ search, match: 0 }, this.scrollToMatch)
+
+  private getSearchSampleItems = () =>
+    this.getLines().slice(0, 50).map(getActionsLogLineText)
 
   private nextMatch = () => {
     const count = this.getMatches(this.getLines()).length
@@ -247,7 +312,7 @@ export class JobLogViewer extends React.Component<
 
   public render() {
     const lines = this.getLines()
-    const matches = this.getMatches(lines)
+    const { matches, regexError } = this.getSearchResult(lines)
     const expired =
       this.props.error instanceof APIError &&
       this.props.error.responseStatus === 410
@@ -280,8 +345,20 @@ export class JobLogViewer extends React.Component<
               placeholder="Search logs"
               aria-label="Search logs"
             />
+            <FilterModeControl
+              mode={this.state.searchMode}
+              caseSensitive={this.state.searchCaseSensitive}
+              onModeChange={this.onSearchModeChange}
+              onCaseSensitiveChange={this.onSearchCaseSensitiveChange}
+              regexBuilderTarget="Job log"
+              getSampleItems={this.getSearchSampleItems}
+              filterText={this.state.search}
+              onRegexPatternApply={this.onSearchPatternApply}
+            />
             <span role="status" aria-live="polite" aria-atomic="true">
-              {matches.length === 0
+              {regexError !== null
+                ? regexError
+                : matches.length === 0
                 ? 'No matches'
                 : `${Math.min(this.state.match + 1, matches.length)} of ${
                     matches.length

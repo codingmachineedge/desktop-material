@@ -22,6 +22,13 @@
       margin-right: var(--spacing);
     }
 
+    // The 365px popover can't fit the labeled regex-builder chip beside the
+    // search field; collapse the launcher to its icon-only form (its
+    // aria-label still names it).
+    .filter-regex-builder-label {
+      display: none;
+    }
+
     .account-list-item {
       padding: 0 var(--spacing);
       display: flex;

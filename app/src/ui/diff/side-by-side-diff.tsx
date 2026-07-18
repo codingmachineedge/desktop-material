@@ -72,6 +72,11 @@ import { findDOMNode } from 'react-dom'
 import escapeRegExp from 'lodash/escapeRegExp'
 import ReactDOM from 'react-dom'
 import { AriaLiveContainer } from '../accessibility/aria-live-container'
+import {
+  FilterMode,
+  IFilterOptions,
+  MaxRegexPatternLength,
+} from '../../lib/fuzzy-find'
 
 const DefaultRowHeight = 20
 
@@ -208,6 +213,9 @@ interface ISideBySideDiffState {
   readonly isSearching: boolean
 
   readonly searchQuery?: string
+
+  /** The match options the current search results were computed with. */
+  readonly searchOptions?: IFilterOptions
 
   readonly searchResults?: SearchResults
 
@@ -618,6 +626,7 @@ export class SideBySideDiff extends React.Component<
           <DiffSearchInput
             onSearch={this.onSearch}
             onClose={this.onSearchCancel}
+            getSampleItems={this.getSearchSampleItems}
           />
         )}
         <div
@@ -646,6 +655,7 @@ export class SideBySideDiff extends React.Component<
                 isSearching={isSearching}
                 selectedSearchResult={this.state.selectedSearchResult}
                 searchQuery={this.state.searchQuery}
+                searchOptions={this.state.searchOptions}
                 showSideBySideDiff={this.props.showSideBySideDiff}
                 beforeTokens={this.state.beforeTokens}
                 afterTokens={this.state.afterTokens}
@@ -1627,23 +1637,38 @@ export class SideBySideDiff extends React.Component<
     }
   }
 
-  private onSearch = (searchQuery: string, direction: SearchDirection) => {
-    const { searchResults } = this.state
+  private onSearch = (
+    searchQuery: string,
+    direction: SearchDirection,
+    options: IFilterOptions
+  ) => {
+    const { searchResults, searchOptions } = this.state
 
     if (searchQuery?.trim() === '') {
       this.resetSearch(true, 'No results')
-    } else if (searchQuery === this.state.searchQuery && searchResults) {
+    } else if (
+      searchQuery === this.state.searchQuery &&
+      searchOptions !== undefined &&
+      searchOptions.mode === options.mode &&
+      searchOptions.caseSensitive === options.caseSensitive &&
+      searchResults
+    ) {
       this.continueSearch(searchResults, direction)
     } else {
-      this.startSearch(searchQuery, direction)
+      this.startSearch(searchQuery, direction, options)
     }
   }
 
-  private startSearch = (searchQuery: string, direction: SearchDirection) => {
+  private startSearch = (
+    searchQuery: string,
+    direction: SearchDirection,
+    options: IFilterOptions
+  ) => {
     const searchResults = calcSearchTokens(
       this.state.diff,
       this.props.showSideBySideDiff,
       searchQuery,
+      options,
       this.canExpandDiff()
     )
 
@@ -1658,12 +1683,20 @@ export class SideBySideDiff extends React.Component<
 
       this.setState({
         searchQuery,
+        searchOptions: options,
         searchResults,
         selectedSearchResult: 0,
         ariaLiveMessage,
       })
     }
   }
+
+  /** Seeds the regex builder's live tester with lines from this diff. */
+  private getSearchSampleItems = (): ReadonlyArray<string> =>
+    this.state.diff.hunks
+      .flatMap(hunk => hunk.lines.map(line => line.content))
+      .filter(content => content.trim().length > 0)
+      .slice(0, 50)
 
   private continueSearch = (
     searchResults: SearchResults,
@@ -1712,6 +1745,7 @@ export class SideBySideDiff extends React.Component<
     this.setState({
       selectedSearchResult: undefined,
       searchQuery: undefined,
+      searchOptions: undefined,
       searchResults: undefined,
       ariaLiveMessage: searchLiveMessage,
       isSearching,
@@ -2054,18 +2088,53 @@ class SearchResults {
   }
 }
 
+/**
+ * Compile the search query for the requested mode. The diff search locates
+ * occurrences within lines rather than filtering a list, so fuzzy scoring has
+ * no meaning here: Fuzzy (the default) keeps the historical case-insensitive
+ * literal search, Substring adds the case toggle, and Regex uses the raw
+ * pattern. Returns null for an invalid or oversized pattern.
+ */
+function getSearchRegExp(
+  searchQuery: string,
+  options: IFilterOptions
+): RegExp | null {
+  const caseSensitive =
+    options.mode !== FilterMode.Fuzzy && options.caseSensitive
+  const flags = caseSensitive ? 'g' : 'gi'
+
+  if (options.mode === FilterMode.Regex) {
+    if (searchQuery.length > MaxRegexPatternLength) {
+      return null
+    }
+    try {
+      return new RegExp(searchQuery, flags)
+    } catch {
+      return null
+    }
+  }
+
+  return new RegExp(escapeRegExp(searchQuery), flags)
+}
+
 function calcSearchTokens(
   diff: ITextDiff,
   showSideBySideDiffs: boolean,
   searchQuery: string,
+  options: IFilterOptions,
   enableDiffExpansion: boolean
 ): SearchResults | undefined {
   if (searchQuery.length === 0) {
     return undefined
   }
 
+  const searchRe = getSearchRegExp(searchQuery, options)
+
+  if (searchRe === null) {
+    return undefined
+  }
+
   const hits = new SearchResults()
-  const searchRe = new RegExp(escapeRegExp(searchQuery), 'gi')
   const rows = getDiffRows(diff, showSideBySideDiffs, enableDiffExpansion)
 
   for (const [rowNumber, row] of rows.entries()) {
@@ -2075,7 +2144,8 @@ function calcSearchTokens(
 
     for (const column of enumerateColumnContents(row, showSideBySideDiffs)) {
       for (const match of column.content.matchAll(searchRe)) {
-        if (match.index !== undefined) {
+        // Zero-width regex matches (e.g. `a*`) can't be highlighted.
+        if (match.index !== undefined && match[0].length > 0) {
           hits.add(rowNumber, column.type, match.index, match[0].length)
         }
       }

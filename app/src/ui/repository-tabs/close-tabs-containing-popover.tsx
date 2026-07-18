@@ -10,6 +10,14 @@ import {
 } from '../../lib/stores/repository-tabs-store'
 import { IRepositoryTab } from '../../models/repository-tab'
 import { FilterMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
+
+/** The persistence id for the close-matching filter's mode. */
+const CloseTabsFilterListId = 'close-tabs-containing'
 
 interface ICloseTabsContainingPopoverProps {
   readonly tabsStore: RepositoryTabsStore
@@ -22,14 +30,16 @@ interface ICloseTabsContainingPopoverProps {
 
 interface ICloseTabsContainingPopoverState {
   readonly query: string
-  readonly useRegex: boolean
+  readonly mode: FilterMode
+  readonly caseSensitive: boolean
   readonly isSubmitting: boolean
   readonly error: string | null
 }
 
 /**
  * The existing close-matching action. This remains separate from the inverse
- * close flow so adding "close all except" never removes regex-based matching.
+ * close flow so adding "close all except" never removes regex-based matching;
+ * the matching strategy comes from the shared filter-mode cluster.
  */
 export class CloseTabsContainingPopover extends React.Component<
   ICloseTabsContainingPopoverProps,
@@ -39,26 +49,34 @@ export class CloseTabsContainingPopover extends React.Component<
     super(props)
     this.state = {
       query: '',
-      useRegex: false,
+      mode: readPersistedFilterMode(CloseTabsFilterListId),
+      caseSensitive: false,
       isSubmitting: false,
       error: null,
     }
-  }
-
-  private get mode(): FilterMode {
-    return this.state.useRegex ? FilterMode.Regex : FilterMode.Substring
   }
 
   private onQueryChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ query: event.currentTarget.value, error: null })
   }
 
-  private onToggleRegex = () => {
-    this.setState(previous => ({
-      useRegex: !previous.useRegex,
-      error: null,
-    }))
+  private onModeChange = (mode: FilterMode) => {
+    persistFilterMode(CloseTabsFilterListId, mode)
+    this.setState({ mode, error: null })
   }
+
+  private onCaseSensitiveChange = (caseSensitive: boolean) => {
+    this.setState({ caseSensitive, error: null })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({ query: pattern, error: null })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.props.tabsStore
+      .getState()
+      .tabs.map(tab => tab.customLabel ?? tab.repositoryPath)
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
@@ -68,10 +86,11 @@ export class CloseTabsContainingPopover extends React.Component<
   }
 
   private onConfirm = () => {
-    const { query, isSubmitting } = this.state
+    const { query, mode, caseSensitive, isSubmitting } = this.state
     const { tabs, regexError } = this.props.tabsStore.findMatchingTabs(
       query,
-      this.mode
+      mode,
+      caseSensitive
     )
     const closableTabs = tabs.filter(tab => tab.isPinned !== true)
     if (
@@ -85,7 +104,7 @@ export class CloseTabsContainingPopover extends React.Component<
 
     this.setState({ isSubmitting: true, error: null })
     this.props.tabsStore
-      .closeTabsMatching(query, this.mode)
+      .closeTabsMatching(query, mode, caseSensitive)
       .then(activeTabId => {
         this.props.onClosed(activeTabId)
         this.props.onClose()
@@ -101,10 +120,11 @@ export class CloseTabsContainingPopover extends React.Component<
   }
 
   public render() {
-    const { query, useRegex, isSubmitting, error } = this.state
+    const { query, mode, caseSensitive, isSubmitting, error } = this.state
     const { tabs, regexError } = this.props.tabsStore.findMatchingTabs(
       query,
-      this.mode
+      mode,
+      caseSensitive
     )
     const closableCount = tabs.filter(tab => tab.isPinned !== true).length
     const protectedCount = tabs.length - closableCount
@@ -143,20 +163,16 @@ export class CloseTabsContainingPopover extends React.Component<
               aria-label="Close tabs containing"
               aria-describedby="close-tabs-containing-status"
             />
-            <button
-              type="button"
-              className={
-                useRegex
-                  ? 'close-tabs-containing-mode active'
-                  : 'close-tabs-containing-mode'
-              }
-              aria-pressed={useRegex}
-              aria-label="Use regular expression"
-              onClick={this.onToggleRegex}
-              disabled={isSubmitting}
-            >
-              .*
-            </button>
+            <FilterModeControl
+              mode={mode}
+              caseSensitive={caseSensitive}
+              onModeChange={this.onModeChange}
+              onCaseSensitiveChange={this.onCaseSensitiveChange}
+              regexBuilderTarget="Open tabs"
+              getSampleItems={this.getFilterSampleItems}
+              filterText={query}
+              onRegexPatternApply={this.onRegexPatternApply}
+            />
           </div>
           <div
             id="close-tabs-containing-status"

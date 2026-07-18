@@ -175,6 +175,21 @@
     min-width: 0;
   }
 
+  // The search cell hosts the query input plus the filter-mode cluster; the
+  // cluster sits beside the input and wraps under it when the column narrows.
+  .provider-triage-search {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+
+    label {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
   label > span {
     font-size: 12px;
     font-weight: 600;
@@ -762,6 +777,16 @@
   .octicon {
     fill: currentColor;
     flex: none;
+  }
+
+  // The trailing filter-mode cluster stays icon-only inside the 300px rail;
+  // the shared aria-label keeps the regex-builder launcher discoverable.
+  .filter-mode-control-cluster {
+    flex-wrap: nowrap;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
   }
 }
 

@@ -168,9 +168,28 @@
   flex: 0 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
 
-  label:first-child {
-    grid-column: 1 / -1;
+.github-api-explorer-search {
+  display: flex;
+  min-width: 0;
+  grid-column: 1 / -1;
+  gap: 4px;
+  align-items: flex-end;
+
+  label {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  // Optically center the 30px mode buttons against the 38px search input, and
+  // keep the launcher icon-only so the cluster fits the narrow catalog aside.
+  .filter-mode-control {
+    padding-bottom: 4px;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
   }
 }
 
@@ -782,7 +801,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .github-api-explorer-filters label:first-child {
+  .github-api-explorer-search {
     grid-column: auto;
   }
 

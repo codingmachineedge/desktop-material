@@ -16,6 +16,12 @@ import {
 } from '../../lib/stores/provider-triage-store'
 import { Button } from '../lib/button'
 import { LinkButton } from '../lib/link-button'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 export interface IRepositoryProviderTriageProps {
   readonly repository: Repository
@@ -31,8 +37,13 @@ export interface IRepositoryProviderTriageProps {
 interface IRepositoryProviderTriageState {
   readonly triage: IProviderTriageState
   readonly filters: IProviderTriageFilters
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
   readonly selectedAccountKey: string | null
 }
+
+/** The per-surface persistence id for the triage search's filter mode. */
+const ProviderTriageFilterId = 'provider-triage'
 
 function repositoryViewKey(repository: Repository): string {
   const remote = repository.gitHubRepository
@@ -112,6 +123,8 @@ export class RepositoryProviderTriage extends React.Component<
         bucket: 'all',
         sort: 'updated-descending',
       },
+      filterMode: readPersistedFilterMode(ProviderTriageFilterId),
+      filterCaseSensitive: false,
       selectedAccountKey: null,
     }
   }
@@ -229,6 +242,62 @@ export class RepositoryProviderTriage extends React.Component<
     this.setState({
       filters: { ...this.state.filters, query: event.currentTarget.value },
     })
+  }
+
+  private onFilterModeChange = (filterMode: FilterMode) => {
+    persistFilterMode(ProviderTriageFilterId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChange = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({
+      filters: { ...this.state.filters, query: pattern },
+    })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.state.triage.items
+      .slice(0, 50)
+      .map(
+        item =>
+          `${item.title} · ${item.authorLogin} · ${item.repository} · #${item.number}`
+      )
+
+  /**
+   * Apply the free-text query using the current filter mode. Kind, bucket,
+   * and sort still run through {@link filterProviderTriageItems}, which
+   * receives an empty query so the chosen sort order survives every mode.
+   */
+  private getQueryMatchedItems(
+    items: ReadonlyArray<IProviderTriageItem>
+  ): ReadonlyArray<IProviderTriageItem> {
+    const query = this.state.filters.query.trim()
+
+    if (query.length === 0) {
+      return items
+    }
+
+    // Fuzzy matching only scores the first two keys, so author, repository,
+    // and number fold into the second one; Substring / Regex modes test
+    // each key.
+    const { results } = matchWithMode(
+      query,
+      items,
+      item => [
+        item.title,
+        `${item.authorLogin} ${item.repository} #${item.number}`,
+      ],
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
+    )
+
+    return results.map(result => result.item)
   }
 
   private onKindChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -424,7 +493,10 @@ export class RepositoryProviderTriage extends React.Component<
 
   public render() {
     const { triage, filters } = this.state
-    const items = filterProviderTriageItems(triage.items, filters)
+    const items = filterProviderTriageItems(
+      this.getQueryMatchedItems(triage.items),
+      { ...filters, query: '' }
+    )
     const provider =
       triage.provider === null
         ? null
@@ -484,16 +556,28 @@ export class RepositoryProviderTriage extends React.Component<
           {this.renderAccountGuidance()}
 
           <div className="provider-triage-filters" role="search">
-            <label>
-              <span>Search work items</span>
-              <input
-                type="search"
-                value={filters.query}
-                onChange={this.onQueryChange}
-                maxLength={100}
-                placeholder="Title, author, repository, or number"
+            <div className="provider-triage-search">
+              <label>
+                <span>Search work items</span>
+                <input
+                  type="search"
+                  value={filters.query}
+                  onChange={this.onQueryChange}
+                  maxLength={100}
+                  placeholder="Title, author, repository, or number"
+                />
+              </label>
+              <FilterModeControl
+                mode={this.state.filterMode}
+                caseSensitive={this.state.filterCaseSensitive}
+                onModeChange={this.onFilterModeChange}
+                onCaseSensitiveChange={this.onFilterCaseSensitiveChange}
+                regexBuilderTarget="Work items"
+                getSampleItems={this.getFilterSampleItems}
+                filterText={filters.query}
+                onRegexPatternApply={this.onRegexPatternApply}
               />
-            </label>
+            </div>
             <label>
               <span>Work item type</span>
               <select value={filters.kind} onChange={this.onKindChange}>

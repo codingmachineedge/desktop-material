@@ -69,6 +69,30 @@ both themes) instead of borrowing the pull tone, so the pill signals that a
 push will follow the offered pull. The post-shell style contract covers the
 new state alongside the original five.
 
+## 2026-07-18 Regex builder on every filter bar
+
+Every persistent search/filter surface in the app now carries the shared
+`FilterModeControl` cluster (fuzzy/substring/regex mode cycle, match-case
+toggle, and the regex-builder launcher) with its mode persisted per surface.
+The wave covered the 23 surfaces that lacked it: the three
+`SectionFilterList` consumers that only needed a `filterListId` (worktrees,
+account picker, Copilot model picker); the five Actions surfaces (runs
+filter, workflow manager, workflow catalog, cache manager, and the
+find-in-job-log search with mode-aware match navigation); the six
+shell/tab surfaces (command palette, Material context-menu filter, tab
+search, arrange tabs, close-tabs-containing — its inverse "keep" variant
+deliberately stays a documented literal substring for destructive-action
+safety — and the tab-style-editor font search); the five repository
+surfaces (in-diff search with mode-aware occurrence navigation, submodule
+manager, gitignore templates, tools catalog, provider triage); and the
+four GitHub views (issues search, REST + GraphQL API-explorer catalogs,
+notification centre). Bespoke one-off regex toggles were replaced by the
+shared control everywhere they existed. All `FilterModeControl` and
+regex-builder buttons now declare `type="button"` so dialog-form hosts
+(the command palette) cannot implicitly submit. A completeness sweep
+confirmed no remaining filter bar lacks the affordance; compact popovers
+hide the launcher label via their own SCSS while keeping the aria-label.
+
 ## 2026-07-17 Docker builds, sync-pill vibes, auto-build-on-pull, and list typography
 
 The three urgent goals previously recorded at the top of this handoff are

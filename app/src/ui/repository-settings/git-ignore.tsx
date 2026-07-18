@@ -12,6 +12,12 @@ import {
   DefaultCatalogPageSize,
   paginateCatalogItems,
 } from '../../lib/catalog-pagination'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Repository } from '../../models/repository'
 import {
   applyTemplate,
@@ -40,6 +46,10 @@ interface IGitIgnoreState {
   readonly browseOpen: boolean
   /** The current catalog search filter. */
   readonly filter: string
+  /** The text-match strategy for the catalog search. */
+  readonly filterMode: FilterMode
+  /** Whether Substring / Regex matching is case sensitive. */
+  readonly filterCaseSensitive: boolean
   /** The current catalog category filter, or '' for every category. */
   readonly category: '' | GitIgnoreCategory
   /** The current one-based browse page. */
@@ -47,6 +57,9 @@ interface IGitIgnoreState {
   /** Templates shown per browse page. */
   readonly pageSize: number
 }
+
+/** The per-surface persistence id for the template search's filter mode. */
+const GitIgnoreTemplatesFilterId = 'gitignore-templates'
 
 /** Category grouping order and labels for the browse view. */
 const CATEGORY_ORDER: ReadonlyArray<{
@@ -172,6 +185,8 @@ export class GitIgnore extends React.Component<
       suggestions: [],
       browseOpen: false,
       filter: '',
+      filterMode: readPersistedFilterMode(GitIgnoreTemplatesFilterId),
+      filterCaseSensitive: false,
       category: '',
       page: 1,
       pageSize: DefaultCatalogPageSize,
@@ -221,6 +236,22 @@ export class GitIgnore extends React.Component<
   private onFilterChanged = (event: React.FormEvent<HTMLInputElement>) => {
     this.setState({ filter: event.currentTarget.value, page: 1 })
   }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(GitIgnoreTemplatesFilterId, filterMode)
+    this.setState({ filterMode, page: 1 })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive, page: 1 })
+  }
+
+  private onRegexPatternApply = (filter: string) => {
+    this.setState({ filter, page: 1 })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    getTemplateCatalog().map(template => template.label)
 
   private onCategoryChanged = (event: React.FormEvent<HTMLSelectElement>) => {
     this.setState({
@@ -310,14 +341,28 @@ export class GitIgnore extends React.Component<
     )
   }
 
-  private renderBrowse(appliedIds: ReadonlySet<string>) {
-    const filter = this.state.filter.trim().toLowerCase()
+  private getMatchingTemplates(): ReadonlyArray<IGitIgnoreTemplate> {
+    const filter = this.state.filter.trim()
     const category = this.state.category
-    const matches = getTemplateCatalog().filter(
-      t =>
-        (filter.length === 0 || t.label.toLowerCase().includes(filter)) &&
-        (category === '' || t.category === category)
+    const catalog = getTemplateCatalog().filter(
+      t => category === '' || t.category === category
     )
+
+    if (filter.length === 0) {
+      return catalog
+    }
+
+    const { results } = matchWithMode(filter, catalog, t => [t.label], {
+      mode: this.state.filterMode,
+      caseSensitive: this.state.filterCaseSensitive,
+    })
+
+    return results.map(result => result.item)
+  }
+
+  private renderBrowse(appliedIds: ReadonlySet<string>) {
+    const category = this.state.category
+    const matches = this.getMatchingTemplates()
     const { page, items: pageItems } = paginateCatalogItems(
       matches,
       this.state.page,
@@ -361,6 +406,16 @@ export class GitIgnore extends React.Component<
                   onChange={this.onFilterChanged}
                 />
               </div>
+              <FilterModeControl
+                mode={this.state.filterMode}
+                caseSensitive={this.state.filterCaseSensitive}
+                onModeChange={this.onFilterModeChanged}
+                onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+                regexBuilderTarget="Templates"
+                getSampleItems={this.getFilterSampleItems}
+                filterText={this.state.filter}
+                onRegexPatternApply={this.onRegexPatternApply}
+              />
               <label className="gitignore-category">
                 <span className="gitignore-category-label">Category</span>
                 <select

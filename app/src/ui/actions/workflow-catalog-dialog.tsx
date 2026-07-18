@@ -4,16 +4,34 @@ import classNames from 'classnames'
 import { access, mkdir, writeFile } from 'fs/promises'
 import { Repository } from '../../models/repository'
 import { IAPIWorkflow } from '../../lib/api'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { trapActionsDialogFocus } from './actions-dialog-focus'
 import {
-  getTemplateMatcher,
   IWorkflowTemplate,
   WorkflowTemplateCategories,
   WorkflowTemplateCategory,
   WorkflowTemplates,
 } from './workflow-templates'
+
+/** localStorage key used to persist the template search filter mode. */
+const WorkflowCatalogFilterListId = 'actions-workflow-catalog'
+
+// Two keys so fuzzy mode (which only scores the first two) still matches on
+// every field: the template name is the "title" and the rest fold into the
+// "subtitle". Substring / regex modes test every key.
+const getTemplateSearchKeys = (
+  template: IWorkflowTemplate
+): ReadonlyArray<string> => [
+  template.name,
+  `${template.path} ${template.category} ${template.trigger} ${template.description}`,
+]
 
 interface IWorkflowCatalogDialogProps {
   readonly repository: Repository
@@ -30,7 +48,8 @@ interface IWorkflowCatalogDialogProps {
 
 interface IWorkflowCatalogDialogState {
   readonly query: string
-  readonly useRegex: boolean
+  readonly queryMode: FilterMode
+  readonly queryCaseSensitive: boolean
   readonly filtersOpen: boolean
   readonly categories: ReadonlyArray<WorkflowTemplateCategory>
   readonly installedPaths: ReadonlyArray<string>
@@ -54,7 +73,8 @@ export class WorkflowCatalogDialog extends React.Component<
     super(props)
     this.state = {
       query: '',
-      useRegex: false,
+      queryMode: readPersistedFilterMode(WorkflowCatalogFilterListId),
+      queryCaseSensitive: false,
       filtersOpen: false,
       categories: [],
       installedPaths: props.workflows
@@ -88,6 +108,15 @@ export class WorkflowCatalogDialog extends React.Component<
   }
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // Keys pressed inside the regex builder overlay belong to the builder: it
+    // dismisses itself on Escape via a window-level listener that would never
+    // fire past this handler's stopPropagation.
+    if (
+      event.target instanceof Element &&
+      event.target.closest('.regex-builder-overlay') !== null
+    ) {
+      return
+    }
     event.stopPropagation()
     trapActionsDialogFocus(event, event.currentTarget)
     if (event.key === 'Escape' && this.state.busyId === null) {
@@ -135,8 +164,43 @@ export class WorkflowCatalogDialog extends React.Component<
   private onQueryChange = (event: React.FormEvent<HTMLInputElement>) =>
     this.setState({ query: event.currentTarget.value })
 
-  private toggleRegex = () =>
-    this.setState(state => ({ useRegex: !state.useRegex }))
+  private onQueryModeChange = (queryMode: FilterMode) => {
+    persistFilterMode(WorkflowCatalogFilterListId, queryMode)
+    this.setState({ queryMode })
+  }
+
+  private onQueryCaseSensitiveChange = (queryCaseSensitive: boolean) =>
+    this.setState({ queryCaseSensitive })
+
+  private onQueryPatternApply = (query: string) => this.setState({ query })
+
+  private getQuerySampleItems = (): ReadonlyArray<string> =>
+    WorkflowTemplates.flatMap(getTemplateSearchKeys)
+
+  private getVisibleTemplates(): {
+    readonly templates: ReadonlyArray<IWorkflowTemplate>
+    readonly regexError: string | null
+  } {
+    const { categories } = this.state
+    const candidates = WorkflowTemplates.filter(
+      template =>
+        categories.length === 0 || categories.includes(template.category)
+    )
+    const query = this.state.query.trim()
+    if (query.length === 0) {
+      return { templates: candidates, regexError: null }
+    }
+    const { results, regexError } = matchWithMode(
+      query,
+      candidates,
+      getTemplateSearchKeys,
+      {
+        mode: this.state.queryMode,
+        caseSensitive: this.state.queryCaseSensitive,
+      }
+    )
+    return { templates: results.map(r => r.item), regexError }
+  }
 
   private toggleFilters = () =>
     this.setState(state => ({ filtersOpen: !state.filtersOpen }))
@@ -267,13 +331,8 @@ export class WorkflowCatalogDialog extends React.Component<
   }
 
   public render() {
-    const { query, useRegex, filtersOpen, categories } = this.state
-    const matcher = getTemplateMatcher(query, useRegex)
-    const visible = WorkflowTemplates.filter(
-      template =>
-        matcher.matches(template) &&
-        (categories.length === 0 || categories.includes(template.category))
-    )
+    const { query, filtersOpen } = this.state
+    const { templates: visible, regexError } = this.getVisibleTemplates()
     return (
       <div className="actions-dialog-layer">
         {/* The dialog handles Escape and focus wrap from any descendant. */}
@@ -317,7 +376,7 @@ export class WorkflowCatalogDialog extends React.Component<
               className={classNames(
                 'actions-search-pill',
                 'workflow-catalog-search-pill',
-                { invalid: matcher.invalid }
+                { invalid: regexError !== null }
               )}
             >
               <Octicon symbol={octicons.search} />
@@ -328,19 +387,16 @@ export class WorkflowCatalogDialog extends React.Component<
                 spellCheck={false}
                 aria-label="Search workflow templates"
               />
-              <button
-                type="button"
-                className={classNames(
-                  'actions-search-toggle',
-                  'actions-search-regex',
-                  { on: useRegex }
-                )}
-                aria-pressed={useRegex}
-                aria-label="Use regular expression"
-                onClick={this.toggleRegex}
-              >
-                .*
-              </button>
+              <FilterModeControl
+                mode={this.state.queryMode}
+                caseSensitive={this.state.queryCaseSensitive}
+                onModeChange={this.onQueryModeChange}
+                onCaseSensitiveChange={this.onQueryCaseSensitiveChange}
+                regexBuilderTarget="Workflow templates"
+                getSampleItems={this.getQuerySampleItems}
+                filterText={query}
+                onRegexPatternApply={this.onQueryPatternApply}
+              />
               <button
                 type="button"
                 className={classNames('actions-search-toggle', {

@@ -161,6 +161,8 @@ export class AccountPicker extends React.Component<
         <SectionFilterList<IAccountListItem>
           className="account-list"
           rowHeight={47}
+          filterListId="accounts"
+          filterListLabel="Accounts"
           groups={this.getFilterListGroups(this.props.accounts)}
           selectedItem={this.getSelectedItem(
             this.props.accounts,

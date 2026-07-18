@@ -9,6 +9,7 @@ import {
 } from '../../lib/stores/github-notifications-store'
 import { shell } from '../../lib/app-shell'
 import { IAPINotificationThread } from '../../lib/api'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { Account, getAccountKey } from '../../models/account'
 import { CloningRepository } from '../../models/cloning-repository'
 import {
@@ -22,8 +23,15 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { GitHubNotificationListItem } from './github-notification-list-item'
 import { NotificationListItem } from './notification-list-item'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { TooltipDirection } from '../lib/tooltip'
+
+const NotificationSearchFilterId = 'notification-centre-search'
 
 type NotificationSource = 'local' | 'github'
 type NotificationFilter = 'all' | 'unread'
@@ -61,6 +69,8 @@ interface INotificationCentrePanelState {
   readonly source: NotificationSource
   readonly filter: NotificationFilter
   readonly query: string
+  readonly queryMode: FilterMode
+  readonly queryCaseSensitive: boolean
   readonly kind: NotificationKindFilter
   readonly selectedLocalIds: ReadonlySet<string>
   readonly selectedGitHubIds: ReadonlySet<string>
@@ -106,6 +116,8 @@ export class NotificationCentrePanel extends React.Component<
       source: 'local',
       filter: 'all',
       query: '',
+      queryMode: readPersistedFilterMode(NotificationSearchFilterId),
+      queryCaseSensitive: false,
       kind: 'all',
       selectedLocalIds: new Set<string>(),
       selectedGitHubIds: new Set<string>(),
@@ -327,6 +339,45 @@ export class NotificationCentrePanel extends React.Component<
       confirmingBulk: null,
     })
   }
+
+  // Mode, case, and applied patterns change the visible set, so they clear
+  // selections the same way typing in the search field does.
+  private onQueryModeChange = (queryMode: FilterMode) => {
+    persistFilterMode(NotificationSearchFilterId, queryMode)
+    this.setState({
+      queryMode,
+      selectedLocalIds: new Set<string>(),
+      selectedGitHubIds: new Set<string>(),
+      confirmingBulk: null,
+    })
+  }
+
+  private onQueryCaseSensitiveChange = (queryCaseSensitive: boolean) => {
+    this.setState({
+      queryCaseSensitive,
+      selectedLocalIds: new Set<string>(),
+      selectedGitHubIds: new Set<string>(),
+      confirmingBulk: null,
+    })
+  }
+
+  private onQueryPatternApply = (query: string) => {
+    this.setState({
+      query,
+      selectedLocalIds: new Set<string>(),
+      selectedGitHubIds: new Set<string>(),
+      confirmingBulk: null,
+    })
+  }
+
+  private getQuerySampleItems = (): ReadonlyArray<string> =>
+    this.state.source === 'local'
+      ? this.props.entries.slice(0, 50).map(entry => entry.title)
+      : this.state.github.notifications
+          .slice(0, 50)
+          .map(
+            thread => `${thread.repository.full_name} ${thread.subject.title}`
+          )
 
   private onKindChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     this.setState({
@@ -979,17 +1030,31 @@ export class NotificationCentrePanel extends React.Component<
     const local = this.state.source === 'local'
     return (
       <div className="notification-centre-filter-bar">
-        <label className="notification-centre-search">
-          <span>Search</span>
-          <input
-            type="search"
-            value={this.state.query}
-            disabled={this.state.bulkBusy}
-            aria-label={`Search ${this.state.source} notifications`}
-            placeholder="Title, message, repository, or reason"
-            onChange={this.onQueryChange}
+        <div className="notification-centre-search-row">
+          <label className="notification-centre-search">
+            <span>Search</span>
+            <input
+              type="search"
+              value={this.state.query}
+              disabled={this.state.bulkBusy}
+              aria-label={`Search ${this.state.source} notifications`}
+              placeholder="Title, message, repository, or reason"
+              onChange={this.onQueryChange}
+            />
+          </label>
+          <FilterModeControl
+            mode={this.state.queryMode}
+            caseSensitive={this.state.queryCaseSensitive}
+            onModeChange={this.onQueryModeChange}
+            onCaseSensitiveChange={this.onQueryCaseSensitiveChange}
+            regexBuilderTarget={
+              local ? 'Local notifications' : 'GitHub notifications'
+            }
+            getSampleItems={this.getQuerySampleItems}
+            filterText={this.state.query}
+            onRegexPatternApply={this.onQueryPatternApply}
           />
-        </label>
+        </div>
         {local ? (
           <label className="notification-centre-kind-filter">
             <span>Type</span>
@@ -1170,48 +1235,52 @@ export class NotificationCentrePanel extends React.Component<
   }
 
   private get visibleEntries(): ReadonlyArray<INotificationEntry> {
-    return this.props.entries.filter(entry => {
+    const entries = this.props.entries.filter(entry => {
       if (this.state.filter === 'unread' && entry.read) {
         return false
       }
-      if (this.state.kind !== 'all' && entry.kind !== this.state.kind) {
-        return false
-      }
-      return this.matchesQuery([
-        entry.title,
+      return this.state.kind === 'all' || entry.kind === this.state.kind
+    })
+    // Two keys so fuzzy mode (which only scores the first two) still matches on
+    // the body, kind, and account folded into the "subtitle" key.
+    return this.matchQuery(entries, entry => [
+      entry.title,
+      [
         entry.body,
         notificationKindLabels[entry.kind],
         entry.accountKey ?? '',
         entry.repositoryId?.toString() ?? '',
-      ])
-    })
+      ].join(' '),
+    ])
   }
 
   private get visibleGitHubNotifications(): ReadonlyArray<IAPINotificationThread> {
-    return this.state.github.notifications.filter(thread => {
-      if (this.state.github.filter === 'unread' && !thread.unread) {
-        return false
-      }
-      return this.matchesQuery([
-        thread.subject.title,
+    const threads = this.state.github.notifications.filter(
+      thread => this.state.github.filter !== 'unread' || thread.unread
+    )
+    return this.matchQuery(threads, thread => [
+      thread.subject.title,
+      [
         thread.subject.type,
         thread.repository.full_name,
         thread.reason.replace(/_/g, ' '),
-      ])
-    })
+      ].join(' '),
+    ])
   }
 
-  private matchesQuery(fields: ReadonlyArray<string>): boolean {
-    const terms = this.state.query
-      .trim()
-      .toLocaleLowerCase()
-      .split(/\s+/)
-      .filter(term => term.length > 0)
-    if (terms.length === 0) {
-      return true
+  private matchQuery<T>(
+    items: ReadonlyArray<T>,
+    getKey: (item: T) => ReadonlyArray<string>
+  ): ReadonlyArray<T> {
+    const query = this.state.query.trim()
+    if (query.length === 0) {
+      return items
     }
-    const searchable = fields.join(' ').toLocaleLowerCase()
-    return terms.every(term => searchable.includes(term))
+    const { results } = matchWithMode(query, items, getKey, {
+      mode: this.state.queryMode,
+      caseSensitive: this.state.queryCaseSensitive,
+    })
+    return results.map(match => match.item)
   }
 
   private renderLocalList() {

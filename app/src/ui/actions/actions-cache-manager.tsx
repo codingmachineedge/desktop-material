@@ -1,11 +1,29 @@
 import * as React from 'react'
+import classNames from 'classnames'
 import { IActionsCache, IActionsCacheList } from '../../lib/actions-caches'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { IActionsState, ActionsStore } from '../../lib/stores/actions-store'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
 import { formatBytes } from '../lib/bytes'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+
+/** localStorage key used to persist the cache filter mode. */
+const CacheManagerFilterListId = 'actions-caches'
+
+// Two keys so fuzzy mode (which only scores the first two) still matches on
+// every field: the cache key is the "title" and ref + version fold into the
+// "subtitle". Substring / regex modes test every key.
+const getCacheSearchKeys = (cache: IActionsCache): ReadonlyArray<string> => [
+  cache.key,
+  `${cache.ref ?? ''} ${cache.version ?? ''}`.trim(),
+]
 
 interface IActionsCacheManagerProps {
   readonly repository: Repository
@@ -16,16 +34,59 @@ interface IActionsCacheManagerProps {
 interface IActionsCacheManagerState {
   /** Free-text query narrowing caches by key, ref, or version. */
   readonly filterText: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
 }
 
 export class ActionsCacheManager extends React.PureComponent<
   IActionsCacheManagerProps,
   IActionsCacheManagerState
 > {
-  public state: IActionsCacheManagerState = { filterText: '' }
+  public state: IActionsCacheManagerState = {
+    filterText: '',
+    filterMode: readPersistedFilterMode(CacheManagerFilterListId),
+    filterCaseSensitive: false,
+  }
 
   private onFilterChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ filterText: event.target.value })
+  }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(CacheManagerFilterListId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) =>
+    this.setState({ filterCaseSensitive })
+
+  private onFilterPatternApply = (filterText: string) =>
+    this.setState({ filterText })
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    (this.props.state.caches?.caches ?? [])
+      .flatMap(getCacheSearchKeys)
+      .filter(key => key.length > 0)
+
+  private getFilteredCaches(): {
+    readonly caches: ReadonlyArray<IActionsCache>
+    readonly regexError: string | null
+  } {
+    const loaded = this.props.state.caches?.caches ?? []
+    const query = this.state.filterText.trim()
+    if (query.length === 0) {
+      return { caches: loaded, regexError: null }
+    }
+    const { results, regexError } = matchWithMode(
+      query,
+      loaded,
+      getCacheSearchKeys,
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
+    )
+    return { caches: results.map(r => r.item), regexError }
   }
 
   private loadCaches = () => {
@@ -173,15 +234,7 @@ export class ActionsCacheManager extends React.PureComponent<
   }
 
   private renderCacheList(list: IActionsCacheList) {
-    const query = this.state.filterText.trim().toLowerCase()
-    const caches =
-      query.length === 0
-        ? list.caches
-        : list.caches.filter(cache =>
-            `${cache.key} ${cache.ref ?? ''} ${cache.version ?? ''}`
-              .toLowerCase()
-              .includes(query)
-          )
+    const { caches } = this.getFilteredCaches()
 
     if (caches.length === 0) {
       return (
@@ -286,7 +339,11 @@ export class ActionsCacheManager extends React.PureComponent<
         </header>
 
         <div className="actions-search-row actions-cache-filter">
-          <div className="actions-search-pill">
+          <div
+            className={classNames('actions-search-pill', {
+              invalid: this.getFilteredCaches().regexError !== null,
+            })}
+          >
             <Octicon symbol={octicons.search} />
             <input
               value={this.state.filterText}
@@ -294,6 +351,16 @@ export class ActionsCacheManager extends React.PureComponent<
               placeholder="Filter caches by key, ref, or version…"
               spellCheck={false}
               aria-label="Filter caches"
+            />
+            <FilterModeControl
+              mode={this.state.filterMode}
+              caseSensitive={this.state.filterCaseSensitive}
+              onModeChange={this.onFilterModeChanged}
+              onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+              regexBuilderTarget="Caches"
+              getSampleItems={this.getFilterSampleItems}
+              filterText={this.state.filterText}
+              onRegexPatternApply={this.onFilterPatternApply}
             />
           </div>
         </div>

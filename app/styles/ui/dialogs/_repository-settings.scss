@@ -883,9 +883,16 @@
       flex-direction: column;
       gap: 8px;
 
+      .submodules-filter-search {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
       .submodules-filter-text {
         max-width: 100%;
         min-width: 0;
+        flex: 1;
       }
     }
 

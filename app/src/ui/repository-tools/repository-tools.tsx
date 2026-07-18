@@ -41,6 +41,12 @@ import {
 } from './operations'
 import { RepositoryBundleImport } from './bundle-import'
 import { RepositoryShallowHistory } from './shallow-history'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -224,6 +230,9 @@ const RepositoryToolsHubCategories: ReadonlyArray<RepositoryToolsHubCategoryFilt
 
 const DefaultHubTool: RepositoryToolsHubToolID = 'status-summary'
 
+/** The per-surface persistence id for the tools-hub search's filter mode. */
+const RepositoryToolsFilterId = 'repository-tools-hub'
+
 function isRepositoryToolsHubCategoryFilter(
   value: string
 ): value is RepositoryToolsHubCategoryFilter {
@@ -308,6 +317,8 @@ interface IRepositoryToolsState {
   readonly noteMessage: string
   readonly noteRequest: IRepositoryNoteRequest | null
   readonly toolFilter: string
+  readonly toolFilterMode: FilterMode
+  readonly toolFilterCaseSensitive: boolean
   readonly toolCategory: RepositoryToolsHubCategoryFilter
   readonly selectedTool: RepositoryToolsHubToolID
 }
@@ -355,6 +366,8 @@ export class RepositoryTools extends React.Component<
       noteMessage: '',
       noteRequest: null,
       toolFilter: '',
+      toolFilterMode: readPersistedFilterMode(RepositoryToolsFilterId),
+      toolFilterCaseSensitive: false,
       toolCategory: 'All',
       selectedTool: DefaultHubTool,
     }
@@ -498,6 +511,26 @@ export class RepositoryTools extends React.Component<
     this.setState({ toolFilter: event.currentTarget.value })
   }
 
+  private onHubFilterModeChanged = (toolFilterMode: FilterMode) => {
+    persistFilterMode(RepositoryToolsFilterId, toolFilterMode)
+    this.setState({ toolFilterMode })
+  }
+
+  private onHubFilterCaseSensitiveChanged = (
+    toolFilterCaseSensitive: boolean
+  ) => {
+    this.setState({ toolFilterCaseSensitive })
+  }
+
+  private onHubRegexPatternApply = (toolFilter: string) => {
+    this.setState({ toolFilter })
+  }
+
+  private getHubFilterSampleItems = (): ReadonlyArray<string> =>
+    this.getAllHubEntries().map(
+      entry => `${entry.title} · ${entry.category} · ${entry.description}`
+    )
+
   private onHubCategoryClicked = (
     event: React.MouseEvent<HTMLButtonElement>
   ) => {
@@ -542,21 +575,32 @@ export class RepositoryTools extends React.Component<
   }
 
   private getVisibleHubEntries(): ReadonlyArray<IRepositoryToolsHubEntry> {
-    const filter = this.state.toolFilter.trim().toLowerCase()
-    return this.getAllHubEntries().filter(entry => {
-      if (
-        this.state.toolCategory !== 'All' &&
-        entry.category !== this.state.toolCategory
-      ) {
-        return false
-      }
-      if (filter.length === 0) {
-        return true
-      }
-      return `${entry.title} ${entry.category} ${entry.description}`
-        .toLowerCase()
-        .includes(filter)
-    })
+    const {
+      toolFilter,
+      toolFilterMode,
+      toolFilterCaseSensitive,
+      toolCategory,
+    } = this.state
+    const categoryMatches = this.getAllHubEntries().filter(
+      entry => toolCategory === 'All' || entry.category === toolCategory
+    )
+    const query = toolFilter.trim()
+
+    if (query.length === 0) {
+      return categoryMatches
+    }
+
+    // Fuzzy matching only scores the first two keys, so category and
+    // description fold into the second one; Substring / Regex modes test
+    // each key.
+    const { results } = matchWithMode(
+      query,
+      categoryMatches,
+      entry => [entry.title, `${entry.category} ${entry.description}`],
+      { mode: toolFilterMode, caseSensitive: toolFilterCaseSensitive }
+    )
+
+    return results.map(result => result.item)
   }
 
   private async startOperation(
@@ -1711,6 +1755,16 @@ export class RepositoryTools extends React.Component<
             value={this.state.toolFilter}
             onChange={this.onHubFilterChanged}
             ref={this.setHubSearchInput}
+          />
+          <FilterModeControl
+            mode={this.state.toolFilterMode}
+            caseSensitive={this.state.toolFilterCaseSensitive}
+            onModeChange={this.onHubFilterModeChanged}
+            onCaseSensitiveChange={this.onHubFilterCaseSensitiveChanged}
+            regexBuilderTarget="Repository tools"
+            getSampleItems={this.getHubFilterSampleItems}
+            filterText={this.state.toolFilter}
+            onRegexPatternApply={this.onHubRegexPatternApply}
           />
         </div>
         <div

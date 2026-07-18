@@ -557,6 +557,9 @@
     position: absolute;
     top: 0;
     right: var(--spacing);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-half);
     border: var(--base-border);
     border-top: 0;
     border-radius: 0 0 var(--border-radius) var(--border-radius);
@@ -564,6 +567,16 @@
     box-shadow: var(--base-box-shadow);
     z-index: var(--popup-z-index);
     background: var(--background-color);
+
+    // The trailing filter-mode cluster stays icon-only in this cramped
+    // popover; the shared aria-label keeps the launcher discoverable.
+    .filter-mode-control-cluster {
+      flex-wrap: nowrap;
+    }
+
+    .filter-regex-builder-label {
+      display: none;
+    }
 
     .text-box-component {
       input {

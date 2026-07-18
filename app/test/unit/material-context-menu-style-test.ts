@@ -37,6 +37,19 @@ describe('material context menu contracts', () => {
     assert.match(manifest, /@import 'ui\/material-context-menu';/)
   })
 
+  it('filters through the shared filter-mode cluster in its compact form', () => {
+    const component = read('src', 'ui', 'lib', 'material-context-menu.tsx')
+    assert.match(component, /<FilterModeControl/)
+    assert.match(component, /matchWithMode/)
+    assert.match(component, /ContextMenuFilterListId = 'material-context-menu'/)
+
+    const styles = read('styles', 'ui', '_material-context-menu.scss')
+    assert.match(
+      styles,
+      /\.context-menu-filter\s*\{[\s\S]*?\.filter-regex-builder-label\s*\{\s*display: none;/
+    )
+  })
+
   it('gives the flagship context menus leading icons', () => {
     const tabStrip = read(
       'src',

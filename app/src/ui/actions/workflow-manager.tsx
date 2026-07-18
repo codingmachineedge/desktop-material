@@ -1,10 +1,19 @@
 import * as React from 'react'
 import classNames from 'classnames'
 import { IAPIWorkflow } from '../../lib/api'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { getWorkflowStateAction } from './workflow-state-control'
 import { getWorkflowFileName, getWorkflowGlyph } from './workflow-templates'
+
+/** localStorage key used to persist the workflow filter mode. */
+const WorkflowManagerFilterListId = 'actions-workflows'
 
 interface IWorkflowManagerRowProps {
   readonly workflow: IAPIWorkflow
@@ -72,6 +81,8 @@ interface IWorkflowManagerProps {
 interface IWorkflowManagerState {
   /** Free-text query narrowing workflows by name or file path. */
   readonly filterText: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
 }
 
 /**
@@ -83,10 +94,49 @@ export class WorkflowManager extends React.PureComponent<
   IWorkflowManagerProps,
   IWorkflowManagerState
 > {
-  public state: IWorkflowManagerState = { filterText: '' }
+  public state: IWorkflowManagerState = {
+    filterText: '',
+    filterMode: readPersistedFilterMode(WorkflowManagerFilterListId),
+    filterCaseSensitive: false,
+  }
 
   private onFilterChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ filterText: event.target.value })
+  }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(WorkflowManagerFilterListId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) =>
+    this.setState({ filterCaseSensitive })
+
+  private onFilterPatternApply = (filterText: string) =>
+    this.setState({ filterText })
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.props.workflows.flatMap(workflow => [workflow.name, workflow.path])
+
+  private getVisibleWorkflows(): {
+    readonly workflows: ReadonlyArray<IAPIWorkflow>
+    readonly regexError: string | null
+  } {
+    const { workflows } = this.props
+    const query = this.state.filterText.trim()
+    if (query.length === 0) {
+      return { workflows, regexError: null }
+    }
+    const { results, regexError } = matchWithMode(
+      query,
+      workflows,
+      workflow => [workflow.name, workflow.path],
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
+    )
+    return { workflows: results.map(r => r.item), regexError }
   }
 
   private renderRow = (workflow: IAPIWorkflow, index: number) => (
@@ -102,13 +152,7 @@ export class WorkflowManager extends React.PureComponent<
   public render() {
     const { workflows } = this.props
     const activeCount = workflows.filter(x => x.state === 'active').length
-    const query = this.state.filterText.trim().toLowerCase()
-    const visible =
-      query.length === 0
-        ? workflows
-        : workflows.filter(workflow =>
-            `${workflow.name} ${workflow.path}`.toLowerCase().includes(query)
-          )
+    const { workflows: visible, regexError } = this.getVisibleWorkflows()
 
     return (
       <section
@@ -131,7 +175,11 @@ export class WorkflowManager extends React.PureComponent<
         </header>
         {workflows.length > 0 && (
           <div className="actions-search-row actions-workflow-filter">
-            <div className="actions-search-pill">
+            <div
+              className={classNames('actions-search-pill', {
+                invalid: regexError !== null,
+              })}
+            >
               <Octicon symbol={octicons.search} />
               <input
                 value={this.state.filterText}
@@ -139,6 +187,16 @@ export class WorkflowManager extends React.PureComponent<
                 placeholder="Filter workflows by name or file…"
                 spellCheck={false}
                 aria-label="Filter workflows"
+              />
+              <FilterModeControl
+                mode={this.state.filterMode}
+                caseSensitive={this.state.filterCaseSensitive}
+                onModeChange={this.onFilterModeChanged}
+                onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+                regexBuilderTarget="Workflows"
+                getSampleItems={this.getFilterSampleItems}
+                filterText={this.state.filterText}
+                onRegexPatternApply={this.onFilterPatternApply}
               />
             </div>
           </div>

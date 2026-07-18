@@ -14,6 +14,12 @@ import {
   SubmoduleStatusFilter,
   filterSubmodules,
 } from '../../lib/submodules/submodule-filter'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 interface ISubmodulesProps {
   readonly repository: Repository
@@ -42,9 +48,18 @@ interface ISubmodulesState {
   /** Free-text query narrowing the list by name, path, or URL. */
   readonly filterText: string
 
+  /** The text-match strategy for the search field. */
+  readonly filterMode: FilterMode
+
+  /** Whether Substring / Regex matching is case sensitive. */
+  readonly filterCaseSensitive: boolean
+
   /** Status scope narrowing the list. */
   readonly statusFilter: SubmoduleStatusFilter
 }
+
+/** The per-surface persistence id for the submodule search's filter mode. */
+const SubmodulesFilterId = 'submodule-manager'
 
 const StatusFilterLabels: ReadonlyArray<{
   readonly key: SubmoduleStatusFilter
@@ -89,6 +104,8 @@ export class Submodules extends React.Component<
       progress: null,
       error: null,
       filterText: '',
+      filterMode: readPersistedFilterMode(SubmodulesFilterId),
+      filterCaseSensitive: false,
       statusFilter: 'all',
     }
   }
@@ -96,6 +113,24 @@ export class Submodules extends React.Component<
   private onFilterTextChanged = (filterText: string) => {
     this.setState({ filterText })
   }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(SubmodulesFilterId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({ filterText: pattern })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    (this.state.submodules ?? []).map(submodule =>
+      [submodule.path, submodule.url].filter(Boolean).join(' · ')
+    )
 
   private onStatusChipClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     const key = event.currentTarget.dataset.statusFilter
@@ -276,13 +311,25 @@ export class Submodules extends React.Component<
 
     return (
       <div className="submodules-filter-row">
-        <TextBox
-          className="submodules-filter-text"
-          placeholder="Search submodules by name, path, or URL"
-          ariaLabel="Search submodules"
-          value={this.state.filterText}
-          onValueChanged={this.onFilterTextChanged}
-        />
+        <div className="submodules-filter-search">
+          <TextBox
+            className="submodules-filter-text"
+            placeholder="Search submodules by name, path, or URL"
+            ariaLabel="Search submodules"
+            value={this.state.filterText}
+            onValueChanged={this.onFilterTextChanged}
+          />
+          <FilterModeControl
+            mode={this.state.filterMode}
+            caseSensitive={this.state.filterCaseSensitive}
+            onModeChange={this.onFilterModeChanged}
+            onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+            regexBuilderTarget="Submodules"
+            getSampleItems={this.getFilterSampleItems}
+            filterText={this.state.filterText}
+            onRegexPatternApply={this.onRegexPatternApply}
+          />
+        </div>
         <div
           className="submodules-filter-chips"
           role="group"
@@ -309,8 +356,32 @@ export class Submodules extends React.Component<
     )
   }
 
+  private getVisibleSubmodules(
+    submodules: ReadonlyArray<IManagedSubmodule>
+  ): ReadonlyArray<IManagedSubmodule> {
+    const { filterText, filterMode, filterCaseSensitive, statusFilter } =
+      this.state
+    const statusMatches = filterSubmodules(submodules, '', statusFilter)
+    const query = filterText.trim()
+
+    if (query.length === 0) {
+      return statusMatches
+    }
+
+    // Fuzzy matching only scores the first two keys, so name and URL fold
+    // into the second one; Substring / Regex modes test each key.
+    const { results } = matchWithMode(
+      query,
+      statusMatches,
+      submodule => [submodule.path, `${submodule.name} ${submodule.url ?? ''}`],
+      { mode: filterMode, caseSensitive: filterCaseSensitive }
+    )
+
+    return results.map(result => result.item)
+  }
+
   private renderList(): JSX.Element {
-    const { submodules, isLoading, filterText, statusFilter } = this.state
+    const { submodules, isLoading } = this.state
 
     if (isLoading && submodules === null) {
       return (
@@ -328,7 +399,7 @@ export class Submodules extends React.Component<
       )
     }
 
-    const visible = filterSubmodules(submodules, filterText, statusFilter)
+    const visible = this.getVisibleSubmodules(submodules)
 
     if (visible.length === 0) {
       return (

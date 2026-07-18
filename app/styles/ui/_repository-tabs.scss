@@ -710,6 +710,16 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
         color: var(--md-sys-color-on-surface);
         font-size: 13px;
       }
+
+      // Compact variant of the shared filter-mode cluster: the 288px editor
+      // is too narrow for the labelled launcher, so it collapses to its glyph.
+      .filter-mode-control-cluster {
+        flex-wrap: nowrap;
+      }
+
+      .filter-regex-builder-label {
+        display: none;
+      }
     }
 
     .tab-style-font-list {
@@ -1000,31 +1010,14 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
       }
     }
 
-    .close-tabs-containing-mode {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      width: 30px;
-      height: 30px;
-      padding: 0;
-      border: 0;
-      border-radius: 999px;
-      background: transparent;
-      color: var(--md-sys-color-on-surface-variant);
-      font-family: var(--font-family-monospace);
-      font-size: 13px;
-      font-weight: var(--font-weight-semibold);
-      cursor: pointer;
+    // Compact variant of the shared filter-mode cluster: the 268px popover
+    // is too narrow for the labelled launcher, so it collapses to its glyph.
+    .filter-mode-control-cluster {
+      flex-wrap: nowrap;
+    }
 
-      &:hover:not(:disabled) {
-        background: var(--md-sys-color-surface-container-highest);
-      }
-
-      &.active {
-        background: var(--md-sys-color-secondary-container);
-        color: var(--md-sys-color-on-secondary-container);
-      }
+    .filter-regex-builder-label {
+      display: none;
     }
   }
 
@@ -1322,7 +1315,16 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
   }
 
+  // The search input plus the shared filter-mode cluster.
+  .arrange-tabs-filter-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
   .arrange-tabs-filter-input {
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 38px;
     padding: 7px 11px;
@@ -1543,8 +1545,16 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     }
   }
 
+  // The search input plus the shared filter-mode cluster.
+  .tab-search-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
   .tab-search-input {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 40px;
     padding: 8px 12px;
@@ -1682,9 +1692,17 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
     max-height: calc(var(--available-height, 100vh) - 20px);
   }
 
+  .tab-search-popover .tab-search-filter-row .filter-regex-builder-label {
+    display: none;
+  }
+
   .arrange-tabs {
     .arrange-tabs-filter {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .arrange-tabs-filter-field .filter-regex-builder-label {
+      display: none;
     }
 
     .arrange-tabs-filter-count {

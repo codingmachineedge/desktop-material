@@ -112,6 +112,13 @@
     }
   }
 
+  // The foldout is only min(365px, 100vw - 16px) wide; the labeled
+  // regex-builder chip would push the mode cluster below the search field, so
+  // collapse the launcher to its icon-only form (its aria-label still names it).
+  .filter-regex-builder-label {
+    display: none;
+  }
+
   .new-worktree-button {
     flex-shrink: 0;
   }

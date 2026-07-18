@@ -471,6 +471,8 @@ export class CopilotModelPicker extends React.Component<
         <SectionFilterList<ICopilotModelListItem>
           className="copilot-model-list"
           rowHeight={this.getRowHeight}
+          filterListId="copilot-models"
+          filterListLabel="Models"
           groups={groups}
           selectedItem={selectedItem}
           renderItem={this.renderModel}

@@ -39,6 +39,13 @@
     margin: var(--spacing) var(--spacing) var(--spacing-half);
   }
 
+  // The 365px popover can't fit the labeled regex-builder chip beside the
+  // search field; collapse the launcher to its icon-only form (its aria-label
+  // still names it).
+  .filter-regex-builder-label {
+    display: none;
+  }
+
   .copilot-model-list-item {
     display: flex;
     align-items: center;

@@ -133,7 +133,13 @@ export class FilterModeControl extends React.Component<
          * fixed-position regex-builder overlay into a containing block.
          */}
         <div className="filter-mode-control-cluster">
+          {/*
+           * Every control is type="button": hosts may mount the cluster
+           * inside a dialog <form>, where the implicit submit type would
+           * dismiss the dialog on click.
+           */}
           <button
+            type="button"
             className={classNames('filter-mode-button', {
               active: mode !== FilterMode.Fuzzy,
             })}
@@ -143,6 +149,7 @@ export class FilterModeControl extends React.Component<
             <span className="filter-mode-glyph">.*</span>
           </button>
           <button
+            type="button"
             className={classNames('filter-case-button', {
               active: !caseDisabled && caseSensitive,
             })}
@@ -155,6 +162,7 @@ export class FilterModeControl extends React.Component<
           </button>
           {this.props.showRegexBuilder !== false && (
             <button
+              type="button"
               className="filter-regex-builder-button"
               aria-label="Open regex builder"
               onClick={this.onOpenBuilder}

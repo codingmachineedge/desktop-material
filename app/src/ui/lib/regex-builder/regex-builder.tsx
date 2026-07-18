@@ -75,6 +75,7 @@ class FlagChip extends React.Component<IFlagChipProps> {
     const { flagKey, tooltip, on } = this.props
     return (
       <button
+        type="button"
         aria-label={`${flagKey} — ${tooltip}`}
         aria-pressed={on}
         className={classNames('regex-flag-chip', { on })}
@@ -107,6 +108,7 @@ class RegexBuilderViewTab extends React.Component<IViewTabProps> {
     const { view, label, icon, selected } = this.props
     return (
       <button
+        type="button"
         id={`regex-builder-view-tab-${view}`}
         role="tab"
         aria-selected={selected}
@@ -423,6 +425,7 @@ export class RegexBuilder extends React.Component<
               </p>
             </div>
             <button
+              type="button"
               className="regex-builder-close"
               aria-label="Close"
               onClick={this.props.onDismissed}
@@ -453,6 +456,7 @@ export class RegexBuilder extends React.Component<
                 {this.renderValidityIcon()}
               </div>
               <button
+                type="button"
                 className="regex-builder-icon-button"
                 aria-label="Delete last character"
                 onClick={this.onBackspace}
@@ -460,6 +464,7 @@ export class RegexBuilder extends React.Component<
                 &#9003;
               </button>
               <button
+                type="button"
                 className="regex-builder-icon-button destructive"
                 aria-label="Clear pattern"
                 onClick={this.onClear}
@@ -490,12 +495,14 @@ export class RegexBuilder extends React.Component<
 
           <div className="regex-builder-footer">
             <button
+              type="button"
               className="regex-builder-cancel"
               onClick={this.props.onDismissed}
             >
               Cancel
             </button>
             <button
+              type="button"
               className="regex-builder-apply"
               disabled={invalid}
               onClick={this.onApply}

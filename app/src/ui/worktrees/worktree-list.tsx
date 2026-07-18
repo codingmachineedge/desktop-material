@@ -156,6 +156,8 @@ export class WorktreeList extends React.Component<IWorktreeListProps> {
       <SectionFilterList<IWorktreeListItem, WorktreeGroupIdentifier>
         className="worktree-list"
         rowHeight={RowHeight}
+        filterListId="worktrees"
+        filterListLabel="Worktrees"
         filterText={this.props.filterText}
         onFilterTextChanged={this.props.onFilterTextChanged}
         selectedItem={null}

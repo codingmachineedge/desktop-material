@@ -113,6 +113,7 @@ class RegexCategoryTab extends React.Component<IRegexCategoryTabProps> {
     const { name, selected } = this.props
     return (
       <button
+        type="button"
         id={`regex-builder-category-${this.props.index}`}
         role="tab"
         aria-selected={selected}
@@ -144,6 +145,7 @@ class RegexTokenChip extends React.Component<IRegexTokenChipProps> {
     const { token, description } = this.props.token
     return (
       <button
+        type="button"
         className="regex-builder-token"
         aria-label={description}
         onClick={this.onClick}

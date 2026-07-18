@@ -102,6 +102,7 @@ function ArrangeHarness(props: IArrangeHarnessProps) {
 
 describe('CloseTabsContainingPopover compatibility', () => {
   it('keeps the existing regex action and protects matching pinned tabs', async () => {
+    localStorage.removeItem('filter-mode/close-tabs-containing')
     const pinnedRepository = new Repository('/work/pinned', 1, null, false)
     const closableRepository = new Repository('/work/closable', 2, null, false)
     const untouchedRepository = new Repository(
@@ -131,8 +132,16 @@ describe('CloseTabsContainingPopover compatibility', () => {
       />
     )
 
+    // Cycle the shared filter-mode control from its fuzzy default to regex.
     fireEvent.click(
-      screen.getByRole('button', { name: 'Use regular expression' })
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
+    )
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Substring (click to change)',
+      })
     )
     const input = screen.getByRole('textbox', {
       name: 'Close tabs containing',
@@ -361,7 +370,8 @@ describe('ArrangeTabsPopover', () => {
     assert.equal(store.getState().activeTabId, 'beta')
   })
 
-  it('filters across literal label, alias, and path terms without changing sort scope', async () => {
+  it('filters via the shared filter modes without changing sort scope', async () => {
+    localStorage.removeItem('filter-mode/arrange-tabs')
     const zed = new Repository(
       '/clients/material/zed',
       1,
@@ -385,10 +395,20 @@ describe('ArrangeTabsPopover', () => {
     )
 
     const filter = screen.getByRole('searchbox', { name: 'Filter tabs' })
-    fireEvent.change(filter, { target: { value: 'studio clients material' } })
+    fireEvent.change(filter, { target: { value: 'material workspace' } })
     assert.ok(screen.getByText('1 of 3 tabs'))
     assert.ok(screen.getByText('Material workspace'))
     assert.equal(screen.queryByText('alpha'), null)
+
+    // Substring mode consults every literal key, e.g. the repository path.
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
+    )
+    fireEvent.change(filter, { target: { value: 'clients/material' } })
+    assert.ok(screen.getByText('1 of 3 tabs'))
+    assert.ok(screen.getByText('Material workspace'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Label A → Z' }))
     await waitFor(() =>
@@ -461,7 +481,8 @@ describe('TabSearchPopover', () => {
   const repository = (tab: IRepositoryTab) =>
     repositories.find(candidate => candidate.id === tab.repositoryId) ?? null
 
-  it('searches all literal keys and switches with Home, End, Enter, and Escape', async () => {
+  it('matches keys under the shared filter modes and switches with Home, End, Enter, and Escape', async () => {
+    localStorage.removeItem('filter-mode/tab-search')
     let selected: string | null = null
     let closes = 0
     render(
@@ -484,9 +505,17 @@ describe('TabSearchPopover', () => {
       })
     )
 
-    fireEvent.change(input, {
-      target: { value: 'studio clients material' },
-    })
+    fireEvent.change(input, { target: { value: 'workspace' } })
+    assert.equal(screen.getAllByRole('option').length, 1)
+    assert.ok(screen.getByText('1 matching tab'))
+
+    // Substring mode consults every literal key, e.g. the repository alias.
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
+    )
+    fireEvent.change(input, { target: { value: 'studio alias' } })
     assert.equal(screen.getAllByRole('option').length, 1)
     assert.ok(screen.getByText('1 matching tab'))
 

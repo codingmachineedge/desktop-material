@@ -5,7 +5,6 @@ import { join } from 'path'
 import {
   WorkflowTemplates,
   WorkflowTemplateCategories,
-  getTemplateMatcher,
   getWorkflowFileName,
   getWorkflowGlyph,
 } from '../../src/ui/actions/workflow-templates'
@@ -147,19 +146,13 @@ describe('Actions v2 style contracts', () => {
     }
   })
 
-  it('matches templates by text or regular expression', () => {
-    const literal = getTemplateMatcher('docker', false)
-    assert.equal(literal.invalid, false)
-    assert.ok(
-      WorkflowTemplates.filter(literal.matches).every(x =>
-        `${x.name} ${x.path} ${x.description}`.toLowerCase().includes('docker')
-      )
-    )
-    const regex = getTemplateMatcher('^node', true)
-    assert.equal(regex.invalid, false)
-    const invalid = getTemplateMatcher('(', true)
-    assert.equal(invalid.invalid, true)
-    assert.ok(WorkflowTemplates.every(invalid.matches))
+  it('filters templates through the shared filter-mode control', () => {
+    const catalog = readSource('workflow-catalog-dialog.tsx')
+    assert.match(catalog, /<FilterModeControl/)
+    assert.match(catalog, /matchWithMode/)
+    assert.match(catalog, /persistFilterMode\(WorkflowCatalogFilterListId/)
+    assert.match(catalog, /regexError !== null/)
+    assert.doesNotMatch(catalog, /aria-label="Use regular expression"/)
   })
 
   it('keeps manager helpers aligned with workflow file paths', () => {
@@ -175,7 +168,8 @@ describe('Actions v2 style contracts', () => {
     assert.match(view, /onNewWorkflow=\{this\.openCatalog\}/)
     assert.match(view, /aria-label="Manage workflows"/)
     assert.match(view, /actions-search-pill/)
-    assert.match(view, /aria-label="Use regular expression"/)
+    assert.match(view, /<FilterModeControl/)
+    assert.match(view, /matchWithMode/)
     assert.match(view, /aria-label="Refresh"/)
   })
 })

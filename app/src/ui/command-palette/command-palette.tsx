@@ -6,8 +6,30 @@ import {
   IPaletteCommand,
   filterPaletteCommands,
 } from '../../lib/command-palette-catalog'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+
+/** The persistence id for the palette's filter mode. */
+const PaletteFilterListId = 'command-palette'
+
+/**
+ * The keys a query is matched against: the title first (fuzzy scoring's
+ * primary key), then group/keywords/event folded into one secondary key.
+ */
+function getPaletteCommandKeys(
+  command: IPaletteCommand
+): ReadonlyArray<string> {
+  return [
+    command.title,
+    `${command.group} ${command.keywords ?? ''} ${command.event}`,
+  ]
+}
 
 interface ICommandPaletteProps {
   /** Executes the chosen command's menu event or palette action id. */
@@ -19,6 +41,8 @@ interface ICommandPaletteProps {
 interface ICommandPaletteState {
   readonly query: string
   readonly highlightedIndex: number
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
 }
 
 /**
@@ -33,7 +57,12 @@ export class CommandPalette extends React.Component<
 
   public constructor(props: ICommandPaletteProps) {
     super(props)
-    this.state = { query: '', highlightedIndex: 0 }
+    this.state = {
+      query: '',
+      highlightedIndex: 0,
+      filterMode: readPersistedFilterMode(PaletteFilterListId),
+      filterCaseSensitive: false,
+    }
   }
 
   public componentDidMount() {
@@ -41,11 +70,27 @@ export class CommandPalette extends React.Component<
   }
 
   private getMatches(): ReadonlyArray<IPaletteCommand> {
-    return filterPaletteCommands(
+    const eligible = filterPaletteCommands(
       CommandPaletteCatalog,
-      this.state.query,
+      '',
       process.platform
     )
+
+    if (this.state.query.trim().length === 0) {
+      return eligible
+    }
+
+    const { results } = matchWithMode(
+      this.state.query,
+      eligible,
+      getPaletteCommandKeys,
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
+    )
+
+    return results.map(r => r.item)
   }
 
   private execute(command: IPaletteCommand) {
@@ -56,6 +101,22 @@ export class CommandPalette extends React.Component<
   private onQueryChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ query: event.target.value, highlightedIndex: 0 })
   }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(PaletteFilterListId, filterMode)
+    this.setState({ filterMode, highlightedIndex: 0 })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive, highlightedIndex: 0 })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({ query: pattern, highlightedIndex: 0 })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.getMatches().map(command => command.title)
 
   private onKeyDown = (event: React.KeyboardEvent) => {
     const matches = this.getMatches()
@@ -114,6 +175,18 @@ export class CommandPalette extends React.Component<
               aria-label="Search commands"
               spellCheck={false}
             />
+            <div className="command-palette-filter-modes">
+              <FilterModeControl
+                mode={this.state.filterMode}
+                caseSensitive={this.state.filterCaseSensitive}
+                onModeChange={this.onFilterModeChanged}
+                onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+                regexBuilderTarget="Commands"
+                getSampleItems={this.getFilterSampleItems}
+                filterText={this.state.query}
+                onRegexPatternApply={this.onRegexPatternApply}
+              />
+            </div>
           </div>
           <div
             className="command-palette-results"

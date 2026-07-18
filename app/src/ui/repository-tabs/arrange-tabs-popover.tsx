@@ -6,7 +6,15 @@ import {
 } from '../lib/popover'
 import { RepositoryTabsStore } from '../../lib/stores/repository-tabs-store'
 import { IProfileTabsState, IRepositoryTab } from '../../models/repository-tab'
-import { repositoryTabMatchesQuery } from './tab-action-helpers'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
+
+/** The persistence id for the arrange filter's mode. */
+const ArrangeTabsFilterListId = 'arrange-tabs'
 
 interface IArrangeTabsPopoverProps {
   readonly tabs: IProfileTabsState
@@ -22,6 +30,8 @@ interface IArrangeTabsPopoverState {
   readonly isApplying: boolean
   readonly announcement: string
   readonly query: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
 }
 
 /** A Material one-shot arrange surface with accessible manual-order actions. */
@@ -35,6 +45,8 @@ export class ArrangeTabsPopover extends React.Component<
       isApplying: false,
       announcement: 'Choose a manual move or a one-time sort.',
       query: '',
+      filterMode: readPersistedFilterMode(ArrangeTabsFilterListId),
+      filterCaseSensitive: false,
     }
   }
 
@@ -289,15 +301,47 @@ export class ArrangeTabsPopover extends React.Component<
     this.setState({ query: event.currentTarget.value })
   }
 
+  private onFilterModeChange = (filterMode: FilterMode) => {
+    persistFilterMode(ArrangeTabsFilterListId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChange = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({ query: pattern })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.props.tabs.tabs.map(tab =>
+      this.props.resolveMatchKeys(tab).join(' · ')
+    )
+
+  private getFilteredTabs(): ReadonlyArray<IRepositoryTab> {
+    const { tabs } = this.props.tabs
+    if (this.state.query.trim().length === 0) {
+      return tabs
+    }
+
+    const { results } = matchWithMode(
+      this.state.query,
+      tabs,
+      this.props.resolveMatchKeys,
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
+    )
+
+    return results.map(r => r.item)
+  }
+
   public render() {
     const { tabs } = this.props.tabs
     const disabled = this.state.isApplying || tabs.length < 2
-    const filteredTabs = tabs.filter(tab =>
-      repositoryTabMatchesQuery(
-        this.state.query,
-        this.props.resolveMatchKeys(tab)
-      )
-    )
+    const filteredTabs = this.getFilteredTabs()
     const resultSummary = `${filteredTabs.length} of ${tabs.length} tabs`
 
     return (
@@ -320,15 +364,27 @@ export class ArrangeTabsPopover extends React.Component<
 
           <div className="arrange-tabs-filter" role="search">
             <label htmlFor="arrange-tabs-filter-input">Filter tabs</label>
-            <input
-              id="arrange-tabs-filter-input"
-              className="arrange-tabs-filter-input"
-              type="search"
-              value={this.state.query}
-              onChange={this.onFilterChange}
-              autoFocus={true}
-              placeholder="Name, alias, path, or URL"
-            />
+            <div className="arrange-tabs-filter-field">
+              <input
+                id="arrange-tabs-filter-input"
+                className="arrange-tabs-filter-input"
+                type="search"
+                value={this.state.query}
+                onChange={this.onFilterChange}
+                autoFocus={true}
+                placeholder="Name, alias, path, or URL"
+              />
+              <FilterModeControl
+                mode={this.state.filterMode}
+                caseSensitive={this.state.filterCaseSensitive}
+                onModeChange={this.onFilterModeChange}
+                onCaseSensitiveChange={this.onFilterCaseSensitiveChange}
+                regexBuilderTarget="Open tabs"
+                getSampleItems={this.getFilterSampleItems}
+                filterText={this.state.query}
+                onRegexPatternApply={this.onRegexPatternApply}
+              />
+            </div>
             <span className="arrange-tabs-filter-count" aria-live="polite">
               {resultSummary}
             </span>

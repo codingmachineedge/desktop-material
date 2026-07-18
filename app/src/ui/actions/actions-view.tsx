@@ -20,9 +20,15 @@ import {
   IActionsState,
 } from '../../lib/stores/actions-store'
 import { APIError } from '../../lib/http'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import classNames from 'classnames'
 import { Select } from '../lib/select'
 import { Button } from '../lib/button'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Octicon, syncClockwise } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { RunList } from './run-list'
@@ -35,6 +41,9 @@ const ActionsViewTabOrder: ReadonlyArray<'runs' | 'workflows' | 'caches'> = [
   'workflows',
   'caches',
 ]
+
+/** localStorage key used to persist the runs filter mode. */
+const ActionsRunsFilterListId = 'actions-runs'
 import { WorkflowDispatchDialog } from './workflow-dispatch-dialog'
 import { JobLogViewer } from './job-log-viewer'
 import { ActionsConfirmationDialog } from './actions-confirmation-dialog'
@@ -80,7 +89,8 @@ interface IActionsViewState {
   readonly event: string
   readonly status: string
   readonly runQuery: string
-  readonly runQueryRegex: boolean
+  readonly runQueryMode: FilterMode
+  readonly runQueryCaseSensitive: boolean
   readonly filtersOpen: boolean
   /** Which in-view category tab is showing: runs, workflows, or caches. */
   readonly activeTab: 'runs' | 'workflows' | 'caches'
@@ -135,7 +145,8 @@ const initialActionsViewState = (repositoryKey: string): IActionsViewState => ({
   event: 'all',
   status: 'all',
   runQuery: '',
-  runQueryRegex: false,
+  runQueryMode: readPersistedFilterMode(ActionsRunsFilterListId),
+  runQueryCaseSensitive: false,
   filtersOpen: true,
   activeTab: 'runs',
   catalogOpen: false,
@@ -815,8 +826,16 @@ export class ActionsView extends React.Component<
   private toggleFilters = () =>
     this.setState(state => ({ filtersOpen: !state.filtersOpen }))
 
-  private toggleRunQueryRegex = () =>
-    this.setState(state => ({ runQueryRegex: !state.runQueryRegex }))
+  private onRunQueryModeChange = (runQueryMode: FilterMode) => {
+    persistFilterMode(ActionsRunsFilterListId, runQueryMode)
+    this.setState({ runQueryMode })
+  }
+
+  private onRunQueryCaseSensitiveChange = (runQueryCaseSensitive: boolean) =>
+    this.setState({ runQueryCaseSensitive })
+
+  private onRunQueryPatternApply = (runQuery: string) =>
+    this.setState({ runQuery })
 
   private onRunQueryChange = (event: React.FormEvent<HTMLInputElement>) =>
     this.setState({ runQuery: event.currentTarget.value })
@@ -1278,24 +1297,8 @@ export class ActionsView extends React.Component<
     }
   }
 
-  /** The active search expression, or null when it is empty or invalid. */
-  private getRunQueryExpression(): RegExp | null {
-    const query = this.state.runQuery.trim()
-    if (query.length === 0) {
-      return null
-    }
-    if (!this.state.runQueryRegex) {
-      return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
-    }
-    try {
-      return new RegExp(query, 'i')
-    } catch {
-      return null
-    }
-  }
-
   private isRunQueryInvalid(): boolean {
-    if (!this.state.runQueryRegex) {
+    if (this.state.runQueryMode !== FilterMode.Regex) {
       return false
     }
     const query = this.state.runQuery.trim()
@@ -1310,28 +1313,48 @@ export class ActionsView extends React.Component<
     }
   }
 
+  // Two keys so fuzzy mode (which only scores the first two) still matches on
+  // every field: the run title is the "title" and the rest fold into the
+  // "subtitle". Substring / regex modes test every key.
+  private getRunSearchKeys(
+    run: IAPIWorkflowRun,
+    workflowNames: ReadonlyMap<number, string>
+  ): ReadonlyArray<string> {
+    return [
+      run.display_title ?? run.name,
+      [
+        run.name,
+        run.head_branch ?? '',
+        run.event,
+        run.actor?.login ?? '',
+        `#${run.run_number ?? run.id}`,
+        workflowNames.get(run.workflow_id) ?? '',
+        run.path ?? '',
+      ].join(' '),
+    ]
+  }
+
+  private getRunQueryWorkflowNames(): ReadonlyMap<number, string> {
+    return new Map(
+      this.state.actions.workflows.map(item => [item.id, item.name])
+    )
+  }
+
+  private getRunQuerySampleItems = (): ReadonlyArray<string> => {
+    const workflowNames = this.getRunQueryWorkflowNames()
+    const items = new Array<string>()
+    for (const run of this.state.actions.runs) {
+      items.push(...this.getRunSearchKeys(run, workflowNames))
+      if (items.length >= 50) {
+        break
+      }
+    }
+    return items
+  }
+
   private getFilteredRuns() {
     const { workflow, branch, event, status, actions } = this.state
-    const expression = this.getRunQueryExpression()
-    const workflowNames = new Map(
-      actions.workflows.map(item => [item.id, item.name])
-    )
-    return actions.runs.filter(run => {
-      if (expression !== null) {
-        const haystack = [
-          run.display_title ?? '',
-          run.name,
-          run.head_branch ?? '',
-          run.event,
-          run.actor?.login ?? '',
-          `#${run.run_number ?? run.id}`,
-          workflowNames.get(run.workflow_id) ?? '',
-          run.path ?? '',
-        ].join(' ')
-        if (!expression.test(haystack)) {
-          return false
-        }
-      }
+    const selected = actions.runs.filter(run => {
       if (workflow !== 'all' && run.workflow_id !== Number(workflow)) {
         return false
       }
@@ -1364,6 +1387,23 @@ export class ActionsView extends React.Component<
       }
       return true
     })
+
+    const query = this.state.runQuery.trim()
+    if (query.length === 0) {
+      return selected
+    }
+
+    const workflowNames = this.getRunQueryWorkflowNames()
+    const { results } = matchWithMode(
+      query,
+      selected,
+      run => this.getRunSearchKeys(run, workflowNames),
+      {
+        mode: this.state.runQueryMode,
+        caseSensitive: this.state.runQueryCaseSensitive,
+      }
+    )
+    return results.map(r => r.item)
   }
 
   private renderRateLimit() {
@@ -1500,19 +1540,16 @@ export class ActionsView extends React.Component<
                   spellCheck={false}
                   aria-label="Filter workflow runs"
                 />
-                <button
-                  type="button"
-                  className={classNames(
-                    'actions-search-toggle',
-                    'actions-search-regex',
-                    { on: this.state.runQueryRegex }
-                  )}
-                  aria-pressed={this.state.runQueryRegex}
-                  aria-label="Use regular expression"
-                  onClick={this.toggleRunQueryRegex}
-                >
-                  .*
-                </button>
+                <FilterModeControl
+                  mode={this.state.runQueryMode}
+                  caseSensitive={this.state.runQueryCaseSensitive}
+                  onModeChange={this.onRunQueryModeChange}
+                  onCaseSensitiveChange={this.onRunQueryCaseSensitiveChange}
+                  regexBuilderTarget="Workflow runs"
+                  getSampleItems={this.getRunQuerySampleItems}
+                  filterText={this.state.runQuery}
+                  onRegexPatternApply={this.onRunQueryPatternApply}
+                />
                 <button
                   type="button"
                   className={classNames('actions-search-toggle', {

@@ -275,7 +275,7 @@
     font-weight: var(--font-weight-semibold);
   }
 
-  label:only-child {
+  > :only-child {
     grid-column: 1 / -1;
   }
 
@@ -300,6 +300,28 @@
     &:disabled {
       opacity: 0.48;
     }
+  }
+}
+
+.notification-centre-search-row {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  align-items: flex-end;
+
+  .notification-centre-search {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  // Optically center the 30px mode buttons against the 36px search input, and
+  // keep the launcher icon-only so the cluster fits the side sheet.
+  .filter-mode-control {
+    padding-bottom: 3px;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
   }
 }
 

@@ -20,6 +20,12 @@ import {
   tabTitleStyleToCss,
 } from '../../models/repository-tab'
 import { getStringArray, setStringArray } from '../../lib/local-storage'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 interface ITabStyleEditorProps {
   readonly tab: IRepositoryTab
@@ -34,6 +40,10 @@ interface ITabStyleEditorState {
   readonly fontMenuOpen: boolean
   /** The current font-search query. */
   readonly fontQuery: string
+  /** The matching strategy used by the font search. */
+  readonly fontFilterMode: FilterMode
+  /** Whether the font search matches case-sensitively. */
+  readonly fontFilterCaseSensitive: boolean
   /** Recently picked colors, most-recent first, persisted across sessions. */
   readonly recentColors: ReadonlyArray<string>
   /** Recently picked highlight colors, kept separate from text colors. */
@@ -41,6 +51,9 @@ interface ITabStyleEditorState {
 }
 
 type TabColorTarget = 'color' | 'backgroundColor'
+
+/** The persistence id for the font search's filter mode. */
+const FontFilterListId = 'tab-style-font'
 
 /** localStorage key backing the "recent colors" row. */
 const RecentColorsKey = 'tab-style-recent-colors'
@@ -100,6 +113,8 @@ export class TabStyleEditor extends React.Component<
     this.state = {
       fontMenuOpen: false,
       fontQuery: '',
+      fontFilterMode: readPersistedFilterMode(FontFilterListId),
+      fontFilterCaseSensitive: false,
       recentColors,
       recentHighlightColors:
         storedHighlightColors.length > 0 ? storedHighlightColors : recentColors,
@@ -151,6 +166,24 @@ export class TabStyleEditor extends React.Component<
   private onFontQueryChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ fontQuery: event.currentTarget.value })
   }
+
+  private onFontFilterModeChange = (fontFilterMode: FilterMode) => {
+    persistFilterMode(FontFilterListId, fontFilterMode)
+    this.setState({ fontFilterMode })
+  }
+
+  private onFontFilterCaseSensitiveChange = (
+    fontFilterCaseSensitive: boolean
+  ) => {
+    this.setState({ fontFilterCaseSensitive })
+  }
+
+  private onFontRegexPatternApply = (pattern: string) => {
+    this.setState({ fontQuery: pattern })
+  }
+
+  private getFontSampleItems = (): ReadonlyArray<string> =>
+    tabFontOptions.map(o => o.label)
 
   private onFontSelect = (event: React.MouseEvent<HTMLButtonElement>) => {
     this.update({ fontFamily: event.currentTarget.value })
@@ -302,11 +335,14 @@ export class TabStyleEditor extends React.Component<
       (current !== undefined && current !== 'system' ? current : 'Roboto')
     const stack = option?.stack ?? 'Roboto, system-ui, sans-serif'
 
-    const query = this.state.fontQuery.trim().toLowerCase()
+    const query = this.state.fontQuery
     const matches =
-      query.length === 0
+      query.trim().length === 0
         ? tabFontOptions
-        : tabFontOptions.filter(o => o.label.toLowerCase().includes(query))
+        : matchWithMode(query, tabFontOptions, o => [o.label], {
+            mode: this.state.fontFilterMode,
+            caseSensitive: this.state.fontFilterCaseSensitive,
+          }).results.map(r => r.item)
 
     return (
       <div className="tab-style-row tab-style-font">
@@ -337,6 +373,16 @@ export class TabStyleEditor extends React.Component<
                   autoFocus={true}
                   onChange={this.onFontQueryChange}
                   aria-label="Search fonts"
+                />
+                <FilterModeControl
+                  mode={this.state.fontFilterMode}
+                  caseSensitive={this.state.fontFilterCaseSensitive}
+                  onModeChange={this.onFontFilterModeChange}
+                  onCaseSensitiveChange={this.onFontFilterCaseSensitiveChange}
+                  regexBuilderTarget="Fonts"
+                  getSampleItems={this.getFontSampleItems}
+                  filterText={this.state.fontQuery}
+                  onRegexPatternApply={this.onFontRegexPatternApply}
                 />
               </div>
               <div className="tab-style-font-list" role="listbox">

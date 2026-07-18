@@ -379,35 +379,6 @@ jobs:
 export const getWorkflowFileName = (path: string) =>
   path.split('/').pop() || path
 
-/** Build the template matcher for the current catalog search text. */
-export function getTemplateMatcher(
-  query: string,
-  useRegex: boolean
-): { matches: (template: IWorkflowTemplate) => boolean; invalid: boolean } {
-  const trimmed = query.trim()
-  if (trimmed.length === 0) {
-    return { matches: () => true, invalid: false }
-  }
-  const haystack = (item: IWorkflowTemplate) =>
-    `${item.name} ${item.path} ${item.category} ${item.trigger} ${item.description}`
-  if (useRegex) {
-    try {
-      const expression = new RegExp(trimmed, 'i')
-      return {
-        matches: item => expression.test(haystack(item)),
-        invalid: false,
-      }
-    } catch {
-      return { matches: () => true, invalid: true }
-    }
-  }
-  const needle = trimmed.toLowerCase()
-  return {
-    matches: item => haystack(item).toLowerCase().includes(needle),
-    invalid: false,
-  }
-}
-
 /**
  * Map a workflow name or path onto the closest catalog glyph so workflow
  * manager rows get the same iconography as the template cards.

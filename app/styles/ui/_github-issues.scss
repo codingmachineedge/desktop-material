@@ -151,7 +151,21 @@
 }
 
 .github-issues-search {
+  display: flex;
+  min-width: 0;
   grid-column: span 2;
+  gap: 6px;
+  align-items: flex-end;
+
+  label {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  // Optically center the 30px mode buttons against the 38px search input.
+  .filter-mode-control {
+    padding-bottom: 4px;
+  }
 }
 
 .github-issues-filter-actions {

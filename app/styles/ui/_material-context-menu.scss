@@ -52,6 +52,16 @@
         color: var(--md-sys-color-on-surface-variant);
       }
     }
+
+    // Compact variant of the shared filter-mode cluster: the menu is too
+    // narrow for the labelled launcher, so it collapses to its `.*` glyph.
+    .filter-mode-control-cluster {
+      flex-wrap: nowrap;
+    }
+
+    .filter-regex-builder-label {
+      display: none;
+    }
   }
 
   .context-menu-items {

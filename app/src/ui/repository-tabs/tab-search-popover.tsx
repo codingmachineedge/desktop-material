@@ -5,7 +5,12 @@ import {
   PopoverDecoration,
 } from '../lib/popover'
 import { IRepositoryTab } from '../../models/repository-tab'
-import { repositoryTabMatchesQuery } from './tab-action-helpers'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 interface ITabSearchPopoverProps {
   readonly tabs: ReadonlyArray<IRepositoryTab>
@@ -19,10 +24,15 @@ interface ITabSearchPopoverProps {
 
 interface ITabSearchPopoverState {
   readonly query: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
   readonly highlightedIndex: number
 }
 
 const ResultListId = 'tab-search-results'
+
+/** The persistence id for the tab search's filter mode. */
+const TabSearchFilterListId = 'tab-search'
 
 /** Accessible keyboard switcher for every open repository tab. */
 export class TabSearchPopover extends React.Component<
@@ -36,6 +46,8 @@ export class TabSearchPopover extends React.Component<
     )
     this.state = {
       query: '',
+      filterMode: readPersistedFilterMode(TabSearchFilterListId),
+      filterCaseSensitive: false,
       highlightedIndex:
         activeIndex === -1 && props.tabs.length > 0 ? 0 : activeIndex,
     }
@@ -53,12 +65,21 @@ export class TabSearchPopover extends React.Component<
   }
 
   private getResults(): ReadonlyArray<IRepositoryTab> {
-    return this.props.tabs.filter(tab =>
-      repositoryTabMatchesQuery(
-        this.state.query,
-        this.props.resolveMatchKeys(tab)
-      )
+    if (this.state.query.trim().length === 0) {
+      return this.props.tabs
+    }
+
+    const { results } = matchWithMode(
+      this.state.query,
+      this.props.tabs,
+      this.props.resolveMatchKeys,
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
     )
+
+    return results.map(r => r.item)
   }
 
   private onQueryChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,6 +88,22 @@ export class TabSearchPopover extends React.Component<
       highlightedIndex: 0,
     })
   }
+
+  private onFilterModeChange = (filterMode: FilterMode) => {
+    persistFilterMode(TabSearchFilterListId, filterMode)
+    this.setState({ filterMode, highlightedIndex: 0 })
+  }
+
+  private onFilterCaseSensitiveChange = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive, highlightedIndex: 0 })
+  }
+
+  private onRegexPatternApply = (pattern: string) => {
+    this.setState({ query: pattern, highlightedIndex: 0 })
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.props.tabs.map(tab => this.props.resolveMatchKeys(tab).join(' · '))
 
   private selectResult(tab: IRepositoryTab) {
     this.props.onSelect(tab)
@@ -150,20 +187,32 @@ export class TabSearchPopover extends React.Component<
             <p>Find an open tab by name, alias, path, or clone URL.</p>
           </header>
 
-          <input
-            className="tab-search-input"
-            type="search"
-            role="combobox"
-            aria-label="Search open tabs"
-            aria-controls={ResultListId}
-            aria-expanded={true}
-            aria-activedescendant={activeDescendant}
-            autoComplete="off"
-            autoFocus={true}
-            value={this.state.query}
-            onChange={this.onQueryChange}
-            onKeyDown={this.onKeyDown}
-          />
+          <div className="tab-search-filter-row">
+            <input
+              className="tab-search-input"
+              type="search"
+              role="combobox"
+              aria-label="Search open tabs"
+              aria-controls={ResultListId}
+              aria-expanded={true}
+              aria-activedescendant={activeDescendant}
+              autoComplete="off"
+              autoFocus={true}
+              value={this.state.query}
+              onChange={this.onQueryChange}
+              onKeyDown={this.onKeyDown}
+            />
+            <FilterModeControl
+              mode={this.state.filterMode}
+              caseSensitive={this.state.filterCaseSensitive}
+              onModeChange={this.onFilterModeChange}
+              onCaseSensitiveChange={this.onFilterCaseSensitiveChange}
+              regexBuilderTarget="Open tabs"
+              getSampleItems={this.getFilterSampleItems}
+              filterText={this.state.query}
+              onRegexPatternApply={this.onRegexPatternApply}
+            />
+          </div>
 
           {results.length === 0 ? (
             <p className="tab-search-empty">No open tabs match this search.</p>
