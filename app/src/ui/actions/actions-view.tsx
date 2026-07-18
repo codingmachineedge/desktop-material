@@ -27,6 +27,14 @@ import { Octicon, syncClockwise } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { RunList } from './run-list'
 import { RunDetails } from './run-details'
+import { TabBar } from '../tab-bar'
+
+/** The in-view Actions category tabs in display order. */
+const ActionsViewTabOrder: ReadonlyArray<'runs' | 'workflows' | 'caches'> = [
+  'runs',
+  'workflows',
+  'caches',
+]
 import { WorkflowDispatchDialog } from './workflow-dispatch-dialog'
 import { JobLogViewer } from './job-log-viewer'
 import { ActionsConfirmationDialog } from './actions-confirmation-dialog'
@@ -74,7 +82,8 @@ interface IActionsViewState {
   readonly runQuery: string
   readonly runQueryRegex: boolean
   readonly filtersOpen: boolean
-  readonly workflowManagerOpen: boolean
+  /** Which in-view category tab is showing: runs, workflows, or caches. */
+  readonly activeTab: 'runs' | 'workflows' | 'caches'
   readonly catalogOpen: boolean
   readonly selectedRun: IAPIWorkflowRun | null
   readonly selectedAttempt: number | null
@@ -128,7 +137,7 @@ const initialActionsViewState = (repositoryKey: string): IActionsViewState => ({
   runQuery: '',
   runQueryRegex: false,
   filtersOpen: true,
-  workflowManagerOpen: true,
+  activeTab: 'runs',
   catalogOpen: false,
   selectedRun: null,
   selectedAttempt: null,
@@ -794,9 +803,13 @@ export class ActionsView extends React.Component<
   }
   private closeDispatch = () => this.setState({ dispatchOpen: false })
 
+  private onActionsTabClicked = (index: number) => {
+    this.setState({ activeTab: ActionsViewTabOrder[index] ?? 'runs' })
+  }
+
   private toggleWorkflowManager = () =>
     this.setState(state => ({
-      workflowManagerOpen: !state.workflowManagerOpen,
+      activeTab: state.activeTab === 'workflows' ? 'runs' : 'workflows',
     }))
 
   private toggleFilters = () =>
@@ -1407,10 +1420,10 @@ export class ActionsView extends React.Component<
             <button
               type="button"
               className={classNames('actions-icon-button', {
-                on: this.state.workflowManagerOpen,
+                on: this.state.activeTab === 'workflows',
               })}
               onClick={this.toggleWorkflowManager}
-              aria-expanded={this.state.workflowManagerOpen}
+              aria-expanded={this.state.activeTab === 'workflows'}
               aria-label="Manage workflows"
             >
               <Octicon symbol={octicons.workflow} />
@@ -1458,107 +1471,187 @@ export class ActionsView extends React.Component<
             {this.state.actionMessage}
           </div>
         )}
-        <div className="actions-search-row">
-          <div
-            className={classNames('actions-search-pill', {
-              invalid: this.isRunQueryInvalid(),
-            })}
+        <div className="actions-tab-bar">
+          <TabBar
+            selectedIndex={Math.max(
+              0,
+              ActionsViewTabOrder.indexOf(this.state.activeTab)
+            )}
+            onTabClicked={this.onActionsTabClicked}
           >
-            <Octicon symbol={octicons.search} />
-            <input
-              value={this.state.runQuery}
-              onChange={this.onRunQueryChange}
-              placeholder="Filter runs — try a branch, event, or actor…"
-              spellCheck={false}
-              aria-label="Filter workflow runs"
-            />
-            <button
-              type="button"
-              className={classNames(
-                'actions-search-toggle',
-                'actions-search-regex',
-                { on: this.state.runQueryRegex }
-              )}
-              aria-pressed={this.state.runQueryRegex}
-              aria-label="Use regular expression"
-              onClick={this.toggleRunQueryRegex}
-            >
-              .*
-            </button>
-            <button
-              type="button"
-              className={classNames('actions-search-toggle', {
-                on: this.state.filtersOpen,
-              })}
-              aria-pressed={this.state.filtersOpen}
-              aria-expanded={this.state.filtersOpen}
-              aria-label="Search filters"
-              onClick={this.toggleFilters}
-            >
-              <Octicon symbol={octicons.filter} />
-            </button>
-          </div>
+            <span>Runs</span>
+            <span>Workflows</span>
+            <span>Caches</span>
+          </TabBar>
         </div>
-        <section
-          className={classNames('actions-filters', {
-            collapsed: !this.state.filtersOpen,
-          })}
-          aria-label="Workflow run filters"
-          hidden={!this.state.filtersOpen}
-        >
-          <Select
-            name="workflow"
-            label="Workflow"
-            value={this.state.workflow}
-            onChange={this.onFilterChange}
-          >
-            <option value="all">All workflows</option>
-            {actions.workflows.map(workflow => (
-              <option key={workflow.id} value={workflow.id}>
-                {workflow.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            name="branch"
-            label="Branch"
-            value={this.state.branch}
-            onChange={this.onFilterChange}
-          >
-            <option value="all">All branches</option>
-            {branches.map(branch => (
-              <option key={branch} value={branch}>
-                {branch}
-              </option>
-            ))}
-          </Select>
-          <Select
-            name="event"
-            label="Event"
-            value={this.state.event}
-            onChange={this.onFilterChange}
-          >
-            <option value="all">All events</option>
-            {events.map(event => (
-              <option key={event} value={event}>
-                {event}
-              </option>
-            ))}
-          </Select>
-          <Select
-            name="status"
-            label="Status"
-            value={this.state.status}
-            onChange={this.onFilterChange}
-          >
-            <option value="all">Any status</option>
-            <option value="queued">Queued</option>
-            <option value="in_progress">In progress</option>
-            <option value="success">Success</option>
-            <option value="failure">Failure</option>
-          </Select>
-        </section>
-        {this.state.workflowManagerOpen && (
+        {this.state.activeTab !== 'runs' ? null : (
+          <>
+            <div className="actions-search-row">
+              <div
+                className={classNames('actions-search-pill', {
+                  invalid: this.isRunQueryInvalid(),
+                })}
+              >
+                <Octicon symbol={octicons.search} />
+                <input
+                  value={this.state.runQuery}
+                  onChange={this.onRunQueryChange}
+                  placeholder="Filter runs — try a branch, event, or actor…"
+                  spellCheck={false}
+                  aria-label="Filter workflow runs"
+                />
+                <button
+                  type="button"
+                  className={classNames(
+                    'actions-search-toggle',
+                    'actions-search-regex',
+                    { on: this.state.runQueryRegex }
+                  )}
+                  aria-pressed={this.state.runQueryRegex}
+                  aria-label="Use regular expression"
+                  onClick={this.toggleRunQueryRegex}
+                >
+                  .*
+                </button>
+                <button
+                  type="button"
+                  className={classNames('actions-search-toggle', {
+                    on: this.state.filtersOpen,
+                  })}
+                  aria-pressed={this.state.filtersOpen}
+                  aria-expanded={this.state.filtersOpen}
+                  aria-label="Search filters"
+                  onClick={this.toggleFilters}
+                >
+                  <Octicon symbol={octicons.filter} />
+                </button>
+              </div>
+            </div>
+            <section
+              className={classNames('actions-filters', {
+                collapsed: !this.state.filtersOpen,
+              })}
+              aria-label="Workflow run filters"
+              hidden={!this.state.filtersOpen}
+            >
+              <Select
+                name="workflow"
+                label="Workflow"
+                value={this.state.workflow}
+                onChange={this.onFilterChange}
+              >
+                <option value="all">All workflows</option>
+                {actions.workflows.map(workflow => (
+                  <option key={workflow.id} value={workflow.id}>
+                    {workflow.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                name="branch"
+                label="Branch"
+                value={this.state.branch}
+                onChange={this.onFilterChange}
+              >
+                <option value="all">All branches</option>
+                {branches.map(branch => (
+                  <option key={branch} value={branch}>
+                    {branch}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                name="event"
+                label="Event"
+                value={this.state.event}
+                onChange={this.onFilterChange}
+              >
+                <option value="all">All events</option>
+                {events.map(event => (
+                  <option key={event} value={event}>
+                    {event}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                name="status"
+                label="Status"
+                value={this.state.status}
+                onChange={this.onFilterChange}
+              >
+                <option value="all">Any status</option>
+                <option value="queued">Queued</option>
+                <option value="in_progress">In progress</option>
+                <option value="success">Success</option>
+                <option value="failure">Failure</option>
+              </Select>
+            </section>
+            {actions.loading && actions.runs.length === 0 && (
+              <div className="actions-loading">Loading workflows…</div>
+            )}
+            <div className="actions-content">
+              <div className="actions-run-column">
+                <RunList
+                  runs={filteredRuns}
+                  selectedRunId={selectedRun?.id ?? null}
+                  busyRunId={this.state.busyRunId}
+                  onSelect={this.selectRun}
+                  onRerun={this.rerun}
+                  onRerunFailed={this.rerunFailed}
+                  onRequestCancel={this.requestCancelRun}
+                />
+                {(actions.runs.length > 0 || actions.runsNextPage !== null) && (
+                  <div
+                    className="actions-run-pagination"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span>
+                      Showing {filteredRuns.length} matching from{' '}
+                      {actions.runs.length} loaded of {actions.runsTotalCount}{' '}
+                      workflow runs.
+                    </span>
+                    {actions.runsNextPage !== null && (
+                      <Button
+                        size="small"
+                        onClick={this.loadMoreRuns}
+                        disabled={actions.runsLoadingMore || actions.loading}
+                      >
+                        {actions.runsLoadingMore
+                          ? 'Loading more…'
+                          : 'Load more runs'}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedRun && this.props.repository.gitHubRepository && (
+                <RunDetails
+                  repository={this.props.repository}
+                  actionsStore={this.props.actionsStore}
+                  run={selectedRun}
+                  jobs={this.state.jobList?.jobs ?? []}
+                  jobsTotalCount={this.state.jobList?.totalCount ?? 0}
+                  jobsNextPage={this.state.jobList?.nextPage ?? null}
+                  jobsPage={this.state.jobList?.page ?? 1}
+                  jobsTruncated={this.state.jobList?.truncated ?? false}
+                  loading={this.state.jobsLoading}
+                  loadingMore={this.state.jobsLoadingMore}
+                  error={this.state.jobsError}
+                  selectedAttempt={this.state.selectedAttempt}
+                  onClose={this.closeRun}
+                  onAttemptChange={this.selectAttempt}
+                  onLoadMoreJobs={this.loadMoreJobs}
+                  onReloadJobs={this.reloadJobs}
+                  onViewLogs={this.viewLogs}
+                  busyJobId={this.state.busyJobId}
+                  onRerunJob={this.rerunJob}
+                />
+              )}
+            </div>
+          </>
+        )}
+        {this.state.activeTab === 'workflows' && (
           <WorkflowManager
             workflows={actions.workflows}
             busyWorkflowId={this.state.busyWorkflowId}
@@ -1566,76 +1659,14 @@ export class ActionsView extends React.Component<
             onNewWorkflow={this.openCatalog}
           />
         )}
-        {actions.loading && actions.runs.length === 0 && (
-          <div className="actions-loading">Loading workflows…</div>
-        )}
-        <div className="actions-content">
-          <div className="actions-run-column">
-            <RunList
-              runs={filteredRuns}
-              selectedRunId={selectedRun?.id ?? null}
-              busyRunId={this.state.busyRunId}
-              onSelect={this.selectRun}
-              onRerun={this.rerun}
-              onRerunFailed={this.rerunFailed}
-              onRequestCancel={this.requestCancelRun}
-            />
-            {(actions.runs.length > 0 || actions.runsNextPage !== null) && (
-              <div
-                className="actions-run-pagination"
-                role="status"
-                aria-live="polite"
-              >
-                <span>
-                  Showing {filteredRuns.length} matching from{' '}
-                  {actions.runs.length} loaded of {actions.runsTotalCount}{' '}
-                  workflow runs.
-                </span>
-                {actions.runsNextPage !== null && (
-                  <Button
-                    size="small"
-                    onClick={this.loadMoreRuns}
-                    disabled={actions.runsLoadingMore || actions.loading}
-                  >
-                    {actions.runsLoadingMore
-                      ? 'Loading more…'
-                      : 'Load more runs'}
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-          {selectedRun && this.props.repository.gitHubRepository && (
-            <RunDetails
+        {this.state.activeTab === 'caches' &&
+          this.props.repository.gitHubRepository && (
+            <ActionsCacheManager
               repository={this.props.repository}
               actionsStore={this.props.actionsStore}
-              run={selectedRun}
-              jobs={this.state.jobList?.jobs ?? []}
-              jobsTotalCount={this.state.jobList?.totalCount ?? 0}
-              jobsNextPage={this.state.jobList?.nextPage ?? null}
-              jobsPage={this.state.jobList?.page ?? 1}
-              jobsTruncated={this.state.jobList?.truncated ?? false}
-              loading={this.state.jobsLoading}
-              loadingMore={this.state.jobsLoadingMore}
-              error={this.state.jobsError}
-              selectedAttempt={this.state.selectedAttempt}
-              onClose={this.closeRun}
-              onAttemptChange={this.selectAttempt}
-              onLoadMoreJobs={this.loadMoreJobs}
-              onReloadJobs={this.reloadJobs}
-              onViewLogs={this.viewLogs}
-              busyJobId={this.state.busyJobId}
-              onRerunJob={this.rerunJob}
+              state={actions}
             />
           )}
-        </div>
-        {this.props.repository.gitHubRepository && (
-          <ActionsCacheManager
-            repository={this.props.repository}
-            actionsStore={this.props.actionsStore}
-            state={actions}
-          />
-        )}
         {this.state.dispatchOpen && this.props.repository.gitHubRepository && (
           <WorkflowDispatchDialog
             repository={this.props.repository}

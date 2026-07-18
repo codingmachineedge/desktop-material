@@ -7,6 +7,17 @@
   padding: 22px;
   overflow-x: hidden;
   overflow-y: auto;
+
+  // In-view category tabs: Runs / Workflows / Caches, each with its own
+  // filter bar, replacing the old stacked always-scrolling sections.
+  .actions-tab-bar {
+    margin: 0 0 10px;
+  }
+
+  .actions-workflow-filter,
+  .actions-cache-filter {
+    margin: 10px 0;
+  }
   color: var(--md-sys-color-on-surface);
   background: var(--md-sys-color-surface);
 

@@ -69,12 +69,26 @@ interface IWorkflowManagerProps {
   readonly onNewWorkflow: () => void
 }
 
+interface IWorkflowManagerState {
+  /** Free-text query narrowing workflows by name or file path. */
+  readonly filterText: string
+}
+
 /**
  * Filled inset card listing every workflow in the repository with an
- * enable/disable switch per row plus the entry point into the workflow
- * template catalog.
+ * enable/disable switch per row, a filter bar, plus the entry point into
+ * the workflow template catalog.
  */
-export class WorkflowManager extends React.PureComponent<IWorkflowManagerProps> {
+export class WorkflowManager extends React.PureComponent<
+  IWorkflowManagerProps,
+  IWorkflowManagerState
+> {
+  public state: IWorkflowManagerState = { filterText: '' }
+
+  private onFilterChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({ filterText: event.target.value })
+  }
+
   private renderRow = (workflow: IAPIWorkflow, index: number) => (
     <WorkflowManagerRow
       key={workflow.id}
@@ -88,6 +102,14 @@ export class WorkflowManager extends React.PureComponent<IWorkflowManagerProps> 
   public render() {
     const { workflows } = this.props
     const activeCount = workflows.filter(x => x.state === 'active').length
+    const query = this.state.filterText.trim().toLowerCase()
+    const visible =
+      query.length === 0
+        ? workflows
+        : workflows.filter(workflow =>
+            `${workflow.name} ${workflow.path}`.toLowerCase().includes(query)
+          )
+
     return (
       <section
         className="actions-workflow-management"
@@ -107,12 +129,30 @@ export class WorkflowManager extends React.PureComponent<IWorkflowManagerProps> 
             New workflow
           </button>
         </header>
+        {workflows.length > 0 && (
+          <div className="actions-search-row actions-workflow-filter">
+            <div className="actions-search-pill">
+              <Octicon symbol={octicons.search} />
+              <input
+                value={this.state.filterText}
+                onChange={this.onFilterChanged}
+                placeholder="Filter workflows by name or file…"
+                spellCheck={false}
+                aria-label="Filter workflows"
+              />
+            </div>
+          </div>
+        )}
         {workflows.length === 0 ? (
           <p className="actions-workflow-management-empty">
             No workflows yet — start from a template.
           </p>
+        ) : visible.length === 0 ? (
+          <p className="actions-workflow-management-empty">
+            No workflows match the current filter.
+          </p>
         ) : (
-          workflows.map(this.renderRow)
+          visible.map(this.renderRow)
         )}
       </section>
     )

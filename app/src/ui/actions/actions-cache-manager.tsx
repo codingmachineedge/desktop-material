@@ -4,6 +4,8 @@ import { IActionsState, ActionsStore } from '../../lib/stores/actions-store'
 import { Repository } from '../../models/repository'
 import { Button } from '../lib/button'
 import { formatBytes } from '../lib/bytes'
+import { Octicon } from '../octicons'
+import * as octicons from '../octicons/octicons.generated'
 
 interface IActionsCacheManagerProps {
   readonly repository: Repository
@@ -11,7 +13,21 @@ interface IActionsCacheManagerProps {
   readonly state: IActionsState
 }
 
-export class ActionsCacheManager extends React.PureComponent<IActionsCacheManagerProps> {
+interface IActionsCacheManagerState {
+  /** Free-text query narrowing caches by key, ref, or version. */
+  readonly filterText: string
+}
+
+export class ActionsCacheManager extends React.PureComponent<
+  IActionsCacheManagerProps,
+  IActionsCacheManagerState
+> {
+  public state: IActionsCacheManagerState = { filterText: '' }
+
+  private onFilterChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({ filterText: event.target.value })
+  }
+
   private loadCaches = () => {
     this.props.actionsStore.loadCacheManager(this.props.repository)
   }
@@ -157,7 +173,17 @@ export class ActionsCacheManager extends React.PureComponent<IActionsCacheManage
   }
 
   private renderCacheList(list: IActionsCacheList) {
-    if (list.caches.length === 0) {
+    const query = this.state.filterText.trim().toLowerCase()
+    const caches =
+      query.length === 0
+        ? list.caches
+        : list.caches.filter(cache =>
+            `${cache.key} ${cache.ref ?? ''} ${cache.version ?? ''}`
+              .toLowerCase()
+              .includes(query)
+          )
+
+    if (caches.length === 0) {
       return (
         <div className="actions-cache-empty" role="status">
           No caches match the current filter.
@@ -174,7 +200,7 @@ export class ActionsCacheManager extends React.PureComponent<IActionsCacheManage
           aria-atomic="true"
         >
           <span>
-            Showing {list.caches.length} loaded of{' '}
+            Showing {caches.length} matching from {list.caches.length} loaded of{' '}
             {list.totalCount.toLocaleString()}{' '}
             {list.totalCount === 1 ? 'cache' : 'caches'}.
           </span>
@@ -198,7 +224,7 @@ export class ActionsCacheManager extends React.PureComponent<IActionsCacheManage
           )}
         </div>
         <div id="actions-cache-grid" className="actions-cache-grid">
-          {list.caches.map(cache => this.renderCacheRow(cache))}
+          {caches.map(cache => this.renderCacheRow(cache))}
         </div>
       </>
     )
@@ -258,6 +284,19 @@ export class ActionsCacheManager extends React.PureComponent<IActionsCacheManage
             </Button>
           </div>
         </header>
+
+        <div className="actions-search-row actions-cache-filter">
+          <div className="actions-search-pill">
+            <Octicon symbol={octicons.search} />
+            <input
+              value={this.state.filterText}
+              onChange={this.onFilterChanged}
+              placeholder="Filter caches by key, ref, or version…"
+              spellCheck={false}
+              aria-label="Filter caches"
+            />
+          </div>
+        </div>
 
         {this.renderUsage()}
         {this.renderCaches()}
