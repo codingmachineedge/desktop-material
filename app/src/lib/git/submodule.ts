@@ -493,7 +493,7 @@ function isPathWithin(root: string, target: string): boolean {
   )
 }
 
-function getCurrentManagedSubmodule(
+function getDeclaredManagedSubmodule(
   submodules: ReadonlyArray<IManagedSubmodule>,
   requestedPath: string
 ): IManagedSubmodule {
@@ -511,13 +511,21 @@ function getCurrentManagedSubmodule(
       `The submodule at '${normalizedPath}' is no longer declared by this repository.`
     )
   }
-  if (current.status === 'uninitialized' || current.sha === null) {
+
+  return current
+}
+
+function requireInitializedManagedSubmodule(
+  submodule: IManagedSubmodule
+): IManagedSubmodule {
+  const normalizedPath = normalizeSubmodulePath(submodule.path)
+  if (submodule.status === 'uninitialized' || submodule.sha === null) {
     throw new Error(
       `Initialize the submodule at '${normalizedPath}' before opening it as a repository.`
     )
   }
 
-  return current
+  return submodule
 }
 
 async function getCanonicalGitCommonDirectory(
@@ -664,15 +672,20 @@ export async function createSubmoduleRepository(
     throw new Error('The parent repository Git directory is not available.')
   }
 
-  const current = getCurrentManagedSubmodule(
+  const declared = getDeclaredManagedSubmodule(
     await getSubmodules(parentRepository, signal),
     submodule.path
   )
+
+  // Check the physical checkout before enforcing Git status. On macOS, Git can
+  // report a redirected checkout as uninitialized, which must not mask the
+  // no-follow rejection for a symlink or junction.
   const physicalPath = await resolveSafeRepositoryPath(
     parentRepository.path,
-    current.path,
+    declared.path,
     signal
   )
+  const current = requireInitializedManagedSubmodule(declared)
   if (!physicalPath.exists) {
     throw new Error(
       'The initialized submodule checkout is no longer available.'
@@ -720,7 +733,7 @@ export async function createSubmoduleRepository(
 
   // Reconcile one final time after filesystem and Git probes so a concurrently
   // removed or deinitialized submodule cannot be returned as a valid model.
-  const latest = getCurrentManagedSubmodule(
+  const latestDeclared = getDeclaredManagedSubmodule(
     await getSubmodules(parentRepository, signal),
     current.path
   )
@@ -730,9 +743,10 @@ export async function createSubmoduleRepository(
   // deinitialize or junction replacement could redirect the returned model.
   const finalPhysicalPath = await resolveSafeRepositoryPath(
     parentRepository.path,
-    latest.path,
+    latestDeclared.path,
     signal
   )
+  const latest = requireInitializedManagedSubmodule(latestDeclared)
   if (!finalPhysicalPath.exists) {
     throw new Error(
       'The initialized submodule checkout is no longer available.'
