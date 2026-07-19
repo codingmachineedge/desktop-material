@@ -607,6 +607,14 @@ export class Dispatcher {
     this.appStore._dismissErrorNotice(id)
   }
 
+  /** Remove one verified stale `.git/index.lock` and refresh its repository. */
+  public removeRepositoryLock(
+    repositoryId: number,
+    noticeId: string
+  ): Promise<void> {
+    return this.appStore._removeRepositoryLock(repositoryId, noticeId)
+  }
+
   /** Load a newest-first page of notification-history commits. */
   public getNotificationHistory(
     skip?: number,

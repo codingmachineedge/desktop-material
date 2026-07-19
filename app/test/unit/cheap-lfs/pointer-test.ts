@@ -1,6 +1,7 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import {
+  CHEAP_LFS_PART_SIZE_BYTES,
   CHEAP_LFS_POINTER_VERSION,
   ICheapLfsPointer,
   isCheapLfsPointerText,
@@ -69,6 +70,48 @@ describe('cheap LFS pointer', () => {
       `part ${'c'.repeat(64)} 20 huge.bin.part002`,
     ])
     assert.deepEqual(parseCheapLfsPointer(text), multiPartPointer)
+  })
+
+  it('round-trips an adaptively deflated part', () => {
+    const compressed: ICheapLfsPointer = {
+      ...pointer,
+      assetName: 'game assets.bin.deflate',
+      parts: [
+        {
+          name: 'game assets.bin.deflate',
+          sizeInBytes: 123456,
+          sha256: 'b'.repeat(64),
+          deflatedSizeInBytes: 1234,
+        },
+      ],
+    }
+    const text = serializeCheapLfsPointer(compressed)
+    assert.match(
+      text,
+      new RegExp(
+        `part-deflate ${'b'.repeat(64)} 123456 1234 game assets\\.bin\\.deflate`
+      )
+    )
+    assert.deepEqual(parseCheapLfsPointer(text), compressed)
+  })
+
+  it('rejects parts that exceed the bounded release-asset size', () => {
+    const oversized = CHEAP_LFS_PART_SIZE_BYTES + 1
+    const text = [
+      `version ${CHEAP_LFS_POINTER_VERSION}`,
+      'release-tag v2.0.0',
+      'asset-name huge.bin',
+      `size ${oversized}`,
+      `sha256 ${'a'.repeat(64)}`,
+      `part-deflate ${'b'.repeat(64)} ${oversized} 1 huge.bin.deflate`,
+      '',
+    ].join('\n')
+
+    assert.equal(parseCheapLfsPointer(text), null)
+    const zeroStored = text
+      .replace(`size ${oversized}`, 'size 10')
+      .replace(`${oversized} 1`, '10 0')
+    assert.equal(parseCheapLfsPointer(zeroStored), null)
   })
 
   it('preserves a part name that contains spaces', () => {

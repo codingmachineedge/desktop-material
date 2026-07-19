@@ -35,6 +35,14 @@ export interface IErrorNotice {
 
   readonly createdAt: number
   readonly updatedAt: number
+
+  /** Optional narrowly-scoped recovery offered by this notice. */
+  readonly action?: IErrorNoticeAction
+}
+
+export type IErrorNoticeAction = {
+  readonly kind: 'remove-repository-lock'
+  readonly repositoryId: number
 }
 
 /** Caller-owned error data before normalization and queue insertion. */
@@ -49,6 +57,7 @@ export interface IErrorNoticeInput {
    * When omitted, the bounded title/message/details tuple is the fingerprint.
    */
   readonly dedupeKey?: string
+  readonly action?: IErrorNoticeAction
 }
 
 export interface IEnqueueErrorNoticeOptions {
@@ -186,6 +195,7 @@ function normalizeInput(
     occurrences: 1,
     createdAt: now,
     updatedAt: now,
+    ...(input.action === undefined ? {} : { action: input.action }),
   }
 }
 

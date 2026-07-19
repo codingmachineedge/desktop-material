@@ -58,6 +58,36 @@ handoff.
   was created, and no disposable fixture or user-data directory required
   cleanup.
 
+## 2026-07-19 adaptive cheap-LFS compression
+
+- Cheap LFS now raw-DEFLATE-compresses each release asset at maximum level
+  before upload and keeps that representation only when it is at least 1%
+  smaller. Already-compressed data remains a raw ranged upload.
+- The backward-compatible pointer format adds `part-deflate` records containing
+  original size/hash and stored size. Materialization verifies the stored size,
+  expands each part into an owned temporary file, verifies every original part,
+  then verifies the reassembled whole before replacing the pointer.
+- Single-asset and multipart uploads share the adaptive behavior. Temporary
+  compressed/expanded files are removed on success and failure. Existing v1
+  raw pointers continue parsing and materializing unchanged.
+
+## 2026-07-19 stale repository lock recovery and CI hardening
+
+- A `LockFileAlreadyExists` notice offers **Remove lock file** only when Git's
+  stderr names the affected repository's exact `index.lock`. Notices use the
+  repository id in their dedupe key so recovery never retargets across repos.
+- Recovery refuses active Desktop operations, recent locks, links, non-files,
+  and locks that change during inspection. It quarantines by atomic rename,
+  rechecks identity, and restores with a non-overwriting hard link on failure;
+  an already-removed lock is an idempotent success.
+- The shared CI setup action now installs the cross-compiled Copilot binary at
+  the exact installed Copilot core version and retries registry installation
+  up to three times. This addresses the Windows ARM64 job's floating-version
+  drift and one-shot package-install failure.
+- SSH working copies remain under **Repository Settings → Remote**. Optional
+  Docker Compose deployment targets that same host; public domain, DNS, TLS,
+  reverse-proxy, and port configuration intentionally remain server-owned.
+
 ## 2026-07-18 repository-page CI status
 
 ### Internationalization follow-up

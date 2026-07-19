@@ -33,6 +33,9 @@ const nonNegativeInteger = /^(?:0|[1-9][0-9]*)$/
 // `part <64-hex sha256> <size> <name>` — sha256 and size sit in fixed leading
 // positions so the trailing name may itself contain spaces.
 const partLine = /^([a-f0-9]{64}) (0|[1-9][0-9]*) (.+)$/
+// `part-deflate <sha256> <original-size> <stored-size> <name>` records an
+// adaptively compressed asset while retaining the original-byte digest/size.
+const deflatedPartLine = /^([a-f0-9]{64}) (0|[1-9][0-9]*) (0|[1-9][0-9]*) (.+)$/
 const controlCharacters = /[\u0000-\u001f]/
 
 /** One uploaded part of a whole file that was split across release assets. */
@@ -40,6 +43,8 @@ export interface ICheapLfsPointerPart {
   readonly name: string
   readonly sizeInBytes: number
   readonly sha256: string
+  /** Present when the release asset is raw-DEFLATE encoded. */
+  readonly deflatedSizeInBytes?: number
 }
 
 export interface ICheapLfsPointer {
@@ -51,9 +56,10 @@ export interface ICheapLfsPointer {
   /** The whole file's SHA-256. */
   readonly sha256: string
   /**
-   * Present only when the file was split across multiple release assets. A
-   * single-asset pointer omits this entirely and parses byte-for-byte as the
-   * original v1 five-line form. Parts are listed in file order.
+   * Present when the file was split across release assets or its single asset
+   * was compressed. An uncompressed single-asset pointer omits this entirely
+   * and parses byte-for-byte as the original v1 five-line form. Parts are
+   * listed in file order.
    */
   readonly parts?: ReadonlyArray<ICheapLfsPointerPart>
 }
@@ -115,7 +121,11 @@ export function serializeCheapLfsPointer(pointer: ICheapLfsPointer): string {
   ]
   if (pointer.parts !== undefined) {
     for (const part of pointer.parts) {
-      lines.push(`part ${part.sha256} ${part.sizeInBytes} ${part.name}`)
+      lines.push(
+        part.deflatedSizeInBytes === undefined
+          ? `part ${part.sha256} ${part.sizeInBytes} ${part.name}`
+          : `part-deflate ${part.sha256} ${part.sizeInBytes} ${part.deflatedSizeInBytes} ${part.name}`
+      )
     }
   }
   return lines.join('\n') + '\n'
@@ -128,10 +138,11 @@ export function serializeCheapLfsPointer(pointer: ICheapLfsPointer): string {
  * one. The five head fields may appear in any order but must each appear
  * exactly once and satisfy their format (correct version, 64-hex SHA-256,
  * non-negative integer size, non-empty whitespace-free tag / non-empty asset
- * name). Optional `part <sha256> <size> <name>` lines follow; when present each
- * must have a 64-hex SHA-256, a non-negative integer size, and a non-empty
- * name, and their sizes must sum exactly to the head `size` (the whole file).
- * Old single-asset pointers have no part lines and parse with no `parts`.
+ * name). Optional raw `part` or compressed `part-deflate` lines follow; when
+ * present each must have a 64-hex SHA-256, a bounded original size, and a
+ * non-empty name. Compressed records also carry their smaller stored size.
+ * Original sizes must sum exactly to the head `size` (the whole file). Old
+ * single-asset pointers have no part lines and parse with no `parts`.
  */
 export function parseCheapLfsPointer(text: string): ICheapLfsPointer | null {
   if (typeof text !== 'string' || text.length > MaximumPointerTextBytes) {
@@ -146,10 +157,18 @@ export function parseCheapLfsPointer(text: string): ICheapLfsPointer | null {
     .trim()
     .split(/\r?\n/)
   const headLines = new Array<string>()
-  const partTexts = new Array<string>()
+  const partTexts = new Array<{
+    readonly text: string
+    readonly deflated: boolean
+  }>()
   for (const line of allLines) {
     if (line.startsWith('part ')) {
-      partTexts.push(line.slice('part '.length))
+      partTexts.push({ text: line.slice('part '.length), deflated: false })
+    } else if (line.startsWith('part-deflate ')) {
+      partTexts.push({
+        text: line.slice('part-deflate '.length),
+        deflated: true,
+      })
     } else {
       headLines.push(line)
     }
@@ -207,20 +226,45 @@ export function parseCheapLfsPointer(text: string): ICheapLfsPointer | null {
 
   const parts = new Array<ICheapLfsPointerPart>()
   let partsTotal = 0
-  for (const partText of partTexts) {
-    const match = partLine.exec(partText)
-    if (match === null || match[3].length > 255) {
+  for (const entry of partTexts) {
+    const match = (entry.deflated ? deflatedPartLine : partLine).exec(
+      entry.text
+    )
+    const nameIndex = entry.deflated ? 4 : 3
+    if (match === null || match[nameIndex].length > 255) {
       return null
     }
     const partSize = Number(match[2])
-    if (!Number.isSafeInteger(partSize) || partSize < 0) {
+    if (
+      !Number.isSafeInteger(partSize) ||
+      partSize < 0 ||
+      partSize > CHEAP_LFS_PART_SIZE_BYTES
+    ) {
       return null
     }
     partsTotal += partSize
     if (!Number.isSafeInteger(partsTotal)) {
       return null
     }
-    parts.push({ name: match[3], sizeInBytes: partSize, sha256: match[1] })
+    if (entry.deflated) {
+      const deflatedSizeInBytes = Number(match[3])
+      if (
+        !Number.isSafeInteger(deflatedSizeInBytes) ||
+        deflatedSizeInBytes < 1 ||
+        deflatedSizeInBytes > CHEAP_LFS_PART_SIZE_BYTES ||
+        deflatedSizeInBytes >= partSize
+      ) {
+        return null
+      }
+      parts.push({
+        name: match[4],
+        sizeInBytes: partSize,
+        sha256: match[1],
+        deflatedSizeInBytes,
+      })
+    } else {
+      parts.push({ name: match[3], sizeInBytes: partSize, sha256: match[1] })
+    }
   }
   // Every byte of the whole file must be accounted for by exactly the parts.
   if (partsTotal !== sizeInBytes) {

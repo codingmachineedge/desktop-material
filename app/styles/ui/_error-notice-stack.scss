@@ -111,6 +111,7 @@
   }
 
   .error-notice-details,
+  .error-notice-recovery,
   .error-notice-dismiss {
     min-height: 36px;
     border: 0;
@@ -133,6 +134,12 @@
 
   .error-notice-details {
     padding: 0 10px;
+    border-radius: 999px;
+  }
+
+  .error-notice-recovery {
+    padding: 0 10px;
+    border: 1px solid currentColor;
     border-radius: 999px;
   }
 

@@ -593,6 +593,10 @@ import * as ipcRenderer from '../ipc-renderer'
 import { pathExists } from '../path-exists'
 import { offsetFromNow } from '../offset-from'
 import { findContributionTargetDefaultBranch } from '../branch'
+import {
+  gitErrorReferencesRepositoryIndexLock,
+  removeStaleRepositoryLock,
+} from '../git/remove-lock'
 import { ValidNotificationPullRequestReview } from '../valid-notification-pull-request-review'
 import { determineMergeability } from '../git/merge-tree'
 import { PopupManager } from '../popup-manager'
@@ -1004,6 +1008,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Non-modal acknowledgement-only errors, newest at the bottom of the stack. */
   private errorNotices: ReadonlyArray<IErrorNotice> = []
   private errorPresentationStyle = getErrorPresentationStyle()
+  private readonly repositoryLockRemovalInFlight = new Set<number>()
 
   /** Coordinates cloning many repositories at once (see BatchCloneStore). */
   private readonly batchCloneStore: BatchCloneStore
@@ -5498,6 +5503,73 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.emitUpdate()
   }
 
+  /** Remove a verified stale index lock for one idle repository. */
+  public async _removeRepositoryLock(
+    repositoryId: number,
+    noticeId: string
+  ): Promise<void> {
+    if (this.repositoryLockRemovalInFlight.has(repositoryId)) {
+      return
+    }
+    const repository =
+      (this.selectedRepository instanceof Repository &&
+      this.selectedRepository.id === repositoryId
+        ? this.selectedRepository
+        : this.repositories.find(candidate => candidate.id === repositoryId)) ??
+      null
+    if (repository === null) {
+      this.emitError(
+        new Error('The repository for this lock no longer exists.')
+      )
+      return
+    }
+
+    const state = this.repositoryStateCache.get(repository)
+    if (
+      state.isCommitting ||
+      state.isGeneratingCommitMessage ||
+      state.isPushPullFetchInProgress ||
+      state.checkoutProgress !== null ||
+      state.multiCommitOperationState !== null ||
+      state.oneClickCommitPushPhase !== null ||
+      state.revertProgress !== null ||
+      (state.mergeAllState?.phase !== undefined &&
+        state.mergeAllState.phase !== 'complete' &&
+        state.mergeAllState.phase !== 'cancelled')
+    ) {
+      this.emitError(
+        new Error(
+          'Desktop is still running a Git operation for this repository. Wait for it to finish before removing the lock.'
+        )
+      )
+      return
+    }
+
+    this.repositoryLockRemovalInFlight.add(repositoryId)
+    try {
+      const removedPath = await removeStaleRepositoryLock(repository)
+      this._dismissErrorNotice(noticeId)
+      await this._refreshRepository(repository)
+      this.postNotification({
+        kind: 'info',
+        title:
+          removedPath === null
+            ? 'Repository lock already gone'
+            : 'Repository lock removed',
+        body:
+          removedPath === null
+            ? `${repository.name} no longer has an index lock.`
+            : `Removed the stale index lock from ${repository.name}.`,
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+    } catch (error) {
+      this.emitError(error instanceof Error ? error : new Error(String(error)))
+    } finally {
+      this.repositoryLockRemovalInFlight.delete(repositoryId)
+    }
+  }
+
   /**
    * Refresh all the data for the Changes section.
    *
@@ -6399,10 +6471,31 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const presentation = getAppErrorPresentation(error)
 
     if (shouldPresentErrorAsNotice(error, this.errorPresentationStyle)) {
+      const underlying =
+        error instanceof ErrorWithMetadata ? error.underlyingError : error
+      const repository =
+        error instanceof ErrorWithMetadata &&
+        error.metadata.repository instanceof Repository
+          ? error.metadata.repository
+          : null
+      const action =
+        underlying instanceof GitError &&
+        underlying.result.gitError === DugiteError.LockFileAlreadyExists &&
+        repository !== null &&
+        gitErrorReferencesRepositoryIndexLock(underlying, repository)
+          ? {
+              kind: 'remove-repository-lock' as const,
+              repositoryId: repository.id,
+            }
+          : undefined
       this.errorNotices = enqueueErrorNotice(this.errorNotices, {
         title: presentation.title,
         message: presentation.message,
         details: presentation.details,
+        ...(action === undefined
+          ? {}
+          : { dedupeKey: `repository-index-lock:${action.repositoryId}` }),
+        ...(action === undefined ? {} : { action }),
       }).notices
     } else {
       this.popupManager.addErrorPopup(error)

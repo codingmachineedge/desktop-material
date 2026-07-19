@@ -66,8 +66,25 @@ runs:
         esac
 
         PKG="@github/copilot-${PLATFORM}-${{ inputs.arch }}"
+        PKG_VERSION=$(node -p "require('./app/node_modules/@github/copilot/package.json').version")
 
         if [ ! -d "app/node_modules/@github/copilot-${PLATFORM}-${{ inputs.arch }}" ]; then
-          echo "Installing ${PKG} for cross-compilation…"
-          cd app && yarn add --optional --ignore-platform --ignore-scripts ${PKG}
+          echo "Installing ${PKG}@${PKG_VERSION} for cross-compilation…"
+          for attempt in 1 2 3; do
+            if (cd app && yarn add --optional --ignore-platform --ignore-scripts "${PKG}@${PKG_VERSION}"); then
+              install_succeeded=true
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt * 15))
+              echo "Install failed; retrying in ${delay} seconds (attempt $((attempt + 1)) of 3)."
+              sleep "$delay"
+            fi
+          done
+
+          if [ "${install_succeeded:-false}" != "true" ]; then
+            echo "Failed to install ${PKG}@${PKG_VERSION} after 3 attempts."
+            exit 1
+          fi
         fi

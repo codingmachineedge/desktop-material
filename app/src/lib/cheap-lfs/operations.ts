@@ -3,6 +3,11 @@ import { createReadStream, createWriteStream } from 'fs'
 import { open, readdir, rename, stat, unlink, writeFile } from 'fs/promises'
 import { Transform } from 'stream'
 import { finished, pipeline } from 'stream/promises'
+import {
+  createDeflateRaw,
+  createInflateRaw,
+  constants as zlibConstants,
+} from 'zlib'
 import { basename, join } from 'path'
 import { Account } from '../../models/account'
 import { Repository } from '../../models/repository'
@@ -57,6 +62,8 @@ const CheapLfsSniffBytes = 4096
  * the sniff size yet still far below any real binary.
  */
 const CheapLfsMaximumPointerBytes = 512 * 1024
+/** Avoid storing a compressed representation unless it saves at least 1%. */
+const CheapLfsCompressionMaximumRatio = 0.99
 /** Directories skipped by the pointer-listing walk. */
 const CheapLfsSkipDirectories = new Set([
   '.git',
@@ -166,6 +173,21 @@ export interface ICheapLfsFileSystem {
     destination: string,
     signal?: AbortSignal
   ): Promise<{ readonly sha256: string; readonly sizeInBytes: number }>
+  /** Compress one source range to a new raw-DEFLATE temp file. */
+  compressRange?(
+    source: string,
+    destination: string,
+    offset: number,
+    length: number,
+    signal?: AbortSignal
+  ): Promise<number>
+  /** Expand one raw-DEFLATE asset to a new temp file. */
+  decompressFile?(
+    source: string,
+    destination: string,
+    maximumOutputBytes: number,
+    signal?: AbortSignal
+  ): Promise<void>
   scanPointerCandidates(
     root: string
   ): Promise<ReadonlyArray<ICheapLfsPointerCandidate>>
@@ -347,6 +369,54 @@ async function assemblePartsOnDisk(
   }
 }
 
+async function compressRangeOnDisk(
+  source: string,
+  destination: string,
+  offset: number,
+  length: number,
+  signal?: AbortSignal
+): Promise<number> {
+  if (length < 1) {
+    throw new Error('Cheap LFS cannot compress an empty range.')
+  }
+  await pipeline(
+    createReadStream(source, { start: offset, end: offset + length - 1 }),
+    createDeflateRaw({ level: zlibConstants.Z_BEST_COMPRESSION }),
+    createWriteStream(destination, { flags: 'wx' }),
+    { signal }
+  )
+  return (await stat(destination)).size
+}
+
+async function decompressFileOnDisk(
+  source: string,
+  destination: string,
+  maximumOutputBytes: number,
+  signal?: AbortSignal
+): Promise<void> {
+  let outputBytes = 0
+  const limiter = new Transform({
+    transform(chunk, _encoding, callback) {
+      outputBytes += (chunk as Buffer).length
+      callback(
+        outputBytes > maximumOutputBytes
+          ? new Error(
+              'A compressed cheap LFS part expands past its pointer size.'
+            )
+          : null,
+        chunk
+      )
+    },
+  })
+  await pipeline(
+    createReadStream(source),
+    createInflateRaw(),
+    limiter,
+    createWriteStream(destination, { flags: 'wx' }),
+    { signal }
+  )
+}
+
 async function readBoundedText(
   path: string,
   maximumBytes: number
@@ -433,6 +503,8 @@ export const defaultCheapLfsFileSystem: ICheapLfsFileSystem = {
   temporaryPathFor: path =>
     `${path}.cheeplfs-${randomBytes(8).toString('hex')}.tmp`,
   assembleParts: assemblePartsOnDisk,
+  compressRange: compressRangeOnDisk,
+  decompressFile: decompressFileOnDisk,
   scanPointerCandidates: scanPointerCandidatesFromDisk,
 }
 
@@ -445,6 +517,32 @@ function ensureReleasesAccount(repository: Repository, account: Account): void {
   }
 }
 
+/** Add a deterministic suffix without exceeding GitHub's 255-character cap. */
+function appendAssetNameSuffix(name: string, suffix: string): string {
+  const maximumPrefixLength = 255 - suffix.length
+  if (maximumPrefixLength < 1) {
+    throw new Error('The cheap LFS release asset suffix is too long.')
+  }
+  let prefix = name.slice(0, maximumPrefixLength)
+  // Avoid ending on the first half of a UTF-16 surrogate pair.
+  const finalCodeUnit = prefix.charCodeAt(prefix.length - 1)
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) {
+    prefix = prefix.slice(0, -1)
+  }
+  return normalizeGitHubReleaseAssetName(`${prefix}${suffix}`)
+}
+
+function insertAssetNameHash(name: string, shortHash: string): string {
+  const dot = name.lastIndexOf('.')
+  if (dot > 0) {
+    const suffix = `-${shortHash}${name.slice(dot)}`
+    if (suffix.length < 255) {
+      return appendAssetNameSuffix(name.slice(0, dot), suffix)
+    }
+  }
+  return appendAssetNameSuffix(name, `-${shortHash}`)
+}
+
 /** Append a short content hash before the extension to dodge a name clash. */
 function dedupeAssetName(
   name: string,
@@ -455,12 +553,7 @@ function dedupeAssetName(
     return name
   }
   const short = sha256.slice(0, 7)
-  const dot = name.lastIndexOf('.')
-  const deduped =
-    dot <= 0
-      ? `${name}-${short}`
-      : `${name.slice(0, dot)}-${short}${name.slice(dot)}`
-  return normalizeGitHubReleaseAssetName(deduped)
+  return insertAssetNameHash(name, short)
 }
 
 /**
@@ -477,19 +570,22 @@ function dedupeMultiPartBaseName(
     return name
   }
   const short = sha256.slice(0, 7)
-  const dot = name.lastIndexOf('.')
-  const deduped =
-    dot <= 0
-      ? `${name}-${short}`
-      : `${name.slice(0, dot)}-${short}${name.slice(dot)}`
-  return normalizeGitHubReleaseAssetName(deduped)
+  return insertAssetNameHash(name, short)
 }
 
 /** The `<base>.partNNN` name for one part, zero-padded to a stable width. */
-function partAssetName(base: string, index: number, count: number): string {
+function partAssetName(
+  base: string,
+  index: number,
+  count: number,
+  deflated: boolean = false
+): string {
   const width = Math.max(3, String(count).length)
-  return normalizeGitHubReleaseAssetName(
-    `${base}.part${String(index + 1).padStart(width, '0')}`
+  return appendAssetNameSuffix(
+    base,
+    `.part${String(index + 1).padStart(width, '0')}${
+      deflated ? '.deflate' : ''
+    }`
   )
 }
 
@@ -502,17 +598,26 @@ function aggregateProgress(
     | ((progress: IGitHubReleaseTransferProgressEvent) => void)
     | undefined,
   transferredBefore: number,
-  wholeSize: number
+  wholeSize: number,
+  logicalPartSize: number
 ): ((progress: IGitHubReleaseTransferProgressEvent) => void) | undefined {
   if (onProgress === undefined) {
     return undefined
   }
-  return progress =>
+  return progress => {
+    const fraction =
+      progress.totalBytes > 0
+        ? Math.min(1, progress.transferredBytes / progress.totalBytes)
+        : progress.transferredBytes > 0
+        ? 1
+        : 0
     onProgress({
       ...progress,
-      transferredBytes: transferredBefore + progress.transferredBytes,
+      transferredBytes:
+        transferredBefore + Math.round(fraction * logicalPartSize),
       totalBytes: wholeSize,
     })
+  }
 }
 
 /**
@@ -575,29 +680,73 @@ export async function pinFileToRelease(
   )
 
   if (hashed.parts.length <= 1) {
-    const assetName = dedupeAssetName(baseName, release.assets, hashed.sha256)
-    const review = releases.createMutationReview(repository, release)
-    const upload = await releases.uploadAsset(
-      repository,
-      review,
-      options.absoluteFilePath,
-      assetName,
-      null,
-      signal ?? new AbortController().signal,
-      onProgress
-    )
-    const pointer: ICheapLfsPointer = {
-      version: CHEAP_LFS_POINTER_VERSION,
-      releaseTag: options.releaseTag,
-      assetName,
-      sizeInBytes: hashed.sizeInBytes,
-      sha256: hashed.sha256,
+    const part = hashed.parts[0]
+    let uploadPath = options.absoluteFilePath
+    let compressedPath: string | null = null
+    let deflatedSizeInBytes: number | undefined
+    try {
+      if (part.length > 0 && fs.compressRange !== undefined) {
+        compressedPath = fs.temporaryPathFor(options.absoluteFilePath)
+        const compressedSize = await fs.compressRange(
+          options.absoluteFilePath,
+          compressedPath,
+          part.offset,
+          part.length,
+          signal
+        )
+        if (compressedSize <= part.length * CheapLfsCompressionMaximumRatio) {
+          uploadPath = compressedPath
+          deflatedSizeInBytes = compressedSize
+        }
+      }
+      const candidateName =
+        deflatedSizeInBytes === undefined
+          ? baseName
+          : appendAssetNameSuffix(baseName, '.deflate')
+      const assetName = dedupeAssetName(
+        candidateName,
+        release.assets,
+        hashed.sha256
+      )
+      const review = releases.createMutationReview(repository, release)
+      const upload = await releases.uploadAsset(
+        repository,
+        review,
+        uploadPath,
+        assetName,
+        null,
+        signal ?? new AbortController().signal,
+        aggregateProgress(onProgress, 0, hashed.sizeInBytes, part.length)
+      )
+      const pointer: ICheapLfsPointer = {
+        version: CHEAP_LFS_POINTER_VERSION,
+        releaseTag: options.releaseTag,
+        assetName,
+        sizeInBytes: hashed.sizeInBytes,
+        sha256: hashed.sha256,
+        ...(deflatedSizeInBytes === undefined
+          ? {}
+          : {
+              parts: [
+                {
+                  name: assetName,
+                  sizeInBytes: part.length,
+                  sha256: part.sha256,
+                  deflatedSizeInBytes,
+                },
+              ],
+            }),
+      }
+      await fs.writePointer(
+        join(repository.path, trackedRelativePath),
+        serializeCheapLfsPointer(pointer)
+      )
+      return { pointer, asset: upload.asset, releaseId: release.id }
+    } finally {
+      if (compressedPath !== null) {
+        await fs.removeFile(compressedPath)
+      }
     }
-    await fs.writePointer(
-      join(repository.path, trackedRelativePath),
-      serializeCheapLfsPointer(pointer)
-    )
-    return { pointer, asset: upload.asset, releaseId: release.id }
   }
 
   const partBaseName = dedupeMultiPartBaseName(
@@ -613,33 +762,78 @@ export async function pinFileToRelease(
   let currentRelease = release
   for (let index = 0; index < hashed.parts.length; index++) {
     const part = hashed.parts[index]
-    const name = partAssetName(partBaseName, index, hashed.parts.length)
-    if (index > 0) {
-      const refreshed = await releases.getReleaseByTag(
-        repository,
-        options.releaseTag,
-        signal
-      )
-      if (refreshed === null) {
-        throw new Error(
-          `The release tagged “${options.releaseTag}” disappeared while its parts were uploading.`
-        )
-      }
-      currentRelease = refreshed
+    let uploadPath = options.absoluteFilePath
+    let uploadRange: IGitHubReleaseAssetUploadRange | undefined = {
+      offset: part.offset,
+      length: part.length,
     }
-    const review = releases.createMutationReview(repository, currentRelease)
-    const upload = await releases.uploadAsset(
-      repository,
-      review,
-      options.absoluteFilePath,
-      name,
-      null,
-      signal ?? new AbortController().signal,
-      aggregateProgress(onProgress, transferred, hashed.sizeInBytes),
-      { offset: part.offset, length: part.length }
-    )
+    let compressedPath: string | null = null
+    let deflatedSizeInBytes: number | undefined
+    let name = partAssetName(partBaseName, index, hashed.parts.length)
+    let upload
+    try {
+      if (part.length > 0 && fs.compressRange !== undefined) {
+        compressedPath = fs.temporaryPathFor(options.absoluteFilePath)
+        const compressedSize = await fs.compressRange(
+          options.absoluteFilePath,
+          compressedPath,
+          part.offset,
+          part.length,
+          signal
+        )
+        if (compressedSize <= part.length * CheapLfsCompressionMaximumRatio) {
+          uploadPath = compressedPath
+          uploadRange = undefined
+          deflatedSizeInBytes = compressedSize
+        }
+      }
+      name = partAssetName(
+        partBaseName,
+        index,
+        hashed.parts.length,
+        deflatedSizeInBytes !== undefined
+      )
+      if (index > 0) {
+        const refreshed = await releases.getReleaseByTag(
+          repository,
+          options.releaseTag,
+          signal
+        )
+        if (refreshed === null) {
+          throw new Error(
+            `The release tagged “${options.releaseTag}” disappeared while its parts were uploading.`
+          )
+        }
+        currentRelease = refreshed
+      }
+      const review = releases.createMutationReview(repository, currentRelease)
+      upload = await releases.uploadAsset(
+        repository,
+        review,
+        uploadPath,
+        name,
+        null,
+        signal ?? new AbortController().signal,
+        aggregateProgress(
+          onProgress,
+          transferred,
+          hashed.sizeInBytes,
+          part.length
+        ),
+        uploadRange
+      )
+    } finally {
+      if (compressedPath !== null) {
+        await fs.removeFile(compressedPath)
+      }
+    }
     firstAsset ??= upload.asset
-    parts.push({ name, sizeInBytes: part.length, sha256: part.sha256 })
+    parts.push({
+      name,
+      sizeInBytes: part.length,
+      sha256: part.sha256,
+      ...(deflatedSizeInBytes === undefined ? {} : { deflatedSizeInBytes }),
+    })
     transferred += part.length
   }
 
@@ -703,7 +897,7 @@ async function materializeSingleAsset(
     asset,
     temporaryPath,
     signal ?? new AbortController().signal,
-    onProgress
+    aggregateProgress(onProgress, 0, pointer.sizeInBytes, pointer.sizeInBytes)
   )
   try {
     const verified = await fs.hashFile(download.path, signal)
@@ -746,11 +940,19 @@ async function materializeMultiPart(
   fs: ICheapLfsFileSystem
 ): Promise<ICheapLfsMaterializeResult> {
   // Resolve every part up front so a missing one fails before any download.
-  const resolved = parts.map(part => ({
-    part,
-    asset: resolveReleaseAsset(release, part.name, pointer.releaseTag),
-  }))
+  const resolved = parts.map(part => {
+    const asset = resolveReleaseAsset(release, part.name, pointer.releaseTag)
+    const expectedStoredSize = part.deflatedSizeInBytes ?? part.sizeInBytes
+    if (asset.sizeInBytes !== expectedStoredSize) {
+      throw new Error(
+        'A cheap LFS release asset size does not match its pointer. The pointer was left in place.'
+      )
+    }
+    return { part, asset }
+  })
   const partPaths = new Array<string>()
+  const expandedPaths = new Array<string>()
+  const assemblySources = new Array<string>()
   let assembledPath: string | null = null
   let assembledConsumed = false
   try {
@@ -764,9 +966,34 @@ async function materializeMultiPart(
         asset,
         partPath,
         signal ?? new AbortController().signal,
-        aggregateProgress(onProgress, transferred, pointer.sizeInBytes)
+        aggregateProgress(
+          onProgress,
+          transferred,
+          pointer.sizeInBytes,
+          part.sizeInBytes
+        )
       )
-      const verified = await fs.hashFile(download.path, signal)
+      let verificationPath = download.path
+      if (part.deflatedSizeInBytes !== undefined) {
+        if (
+          download.bytes !== part.deflatedSizeInBytes ||
+          fs.decompressFile === undefined
+        ) {
+          throw new Error(
+            'A compressed cheap LFS part does not match the pointer. The pointer was left in place.'
+          )
+        }
+        const expandedPath = fs.temporaryPathFor(trackedPath)
+        expandedPaths.push(expandedPath)
+        await fs.decompressFile(
+          download.path,
+          expandedPath,
+          part.sizeInBytes,
+          signal
+        )
+        verificationPath = expandedPath
+      }
+      const verified = await fs.hashFile(verificationPath, signal)
       if (
         verified.sha256 !== part.sha256 ||
         verified.sizeInBytes !== part.sizeInBytes
@@ -775,10 +1002,15 @@ async function materializeMultiPart(
           'A downloaded cheap LFS part does not match the pointer. The pointer was left in place.'
         )
       }
+      assemblySources.push(verificationPath)
       transferred += part.sizeInBytes
     }
     assembledPath = fs.temporaryPathFor(trackedPath)
-    const assembled = await fs.assembleParts(partPaths, assembledPath, signal)
+    const assembled = await fs.assembleParts(
+      assemblySources,
+      assembledPath,
+      signal
+    )
     if (
       assembled.sha256 !== pointer.sha256 ||
       assembled.sizeInBytes !== pointer.sizeInBytes
@@ -793,6 +1025,9 @@ async function materializeMultiPart(
   } finally {
     for (const partPath of partPaths) {
       await fs.removeFile(partPath)
+    }
+    for (const expandedPath of expandedPaths) {
+      await fs.removeFile(expandedPath)
     }
     if (assembledPath !== null && !assembledConsumed) {
       await fs.removeFile(assembledPath)

@@ -96,6 +96,29 @@ describe('ErrorNoticeStack', () => {
     )
   })
 
+  it('offers the scoped stale-lock recovery action', () => {
+    const actions: Array<{ noticeId: string; repositoryId: number }> = []
+    render(
+      <ErrorNoticeStack
+        notices={[
+          notice('lock', {
+            action: { kind: 'remove-repository-lock', repositoryId: 42 },
+          }),
+        ]}
+        onDismiss={() => undefined}
+        onAction={(item, action) =>
+          actions.push({
+            noticeId: item.id,
+            repositoryId: action.repositoryId,
+          })
+        }
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove lock file' }))
+    assert.deepEqual(actions, [{ noticeId: 'lock', repositoryId: 42 }])
+  })
+
   it('renders no landmark when there are no errors', () => {
     const view = render(
       <ErrorNoticeStack notices={[]} onDismiss={() => undefined} />

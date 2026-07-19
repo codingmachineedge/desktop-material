@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import { IErrorNotice } from '../models/error-notice'
+import { IErrorNotice, IErrorNoticeAction } from '../models/error-notice'
 import { Octicon } from './octicons'
 import * as octicons from './octicons/octicons.generated'
 import { TooltippedContent } from './lib/tooltipped-content'
@@ -10,6 +10,7 @@ interface IErrorNoticeCardProps {
   readonly notice: IErrorNotice
   readonly onDismiss: (id: string) => void
   readonly onShowDetails?: (notice: IErrorNotice) => void
+  readonly onAction?: (notice: IErrorNotice, action: IErrorNoticeAction) => void
 }
 
 interface IErrorNoticeCardState {
@@ -33,6 +34,13 @@ class ErrorNoticeCard extends React.PureComponent<
     }
 
     this.setState(state => ({ detailsExpanded: !state.detailsExpanded }))
+  }
+
+  private onAction = () => {
+    const { action } = this.props.notice
+    if (action !== undefined) {
+      this.props.onAction?.(this.props.notice, action)
+    }
   }
 
   public render() {
@@ -62,6 +70,15 @@ class ErrorNoticeCard extends React.PureComponent<
           )}
         </div>
         <div className="error-notice-actions">
+          {notice.action?.kind === 'remove-repository-lock' && (
+            <button
+              type="button"
+              className="error-notice-recovery"
+              onClick={this.onAction}
+            >
+              Remove lock file
+            </button>
+          )}
           {showDetails && (
             <button
               type="button"
@@ -96,6 +113,7 @@ export interface IErrorNoticeStackProps {
   readonly notices: ReadonlyArray<IErrorNotice>
   readonly onDismiss: (id: string) => void
   readonly onShowDetails?: (notice: IErrorNotice) => void
+  readonly onAction?: (notice: IErrorNotice, action: IErrorNoticeAction) => void
 }
 
 /** Fixed non-modal stack for bounded transient application errors. */
@@ -113,6 +131,7 @@ export class ErrorNoticeStack extends React.PureComponent<IErrorNoticeStackProps
             notice={notice}
             onDismiss={this.props.onDismiss}
             onShowDetails={this.props.onShowDetails}
+            onAction={this.props.onAction}
           />
         ))}
       </section>

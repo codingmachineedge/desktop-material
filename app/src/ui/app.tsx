@@ -57,6 +57,7 @@ import { TipState } from '../models/tip'
 import { CloneRepositoryTab } from '../models/clone-repository-tab'
 import { batchCloneNeedsAttention } from '../models/batch-clone'
 import { CloningRepository } from '../models/cloning-repository'
+import { IErrorNotice, IErrorNoticeAction } from '../models/error-notice'
 import { resolveAppearanceCustomization } from '../models/appearance-customization'
 import {
   isRepositoryFileDrag,
@@ -4426,12 +4427,25 @@ export class App extends React.Component<IAppProps, IAppState> {
       <ErrorNoticeStack
         notices={this.state.errorNotices}
         onDismiss={this.onErrorNoticeDismissed}
+        onAction={this.onErrorNoticeAction}
       />
     )
   }
 
   private onErrorNoticeDismissed = (id: string) => {
     this.props.dispatcher.dismissErrorNotice(id)
+  }
+
+  private onErrorNoticeAction = (
+    notice: IErrorNotice,
+    action: IErrorNoticeAction
+  ) => {
+    if (action.kind === 'remove-repository-lock') {
+      void this.props.dispatcher.removeRepositoryLock(
+        action.repositoryId,
+        notice.id
+      )
+    }
   }
 
   private renderApp() {

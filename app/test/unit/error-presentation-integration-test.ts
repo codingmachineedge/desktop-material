@@ -25,9 +25,14 @@ describe('error presentation shell integration', () => {
       appSource,
       /<ErrorNoticeStack\s+notices=\{this\.state\.errorNotices\}\s+onDismiss=\{this\.onErrorNoticeDismissed\}/
     )
+    assert.match(appSource, /onAction=\{this\.onErrorNoticeAction\}/)
     assert.match(
       appSource,
       /onErrorNoticeDismissed = \(id: string\) => \{\s*this\.props\.dispatcher\.dismissErrorNotice\(id\)/
+    )
+    assert.match(
+      appSource,
+      /removeRepositoryLock\(\s*action\.repositoryId,\s*notice\.id/
     )
     assert.equal(
       appSource.match(/\{this\.renderErrorNotices\(\)\}/g)?.length,
