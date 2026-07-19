@@ -685,7 +685,12 @@ they differ from the user-facing message. In **Settings → Notifications**, cho
 need a retry, authentication choice, external remediation, or another real decision remain dialogs
 regardless of that preference.
 
-![Dismissible bottom-right acknowledgement-only error notice](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
+When Git reports the affected repository's exact stale `.git/index.lock`, the notice includes
+**Remove lock file**. Desktop first confirms that its own repository operations are idle, then
+refuses recent, linked, non-file, or changed locks before atomically quarantining and removing the
+verified stale file. Retry the original Git operation after the notice closes.
+
+![Bottom-right Git lock error notice with Remove lock file recovery](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
 
 ---
 

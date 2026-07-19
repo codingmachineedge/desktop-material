@@ -99,7 +99,7 @@ active profile's style, label, and explicit language mode.
 | `material-automation.png` | Layered automation schedules and account overrides |
 | `material-notification-center.png` | Git-backed notification centre |
 | `material-notification-bulk-actions.png` | Filtered Local notification selection and bulk triage |
-| `material-error-notice.png` | Configurable bottom-right acknowledgement-only error notice |
+| `material-error-notice.png` | Scoped stale Git lock recovery from a bottom-right error notice |
 | `material-github-notifications.png` | Account-aware GitHub notifications |
 | `material-provider-accounts.png` | GitHub, GitLab, and Bitbucket account controls |
 | `material-agent-access.png` | Local MCP and REST agent access controls |
@@ -321,7 +321,7 @@ authentication choice, or remediation remain decision dialogs.
 
 ![Filtered Local notifications selected for bulk triage](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-bulk-actions.png)
 
-![Dismissible bottom-right acknowledgement-only error notice](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
+![Bottom-right Git lock error notice with Remove lock file recovery](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
 
 ![Account-aware GitHub notifications](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
 

@@ -87,6 +87,28 @@ handoff.
 - SSH working copies remain under **Repository Settings → Remote**. Optional
   Docker Compose deployment targets that same host; public domain, DNS, TLS,
   reverse-proxy, and port configuration intentionally remain server-owned.
+- Exact production verification later succeeded through the requested HTTP MCP
+  checkout at `ed1427f69b20dcd66df1de2ae3c6ba6591e2e640`. The first exact build
+  exposed missing local native outputs; `desktop-notifications`,
+  `desktop-trampoline`, `windows-argv-parser`, `printenvz`, and Electron were
+  rebuilt/downloaded with the pinned Node 24 runtime, after which the MCP build
+  returned `client_ok: true`, exit code 0, and no timeout.
+- On the never-shown desktop `DesktopMaterialLock0d8c93b0`, disposable fixture
+  commit `2f4c3c4` failed against an aged exact `index.lock`; the rendered notice
+  offered **Remove lock file**. Clicking it dismissed the notice, left no lock
+  or quarantine, and the same UI commit immediately succeeded as `509c9ea`.
+  The accepted 960×660 light client capture is
+  `docs/assets/screenshots/material-error-notice.png`, 93,361 bytes, SHA-256
+  `94e122b927e0be24dd040b6465f90cb8d47011b01616a1899bee3c3398a877d4`.
+- The MCP checkout had no installed startup task, so verification used a
+  transient hidden server from that exact checkout and port without changing
+  boot configuration. The app launch PID was `48520` and its dynamically
+  resolved HWND was `5244054`. Hidden-HWND resize/close failed closed; after
+  revalidating the exact executable and full launch arguments, only PID `48520`
+  was terminated. The desktop then reported zero windows and closed, and the
+  separately revalidated transient server PID `44992` was stopped. Read-only
+  Git object attributes were cleared only inside the containment-checked owned
+  run root, which was then removed and independently verified absent.
 
 ## 2026-07-18 repository-page CI status
 
