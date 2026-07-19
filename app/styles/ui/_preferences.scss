@@ -345,7 +345,8 @@
   // prototype renders the Prompts rows as checkbox CARDS instead (below), so
   // prompts are deliberately NOT part of this selector any more.
   .tab-container[aria-labelledby='preferences-tab-notifications'] .checkbox-component,
-  .tab-container[aria-labelledby='preferences-tab-appearance'] .checkbox-component.auto-fit-zoom {
+  .tab-container[aria-labelledby='preferences-tab-appearance'] .checkbox-component.auto-fit-zoom,
+  .tab-container[aria-labelledby='preferences-tab-appearance'] .checkbox-component.desktop-material-feature-toggle {
     flex-direction: row-reverse;
     justify-content: space-between;
     gap: 14px;
@@ -1230,6 +1231,44 @@
       color: inherit;
       font-size: var(--font-size-sm);
       line-height: 1.45;
+    }
+  }
+
+  .appearance-feature-highlighting {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 var(--spacing-double);
+    padding: 16px 18px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 20px;
+    background: var(--md-sys-color-surface-container-low);
+
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h2 {
+      color: var(--md-sys-color-on-surface);
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    p {
+      margin-top: 4px;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: var(--font-size-sm);
+      line-height: 1.45;
+    }
+
+    .checkbox-component.desktop-material-feature-toggle {
+      padding: 0;
+
+      label {
+        color: var(--md-sys-color-on-surface);
+        font-size: 13.5px;
+        font-weight: var(--font-weight-semibold);
+      }
     }
   }
 

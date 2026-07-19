@@ -275,7 +275,7 @@ without destructively clearing a usable current session.
 ### App defaults in the active profile
 
 Open **Settings → Appearance**. The callout at the top identifies these controls as app defaults
-for the active profile. All 12 are saved through the profile's local Git-backed settings history:
+for the active profile. All 13 are saved through the profile's local Git-backed settings history:
 
 1. **Accent color** — Blue, Violet, Teal, Green, Amber, or Rose.
 2. **Surface color** — Tonal or Neutral.
@@ -289,6 +289,16 @@ for the active profile. All 12 are saved through the profile's local Git-backed 
 10. **Tab density** — Comfortable or Compact.
 11. **Tab width** — Compact, Standard, or Wide.
 12. **Tab close buttons** — On hover, Always, or Active tab only.
+13. **Highlight Desktop Material features** — off by default; when enabled, adds a non-animated
+    accent edge and an `M` or **Material** badge to reviewed entry points that are not present in
+    stock GitHub Desktop.
+
+The highlight is a discovery aid only and does not change what a control does. Its conservative
+allowlist covers the custom Actions, Releases, Issues, API, Triage, and Tools repository
+destinations; repository-tab search, arrange, new-tab, notification, and settings-history controls;
+Agent access and Automation settings; fork-only toolbar controls; and reviewed custom
+menu/command-palette entries. Mixed or upstream controls such as Changes, History, Branches,
+Accounts, Git, and Appearance remain neutral.
 
 The same page also owns the active profile's **default repository logo**. Repositories inherit this
 editable vector design unless they save a local override, so switching profiles can change both the
@@ -324,8 +334,9 @@ inherits the active-profile value until changed.
 These six values and an optional custom repository-logo document are stored under
 `desktop-material.appearance` in the repository's local `.git/config`. They are not committed and
 are not shared with collaborators. Interface/code fonts, surface depth, motion, repository-list
-density, and tab close-button behavior intentionally remain profile defaults; individual tab
-text/background styling remains in the profile's tab history.
+density, tab close-button behavior, and optional Desktop Material feature highlighting
+intentionally remain profile defaults; individual tab text/background styling remains in the
+profile's tab history.
 
 ### Advanced repository logo studio
 
@@ -350,7 +361,7 @@ model.
 
 ![Layered custom repository-logo studio with a live preview and safe vector controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 
-![Profile-backed Appearance preferences with repository override guidance](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance preferences with optional Desktop Material feature highlighting enabled and Material badges on fork-only entry points](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ---
 

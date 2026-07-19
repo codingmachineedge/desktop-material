@@ -46,6 +46,8 @@ export interface IAppearanceCustomization {
   readonly tabDensity: DensityPreference
   readonly tabWidth: TabWidthPreference
   readonly tabCloseButtons: TabCloseButtonPreference
+  /** Visually identifies entry points added by Desktop Material. */
+  readonly highlightDesktopMaterialFeatures: boolean
   readonly appIdentity: IAppIdentityCustomization
   /** Default vector identity inherited by repositories without an override. */
   readonly repositoryLogo: IRepositoryLogoDesign
@@ -92,6 +94,7 @@ export const DefaultAppearanceCustomization: IAppearanceCustomization = {
   tabDensity: 'comfortable',
   tabWidth: 'standard',
   tabCloseButtons: 'hover',
+  highlightDesktopMaterialFeatures: false,
   appIdentity: DefaultAppIdentityCustomization,
   repositoryLogo: DefaultRepositoryLogoDesign,
 }
@@ -201,6 +204,10 @@ export function normalizeAppearanceCustomization(
     tabCloseButtons: isOneOf(source.tabCloseButtons, tabCloseButtonPreferences)
       ? source.tabCloseButtons
       : defaults.tabCloseButtons,
+    highlightDesktopMaterialFeatures:
+      typeof source.highlightDesktopMaterialFeatures === 'boolean'
+        ? source.highlightDesktopMaterialFeatures
+        : defaults.highlightDesktopMaterialFeatures,
     appIdentity: normalizeAppIdentityCustomization(source.appIdentity),
     repositoryLogo:
       isRecord(source.repositoryLogo) &&

@@ -6,6 +6,7 @@ import * as octicons from '../octicons/octicons.generated'
 import { MenuItem } from '../../models/app-menu'
 import { AccessText } from '../lib/access-text'
 import { getPlatformSpecificNameOrSymbolForModifier } from '../../lib/menu-item'
+import { isDesktopMaterialFeatureEntryPoint } from '../../lib/desktop-material-features'
 
 interface IMenuListItemProps {
   readonly item: MenuItem
@@ -200,6 +201,10 @@ export class MenuListItem extends React.Component<IMenuListItemProps, {}> {
         role={role}
         tabIndex={-1}
         aria-checked={ariaChecked}
+        data-menu-item-id={item.id}
+        data-dm-feature={
+          isDesktopMaterialFeatureEntryPoint(item.id) ? true : undefined
+        }
       >
         {this.getIcon(item)}
         <div className="label">{this.renderLabel()}</div>

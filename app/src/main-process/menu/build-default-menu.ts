@@ -185,6 +185,7 @@ export function buildDefaultMenuTemplate({
       { role: 'redo', label: __DARWIN__ ? 'Redo' : '&Redo' },
       {
         label: __DARWIN__ ? 'Settings History…' : 'Settings &history…',
+        id: 'show-settings-history',
         accelerator: 'CmdOrCtrl+Alt+Z',
         click: emit('show-settings-history'),
       },
@@ -653,6 +654,7 @@ export function buildDefaultMenuTemplate({
   }
 
   const viewLogHistoryItem: Electron.MenuItemConstructorOptions = {
+    id: 'view-log-history',
     label: __DARWIN__ ? 'View Log History' : '&View log history',
     click: emit('view-log-history'),
   }

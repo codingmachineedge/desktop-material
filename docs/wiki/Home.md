@@ -93,12 +93,15 @@ receipts as acceptance evidence.
 
 ### Appearance, onboarding, and adaptive layout
 
-Open **Settings → Appearance** to set the 12 app defaults carried by the active profile: **accent
+Open **Settings → Appearance** to set the 13 app defaults carried by the active profile: **accent
 palette**, **surface palette**, **surface depth**, **interface font**, **code and diff font**,
 **motion**, **toolbar labels**, **toolbar density**, **repository-list density**, **tab density**,
-**tab width**, and **tab close-button visibility**. They are captured in that profile's local Git
-history, so switching profiles switches the appearance context and Settings History can audit or
-restore it.
+**tab width**, **tab close-button visibility**, and default-off **Desktop Material feature
+highlighting**. The optional discovery treatment adds an accent edge plus an `M` or **Material**
+badge only to explicitly reviewed fork-only navigation, toolbar, settings, menu, and command entry
+points; it does not change their behavior or label upstream/mixed controls. All 13 settings are
+captured in that profile's local Git history, so switching profiles switches the appearance context
+and Settings History can audit or restore it.
 
 For a project-specific workspace, open **Repository settings → Appearance**. Its six optional
 overrides are **accent palette**, **surface palette**, **toolbar labels**, **toolbar density**, **tab
@@ -123,7 +126,7 @@ the tonal workspace preview hides when a compact window needs the space.
 
 ![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-welcome.png)
 
-![Profile-backed Appearance preferences with repository override guidance](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance preferences with optional Desktop Material feature highlighting enabled and Material badges on fork-only entry points](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ![Measured narrow toolbar with Build and Run and Commit and Push in the More actions surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
 

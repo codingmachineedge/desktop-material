@@ -342,6 +342,19 @@ async function seedProfile() {
     await sleep(4500)
     await client.send('Runtime.enable')
   }
+  if (
+    await clickText('Continue without signing in', {
+      optional: true,
+    })
+  ) {
+    await sleep(3000)
+  }
+  if (await clickText('Finish', { optional: true })) {
+    await sleep(3500)
+  }
+  if (await clickText('Skip for now', { optional: true })) {
+    await sleep(1800)
+  }
   process.stdout.write(`SEEDED changed=${changed}\n`)
 }
 
@@ -489,6 +502,16 @@ scene('dump', async () => {
   process.stdout.write(`DUMP ${JSON.stringify(summary, null, 1)}\n`)
 })
 
+scene('raw-feature-highlights', async () => {
+  await closeAllDialogs()
+  await evaluate(
+    `document.body.setAttribute('data-dm-highlight-features', ''), true`
+  )
+  await sleep(500)
+  await parkPointer()
+  await capture('material-feature-highlights-compact')
+})
+
 scene('welcome', async () => {
   const inWelcome = await evaluate(
     `document.querySelector('#welcome') !== null`
@@ -623,7 +646,7 @@ scene('settings', async () => {
 })
 
 /** Open Settings on a named tab and capture. */
-async function captureSettingsTab(tabLabel, name) {
+async function captureSettingsTab(tabLabel, name, beforeCapture = null) {
   await ensureRepository()
   await menuEvent('show-preferences')
   await waitFor(
@@ -635,6 +658,9 @@ async function captureSettingsTab(tabLabel, name) {
     await clickText(tabLabel, { within: '#preferences' })
     await sleep(900)
   }
+  if (beforeCapture !== null) {
+    await beforeCapture()
+  }
   await parkPointer()
   await capture(name)
   await closeAllDialogs()
@@ -645,7 +671,25 @@ scene('settings-agent-access', async () => {
 })
 
 scene('settings-appearance', async () => {
-  await captureSettingsTab('Appearance', 'material-customization')
+  await captureSettingsTab('Appearance', 'material-customization', async () => {
+    const enabled = await evaluate(`(() => {
+        const label = [...document.querySelectorAll('#preferences label')]
+          .find(node => node.textContent.trim() === 'Highlight Desktop Material features')
+        if (!(label instanceof HTMLLabelElement)) return false
+        const input = document.getElementById(label.htmlFor)
+        if (!(input instanceof HTMLInputElement)) return false
+        if (!input.checked) input.click()
+        return input.checked
+      })()`)
+    if (!enabled) {
+      fail('Unable to enable Desktop Material feature highlighting.')
+    }
+    await waitFor(
+      `document.body.hasAttribute('data-dm-highlight-features') && document.querySelectorAll('#preferences [data-dm-feature]').length >= 2`,
+      'enabled Desktop Material feature markers'
+    )
+    await sleep(500)
+  })
 })
 
 scene('settings-accounts', async () => {
@@ -1530,7 +1574,10 @@ async function main() {
   await client.open()
   await client.send('Runtime.enable')
   await client.send('Page.enable')
-  await setViewport()
+  await setViewport(
+    Number(args.get('width') ?? DefaultWidth),
+    Number(args.get('height') ?? DefaultHeight)
+  )
 
   if (args.has('probe')) {
     const value = await evaluate(args.get('probe'))

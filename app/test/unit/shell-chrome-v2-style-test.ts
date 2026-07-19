@@ -60,7 +60,7 @@ describe('shell chrome v2 style contracts', () => {
     // Rendered as the final item of the #desktop-app-toolbar composition.
     assert.match(
       app,
-      /id="build-run"[\s\S]*?<ToolbarItem id="theme-toggle"[\s\S]*?<ThemeToggleButton[\s\S]*?selectedTheme=\{this\.state\.selectedTheme\}[\s\S]*?<\/Toolbar>/
+      /id="build-run"[\s\S]*?<ToolbarItem\s+id="theme-toggle"[\s\S]*?<ThemeToggleButton[\s\S]*?selectedTheme=\{this\.state\.selectedTheme\}[\s\S]*?<\/Toolbar>/
     )
   })
 

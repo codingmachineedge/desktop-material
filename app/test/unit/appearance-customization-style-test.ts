@@ -37,6 +37,83 @@ describe('appearance customization style contracts', () => {
     assert.match(tabs, /data-dm-tab-close-buttons='always'/)
   })
 
+  it('gates explicit Desktop Material feature markers behind the profile toggle', async () => {
+    const [
+      highlights,
+      appearance,
+      repository,
+      preferences,
+      repositoryTabs,
+      notificationBell,
+    ] = await Promise.all([
+      readFile(Path.join(styles, 'ui/_feature-highlights.scss'), 'utf8'),
+      readFile(Path.join(app, 'src/ui/preferences/appearance.tsx'), 'utf8'),
+      readFile(Path.join(app, 'src/ui/repository.tsx'), 'utf8'),
+      readFile(Path.join(app, 'src/ui/preferences/preferences.tsx'), 'utf8'),
+      readFile(
+        Path.join(app, 'src/ui/repository-tabs/repository-tab-strip.tsx'),
+        'utf8'
+      ),
+      readFile(
+        Path.join(app, 'src/ui/notifications/notification-bell-button.tsx'),
+        'utf8'
+      ),
+    ])
+
+    assert.match(highlights, /body\[data-dm-highlight-features\]/)
+    assert.doesNotMatch(highlights, /@keyframes|animation:/)
+    assert.match(highlights, /content: 'M'/)
+    assert.match(highlights, /content: 'Material'/)
+    assert.match(
+      highlights,
+      /@container preferences-dialog \(max-width: 620px\)[\s\S]*?content: 'M'/
+    )
+    assert.match(
+      highlights,
+      /\.repository-tab-strip button\[data-dm-feature\][\s\S]*?box-shadow:/
+    )
+    assert.match(appearance, /Highlight Desktop Material features/)
+
+    for (const id of [
+      'actions-tab',
+      'releases-tab',
+      'issues-tab',
+      'github-api-tab',
+      'triage-tab',
+      'repository-tools-tab',
+    ]) {
+      assert.match(
+        repository,
+        new RegExp(`id="${id}"[\\s\\S]*?data-dm-feature=\\{true\\}`)
+      )
+    }
+
+    assert.match(
+      preferences,
+      /getTabId\(PreferencesTab\.AgentAccess\)[\s\S]*?data-dm-feature/
+    )
+    assert.match(
+      preferences,
+      /getTabId\(PreferencesTab\.Automation\)[\s\S]*?data-dm-feature/
+    )
+
+    for (const className of [
+      'repository-tab-search',
+      'repository-tab-arrange',
+      'repository-tab-new',
+      'repository-tab-undo',
+      'repository-tab-redo',
+    ]) {
+      assert.match(
+        repositoryTabs,
+        new RegExp(
+          `className="${className}"[\\s\\S]*?data-dm-feature=\\{true\\}`
+        )
+      )
+    }
+    assert.match(notificationBell, /data-dm-feature=\{true\}/)
+  })
+
   it('explains app and repository appearance scope in a Material tonal note', async () => {
     const [appearance, preferences] = await Promise.all([
       readFile(Path.join(app, 'src/ui/preferences/appearance.tsx'), 'utf8'),

@@ -25,6 +25,7 @@ const appearanceAttributes = [
   'data-dm-tab-density',
   'data-dm-tab-width',
   'data-dm-tab-close-buttons',
+  'data-dm-highlight-features',
 ] as const
 
 /**
@@ -88,6 +89,10 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
     body.setAttribute('data-dm-tab-density', appearance.tabDensity)
     body.setAttribute('data-dm-tab-width', appearance.tabWidth)
     body.setAttribute('data-dm-tab-close-buttons', appearance.tabCloseButtons)
+    body.toggleAttribute(
+      'data-dm-highlight-features',
+      appearance.highlightDesktopMaterialFeatures
+    )
   }
 
   private appearanceEquals(
@@ -106,7 +111,9 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
       left.repositoryListDensity === right.repositoryListDensity &&
       left.tabDensity === right.tabDensity &&
       left.tabWidth === right.tabWidth &&
-      left.tabCloseButtons === right.tabCloseButtons
+      left.tabCloseButtons === right.tabCloseButtons &&
+      left.highlightDesktopMaterialFeatures ===
+        right.highlightDesktopMaterialFeatures
     )
   }
 

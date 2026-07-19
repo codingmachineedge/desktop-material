@@ -1,0 +1,186 @@
+// Optional discovery treatment for entry points that are specific to Desktop
+// Material. Markers are inert and invisible unless the profile preference adds
+// the body gate. Compact chrome uses an "M" badge; roomier command surfaces
+// spell out "Material". The accent edge ensures the treatment is not color-only.
+body[data-dm-highlight-features] {
+  .repository-rail [data-dm-feature] {
+    position: relative;
+
+    .rail-pill {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--md-sys-color-primary) 72%, transparent);
+    }
+
+    .rail-label {
+      color: var(--md-sys-color-primary);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    &::after {
+      content: 'M';
+      position: absolute;
+      top: 0;
+      right: 6px;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 17px;
+      height: 17px;
+      border: 2px solid var(--md-sys-color-surface);
+      border-radius: 999px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1;
+      pointer-events: none;
+    }
+  }
+
+  #preferences .preferences-rail [data-dm-feature] {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+
+    &::after {
+      content: 'Material';
+      flex: none;
+      margin-left: auto;
+      padding: 2px 7px;
+      border: 1px solid color-mix(in srgb, var(--md-sys-color-primary) 54%, transparent);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+      color: var(--md-sys-color-primary);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.02em;
+      line-height: 16px;
+      pointer-events: none;
+    }
+  }
+
+  .toolbar-item[data-dm-feature],
+  .toolbar-overflow-item[data-dm-feature] {
+    position: relative;
+    border-radius: var(--md-sys-shape-corner-medium);
+    box-shadow: inset 0 -3px 0 var(--md-sys-color-primary);
+
+    &::after {
+      content: 'M';
+      position: absolute;
+      top: 1px;
+      right: 2px;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1;
+      pointer-events: none;
+    }
+  }
+
+  .repository-tab-strip button[data-dm-feature] {
+    position: relative;
+    box-shadow: inset 0 -3px 0 var(--md-sys-color-primary);
+
+    &::after {
+      content: 'M';
+      position: absolute;
+      right: -3px;
+      bottom: -3px;
+      z-index: 2;
+      display: grid;
+      width: 14px;
+      height: 14px;
+      place-items: center;
+      border: 2px solid var(--md-sys-color-surface);
+      border-radius: 999px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 1;
+      pointer-events: none;
+    }
+  }
+
+  #app-menu-foldout .menu-item[data-dm-feature],
+  .command-palette-row[data-dm-feature] {
+    position: relative;
+    box-shadow: inset 3px 0 0 var(--md-sys-color-primary);
+
+    &::after {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      z-index: 1;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+      font-size: 9px;
+      font-weight: 750;
+      line-height: 14px;
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+  }
+
+  #app-menu-foldout .menu-item[data-dm-feature] {
+    padding-right: 38px;
+
+    &::after {
+      content: 'M';
+      min-width: 14px;
+      padding-right: 2px;
+      padding-left: 2px;
+      text-align: center;
+    }
+  }
+
+  .command-palette-row[data-dm-feature] {
+    padding-right: 76px;
+
+    &::after {
+      content: 'Material';
+    }
+  }
+}
+
+@container preferences-dialog (max-width: 620px) {
+  body[data-dm-highlight-features] #preferences .preferences-rail [data-dm-feature] {
+    position: relative;
+
+    &::after {
+      content: 'M';
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      display: grid;
+      width: 15px;
+      height: 15px;
+      place-items: center;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-size: 8px;
+      line-height: 1;
+    }
+  }
+}
+
+@media (max-height: 520px) {
+  body[data-dm-highlight-features] .repository-rail [data-dm-feature]::after {
+    top: -1px;
+    right: 0;
+  }
+}

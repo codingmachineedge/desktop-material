@@ -1642,6 +1642,63 @@ that baseline reported zero dirty files, zero stashes, no unmerged local or
 remote branches, one local branch (`main`), one remote branch (`origin/main`),
 one canonical worktree, and `0/0` divergence between `main` and `origin/main`.
 
+## 2026-07-18 optional Desktop Material feature highlighting
+
+The current publication changeset adds a thirteenth profile-backed Appearance
+default: **Highlight Desktop Material features**. It is off by default and uses
+the existing version-1 appearance object, profile persistence, local Git-backed
+Settings History, live preview, and Cancel rollback. No parallel store, schema
+version, storage key, or repository-local override was added. The normalizer
+accepts only a real boolean and old version-1 profiles migrate naturally to
+`false`.
+
+When enabled, `AppTheme` installs one `data-dm-highlight-features` body gate.
+Only explicit `data-dm-feature` entry points receive the non-animated accent
+edge plus compact `M` or full **Material** badge. The reviewed inventory covers
+repository Actions, Releases, Issues, API, Triage, and Tools; Settings Agent
+access and Automation; repository-tab search, arrange, new-tab, notification,
+and settings-history controls; the Commit & Push, Build & Run, and theme
+toolbar controls (including overflow); and a centralized allowlist shared by
+the app menu and command palette. Changes, History, Branches, Accounts, Git,
+Appearance, and other upstream/mixed surfaces remain deliberately neutral.
+
+Focused persistence, UI, theme-side-effect, responsive-marker, shell,
+Settings-toggle, and allowlist coverage passed `28/28` tests across seven
+files. All 554 repository unit-test files passed in three batches in `516.9s`;
+script tests passed `16/16`; deterministic provider tests passed `14/14`; root
+and script TypeScript, repository-wide no-cache ESLint, and repository-wide
+Prettier passed. The configured Markdownlint command is not a clean Windows
+repository gate: its recursive glob includes nested dependencies and reported
+54,084 baseline diagnostics, so this milestone does not claim a Markdownlint
+pass.
+
+The fixed MCP preflight was healthy at `127.0.0.1:8765`; its scheduled task
+points to checkout `8d6940be6a5f6e7c37de3f73acd2259fa7651efe`. A temporary
+Yarn shim came strictly from the existing local npm cache, delegated to pinned
+Yarn `1.21.1`, and the exact required final production build passed in `229.1s`
+(`yarn` reported `227.46s`). The shim was removed and `where yarn` was absent.
+
+The final rebuilt UI run stayed on Win32 desktop
+`DesktopMaterialHighlightFinal-20260718-2015` (handle `1044`). Provider and
+launcher PIDs `32220`/`20420` used loopback port `52821`; exact launch PID
+`7260` resolved to HWND `20251006`, with CDP on `9347`. The accepted light
+Appearance capture is 1440×960, 137,390 bytes, SHA-256
+`3e7cfc236741dc9873e4e3dace1d25e58b57c73464ed026a45e56c44eda53b08`.
+A final 1440×960 dark capture, a 600×240 compact shell capture, and a true
+300×400 narrow Settings capture were inspected for contrast, compact `M`
+replacement, hidden-label behavior, scroll reachability, and clipping. The
+native off-screen helper could not close the revalidated HWND, so only saved
+launch PID `7260` was terminated as the documented fallback. The desktop then
+reported zero windows and closed; both loopback ports reached zero listeners;
+both provider processes stopped; and containment-checked cleanup removed the
+exact owned Temp root. The visible desktop and unrelated Electron processes
+were untouched.
+
+The tracked `material-customization.png`, README, Pages, and wiki sources now
+describe the default-off discovery treatment. Diff/staged scan, commit/push,
+CI, wiki, and final clean-state receipts are intentionally left to the final
+publication update rather than being claimed early.
+
 ## Maintenance constraints
 
 - Keep account identity on `endpoint#id`; never collapse provider accounts by

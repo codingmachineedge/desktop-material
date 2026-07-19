@@ -33,7 +33,10 @@ import { RepositoryLogoStudio } from '../repository-logo/repository-logo-studio'
 
 type AppearanceSelectKey = Exclude<
   keyof IAppearanceCustomization,
-  'version' | 'appIdentity' | 'repositoryLogo'
+  | 'version'
+  | 'appIdentity'
+  | 'repositoryLogo'
+  | 'highlightDesktopMaterialFeatures'
 >
 
 interface IAppearanceProps {
@@ -141,6 +144,47 @@ export class Appearance extends React.Component<
       ...this.props.appearanceCustomization,
       repositoryLogo,
     })
+  }
+
+  private onHighlightDesktopMaterialFeaturesChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.props.onAppearanceCustomizationChanged({
+      ...this.props.appearanceCustomization,
+      highlightDesktopMaterialFeatures: event.currentTarget.checked,
+    })
+  }
+
+  private renderFeatureHighlighting() {
+    return (
+      <section
+        className="appearance-feature-highlighting"
+        aria-labelledby="appearance-feature-highlighting-heading"
+      >
+        <div className="appearance-feature-highlighting-copy">
+          <h2 id="appearance-feature-highlighting-heading">
+            Feature discovery
+          </h2>
+          <p id="appearance-feature-highlighting-description">
+            Adds an accent edge and a Material badge to primary navigation,
+            toolbar, and command entry points that aren&apos;t available in
+            stock GitHub Desktop. This doesn&apos;t change how the features
+            work.
+          </p>
+        </div>
+        <Checkbox
+          className="desktop-material-feature-toggle"
+          label="Highlight Desktop Material features"
+          ariaDescribedBy="appearance-feature-highlighting-description"
+          value={
+            this.props.appearanceCustomization.highlightDesktopMaterialFeatures
+              ? CheckboxValue.On
+              : CheckboxValue.Off
+          }
+          onChange={this.onHighlightDesktopMaterialFeaturesChanged}
+        />
+      </section>
+    )
   }
 
   public async componentDidUpdate(prevProps: IAppearanceProps) {
@@ -668,6 +712,7 @@ export class Appearance extends React.Component<
             </p>
           </div>
         </aside>
+        {this.renderFeatureHighlighting()}
         <AppIdentity
           value={this.props.appearanceCustomization.appIdentity}
           onChange={this.onAppIdentityChanged}

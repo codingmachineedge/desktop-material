@@ -4946,6 +4946,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           id="one-click-commit-push"
           preferredWidth={180}
           overflowPriority={2}
+          desktopMaterialFeature={true}
           renderOverflow={this.renderOneClickCommitPushOverflowButton}
         >
           {this.renderOneClickCommitPushButton()}
@@ -4954,11 +4955,16 @@ export class App extends React.Component<IAppProps, IAppState> {
           id="build-run"
           preferredWidth={210}
           overflowPriority={1}
+          desktopMaterialFeature={true}
           renderOverflow={this.renderBuildRunToolbarOverflowButton}
         >
           {this.renderBuildRunToolbarButton()}
         </ToolbarItem>
-        <ToolbarItem id="theme-toggle" preferredWidth={54}>
+        <ToolbarItem
+          id="theme-toggle"
+          preferredWidth={54}
+          desktopMaterialFeature={true}
+        >
           <ThemeToggleButton
             dispatcher={this.props.dispatcher}
             selectedTheme={this.state.selectedTheme}

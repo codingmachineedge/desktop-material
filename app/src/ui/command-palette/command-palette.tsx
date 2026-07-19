@@ -7,6 +7,7 @@ import {
   filterPaletteCommands,
 } from '../../lib/command-palette-catalog'
 import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { isDesktopMaterialFeatureEntryPoint } from '../../lib/desktop-material-features'
 import { FilterModeControl } from '../lib/filter-mode-control'
 import {
   persistFilterMode,
@@ -206,6 +207,12 @@ export class CommandPalette extends React.Component<
                     highlighted: index === this.state.highlightedIndex,
                   })}
                   data-command-index={index}
+                  data-command-event={command.event}
+                  data-dm-feature={
+                    isDesktopMaterialFeatureEntryPoint(command.event)
+                      ? true
+                      : undefined
+                  }
                   onClick={this.onRowClick}
                 >
                   <span className="command-palette-group">{command.group}</span>

@@ -55,6 +55,10 @@ describe('helper side-effect surfaces', () => {
       )
 
       assert.ok(document.body.classList.contains('theme-dark'))
+      assert.equal(
+        document.body.hasAttribute('data-dm-highlight-features'),
+        false
+      )
       assert.equal(document.documentElement.style.colorScheme, 'dark')
       assert.deepEqual(sends, [
         ['update-window-background-color', 'rgb(1, 2, 3)'],
@@ -67,6 +71,7 @@ describe('helper side-effect surfaces', () => {
             ...DefaultAppearanceCustomization,
             accentPalette: 'violet',
             motion: 'reduced',
+            highlightDesktopMaterialFeatures: true,
           }}
         />
       )
@@ -75,6 +80,10 @@ describe('helper side-effect surfaces', () => {
       assert.ok(document.body.classList.contains('theme-light'))
       assert.equal(document.body.getAttribute('data-dm-accent'), 'violet')
       assert.equal(document.body.getAttribute('data-dm-motion'), 'reduced')
+      assert.equal(
+        document.body.hasAttribute('data-dm-highlight-features'),
+        true
+      )
       assert.equal(document.documentElement.style.colorScheme, 'light')
       assert.deepEqual(sends.at(-1), [
         'update-window-background-color',
@@ -85,6 +94,10 @@ describe('helper side-effect surfaces', () => {
 
       assert.equal(document.body.classList.contains('theme-light'), false)
       assert.equal(document.body.hasAttribute('data-dm-accent'), false)
+      assert.equal(
+        document.body.hasAttribute('data-dm-highlight-features'),
+        false
+      )
     } finally {
       electron.ipcRenderer.send = previousSend
     }

@@ -50,6 +50,7 @@ describe('appearance customization', () => {
     assert.equal(parsed.surfacePalette, 'tonal')
     assert.equal(parsed.motion, 'reduced')
     assert.equal(parsed.tabWidth, 'wide')
+    assert.equal(parsed.highlightDesktopMaterialFeatures, false)
     assert.equal(parsed.appIdentity.displayName, 'Desktop Material')
     assert.equal(parsed.repositoryLogo.version, 1)
     assert.equal('unexpected' in parsed, false)
@@ -88,10 +89,19 @@ describe('appearance customization', () => {
       ...DefaultAppearanceCustomization,
       toolbarDensity: 'compact',
       uiFont: 'url(javascript:bad)',
+      highlightDesktopMaterialFeatures: true,
     })
 
     assert.equal(normalized.toolbarDensity, 'compact')
     assert.equal(normalized.uiFont, 'material')
+    assert.equal(normalized.highlightDesktopMaterialFeatures, true)
+    assert.equal(
+      normalizeAppearanceCustomization({
+        ...DefaultAppearanceCustomization,
+        highlightDesktopMaterialFeatures: 'yes',
+      }).highlightDesktopMaterialFeatures,
+      false
+    )
   })
 
   it('allowlists repository overrides and resolves them over profile values', () => {
@@ -103,6 +113,7 @@ describe('appearance customization', () => {
         motion: 'reduced',
         uiFont: 'system',
         toolbarDensity: 'invalid',
+        highlightDesktopMaterialFeatures: true,
       })
     )
 
@@ -116,12 +127,14 @@ describe('appearance customization', () => {
         ...DefaultAppearanceCustomization,
         surfacePalette: 'neutral',
         tabWidth: 'wide',
+        highlightDesktopMaterialFeatures: true,
       },
       overrides
     )
     assert.equal(resolved.accentPalette, 'amber')
     assert.equal(resolved.surfacePalette, 'neutral')
     assert.equal(resolved.tabWidth, 'compact')
+    assert.equal(resolved.highlightDesktopMaterialFeatures, true)
   })
 
   it('validates repository list-name typography before it can reach a row', () => {

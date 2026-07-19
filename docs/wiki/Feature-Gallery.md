@@ -39,7 +39,7 @@ display.
 | --- | --- |
 | `material-app-identity-workspace.png` | Restart-restored profile app identity and favorite repository tab |
 | `material-welcome.png` | Material first-run task card and responsive workspace preview |
-| `material-customization.png` | Git-backed profile appearance defaults and repository override guidance |
+| `material-customization.png` | Default-off feature-highlighting preference with Material badges on reviewed fork-only entry points |
 | `material-repository-logo-studio.png` | Layered custom repository-logo studio with live preview and safe transfer controls |
 | `material-toolbar-overflow.png` | Measured narrow toolbar with Build & Run and Commit & Push in More |
 | `material-tab-appearance-word.png` | Word-style tab typography, alignment, and independent color palettes |
@@ -230,14 +230,17 @@ the inverse literal close flow adds live counts/preview and cannot confirm empty
 or zero-match input. Pinned/manual/keyboard arrangement plus stable one-shot
 label/opened/status sorts persist without continuously reacting to later status
 changes. App/profile appearance inheritance and measured toolbar overflow are
-shown with the matching inspected evidence below. The custom repository-logo
+shown with the matching inspected evidence below. The default-off feature
+discovery setting uses an explicit allowlist and adds a non-animated accent edge
+plus an `M` or **Material** badge without changing control behavior; mixed and
+upstream GitHub Desktop entry points remain neutral. The custom repository-logo
 studio composes bounded mark and text layers, transforms and colors in a live
 preview with undo/redo and safe JSON transfer; a profile default can be
 overridden locally per repository without accepting executable SVG.
 
 ![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-welcome.png)
 
-![Profile-backed Appearance preferences with repository override guidance](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance preferences with optional Desktop Material feature highlighting enabled and Material badges on fork-only entry points](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ![Layered custom repository-logo studio with live preview and safe transfer controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 

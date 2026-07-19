@@ -38,6 +38,8 @@ export interface IToolbarItemProps {
   readonly className?: string
   readonly style?: React.CSSProperties
   readonly canGrow?: boolean
+  /** Marks an entry point that is specific to Desktop Material. */
+  readonly desktopMaterialFeature?: boolean
   /**
    * Render the same action inside the overflow surface. The original child
    * remains mounted off-layout so subscriptions and in-flight state survive.
@@ -475,7 +477,13 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
 
   private renderToolbarItem(item: IResolvedToolbarItem) {
     const { element, id } = item
-    const { className, style, preferredWidth, canGrow } = element.props
+    const {
+      className,
+      style,
+      preferredWidth,
+      canGrow,
+      desktopMaterialFeature,
+    } = element.props
     const isOverflowed = this.state.overflowedItemIds.includes(id)
     const layoutWidth = this.state.itemPreferredWidths[id] ?? preferredWidth
     const itemStyle = {
@@ -493,6 +501,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
         })}
         style={itemStyle}
         data-toolbar-item-id={id}
+        data-dm-feature={desktopMaterialFeature ? true : undefined}
         aria-hidden={isOverflowed ? true : undefined}
       >
         {element.props.children}
@@ -540,6 +549,9 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
                 key={item.id}
                 className="toolbar-overflow-item"
                 data-toolbar-overflow-item-id={item.id}
+                data-dm-feature={
+                  item.element.props.desktopMaterialFeature ? true : undefined
+                }
                 onClick={this.onOverflowItemClick}
               >
                 {item.element.props.renderOverflow?.() ?? null}

@@ -409,7 +409,7 @@ export class RepositoryView extends React.Component<
           <span className="rail-label">History</span>
         </span>
         {this.supportsGitHubActions() && (
-          <span className="rail-item" id="actions-tab">
+          <span className="rail-item" id="actions-tab" data-dm-feature={true}>
             <span className="rail-pill">
               <Octicon symbol={octicons.workflow} className="rail-icon" />
             </span>
@@ -417,7 +417,7 @@ export class RepositoryView extends React.Component<
           </span>
         )}
         {this.showsGitHubReleases() && (
-          <span className="rail-item" id="releases-tab">
+          <span className="rail-item" id="releases-tab" data-dm-feature={true}>
             <span className="rail-pill">
               <Octicon symbol={octicons.tag} className="rail-icon" />
             </span>
@@ -425,7 +425,7 @@ export class RepositoryView extends React.Component<
           </span>
         )}
         {this.showsGitHubIssues() && (
-          <span className="rail-item" id="issues-tab">
+          <span className="rail-item" id="issues-tab" data-dm-feature={true}>
             <span className="rail-pill">
               <Octicon symbol={octicons.issueOpened} className="rail-icon" />
             </span>
@@ -433,20 +433,28 @@ export class RepositoryView extends React.Component<
           </span>
         )}
         {this.showsGitHubAPI() && (
-          <span className="rail-item" id="github-api-tab">
+          <span
+            className="rail-item"
+            id="github-api-tab"
+            data-dm-feature={true}
+          >
             <span className="rail-pill">
               <Octicon symbol={octicons.codeSquare} className="rail-icon" />
             </span>
             <span className="rail-label">API</span>
           </span>
         )}
-        <span className="rail-item" id="triage-tab">
+        <span className="rail-item" id="triage-tab" data-dm-feature={true}>
           <span className="rail-pill">
             <Octicon symbol={octicons.checklist} className="rail-icon" />
           </span>
           <span className="rail-label">Triage</span>
         </span>
-        <span className="rail-item" id="repository-tools-tab">
+        <span
+          className="rail-item"
+          id="repository-tools-tab"
+          data-dm-feature={true}
+        >
           <span className="rail-pill">
             <Octicon symbol={octicons.tools} className="rail-icon" />
           </span>

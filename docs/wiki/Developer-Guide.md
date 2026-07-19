@@ -174,17 +174,20 @@ publication, release, or cleanup evidence.
   `app/src/ui/error-notice-stack.tsx` renders dismissible bottom-right alerts. Retry,
   authentication, and remediation choices must remain dialogs.
 - **Appearance and adaptive Material shell** —
-  `app/src/models/appearance-customization.ts` owns the strict versioned model for the 12 profile
+  `app/src/models/appearance-customization.ts` owns the strict versioned model for the 13 profile
   defaults: accent palette, surface palette, elevation, interface font, monospace font, motion,
-  toolbar labels, toolbar density, repository-list density, tab density, tab width, and tab close
-  buttons plus the profile's default repository logo. `app/src/models/repository-logo.ts` owns the
+  toolbar labels, toolbar density, repository-list density, tab density, tab width, tab close
+  buttons, and default-off Desktop Material feature highlighting. The profile also carries a
+  default repository logo; `app/src/models/repository-logo.ts` owns its
   versioned code-native vector model: bounded backgrounds and at most eight allowlisted mark/text
   layers, with strict color, transform, typography, text, and 16 KiB document normalization.
   `app/src/lib/appearance-customization.ts` resolves the six scalar repository-local overrides and
   optional local logo; `app/src/ui/repository-logo/` renders the safe SVG projection, full studio,
   and bounded 128-entry shared async cache. It never accepts raw SVG or image bytes.
-  `app/src/ui/app-theme.tsx` applies only normalized data attributes and tokens; Preferences and
-  Repository Settings expose the two scopes. `app/src/ui/toolbar/toolbar-overflow-layout.ts` keeps
+  `app/src/ui/app-theme.tsx` applies only normalized data attributes and tokens, including the
+  feature-highlighting body gate. A centralized allowlist and explicit entry-point markers keep
+  upstream and mixed controls neutral; Preferences and Repository Settings expose the two scopes.
+  `app/src/ui/toolbar/toolbar-overflow-layout.ts` keeps
   the width/priority calculation pure while `toolbar.tsx` owns ResizeObserver, More-surface focus,
   and restoration. The first-run React surface lives in `app/src/ui/welcome/` and retains the
   existing sign-in/configure-Git state machine beneath the Material presentation.

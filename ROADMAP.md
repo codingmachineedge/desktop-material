@@ -78,7 +78,7 @@ is described as shipped.
 
 | Work | State | Required proof |
 |---|---|---|
-| Profile, repository, and tab appearance customization | **Complete** | Verified all 12 active-profile defaults, profile local-Git history, all six repository-local overrides and inheritance, Word-style per-tab typography plus independent text/background palettes, restart persistence, compact layouts, and inspected appearance evidence. |
+| Profile, repository, and tab appearance customization | **Complete** | Verified all 13 active-profile defaults, including default-off Desktop Material feature highlighting with an explicit fork-only allowlist, profile local-Git history, all six repository-local overrides and inheritance, Word-style per-tab typography plus independent text/background palettes, restart persistence, light/dark/compact layouts, and inspected appearance evidence. |
 | App identity and portable tab workspace | **Complete** | Verified profile-backed app logo/name typography and effects, favorites, folder-drop tab opening, current-tab session import/export, appropriate right-click customization/history context, unknown-key migration safety, restart persistence, 38 named identity controls, compact no-overflow geometry, and inspected headless evidence. |
 | Measured app-bar overflow | **Complete** | Verified live label measurement, Icons only/compact footprints, Build & Run then Commit & Push overflow order, mounted-state and focus continuity, deterministic widening restore, and `material-toolbar-overflow.png`. |
 | Material Welcome and landing page | **Complete** | Verified the first-run task card and compact fallback, the Material landing structure and keyboard path, and inspected `material-welcome.png`. |

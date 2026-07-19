@@ -468,11 +468,17 @@ export class Preferences extends React.Component<
                 <Octicon className="icon" symbol={octicons.accessibility} />
                 Accessibility
               </span>
-              <span id={this.getTabId(PreferencesTab.AgentAccess)}>
+              <span
+                id={this.getTabId(PreferencesTab.AgentAccess)}
+                data-dm-feature={true}
+              >
                 <Octicon className="icon" symbol={octicons.server} />
                 Agent access
               </span>
-              <span id={this.getTabId(PreferencesTab.Automation)}>
+              <span
+                id={this.getTabId(PreferencesTab.Automation)}
+                data-dm-feature={true}
+              >
                 <Octicon className="icon" symbol={octicons.sync} />
                 Automation
               </span>

@@ -63,10 +63,10 @@ describe('settings dialog v2 style contracts', () => {
     assert.match(promptsBlock, /transform: rotate\(-45deg\) scale\(1\);/)
   })
 
-  it('styles the Appearance auto-fit control as a 54x32 toggle switch', () => {
+  it('styles the Appearance toggles as 54x32 switches', () => {
     assert.match(
       styles,
-      /\.tab-container\[aria-labelledby='preferences-tab-notifications'\]\s*\.checkbox-component,\s*\.tab-container\[aria-labelledby='preferences-tab-appearance'\]\s*\.checkbox-component\.auto-fit-zoom\s*\{[\s\S]*?flex-direction: row-reverse;[\s\S]*?width: 54px;[\s\S]*?height: 32px;[\s\S]*?border-radius: 999px;/
+      /\.tab-container\[aria-labelledby='preferences-tab-notifications'\]\s*\.checkbox-component,\s*\.tab-container\[aria-labelledby='preferences-tab-appearance'\]\s*\.checkbox-component\.auto-fit-zoom,\s*\.tab-container\[aria-labelledby='preferences-tab-appearance'\]\s*\.checkbox-component\.desktop-material-feature-toggle\s*\{[\s\S]*?flex-direction: row-reverse;[\s\S]*?width: 54px;[\s\S]*?height: 32px;[\s\S]*?border-radius: 999px;/
     )
     // Title-over-caption copy on the left of the switch.
     assert.match(

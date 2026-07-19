@@ -655,6 +655,7 @@ export class RepositoryTabStrip extends React.Component<
         </div>
         <button
           className="repository-tab-search"
+          data-dm-feature={true}
           aria-label="Search tabs"
           aria-haspopup="dialog"
           aria-expanded={this.state.searchAnchor !== null}
@@ -664,6 +665,7 @@ export class RepositoryTabStrip extends React.Component<
         </button>
         <button
           className="repository-tab-arrange"
+          data-dm-feature={true}
           aria-label="Arrange tabs"
           aria-haspopup="dialog"
           aria-expanded={this.state.arrangeAnchor !== null}
@@ -673,6 +675,7 @@ export class RepositoryTabStrip extends React.Component<
         </button>
         <button
           className="repository-tab-new"
+          data-dm-feature={true}
           aria-label="Open a repository in a new tab"
           onClick={this.onNewTab}
         >
@@ -686,6 +689,7 @@ export class RepositoryTabStrip extends React.Component<
           />
           <button
             className="repository-tab-undo"
+            data-dm-feature={true}
             aria-label="Undo last settings change"
             onClick={this.onUndoSettingsChange}
           >
@@ -693,6 +697,7 @@ export class RepositoryTabStrip extends React.Component<
           </button>
           <button
             className="repository-tab-redo"
+            data-dm-feature={true}
             aria-label="Redo settings change"
             onClick={this.onRedoSettingsChange}
           >
