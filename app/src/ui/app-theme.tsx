@@ -14,6 +14,7 @@ interface IAppThemeProps {
 
 const appearanceAttributes = [
   'data-dm-accent',
+  'data-dm-update-progress',
   'data-dm-surface',
   'data-dm-elevation',
   'data-dm-ui-font',
@@ -75,6 +76,10 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
     const body = document.body
     const appearance = this.props.appearance
     body.setAttribute('data-dm-accent', appearance.accentPalette)
+    body.setAttribute(
+      'data-dm-update-progress',
+      appearance.updateProgressPalette
+    )
     body.setAttribute('data-dm-surface', appearance.surfacePalette)
     body.setAttribute('data-dm-elevation', appearance.elevation)
     body.setAttribute('data-dm-ui-font', appearance.uiFont)
@@ -101,6 +106,7 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
   ): boolean {
     return (
       left.accentPalette === right.accentPalette &&
+      left.updateProgressPalette === right.updateProgressPalette &&
       left.surfacePalette === right.surfacePalette &&
       left.elevation === right.elevation &&
       left.uiFont === right.uiFont &&

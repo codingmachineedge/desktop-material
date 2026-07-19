@@ -28,6 +28,26 @@ Pages deployment remains subject to the protected reviewed `main` promotion
 path; historical branch-only publication receipts below are retained as
 provenance rather than current status.
 
+## 2026-07-18 repository-page CI status
+
+- The selected repository's branch control now shows the existing compact,
+  state-coloured CI logo for the current commit even when that branch has no
+  pull request. Pull-request branches retain their existing interactive badge.
+- Each rendered status has a concise tooltip and accessible label, including
+  successful, failed, action-required, timed-out, and in-progress states.
+- The real auto-updater `UpdateAvailable` download phase now renders a thin,
+  non-blocking top-edge progress bar. Electron's Squirrel-backed updater does
+  not expose byte totals, so this phase is accurately indeterminate and clears
+  as soon as the updater becomes ready, unavailable, or errors.
+- Settings → Appearance persists an allowlisted update-progress palette. It
+  inherits the active accent by default or can use blue, violet, teal, green,
+  amber, or rose; reduced-motion users receive a static full-width bar.
+- Focused CI status tests and repository lint pass. The required exact MCP
+  endpoint was listening with the pinned startup arguments and source SHA
+  `beed66ca6ed2503e6170ee1e1158247f1c2f0140`, but its streamable HTTP session
+  failed during initialization; the local production build is retained as the
+  fallback verification receipt for this small toolbar-only change.
+
 ## 2026-07-18 complete inbox, Docker-over-SSH, and Releases dashboard
 
 - GitHub notifications now traverse every 50-item page instead of stopping at

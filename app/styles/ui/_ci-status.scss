@@ -3,6 +3,10 @@
   flex-shrink: 0;
 }
 
+.repository-ci-status {
+  margin-left: var(--spacing-half);
+}
+
 // MD3 de-stock: CI state colors route through Material roles instead of the
 // stock raw green/red/yellow/gray SCSS palette.
 .ci-status-pending {

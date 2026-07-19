@@ -459,6 +459,19 @@ export class Appearance extends React.Component<
             { value: 'amber', label: 'Amber' },
             { value: 'rose', label: 'Rose' },
           ])}
+          {this.renderCustomizationSelect(
+            'updateProgressPalette',
+            'Update progress color',
+            [
+              { value: 'accent', label: 'Use accent color' },
+              { value: 'blue', label: 'Blue' },
+              { value: 'violet', label: 'Violet' },
+              { value: 'teal', label: 'Teal' },
+              { value: 'green', label: 'Green' },
+              { value: 'amber', label: 'Amber' },
+              { value: 'rose', label: 'Rose' },
+            ]
+          )}
           {this.renderCustomizationSelect('surfacePalette', 'Surface color', [
             { value: 'tonal', label: 'Tonal' },
             { value: 'neutral', label: 'Neutral' },

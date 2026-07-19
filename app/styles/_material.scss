@@ -227,6 +227,30 @@ body.theme-dark {
 // Curated, contrast-paired accent palettes. Keeping these as fixed semantic
 // role bundles avoids accepting arbitrary CSS while preserving readable
 // on-primary and container content in both themes.
+body[data-dm-update-progress='blue'] {
+  --dm-update-progress-color: #0969da;
+}
+
+body[data-dm-update-progress='violet'] {
+  --dm-update-progress-color: #8250df;
+}
+
+body[data-dm-update-progress='teal'] {
+  --dm-update-progress-color: #00897b;
+}
+
+body[data-dm-update-progress='green'] {
+  --dm-update-progress-color: #2da44e;
+}
+
+body[data-dm-update-progress='amber'] {
+  --dm-update-progress-color: #bf8700;
+}
+
+body[data-dm-update-progress='rose'] {
+  --dm-update-progress-color: #bf3989;
+}
+
 body[data-dm-accent='violet'] {
   --md-sys-color-primary: #6f43c0;
   --md-sys-color-on-primary: #ffffff;

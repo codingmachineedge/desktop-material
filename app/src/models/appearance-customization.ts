@@ -21,6 +21,7 @@ export type AccentPalette =
   | 'green'
   | 'amber'
   | 'rose'
+export type UpdateProgressPalette = 'accent' | AccentPalette
 export type SurfacePalette = 'tonal' | 'neutral'
 export type ElevationPreference = 'standard' | 'subtle' | 'flat'
 export type UIFontPreference = 'material' | 'system'
@@ -35,6 +36,7 @@ export type TabCloseButtonPreference = 'hover' | 'always' | 'active'
 export interface IAppearanceCustomization {
   readonly version: typeof AppearanceCustomizationVersion
   readonly accentPalette: AccentPalette
+  readonly updateProgressPalette: UpdateProgressPalette
   readonly surfacePalette: SurfacePalette
   readonly elevation: ElevationPreference
   readonly uiFont: UIFontPreference
@@ -83,6 +85,7 @@ export const MaxListNameFontSize = 18
 export const DefaultAppearanceCustomization: IAppearanceCustomization = {
   version: AppearanceCustomizationVersion,
   accentPalette: 'blue',
+  updateProgressPalette: 'accent',
   surfacePalette: 'tonal',
   elevation: 'standard',
   uiFont: 'material',
@@ -106,6 +109,10 @@ export const accentPalettes: ReadonlyArray<AccentPalette> = [
   'green',
   'amber',
   'rose',
+]
+export const updateProgressPalettes: ReadonlyArray<UpdateProgressPalette> = [
+  'accent',
+  ...accentPalettes,
 ]
 export const surfacePalettes: ReadonlyArray<SurfacePalette> = [
   'tonal',
@@ -168,6 +175,12 @@ export function normalizeAppearanceCustomization(
     accentPalette: isOneOf(source.accentPalette, accentPalettes)
       ? source.accentPalette
       : defaults.accentPalette,
+    updateProgressPalette: isOneOf(
+      source.updateProgressPalette,
+      updateProgressPalettes
+    )
+      ? source.updateProgressPalette
+      : defaults.updateProgressPalette,
     surfacePalette: isOneOf(source.surfacePalette, surfacePalettes)
       ? source.surfacePalette
       : defaults.surfacePalette,

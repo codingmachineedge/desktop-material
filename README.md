@@ -26,13 +26,13 @@ maintenance acceptance items are complete.
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu
 - Left icon navigation rail — Changes (with a badge), History, Branches, Settings, and the account avatar
-- A floating pill toolbar with repository and branch chips and a sync pill that shows an ahead badge; it measures the available lane and live ellipsis pressure, then moves Build & Run and, if needed, Commit & Push into an accessible **More** surface before labels clip
+- A floating pill toolbar with repository and branch chips, a small colour-coded CI result on the current branch, and a sync pill that shows an ahead badge; it measures the available lane and live ellipsis pressure, then moves Build & Run and, if needed, Commit & Push into an accessible **More** surface before labels clip
 - Floating, radius-24 elevated workspace cards with an animated light/dark theme
 - Full MD3 workspace surfaces: tri-state selection checkboxes, tonal status chips, token-based diff colors, an inverse-surface undo banner, and a redesigned welcome flow and blank slate
 - A pure Material first-run Welcome task card and tonal workspace preview, paired with a Material 3 public landing page built from an expressive app bar, hero surface, principle cards, evidence gallery, and tonal calls to action
 
 **Appearance customization**
-- Thirteen app defaults in **Settings → Appearance**: accent color, surface color, surface depth, interface font, code/diff font, animation, toolbar labels, toolbar density, repository-list density, tab density, tab width, tab-close-button behavior, and opt-in Desktop Material feature highlighting
+- Fourteen app defaults in **Settings → Appearance**: accent color, update-progress color, surface color, surface depth, interface font, code/diff font, animation, toolbar labels, toolbar density, repository-list density, tab density, tab width, tab-close-button behavior, and opt-in Desktop Material feature highlighting. The thin top-edge bar appears only while an app update is downloading and defaults to the active accent color
 - **Highlight Desktop Material features** is off by default. Turn it on to add a non-animated accent edge and an `M` or **Material** badge to explicitly classified fork-only navigation, repository-tab tools, notifications, toolbar, menu, and command entry points; upstream and mixed GitHub Desktop controls stay neutral
 - A live **App identity** editor for the in-app logo, app name, logo geometry/border/shadow, colors, font, width, weight, case, size, spacing, opacity, emphasis, highlight, and text effects. Identity follows the active profile and restores across restart; signed binaries and the operating-system icon remain unchanged
 - A safe vector **Custom repository logo** studio with presets, editable mark/text layers, colors, transforms, live preview, undo/redo, bounded JSON import/export, a profile default, and per-repository inheritance. The resolved design follows the repository into its tab and repository-list row; executable/raw SVG is never stored

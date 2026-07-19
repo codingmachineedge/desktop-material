@@ -4275,6 +4275,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         data-customization-label="App workspace"
         data-customization-scope="profile"
       >
+        {this.renderUpdateDownloadProgress()}
         {this.renderRepositoryTabStrip()}
         {this.renderToolbar()}
         {this.renderBanner()}
@@ -4311,6 +4312,23 @@ export class App extends React.Component<IAppProps, IAppState> {
             Existing repositories switch instantly; new ones are added.
           </span>
         </div>
+      </div>
+    )
+  }
+
+  private renderUpdateDownloadProgress() {
+    if (this.state.updateState.status !== UpdateStatus.UpdateAvailable) {
+      return null
+    }
+
+    return (
+      <div
+        className="update-download-progress"
+        role="progressbar"
+        aria-label="Downloading app update"
+        aria-valuetext="Downloading"
+      >
+        <span />
       </div>
     )
   }

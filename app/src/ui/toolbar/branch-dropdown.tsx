@@ -31,6 +31,7 @@ import { showContextualMenu } from '../../lib/menu-item'
 import { Emoji } from '../../lib/emoji'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
 import { BranchSortOrder } from '../../models/branch-sort-order'
+import { CIStatus } from '../branches/ci-status'
 
 interface IBranchDropdownProps {
   readonly dispatcher: Dispatcher
@@ -226,7 +227,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
             isOverflowed={isDescriptionOverflowed}
             enableFocusTrap={enableFocusTrap}
           >
-            {this.renderPullRequestInfo()}
+            {this.renderBranchStatus()}
           </ToolbarDropdown>
           {this.props.showCIStatusPopover && this.renderPopover()}
         </>
@@ -273,7 +274,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
             isOverflowed={isDescriptionOverflowed}
             enableFocusTrap={enableFocusTrap}
           >
-            {this.renderPullRequestInfo()}
+            {this.renderBranchStatus()}
           </ToolbarDropdown>
           {this.props.showCIStatusPopover && this.renderPopover()}
         </Resizable>
@@ -518,6 +519,31 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
         onBadgeRef={this.onBadgeRef}
         onBadgeClick={this.onBadgeClick}
         showCIStatusPopover={this.props.showCIStatusPopover}
+      />
+    )
+  }
+
+  private renderBranchStatus() {
+    const pullRequestInfo = this.renderPullRequestInfo()
+    if (pullRequestInfo !== null) {
+      return pullRequestInfo
+    }
+
+    const { repository, repositoryState, dispatcher } = this.props
+    const { tip } = repositoryState.branchesState
+    if (
+      tip.kind !== TipState.Valid ||
+      !isRepositoryWithGitHubRepository(repository)
+    ) {
+      return null
+    }
+
+    return (
+      <CIStatus
+        className="repository-ci-status"
+        dispatcher={dispatcher}
+        repository={repository.gitHubRepository}
+        commitRef={tip.branch.tip.sha}
       />
     )
   }

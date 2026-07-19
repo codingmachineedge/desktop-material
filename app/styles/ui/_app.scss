@@ -29,6 +29,27 @@
 }
 
 #desktop-app-contents {
+  position: relative;
+
+  .update-download-progress {
+    position: absolute;
+    z-index: 1000;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    overflow: hidden;
+    pointer-events: none;
+
+    span {
+      display: block;
+      width: 40%;
+      height: 100%;
+      background: var(--dm-update-progress-color, var(--md-sys-color-primary));
+      animation: dm-update-download-progress 1.25s ease-in-out infinite;
+    }
+  }
+
   &.commit-being-dragged {
     :not(input):not(textarea),
     :not(input):not(textarea)::after,
@@ -109,6 +130,22 @@
         }
       }
     }
+  }
+}
+
+@keyframes dm-update-download-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-download-progress span {
+    width: 100%;
+    animation: none;
   }
 }
 

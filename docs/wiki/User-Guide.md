@@ -90,13 +90,18 @@ every day is made of a few pieces:
 - **A floating pill toolbar** across the top carrying repository, worktree, branch, and sync
   controls. When the measured width gets tight, **Build & Run** moves into the keyboard-accessible
   **More toolbar actions** surface first, then **Commit & Push** follows. Widening the window
-  restores each action automatically before its label can clip.
+  restores each action automatically before its label can clip. For GitHub-backed repositories,
+  the branch control also shows a small colour-coded CI logo for the current commit; hover it for
+  the result, such as **CI checks: successful**.
 - **Browser-like repository tabs** (see [Repository tabs](#repository-tabs)) above the workspace.
 - **Floating, radius-24 workspace cards** for Changes, the diff, History, and the empty/welcome
   states, with tri-state selection checkboxes, tonal status chips, token-based diff colors, and an
   inverse-surface undo banner.
 
 The whole shell has an **animated light/dark theme**. Everything below tells you how to drive it.
+While an app update downloads, a thin indeterminate progress bar appears at the
+top of the workspace. Choose **Settings → Appearance → Update progress color**
+to inherit the accent or select blue, violet, teal, green, amber, or rose.
 
 ![Desktop Material workspace with a profile-customized app identity and favorite repository tab](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 

@@ -6,7 +6,7 @@ import { GitHubRepository } from '../../models/github-repository'
 import type { Disposable } from 'event-kit'
 import { Dispatcher } from '../dispatcher'
 import { ICombinedRefCheck, IRefCheck } from '../../lib/ci-checks/ci-checks'
-import { IAPIWorkflowJobStep } from '../../lib/api'
+import { APICheckConclusion, IAPIWorkflowJobStep } from '../../lib/api'
 
 interface ICIStatusProps {
   /** The classname for the underlying element. */
@@ -111,9 +111,35 @@ export class CIStatus extends React.PureComponent<
           this.props.className
         )}
         symbol={getSymbolForCheck(check)}
+        title={`CI checks: ${getLabelForCheck(check)}`}
       />
     )
   }
+}
+
+export function getLabelForCheck(check: {
+  readonly conclusion: APICheckConclusion | null
+}): string {
+  switch (check.conclusion) {
+    case 'timed_out':
+      return 'timed out'
+    case 'action_required':
+      return 'action required'
+    case 'failure':
+      return 'failed'
+    case 'neutral':
+      return 'neutral'
+    case 'success':
+      return 'successful'
+    case 'cancelled':
+      return 'cancelled'
+    case 'skipped':
+      return 'skipped'
+    case 'stale':
+      return 'stale'
+  }
+
+  return 'in progress'
 }
 
 export function getSymbolForCheck(
