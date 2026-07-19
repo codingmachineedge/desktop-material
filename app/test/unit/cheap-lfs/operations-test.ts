@@ -271,7 +271,8 @@ describe('cheap LFS operations', () => {
                 ok: true,
                 path: destination,
                 bytes: uploadedBytes!.length,
-                sha256: 'unused',
+                localDigest: 'sha256:unused',
+                matchesGitHubDigest: null,
               }
             },
           }
