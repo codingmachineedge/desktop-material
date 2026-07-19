@@ -88,4 +88,30 @@
   .popover-component {
     width: 250px;
   }
+
+  .diff-context-preferences {
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    margin-top: 0.75em;
+    padding-top: 0.25em;
+  }
+
+  .diff-context-help {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .diff-context-line-choices {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 4px;
+
+    label {
+      min-height: 32px;
+      white-space: nowrap;
+    }
+  }
+}
+
+[data-language-mode='bilingual'] .diff-options-component .diff-context-line-choices {
+  grid-template-columns: 1fr;
 }

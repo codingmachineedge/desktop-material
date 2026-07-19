@@ -270,6 +270,7 @@ export class SelectedCommits extends React.Component<
           availableWidth={availableWidth}
           onContextMenu={this.onContextMenu}
           onRowDoubleClick={this.onRowDoubleClick}
+          showViewToggle={true}
         />
       </>
     )

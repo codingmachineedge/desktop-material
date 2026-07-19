@@ -63,6 +63,10 @@ describe('git/stash', () => {
       assert.equal(entries[0].name, 'refs/stash@{0}')
       assert.equal(stash.stashEntryCount, 3)
       assert.equal(stash.foreignStashEntryCount, 2)
+      assert.equal(stash.foreignEntries.length, 2)
+      assert.equal(stash.foreignEntries[0].origin, 'external')
+      assert.equal(stash.foreignEntries[0].branchName, 'master')
+      assert.equal(stash.foreignEntries[0].displayName, 'Should get filtered')
       assert.equal(stash.isTruncated, false)
     })
   })
@@ -244,6 +248,26 @@ describe('git/stash', () => {
         (await getStatusOrThrow(repository)).workingDirectory.files.length,
         1
       )
+    })
+
+    it('applies and explicitly clears a stash created outside Desktop', async t => {
+      const repository = await setup(t)
+      await appendFile(join(repository.path, 'README.md'), ' external')
+      await stash(repository, 'master', 'CLI checkpoint')
+      const entry = (await getStashes(repository)).foreignEntries[0]
+
+      await applyDesktopStashEntry(repository, entry.stashSha)
+
+      assert.equal((await getStashes(repository)).foreignEntries.length, 1)
+      assert.equal(
+        (await getStatusOrThrow(repository)).workingDirectory.files.length,
+        1
+      )
+      assert.equal(
+        await clearReviewedDesktopStashes(repository, [entry.stashSha]),
+        1
+      )
+      assert.equal((await getStashes(repository)).stashEntryCount, 0)
     })
 
     it('renames and moves association without changing the stashed tree', async t => {

@@ -90,4 +90,18 @@ describe('runBoundedPullAll', () => {
       )
     )
   })
+
+  it('reports fetch-only work without implying a worktree pull', async () => {
+    const statuses: string[] = []
+    const results = await runBoundedPullAll(
+      [{ id: 1, name: 'repo-1' }],
+      async () => ({ status: 'fetched', detail: 'Fetch completed.' }),
+      1,
+      update => statuses.push(update.item.status),
+      'fetching'
+    )
+
+    assert(statuses.includes('fetching'))
+    assert.equal(results[0].status, 'fetched')
+  })
 })

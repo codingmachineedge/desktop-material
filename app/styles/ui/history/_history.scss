@@ -210,6 +210,32 @@
   flex: 0 0 auto;
   padding: 0 14px 10px;
 
+  .history-scope-control {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--md-sys-color-surface-container-high);
+
+    .button-component {
+      min-width: 0;
+      min-height: 34px;
+      padding: 4px 8px;
+      border: 0;
+      border-radius: 9px;
+      box-shadow: none;
+      color: var(--md-sys-color-on-surface-variant);
+      background: transparent;
+      font-size: 12px;
+
+      &[aria-pressed='true'] {
+        color: var(--md-sys-color-on-secondary-container);
+        background: var(--md-sys-color-secondary-container);
+      }
+    }
+  }
+
   // The search field plus its trailing control cluster (mode control, filter
   // chips toggle, graph toggle) wrap as one row; the chip row sits below.
   .history-commit-filter-row {

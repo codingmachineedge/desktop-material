@@ -5,8 +5,10 @@ import {
   IGitHubPullRequestLifecycle,
   IGitHubPullRequestMergeReceipt,
   IGitHubPullRequestMutationReceipt,
+  IGitHubPullRequestReview,
   IGitHubPullRequestReviewReceipt,
 } from '../../src/lib/github-pull-request'
+import { IGitHubPullRequestWorkspace } from '../../src/lib/github-pull-request-workspace'
 import { PullRequestLifecycleStore } from '../../src/lib/stores/pull-request-lifecycle-store'
 import { Account } from '../../src/models/account'
 import { GitHubRepository } from '../../src/models/github-repository'
@@ -66,14 +68,68 @@ function snapshot(
   }
 }
 
+function workspace(
+  headSHA: string = 'a'.repeat(40)
+): IGitHubPullRequestWorkspace {
+  return {
+    headSHA,
+    files: [
+      {
+        sha: 'b'.repeat(40),
+        path: 'README.md',
+        previousPath: null,
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+        changes: 2,
+        patch: '@@ -1 +1 @@',
+      },
+    ],
+    commits: [],
+    reviews: [],
+    issueComments: [],
+    reviewComments: [
+      {
+        id: 7,
+        reviewId: 5,
+        body: 'Thread',
+        author: 'reviewer',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        path: 'README.md',
+        line: 1,
+        side: 'RIGHT',
+        startLine: null,
+        inReplyToId: null,
+        commitSHA: headSHA,
+        diffHunk: '@@ -1 +1 @@',
+      },
+    ],
+    capped: {
+      files: false,
+      commits: false,
+      reviews: false,
+      issueComments: false,
+      reviewComments: false,
+    },
+  }
+}
+
 class FakeAPI {
   public inspectResult = Promise.resolve(snapshot())
+  public workspaceResult = Promise.resolve(workspace())
   public updateCalls = 0
   public reviewCalls = 0
   public mergeCalls = 0
+  public stateCalls = 0
+  public lastReview: IGitHubPullRequestReview | null = null
 
   public inspectPullRequest() {
     return this.inspectResult
+  }
+
+  public inspectPullRequestWorkspace() {
+    return this.workspaceResult
   }
 
   public async updatePullRequestLifecycle(): Promise<IGitHubPullRequestMutationReceipt> {
@@ -81,8 +137,29 @@ class FakeAPI {
     return { pullRequest: { ...snapshot(), title: 'Updated' }, warnings: [] }
   }
 
-  public async submitPullRequestReview(): Promise<IGitHubPullRequestReviewReceipt> {
+  public async setPullRequestState(
+    _owner: string,
+    _name: string,
+    _number: number,
+    _headSHA: string,
+    state: 'open' | 'closed'
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    this.stateCalls++
+    return {
+      pullRequest: { ...snapshot(), state },
+      warnings: [],
+    }
+  }
+
+  public async submitPullRequestReview(
+    _owner: string,
+    _name: string,
+    _number: number,
+    _headSHA: string,
+    review: IGitHubPullRequestReview
+  ): Promise<IGitHubPullRequestReviewReceipt> {
     this.reviewCalls++
+    this.lastReview = review
     return {
       id: 1,
       state: 'APPROVED',
@@ -157,5 +234,83 @@ describe('PullRequestLifecycleStore', () => {
     resolveFirst(snapshot())
     await assert.rejects(stale)
     assert.equal(store.get(target, account, 42), fresh)
+  })
+
+  it('binds inline comments and replies to a loaded workspace for the exact head', async () => {
+    const api = new FakeAPI()
+    const store = new PullRequestLifecycleStore(() => api)
+    const target = createRepository()
+    const account = createAccount()
+    const inspected = await store.inspect(target, account, 42)
+
+    await assert.rejects(() =>
+      store.review(target, account, 42, inspected.headSHA, {
+        event: 'COMMENT',
+        body: 'Review',
+        comments: [
+          { path: 'README.md', line: 1, side: 'RIGHT', body: 'Inline' },
+        ],
+      })
+    )
+    assert.equal(api.reviewCalls, 0)
+
+    await store.inspectWorkspace(target, account, 42, inspected.headSHA)
+    await assert.rejects(() =>
+      store.review(target, account, 42, inspected.headSHA, {
+        event: 'COMMENT',
+        body: 'Review',
+        comments: [
+          { path: 'unknown.ts', line: 1, side: 'RIGHT', body: 'Inline' },
+        ],
+      })
+    )
+    await store.review(target, account, 42, inspected.headSHA, {
+      event: 'APPROVE',
+      body: 'Ready',
+      comments: [{ path: 'README.md', line: 1, side: 'RIGHT', body: 'Inline' }],
+      replies: [{ inReplyToId: 7, body: 'Resolved' }],
+    })
+    assert.equal(api.reviewCalls, 1)
+    assert.deepEqual(api.lastReview?.comments, [
+      { path: 'README.md', line: 1, side: 'RIGHT', body: 'Inline' },
+    ])
+    assert.deepEqual(api.lastReview?.replies, [
+      { inReplyToId: 7, body: 'Resolved' },
+    ])
+    assert.equal(store.getWorkspace(target, account, 42), null)
+  })
+
+  it('updates close and reopen state only from the reviewed snapshot', async () => {
+    const api = new FakeAPI()
+    const store = new PullRequestLifecycleStore(() => api)
+    const target = createRepository()
+    const account = createAccount()
+    const inspected = await store.inspect(target, account, 42)
+    let resolveWorkspace!: (value: IGitHubPullRequestWorkspace) => void
+    api.workspaceResult = new Promise(resolve => {
+      resolveWorkspace = resolve
+    })
+    const staleWorkspace = store.inspectWorkspace(
+      target,
+      account,
+      42,
+      inspected.headSHA
+    )
+    const closed = await store.setState(
+      target,
+      account,
+      42,
+      inspected.headSHA,
+      'closed'
+    )
+    assert.equal(closed.pullRequest.state, 'closed')
+    assert.equal(api.stateCalls, 1)
+    resolveWorkspace(workspace())
+    await assert.rejects(staleWorkspace)
+    assert.equal(store.getWorkspace(target, account, 42), null)
+    await assert.rejects(() =>
+      store.setState(target, account, 42, 'c'.repeat(40), 'open')
+    )
+    assert.equal(api.stateCalls, 1)
   })
 })

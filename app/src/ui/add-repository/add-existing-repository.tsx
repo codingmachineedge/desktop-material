@@ -1,5 +1,4 @@
 import * as React from 'react'
-import * as Path from 'path'
 import { Dispatcher } from '../dispatcher'
 import { addSafeDirectory, getRepositoryType } from '../../lib/git'
 import { Button } from '../lib/button'
@@ -16,6 +15,20 @@ import { showOpenDialog } from '../main-process-proxy'
 import { Ref } from '../lib/ref'
 import { InputError } from '../lib/input-description/input-error'
 import { IAccessibleMessage } from '../../models/accessible-message'
+import {
+  classifyNetworkRepositoryPath,
+  NetworkRepositoryPathKind,
+  resolveRepositoryInputPath,
+} from '../../lib/network-repository-path'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+  translatedVariable,
+  TranslationKey,
+  TranslationVariables,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
 interface IAddExistingRepositoryProps {
   readonly dispatcher: Dispatcher
@@ -28,6 +41,7 @@ interface IAddExistingRepositoryProps {
 }
 
 interface IAddExistingRepositoryState {
+  readonly languageMode: LanguageMode
   readonly path: string
 
   /**
@@ -43,6 +57,8 @@ interface IAddExistingRepositoryState {
   readonly isRepositoryUnsafe: boolean
   readonly repositoryUnsafePath?: string
   readonly isTrustingRepository: boolean
+  readonly networkPathKind: NetworkRepositoryPathKind | null
+  readonly isCheckingRepository: boolean
 }
 
 /** The component for adding an existing local repository. */
@@ -58,12 +74,44 @@ export class AddExistingRepository extends React.Component<
     const path = this.props.path ? this.props.path : ''
 
     this.state = {
+      languageMode: getPersistedLanguageMode(),
       path,
       showNonGitRepositoryWarning: false,
       isRepositoryBare: false,
       isRepositoryUnsafe: false,
       isTrustingRepository: false,
+      networkPathKind: null,
+      isCheckingRepository: false,
     }
+  }
+
+  public componentDidMount(): void {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount(): void {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
+  }
+
+  private localize(
+    key: TranslationKey,
+    variables?: TranslationVariables
+  ): string {
+    return translate(key, this.state.languageMode, variables)
   }
 
   private onTrustDirectory = async () => {
@@ -85,11 +133,18 @@ export class AddExistingRepository extends React.Component<
       this.setState({
         isRepositoryBare: false,
         showNonGitRepositoryWarning: false,
+        networkPathKind: null,
       })
       return false
     }
 
-    const type = await getRepositoryType(path)
+    this.setState({ isCheckingRepository: true })
+    const networkPathKind = await classifyNetworkRepositoryPath(path).catch(
+      () => null
+    )
+    const type = await getRepositoryType(path).catch(() => ({
+      kind: 'missing' as const,
+    }))
 
     const isRepository = type.kind !== 'missing' && type.kind !== 'unsafe'
     const isRepositoryUnsafe = type.kind === 'unsafe'
@@ -97,16 +152,18 @@ export class AddExistingRepository extends React.Component<
     const showNonGitRepositoryWarning = !isRepository || isRepositoryBare
     const repositoryUnsafePath = type.kind === 'unsafe' ? type.path : undefined
 
-    this.setState(state =>
-      path === state.path
-        ? {
-            isRepositoryBare,
-            isRepositoryUnsafe,
-            showNonGitRepositoryWarning,
-            repositoryUnsafePath,
-          }
-        : null
-    )
+    if (path === this.state.path) {
+      this.setState({
+        isRepositoryBare,
+        isRepositoryUnsafe,
+        showNonGitRepositoryWarning,
+        repositoryUnsafePath,
+        networkPathKind,
+        isCheckingRepository: false,
+      })
+    } else {
+      this.setState({ isCheckingRepository: false })
+    }
 
     return path.length > 0 && isRepository && !isRepositoryBare
   }
@@ -178,21 +235,32 @@ export class AddExistingRepository extends React.Component<
       return null
     }
 
+    const isNetworkPath = this.state.networkPathKind !== null
     const displayedMessage = (
       <>
-        <p>This directory does not appear to be a Git repository.</p>
         <p>
-          Would you like to{' '}
-          <LinkButton onClick={this.onCreateRepositoryClicked}>
-            create a repository
-          </LinkButton>{' '}
-          here instead?
+          {isNetworkPath
+            ? this.localize('networkRepository.unavailable')
+            : 'This directory does not appear to be a Git repository.'}
         </p>
+        {isNetworkPath ? (
+          <p>{this.localize('networkRepository.reconnect')}</p>
+        ) : null}
+        {!isNetworkPath ? (
+          <p>
+            Would you like to{' '}
+            <LinkButton onClick={this.onCreateRepositoryClicked}>
+              create a repository
+            </LinkButton>{' '}
+            here instead?
+          </p>
+        ) : null}
       </>
     )
 
-    const screenReaderMessage =
-      'This directory does not appear to be a Git repository. Would you like to create a repository here instead?'
+    const screenReaderMessage = isNetworkPath
+      ? this.localize('networkRepository.unavailableAria')
+      : 'This directory does not appear to be a Git repository. Would you like to create a repository here instead?'
 
     return { screenReaderMessage, displayedMessage }
   }
@@ -219,6 +287,30 @@ export class AddExistingRepository extends React.Component<
     )
   }
 
+  private renderNetworkNotice() {
+    if (
+      this.state.networkPathKind === null ||
+      this.state.showNonGitRepositoryWarning
+    ) {
+      return null
+    }
+    const labelKey: TranslationKey =
+      this.state.networkPathKind === 'mapped-drive'
+        ? 'networkRepository.mappedDrive'
+        : this.state.networkPathKind === 'wsl'
+        ? 'networkRepository.wslShare'
+        : 'networkRepository.uncShare'
+    return (
+      <Row>
+        <p role="status">
+          {this.localize('networkRepository.detected', {
+            location: translatedVariable(labelKey),
+          })}
+        </p>
+      </Row>
+    )
+  }
+
   public render() {
     return (
       <Dialog
@@ -226,7 +318,9 @@ export class AddExistingRepository extends React.Component<
         title={__DARWIN__ ? 'Add Local Repository' : 'Add local repository'}
         onSubmit={this.addRepository}
         onDismissed={this.props.onDismissed}
-        loading={this.state.isTrustingRepository}
+        loading={
+          this.state.isTrustingRepository || this.state.isCheckingRepository
+        }
       >
         <DialogContent>
           <Row>
@@ -241,6 +335,7 @@ export class AddExistingRepository extends React.Component<
             <Button onClick={this.showFilePicker}>Choose…</Button>
           </Row>
           {this.renderErrors()}
+          {this.renderNetworkNotice()}
         </DialogContent>
 
         <DialogFooter>
@@ -271,7 +366,7 @@ export class AddExistingRepository extends React.Component<
   }
 
   private resolvedPath(path: string): string {
-    return Path.resolve('/', untildify(path))
+    return resolveRepositoryInputPath(untildify(path))
   }
 
   private addRepository = async () => {

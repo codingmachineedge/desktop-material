@@ -35,6 +35,21 @@ describe('recent UI internationalization', () => {
     )
   })
 
+  it('localizes network notices and WSL recovery without mixing variable locales', () => {
+    assert.equal(
+      translate('networkRepository.detected', 'bilingual', {
+        location: translatedVariable('networkRepository.wslShare'),
+      }),
+      'Detected a WSL share. Desktop Material keeps its exact path; reconnect it before Git operations if the location goes offline. · 偵測到以下位置：WSL 共享。Desktop Material 會保留精確路徑；如果位置離線，做 Git 操作前請先重新連接。'
+    )
+    assert.equal(
+      translate('editor.wslDistributionMismatch', 'cantonese', {
+        distribution: 'Ubuntu',
+      }),
+      '呢個路徑屬於 WSL 發行版「Ubuntu」。請揀返配對嘅 WSL 編輯器項目。'
+    )
+  })
+
   it('preserves user-controlled separators instead of parsing them as locale data', () => {
     assert.equal(
       translate('submodule.backToParent', 'bilingual', { parent: 'A · B' }),

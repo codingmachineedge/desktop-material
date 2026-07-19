@@ -84,6 +84,21 @@ import {
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
 import { createFileHistoryMenuItem } from '../file-history'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translateForAccessibleName,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import {
+  buildChangedFileTreeGroups,
+  ChangedFileViewMode,
+  ChangedFileViewModeChangedEvent,
+  getChangedFileTreeDepth,
+  normalizeChangedFileViewMode,
+  readChangedFileViewMode,
+} from '../lib/changed-file-view'
+import { ChangedFileViewToggle } from '../lib/changed-file-view-toggle'
 
 export interface IChangesListItem extends IFilterListItem {
   readonly id: string
@@ -268,10 +283,14 @@ interface IFilterChangesListState {
 
   /** Whether the regex builder dialog is open. */
   readonly isRegexBuilderOpen: boolean
+
+  readonly fileViewMode: ChangedFileViewMode
+  readonly languageMode: LanguageMode
 }
 
 /** Persistence key for the Changes filter's mode + regex-builder target label. */
 const ChangesFilterListId = 'changes'
+const ChangedFileDirectoryGroupPrefix = 'changed-file-directory:'
 
 export const isStashContextMenuKey = (key: string, shiftKey: boolean) =>
   key === 'ContextMenu' || (shiftKey && key === 'F10')
@@ -376,11 +395,12 @@ export class FilterChangesList extends React.Component<
     super(props)
 
     const listItems = this.createListItems(props.workingDirectory.files)
-    const groups = [listItems]
+    const fileViewMode = readChangedFileViewMode()
+    const groups = this.createListGroups(listItems, fileViewMode)
 
     this.state = {
       filteredItems: new Map<string, IChangesListItem>(
-        listItems.items.map(i => [i.id, i])
+        listItems.map(i => [i.id, i])
       ),
       selectedItems: getSelectedItemsFromProps(props),
       focusedRow: null,
@@ -389,7 +409,31 @@ export class FilterChangesList extends React.Component<
       caseSensitive: false,
       showFilterChips: false,
       isRegexBuilderOpen: false,
+      fileViewMode,
+      languageMode: getPersistedLanguageMode(),
     }
+  }
+
+  public componentDidMount() {
+    document.addEventListener(
+      ChangedFileViewModeChangedEvent,
+      this.onFileViewModeChanged
+    )
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      ChangedFileViewModeChangedEvent,
+      this.onFileViewModeChanged
+    )
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
   }
 
   public componentWillReceiveProps(nextProps: IFilterChangesListProps) {
@@ -404,23 +448,67 @@ export class FilterChangesList extends React.Component<
     ) {
       this.setState({
         selectedItems: getSelectedItemsFromProps(nextProps),
-        groups: [this.createListItems(nextProps.workingDirectory.files)],
+        groups: this.createListGroups(
+          this.createListItems(nextProps.workingDirectory.files),
+          this.state.fileViewMode
+        ),
       })
     }
   }
 
   private createListItems(
     files: ReadonlyArray<WorkingDirectoryFileChange>
-  ): IFilterListGroup<IChangesListItem> {
-    const items = files.map(file => ({
+  ): ReadonlyArray<IChangesListItem> {
+    return files.map(file => ({
       text: [file.path],
       id: file.id,
       change: file,
     }))
+  }
 
-    return {
-      identifier: 'changed-files',
-      items,
+  private createListGroups(
+    items: ReadonlyArray<IChangesListItem>,
+    mode: ChangedFileViewMode
+  ): ReadonlyArray<IFilterListGroup<IChangesListItem>> {
+    if (mode === 'flat') {
+      return [{ identifier: 'changed-files', items, showHeader: false }]
+    }
+
+    return buildChangedFileTreeGroups(items, item => item.change.path).map(
+      group => ({
+        identifier:
+          group.directoryPath === null
+            ? 'changed-files-root'
+            : `${ChangedFileDirectoryGroupPrefix}${group.depth}:${group.directoryPath}`,
+        items: group.files,
+        showHeader: group.directoryPath !== null,
+      })
+    )
+  }
+
+  private onFileViewModeChanged = (event: Event) => {
+    const fileViewMode = normalizeChangedFileViewMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (fileViewMode === this.state.fileViewMode) {
+      return
+    }
+
+    this.setState({
+      fileViewMode,
+      groups: this.createListGroups(
+        this.createListItems(this.props.workingDirectory.files),
+        fileViewMode
+      ),
+    })
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
     }
   }
 
@@ -481,7 +569,7 @@ export class FilterChangesList extends React.Component<
       ? 'Only changes that have been committed within the submodule will be added to this repository. You need to commit any other modified or untracked changes in the submodule before including them in this repository.'
       : undefined
 
-    return (
+    const changedFile = (
       <ChangedFile
         file={file}
         include={isPartiallyCommittableSubmodule && include ? null : include}
@@ -493,6 +581,22 @@ export class FilterChangesList extends React.Component<
         focused={this.state.focusedRow === changeListItem.id}
         matches={matches}
       />
+    )
+
+    if (this.state.fileViewMode === 'flat') {
+      return changedFile
+    }
+
+    const depth = getChangedFileTreeDepth(file.path)
+    const treeStyle = {
+      '--changed-file-tree-indent': `${depth * 12}px`,
+    } as React.CSSProperties
+    return (
+      <div className="changed-file-tree-file" style={treeStyle}>
+        {React.cloneElement(changedFile, {
+          availableWidth: Math.max(availableWidth - depth * 12, 0),
+        })}
+      </div>
     )
   }
 
@@ -1302,6 +1406,45 @@ export class FilterChangesList extends React.Component<
             {formatNumber(fileCount)}
           </span>
         )}
+        <ChangedFileViewToggle mode={this.state.fileViewMode} />
+      </div>
+    )
+  }
+
+  private renderDirectoryGroup = (identifier: string) => {
+    if (!identifier.startsWith(ChangedFileDirectoryGroupPrefix)) {
+      return null
+    }
+
+    const encoded = identifier.slice(ChangedFileDirectoryGroupPrefix.length)
+    const separator = encoded.indexOf(':')
+    if (separator === -1) {
+      return null
+    }
+
+    const parsedDepth = Number(encoded.slice(0, separator))
+    const depth = Number.isSafeInteger(parsedDepth)
+      ? Math.max(0, Math.min(parsedDepth, 127))
+      : 0
+    const path = encoded.slice(separator + 1)
+    const treeStyle = {
+      '--changed-file-tree-indent': `${depth * 12}px`,
+    } as React.CSSProperties
+
+    return (
+      <div
+        className="changed-file-tree-directory"
+        style={treeStyle}
+        role="heading"
+        aria-level={3}
+        aria-label={translateForAccessibleName(
+          'fileList.directory',
+          { path },
+          this.state.languageMode
+        )}
+      >
+        <Octicon symbol={octicons.fileDirectory} />
+        <span>{path}</span>
       </div>
     )
   }
@@ -1509,6 +1652,7 @@ export class FilterChangesList extends React.Component<
             onItemKeyDown={this.onItemKeyDown}
             onSelectionChanged={this.onFileSelectionChanged}
             groups={this.state.groups}
+            renderGroupHeader={this.renderDirectoryGroup}
             filterMethod={
               this.props.fileListFilter.isIncludedInCommit ||
               this.props.fileListFilter.isNewFile ||
@@ -1523,6 +1667,8 @@ export class FilterChangesList extends React.Component<
               isCommitting: isCommitting,
               focusedRow: this.state.focusedRow,
               showChangesFilter: this.props.showChangesFilter,
+              fileViewMode: this.state.fileViewMode,
+              languageMode: this.state.languageMode,
               filterNewFiles: this.props.fileListFilter.isNewFile,
               filterModifiedFiles: this.props.fileListFilter.isModifiedFile,
               filterDeletedFiles: this.props.fileListFilter.isDeletedFile,

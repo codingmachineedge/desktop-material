@@ -191,6 +191,7 @@ import { findAccountForRemoteURL } from '../find-account'
 import { shell } from '../app-shell'
 import {
   CompareAction,
+  HistoryScope,
   HistoryTabMode,
   Foldout,
   FoldoutType,
@@ -239,6 +240,19 @@ import {
 } from '../get-account-for-repository'
 import { getForkRepositoryEligibility } from '../fork-repository'
 import {
+  assertCheckoutPlanSelection,
+  createForkNetworkBranchCatalog,
+  createForkNetworkCatalog,
+  ForkBranchCheckoutError,
+  getForkNetworkRepositoryIdentity,
+  IForkBranchCheckoutPlan,
+  IForkBranchCheckoutResult,
+  IForkNetworkBranch,
+  IForkNetworkBranchCatalog,
+  IForkNetworkCatalog,
+  IForkNetworkRepository,
+} from '../fork-network'
+import {
   abortMerge,
   addRemote,
   checkoutBranch,
@@ -268,7 +282,10 @@ import {
   MergeResult,
   getBranchesDifferingFromUpstream,
   deleteLocalBranch,
+  deleteReviewedLocalBranches,
   deleteRemoteBranch,
+  IReviewedBranchDeletion,
+  IReviewedBranchDeletionResult,
   fastForwardBranches,
   GitResetMode,
   reset,
@@ -330,8 +347,18 @@ import {
   IRemoteManagementApplyOptions,
   unstageAll,
   fetchRepositoryShallowHistory,
+  applyForkBranchCheckoutPlan,
+  reviewForkBranchCheckout,
 } from '../git'
-import type { IRepositoryShallowHistoryFetchRequest } from '../git'
+import type {
+  ICreateTagLifecycleOptions,
+  IMoveTagLifecycleOptions,
+  IRemoteTagDeletionReview,
+  ITagRefReview,
+  ITagPushReview,
+  IRepositoryShallowHistoryFetchRequest,
+  ITagLifecycleInventory,
+} from '../git'
 import {
   installGlobalLFSFilters,
   installLFSHooks,
@@ -427,7 +454,9 @@ import {
   selectWorktreeCandidates,
 } from '../automation/merge-all'
 import {
+  IPullAllCandidate,
   IPullAllResult,
+  IRepositorySyncRequest,
   PullAllProgressListener,
   runBoundedPullAll,
 } from '../automation/pull-all'
@@ -1865,7 +1894,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.repositoryStateCache.updateChangesState(repository, state => {
       const stashEntries = gitStore.currentBranchStashEntries
-      const allStashEntries = gitStore.allDesktopStashEntries
+      const allStashEntries = gitStore.allStashEntries
 
       // Figure out what selection changes we need to make as a result of this
       // change.
@@ -2242,7 +2271,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       const { compareState } = this.repositoryStateCache.get(repository)
-      const { formState, commitSHAs } = compareState
+      const { formState, commitSHAs, historyScope } = compareState
       const previousTip = compareState.tip
 
       const tipIsUnchanged =
@@ -2252,6 +2281,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       if (
         tipIsUnchanged &&
+        historyScope === HistoryScope.CurrentBranch &&
         formState.kind === HistoryTabMode.History &&
         commitSHAs.length > 0
       ) {
@@ -2261,7 +2291,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       // load initial group of commits for current branch
-      const commits = await gitStore.loadCommitBatch('HEAD', 0)
+      const commits = await gitStore.loadHistoryBatch(historyScope, 0)
 
       if (commits === null || !this.isTemporaryRepositoryActive(repository)) {
         return
@@ -2288,6 +2318,63 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     return assertNever(action, `Unknown action: ${kind}`)
+  }
+
+  /** Switch the normal History view between the current branch and all refs. */
+  public async _setHistoryScope(
+    repository: Repository,
+    historyScope: HistoryScope
+  ): Promise<void> {
+    if (!this.isTemporaryRepositoryActive(repository)) {
+      return
+    }
+
+    const current = this.repositoryStateCache.get(repository).compareState
+    if (
+      current.formState.kind === HistoryTabMode.History &&
+      current.historyScope === historyScope &&
+      current.commitSHAs.length > 0
+    ) {
+      return
+    }
+
+    const gitStore = this.gitStoreCache.get(repository)
+    const tip = gitStore.tip
+    const currentSha =
+      tip.kind === TipState.Valid
+        ? tip.branch.tip.sha
+        : tip.kind === TipState.Detached
+        ? tip.currentSha
+        : null
+
+    this.repositoryStateCache.updateCompareState(repository, () => ({
+      formState: { kind: HistoryTabMode.History },
+      historyScope,
+      tip: currentSha,
+      commitSHAs: [],
+      filterText: '',
+      showBranchList: false,
+    }))
+    this.emitUpdate()
+
+    const commits = await gitStore.loadHistoryBatch(historyScope, 0)
+    if (!this.isTemporaryRepositoryActive(repository) || commits === null) {
+      return
+    }
+
+    const latest = this.repositoryStateCache.get(repository).compareState
+    if (
+      latest.formState.kind !== HistoryTabMode.History ||
+      latest.historyScope !== historyScope
+    ) {
+      return
+    }
+
+    this.repositoryStateCache.updateCompareState(repository, () => ({
+      commitSHAs: commits,
+    }))
+    this.updateOrSelectFirstCommit(repository, commits)
+    this.emitUpdate()
   }
 
   private async updateCompareToBranch(
@@ -2435,6 +2522,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       // Prioritize pulling from the local commits if the last one we pulled is local
       if (
+        state.compareState.historyScope === HistoryScope.CurrentBranch &&
         commits.length > 0 &&
         tip.kind === TipState.Valid &&
         gitStore.localCommitSHAs.includes(commits[commits.length - 1])
@@ -2446,7 +2534,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       if (!newCommits || newCommits.length === 0) {
-        newCommits = await gitStore.loadCommitBatch('HEAD', commits.length)
+        newCommits = await gitStore.loadHistoryBatch(
+          state.compareState.historyScope,
+          commits.length
+        )
       }
 
       if (!newCommits || !this.isTemporaryRepositoryActive(repository)) {
@@ -5830,6 +5921,97 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
   }
 
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _getTagLifecycleInventory(
+    repository: Repository,
+    includeRemote: boolean
+  ): Promise<ITagLifecycleInventory> {
+    return this.gitStoreCache
+      .get(repository)
+      .getTagLifecycleInventory(includeRemote)
+  }
+
+  private withTagLifecycleMutationGuard<T>(
+    repository: Repository,
+    mutation: () => Promise<T>
+  ): Promise<T> {
+    if (isSubmoduleRepository(repository)) {
+      throw new Error(
+        t('submodule.temporaryToolsReadOnly', {
+          parent: repository.parentRepository.name,
+        })
+      )
+    }
+    return this.withTemporaryRepositoryMutationGuard(repository, mutation)
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _createLifecycleTag(
+    repository: Repository,
+    options: ICreateTagLifecycleOptions
+  ): Promise<boolean> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return this.withTagLifecycleMutationGuard(repository, () =>
+      gitStore.createLifecycleTag(options)
+    )
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _moveLifecycleTag(
+    repository: Repository,
+    options: IMoveTagLifecycleOptions
+  ): Promise<boolean> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return this.withTagLifecycleMutationGuard(repository, () =>
+      gitStore.moveLifecycleTag(options)
+    )
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _deleteReviewedLifecycleTag(
+    repository: Repository,
+    review: ITagRefReview
+  ): Promise<boolean> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return this.withTagLifecycleMutationGuard(repository, () =>
+      gitStore.deleteReviewedLifecycleTag(review)
+    )
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _pushLifecycleTags(
+    repository: Repository,
+    reviews: ReadonlyArray<ITagPushReview>
+  ): Promise<boolean> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return this.withTagLifecycleMutationGuard(repository, () =>
+      gitStore.pushLifecycleTags(reviews)
+    )
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _fetchLifecycleTags(
+    repository: Repository,
+    prune: boolean,
+    reviewedLocalTags: ReadonlyArray<ITagRefReview>
+  ): Promise<boolean> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return this.withTagLifecycleMutationGuard(repository, () =>
+      gitStore.fetchLifecycleTags(prune, reviewedLocalTags)
+    )
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public _deleteRemoteLifecycleTag(
+    repository: Repository,
+    review: IRemoteTagDeletionReview
+  ): Promise<boolean> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return this.withTagLifecycleMutationGuard(repository, () =>
+      gitStore.deleteRemoteLifecycleTag(review)
+    )
+  }
+
   private updateCheckoutProgress(
     repository: Repository,
     checkoutProgress: ICheckoutProgress | null
@@ -7494,6 +7676,34 @@ export class AppStore extends TypedBaseStore<IAppState> {
     })
   }
 
+  /** Delete only exact reviewed local branch tips, never current/default. */
+  public async _deleteReviewedBranches(
+    repository: Repository,
+    reviewedBranches: ReadonlyArray<IReviewedBranchDeletion>
+  ): Promise<ReadonlyArray<IReviewedBranchDeletionResult>> {
+    const state = this.repositoryStateCache.get(repository).branchesState
+    const protectedNames = new Set<string>()
+    if (state.tip.kind === TipState.Valid) {
+      protectedNames.add(state.tip.branch.name)
+    }
+    if (state.defaultBranch !== null) {
+      protectedNames.add(state.defaultBranch.name)
+    }
+    if (reviewedBranches.some(branch => protectedNames.has(branch.name))) {
+      throw new Error(
+        'The current and default branches cannot be bulk deleted.'
+      )
+    }
+
+    try {
+      return await this.withTemporaryRepositoryMutationGuard(repository, () =>
+        deleteReviewedLocalBranches(repository, reviewedBranches)
+      )
+    } finally {
+      await this._refreshRepository(repository)
+    }
+  }
+
   /**
    * Deletes the local branch. If the parameter `includeUpstream` is true, the
    * upstream branch will be deleted also.
@@ -8067,6 +8277,95 @@ export class AppStore extends TypedBaseStore<IAppState> {
       3,
       onProgress
     )
+  }
+
+  /** Return the current persisted repositories for a reviewed batch sync. */
+  public async _getRepositorySyncCandidates(): Promise<
+    ReadonlyArray<IPullAllCandidate>
+  > {
+    const repositories = await this.repositoriesStore.getAll()
+    return repositories.map(repository => ({
+      id: repository.id,
+      name: repository.name,
+    }))
+  }
+
+  /** Pull or fetch only the exact repository IDs reviewed in the dialog. */
+  public async _syncRepositories(
+    request: IRepositorySyncRequest,
+    onProgress?: PullAllProgressListener
+  ): Promise<ReadonlyArray<IPullAllResult>> {
+    if (request.operation !== 'pull' && request.operation !== 'fetch') {
+      throw new Error('Choose pull or fetch for the repository batch.')
+    }
+
+    const repositoryIds = [...new Set(request.repositoryIds)]
+    if (
+      repositoryIds.length === 0 ||
+      repositoryIds.length > 500 ||
+      repositoryIds.some(id => !Number.isSafeInteger(id) || id < 0)
+    ) {
+      throw new Error('Review between 1 and 500 repositories for this batch.')
+    }
+
+    const repositories = await this.repositoriesStore.getAll()
+    const selected = new Set(repositoryIds)
+    const candidates = repositories.filter(repository =>
+      selected.has(repository.id)
+    )
+    if (candidates.length !== repositoryIds.length) {
+      throw new Error(
+        'The reviewed repository list changed. Refresh it before starting.'
+      )
+    }
+    const repositoriesById = new Map(
+      candidates.map(repository => [repository.id, repository])
+    )
+
+    return runBoundedPullAll(
+      candidates.map(repository => ({
+        id: repository.id,
+        name: repository.name,
+      })),
+      async (candidate, reportProgress) => {
+        const repository = repositoriesById.get(candidate.id)
+        if (repository === undefined) {
+          return { status: 'skipped', detail: 'Repository was removed.' }
+        }
+        return request.operation === 'pull'
+          ? this.performPullAllRepository(repository, reportProgress)
+          : this.performFetchAllRepository(repository, reportProgress)
+      },
+      3,
+      onProgress,
+      request.operation === 'pull' ? 'pulling' : 'fetching'
+    )
+  }
+
+  private async performFetchAllRepository(
+    repository: Repository,
+    reportProgress: (detail: string) => void
+  ) {
+    if (repository.missing) {
+      return { status: 'skipped' as const, detail: 'Repository is missing.' }
+    }
+
+    reportProgress('Refreshing repository state.')
+    await this._refreshRepository(repository)
+    const state = this.repositoryStateCache.get(repository)
+    if (state.isPushPullFetchInProgress) {
+      return {
+        status: 'skipped' as const,
+        detail: 'Another network operation is in progress.',
+      }
+    }
+    if ((await getRemotes(repository)).length === 0) {
+      return { status: 'skipped' as const, detail: 'No fetch remote.' }
+    }
+
+    reportProgress('Fetching relevant remotes without changing the worktree.')
+    await this.performFetch(repository, FetchType.UserInitiatedTask)
+    return { status: 'fetched' as const, detail: 'Fetch completed.' }
   }
 
   private async performPullAllRepository(
@@ -12730,6 +13029,160 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     return gitStore.addUpstreamRemoteIfNeeded()
+  }
+
+  private assertForkNetworkRepositoryContext(repository: Repository): void {
+    const selected = this.selectedRepository
+    if (
+      !(selected instanceof Repository) ||
+      selected.id !== repository.id ||
+      selected.path !== repository.path ||
+      getForkNetworkRepositoryIdentity(selected) !==
+        getForkNetworkRepositoryIdentity(repository)
+    ) {
+      throw new ForkBranchCheckoutError('repository-context-changed')
+    }
+  }
+
+  private getForkNetworkAPI(repository: Repository): API {
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new ForkBranchCheckoutError('unsupported-repository')
+    }
+    const account = getAccountForRepository(this.accounts, repository)
+    if (
+      account === null ||
+      account.provider !== 'github' ||
+      account.token.length === 0
+    ) {
+      throw new ForkBranchCheckoutError('sign-in-required')
+    }
+    return API.fromAccount(account)
+  }
+
+  private async wrapForkNetworkRequest<T>(
+    request: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await request()
+    } catch (error) {
+      if (
+        error instanceof ForkBranchCheckoutError ||
+        (error instanceof Error && error.name === 'AbortError')
+      ) {
+        throw error
+      }
+      throw new ForkBranchCheckoutError('network-or-permission')
+    }
+  }
+
+  /** Load the first bounded, authenticated fork-network review stage. */
+  public async _loadForkNetworkRepositories(
+    repository: Repository,
+    signal?: AbortSignal
+  ): Promise<IForkNetworkCatalog> {
+    this.assertForkNetworkRepositoryContext(repository)
+    if (!isRepositoryWithGitHubRepository(repository)) {
+      throw new ForkBranchCheckoutError('unsupported-repository')
+    }
+    const root =
+      repository.gitHubRepository.parent ?? repository.gitHubRepository
+    const page = await this.wrapForkNetworkRequest(() =>
+      this.getForkNetworkAPI(repository).fetchForkNetworkRepositories(
+        root.owner.login,
+        root.name,
+        signal
+      )
+    )
+    this.assertForkNetworkRepositoryContext(repository)
+    return createForkNetworkCatalog(repository, page)
+  }
+
+  /** Load and verify branches only for the exact fork selected in stage one. */
+  public async _loadForkNetworkBranches(
+    repository: Repository,
+    catalog: IForkNetworkCatalog,
+    fork: IForkNetworkRepository,
+    signal?: AbortSignal
+  ): Promise<IForkNetworkBranchCatalog> {
+    this.assertForkNetworkRepositoryContext(repository)
+    if (
+      catalog.repositoryIdentity !==
+        getForkNetworkRepositoryIdentity(repository) ||
+      !catalog.forks.some(
+        candidate =>
+          candidate.id === fork.id && candidate.cloneURL === fork.cloneURL
+      )
+    ) {
+      throw new ForkBranchCheckoutError('stale-review')
+    }
+    const api = this.getForkNetworkAPI(repository)
+    const [liveFork, branches] = await this.wrapForkNetworkRequest(() =>
+      Promise.all([
+        api.fetchForkNetworkRepository(fork.owner, fork.name, signal),
+        api.fetchForkNetworkBranches(fork.owner, fork.name, signal),
+      ])
+    )
+    this.assertForkNetworkRepositoryContext(repository)
+    return createForkNetworkBranchCatalog(repository, fork, liveFork, branches)
+  }
+
+  /** Capture remotes and local-ref absence for the confirmation surface. */
+  public async _reviewForkBranchCheckout(
+    repository: Repository,
+    catalog: IForkNetworkBranchCatalog,
+    branch: IForkNetworkBranch,
+    localBranchName: string
+  ): Promise<IForkBranchCheckoutPlan> {
+    this.assertForkNetworkRepositoryContext(repository)
+    return reviewForkBranchCheckout(
+      repository,
+      catalog,
+      branch,
+      localBranchName
+    )
+  }
+
+  /** Revalidate GitHub, atomically prepare exact refs, and start checkout. */
+  public async _checkoutReviewedForkBranch(
+    repository: Repository,
+    plan: IForkBranchCheckoutPlan
+  ): Promise<IForkBranchCheckoutResult> {
+    this.assertForkNetworkRepositoryContext(repository)
+    const api = this.getForkNetworkAPI(repository)
+    const [liveFork, liveBranch] = await this.wrapForkNetworkRequest(() =>
+      Promise.all([
+        api.fetchForkNetworkRepository(plan.fork.owner, plan.fork.name),
+        api.fetchForkNetworkBranch(
+          plan.fork.owner,
+          plan.fork.name,
+          plan.branch.name
+        ),
+      ])
+    )
+    this.assertForkNetworkRepositoryContext(repository)
+    assertCheckoutPlanSelection(repository, plan, liveFork, liveBranch)
+
+    await this.withTemporaryRepositoryMutationGuard(repository, () =>
+      applyForkBranchCheckoutPlan(repository, plan)
+    )
+    const gitStore = this.gitStoreCache.get(repository)
+    await gitStore.loadBranches()
+    const localBranch = gitStore.allBranches.find(
+      branch =>
+        branch.type === BranchType.Local &&
+        branch.name === plan.localBranchName &&
+        branch.tip.sha.toLowerCase() === plan.branch.headSha
+    )
+    if (localBranch === undefined) {
+      throw new ForkBranchCheckoutError('git-failed')
+    }
+    await this._checkoutBranch(repository, localBranch)
+    return {
+      localBranchName: plan.localBranchName,
+      remoteName: plan.remoteName,
+      headSha: plan.branch.headSha,
+      checkoutStarted: true,
+    }
   }
 
   public async _checkoutPullRequest(

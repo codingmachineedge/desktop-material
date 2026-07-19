@@ -2,7 +2,7 @@
 
 ## Current status
 
-Milestones **M0 through M19 are shipped on `main`**. The concise public status
+Milestones **M0 through M21 are shipped on `main`**. The concise public status
 and current maintenance gates live in [`ROADMAP.md`](ROADMAP.md); this document
 keeps the detailed implementation ledger, architecture contracts, and
 historical acceptance evidence. Build, screenshot, CI, Pages, wiki, privacy,
@@ -28,6 +28,15 @@ focused `98d93ccc` correction passed remote CI and CodeQL and published
 `v3.6.3-beta3-b0000000165`. Exact Pages, wiki, asset, and cleanup receipts are
 recorded in `HANDOFF.md` and the canonical wiki.
 
+M21 closes the 30 demand-backed workflow gaps in the July 19 research brief.
+The canonical item-by-item map is
+[`docs/features/github-desktop-demand-backlog.md`](docs/features/github-desktop-demand-backlog.md);
+its category documents define configuration, failure recovery, security bounds,
+and focused verification. The implementation extends existing account,
+repository, Git, provider, store/dispatcher, and Material UI contracts rather
+than introducing a new application HTTP endpoint, so no new Postman collection
+is applicable.
+
 ## Product milestone ledger
 
 | Milestone | Status | Delivered capability | Important implementation paths |
@@ -52,6 +61,8 @@ recorded in `HANDOFF.md` and the canonical wiki.
 | **M17 — GitLab, Bitbucket, and self-hosted GitLab** | **COMPLETE** | Provider API foundation, GitLab PAT and Bitbucket sign-in, self-hosted endpoint support, provider clone browsing, cross-host PR/status routing, credential isolation, and provider documentation. | `app/src/lib/api.ts`, `app/src/lib/stores/accounts-store.ts`, `app/src/ui/preferences/accounts.tsx`, `app/src/ui/clone-repository/`, `docs/integrations/gitlab.md`, `docs/integrations/bitbucket.md` |
 | **M18 — Final Material alignment** | **COMPLETE** | Full MD3 shell, tokens, motion, navigation rail, floating workspace cards, dialogs/sheets, de-stocked controls, final post-shell polish, accessibility coverage, and clipping/layout fixes across milestone surfaces. | `app/styles/_material.scss`, `app/styles/_material-shell.scss`, `app/styles/ui/`, `app/src/ui/app.tsx`, `app/test/unit/post-shell-style-test.ts`, `app/test/unit/ui/` |
 | **M19 — Guided Git, GitHub, and provider parity** | **COMPLETE** | Native P0/P1/P2/Later workflows: PR lifecycle, Actions artifacts and effective rules, patch series, structured commit rewrite, signing, LFS, worktrees, branch visibility, merge-tree conflict preview, bisect, complete stash/remote/hooks administration, Releases/assets, richer GitHub Issues, and provider-neutral triage. Exact app source `e282eb2fce` is built and accepted off-screen; current `main` documentation and screenshot evidence are complete. | `app/src/ui/repository-tools/`, `app/src/ui/actions/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/github-releases/`, `app/src/ui/github-issues/`, `app/src/ui/worktrees/`, `app/src/ui/stashing/`, `app/src/lib/provider-triage.ts` |
+| **M20 — Platform wave** | **COMPLETE** | Secure LAN agent access, full notification/Releases depth, submodule workflows, Material context menus, compact-surface corrections, and refreshed gallery evidence. | `app/src/main-process/agent-server/`, `app/src/ui/notifications/`, `app/src/ui/github-releases/`, `app/src/ui/submodules/`, `app/styles/ui/`, `docs/assets/screenshots/` |
+| **M21 — Advanced workflow completeness** | **COMPLETE** | All 30 demand-backed identity/workspace, PR, stash/tag, history/navigation, diff, editor/integration, network, and live/offline Projects requests, with reviewed mutation boundaries and exact-context guards. | `app/src/lib/github-pull-request*`, `app/src/lib/git/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/repository-tools/`, `app/src/ui/github-projects/`, `app/src/ui/stashing/`, `app/src/ui/tag/`, `docs/features/` |
 
 ## M19 guided parity implementation ledger
 

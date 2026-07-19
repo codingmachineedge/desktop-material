@@ -20,6 +20,8 @@ import {
   IRepositoryLogoLoader,
   repositoryLogoLoader,
 } from '../repository-logo/repository-logo-loader'
+import { LanguageMode } from '../../models/language-mode'
+import { LocalizedText } from '../lib/localized-text'
 
 export interface IRepositoryLogoChange {
   readonly revision: number
@@ -44,6 +46,12 @@ interface IRepositoryListItemProps {
 
   /** Current branch to show beside the repository name, or null to hide it. */
   readonly branchName: string | null
+
+  /** Whether this repository is visible only because Show hidden is active. */
+  readonly isHidden?: boolean
+
+  /** Active app language, supplied by the repository picker. */
+  readonly languageMode?: LanguageMode
 
   /** The latest repository-logo invalidation observed by the parent list. */
   readonly repositoryLogoChange?: IRepositoryLogoChange
@@ -211,6 +219,15 @@ export class RepositoryListItem extends React.Component<
           </span>
         )}
 
+        {this.props.isHidden === true && (
+          <span className="repository-hidden-pill">
+            <LocalizedText
+              translationKey="repositoryPicker.hidden"
+              languageMode={this.props.languageMode}
+            />
+          </span>
+        )}
+
         {repository instanceof Repository &&
           renderRepoIndicators({
             aheadBehind: this.props.aheadBehind,
@@ -308,6 +325,8 @@ export class RepositoryListItem extends React.Component<
         nextProps.aheadBehind !== this.props.aheadBehind ||
         nextProps.changedFilesCount !== this.props.changedFilesCount ||
         nextProps.branchName !== this.props.branchName ||
+        nextProps.isHidden !== this.props.isHidden ||
+        nextProps.languageMode !== this.props.languageMode ||
         relevantLogoChange ||
         nextProps.repositoryLogoLoader !== this.props.repositoryLogoLoader
       )

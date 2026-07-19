@@ -4,9 +4,10 @@ import { resolve } from 'node:path'
 import * as React from 'react'
 import {
   ICLICommandOutputEvent,
-  ICLICommandRequest,
   ICLICommandStateEvent,
+  ICLIWorkbenchOperationRequest,
 } from '../../../src/lib/cli-workbench'
+import { LanguageModeChangedEvent } from '../../../src/lib/i18n'
 import { RepositoryPatchSeries } from '../../../src/ui/repository-tools'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 
@@ -25,7 +26,7 @@ const secondPatchPath = resolve(
 )
 
 class FakePatchClient {
-  public readonly starts = new Array<ICLICommandRequest>()
+  public readonly starts = new Array<ICLIWorkbenchOperationRequest>()
   public readonly cancels = new Array<string>()
   private readonly outputHandlers = new Set<
     (event: ICLICommandOutputEvent) => void
@@ -34,7 +35,7 @@ class FakePatchClient {
     (event: ICLICommandStateEvent) => void
   >()
 
-  public start = async (request: ICLICommandRequest) => {
+  public start = async (request: ICLIWorkbenchOperationRequest) => {
     this.starts.push(request)
   }
   public cancel = async (id: string) => {
@@ -99,8 +100,8 @@ describe('Repository patch series', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Export patch series' }))
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepEqual(client.starts[0].recipe, {
-      kind: 'repository-patch-export',
+    assert.deepEqual(client.starts[0].operation, {
+      id: 'patch-export',
       destination: exportDestination,
     })
     assert.equal(client.starts[0].confirmed, true)
@@ -129,8 +130,8 @@ describe('Repository patch series', () => {
     assert.ok(screen.getByText('0002-second.patch'))
     fireEvent.click(screen.getByRole('button', { name: 'Apply patch series' }))
     await waitFor(() => assert.equal(client.starts.length, 1))
-    assert.deepEqual(client.starts[0].recipe, {
-      kind: 'repository-patch-import',
+    assert.deepEqual(client.starts[0].operation, {
+      id: 'patch-import',
       patchPaths: [firstPatchPath, secondPatchPath],
     })
 
@@ -145,8 +146,8 @@ describe('Repository patch series', () => {
     assert.ok(screen.getByRole('button', { name: 'Skip patch' }))
     fireEvent.click(screen.getByRole('button', { name: 'Abort import' }))
     await waitFor(() => assert.equal(client.starts.length, 2))
-    assert.deepEqual(client.starts[1].recipe, {
-      kind: 'repository-patch-session',
+    assert.deepEqual(client.starts[1].operation, {
+      id: 'patch-session',
       operation: 'abort',
     })
   })
@@ -185,5 +186,76 @@ describe('Repository patch series', () => {
       screen.queryByRole('group', { name: 'Patch conflict recovery' }),
       null
     )
+  })
+
+  it('switches workflow copy and live operation status across language modes', async () => {
+    localStorage.setItem(
+      'appearance-customization-v1',
+      JSON.stringify({ version: 1, languageMode: 'english' })
+    )
+    const client = new FakePatchClient()
+    const view = renderPatchSeries(client, {
+      choosePatchFiles: async () => [firstPatchPath],
+    })
+
+    try {
+      assert.ok(screen.getByRole('heading', { name: 'Patch series' }))
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'cantonese' })
+      )
+      await waitFor(() =>
+        assert.ok(screen.getByRole('heading', { name: 'Patch 系列' }))
+      )
+      assert.ok(screen.getByRole('button', { name: '揀 patch 檔案' }))
+      assert.match(
+        screen.getByRole('status').textContent ?? '',
+        /揀匯出或者匯入操作/
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: '揀 patch 檔案' }))
+      await screen.findByRole('alertdialog')
+      assert.match(
+        screen.getByRole('alertdialog').textContent ?? '',
+        /按呢個次序套用 1 個 patch/
+      )
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'bilingual' })
+      )
+      await waitFor(() =>
+        assert.match(
+          screen.getByRole('alertdialog').textContent ?? '',
+          /Apply 1 patches in this order\? · 按呢個次序套用 1 個 patch？/
+        )
+      )
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Apply patch series' })
+      )
+      await waitFor(() => assert.equal(client.starts.length, 1))
+      assert.match(
+        screen.getByRole('status').textContent ?? '',
+        /Applying the reviewed patch series… · 套用緊已覆核嘅 patch 系列…/
+      )
+
+      client.emitState({
+        id: client.starts[0].id,
+        state: 'failed',
+        exitCode: 1,
+        signal: null,
+      })
+      await screen.findByRole('group', { name: 'Patch conflict recovery' })
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'cantonese' })
+      )
+      await waitFor(() =>
+        assert.ok(screen.getByRole('group', { name: 'Patch 衝突復原' }))
+      )
+      assert.ok(screen.getByRole('button', { name: '略過 patch' }))
+    } finally {
+      view.unmount()
+      localStorage.removeItem('appearance-customization-v1')
+    }
   })
 })

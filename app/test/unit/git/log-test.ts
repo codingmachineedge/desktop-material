@@ -2,9 +2,14 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import { Repository } from '../../../src/models/repository'
 import { getChangedFiles, getCommits } from '../../../src/lib/git'
-import { setupFixtureRepository } from '../../helpers/repositories'
+import {
+  setupEmptyRepository,
+  setupFixtureRepository,
+} from '../../helpers/repositories'
 import { AppFileStatusKind } from '../../../src/models/status'
 import { setupLocalConfig } from '../../helpers/local-config'
+import { makeCommit, switchTo } from '../../helpers/repository-scaffolding'
+import { exec } from 'dugite'
 
 describe('git/log', () => {
   describe('getCommits', () => {
@@ -60,6 +65,46 @@ describe('git/log', () => {
       assert.deepStrictEqual(commits[0].tags, ['important'])
       assert.deepStrictEqual(commits[1].tags, ['tentative', 'less-important'])
       assert.equal(commits[2].tags.length, 0)
+    })
+
+    it('can page commits reachable only from remote refs', async t => {
+      const repository = await setupEmptyRepository(t)
+      await makeCommit(repository, {
+        entries: [{ path: 'base.txt', contents: 'base' }],
+      })
+      await exec(['branch', 'fork-feature'], repository.path)
+      await switchTo(repository, 'fork-feature')
+      await makeCommit(repository, {
+        entries: [{ path: 'fork.txt', contents: 'remote only' }],
+      })
+
+      const remoteOnlySha = (
+        await exec(['rev-parse', 'HEAD'], repository.path)
+      ).stdout.trim()
+      await switchTo(repository, 'master')
+      await exec(
+        ['update-ref', 'refs/remotes/contributor/fork-feature', remoteOnlySha],
+        repository.path
+      )
+      await exec(['branch', '-D', 'fork-feature'], repository.path)
+
+      const currentBranch = await getCommits(repository, 'HEAD', 100)
+      const everyBranchAndTag = await getCommits(
+        repository,
+        undefined,
+        100,
+        0,
+        ['--branches', '--remotes', '--tags', '--topo-order']
+      )
+
+      assert.equal(
+        currentBranch.some(commit => commit.sha === remoteOnlySha),
+        false
+      )
+      assert.equal(
+        everyBranchAndTag.some(commit => commit.sha === remoteOnlySha),
+        true
+      )
     })
   })
 

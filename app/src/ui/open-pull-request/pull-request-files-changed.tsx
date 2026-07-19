@@ -277,6 +277,7 @@ export class PullRequestFilesChanged extends React.Component<
           availableWidth={clamp(fileListWidth)}
           onContextMenu={this.onFileContextMenu}
           onRowDoubleClick={this.onRowDoubleClick}
+          showViewToggle={true}
         />
       </Resizable>
     )

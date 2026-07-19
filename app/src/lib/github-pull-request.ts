@@ -4,6 +4,11 @@ import { IRemote } from '../models/remote'
 import { Repository } from '../models/repository'
 import { APIError } from './http'
 import { validateGitHubRepositoryPart } from './github-issue'
+import {
+  IGitHubPullRequestPendingInlineComment,
+  IGitHubPullRequestPendingReply,
+  normalizeGitHubPullRequestPendingComments,
+} from './github-pull-request-workspace'
 
 export const GitHubPullRequestTitleMaximumLength = 256
 export const GitHubPullRequestBodyMaximumLength = 65536
@@ -62,6 +67,8 @@ export interface IGitHubPullRequestMetadata {
   readonly reviewers: ReadonlyArray<string>
   readonly assignees: ReadonlyArray<string>
   readonly labels: ReadonlyArray<string>
+  /** Creation-only issue metadata. Omitted lifecycle metadata remains unchanged. */
+  readonly milestone?: number | null
 }
 
 export const EmptyGitHubPullRequestMetadata: IGitHubPullRequestMetadata = {
@@ -123,6 +130,8 @@ export type GitHubPullRequestReviewEvent =
 export interface IGitHubPullRequestReview {
   readonly event: GitHubPullRequestReviewEvent
   readonly body: string
+  readonly comments?: ReadonlyArray<IGitHubPullRequestPendingInlineComment>
+  readonly replies?: ReadonlyArray<IGitHubPullRequestPendingReply>
 }
 
 export type GitHubPullRequestMergeMethod = 'merge' | 'squash' | 'rebase'
@@ -136,6 +145,8 @@ export interface IGitHubPullRequestReviewReceipt {
   readonly id: number
   readonly state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED'
   readonly url: string
+  /** A review can succeed even when a separately posted reply fails. */
+  readonly warnings?: ReadonlyArray<string>
 }
 
 export interface IGitHubPullRequestMergeReceipt {
@@ -497,12 +508,21 @@ function normalizeGitHubPullRequestMetadataList(
 export function normalizeGitHubPullRequestMetadata(
   reviewers: ReadonlyArray<string>,
   assignees: ReadonlyArray<string>,
-  labels: ReadonlyArray<string>
+  labels: ReadonlyArray<string>,
+  milestone?: number | null
 ): IGitHubPullRequestMetadata {
+  if (
+    milestone !== undefined &&
+    milestone !== null &&
+    (!Number.isSafeInteger(milestone) || milestone < 1)
+  ) {
+    throw new Error('Choose a valid pull request milestone.')
+  }
   return {
     reviewers: normalizeGitHubPullRequestMetadataList(reviewers, 'reviewer'),
     assignees: normalizeGitHubPullRequestMetadataList(assignees, 'assignee'),
     labels: normalizeGitHubPullRequestMetadataList(labels, 'label'),
+    ...(milestone === undefined ? {} : { milestone }),
   }
 }
 
@@ -537,7 +557,9 @@ export function normalizeGitHubPullRequestUpdate(
 
 export function normalizeGitHubPullRequestReview(
   event: GitHubPullRequestReviewEvent,
-  body: string
+  body: string,
+  comments: ReadonlyArray<IGitHubPullRequestPendingInlineComment> = [],
+  replies: ReadonlyArray<IGitHubPullRequestPendingReply> = []
 ): IGitHubPullRequestReview {
   if (!['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event)) {
     throw new Error('Choose a supported pull request review decision.')
@@ -550,7 +572,18 @@ export function normalizeGitHubPullRequestReview(
   if (event === 'REQUEST_CHANGES' && body.trim() === '') {
     throw new Error('Explain the requested changes before submitting.')
   }
-  return { event, body }
+  const normalized = normalizeGitHubPullRequestPendingComments(
+    comments,
+    replies
+  )
+  return {
+    event,
+    body,
+    ...(normalized.comments.length === 0
+      ? {}
+      : { comments: normalized.comments }),
+    ...(normalized.replies.length === 0 ? {} : { replies: normalized.replies }),
+  }
 }
 
 export function validateGitHubPullRequestNumber(value: number): number {

@@ -7,6 +7,10 @@ import {
   IGitHubPullRequestDraft,
   IGitHubPullRequestTarget,
 } from '../../../src/lib/github-pull-request'
+import {
+  IGitHubPullRequestCreationContext,
+  IGitHubPullRequestCreationMetadata,
+} from '../../../src/lib/github-pull-request-creation'
 import { APIError } from '../../../src/lib/http'
 import { Account } from '../../../src/models/account'
 import { Branch, BranchType } from '../../../src/models/branch'
@@ -24,6 +28,7 @@ let restoreIpcSend: (() => void) | null = null
 let restoreDialogShow: (() => void) | null = null
 
 beforeEach(async () => {
+  localStorage.removeItem('appearance-customization-v1')
   const electron = await import('electron')
   const previousSend = electron.ipcRenderer.send
   electron.ipcRenderer.send = () => {}
@@ -159,6 +164,7 @@ class TestDispatcher {
     providerHTMLURL: string
     contextVersion: string
     draft: IGitHubPullRequestDraft
+    metadata: IGitHubPullRequestCreationMetadata
     signal: AbortSignal
   }>()
   public browserCalls = new Array<{
@@ -167,6 +173,16 @@ class TestDispatcher {
     sourceRemote: IRemote | null
   }>()
   public openedURLs = new Array<string>()
+  public creationContext: IGitHubPullRequestCreationContext = {
+    templates: [],
+    reviewers: [],
+    labels: [],
+    assignees: [],
+    milestones: [],
+    capped: [],
+    unavailable: [],
+    warnings: [],
+  }
 
   public createResult: (
     signal: AbortSignal
@@ -181,6 +197,10 @@ class TestDispatcher {
     return this.contextCurrent
   }
 
+  public async inspectGitHubPullRequestCreation() {
+    return this.creationContext
+  }
+
   public createGitHubPullRequest(
     _repository: Repository,
     target: GitHubRepository,
@@ -190,6 +210,7 @@ class TestDispatcher {
     providerHTMLURL: string,
     contextVersion: string,
     draft: IGitHubPullRequestDraft,
+    metadata: IGitHubPullRequestCreationMetadata,
     signal: AbortSignal
   ) {
     this.createCalls.push({
@@ -200,6 +221,7 @@ class TestDispatcher {
       providerHTMLURL,
       contextVersion,
       draft,
+      metadata,
       signal,
     })
     return this.createResult(signal)
@@ -259,7 +281,19 @@ function dialogElement(
   )
 }
 
-function composeAndReview(title: string, body: string, draft: boolean = false) {
+async function composeAndReview(
+  title: string,
+  body: string,
+  draft: boolean = false
+) {
+  await waitFor(() =>
+    assert.equal(
+      screen.getByRole<HTMLButtonElement>('button', {
+        name: 'Review pull request',
+      }).disabled,
+      false
+    )
+  )
   fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
     target: { value: title },
   })
@@ -299,7 +333,11 @@ describe('CreateGitHubPullRequestDialog', () => {
     )
     assert.equal(document.body.textContent?.includes('token'), false)
 
-    composeAndReview('  Native pull request  ', 'Line one\nLine two', true)
+    await composeAndReview(
+      '  Native pull request  ',
+      'Line one\nLine two',
+      true
+    )
     assert.ok(screen.getByRole('heading', { name: 'Native pull request' }))
     assert.match(
       screen.getByRole('group', { name: 'Pull request route' }).textContent ??
@@ -327,6 +365,11 @@ describe('CreateGitHubPullRequestDialog', () => {
       base: 'main',
       draft: true,
     })
+    assert.deepEqual(call.metadata, {
+      reviewers: [],
+      assignees: [],
+      labels: [],
+    })
     assert.equal(call.signal.aborted, false)
 
     await waitFor(() =>
@@ -353,7 +396,7 @@ describe('CreateGitHubPullRequestDialog', () => {
       })
     render(dialogElement(fixture, dispatcher, () => {}))
 
-    composeAndReview('Cancel native PR', '')
+    await composeAndReview('Cancel native PR', '')
     fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
     await waitFor(() => assert.equal(dispatcher.createCalls.length, 1))
     assert.equal(screen.queryByRole('button', { name: 'Close' }), null)
@@ -381,7 +424,7 @@ describe('CreateGitHubPullRequestDialog', () => {
     }
     render(dialogElement(fixture, dispatcher, () => {}))
 
-    composeAndReview('Permission test', 'Private description')
+    await composeAndReview('Permission test', 'Private description')
     fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
 
     await waitFor(() =>
@@ -463,7 +506,7 @@ describe('CreateGitHubPullRequestDialog', () => {
     )
 
     rendered.rerender(dialogElement(fixture, dispatcher, () => {}))
-    composeAndReview('Generation guard', '')
+    await composeAndReview('Generation guard', '')
     fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
     await waitFor(() => assert.equal(dispatcher.createCalls.length, 1))
 
@@ -487,7 +530,7 @@ describe('CreateGitHubPullRequestDialog', () => {
     const dispatcher = new TestDispatcher()
     const rendered = render(dialogElement(fixture, dispatcher, () => {}))
 
-    composeAndReview('Durable success', 'Immutable description')
+    await composeAndReview('Durable success', 'Immutable description')
     fireEvent.click(screen.getByRole('button', { name: 'Create pull request' }))
     await waitFor(() => assert.ok(screen.getByText('Pull request #12 created')))
 
@@ -502,5 +545,185 @@ describe('CreateGitHubPullRequestDialog', () => {
     assert.ok(screen.getByText('Immutable description'))
     assert.equal(screen.queryByText('Created title'), null)
     assert.ok(screen.getByRole('button', { name: 'Open on GitHub' }))
+  })
+
+  it('applies a selected repository template and submits its reviewed metadata', async () => {
+    const fixture = createFixture()
+    const dispatcher = new TestDispatcher()
+    dispatcher.creationContext = {
+      templates: [
+        {
+          path: '.github/pull_request_template.md',
+          name: 'Default review',
+          title: 'Template title',
+          body: '## Summary\n\nTemplate body',
+          draft: true,
+          metadata: {
+            reviewers: ['reviewer'],
+            assignees: ['octocat'],
+            labels: ['ready'],
+            milestone: 3,
+          },
+          warnings: [],
+        },
+        {
+          path: '.github/PULL_REQUEST_TEMPLATE/fix.md',
+          name: 'Fix review',
+          title: 'Fix title',
+          body: '## Fix',
+          draft: false,
+          metadata: {
+            reviewers: [],
+            assignees: [],
+            labels: ['bug'],
+          },
+          warnings: [],
+        },
+      ],
+      reviewers: ['reviewer'],
+      labels: [
+        { id: 1, name: 'ready', color: '0969da', description: null },
+        { id: 2, name: 'bug', color: 'd73a4a', description: null },
+      ],
+      assignees: ['octocat'],
+      milestones: [
+        {
+          number: 3,
+          title: 'Ship it',
+          state: 'open',
+          dueOn: null,
+        },
+      ],
+      capped: [],
+      unavailable: [],
+      warnings: [],
+    }
+    dispatcher.createResult = async () => ({
+      number: 12,
+      title: 'Template title',
+      url: 'https://github.com/desktop/material/pull/12',
+      draft: true,
+      metadataWarnings: [
+        'The pull request was created, but labels were not applied.',
+      ],
+    })
+    render(dialogElement(fixture, dispatcher, () => {}))
+
+    await waitFor(() =>
+      assert.equal(
+        screen.getByRole<HTMLSelectElement>('combobox', {
+          name: 'Pull request template',
+        }).value,
+        '.github/pull_request_template.md'
+      )
+    )
+    assert.equal(
+      screen.getByRole<HTMLInputElement>('textbox', { name: 'Title' }).value,
+      'Template title'
+    )
+    assert.equal(
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
+        name: 'Description (optional)',
+      }).value,
+      '## Summary\n\nTemplate body'
+    )
+    assert.equal(
+      screen.getByRole<HTMLInputElement>('checkbox', {
+        name: 'Create as draft pull request',
+      }).checked,
+      true
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review pull request' }))
+    assert.ok(screen.getByText(/Reviewers: reviewer/))
+    assert.ok(screen.getByText(/Milestone: Ship it/))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create draft pull request' })
+    )
+    await waitFor(() => assert.equal(dispatcher.createCalls.length, 1))
+    assert.deepEqual(dispatcher.createCalls[0].metadata, {
+      reviewers: ['reviewer'],
+      assignees: ['octocat'],
+      labels: ['ready'],
+      milestone: 3,
+    })
+    await waitFor(() =>
+      assert.ok(
+        screen.getByText(
+          'The pull request was created, but labels were not applied.'
+        )
+      )
+    )
+  })
+
+  it('live-switches the creation surface across Cantonese and bilingual modes', async () => {
+    const fixture = createFixture()
+    const dispatcher = new TestDispatcher()
+    render(dialogElement(fixture, dispatcher, () => {}))
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('heading', { name: 'Create GitHub pull request' })
+      )
+    )
+
+    document.dispatchEvent(
+      new CustomEvent('desktop-material-language-mode-changed', {
+        detail: 'cantonese',
+      })
+    )
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('heading', { name: '建立 GitHub pull request' })
+      )
+    )
+    assert.ok(screen.getByText('Pull request 範本'))
+
+    document.dispatchEvent(
+      new CustomEvent('desktop-material-language-mode-changed', {
+        detail: 'bilingual',
+      })
+    )
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('heading', {
+          name: 'Create GitHub pull request · 建立 GitHub pull request',
+        })
+      )
+    )
+  })
+
+  it('keeps core creation available when optional metadata choices are unavailable', async () => {
+    const fixture = createFixture()
+    const dispatcher = new TestDispatcher()
+    dispatcher.creationContext = {
+      ...dispatcher.creationContext,
+      unavailable: ['templates', 'reviewers', 'labels'],
+      warnings: ['Reviewer suggestions are unavailable for this account.'],
+    }
+    render(dialogElement(fixture, dispatcher, () => {}))
+
+    await waitFor(() =>
+      assert.equal(
+        screen.getByRole<HTMLButtonElement>('button', {
+          name: 'Review pull request',
+        }).disabled,
+        false
+      )
+    )
+    assert.equal(
+      screen.getByRole<HTMLSelectElement>('listbox', { name: 'Reviewers' })
+        .disabled,
+      true
+    )
+    assert.equal(
+      screen.getByRole<HTMLSelectElement>('listbox', { name: 'Labels' })
+        .disabled,
+      true
+    )
+    assert.ok(
+      screen.getAllByText('Suggestions unavailable for this account').length >=
+        2
+    )
+    assert.ok(screen.getByText(/You can still create the pull request/))
   })
 })

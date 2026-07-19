@@ -11,6 +11,7 @@ import { pathExists } from '../path-exists'
 
 import { IFoundEditor } from './found-editor'
 import memoizeOne from 'memoize-one'
+import { getWslDistributions } from './wsl'
 
 interface IWindowsAppInformation {
   displayName: string
@@ -624,6 +625,28 @@ export async function getAvailableEditors(): Promise<
 
     if (path) {
       results.push({ editor: editor.name, path })
+    }
+  }
+
+  const distributions = await getWslDistributions().catch(error => {
+    log.debug(
+      'WSL distributions are unavailable for editor discovery.',
+      error instanceof Error ? error : undefined
+    )
+    return []
+  })
+  const remoteCapableEditors = results.filter(
+    editor =>
+      editor.editor === 'Visual Studio Code' ||
+      editor.editor === 'Visual Studio Code (Insiders)'
+  )
+  for (const editor of remoteCapableEditors) {
+    for (const distribution of distributions) {
+      results.push({
+        editor: `${editor.editor} — WSL: ${distribution}`,
+        path: editor.path,
+        wslDistribution: distribution,
+      })
     }
   }
 

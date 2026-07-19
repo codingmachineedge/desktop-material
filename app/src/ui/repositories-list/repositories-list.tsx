@@ -50,7 +50,13 @@ import {
   isAccountFilterAvailable,
   RepositoryAccountFilter,
   RepositoryServiceFilter,
+  RepositoryStatusFilter,
 } from './repository-list-filters'
+import {
+  getHiddenRepositories,
+  hideRepository,
+  unhideRepository,
+} from '../../lib/stores/repository-list-visibility'
 import {
   getProfileRepositoryLogoSignature,
   IRepositoryLogoLoader,
@@ -60,6 +66,14 @@ import {
   IRepositoryLogoChangedDetail,
   RepositoryLogoChangedEvent,
 } from '../../lib/appearance-customization'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translateForAccessibleName,
+  TranslationKey,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import { LocalizedText } from '../lib/localized-text'
 
 const BlankSlateImage = encodePathAsUrl(__dirname, 'static/empty-no-repo.svg')
 
@@ -135,8 +149,26 @@ interface IRepositoriesListState {
   readonly pinnedRepositoryIds: ReadonlyArray<number>
   readonly accountFilter: RepositoryAccountFilter
   readonly serviceFilter: RepositoryServiceFilter
+  readonly statusFilters: ReadonlyArray<RepositoryStatusFilter>
+  readonly hiddenRepositoryIds: ReadonlyArray<number>
+  readonly showHiddenRepositories: boolean
   readonly repositoryLogoChange: IRepositoryLogoChange
+  readonly languageMode: LanguageMode
 }
+
+const RepositoryStatusFilters: ReadonlyArray<{
+  readonly value: RepositoryStatusFilter
+  readonly labelKey: TranslationKey
+}> = [
+  { value: 'clean', labelKey: 'repositoryPicker.clean' },
+  { value: 'changed', labelKey: 'repositoryPicker.changed' },
+  { value: 'ahead', labelKey: 'repositoryPicker.ahead' },
+  { value: 'behind', labelKey: 'repositoryPicker.behind' },
+  {
+    value: 'missing-or-cloning',
+    labelKey: 'repositoryPicker.missingOrCloning',
+  },
+]
 
 /**
  * Side-sheet row geometry. The list renders exclusively inside the Current
@@ -230,7 +262,11 @@ export class RepositoriesList extends React.Component<
       pinnedRepositoryIds: getPinnedRepositories(),
       accountFilter: 'all',
       serviceFilter: 'all',
+      statusFilters: [],
+      hiddenRepositoryIds: getHiddenRepositories(),
+      showHiddenRepositories: false,
       repositoryLogoChange: { revision: 0, repositoryPath: null },
+      languageMode: getPersistedLanguageMode(),
     }
   }
 
@@ -238,6 +274,10 @@ export class RepositoriesList extends React.Component<
     document.addEventListener(
       RepositoryLogoChangedEvent,
       this.onRepositoryLogoChanged
+    )
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
     )
   }
 
@@ -269,6 +309,19 @@ export class RepositoriesList extends React.Component<
       RepositoryLogoChangedEvent,
       this.onRepositoryLogoChanged
     )
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
+    }
   }
 
   private get logoLoader(): IRepositoryLogoLoader {
@@ -327,6 +380,8 @@ export class RepositoriesList extends React.Component<
             ? item.branchName
             : null
         }
+        isHidden={this.state.hiddenRepositoryIds.includes(repository.id)}
+        languageMode={this.state.languageMode}
         repositoryLogoChange={this.state.repositoryLogoChange}
         repositoryLogoLoader={this.logoLoader}
       />
@@ -486,6 +541,10 @@ export class RepositoriesList extends React.Component<
       isPinned: this.state.pinnedRepositoryIds.includes(item.repository.id),
       onPinRepository: this.onPinRepository,
       onUnpinRepository: this.onUnpinRepository,
+      isHidden: this.state.hiddenRepositoryIds.includes(item.repository.id),
+      languageMode: this.state.languageMode,
+      onHideRepository: this.onHideRepository,
+      onUnhideRepository: this.onUnhideRepository,
       repository: item.repository,
       shellLabel: this.props.shellLabel,
     })
@@ -493,7 +552,14 @@ export class RepositoriesList extends React.Component<
     showContextualMenu(items)
   }
 
-  private getItemAriaLabel = (item: IRepositoryListItem) => item.repository.name
+  private getItemAriaLabel = (item: IRepositoryListItem) =>
+    this.state.hiddenRepositoryIds.includes(item.repository.id)
+      ? translateForAccessibleName(
+          'repositoryPicker.itemHiddenAria',
+          { repository: item.repository.name },
+          this.state.languageMode
+        )
+      : item.repository.name
   private getGroupAriaLabelGetter =
     (
       groups: ReadonlyArray<
@@ -515,7 +581,12 @@ export class RepositoriesList extends React.Component<
       allGroups,
       this.props.accounts ?? [],
       this.state.accountFilter,
-      this.state.serviceFilter
+      this.state.serviceFilter,
+      {
+        statusFilters: this.state.statusFilters,
+        hiddenRepositoryIds: this.state.hiddenRepositoryIds,
+        showHiddenRepositories: this.state.showHiddenRepositories,
+      }
     )
 
     // So there's two types of selection at play here. There's the repository
@@ -553,7 +624,11 @@ export class RepositoriesList extends React.Component<
             accounts: this.props.accounts,
             accountFilter: this.state.accountFilter,
             serviceFilter: this.state.serviceFilter,
+            statusFilters: this.state.statusFilters,
+            hiddenRepositoryIds: this.state.hiddenRepositoryIds,
+            showHiddenRepositories: this.state.showHiddenRepositories,
             repositoryLogoRevision: this.state.repositoryLogoChange.revision,
+            languageMode: this.state.languageMode,
           }}
           onItemContextMenu={this.onItemContextMenu}
           getGroupAriaLabel={this.getGroupAriaLabelGetter(groups)}
@@ -586,48 +661,176 @@ export class RepositoriesList extends React.Component<
     })
   }
 
+  private onStatusFilterToggle = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const status = event.currentTarget.value as RepositoryStatusFilter
+    this.setState(state => {
+      const filters = new Set(state.statusFilters)
+      if (filters.has(status)) {
+        filters.delete(status)
+      } else {
+        filters.add(status)
+      }
+      return { statusFilters: [...filters], selectedItem: null }
+    })
+  }
+
+  private onShowAllStatuses = () => {
+    this.setState({ statusFilters: [], selectedItem: null })
+  }
+
+  private onShowHiddenRepositoriesToggle = () => {
+    this.setState(state => ({
+      showHiddenRepositories: !state.showHiddenRepositories,
+      selectedItem: null,
+    }))
+  }
+
+  private get hiddenRepositoryCount() {
+    const hidden = new Set(this.state.hiddenRepositoryIds)
+    return this.props.repositories.filter(
+      repository =>
+        repository instanceof Repository && hidden.has(repository.id)
+    ).length
+  }
+
   private renderScopeFilters = () => {
     const accounts = this.props.accounts ?? []
+    const allStatusesSelected = this.state.statusFilters.length === 0
+    const hiddenRepositoryCount = this.hiddenRepositoryCount
+    const languageMode = this.state.languageMode
+
     return (
-      <div
-        className="repository-list-scope-filters"
-        role="group"
-        aria-label="Repository scope filters"
-      >
-        <label>
-          <span>Repository account</span>
-          <select
-            aria-label="Repository account"
-            value={this.state.accountFilter}
-            onChange={this.onAccountFilterChange}
+      <div className="repository-list-filter-controls">
+        <div
+          className="repository-list-scope-filters"
+          role="group"
+          aria-label="Repository scope filters"
+        >
+          <label>
+            <span>Repository account</span>
+            <select
+              aria-label="Repository account"
+              value={this.state.accountFilter}
+              onChange={this.onAccountFilterChange}
+            >
+              <option value="all">All accounts</option>
+              {accounts.map(account => (
+                <option
+                  key={accountFilterFor(account)}
+                  value={accountFilterFor(account)}
+                >
+                  {account.friendlyName} · {account.friendlyEndpoint}
+                </option>
+              ))}
+              <option value="unassigned">No available account</option>
+            </select>
+          </label>
+          <label>
+            <span>Repository service</span>
+            <select
+              aria-label="Repository service"
+              value={this.state.serviceFilter}
+              onChange={this.onServiceFilterChange}
+            >
+              <option value="all">All services</option>
+              <option value="github">GitHub</option>
+              <option value="gitlab">GitLab</option>
+              <option value="bitbucket">Bitbucket</option>
+              <option value="local">Local only</option>
+              <option value="unknown">Unknown or signed out</option>
+            </select>
+          </label>
+        </div>
+        <div className="repository-list-status-filter">
+          <span id="repository-status-filter-label">
+            <LocalizedText
+              translationKey="repositoryPicker.status"
+              languageMode={languageMode}
+            />
+          </span>
+          <div
+            className="repository-list-status-chips"
+            role="group"
+            aria-labelledby="repository-status-filter-label"
           >
-            <option value="all">All accounts</option>
-            {accounts.map(account => (
-              <option
-                key={accountFilterFor(account)}
-                value={accountFilterFor(account)}
+            <button
+              type="button"
+              className="repository-status-chip"
+              aria-label={translateForAccessibleName(
+                'repositoryPicker.all',
+                {},
+                languageMode
+              )}
+              aria-pressed={allStatusesSelected}
+              onClick={this.onShowAllStatuses}
+            >
+              <LocalizedText
+                translationKey="repositoryPicker.all"
+                languageMode={languageMode}
+              />
+            </button>
+            {RepositoryStatusFilters.map(filter => (
+              <button
+                type="button"
+                key={filter.value}
+                value={filter.value}
+                className="repository-status-chip"
+                aria-label={translateForAccessibleName(
+                  filter.labelKey,
+                  {},
+                  languageMode
+                )}
+                aria-pressed={this.state.statusFilters.includes(filter.value)}
+                onClick={this.onStatusFilterToggle}
               >
-                {account.friendlyName} · {account.friendlyEndpoint}
-              </option>
+                <LocalizedText
+                  translationKey={filter.labelKey}
+                  languageMode={languageMode}
+                />
+              </button>
             ))}
-            <option value="unassigned">No available account</option>
-          </select>
-        </label>
-        <label>
-          <span>Repository service</span>
-          <select
-            aria-label="Repository service"
-            value={this.state.serviceFilter}
-            onChange={this.onServiceFilterChange}
-          >
-            <option value="all">All services</option>
-            <option value="github">GitHub</option>
-            <option value="gitlab">GitLab</option>
-            <option value="bitbucket">Bitbucket</option>
-            <option value="local">Local only</option>
-            <option value="unknown">Unknown or signed out</option>
-          </select>
-        </label>
+          </div>
+          {hiddenRepositoryCount > 0 && (
+            <button
+              type="button"
+              className="repository-hidden-toggle"
+              aria-pressed={this.state.showHiddenRepositories}
+              aria-label={
+                this.state.showHiddenRepositories
+                  ? translateForAccessibleName(
+                      'repositoryPicker.hideHiddenAria',
+                      {},
+                      languageMode
+                    )
+                  : translateForAccessibleName(
+                      'repositoryPicker.showHiddenAria',
+                      { count: String(hiddenRepositoryCount) },
+                      languageMode
+                    )
+              }
+              onClick={this.onShowHiddenRepositoriesToggle}
+            >
+              <Octicon
+                symbol={
+                  this.state.showHiddenRepositories
+                    ? octicons.eyeClosed
+                    : octicons.eye
+                }
+              />
+              <LocalizedText
+                translationKey={
+                  this.state.showHiddenRepositories
+                    ? 'repositoryPicker.showingHidden'
+                    : 'repositoryPicker.showHidden'
+                }
+                variables={{ count: String(hiddenRepositoryCount) }}
+                languageMode={languageMode}
+              />
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -661,7 +864,7 @@ export class RepositoriesList extends React.Component<
           className="pull-all-repositories-button"
           onClick={this.onPullAllRepositories}
         >
-          <Octicon symbol={octicons.arrowDown} /> Pull all
+          <Octicon symbol={octicons.sync} /> Sync repositories
         </Button>
         <Button
           className="commit-push-all-repositories-button"
@@ -807,5 +1010,21 @@ export class RepositoriesList extends React.Component<
   private onUnpinRepository = (repository: Repository) => {
     removePinnedRepository(repository)
     this.setState({ pinnedRepositoryIds: getPinnedRepositories() })
+  }
+
+  private onHideRepository = (repository: Repository) => {
+    hideRepository(repository)
+    this.setState({
+      hiddenRepositoryIds: getHiddenRepositories(),
+      selectedItem: null,
+    })
+  }
+
+  private onUnhideRepository = (repository: Repository) => {
+    unhideRepository(repository)
+    this.setState({
+      hiddenRepositoryIds: getHiddenRepositories(),
+      selectedItem: null,
+    })
   }
 }

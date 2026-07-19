@@ -255,3 +255,64 @@
     }
   }
 }
+
+#pull-all-repositories {
+  .pull-all-review {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pull-all-review fieldset {
+    display: flex;
+    padding: 12px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 12px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pull-all-review-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    h2 {
+      margin: 0;
+    }
+
+    > div {
+      display: flex;
+      gap: 6px;
+    }
+  }
+
+  .pull-all-review-list {
+    display: grid;
+    max-height: 280px;
+    padding: 8px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 12px;
+    gap: 2px;
+    overflow: auto;
+
+    label {
+      display: flex;
+      min-height: 34px;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 8px;
+      gap: 8px;
+
+      &:hover {
+        background: var(--md-sys-color-surface-container-high);
+      }
+    }
+  }
+
+  .pull-all-review-note {
+    margin: 0;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+}

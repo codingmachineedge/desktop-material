@@ -399,14 +399,63 @@ describe('guided hidden-desktop proof fixture', () => {
       assert.deepEqual(updatedPullRequest.pullRequest.metadata.reviewers, [
         'proof-a',
       ])
+      const reviewWorkspace = await api.inspectPullRequestWorkspace(
+        'material-proof',
+        'guided-proof',
+        8,
+        initialPullRequest.headSHA
+      )
+      assert.equal(reviewWorkspace.files[0].path, 'README.md')
+      assert.equal(reviewWorkspace.commits.length, 1)
+      assert.equal(reviewWorkspace.reviews[0].state, 'COMMENTED')
+      assert.equal(reviewWorkspace.issueComments.length, 1)
+      assert.equal(reviewWorkspace.reviewComments[0].id, 8901)
       const reviewReceipt = await api.submitPullRequestReview(
         'material-proof',
         'guided-proof',
         8,
         initialPullRequest.headSHA,
-        { event: 'COMMENT', body: 'Bounded review submitted.' }
+        {
+          event: 'COMMENT',
+          body: 'Bounded review submitted.',
+          comments: [
+            {
+              path: 'README.md',
+              line: 1,
+              side: 'RIGHT',
+              body: 'Bounded inline review comment.',
+            },
+          ],
+          replies: [
+            { inReplyToId: 8901, body: 'Bounded inline review reply.' },
+          ],
+        }
       )
       assert.equal(reviewReceipt.state, 'COMMENTED')
+      const refreshedWorkspace = await api.inspectPullRequestWorkspace(
+        'material-proof',
+        'guided-proof',
+        8,
+        initialPullRequest.headSHA
+      )
+      assert.equal(refreshedWorkspace.reviews.length, 2)
+      assert.equal(refreshedWorkspace.reviewComments.length, 3)
+
+      const creationContext = await api.inspectPullRequestCreation(
+        'material-proof',
+        'guided-proof',
+        'main'
+      )
+      assert.deepEqual(
+        creationContext.templates.map(template => template.name),
+        ['Guided proof review', 'Guided proof fix']
+      )
+      assert.equal(creationContext.templates[0].draft, true)
+      assert.deepEqual(creationContext.reviewers, [
+        'proof-b',
+        'guided-proof-reviewer',
+      ])
+      assert.equal(creationContext.milestones[0].number, 3)
 
       const createdPullRequest = await api.createPullRequest(
         'material-proof',
@@ -422,6 +471,7 @@ describe('guided hidden-desktop proof fixture', () => {
           reviewers: ['guided-proof-reviewer'],
           assignees: ['proof-b'],
           labels: ['guided-proof'],
+          milestone: 3,
         }
       )
       assert.equal(createdPullRequest.number, 9)
@@ -437,19 +487,14 @@ describe('guided hidden-desktop proof fixture', () => {
         ['guided-proof']
       )
       for (const state of ['closed', 'open'] as const) {
-        const stateResponse = await fetch(
-          `${harness.endpoint}/repos/material-proof/guided-proof/pulls/9`,
-          {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${tokenB}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ state }),
-          }
+        const stateReceipt = await api.setPullRequestState(
+          'material-proof',
+          'guided-proof',
+          createdPullRequest.number,
+          initialPullRequest.headSHA,
+          state
         )
-        assert.equal(stateResponse.status, 200)
-        assert.equal((await stateResponse.json()).state, state)
+        assert.equal(stateReceipt.pullRequest.state, state)
         assert.equal(
           (
             await api.inspectPullRequest(

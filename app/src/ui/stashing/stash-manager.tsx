@@ -7,12 +7,25 @@ import {
   IStashEntry,
   StashedChangesLoadStates,
   StashCreateScope,
+  isDesktopManagedStash,
   stashEntryTitle,
 } from '../../models/stash-entry'
 import { AppFileStatusKind, WorkingDirectoryStatus } from '../../models/status'
 import { Button } from '../lib/button'
 import { Octicon, OcticonSymbolVariant } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import {
+  bilingualVariable,
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+  translatedVariable,
+  translateForAccessibleName,
+  TranslationKey,
+  TranslationVariables,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import { LocalizedText } from '../lib/localized-text'
 
 const StashManagerPanelId = 'desktop-material-stash-manager-panel'
 const StashNameInputId = 'desktop-material-stash-name'
@@ -70,14 +83,23 @@ export function groupManagedStashes(
     }))
 }
 
-export function formatManagedStashTimestamp(value?: string | null): string {
+export function formatManagedStashTimestamp(
+  value?: string | null,
+  languageMode: LanguageMode = 'english'
+): string {
   if (value === undefined || value === null) {
-    return 'Time unavailable'
+    return translate('stashManager.timeUnavailable', languageMode)
   }
   const date = new Date(value)
-  return Number.isFinite(date.getTime())
-    ? date.toLocaleString()
-    : 'Time unavailable'
+  if (!Number.isFinite(date.getTime())) {
+    return translate('stashManager.timeUnavailable', languageMode)
+  }
+  return translate('stashManager.timestamp', languageMode, {
+    timestamp: bilingualVariable(
+      date.toLocaleString('en'),
+      date.toLocaleString('zh-HK')
+    ),
+  })
 }
 
 export function describeManagedStashError(
@@ -89,12 +111,19 @@ export function describeManagedStashError(
     cancelled ||
     (error instanceof StashManagerError && error.kind === 'aborted')
   ) {
-    return `${operation} cancelled. The repository was refreshed.`
+    return translate('stashManager.operationCancelled', 'english', {
+      operation,
+    })
   }
   if (error instanceof StashManagerError) {
     return error.message
   }
-  return `${operation} could not finish. Git may have left working-tree conflicts; the stash was kept whenever restore was not clean. Review Changes and try again.`
+  return translate('stashManager.operationFailed', 'english', { operation })
+}
+
+interface ILocalizedMessage {
+  readonly key: TranslationKey
+  readonly variables?: TranslationVariables
 }
 
 type ConfirmationKind = 'branch' | 'clear' | 'discard' | 'restore'
@@ -132,9 +161,10 @@ interface IStashManagerState {
   readonly metadataBranch: string
   readonly newBranchName: string
   readonly confirmation: IConfirmation | null
-  readonly busyOperation: string | null
-  readonly status: string | null
-  readonly error: string | null
+  readonly busyOperation: ILocalizedMessage | null
+  readonly status: ILocalizedMessage | null
+  readonly error: ILocalizedMessage | string | null
+  readonly languageMode: LanguageMode
 }
 
 /** A native, task-specific manager for Desktop-managed repository stashes. */
@@ -163,11 +193,16 @@ export class StashManager extends React.Component<
       busyOperation: null,
       status: null,
       error: null,
+      languageMode: getPersistedLanguageMode(),
     }
   }
 
   public componentDidMount() {
     this.mounted = true
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
   }
 
   public componentDidUpdate(prevProps: IStashManagerProps) {
@@ -180,7 +215,7 @@ export class StashManager extends React.Component<
         editor: null,
         confirmation: null,
         busyOperation: null,
-        status: 'Repository changed. The stash manager was reset.',
+        status: { key: 'stashManager.repositoryChangedStatus' },
         error: null,
       })
       return
@@ -210,6 +245,43 @@ export class StashManager extends React.Component<
   public componentWillUnmount() {
     this.mounted = false
     this.operationController?.abort()
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
+    }
+  }
+
+  private accessibleText(
+    key: TranslationKey,
+    variables: TranslationVariables = {}
+  ): string {
+    return translateForAccessibleName(key, variables, this.state.languageMode)
+  }
+
+  private localized(
+    key: TranslationKey,
+    variables: TranslationVariables = {}
+  ): JSX.Element {
+    return (
+      <LocalizedText
+        translationKey={key}
+        variables={variables}
+        languageMode={this.state.languageMode}
+      />
+    )
+  }
+
+  private renderMessage(message: ILocalizedMessage): JSX.Element {
+    return this.localized(message.key, message.variables)
   }
 
   private get selectedPaths(): ReadonlyArray<string> {
@@ -243,9 +315,9 @@ export class StashManager extends React.Component<
   }
 
   private runOperation = async (
-    operation: string,
+    operation: ILocalizedMessage,
     task: (signal: AbortSignal) => Promise<unknown>,
-    success: string,
+    success: ILocalizedMessage,
     afterSuccess?: () => void
   ) => {
     if (this.state.busyOperation !== null) {
@@ -255,9 +327,16 @@ export class StashManager extends React.Component<
     const sequence = ++this.operationSequence
     const repositoryHash = this.props.repository.hash
     this.operationController = controller
+    const operationVariable = translatedVariable(
+      operation.key,
+      operation.variables
+    )
     this.setState({
       busyOperation: operation,
-      status: `${operation}…`,
+      status: {
+        key: 'stashManager.operationProgress',
+        variables: { operation: operationVariable },
+      },
       error: null,
       confirmation: null,
     })
@@ -280,11 +359,19 @@ export class StashManager extends React.Component<
       ) {
         this.setState({
           status: null,
-          error: describeManagedStashError(
-            error,
-            operation,
-            controller.signal.aborted
-          ),
+          error:
+            controller.signal.aborted ||
+            (error instanceof StashManagerError && error.kind === 'aborted')
+              ? {
+                  key: 'stashManager.operationCancelled',
+                  variables: { operation: operationVariable },
+                }
+              : error instanceof StashManagerError
+              ? error.message
+              : {
+                  key: 'stashManager.operationFailed',
+                  variables: { operation: operationVariable },
+                },
         })
       }
     } finally {
@@ -311,7 +398,7 @@ export class StashManager extends React.Component<
   private cancelOperation = () => {
     if (this.operationController !== null) {
       this.operationController.abort()
-      this.setState({ status: 'Cancelling…' })
+      this.setState({ status: { key: 'stashManager.cancellingStatus' } })
     }
   }
 
@@ -331,7 +418,7 @@ export class StashManager extends React.Component<
   private createStash = () => {
     const selectedPaths = this.selectedPaths
     void this.runOperation(
-      'Creating named stash',
+      { key: 'stashManager.createOperation' },
       signal =>
         this.props.dispatcher.createManagedStash(
           this.props.repository,
@@ -343,7 +430,7 @@ export class StashManager extends React.Component<
           },
           signal
         ),
-      'Named stash created. It is available under its recorded branch.',
+      { key: 'stashManager.createSuccess' },
       () => this.setState({ createName: '' })
     )
   }
@@ -396,14 +483,14 @@ export class StashManager extends React.Component<
       return
     }
     void this.runOperation(
-      'Applying stash copy',
+      { key: 'stashManager.applyOperation' },
       signal =>
         this.props.dispatcher.applyStashKeepingEntry(
           this.props.repository,
           entry,
           signal
         ),
-      'Stashed changes were applied. The stash was kept for recovery.'
+      { key: 'stashManager.applySuccess' }
     )
   }
 
@@ -427,7 +514,7 @@ export class StashManager extends React.Component<
       return
     }
     void this.runOperation(
-      'Saving stash details',
+      { key: 'stashManager.saveDetailsOperation' },
       signal =>
         this.props.dispatcher.updateManagedStash(
           this.props.repository,
@@ -438,7 +525,7 @@ export class StashManager extends React.Component<
           },
           signal
         ),
-      'Stash name and branch association updated.',
+      { key: 'stashManager.saveDetailsSuccess' },
       () => this.setState({ editor: null, focusedStashSha: null })
     )
   }
@@ -502,16 +589,20 @@ export class StashManager extends React.Component<
     if (confirmation.kind === 'clear') {
       const reviewed = [...this.state.reviewedStashShas]
       void this.runOperation(
-        'Clearing reviewed stashes',
+        { key: 'stashManager.clearOperation' },
         signal =>
           this.props.dispatcher.clearReviewedManagedStashes(
             this.props.repository,
             reviewed,
             signal
           ),
-        `${reviewed.length} reviewed Desktop-managed ${
-          reviewed.length === 1 ? 'stash' : 'stashes'
-        } cleared. Other Git stashes were not touched.`,
+        {
+          key:
+            reviewed.length === 1
+              ? 'stashManager.clearSuccessSingular'
+              : 'stashManager.clearSuccessPlural',
+          variables: { count: String(reviewed.length) },
+        },
         () =>
           this.setState({
             reviewedStashShas: new Set<string>(),
@@ -527,34 +618,34 @@ export class StashManager extends React.Component<
     if (entry === undefined) {
       this.setState({
         confirmation: null,
-        error: 'That stash changed. Refresh and review the current list.',
+        error: { key: 'stashManager.stashChangedError' },
       })
       return
     }
 
     if (confirmation.kind === 'restore') {
       void this.runOperation(
-        'Restoring stash',
+        { key: 'stashManager.restoreOperation' },
         signal =>
           this.props.dispatcher.popStash(this.props.repository, entry, signal),
-        'Stash restored and removed. Resolve any Changes conflicts before continuing.',
+        { key: 'stashManager.restoreSuccess' },
         () => this.setState({ focusedStashSha: null })
       )
     } else if (confirmation.kind === 'discard') {
       void this.runOperation(
-        'Discarding stash',
+        { key: 'stashManager.discardOperation' },
         signal =>
           this.props.dispatcher.clearReviewedManagedStashes(
             this.props.repository,
             [entry.stashSha],
             signal
           ),
-        'Reviewed Desktop-managed stash discarded.',
+        { key: 'stashManager.discardSuccess' },
         () => this.setState({ focusedStashSha: null })
       )
     } else {
       void this.runOperation(
-        'Creating branch from stash',
+        { key: 'stashManager.createBranchOperation' },
         signal =>
           this.props.dispatcher.createBranchFromManagedStash(
             this.props.repository,
@@ -562,7 +653,7 @@ export class StashManager extends React.Component<
             this.state.newBranchName,
             signal
           ),
-        'New branch created and checked out. The stash was consumed only after a clean restore.',
+        { key: 'stashManager.createBranchSuccess' },
         () => this.setState({ focusedStashSha: null, editor: null })
       )
     }
@@ -588,8 +679,12 @@ export class StashManager extends React.Component<
         className="stash-manager-create"
         aria-labelledby="stash-create-heading"
       >
-        <h4 id="stash-create-heading">Create a named stash</h4>
-        <label htmlFor={StashNameInputId}>Name</label>
+        <h4 id="stash-create-heading">
+          {this.localized('stashManager.createHeading')}
+        </h4>
+        <label htmlFor={StashNameInputId}>
+          {this.localized('stashManager.nameLabel')}
+        </label>
         <input
           id={StashNameInputId}
           type="text"
@@ -597,10 +692,10 @@ export class StashManager extends React.Component<
           maxLength={120}
           disabled={busy}
           onChange={this.onCreateNameChanged}
-          placeholder="What are you saving?"
+          placeholder={this.accessibleText('stashManager.createPlaceholder')}
         />
         <fieldset disabled={busy}>
-          <legend>Changes to save</legend>
+          <legend>{this.localized('stashManager.changesToSave')}</legend>
           <label>
             <input
               type="radio"
@@ -609,7 +704,7 @@ export class StashManager extends React.Component<
               checked={this.state.createScope === 'all'}
               onChange={this.onCreateScopeChanged}
             />
-            All tracked changes
+            {this.localized('stashManager.allTrackedChanges')}
           </label>
           <label>
             <input
@@ -619,9 +714,12 @@ export class StashManager extends React.Component<
               checked={this.state.createScope === 'selected'}
               onChange={this.onCreateScopeChanged}
             />
-            {selectedCount === 1
-              ? '1 selected file'
-              : `${selectedCount} selected files`}
+            {this.localized(
+              selectedCount === 1
+                ? 'stashManager.selectedFileSingular'
+                : 'stashManager.selectedFilePlural',
+              { count: String(selectedCount) }
+            )}
           </label>
           <label>
             <input
@@ -629,23 +727,20 @@ export class StashManager extends React.Component<
               checked={this.state.includeUntracked}
               onChange={this.onIncludeUntrackedChanged}
             />
-            Include untracked files in this scope
+            {this.localized('stashManager.includeUntracked')}
           </label>
         </fieldset>
         <p className="stash-manager-caption">
-          Selected scope saves whole files and rechecks the selected paths
-          before Git runs. Partial-hunk staging is left in Changes.
+          {this.localized('stashManager.selectedScopeCaption')}
         </p>
         {untrackedWarning ? (
           <p className="stash-manager-warning" role="status">
-            Selected untracked files stay in Changes unless Include untracked is
-            checked.
+            {this.localized('stashManager.untrackedWarning')}
           </p>
         ) : null}
         {this.props.hasConflicts ? (
           <p className="stash-manager-warning" role="status">
-            Resolve the current working-tree conflicts before creating another
-            stash.
+            {this.localized('stashManager.conflictsWarning')}
           </p>
         ) : null}
         <Button
@@ -653,7 +748,7 @@ export class StashManager extends React.Component<
           disabled={createDisabled}
           onClick={this.createStash}
         >
-          Create named stash
+          {this.localized('stashManager.createAction')}
         </Button>
       </section>
     )
@@ -666,10 +761,13 @@ export class StashManager extends React.Component<
       this.props.selectedStashEntry?.stashSha === entry.stashSha
     const fileCount =
       entry.files.kind === StashedChangesLoadStates.Loaded
-        ? `${entry.files.files.length} ${
-            entry.files.files.length === 1 ? 'file' : 'files'
-          }`
-        : 'Files load when opened'
+        ? this.localized(
+            entry.files.files.length === 1
+              ? 'stashManager.fileCountSingular'
+              : 'stashManager.fileCountPlural',
+            { count: String(entry.files.files.length) }
+          )
+        : this.localized('stashManager.filesLoadWhenOpened')
     const busy = this.state.busyOperation !== null
 
     return (
@@ -681,7 +779,9 @@ export class StashManager extends React.Component<
             checked={this.state.reviewedStashShas.has(entry.stashSha)}
             disabled={busy}
             onChange={this.onReviewedChanged}
-            aria-label={`Review ${stashEntryTitle(entry)} for managed clear`}
+            aria-label={this.accessibleText('stashManager.reviewStashAria', {
+              name: stashEntryTitle(entry),
+            })}
           />
           <button
             type="button"
@@ -693,9 +793,18 @@ export class StashManager extends React.Component<
           >
             <span className="stash-manager-entry-title">
               {stashEntryTitle(entry)}
+              {!isDesktopManagedStash(entry) ? (
+                <span className="stash-manager-origin">
+                  {this.localized('stashManager.externalLabel')}
+                </span>
+              ) : null}
             </span>
             <span className="stash-manager-entry-meta">
-              {fileCount} · {formatManagedStashTimestamp(entry.createdAt)}
+              {fileCount} ·{' '}
+              {formatManagedStashTimestamp(
+                entry.createdAt,
+                this.state.languageMode
+              )}
             </span>
           </button>
           <Octicon
@@ -714,34 +823,39 @@ export class StashManager extends React.Component<
       <div
         className="stash-manager-focused-actions"
         role="group"
-        aria-label="Selected stash actions"
+        aria-label={this.accessibleText('stashManager.selectedActionsAria')}
       >
         {workingChanges > 0 ? (
           <p className="stash-manager-warning">
-            Changes already contains {workingChanges}{' '}
-            {workingChanges === 1 ? 'file' : 'files'}. Apply or restore may
-            conflict; a failed restore keeps the stash.
+            {this.localized(
+              workingChanges === 1
+                ? 'stashManager.workingChangesWarningSingular'
+                : 'stashManager.workingChangesWarningPlural',
+              { count: String(workingChanges) }
+            )}
           </p>
         ) : null}
         <div className="stash-manager-action-grid">
           <Button disabled={busy} onClick={this.applyFocused}>
-            Apply copy
+            {this.localized('stashManager.applyAction')}
           </Button>
           <Button disabled={busy} onClick={this.requestRestoreConfirmation}>
-            Restore
+            {this.localized('stashManager.restoreAction')}
           </Button>
-          <Button disabled={busy} onClick={this.beginMetadataEdit}>
-            Rename or move
-          </Button>
+          {isDesktopManagedStash(entry) ? (
+            <Button disabled={busy} onClick={this.beginMetadataEdit}>
+              {this.localized('stashManager.renameMoveAction')}
+            </Button>
+          ) : null}
           <Button disabled={busy} onClick={this.beginNewBranch}>
-            New branch
+            {this.localized('stashManager.newBranchAction')}
           </Button>
           <Button
             className="destructive stash-manager-danger-action"
             disabled={busy}
             onClick={this.requestDiscardConfirmation}
           >
-            Discard
+            {this.localized('stashManager.discardAction')}
           </Button>
         </div>
         {this.state.editor === 'metadata'
@@ -769,9 +883,13 @@ export class StashManager extends React.Component<
       <div
         className="stash-manager-editor"
         role="group"
-        aria-label={`Edit ${stashEntryTitle(entry)}`}
+        aria-label={this.accessibleText('stashManager.editStashAria', {
+          name: stashEntryTitle(entry),
+        })}
       >
-        <label htmlFor={StashMetadataNameInputId}>Name</label>
+        <label htmlFor={StashMetadataNameInputId}>
+          {this.localized('stashManager.nameLabel')}
+        </label>
         <input
           id={StashMetadataNameInputId}
           type="text"
@@ -780,7 +898,9 @@ export class StashManager extends React.Component<
           disabled={busy}
           onChange={this.onMetadataNameChanged}
         />
-        <label htmlFor={StashMetadataBranchInputId}>Branch association</label>
+        <label htmlFor={StashMetadataBranchInputId}>
+          {this.localized('stashManager.branchAssociation')}
+        </label>
         <input
           id={StashMetadataBranchInputId}
           type="text"
@@ -796,8 +916,7 @@ export class StashManager extends React.Component<
           ))}
         </datalist>
         <p className="stash-manager-caption">
-          This changes Desktop Material’s grouping only; it does not switch
-          branches or modify the saved files.
+          {this.localized('stashManager.metadataCaption')}
         </p>
         <div className="stash-manager-editor-actions">
           <Button
@@ -808,10 +927,10 @@ export class StashManager extends React.Component<
             }
             onClick={this.saveMetadata}
           >
-            Save details
+            {this.localized('stashManager.saveDetailsAction')}
           </Button>
           <Button disabled={busy} onClick={this.cancelInlineAction}>
-            Cancel
+            {this.localized('stashManager.cancelAction')}
           </Button>
         </div>
       </div>
@@ -824,9 +943,13 @@ export class StashManager extends React.Component<
       <div
         className="stash-manager-editor"
         role="group"
-        aria-label={`Branch from ${stashEntryTitle(entry)}`}
+        aria-label={this.accessibleText('stashManager.branchFromAria', {
+          name: stashEntryTitle(entry),
+        })}
       >
-        <label htmlFor={StashBranchInputId}>New local branch</label>
+        <label htmlFor={StashBranchInputId}>
+          {this.localized('stashManager.newLocalBranch')}
+        </label>
         <input
           id={StashBranchInputId}
           type="text"
@@ -836,18 +959,17 @@ export class StashManager extends React.Component<
           onChange={this.onNewBranchNameChanged}
         />
         <p className="stash-manager-caption">
-          Git validates that the branch is new, checks it out, and consumes the
-          stash only after its changes apply cleanly.
+          {this.localized('stashManager.branchCaption')}
         </p>
         <div className="stash-manager-editor-actions">
           <Button
             disabled={busy || this.state.newBranchName.trim().length === 0}
             onClick={this.requestBranchConfirmation}
           >
-            Review branch creation
+            {this.localized('stashManager.reviewBranchAction')}
           </Button>
           <Button disabled={busy} onClick={this.cancelInlineAction}>
-            Cancel
+            {this.localized('stashManager.cancelAction')}
           </Button>
         </div>
       </div>
@@ -862,14 +984,19 @@ export class StashManager extends React.Component<
     const reviewedCount = this.state.reviewedStashShas.size
     const content =
       confirmation.kind === 'restore'
-        ? 'Restore applies these changes and removes the stash only if Git finishes cleanly.'
+        ? this.localized('stashManager.confirmRestore')
         : confirmation.kind === 'discard'
-        ? 'Discard permanently removes this reviewed Desktop-managed stash.'
+        ? this.localized('stashManager.confirmDiscard')
         : confirmation.kind === 'branch'
-        ? `Create and check out “${this.state.newBranchName}” from this stash?`
-        : `Permanently clear ${reviewedCount} reviewed Desktop-managed ${
-            reviewedCount === 1 ? 'stash' : 'stashes'
-          }? Foreign Git stashes are never included.`
+        ? this.localized('stashManager.confirmBranch', {
+            name: this.state.newBranchName,
+          })
+        : this.localized(
+            reviewedCount === 1
+              ? 'stashManager.confirmClearSingular'
+              : 'stashManager.confirmClearPlural',
+            { count: String(reviewedCount) }
+          )
     return (
       <div className="stash-manager-confirmation" role="alert">
         <p>{content}</p>
@@ -878,9 +1005,15 @@ export class StashManager extends React.Component<
             className="destructive stash-manager-danger-action"
             onClick={this.confirmAction}
           >
-            {confirmation.kind === 'branch' ? 'Create branch' : 'Confirm'}
+            {this.localized(
+              confirmation.kind === 'branch'
+                ? 'stashManager.createBranchAction'
+                : 'stashManager.confirmAction'
+            )}
           </Button>
-          <Button onClick={this.cancelInlineAction}>Cancel</Button>
+          <Button onClick={this.cancelInlineAction}>
+            {this.localized('stashManager.cancelAction')}
+          </Button>
         </div>
       </div>
     )
@@ -897,7 +1030,9 @@ export class StashManager extends React.Component<
         aria-labelledby="stash-inventory-heading"
       >
         <div className="stash-manager-inventory-heading">
-          <h4 id="stash-inventory-heading">Repository stash inventory</h4>
+          <h4 id="stash-inventory-heading">
+            {this.localized('stashManager.inventoryHeading')}
+          </h4>
           <Button
             size="small"
             disabled={
@@ -906,12 +1041,14 @@ export class StashManager extends React.Component<
             }
             onClick={this.requestClearConfirmation}
           >
-            Clear reviewed ({this.state.reviewedStashShas.size})
+            {this.localized('stashManager.clearReviewedAction', {
+              count: String(this.state.reviewedStashShas.size),
+            })}
           </Button>
         </div>
         {groups.length === 0 ? (
           <p className="stash-manager-empty">
-            No Desktop-managed stashes in this repository.
+            {this.localized('stashManager.emptyInventory')}
           </p>
         ) : (
           groups.map(group => (
@@ -922,7 +1059,9 @@ export class StashManager extends React.Component<
               <h5>
                 <span>{group.branchName}</span>
                 {group.isCurrentBranch ? (
-                  <span className="current">Current</span>
+                  <span className="current">
+                    {this.localized('stashManager.currentLabel')}
+                  </span>
                 ) : null}
                 <span className="count">{group.entries.length}</span>
               </h5>
@@ -935,15 +1074,16 @@ export class StashManager extends React.Component<
           : null}
         <p className="stash-manager-caption">
           {this.props.foreignStashEntryCount === 0
-            ? 'No foreign Git stashes are shown or editable here.'
-            : `${this.props.foreignStashEntryCount} other Git ${
+            ? this.localized('stashManager.managedOnlyCaption')
+            : this.localized(
                 this.props.foreignStashEntryCount === 1
-                  ? 'stash is'
-                  : 'stashes are'
-              } present and will be left untouched.`}
+                  ? 'stashManager.externalCaptionSingular'
+                  : 'stashManager.externalCaptionPlural',
+                { count: String(this.props.foreignStashEntryCount) }
+              )}
           {this.props.stashInventoryTruncated
-            ? ' The inventory is limited to the newest 500 entries; refresh after clearing a reviewed batch.'
-            : ''}
+            ? this.localized('stashManager.truncatedCaption')
+            : null}
         </p>
       </section>
     )
@@ -957,19 +1097,27 @@ export class StashManager extends React.Component<
     return (
       <section
         className="stashed-changes-section stash-manager"
-        aria-label="Stash manager"
+        aria-label={this.accessibleText('stashManager.managerAria')}
         aria-busy={this.state.busyOperation !== null}
       >
         <div className="stashed-changes-header stash-manager-header">
           <Octicon className="stack-icon" symbol={StashIcon} />
           <span className="stash-manager-header-copy">
             <strong>
-              {count === 1 ? '1 managed stash' : `${count} managed stashes`}
+              {this.localized(
+                count === 1
+                  ? 'stashManager.repositoryStashSingular'
+                  : 'stashManager.repositoryStashPlural',
+                { count: String(count) }
+              )}
             </strong>
             <span>
               {this.props.branch === null
-                ? 'Check out a branch to create one'
-                : `${currentCount} on ${this.props.branch}`}
+                ? this.localized('stashManager.checkoutBranchCaption')
+                : this.localized('stashManager.onBranchCaption', {
+                    count: String(currentCount),
+                    branch: this.props.branch,
+                  })}
             </span>
           </span>
           <Button
@@ -978,7 +1126,11 @@ export class StashManager extends React.Component<
             ariaExpanded={this.state.expanded}
             ariaControls={StashManagerPanelId}
           >
-            {this.state.expanded ? 'Close' : 'Manage'}
+            {this.localized(
+              this.state.expanded
+                ? 'stashManager.closeAction'
+                : 'stashManager.manageAction'
+            )}
           </Button>
         </div>
         {this.state.expanded ? (
@@ -986,15 +1138,22 @@ export class StashManager extends React.Component<
             id={StashManagerPanelId}
             className="stash-manager-panel"
             role="region"
-            aria-label="Managed stash controls"
+            aria-label={this.accessibleText('stashManager.controlsAria')}
           >
             {this.renderCreateForm()}
             {this.renderInventory()}
             {this.state.busyOperation !== null ? (
               <div className="stash-manager-busy">
-                <span>{this.state.busyOperation}…</span>
+                <span>
+                  {this.localized('stashManager.operationProgress', {
+                    operation: translatedVariable(
+                      this.state.busyOperation.key,
+                      this.state.busyOperation.variables
+                    ),
+                  })}
+                </span>
                 <Button size="small" onClick={this.cancelOperation}>
-                  Cancel operation
+                  {this.localized('stashManager.cancelOperationAction')}
                 </Button>
               </div>
             ) : null}
@@ -1005,10 +1164,14 @@ export class StashManager extends React.Component<
             >
               {this.state.error !== null ? (
                 <p className="stash-manager-error" role="alert">
-                  {this.state.error}
+                  {typeof this.state.error === 'string'
+                    ? this.state.error
+                    : this.renderMessage(this.state.error)}
                 </p>
               ) : this.state.status !== null ? (
-                <p className="stash-manager-status">{this.state.status}</p>
+                <p className="stash-manager-status">
+                  {this.renderMessage(this.state.status)}
+                </p>
               ) : null}
             </div>
           </div>

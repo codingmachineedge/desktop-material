@@ -24,7 +24,7 @@ import {
 import { DiffParser } from '../diff-parser'
 import { getOldPathOrDefault } from '../get-old-path'
 import { readFile, writeFile, unlink } from 'fs/promises'
-import { getTempFilePath } from '../file-system'
+import { getTempFilePath, readPartialFile } from '../file-system'
 import { forceUnwrap } from '../fatal-error'
 import { git } from './core'
 import { NullTreeSHA } from './diff-index'
@@ -38,6 +38,7 @@ import { enableImagePreviewsForDDSFiles } from '../feature-flag'
 import { unstageAll } from './reset'
 import { stageFiles } from './update-index'
 import { isAbsolute } from 'path'
+import { convertTGAToPNG, MaxTGAFileBytes, TGAConversionError } from '../tga'
 
 /**
  * V8 has a limit on the size of string it can create (~256MB), and unless we want to
@@ -101,6 +102,7 @@ const imageFileExtensions = new Set([
   '.bmp',
   '.avif',
   '.svg',
+  '.tga',
 ])
 
 if (enableImagePreviewsForDDSFiles()) {
@@ -684,6 +686,23 @@ export async function convertDiff(
         }
   }
 
+  if (extension === '.tga') {
+    try {
+      return await getImageDiff(
+        repository,
+        file,
+        newestCommitish,
+        oldestCommitish
+      )
+    } catch (error) {
+      if (!(error instanceof TGAConversionError)) {
+        throw error
+      }
+      log.warn(`Unable to render TGA preview for ${file.path}`, error)
+      return { kind: DiffType.Binary }
+    }
+  }
+
   if (diff.isBinary) {
     // some extension we don't know how to parse, never mind
     if (!imageFileExtensions.has(extension)) {
@@ -898,8 +917,31 @@ export async function getBlobImage(
   path: string,
   commitish: string
 ): Promise<Image> {
-  const extension = Path.extname(path)
-  const contents = await getBlobContents(repository, commitish, path)
+  const extension = Path.extname(path).toLowerCase()
+  let contents: Buffer
+  if (extension === '.tga') {
+    const object = `${commitish}:${path}`
+    const { stdout } = await git(
+      ['cat-file', '-s', object],
+      repository.path,
+      'getBlobImageSize'
+    )
+    const size = Number(stdout.trim())
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new Error(`Invalid TGA blob size for ${object}`)
+    }
+    if (size > MaxTGAFileBytes) {
+      throw new TGAConversionError('oversized')
+    }
+    contents = await getBlobContents(repository, commitish, path)
+  } else {
+    contents = await getBlobContents(repository, commitish, path)
+  }
+
+  if (extension === '.tga') {
+    return getTGAImage(contents)
+  }
+
   return new Image(
     contents.buffer,
     contents.toString('base64'),
@@ -920,11 +962,31 @@ export async function getWorkingDirectoryImage(
   repository: Repository,
   file: FileChange
 ): Promise<Image> {
-  const contents = await readFile(Path.join(repository.path, file.path))
+  const extension = Path.extname(file.path).toLowerCase()
+  const fullPath = Path.join(repository.path, file.path)
+  const contents =
+    extension === '.tga'
+      ? await readPartialFile(fullPath, 0, MaxTGAFileBytes)
+      : await readFile(fullPath)
+
+  if (extension === '.tga') {
+    return getTGAImage(contents)
+  }
+
   return new Image(
     contents.buffer,
     contents.toString('base64'),
-    getMediaType(Path.extname(file.path)),
+    getMediaType(extension),
+    contents.length
+  )
+}
+
+function getTGAImage(contents: Buffer): Image {
+  const png = convertTGAToPNG(contents)
+  return new Image(
+    png.buffer,
+    png.toString('base64'),
+    'image/png',
     contents.length
   )
 }

@@ -16,7 +16,7 @@ const styles = readFileSync(
 
 describe('GitHub pull request lifecycle responsive styles', () => {
   it('bounds the workbench and scrolls inside the dialog', () => {
-    assert.match(styles, /width: min\(760px, calc\(100vw/)
+    assert.match(styles, /width: min\(1040px, calc\(100vw/)
     assert.match(styles, /max-height: calc\(100vh/)
     assert.match(styles, /overflow-x: hidden/)
     assert.match(styles, /\.dialog-content[\s\S]*?overflow-y: auto/)
@@ -34,6 +34,17 @@ describe('GitHub pull request lifecycle responsive styles', () => {
     assert.match(
       styles,
       /@media \(max-width: 440px\)[\s\S]*?\.dialog-footer \.button-group[\s\S]*?grid-template-columns: minmax\(0, 1fr\)[\s\S]*?width: 100%/
+    )
+  })
+
+  it('keeps workspace tabs and patches bounded inside the dialog', () => {
+    assert.match(
+      styles,
+      /\.github-pull-request-lifecycle-tabs[\s\S]*?overflow-x: auto/
+    )
+    assert.match(
+      styles,
+      /\.github-pull-request-lifecycle-file-list[\s\S]*?pre[\s\S]*?max-height: 320px[\s\S]*?overflow: auto/
     )
   })
 })

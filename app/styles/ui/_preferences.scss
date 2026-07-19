@@ -115,6 +115,41 @@
     .hooks-warning {
       margin-bottom: var(--spacing);
     }
+
+    .global-ignore-editor {
+      display: grid;
+      min-width: 0;
+      gap: var(--spacing);
+
+      h2,
+      p {
+        margin: 0;
+      }
+
+      > input,
+      textarea {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+      }
+
+      .global-ignore-rules {
+        min-height: 220px;
+        font-family: var(--font-family-monospace);
+        resize: vertical;
+      }
+
+      .global-ignore-starters,
+      .global-ignore-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-half);
+      }
+
+      .global-ignore-actions {
+        justify-content: flex-end;
+      }
+    }
   }
 
   // --- MD3 settings card (commit 12) -------------------------------------

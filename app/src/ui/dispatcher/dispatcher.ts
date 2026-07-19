@@ -23,6 +23,7 @@ import {
 import { shell } from '../../lib/app-shell'
 import {
   CompareAction,
+  HistoryScope,
   Foldout,
   FoldoutType,
   ICompareFormUpdate,
@@ -56,6 +57,12 @@ import {
   ISubtreeRemoteOptions,
   ISubtreeSplitOptions,
   IRemoteManagementApplyOptions,
+  ICreateTagLifecycleOptions,
+  IMoveTagLifecycleOptions,
+  IRemoteTagDeletionReview,
+  ITagLifecycleInventory,
+  ITagRefReview,
+  ITagPushReview,
   IRepositoryShallowHistoryFetchRequest,
 } from '../../lib/git'
 import { isGitOnPath } from '../../lib/is-git-on-path'
@@ -86,6 +93,7 @@ import type {
 import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { PullRequestLifecycleStore } from '../../lib/stores/pull-request-lifecycle-store'
+import { PullRequestCreationStore } from '../../lib/stores/pull-request-creation-store'
 import { getTipSha } from '../../lib/tip'
 import type {
   IAutomationSettingsOverrides,
@@ -93,13 +101,23 @@ import type {
 } from '../../lib/automation/automation-settings'
 import type { MergeAllMode } from '../../lib/automation/merge-all'
 import type {
+  IPullAllCandidate,
   PullAllProgressListener,
   IPullAllResult,
+  IRepositorySyncRequest,
 } from '../../lib/automation/pull-all'
 import type {
   CommitPushAllProgressListener,
   ICommitPushAllResult,
 } from '../../lib/automation/commit-push-all'
+import type {
+  IForkBranchCheckoutPlan,
+  IForkBranchCheckoutResult,
+  IForkNetworkBranch,
+  IForkNetworkBranchCatalog,
+  IForkNetworkCatalog,
+  IForkNetworkRepository,
+} from '../../lib/fork-network'
 
 import { Account } from '../../models/account'
 import { AppMenu, ExecutableMenuItem } from '../../models/app-menu'
@@ -248,6 +266,7 @@ import {
 import { ICreatedGitHubIssue } from '../../lib/github-issue'
 import {
   getGitHubPullRequestHead,
+  getGitHubPullRequestHeadRepository,
   GitHubPullRequestMergeMethod,
   GitHubPullRequestContextChangedError,
   ICreatedGitHubPullRequest,
@@ -260,6 +279,11 @@ import {
   IGitHubPullRequestUpdate,
   validateGitHubPullRequestNumber,
 } from '../../lib/github-pull-request'
+import { IGitHubPullRequestWorkspace } from '../../lib/github-pull-request-workspace'
+import {
+  IGitHubPullRequestCreationContext,
+  IGitHubPullRequestCreationMetadata,
+} from '../../lib/github-pull-request-creation'
 
 /**
  * An error handler function.
@@ -315,6 +339,7 @@ function settingsHistoryFilter(
 export class Dispatcher {
   private readonly errorHandlers = new Array<ErrorHandler>()
   private readonly pullRequestLifecycleStore = new PullRequestLifecycleStore()
+  private readonly pullRequestCreationStore = new PullRequestCreationStore()
   public incrementMetric: StatsStore['increment']
 
   public constructor(
@@ -1372,6 +1397,67 @@ export class Dispatcher {
     return this.appStore._deleteTag(repository, name)
   }
 
+  /** Load the local tag inventory and, when requested, the default remote. */
+  public getTagLifecycleInventory(
+    repository: Repository,
+    includeRemote: boolean
+  ): Promise<ITagLifecycleInventory> {
+    return this.appStore._getTagLifecycleInventory(repository, includeRemote)
+  }
+
+  /** Create a lightweight, annotated, or signed annotated tag. */
+  public createLifecycleTag(
+    repository: Repository,
+    options: ICreateTagLifecycleOptions
+  ): Promise<boolean> {
+    return this.appStore._createLifecycleTag(repository, options)
+  }
+
+  /** Move/recreate a tag after an explicit, stale-safe review. */
+  public moveLifecycleTag(
+    repository: Repository,
+    options: IMoveTagLifecycleOptions
+  ): Promise<boolean> {
+    return this.appStore._moveLifecycleTag(repository, options)
+  }
+
+  /** Delete a local tag only if its exact reviewed object still matches. */
+  public deleteReviewedLifecycleTag(
+    repository: Repository,
+    review: ITagRefReview
+  ): Promise<boolean> {
+    return this.appStore._deleteReviewedLifecycleTag(repository, review)
+  }
+
+  /** Push one or more exact reviewed local tag objects. */
+  public pushLifecycleTags(
+    repository: Repository,
+    reviews: ReadonlyArray<ITagPushReview>
+  ): Promise<boolean> {
+    return this.appStore._pushLifecycleTags(repository, reviews)
+  }
+
+  /** Fetch tags, optionally pruning local tags missing from the remote. */
+  public fetchLifecycleTags(
+    repository: Repository,
+    prune: boolean,
+    reviewedLocalTags: ReadonlyArray<ITagRefReview>
+  ): Promise<boolean> {
+    return this.appStore._fetchLifecycleTags(
+      repository,
+      prune,
+      reviewedLocalTags
+    )
+  }
+
+  /** Delete a reviewed remote tag only if its exact object still matches. */
+  public deleteRemoteLifecycleTag(
+    repository: Repository,
+    review: IRemoteTagDeletionReview
+  ): Promise<boolean> {
+    return this.appStore._deleteRemoteLifecycleTag(repository, review)
+  }
+
   /**
    * Show the tag creation dialog.
    */
@@ -1411,6 +1497,52 @@ export class Dispatcher {
     strategy?: UncommittedChangesStrategy
   ): Promise<Repository> {
     return this.appStore._checkoutBranch(repository, branch, strategy)
+  }
+
+  /** Discover a bounded set of other forks for the selected repository. */
+  public loadForkNetworkRepositories(
+    repository: Repository,
+    signal?: AbortSignal
+  ): Promise<IForkNetworkCatalog> {
+    return this.appStore._loadForkNetworkRepositories(repository, signal)
+  }
+
+  /** Discover exact branch heads for one reviewed fork identity. */
+  public loadForkNetworkBranches(
+    repository: Repository,
+    catalog: IForkNetworkCatalog,
+    fork: IForkNetworkRepository,
+    signal?: AbortSignal
+  ): Promise<IForkNetworkBranchCatalog> {
+    return this.appStore._loadForkNetworkBranches(
+      repository,
+      catalog,
+      fork,
+      signal
+    )
+  }
+
+  /** Build the non-mutating confirmation for one exact fork branch head. */
+  public reviewForkBranchCheckout(
+    repository: Repository,
+    catalog: IForkNetworkBranchCatalog,
+    branch: IForkNetworkBranch,
+    localBranchName: string
+  ): Promise<IForkBranchCheckoutPlan> {
+    return this.appStore._reviewForkBranchCheckout(
+      repository,
+      catalog,
+      branch,
+      localBranchName
+    )
+  }
+
+  /** Apply one exact, revalidated fork-branch checkout plan. */
+  public checkoutReviewedForkBranch(
+    repository: Repository,
+    plan: IForkBranchCheckoutPlan
+  ): Promise<IForkBranchCheckoutResult> {
+    return this.appStore._checkoutReviewedForkBranch(repository, plan)
   }
 
   /** Check out the given commit. */
@@ -1512,6 +1644,19 @@ export class Dispatcher {
     onProgress?: PullAllProgressListener
   ): Promise<ReadonlyArray<IPullAllResult>> {
     return this.appStore._pullAllRepositories(onProgress)
+  }
+
+  public getRepositorySyncCandidates(): Promise<
+    ReadonlyArray<IPullAllCandidate>
+  > {
+    return this.appStore._getRepositorySyncCandidates()
+  }
+
+  public syncRepositories(
+    request: IRepositorySyncRequest,
+    onProgress?: PullAllProgressListener
+  ): Promise<ReadonlyArray<IPullAllResult>> {
+    return this.appStore._syncRepositories(request, onProgress)
   }
 
   /**
@@ -1773,6 +1918,17 @@ export class Dispatcher {
     branch: Branch
   ): Promise<void> {
     return this.appStore._deleteBranch(repository, branch)
+  }
+
+  public deleteReviewedBranches(
+    repository: Repository,
+    reviewedBranches: ReadonlyArray<
+      import('../../lib/git').IReviewedBranchDeletion
+    >
+  ): Promise<
+    ReadonlyArray<import('../../lib/git').IReviewedBranchDeletionResult>
+  > {
+    return this.appStore._deleteReviewedBranches(repository, reviewedBranches)
   }
 
   /** Discard the changes to the given files. */
@@ -4169,6 +4325,11 @@ export class Dispatcher {
     return this.appStore._executeCompare(repository, action)
   }
 
+  /** Choose which refs populate the normal History view. */
+  public setHistoryScope(repository: Repository, scope: HistoryScope) {
+    return this.appStore._setHistoryScope(repository, scope)
+  }
+
   /** Update the compare form state for the current repository */
   public updateCompareForm<K extends keyof ICompareFormUpdate>(
     repository: Repository,
@@ -4677,6 +4838,7 @@ export class Dispatcher {
     providerHTMLURL: string,
     contextVersion: string,
     draft: IGitHubPullRequestDraft,
+    metadata: IGitHubPullRequestCreationMetadata,
     signal: AbortSignal
   ): Promise<ICreatedGitHubPullRequest> {
     if (
@@ -4724,16 +4886,84 @@ export class Dispatcher {
       throw new GitHubPullRequestContextChangedError()
     }
 
-    return API.fromAccount(account).createPullRequest(
-      target.owner.login,
-      target.name,
-      draft.title,
-      draft.body,
-      draft.head,
-      draft.base,
-      draft.draft,
+    if (
+      !this.appStore._isGitHubPullRequestContextCurrent(
+        repository,
+        contextVersion
+      )
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    return this.pullRequestCreationStore.create(
+      target,
+      account,
+      draft,
+      getGitHubPullRequestHeadRepository(source, target),
+      metadata,
       signal
     )
+  }
+
+  /** Load templates and provider-backed choices for one exact creation route. */
+  public async inspectGitHubPullRequestCreation(
+    repository: Repository,
+    target: GitHubRepository,
+    account: Account,
+    currentBranch: Branch,
+    sourceRemote: IRemote | null,
+    providerHTMLURL: string,
+    contextVersion: string,
+    base: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestCreationContext> {
+    if (
+      !this.appStore._isGitHubPullRequestContextCurrent(
+        repository,
+        contextVersion
+      ) ||
+      !isRepositoryWithGitHubRepository(repository)
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    const source = repository.gitHubRepository
+    if (
+      providerHTMLURL !== getHTMLURL(source.endpoint) ||
+      (target.hash !== source.hash && target.hash !== source.parent?.hash) ||
+      target.endpoint !== source.endpoint
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (
+      target.isArchived ||
+      account.provider !== 'github' ||
+      account.token.length === 0 ||
+      account.endpoint !== target.endpoint
+    ) {
+      throw new Error('Pull request creation metadata is unavailable.')
+    }
+    const head = getGitHubPullRequestHead(
+      source,
+      target,
+      currentBranch,
+      sourceRemote,
+      providerHTMLURL
+    )
+    const context = await this.pullRequestCreationStore.inspect(
+      target,
+      account,
+      base,
+      head,
+      signal
+    )
+    if (
+      !this.appStore._isGitHubPullRequestContextCurrent(
+        repository,
+        contextVersion
+      )
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    return context
   }
 
   private getGitHubPullRequestLifecycleTarget(
@@ -4783,6 +5013,28 @@ export class Dispatcher {
     )
   }
 
+  public inspectGitHubPullRequestWorkspace(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestWorkspace> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      false
+    )
+    return this.pullRequestLifecycleStore.inspectWorkspace(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      signal
+    )
+  }
+
   public async updateGitHubPullRequest(
     repository: Repository,
     pullRequest: PullRequest,
@@ -4803,6 +5055,32 @@ export class Dispatcher {
       pullRequest.pullRequestNumber,
       expectedHeadSHA,
       update,
+      signal
+    )
+    void this.appStore._refreshPullRequests(repository)
+    return receipt
+  }
+
+  public async setGitHubPullRequestState(
+    repository: Repository,
+    pullRequest: PullRequest,
+    account: Account,
+    expectedHeadSHA: string,
+    state: 'open' | 'closed',
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    const target = this.getGitHubPullRequestLifecycleTarget(
+      repository,
+      pullRequest,
+      account,
+      true
+    )
+    const receipt = await this.pullRequestLifecycleStore.setState(
+      target,
+      account,
+      pullRequest.pullRequestNumber,
+      expectedHeadSHA,
+      state,
       signal
     )
     void this.appStore._refreshPullRequests(repository)

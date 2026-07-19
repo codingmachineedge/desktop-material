@@ -3,10 +3,21 @@ import * as React from 'react'
 import {
   GuidedPatchSessionOperation,
   ICLICommandOutputEvent,
-  ICLICommandRequest,
   ICLICommandStateEvent,
+  ICLIWorkbenchOperationRequest,
 } from '../../lib/cli-workbench'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+  translatedVariable,
+  translateForAccessibleName,
+  TranslationKey,
+  TranslationVariables,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { Button } from '../lib/button'
+import { LocalizedText } from '../lib/localized-text'
 import { showOpenDialogMultiple, showSaveDialog } from '../main-process-proxy'
 import {
   IRepositoryPatchExportRequest,
@@ -32,7 +43,7 @@ type PatchSeriesPhase =
   | 'failed'
 
 interface IPatchSeriesClient {
-  readonly start: (request: ICLICommandRequest) => Promise<void>
+  readonly start: (request: ICLIWorkbenchOperationRequest) => Promise<void>
   readonly cancel: (id: string) => Promise<boolean>
   readonly onOutput: (
     handler: (output: ICLICommandOutputEvent) => void
@@ -59,9 +70,16 @@ interface IRepositoryPatchSeriesState {
   readonly exportRequest: IRepositoryPatchExportRequest | null
   readonly importRequest: IRepositoryPatchImportRequest | null
   readonly output: string
-  readonly status: string
-  readonly error: string | null
+  readonly status: IPatchSeriesMessage
+  readonly error: IPatchSeriesMessage | null
   readonly recoveryAvailable: boolean
+  readonly languageMode: LanguageMode
+}
+
+interface IPatchSeriesMessage {
+  readonly key?: TranslationKey
+  readonly variables?: TranslationVariables
+  readonly raw?: string
 }
 
 let nextPatchSeriesSequence = 0
@@ -70,20 +88,20 @@ function appendOutput(current: string, value: string): string {
   return `${current}${value}`.slice(-MaxPatchOutput)
 }
 
-function runningPhaseLabel(phase: PatchSeriesPhase): string {
+function runningPhaseKey(phase: PatchSeriesPhase): TranslationKey {
   switch (phase) {
     case 'running-export':
-      return 'Exporting commits ahead of the configured upstream'
+      return 'patchSeries.runningExport'
     case 'running-import':
-      return 'Applying the reviewed patch series'
+      return 'patchSeries.runningImport'
     case 'running-continue':
-      return 'Continuing the current patch session'
+      return 'patchSeries.runningContinue'
     case 'running-skip':
-      return 'Skipping the current patch'
+      return 'patchSeries.runningSkip'
     case 'running-abort':
-      return 'Aborting the current patch session'
+      return 'patchSeries.runningAbort'
     default:
-      return 'Patch-series operation'
+      return 'patchSeries.operation'
   }
 }
 
@@ -105,20 +123,27 @@ export class RepositoryPatchSeries extends React.Component<
     this.state = this.initialState()
   }
 
-  private initialState(): IRepositoryPatchSeriesState {
+  private initialState(
+    languageMode: LanguageMode = getPersistedLanguageMode()
+  ): IRepositoryPatchSeriesState {
     return {
       phase: 'idle',
       exportRequest: null,
       importRequest: null,
       output: '',
-      status: 'Choose an export or import operation.',
+      status: { key: 'patchSeries.initialStatus' },
       error: null,
       recoveryAvailable: false,
+      languageMode,
     }
   }
 
   public componentDidMount() {
     this.mounted = true
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     this.subscribe(this.props.client)
   }
 
@@ -137,11 +162,15 @@ export class RepositoryPatchSeries extends React.Component<
       this.subscribe(this.props.client)
     }
     this.props.onBusyChanged(false)
-    this.setState(this.initialState())
+    this.setState(this.initialState(this.state.languageMode))
   }
 
   public componentWillUnmount() {
     this.mounted = false
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     this.repositoryGeneration++
     this.unsubscribeOutput?.()
     this.unsubscribeState?.()
@@ -149,6 +178,30 @@ export class RepositoryPatchSeries extends React.Component<
     this.unsubscribeState = null
     this.cancelRun()
   }
+
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
+    }
+  }
+
+  private message(message: IPatchSeriesMessage): React.ReactNode {
+    return message.key === undefined ? (
+      message.raw ?? null
+    ) : (
+      <LocalizedText
+        translationKey={message.key}
+        variables={message.variables}
+        languageMode={this.state.languageMode}
+      />
+    )
+  }
+
+  private aria = (key: TranslationKey, variables: TranslationVariables = {}) =>
+    translateForAccessibleName(key, variables, this.state.languageMode)
 
   private subscribe(client: IPatchSeriesClient) {
     this.unsubscribeOutput = client.onOutput(this.onOutput)
@@ -189,7 +242,7 @@ export class RepositoryPatchSeries extends React.Component<
       const destination = this.props.chooseExportDestination
         ? await this.props.chooseExportDestination(defaultPath)
         : await showSaveDialog({
-            title: 'Choose a new patch-series folder',
+            title: this.aria('patchSeries.chooseExportTitle'),
             defaultPath,
           })
       if (destination === null || !this.isCurrentRepository(path, generation)) {
@@ -203,7 +256,7 @@ export class RepositoryPatchSeries extends React.Component<
           exportRequest,
           importRequest: null,
           output: '',
-          status: 'Review the new export folder.',
+          status: { key: 'patchSeries.reviewExportStatus' },
           error: null,
           recoveryAvailable: false,
         },
@@ -215,9 +268,9 @@ export class RepositoryPatchSeries extends React.Component<
           phase: 'failed',
           error:
             error instanceof Error
-              ? error.message
-              : 'Unable to prepare the patch-series export.',
-          status: 'Patch export preparation failed.',
+              ? { raw: error.message }
+              : { key: 'patchSeries.prepareExportError' },
+          status: { key: 'patchSeries.prepareExportFailed' },
         })
       }
     }
@@ -233,9 +286,14 @@ export class RepositoryPatchSeries extends React.Component<
       const patchPaths = this.props.choosePatchFiles
         ? await this.props.choosePatchFiles()
         : await showOpenDialogMultiple({
-            title: 'Choose patch files in apply order',
+            title: this.aria('patchSeries.chooseImportTitle'),
             properties: ['openFile', 'multiSelections'],
-            filters: [{ name: 'Git patch series', extensions: ['patch'] }],
+            filters: [
+              {
+                name: this.aria('patchSeries.patchFileFilter'),
+                extensions: ['patch'],
+              },
+            ],
           })
       if (
         patchPaths.length === 0 ||
@@ -251,7 +309,7 @@ export class RepositoryPatchSeries extends React.Component<
           exportRequest: null,
           importRequest,
           output: '',
-          status: 'Review the selected patch order.',
+          status: { key: 'patchSeries.reviewImportStatus' },
           error: null,
           recoveryAvailable: false,
         },
@@ -263,9 +321,9 @@ export class RepositoryPatchSeries extends React.Component<
           phase: 'failed',
           error:
             error instanceof Error
-              ? error.message
-              : 'Unable to prepare the patch-series import.',
-          status: 'Patch import preparation failed.',
+              ? { raw: error.message }
+              : { key: 'patchSeries.prepareImportError' },
+          status: { key: 'patchSeries.prepareImportFailed' },
         })
       }
     }
@@ -279,7 +337,7 @@ export class RepositoryPatchSeries extends React.Component<
     const request = this.state.exportRequest
     if (request !== null) {
       void this.start('running-export', {
-        kind: 'repository-patch-export',
+        id: 'patch-export',
         destination: request.destination,
       })
     }
@@ -289,7 +347,7 @@ export class RepositoryPatchSeries extends React.Component<
     const request = this.state.importRequest
     if (request !== null) {
       void this.start('running-import', {
-        kind: 'repository-patch-import',
+        id: 'patch-import',
         patchPaths: request.patchPaths,
       })
     }
@@ -310,7 +368,7 @@ export class RepositoryPatchSeries extends React.Component<
   private startPatchSession(operation: GuidedPatchSessionOperation) {
     const phase = `running-${operation}` as const
     this.setBusy(true)
-    return this.start(phase, { kind: 'repository-patch-session', operation })
+    return this.start(phase, { id: 'patch-session', operation })
   }
 
   private async start(
@@ -320,7 +378,7 @@ export class RepositoryPatchSeries extends React.Component<
       | 'running-continue'
       | 'running-skip'
       | 'running-abort',
-    recipe: ICLICommandRequest['recipe']
+    operation: ICLIWorkbenchOperationRequest['operation']
   ) {
     if (this.runId !== null || !this.mounted) {
       return
@@ -329,18 +387,26 @@ export class RepositoryPatchSeries extends React.Component<
     this.runId = id
     this.runPhase = phase
     this.cancelRequested = false
-    const label = runningPhaseLabel(phase)
+    const labelKey = runningPhaseKey(phase)
+    const variables = { operation: translatedVariable(labelKey) }
     this.setState(state => ({
       phase,
-      status: `${label}…`,
+      status: { key: 'patchSeries.runningStatus', variables },
       error: null,
-      output: appendOutput(state.output, `${label}…\n`),
+      output: appendOutput(
+        state.output,
+        `${translate(
+          'patchSeries.runningStatus',
+          state.languageMode,
+          variables
+        )}\n`
+      ),
     }))
     try {
       await this.props.client.start({
         id,
         repositoryPath: this.props.repositoryPath,
-        recipe,
+        operation,
         confirmed: true,
       })
     } catch (error) {
@@ -349,11 +415,11 @@ export class RepositoryPatchSeries extends React.Component<
         this.setBusy(false)
         this.setState({
           phase: 'failed',
-          status: 'Unable to start the patch-series operation.',
+          status: { key: 'patchSeries.startError' },
           error:
             error instanceof Error
-              ? error.message
-              : 'Unable to start the patch-series operation.',
+              ? { raw: error.message }
+              : { key: 'patchSeries.startError' },
           recoveryAvailable:
             phase !== 'running-export' && phase !== 'running-import',
         })
@@ -386,7 +452,7 @@ export class RepositoryPatchSeries extends React.Component<
       this.setBusy(false)
       this.setState({
         phase: 'cancelled',
-        status: 'Patch-series operation cancelled.',
+        status: { key: 'patchSeries.cancelledStatus' },
         error: null,
         recoveryAvailable: phase !== 'running-export',
       })
@@ -396,12 +462,21 @@ export class RepositoryPatchSeries extends React.Component<
       this.setBusy(false)
       this.setState({
         phase: 'failed',
-        status: `${runningPhaseLabel(phase)} failed.`,
+        status: {
+          key: 'patchSeries.failedStatus',
+          variables: {
+            operation: translatedVariable(runningPhaseKey(phase)),
+          },
+        },
         error:
-          event.error ??
-          `Git could not complete this operation${
-            event.exitCode === null ? '' : ` (exit ${event.exitCode})`
-          }.`,
+          event.error !== undefined
+            ? { raw: event.error }
+            : event.exitCode === null
+            ? { key: 'patchSeries.gitFailed' }
+            : {
+                key: 'patchSeries.gitFailedWithCode',
+                variables: { code: String(event.exitCode) },
+              },
         recoveryAvailable: phase !== 'running-export',
       })
       return
@@ -410,7 +485,10 @@ export class RepositoryPatchSeries extends React.Component<
   }
 
   private async refreshAfterSuccess(phase: PatchSeriesPhase) {
-    this.setState({ phase: 'refreshing', status: 'Refreshing repository…' })
+    this.setState({
+      phase: 'refreshing',
+      status: { key: 'patchSeries.refreshingStatus' },
+    })
     try {
       await this.props.onRefreshRepository()
       if (this.mounted) {
@@ -419,10 +497,10 @@ export class RepositoryPatchSeries extends React.Component<
           phase: 'completed',
           status:
             phase === 'running-export'
-              ? 'Patch series exported to a new folder.'
+              ? { key: 'patchSeries.exportedStatus' }
               : phase === 'running-abort'
-              ? 'Patch session aborted and repository state restored.'
-              : 'Patch-series operation completed.',
+              ? { key: 'patchSeries.abortedStatus' }
+              : { key: 'patchSeries.completedStatus' },
           error: null,
           recoveryAvailable: false,
         })
@@ -432,8 +510,8 @@ export class RepositoryPatchSeries extends React.Component<
         this.setBusy(false)
         this.setState({
           phase: 'failed',
-          status: 'The patch operation completed, but refresh failed.',
-          error: 'Refresh the repository before starting another operation.',
+          status: { key: 'patchSeries.refreshFailedStatus' },
+          error: { key: 'patchSeries.refreshRequiredError' },
           recoveryAvailable: false,
         })
       }
@@ -451,7 +529,7 @@ export class RepositoryPatchSeries extends React.Component<
 
   private onGoBack = () => {
     this.setBusy(false)
-    this.setState(this.initialState())
+    this.setState(this.initialState(this.state.languageMode))
   }
 
   private renderConfirmation() {
@@ -468,21 +546,38 @@ export class RepositoryPatchSeries extends React.Component<
           aria-describedby="repository-patch-export-description"
         >
           <strong id="repository-patch-export-title">
-            Export commits ahead of upstream?
+            <LocalizedText
+              translationKey="patchSeries.exportConfirmTitle"
+              languageMode={this.state.languageMode}
+            />
           </strong>
           <p id="repository-patch-export-description">
-            Git will create a new numbered patch-series folder at{' '}
-            <span>{request.destination}</span>. Existing destinations are never
-            replaced.
+            <LocalizedText
+              translationKey="patchSeries.exportConfirmDescription"
+              variables={{ destination: request.destination }}
+              languageMode={this.state.languageMode}
+            />
           </p>
           <div className="repository-tool-controls">
             <Button
+              ariaLabel={this.aria('patchSeries.exportAction')}
               onButtonRef={this.onConfirmButtonRef}
               onClick={this.onConfirmExport}
             >
-              Export patch series
+              <LocalizedText
+                translationKey="patchSeries.exportAction"
+                languageMode={this.state.languageMode}
+              />
             </Button>
-            <Button onClick={this.onGoBack}>Go back</Button>
+            <Button
+              ariaLabel={this.aria('patchSeries.goBack')}
+              onClick={this.onGoBack}
+            >
+              <LocalizedText
+                translationKey="patchSeries.goBack"
+                languageMode={this.state.languageMode}
+              />
+            </Button>
           </div>
         </div>
       )
@@ -501,11 +596,17 @@ export class RepositoryPatchSeries extends React.Component<
           aria-describedby="repository-patch-import-description"
         >
           <strong id="repository-patch-import-title">
-            Apply {request.patchPaths.length} patches in this order?
+            <LocalizedText
+              translationKey="patchSeries.importConfirmTitle"
+              variables={{ count: String(request.patchPaths.length) }}
+              languageMode={this.state.languageMode}
+            />
           </strong>
           <p id="repository-patch-import-description">
-            Git will create commits with three-way fallback. Resolve any
-            conflict in Changes, then continue, skip, or abort here.
+            <LocalizedText
+              translationKey="patchSeries.importConfirmDescription"
+              languageMode={this.state.languageMode}
+            />
           </p>
           <ol className="repository-patch-file-list">
             {request.patchPaths.slice(0, 20).map(path => (
@@ -513,16 +614,34 @@ export class RepositoryPatchSeries extends React.Component<
             ))}
           </ol>
           {request.patchPaths.length > 20 && (
-            <p>{request.patchPaths.length - 20} additional patches selected.</p>
+            <p>
+              <LocalizedText
+                translationKey="patchSeries.additionalPatches"
+                variables={{ count: String(request.patchPaths.length - 20) }}
+                languageMode={this.state.languageMode}
+              />
+            </p>
           )}
           <div className="repository-tool-controls">
             <Button
+              ariaLabel={this.aria('patchSeries.importAction')}
               onButtonRef={this.onConfirmButtonRef}
               onClick={this.onConfirmImport}
             >
-              Apply patch series
+              <LocalizedText
+                translationKey="patchSeries.importAction"
+                languageMode={this.state.languageMode}
+              />
             </Button>
-            <Button onClick={this.onGoBack}>Go back</Button>
+            <Button
+              ariaLabel={this.aria('patchSeries.goBack')}
+              onClick={this.onGoBack}
+            >
+              <LocalizedText
+                translationKey="patchSeries.goBack"
+                languageMode={this.state.languageMode}
+              />
+            </Button>
           </div>
         </div>
       )
@@ -538,16 +657,42 @@ export class RepositoryPatchSeries extends React.Component<
       <div
         className="repository-patch-recovery"
         role="group"
-        aria-label="Patch conflict recovery"
+        aria-label={this.aria('patchSeries.recoveryAria')}
       >
         <p>
-          After resolving files in Changes, continue this patch, skip it, or
-          abort the complete import.
+          <LocalizedText
+            translationKey="patchSeries.recoveryDescription"
+            languageMode={this.state.languageMode}
+          />
         </p>
         <div className="repository-tool-controls">
-          <Button onClick={this.onContinue}>Continue</Button>
-          <Button onClick={this.onSkip}>Skip patch</Button>
-          <Button onClick={this.onAbort}>Abort import</Button>
+          <Button
+            ariaLabel={this.aria('patchSeries.continueAction')}
+            onClick={this.onContinue}
+          >
+            <LocalizedText
+              translationKey="patchSeries.continueAction"
+              languageMode={this.state.languageMode}
+            />
+          </Button>
+          <Button
+            ariaLabel={this.aria('patchSeries.skipAction')}
+            onClick={this.onSkip}
+          >
+            <LocalizedText
+              translationKey="patchSeries.skipAction"
+              languageMode={this.state.languageMode}
+            />
+          </Button>
+          <Button
+            ariaLabel={this.aria('patchSeries.abortAction')}
+            onClick={this.onAbort}
+          >
+            <LocalizedText
+              translationKey="patchSeries.abortAction"
+              languageMode={this.state.languageMode}
+            />
+          </Button>
         </div>
       </div>
     )
@@ -555,34 +700,65 @@ export class RepositoryPatchSeries extends React.Component<
 
   public render() {
     const running = this.runId !== null
+    const languageMode = this.state.languageMode
     return (
       <section
         className="repository-tools-category repository-patch-series"
         aria-labelledby="repository-patch-series-title"
       >
-        <h2 id="repository-patch-series-title">Patch series</h2>
+        <h2 id="repository-patch-series-title">
+          <LocalizedText
+            translationKey="patchSeries.title"
+            languageMode={languageMode}
+          />
+        </h2>
         <article className="repository-tool-card repository-patch-card">
           <div>
-            <h3>Exchange reviewable commit series</h3>
+            <h3>
+              <LocalizedText
+                translationKey="patchSeries.heading"
+                languageMode={languageMode}
+              />
+            </h3>
             <p>
-              Export commits ahead of the configured upstream, or apply a
-              native-picker selection of numbered patches in reviewed order.
+              <LocalizedText
+                translationKey="patchSeries.description"
+                languageMode={languageMode}
+              />
             </p>
           </div>
           <div className="repository-tool-controls">
             <Button
+              ariaLabel={this.aria('patchSeries.chooseExportAction')}
               disabled={this.props.disabled || running}
               onClick={this.chooseExport}
             >
-              Choose export destination
+              <LocalizedText
+                translationKey="patchSeries.chooseExportAction"
+                languageMode={languageMode}
+              />
             </Button>
             <Button
+              ariaLabel={this.aria('patchSeries.chooseImportAction')}
               disabled={this.props.disabled || running}
               onClick={this.chooseImport}
             >
-              Choose patch files
+              <LocalizedText
+                translationKey="patchSeries.chooseImportAction"
+                languageMode={languageMode}
+              />
             </Button>
-            {running && <Button onClick={this.onCancel}>Cancel</Button>}
+            {running && (
+              <Button
+                ariaLabel={this.aria('patchSeries.cancelAction')}
+                onClick={this.onCancel}
+              >
+                <LocalizedText
+                  translationKey="patchSeries.cancelAction"
+                  languageMode={languageMode}
+                />
+              </Button>
+            )}
           </div>
         </article>
         {this.renderConfirmation()}
@@ -592,18 +768,18 @@ export class RepositoryPatchSeries extends React.Component<
           role="status"
           aria-live="polite"
         >
-          {this.state.status}
+          {this.message(this.state.status)}
         </div>
         {this.state.error !== null && (
           <p className="repository-tools-error" role="alert">
-            {this.state.error}
+            {this.message(this.state.error)}
           </p>
         )}
         {this.state.output.length > 0 && (
           <pre
             className="repository-tools-output"
             role="log"
-            aria-label="Patch-series results"
+            aria-label={this.aria('patchSeries.resultsAria')}
           >
             {this.state.output}
           </pre>

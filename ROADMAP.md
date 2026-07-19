@@ -2,10 +2,26 @@
 
 Updated: **July 19, 2026**
 
-Desktop Material's feature roadmap is complete through **M19**, plus the
-**M20 platform wave** below. This file is the compact public source of truth;
+Desktop Material's feature roadmap is complete through the **M21 advanced
+workflow wave** below. This file is the compact public source of truth;
 implementation details and historical test receipts stay in
 [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
+
+## M21 — Advanced workflow completeness (July 19, 2026) — **Complete**
+
+- Exact account/repository identity, scalable repository and branch switching,
+  reviewed multi-repository sync, and current-branch/all-ref history discovery.
+- Native pull-request review and creation, activity notifications, rich checks
+  and metadata context, plus exact fork branch/commit checkout.
+- Selective, named, and external stash interoperability alongside complete
+  reviewed tag lifecycle management.
+- Changed-file trees, persisted diff context, structured CSV/TSV comparison,
+  TGA preview, broader editor discovery, WSL/network paths, global ignores,
+  allowlisted Git command presets, patch import/export, and guarded bulk branch
+  deletion.
+- Live GitHub Projects with bounded last-known-good offline cache behavior and
+  explicit stale/error states. All 30 source demands are mapped in the
+  [feature ledger](docs/features/github-desktop-demand-backlog.md).
 
 ## M20 — Platform wave (July 17–18, 2026) — **Complete**
 
@@ -64,6 +80,8 @@ shipped.
 | **M17** | **Complete** | GitLab, Bitbucket, and self-hosted GitLab accounts, clone browsing, and provider routing. |
 | **M18** | **Complete** | Material Design 3 shell, responsive layouts, keyboard focus, accessibility, and clipping coverage. |
 | **M19** | **Complete** | Guided Git/GitHub/provider parity: PR lifecycle, Releases, Issues, rules, patch series, commit rewrite, signing, LFS, worktrees, remotes, hooks, bisect, and triage. |
+| **M20** | **Complete** | Secure LAN agent access, provider inbox and Releases depth, submodule workflows, Material context menus, compact-surface fixes, and refreshed gallery evidence. |
+| **M21** | **Complete** | Thirty demand-backed identity, PR, stash/tag, navigation, diff, integration, and Projects workflow closures with bounded safety contracts. |
 
 The completed milestone waves remain shipped. The temporary-submodule
 navigation and CI/release hardening items below completed local acceptance and

@@ -1130,6 +1130,11 @@ export class RepositoryView extends React.Component<
           onOpenSubmoduleManager={this.onOpenSubmoduleManager}
           subtreeCount={this.state.subtreeCount}
           onOpenSubtreeManager={this.onOpenSubtreeManager}
+          tagLifecycleDispatcher={this.props.dispatcher}
+          githubProjects={{
+            repository: this.props.repository,
+            accounts: this.props.accounts,
+          }}
           cheapLfs={{
             repository: this.props.repository,
             accounts: this.props.accounts,

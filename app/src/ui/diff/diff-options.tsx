@@ -10,6 +10,7 @@ import {
 } from '../lib/popover'
 import { Tooltip, TooltipDirection } from '../lib/tooltip'
 import { createObservableRef } from '../lib/observable-ref'
+import { DiffContextPreferencesControl } from './diff-context-preferences-control'
 
 interface IDiffOptionsProps {
   readonly isInteractiveDiff: boolean
@@ -122,6 +123,7 @@ export class DiffOptions extends React.Component<
         <h3 id="diff-options-popover-header">{header}</h3>
         {this.renderHideWhitespaceChanges()}
         {this.renderShowSideBySide()}
+        <DiffContextPreferencesControl />
       </Popover>
     )
   }

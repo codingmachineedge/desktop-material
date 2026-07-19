@@ -6,6 +6,7 @@ import {
   RepositoryArchiveFormat,
   RepositoryToolOperationID,
 } from '../../lib/cli-workbench'
+import { prepareCustomGitCommand } from '../../lib/custom-git-command'
 
 const MaximumPathLength = 32_767
 const MaximumRemoteLength = 255
@@ -13,6 +14,9 @@ const MaximumBranchLength = 1_000
 const MaximumRefLength = 1_024
 const MaximumDeepenCommitCount = 1_000_000
 const MaximumSearchPatternLength = 256
+const MaximumPatchFiles = 256
+const MaximumPatchFileBytes = 16 * 1024 * 1024
+const MaximumPatchSeriesBytes = 64 * 1024 * 1024
 
 export interface IResolvedCLIWorkbenchOperation {
   readonly operation: CLIWorkbenchOperation
@@ -189,6 +193,83 @@ async function normalizeBundlePath(value: unknown): Promise<string> {
     throw new Error('Git bundle file does not exist.')
   }
   return bundlePath
+}
+
+async function normalizePatchExportDestination(
+  value: unknown,
+  repositoryPath: string
+): Promise<string> {
+  const selected = normalizedPath(
+    value,
+    'Patch-series export destination is invalid.'
+  )
+  const destination = selected.toLowerCase().endsWith('.patches')
+    ? selected
+    : `${selected}.patches`
+  if (
+    destination.length > MaximumPathLength ||
+    pathIsInside(join(repositoryPath, '.git'), destination)
+  ) {
+    throw new Error('Patch-series export destination is invalid.')
+  }
+  const parent = await stat(dirname(destination)).catch(() => null)
+  if (parent === null || !parent.isDirectory()) {
+    throw new Error('Patch-series export parent directory does not exist.')
+  }
+  if ((await stat(destination).catch(() => null)) !== null) {
+    throw new Error('Patch-series export destination already exists.')
+  }
+  return destination
+}
+
+async function normalizePatchPaths(
+  value: unknown
+): Promise<ReadonlyArray<string>> {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MaximumPatchFiles
+  ) {
+    throw new Error(`Choose between 1 and ${MaximumPatchFiles} patch files.`)
+  }
+
+  const paths = value.map(path =>
+    normalizedPath(path, 'Patch-series file path is invalid.')
+  )
+  if (
+    paths.some(path => !path.toLowerCase().endsWith('.patch')) ||
+    new Set(paths.map(path => path.toLowerCase())).size !== paths.length
+  ) {
+    throw new Error('Patch-series file paths are invalid.')
+  }
+
+  let total = 0
+  for (const path of paths) {
+    const metadata = await stat(path).catch(() => null)
+    if (
+      metadata === null ||
+      !metadata.isFile() ||
+      metadata.size > MaximumPatchFileBytes
+    ) {
+      throw new Error(
+        'Each patch must be a regular file no larger than 16 MiB.'
+      )
+    }
+    total += metadata.size
+    if (total > MaximumPatchSeriesBytes) {
+      throw new Error('The selected patch series exceeds 64 MiB.')
+    }
+  }
+  return paths
+}
+
+function normalizePatchSessionOperation(
+  value: unknown
+): 'continue' | 'skip' | 'abort' {
+  if (value !== 'continue' && value !== 'skip' && value !== 'abort') {
+    throw new Error('Patch-session operation is invalid.')
+  }
+  return value
 }
 
 function isValidFullRefName(ref: string): boolean {
@@ -614,6 +695,47 @@ export async function resolveCLIWorkbenchOperation(
         ['notes', 'remove', '--', oid],
         true
       )
+    }
+    case 'patch-export': {
+      requireExactFields(value, ['id', 'destination'])
+      const destination = await normalizePatchExportDestination(
+        value.destination,
+        repositoryPath
+      )
+      return resolved(
+        { id: value.id, destination },
+        [
+          'format-patch',
+          '--no-signature',
+          '--numbered',
+          `--output-directory=${destination}`,
+          '@{upstream}..HEAD',
+        ],
+        true
+      )
+    }
+    case 'patch-import': {
+      requireExactFields(value, ['id', 'patchPaths'])
+      const patchPaths = await normalizePatchPaths(value.patchPaths)
+      return resolved(
+        { id: value.id, patchPaths },
+        ['am', '--3way', '--keep-cr', '--no-gpg-sign', '--', ...patchPaths],
+        true
+      )
+    }
+    case 'patch-session': {
+      requireExactFields(value, ['id', 'operation'])
+      const operation = normalizePatchSessionOperation(value.operation)
+      return resolved(
+        { id: value.id, operation },
+        ['am', `--${operation}`],
+        true
+      )
+    }
+    case 'custom-git-command': {
+      requireExactFields(value, ['id', 'command', 'args'])
+      const operation = prepareCustomGitCommand(value.command, value.args)
+      return resolved(operation, [operation.command, ...operation.args], true)
     }
     default:
       throw new Error('Unknown CLI workbench operation.')

@@ -18,6 +18,7 @@ import {
   isRepositoryToolMutation,
 } from '../../../src/ui/repository-tools'
 import { Repository, SubmoduleRepository } from '../../../src/models/repository'
+import { ITagLifecycleDispatcher } from '../../../src/ui/tag/tag-lifecycle-manager'
 import {
   fireEvent,
   render,
@@ -204,6 +205,29 @@ describe('Repository tools', () => {
     ]) {
       assert.equal(isRepositoryToolMutation(operation), false, operation.id)
     }
+    assert.equal(
+      isRepositoryToolMutation({ id: 'patch-import', patchPaths: [] }),
+      true
+    )
+    assert.equal(
+      isRepositoryToolMutation({ id: 'patch-session', operation: 'abort' }),
+      true
+    )
+    assert.equal(
+      isRepositoryToolMutation({
+        id: 'custom-git-command',
+        command: 'status',
+        args: ['--short'],
+      }),
+      true
+    )
+    assert.equal(
+      isRepositoryToolMutation({
+        id: 'patch-export',
+        destination: 'C:/patches',
+      }),
+      false
+    )
   })
 
   it('keeps temporary child tools read-only and leaves inspections enabled', async () => {
@@ -267,6 +291,10 @@ describe('Repository tools', () => {
     )
     fireEvent.click(mutationButton)
     assert.equal(client.starts.length, 1)
+
+    selectHubTool('custom-git-presets')
+    const customRun = screen.getByRole('button', { name: 'Review run' })
+    assert.equal(customRun.getAttribute('aria-disabled'), 'true')
   })
 
   it('renders a searchable named-function hub without raw command or terminal inputs', async () => {
@@ -296,6 +324,7 @@ describe('Repository tools', () => {
       'Search tracked content',
       'Edit commit notes',
       'Export repository artifacts',
+      'Exchange patch series',
       'Import a branch from a Git bundle',
     ]) {
       assert.ok(screen.getAllByText(title).length >= 1, title)
@@ -458,6 +487,54 @@ describe('Repository tools', () => {
     const transferMatches = listedIds()
     assert.ok(transferMatches.includes('export-artifacts'))
     assert.ok(transferMatches.includes('bundle-import'))
+    assert.ok(transferMatches.includes('patch-series'))
+  })
+
+  it('discovers the typed tag lifecycle manager when dispatcher wiring exists', async () => {
+    const client = new FakeRepositoryToolsClient()
+    const tagDispatcher: ITagLifecycleDispatcher = {
+      getTagLifecycleInventory: async () => ({
+        local: [],
+        remote: null,
+        remoteName: null,
+        localTruncated: false,
+        remoteTruncated: false,
+        signingConfigured: false,
+        signingFormat: 'openpgp',
+      }),
+      createLifecycleTag: async () => true,
+      moveLifecycleTag: async () => true,
+      deleteReviewedLifecycleTag: async () => true,
+      pushLifecycleTags: async () => true,
+      fetchLifecycleTags: async () => true,
+      deleteRemoteLifecycleTag: async () => true,
+    }
+    render(
+      <RepositoryTools
+        repository={new Repository(uiRepositoryPath, 91, null, false)}
+        repositoryPath={uiRepositoryPath}
+        onRefreshRepository={async () => undefined}
+        client={client}
+        tagLifecycleDispatcher={tagDispatcher}
+      />
+    )
+    await screen.findByText('git version 2.55.0')
+    selectHubTool('tag-lifecycle')
+    await screen.findByRole('heading', { name: 'Tag lifecycle' })
+    assert.ok(screen.getByRole('button', { name: 'Create local tag' }))
+    assert.equal(screen.queryByRole('textbox', { name: /command/i }), null)
+  })
+
+  it('mounts custom Git presets with the guarded workbench client', async () => {
+    const client = new FakeRepositoryToolsClient()
+    renderTools(client)
+    await screen.findByText('git version 2.55.0')
+    selectHubTool('custom-git-presets')
+    assert.ok(
+      screen.getByRole('heading', { name: 'Custom Git command presets' })
+    )
+    assert.ok(screen.getByRole('button', { name: 'Review run' }))
+    assert.equal(screen.queryByLabelText(/executable/i), null)
   })
 
   it('runs a status summary through its fixed recipe', async () => {

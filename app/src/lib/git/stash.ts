@@ -60,6 +60,9 @@ export type StashResult = {
   /** The stash entries created by Desktop */
   readonly desktopEntries: ReadonlyArray<IStashEntry>
 
+  /** Stashes created by another Git client, exposed for reviewed actions. */
+  readonly foreignEntries: ReadonlyArray<IStashEntry>
+
   /**
    * The total amount of stash entries,
    * i.e. stash entries created both by Desktop and outside of Desktop
@@ -152,6 +155,7 @@ export async function getStashes(
   if (result.exitCode === 128) {
     return {
       desktopEntries: [],
+      foreignEntries: [],
       stashEntryCount: 0,
       foreignStashEntryCount: 0,
       isTruncated: false,
@@ -159,6 +163,7 @@ export async function getStashes(
   }
 
   const desktopEntries: Array<IStashEntry> = []
+  const foreignEntries: Array<IStashEntry> = []
   const files: StashedFileChanges = { kind: StashedChangesLoadStates.NotLoaded }
 
   const parsedEntries = parse(result.stdout)
@@ -175,6 +180,20 @@ export async function getStashes(
         branchName: metadata.branchName,
         displayName: metadata.displayName,
         createdAt: normalizeCreatedAt(createdAt),
+        origin: 'desktop',
+        tree,
+        parents: parents.length > 0 ? parents.split(' ') : [],
+        files,
+      })
+    } else {
+      const external = extractExternalMetadataFromMessage(message)
+      foreignEntries.push({
+        name,
+        stashSha,
+        branchName: external.branchName,
+        displayName: external.displayName,
+        createdAt: normalizeCreatedAt(createdAt),
+        origin: 'external',
         tree,
         parents: parents.length > 0 ? parents.split(' ') : [],
         files,
@@ -184,9 +203,35 @@ export async function getStashes(
 
   return {
     desktopEntries,
+    foreignEntries,
     stashEntryCount: entries.length,
     foreignStashEntryCount: entries.length - desktopEntries.length,
     isTruncated,
+  }
+}
+
+function boundedExternalLabel(value: string, fallback: string): string {
+  const printable = value.replace(/[\0-\x1f\x7f]+/g, ' ').trim()
+  if (printable.length === 0) {
+    return fallback
+  }
+  return Array.from(printable).slice(0, MaximumStashDisplayNameLength).join('')
+}
+
+/** Recover useful grouping from Git's standard `On/WIP on branch: message`. */
+function extractExternalMetadataFromMessage(message: string): {
+  readonly branchName: string
+  readonly displayName: string
+} {
+  const normalized = boundedExternalLabel(message, 'External stash')
+  const match = /^(?:WIP on|On) ([^:]+):\s*(.*)$/i.exec(normalized)
+  if (match === null) {
+    return { branchName: 'External', displayName: normalized }
+  }
+
+  return {
+    branchName: boundedExternalLabel(match[1], 'External'),
+    displayName: boundedExternalLabel(match[2], normalized),
   }
 }
 
@@ -359,6 +404,25 @@ async function requireDesktopStashEntry(
     throw new StashManagerError(
       'stale-entry',
       'That Desktop-managed stash changed or no longer exists. Refresh and review the current list.'
+    )
+  }
+  return entry
+}
+
+async function requireStashEntry(
+  repository: Repository,
+  stashSha: string,
+  signal?: AbortSignal
+): Promise<IStashEntry> {
+  const normalizedSha = normalizeStashSHA(stashSha)
+  const stash = await getStashes(repository, signal)
+  const entry = [...stash.desktopEntries, ...stash.foreignEntries].find(
+    candidate => candidate.stashSha === normalizedSha
+  )
+  if (entry === undefined) {
+    throw new StashManagerError(
+      'stale-entry',
+      'That stash changed or no longer exists. Refresh and review the current list.'
     )
   }
   return entry
@@ -595,8 +659,9 @@ async function getStashEntryMatchingSha(
   }
   const stash = await getStashes(repository, signal)
   return (
-    stash.desktopEntries.find(e => e.stashSha === sha.trim().toLowerCase()) ||
-    null
+    [...stash.desktopEntries, ...stash.foreignEntries].find(
+      e => e.stashSha === sha.trim().toLowerCase()
+    ) || null
   )
 }
 
@@ -627,7 +692,7 @@ async function dropReviewedDesktopStashEntry(
   stashSha: string,
   signal?: AbortSignal
 ): Promise<void> {
-  const entry = await requireDesktopStashEntry(repository, stashSha, signal)
+  const entry = await requireStashEntry(repository, stashSha, signal)
   await git(
     ['stash', 'drop', entry.name],
     repository.path,
@@ -643,7 +708,7 @@ export async function applyDesktopStashEntry(
   stashSha: string,
   signal?: AbortSignal
 ): Promise<void> {
-  const entry = await requireDesktopStashEntry(repository, stashSha, signal)
+  const entry = await requireStashEntry(repository, stashSha, signal)
   try {
     await git(
       ['stash', 'apply', '--quiet', entry.stashSha],
@@ -687,7 +752,7 @@ export async function popStashEntry(
   stashSha: string,
   signal?: AbortSignal
 ): Promise<void> {
-  const entry = await requireDesktopStashEntry(repository, stashSha, signal)
+  const entry = await requireStashEntry(repository, stashSha, signal)
   await applyDesktopStashEntry(repository, entry.stashSha, signal)
   // Re-resolve by object identity after apply. A conflict throws above and the
   // stash remains available for recovery; only a clean apply reaches this drop.
@@ -720,7 +785,7 @@ export async function createBranchFromDesktopStash(
     )
   }
 
-  const entry = await requireDesktopStashEntry(repository, stashSha, signal)
+  const entry = await requireStashEntry(repository, stashSha, signal)
   // Mutation-boundary ref check closes the review/execution race.
   const rechecked = await git(
     ['show-ref', '--verify', '--quiet', ref],
@@ -734,7 +799,7 @@ export async function createBranchFromDesktopStash(
       `The branch “${safeBranch}” appeared after review. Nothing was changed.`
     )
   }
-  await requireDesktopStashEntry(repository, entry.stashSha, signal)
+  await requireStashEntry(repository, entry.stashSha, signal)
   await git(
     ['stash', 'branch', safeBranch, entry.name],
     repository.path,
@@ -744,7 +809,7 @@ export async function createBranchFromDesktopStash(
   throwIfAborted(signal)
 }
 
-/** Drop only the exact Desktop-managed stashes the user reviewed. */
+/** Drop only the exact repository stashes the user reviewed. */
 export async function clearReviewedDesktopStashes(
   repository: Repository,
   reviewedStashShas: ReadonlyArray<string>,
@@ -754,7 +819,7 @@ export async function clearReviewedDesktopStashes(
   if (reviewed.length === 0) {
     throw new StashManagerError(
       'invalid-input',
-      'Review and select at least one Desktop-managed stash to clear.'
+      'Review and select at least one stash to clear.'
     )
   }
   if (reviewed.length > MaximumReviewedStashes) {
@@ -765,7 +830,11 @@ export async function clearReviewedDesktopStashes(
   }
 
   const inventory = await getStashes(repository, signal)
-  const managed = new Set(inventory.desktopEntries.map(entry => entry.stashSha))
+  const managed = new Set(
+    [...inventory.desktopEntries, ...inventory.foreignEntries].map(
+      entry => entry.stashSha
+    )
+  )
   for (const sha of reviewed) {
     if (!managed.has(sha)) {
       throw new StashManagerError(
@@ -777,7 +846,14 @@ export async function clearReviewedDesktopStashes(
 
   let cleared = 0
   for (const sha of reviewed) {
-    await dropReviewedDesktopStashEntry(repository, sha, signal)
+    const entry = await requireStashEntry(repository, sha, signal)
+    await git(
+      ['stash', 'drop', entry.name],
+      repository.path,
+      'dropReviewedStashEntry',
+      stashGitOptions(signal)
+    )
+    throwIfAborted(signal)
     cleared++
   }
   return cleared

@@ -8,6 +8,12 @@ import { suggestedExternalEditor } from '../../lib/editors/shared'
 import { CustomIntegrationForm } from './custom-integration-form'
 import { ICustomIntegration } from '../../lib/custom-integration'
 import { enableCustomIntegration } from '../../lib/feature-flag'
+import { getExternalEditorDisplayName } from '../../lib/editors/display-name'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
 const CustomIntegrationValue = 'other'
 const BranchPresetScriptDocumentationUrl =
@@ -35,6 +41,7 @@ interface IIntegrationsPreferencesProps {
 }
 
 interface IIntegrationsPreferencesState {
+  readonly languageMode: LanguageMode
   readonly selectedExternalEditor: string | null
   readonly selectedShell: Shell
   readonly useCustomEditor: boolean
@@ -55,6 +62,7 @@ export class Integrations extends React.Component<
     super(props)
 
     this.state = {
+      languageMode: getPersistedLanguageMode(),
       selectedExternalEditor: this.props.selectedExternalEditor,
       selectedShell: this.props.selectedShell,
       useCustomEditor: this.props.useCustomEditor,
@@ -101,6 +109,10 @@ export class Integrations extends React.Component<
   }
 
   public componentDidMount(): void {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     if (enableCustomIntegration()) {
       const {
         availableEditors,
@@ -122,6 +134,21 @@ export class Integrations extends React.Component<
         this.setSelectedShell(CustomIntegrationValue)
       }
     }
+  }
+
+  public componentWillUnmount(): void {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
   }
 
   public componentDidUpdate(
@@ -227,7 +254,7 @@ export class Integrations extends React.Component<
       >
         {options.map(n => (
           <option key={n} value={n}>
-            {n}
+            {getExternalEditorDisplayName(n, this.state.languageMode)}
           </option>
         ))}
         {enableCustomIntegration() && (

@@ -30,7 +30,7 @@ describe('Create GitHub pull request responsive styles', () => {
   it('wraps routing, review, error, and action text', () => {
     assert.match(
       styles,
-      /\.dialog-header h1,[\s\S]*?\.create-github-pull-request-browser-note\s*\{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/
+      /\.dialog-header h1,[\s\S]*?\.create-github-pull-request-browser-note,[\s\S]*?\.create-github-pull-request-partial-success\s*\{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/
     )
     assert.match(
       styles,
@@ -50,6 +50,21 @@ describe('Create GitHub pull request responsive styles', () => {
     assert.match(
       styles,
       /@media \(max-width: 420px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\);[\s\S]*?button\s*\{[\s\S]*?width: 100%;/
+    )
+  })
+
+  it('bounds metadata selectors and partial-success notices', () => {
+    assert.match(
+      styles,
+      /\.create-github-pull-request-metadata\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?select\[multiple\][\s\S]*?min-height: 72px;/
+    )
+    assert.match(
+      styles,
+      /\.create-github-pull-request-partial-success[\s\S]*?overflow-wrap: anywhere;/
+    )
+    assert.match(
+      styles,
+      /@media \(max-width: 620px\)[\s\S]*?\.create-github-pull-request-metadata[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/
     )
   })
 })

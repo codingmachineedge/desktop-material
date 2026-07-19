@@ -86,6 +86,17 @@ export type CLIWorkbenchOperation =
       readonly message: string
     }
   | { readonly id: 'notes-remove'; readonly oid: string }
+  | { readonly id: 'patch-export'; readonly destination: string }
+  | { readonly id: 'patch-import'; readonly patchPaths: ReadonlyArray<string> }
+  | {
+      readonly id: 'patch-session'
+      readonly operation: GuidedPatchSessionOperation
+    }
+  | {
+      readonly id: 'custom-git-command'
+      readonly command: string
+      readonly args: ReadonlyArray<string>
+    }
 
 // Compatibility contracts for the older guided Repository Tools surfaces.
 // The main-process runner above still accepts only CLIWorkbenchOperation; these

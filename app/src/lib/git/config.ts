@@ -28,6 +28,16 @@ export function getGlobalConfigValue(
   return getConfigValueInPath(name, null, false, undefined, env)
 }
 
+/** Look up and expand a global path-valued Git configuration entry. */
+export function getGlobalPathConfigValue(
+  name: string,
+  env?: {
+    HOME: string
+  }
+): Promise<string | null> {
+  return getConfigValueInPath(name, null, false, 'path', env)
+}
+
 /**
  * Look up a config value by name.
  *

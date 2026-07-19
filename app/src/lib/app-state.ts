@@ -996,6 +996,15 @@ export enum HistoryTabMode {
   Compare = 'Compare',
 }
 
+/** The ref set used to populate the normal History view. */
+export enum HistoryScope {
+  /** Follow only the currently checked-out branch, matching Desktop's default. */
+  CurrentBranch = 'current-branch',
+
+  /** Include commits reachable from every local and remote branch and tag. */
+  AllRefs = 'all-refs',
+}
+
 /**
  * This represents whether the compare tab is currently viewing the
  * commits ahead or behind when merging some other branch into your
@@ -1049,6 +1058,9 @@ export interface ICompareState {
 
   /** The SHAs of commits to render in the compare list */
   readonly commitSHAs: ReadonlyArray<string>
+
+  /** The ref set used when the normal History view is active. */
+  readonly historyScope: HistoryScope
 
   /** The SHAs of commits to highlight in the compare list */
   readonly shasToHighlight: ReadonlyArray<string>

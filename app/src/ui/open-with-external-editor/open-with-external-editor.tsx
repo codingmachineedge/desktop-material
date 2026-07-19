@@ -11,6 +11,12 @@ import {
 } from '../../lib/custom-integration'
 import { getAvailableEditors } from '../../lib/editors/lookup'
 import { enableCustomIntegration } from '../../lib/feature-flag'
+import { getExternalEditorDisplayName } from '../../lib/editors/display-name'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
 const CustomIntegrationValue = 'other'
 
@@ -23,6 +29,7 @@ interface IOpenWithExternalEditorProps {
 }
 
 interface IOpenWithExternalEditorState {
+  readonly languageMode: LanguageMode
   readonly availableEditors: ReadonlyArray<string>
   readonly selectedEditor: string | null
   readonly useCustomEditor: boolean
@@ -37,6 +44,7 @@ export class OpenWithExternalEditor extends React.Component<
     super(props)
 
     this.state = {
+      languageMode: getPersistedLanguageMode(),
       availableEditors: [],
       selectedEditor: null,
       useCustomEditor: false,
@@ -45,6 +53,10 @@ export class OpenWithExternalEditor extends React.Component<
   }
 
   public async componentDidMount() {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     const editors = await getAvailableEditors()
     const availableEditors = editors.map(e => e.editor)
     const selectedEditor =
@@ -55,6 +67,21 @@ export class OpenWithExternalEditor extends React.Component<
       availableEditors,
       selectedEditor,
       useCustomEditor: availableEditors.length === 0 && allowCustomIntegration,
+    })
+  }
+
+  public componentWillUnmount(): void {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
     })
   }
 
@@ -115,7 +142,7 @@ export class OpenWithExternalEditor extends React.Component<
       >
         {options.map(n => (
           <option key={n} value={n}>
-            {n}
+            {getExternalEditorDisplayName(n, this.state.languageMode)}
           </option>
         ))}
         {enableCustomIntegration() && (

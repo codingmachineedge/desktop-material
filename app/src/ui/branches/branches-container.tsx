@@ -40,6 +40,8 @@ import { PullRequestQuickView } from '../pull-request-quick-view'
 import { Emoji } from '../../lib/emoji'
 import classNames from 'classnames'
 import { BranchSortOrder } from '../../models/branch-sort-order'
+import { BulkBranchDelete } from './bulk-branch-delete'
+import { ForkBranchCheckout } from './fork-branch-checkout'
 
 /**
  * Virtualized row height for branch rows inside the branch side sheet.
@@ -365,7 +367,21 @@ export class BranchesContainer extends React.Component<
 
   private renderPreList = () => {
     if (!dragAndDropManager.isDragOfTypeInProgress(DragType.Commit)) {
-      return null
+      return (
+        <div className="branch-management-tools">
+          <ForkBranchCheckout
+            repository={this.props.repository}
+            dispatcher={this.props.dispatcher}
+          />
+          <BulkBranchDelete
+            repository={this.props.repository}
+            allBranches={this.props.allBranches}
+            currentBranch={this.props.currentBranch}
+            defaultBranch={this.props.defaultBranch}
+            dispatcher={this.props.dispatcher}
+          />
+        </div>
+      )
     }
 
     const label = __DARWIN__ ? 'New Branch' : 'New branch'

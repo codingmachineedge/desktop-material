@@ -8,6 +8,7 @@ import {
 } from '../../models/status'
 import { Tip, TipState } from '../../models/tip'
 import {
+  HistoryScope,
   HistoryTabMode,
   IBranchesState,
   IChangesState,
@@ -428,6 +429,7 @@ function getInitialRepositoryState(): IRepositoryState {
       showBranchList: false,
       filterText: '',
       commitSHAs: [],
+      historyScope: HistoryScope.CurrentBranch,
       shasToHighlight: [],
       branches: new Array<Branch>(),
       recentBranches: new Array<Branch>(),

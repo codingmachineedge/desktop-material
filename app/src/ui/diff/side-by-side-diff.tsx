@@ -77,6 +77,13 @@ import {
   IFilterOptions,
   MaxRegexPatternLength,
 } from '../../lib/fuzzy-find'
+import {
+  canAutomaticallyExpandDiff,
+  DiffContextPreferencesChangedEvent,
+  IDiffContextPreferences,
+  normalizeDiffContextPreferences,
+  readDiffContextPreferences,
+} from './diff-context-preferences'
 
 const DefaultRowHeight = 20
 
@@ -244,6 +251,8 @@ export class SideBySideDiff extends React.Component<
 
   /** Diff to restore when "Collapse all expanded lines" option is used */
   private diffToRestore: ITextDiff | null = null
+  private diffContextPreferences: IDiffContextPreferences =
+    readDiffContextPreferences()
 
   private textSelectionStartRow: number | undefined = undefined
   private textSelectionEndRow: number | undefined = undefined
@@ -271,8 +280,13 @@ export class SideBySideDiff extends React.Component<
   public constructor(props: ISideBySideDiffProps) {
     super(props)
 
+    const initialDiff = this.getAutomaticallyExpandedDiff(props.diff)
+    if (initialDiff !== props.diff) {
+      this.diffToRestore = props.diff
+    }
+
     this.state = {
-      diff: props.diff,
+      diff: initialDiff,
       isSearching: false,
       selectedSearchResult: undefined,
       selectingTextInRow: 'before',
@@ -294,6 +308,10 @@ export class SideBySideDiff extends React.Component<
     document.addEventListener('copy', this.onCutOrCopy)
 
     document.addEventListener('selectionchange', this.onDocumentSelectionChange)
+    document.addEventListener(
+      DiffContextPreferencesChangedEvent,
+      this.onDiffContextPreferencesChanged
+    )
 
     this.addContextMenuListenerToDiff()
   }
@@ -429,7 +447,23 @@ export class SideBySideDiff extends React.Component<
       this.onDocumentSelectionChange
     )
     document.removeEventListener('mousemove', this.onUpdateSelection)
+    document.removeEventListener(
+      DiffContextPreferencesChangedEvent,
+      this.onDiffContextPreferencesChanged
+    )
     this.removeContextMenuListenerFromDiff()
+  }
+
+  private onDiffContextPreferencesChanged = (event: Event) => {
+    const previous = this.diffContextPreferences
+    const next = normalizeDiffContextPreferences(
+      (event as CustomEvent<unknown>).detail
+    )
+    this.diffContextPreferences = next
+
+    if (!previous.alwaysExpand && next.alwaysExpand) {
+      this.expandWholeFile(false, true)
+    }
   }
 
   public componentDidUpdate(
@@ -443,9 +477,13 @@ export class SideBySideDiff extends React.Component<
       this.clearListRowsHeightCache()
     }
 
-    if (!textDiffEquals(this.props.diff, prevProps.diff)) {
-      this.diffToRestore = null
-      this.setState({ diff: this.props.diff, lastExpandedHunk: null })
+    if (
+      !textDiffEquals(this.props.diff, prevProps.diff) ||
+      this.props.file.id !== prevProps.file.id
+    ) {
+      const nextDiff = this.getAutomaticallyExpandedDiff(this.props.diff)
+      this.diffToRestore = nextDiff === this.props.diff ? null : this.props.diff
+      this.setState({ diff: nextDiff, lastExpandedHunk: null })
       this.rowSelectableGroupStaticDataCache.clear()
     }
 
@@ -568,6 +606,18 @@ export class SideBySideDiff extends React.Component<
       contents.canBeExpanded &&
       contents.newContents.length > 0
     )
+  }
+
+  private getAutomaticallyExpandedDiff(diff: ITextDiff): ITextDiff {
+    const contents = this.props.fileContents
+    if (
+      !this.diffContextPreferences.alwaysExpand ||
+      !canAutomaticallyExpandDiff(contents)
+    ) {
+      return diff
+    }
+
+    return expandWholeTextDiff(diff, contents.newContents) ?? diff
   }
 
   private onDiffContainerRef = (ref: HTMLDivElement | null) => {
@@ -1505,11 +1555,17 @@ export class SideBySideDiff extends React.Component<
         }
   }
 
-  private onExpandWholeFile = () => {
+  private onExpandWholeFile = () => this.expandWholeFile(true, false)
+
+  private expandWholeFile(announce: boolean, automatically: boolean) {
     const contents = this.props.fileContents
     const { diff } = this.state
 
-    if (contents === null || !this.canExpandDiff()) {
+    if (
+      contents === null ||
+      !this.canExpandDiff() ||
+      (automatically && !canAutomaticallyExpandDiff(contents))
+    ) {
       return
     }
 
@@ -1521,10 +1577,12 @@ export class SideBySideDiff extends React.Component<
 
     this.diffToRestore = diff
 
-    this.ariaLiveChangeSignal = !this.ariaLiveChangeSignal
+    if (announce) {
+      this.ariaLiveChangeSignal = !this.ariaLiveChangeSignal
+    }
     this.setState({
       diff: updatedDiff,
-      ariaLiveMessage: 'Expanded',
+      ariaLiveMessage: announce ? 'Expanded' : this.state.ariaLiveMessage,
     })
   }
 
@@ -1765,7 +1823,8 @@ export class SideBySideDiff extends React.Component<
       diff,
       hunk,
       kind,
-      contents.newContents
+      contents.newContents,
+      readDiffContextPreferences().contextLines
     )
 
     if (updatedDiff === undefined) {

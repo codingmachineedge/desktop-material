@@ -12,9 +12,227 @@
 .repository-shallow-history,
 .repository-shallow-history *,
 .repository-bundle-import,
-.repository-bundle-import * {
+.repository-bundle-import *,
+.tag-lifecycle-manager,
+.tag-lifecycle-manager *,
+.repository-custom-git-commands,
+.repository-custom-git-commands * {
   box-sizing: border-box;
   min-width: 0;
+}
+
+.repository-custom-git-commands {
+  display: grid;
+  gap: 12px;
+
+  > p {
+    margin: 0;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.45;
+  }
+}
+
+.repository-custom-git-picker {
+  display: grid;
+  align-items: end;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+
+  label {
+    grid-column: 1 / -1;
+  }
+}
+
+.repository-custom-git-form {
+  display: grid;
+  align-items: center;
+  gap: 8px 12px;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+}
+
+.repository-custom-git-picker select,
+.repository-custom-git-form input {
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 10px;
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+
+  &:focus-visible {
+    border-color: var(--md-sys-color-primary);
+    outline: 2px solid var(--md-sys-color-primary-container);
+    outline-offset: 1px;
+  }
+}
+
+.repository-custom-git-warning {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container) !important;
+}
+
+.repository-custom-git-commands .repository-tool-confirmation code {
+  display: block;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-lowest);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tag-lifecycle-manager {
+  display: grid;
+  gap: 16px;
+
+  > header,
+  .tag-lifecycle-inventory-toolbar {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+  }
+
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+
+  > header p,
+  .tag-lifecycle-editor > p,
+  .tag-lifecycle-row span,
+  .tag-lifecycle-row p,
+  .tag-lifecycle-signing-status {
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.45;
+  }
+
+  label {
+    display: grid;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 6px;
+  }
+
+  input,
+  select,
+  textarea {
+    background: var(--md-sys-color-surface-container-lowest);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 10px;
+    color: var(--md-sys-color-on-surface);
+    font: inherit;
+    min-height: 36px;
+    padding: 8px 10px;
+
+    &:focus-visible {
+      border-color: var(--md-sys-color-primary);
+      outline: 2px solid var(--md-sys-color-primary-container);
+      outline-offset: 1px;
+    }
+  }
+
+  textarea {
+    min-height: 72px;
+    resize: vertical;
+  }
+}
+
+.tag-lifecycle-editor,
+.tag-lifecycle-confirmation,
+.tag-lifecycle-inventory {
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.tag-lifecycle-confirmation {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.tag-lifecycle-form-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.tag-lifecycle-check {
+  align-items: center;
+  display: flex !important;
+  font-weight: 500 !important;
+  gap: 8px !important;
+
+  input {
+    min-height: auto;
+  }
+}
+
+.tag-lifecycle-actions,
+.tag-lifecycle-row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-lifecycle-notice,
+.tag-lifecycle-error {
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.tag-lifecycle-notice {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.tag-lifecycle-error {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.tag-lifecycle-inventory {
+  ul {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.tag-lifecycle-inventory-toolbar > label {
+  flex: 1 1 220px;
+}
+
+.tag-lifecycle-row {
+  align-items: center;
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+
+  > div:first-child {
+    display: grid;
+    flex: 1 1 230px;
+    gap: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  &.remote {
+    border-inline-start: 3px solid var(--md-sys-color-tertiary);
+  }
 }
 
 .provider-triage {

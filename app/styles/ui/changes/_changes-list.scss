@@ -572,6 +572,16 @@
     font-weight: var(--font-weight-semibold);
   }
 
+  .stash-manager-origin {
+    padding: 1px 5px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    font-size: 9px;
+    font-weight: var(--font-weight-normal);
+  }
+
   .stash-manager-entry-meta {
     color: var(--md-sys-color-on-surface-variant);
     font-size: 10px;

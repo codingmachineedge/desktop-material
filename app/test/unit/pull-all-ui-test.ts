@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test'
 import * as React from 'react'
 
 import {
+  IRepositorySyncRequest,
   IPullAllProgressUpdate,
   IPullAllResult,
   PullAllProgressListener,
@@ -10,6 +11,7 @@ import {
 import { Dispatcher } from '../../src/ui/dispatcher'
 import { PullAllDialog } from '../../src/ui/pull-all/pull-all-dialog'
 import { fireEvent, render, screen, waitFor } from '../helpers/ui/render'
+import { LanguageModeChangedEvent } from '../../src/lib/i18n'
 
 let restoreIpcSend: (() => void) | null = null
 let restoreDialogShow: (() => void) | null = null
@@ -73,18 +75,62 @@ function progress(
 
 function createDispatcher(
   run: (
+    request: IRepositorySyncRequest,
     listener?: PullAllProgressListener
-  ) => Promise<ReadonlyArray<IPullAllResult>>
+  ) => Promise<ReadonlyArray<IPullAllResult>>,
+  candidates = [
+    { id: 1, name: 'repository-1' },
+    { id: 2, name: 'repository-2' },
+  ]
 ): Dispatcher {
-  return { pullAllRepositories: run } as unknown as Dispatcher
+  return {
+    getRepositorySyncCandidates: async () => candidates,
+    syncRepositories: run,
+  } as unknown as Dispatcher
 }
 
 describe('PullAllDialog', () => {
+  it('switches the reviewed dialog live across all language modes', async () => {
+    localStorage.setItem(
+      'appearance-customization-v1',
+      JSON.stringify({ version: 1, languageMode: 'english' })
+    )
+    const view = render(
+      React.createElement(PullAllDialog, {
+        dispatcher: createDispatcher(async () => []),
+        onDismissed: () => {},
+      })
+    )
+
+    try {
+      assert.ok(await screen.findByRole('button', { name: 'Start pull' }))
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'cantonese' })
+      )
+      await waitFor(() =>
+        assert.ok(screen.getByRole('button', { name: '開始 Pull' }))
+      )
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'bilingual' })
+      )
+      await waitFor(() =>
+        assert.ok(
+          screen.getByRole('button', { name: 'Start pull · 開始 Pull' })
+        )
+      )
+    } finally {
+      view.unmount()
+      localStorage.removeItem('appearance-customization-v1')
+    }
+  })
+
   it('renders live progress, stays dismissible, and summarizes completion', async () => {
     const completion = deferred<ReadonlyArray<IPullAllResult>>()
     let listener: PullAllProgressListener | undefined
     let dismissed = 0
-    const dispatcher = createDispatcher(onProgress => {
+    const dispatcher = createDispatcher((_request, onProgress) => {
       listener = onProgress
       onProgress?.(progress(1, 'queued', 'Waiting for a worker.', 0, 0))
       onProgress?.(progress(2, 'queued', 'Waiting for a worker.', 0, 0))
@@ -98,17 +144,17 @@ describe('PullAllDialog', () => {
       })
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Start pull' }))
+
     const progressbar = screen.getByRole('progressbar', {
-      name: 'Repositories pulled',
+      name: 'Repositories synchronized',
     })
     assert.equal(progressbar.getAttribute('aria-valuenow'), '0')
     assert.equal(
       (await screen.findAllByText('Waiting for a worker.')).length,
       2
     )
-    assert.ok(
-      screen.getByRole('region', { name: 'Pull all repository progress' })
-    )
+    assert.ok(screen.getByRole('region', { name: 'Repository sync progress' }))
 
     listener?.(
       progress(
@@ -162,6 +208,8 @@ describe('PullAllDialog', () => {
       })
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Start pull' }))
+
     const alert = await screen.findByRole('alert')
     assert.equal(alert.textContent, 'Unable to enumerate repositories.')
     assert.ok(screen.getByRole('button', { name: 'Done' }))
@@ -171,7 +219,7 @@ describe('PullAllDialog', () => {
     const completion = deferred<ReadonlyArray<IPullAllResult>>()
     let listener: PullAllProgressListener | undefined
     let calls = 0
-    const dispatcher = createDispatcher(onProgress => {
+    const dispatcher = createDispatcher((_request, onProgress) => {
       calls++
       listener = onProgress
       return completion.promise
@@ -183,6 +231,7 @@ describe('PullAllDialog', () => {
       })
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Start pull' }))
     await waitFor(() => assert.notEqual(listener, undefined))
     view.unmount()
     listener?.(progress(1, 'pulling', 'Background update.', 0, 1))
@@ -212,6 +261,7 @@ describe('PullAllDialog', () => {
       })
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Start pull' }))
     await screen.findByText('All repositories processed')
     firstView.unmount()
 
@@ -222,6 +272,52 @@ describe('PullAllDialog', () => {
       })
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Start pull' }))
     await waitFor(() => assert.equal(calls, 2))
+  })
+
+  it('runs fetch-only for the exact reviewed repository selection', async () => {
+    let request: IRepositorySyncRequest | undefined
+    const dispatcher = createDispatcher(async (current, onProgress) => {
+      request = current
+      onProgress?.({
+        completed: 1,
+        total: 1,
+        active: 0,
+        item: {
+          id: 2,
+          name: 'repository-2',
+          status: 'fetched',
+          detail: 'Fetch completed.',
+        },
+      })
+      return [
+        {
+          id: 2,
+          name: 'repository-2',
+          status: 'fetched',
+          detail: 'Fetch completed.',
+        },
+      ]
+    })
+
+    render(
+      React.createElement(PullAllDialog, {
+        dispatcher,
+        onDismissed: () => {},
+      })
+    )
+
+    fireEvent.click(
+      await screen.findByRole('radio', {
+        name: 'Fetch only (leave worktrees unchanged)',
+      })
+    )
+    fireEvent.click(screen.getByRole('checkbox', { name: 'repository-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start fetch' }))
+
+    await waitFor(() => assert.notEqual(request, undefined))
+    assert.deepEqual(request, { operation: 'fetch', repositoryIds: [2] })
+    assert(await screen.findByText('1 fetched, 0 skipped, 0 failed.'))
   })
 })

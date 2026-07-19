@@ -9,6 +9,8 @@ import {
   DefaultEditorLabel,
   DefaultShellLabel,
 } from '../lib/context-menu'
+import { getPersistedLanguageMode, translate } from '../../lib/i18n'
+import { LanguageMode } from '../../models/language-mode'
 
 interface IRepositoryListItemContextMenuConfig {
   repository: Repositoryish
@@ -32,6 +34,10 @@ interface IRepositoryListItemContextMenuConfig {
   isPinned?: boolean
   onPinRepository?: (repository: Repository) => void
   onUnpinRepository?: (repository: Repository) => void
+  isHidden?: boolean
+  onHideRepository?: (repository: Repository) => void
+  onUnhideRepository?: (repository: Repository) => void
+  languageMode?: LanguageMode
 }
 
 export const generateRepositoryListContextMenu = (
@@ -64,8 +70,32 @@ export const generateRepositoryListContextMenu = (
                 ? config.onUnpinRepository?.(repository)
                 : config.onPinRepository?.(repository),
           },
-          { type: 'separator' as const },
         ]
+      : []),
+    ...(repository instanceof Repository &&
+    config.onHideRepository !== undefined &&
+    config.onUnhideRepository !== undefined
+      ? [
+          {
+            label: translate(
+              config.isHidden
+                ? 'repositoryPicker.unhideMenu'
+                : 'repositoryPicker.hideMenu',
+              config.languageMode ?? getPersistedLanguageMode()
+            ),
+            action: () =>
+              config.isHidden
+                ? config.onUnhideRepository?.(repository)
+                : config.onHideRepository?.(repository),
+          },
+        ]
+      : []),
+    ...(repository instanceof Repository &&
+    ((config.onPinRepository !== undefined &&
+      config.onUnpinRepository !== undefined) ||
+      (config.onHideRepository !== undefined &&
+        config.onUnhideRepository !== undefined))
+      ? [{ type: 'separator' as const }]
       : []),
     ...buildAliasMenuItems(config),
     ...buildGroupNameMenuItems(config),

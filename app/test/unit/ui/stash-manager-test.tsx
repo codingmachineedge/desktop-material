@@ -16,6 +16,7 @@ import { WorkingDirectoryStatus } from '../../../src/models/status'
 import { Dispatcher } from '../../../src/ui/dispatcher'
 import { StashManagerError } from '../../../src/lib/git/stash'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+import { LanguageModeChangedEvent } from '../../../src/lib/i18n'
 
 const mainEntry: IStashEntry = {
   name: 'refs/stash@{0}',
@@ -36,6 +37,18 @@ const featureEntry: IStashEntry = {
   createdAt: '2026-07-12T12:00:00.000Z',
   tree: 'e'.repeat(40),
   parents: ['f'.repeat(40)],
+  files: { kind: StashedChangesLoadStates.NotLoaded },
+}
+
+const externalEntry: IStashEntry = {
+  name: 'refs/stash@{2}',
+  branchName: 'main',
+  stashSha: '1'.repeat(40),
+  displayName: 'CLI checkpoint',
+  createdAt: '2026-07-11T12:00:00.000Z',
+  origin: 'external',
+  tree: '2'.repeat(40),
+  parents: ['3'.repeat(40)],
   files: { kind: StashedChangesLoadStates.NotLoaded },
 }
 
@@ -144,7 +157,7 @@ describe('stash manager', () => {
 
   it('renders a compact summary then exposes accessible all-branch inventory', () => {
     renderManager()
-    assert(screen.getByText('2 managed stashes'))
+    assert(screen.getByText('2 repository stashes'))
     assert(screen.getByText('1 on main'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
@@ -153,11 +166,19 @@ describe('stash manager', () => {
     assert(screen.getByText('Main review'))
     assert(screen.getByText('Feature review'))
     assert(screen.getByText('Current'))
-    assert(
-      screen.getByText(
-        /2 other Git stashes are present and will be left untouched/
-      )
-    )
+    assert(screen.getByText(/2 external Git stashes are shown/))
+  })
+
+  it('shows external stashes with safe actions but no metadata rewrite', () => {
+    renderManager(new FakeStashDispatcher(), [externalEntry])
+    fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
+    assert(screen.getByText('External'))
+    fireEvent.click(screen.getByRole('button', { name: /CLI checkpoint/ }))
+    assert(screen.getByRole('button', { name: 'Apply copy' }))
+    assert(screen.getByRole('button', { name: 'Restore' }))
+    assert(screen.getByRole('button', { name: 'New branch' }))
+    assert(screen.getByRole('button', { name: 'Discard' }))
+    assert(screen.queryByRole('button', { name: 'Rename or move' }) === null)
   })
 
   it('creates a named all-changes stash without exposing command arguments', async () => {
@@ -198,11 +219,11 @@ describe('stash manager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
     fireEvent.click(
       screen.getByRole('checkbox', {
-        name: 'Review Main review for managed clear',
+        name: 'Review Main review for stash clear',
       })
     )
     fireEvent.click(screen.getByRole('button', { name: 'Clear reviewed (1)' }))
-    assert(screen.getByText(/Foreign Git stashes are never included/))
+    assert(screen.getByText(/Only the exact checked identities are included/))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await waitFor(() => assert.equal(fake.cleared.length, 1))
@@ -300,5 +321,62 @@ describe('stash manager', () => {
       describeManagedStashError(new Error('secret argv'), 'Restore', false),
       /secret argv/
     )
+  })
+
+  it('live-switches external actions and an existing operation status', async () => {
+    localStorage.setItem(
+      'appearance-customization-v1',
+      JSON.stringify({ version: 1, languageMode: 'english' })
+    )
+    const fake = new FakeStashDispatcher()
+    const repository = new Repository('C:\\repo', 1, null, false)
+    const view = render(
+      <StashManager
+        repository={repository}
+        dispatcher={fake as unknown as Dispatcher}
+        branch="main"
+        workingDirectory={WorkingDirectoryStatus.fromFiles([])}
+        selectedFileIDs={[]}
+        allStashEntries={[externalEntry]}
+        foreignStashEntryCount={1}
+        stashInventoryTruncated={false}
+        selectedStashEntry={null}
+        isShowingStashEntry={false}
+        hasConflicts={false}
+      />
+    )
+
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
+      fireEvent.click(screen.getByRole('button', { name: /CLI checkpoint/ }))
+      fireEvent.change(screen.getByLabelText('Name'), {
+        target: { value: 'Localized checkpoint' },
+      })
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create named stash' })
+      )
+      await screen.findByText(
+        'Named stash created. It is available under its recorded branch.'
+      )
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'cantonese' })
+      )
+      await waitFor(() => assert.ok(screen.getByText('外部')))
+      assert.ok(screen.getByRole('button', { name: '套用副本' }))
+      assert.ok(
+        screen.getByText('命名 stash 已建立，並已放喺記錄咗嘅分支下面。')
+      )
+
+      document.dispatchEvent(
+        new CustomEvent(LanguageModeChangedEvent, { detail: 'bilingual' })
+      )
+      await waitFor(() =>
+        assert.match(view.container.textContent ?? '', /External · 外部/)
+      )
+    } finally {
+      view.unmount()
+      localStorage.removeItem('appearance-customization-v1')
+    }
   })
 })

@@ -50,6 +50,204 @@
   flex: 1;
 }
 
+.branch-management-tools {
+  display: grid;
+  gap: 4px;
+}
+
+.fork-branch-checkout {
+  display: grid;
+  padding: 0 12px 8px;
+  gap: 8px;
+
+  > .button-component {
+    justify-self: start;
+  }
+}
+
+.fork-branch-checkout-panel {
+  display: grid;
+  max-height: min(480px, 58vh);
+  padding: 10px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  background: var(--md-sys-color-surface-container);
+  gap: 9px;
+  overflow: auto;
+
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+
+  h3 {
+    font-size: 13px;
+  }
+
+  h4 {
+    font-size: 12px;
+  }
+
+  > p,
+  label > span,
+  dt {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+  }
+
+  label {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  input,
+  select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.fork-branch-checkout-local,
+.fork-branch-checkout-review,
+.fork-branch-checkout-error {
+  display: grid;
+  gap: 8px;
+}
+
+.fork-branch-checkout-local > .button-component,
+.fork-branch-checkout-review > .button-component,
+.fork-branch-checkout-error > .button-component {
+  justify-self: start;
+}
+
+.fork-branch-checkout-review {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+
+  dl {
+    display: grid;
+    margin: 0;
+    gap: 4px 8px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    white-space: normal;
+    word-break: break-all;
+  }
+}
+
+.fork-branch-checkout-error {
+  padding: 9px;
+  border-radius: 10px;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.fork-branch-checkout-notice {
+  padding: 7px;
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.fork-branch-checkout-success {
+  padding: 9px;
+  border-radius: 10px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.bulk-branch-delete {
+  display: grid;
+  padding: 0 12px 8px;
+  gap: 8px;
+
+  > .button-component {
+    justify-self: start;
+  }
+}
+
+.bulk-branch-delete-panel {
+  display: grid;
+  padding: 10px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  background: var(--md-sys-color-surface-container);
+  gap: 9px;
+
+  > header,
+  > header > div,
+  .bulk-branch-delete-confirmation > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  > header > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  header span,
+  > p {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+  }
+}
+
+.bulk-branch-delete-list {
+  display: grid;
+  max-height: 180px;
+  border-block: 1px solid var(--md-sys-color-outline-variant);
+  overflow: auto;
+
+  label {
+    display: grid;
+    min-height: 34px;
+    align-items: center;
+    padding: 4px;
+    gap: 7px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  code {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+  }
+}
+
+.bulk-branch-delete-confirmation {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.bulk-branch-delete-results {
+  padding-left: 20px;
+  margin: 0;
+
+  .deleted {
+    color: var(--md-sys-color-primary);
+  }
+
+  .failed {
+    color: var(--md-sys-color-error);
+  }
+}
+
 .pull-request-tab {
   display: flex;
   flex-direction: row;

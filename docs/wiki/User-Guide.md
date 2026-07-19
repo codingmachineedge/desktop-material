@@ -6,7 +6,7 @@ focuses on what Desktop Material adds on top.
 
 **Feature guide**
 
-The complete M0–M20 roadmap is published on `main`. This guide also covers the current locally
+The complete M0–M21 roadmap is published on `main`. This guide also covers the current locally
 accepted maintenance changeset: adaptive appearance and profile app identity, favorite/portable tabs, Material entry surfaces, guarded tab management, workflow-run
 cancellation, reviewed rebase, repository-account propagation, bounded OAuth scopes, compact
 surface corrections, temporary submodule navigation, and its explicit language and Back-control
@@ -33,6 +33,7 @@ catalogued function or state owns one distinct screenshot rather than borrowing 
 - [Settings history](#settings-history)
 - [Non-modal dialogs](#non-modal-dialogs)
 - [Multi-clone](#multi-clone)
+- [Advanced Git and collaboration workflows](#advanced-git-and-collaboration-workflows)
 - [Guided Git and GitHub functions](#guided-git-and-github-functions)
 - [GitHub API Explorer](#github-api-explorer)
 - [One-click commit & push](#one-click-commit--push)
@@ -46,6 +47,39 @@ catalogued function or state owns one distinct screenshot rather than borrowing 
 - [Repository power tools](#repository-power-tools)
 - [Multi-window workflows](#multi-window-workflows)
 - [Agent access and CLI](#agent-access-and-cli)
+
+---
+
+## Advanced Git and collaboration workflows
+
+M21 adds progressively disclosed controls around the familiar Desktop flow:
+
+- Use the repository sheet to search, filter by account/provider/status, pin or
+  hide repositories, and run Pull/Fetch All only after reviewing the exact
+  selected subset. History can switch between the current branch and all refs
+  to reveal commits that exist only on remote branches or tags.
+- Open a pull request workspace to inspect its summary, checks, changed-file
+  tree, and expanded diff context; comment and reply, resolve conversations,
+  submit an approval or change request, and update supported metadata. The
+  creation composer discovers bounded repository templates and optional
+  metadata before an immutable final review. Fork checkout separately reviews
+  the exact source repository, branch, and commit before fetching.
+- Open Stash Manager to create a named stash from selected files or manage any
+  stash visible to Git, including entries made outside the app. Repository
+  Tools exposes tag creation, fetch, push, move, signing, pruning, and deletion;
+  destructive tag and bulk-branch actions identify the exact refs first and
+  retain recovery information.
+- In Changes, switch the file list to a directory tree, choose persisted diff
+  context, compare CSV/TSV rows and cells, and preview TGA images. Editor actions
+  understand the expanded editor catalog plus WSL paths. Settings and Repository
+  Tools expose global-ignore editing, allowlisted custom Git presets, reviewed
+  patch import/export, and network/WSL path diagnostics.
+- Open GitHub Projects from Repository Tools for the current account-bound
+  repository. A successful bounded load refreshes the local cache; while
+  offline, the workspace labels and shows only the last-known-good snapshot.
+
+The complete [30-item feature ledger](https://github.com/codingmachineedge/desktop-material/blob/main/docs/features/github-desktop-demand-backlog.md)
+links to behavior, recovery, security, and test details for every workflow.
 
 ---
 

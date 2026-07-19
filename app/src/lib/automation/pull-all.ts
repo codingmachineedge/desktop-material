@@ -1,4 +1,11 @@
-export type PullAllResultStatus = 'pulled' | 'skipped' | 'failed'
+export type RepositorySyncOperation = 'pull' | 'fetch'
+
+export interface IRepositorySyncRequest {
+  readonly operation: RepositorySyncOperation
+  readonly repositoryIds: ReadonlyArray<number>
+}
+
+export type PullAllResultStatus = 'pulled' | 'fetched' | 'skipped' | 'failed'
 
 export interface IPullAllCandidate {
   readonly id: number
@@ -10,7 +17,11 @@ export interface IPullAllResult extends IPullAllCandidate {
   readonly detail: string
 }
 
-export type PullAllProgressStatus = 'queued' | 'pulling' | PullAllResultStatus
+export type PullAllProgressStatus =
+  | 'queued'
+  | 'pulling'
+  | 'fetching'
+  | PullAllResultStatus
 
 export interface IPullAllProgress extends IPullAllCandidate {
   readonly status: PullAllProgressStatus
@@ -37,7 +48,8 @@ export async function runBoundedPullAll(
     onProgress: PullAllOperationProgressListener
   ) => Promise<PullAllOperationResult>,
   concurrency = 3,
-  onProgress?: PullAllProgressListener
+  onProgress?: PullAllProgressListener,
+  activeStatus: 'pulling' | 'fetching' = 'pulling'
 ): Promise<ReadonlyArray<IPullAllResult>> {
   if (!Number.isInteger(concurrency) || concurrency < 1) {
     throw new Error('Pull-all concurrency must be a positive integer.')
@@ -56,7 +68,7 @@ export async function runBoundedPullAll(
       item: {
         ...candidate,
         status: 'queued',
-        detail: 'Waiting for an available pull worker.',
+        detail: 'Waiting for an available repository worker.',
       },
     })
   }
@@ -77,7 +89,7 @@ export async function runBoundedPullAll(
           active,
           item: {
             ...candidate,
-            status: 'pulling',
+            status: activeStatus,
             detail,
           },
         })

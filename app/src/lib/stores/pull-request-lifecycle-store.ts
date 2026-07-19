@@ -8,8 +8,10 @@ import {
   IGitHubPullRequestReview,
   IGitHubPullRequestReviewReceipt,
   IGitHubPullRequestUpdate,
+  normalizeGitHubPullRequestReview,
   validateGitHubPullRequestNumber,
 } from '../github-pull-request'
+import { IGitHubPullRequestWorkspace } from '../github-pull-request-workspace'
 import { Account, getAccountKey } from '../../models/account'
 import { GitHubRepository } from '../../models/github-repository'
 
@@ -20,12 +22,27 @@ interface IPullRequestLifecycleAPI {
     pullRequestNumber: number,
     signal?: AbortSignal
   ): Promise<IGitHubPullRequestLifecycle>
+  inspectPullRequestWorkspace(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestWorkspace>
   updatePullRequestLifecycle(
     owner: string,
     name: string,
     pullRequestNumber: number,
     expectedHeadSHA: string,
     update: IGitHubPullRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt>
+  setPullRequestState(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    state: 'open' | 'closed',
     signal?: AbortSignal
   ): Promise<IGitHubPullRequestMutationReceipt>
   submitPullRequestReview(
@@ -67,7 +84,9 @@ function assertBoundAccount(target: GitHubRepository, account: Account) {
  */
 export class PullRequestLifecycleStore {
   private readonly snapshots = new Map<string, IGitHubPullRequestLifecycle>()
+  private readonly workspaces = new Map<string, IGitHubPullRequestWorkspace>()
   private readonly generations = new Map<string, number>()
+  private readonly workspaceGenerations = new Map<string, number>()
 
   public constructor(
     private readonly apiFactory: PullRequestLifecycleAPIFactory = account =>
@@ -92,6 +111,14 @@ export class PullRequestLifecycleStore {
     return this.apiFactory(account)
   }
 
+  private invalidateWorkspace(key: string): void {
+    this.workspaceGenerations.set(
+      key,
+      (this.workspaceGenerations.get(key) ?? 0) + 1
+    )
+    this.workspaces.delete(key)
+  }
+
   public get(
     target: GitHubRepository,
     account: Account,
@@ -99,6 +126,17 @@ export class PullRequestLifecycleStore {
   ): IGitHubPullRequestLifecycle | null {
     return (
       this.snapshots.get(this.getKey(target, account, pullRequestNumber)) ??
+      null
+    )
+  }
+
+  public getWorkspace(
+    target: GitHubRepository,
+    account: Account,
+    pullRequestNumber: number
+  ): IGitHubPullRequestWorkspace | null {
+    return (
+      this.workspaces.get(this.getKey(target, account, pullRequestNumber)) ??
       null
     )
   }
@@ -123,7 +161,43 @@ export class PullRequestLifecycleStore {
       throw new GitHubPullRequestContextChangedError()
     }
     this.snapshots.set(key, value)
+    this.invalidateWorkspace(key)
     return value
+  }
+
+  public async inspectWorkspace(
+    target: GitHubRepository,
+    account: Account,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestWorkspace> {
+    const api = this.getAPI(target, account)
+    const reviewed = this.getReviewedSnapshot(
+      target,
+      account,
+      pullRequestNumber,
+      expectedHeadSHA
+    )
+    const generation = (this.workspaceGenerations.get(reviewed.key) ?? 0) + 1
+    this.workspaceGenerations.set(reviewed.key, generation)
+    const workspace = await api.inspectPullRequestWorkspace(
+      target.owner.login,
+      target.name,
+      pullRequestNumber,
+      reviewed.value.headSHA,
+      signal
+    )
+    const current = this.snapshots.get(reviewed.key)
+    if (
+      this.workspaceGenerations.get(reviewed.key) !== generation ||
+      current === undefined ||
+      current.headSHA !== workspace.headSHA
+    ) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    this.workspaces.set(reviewed.key, workspace)
+    return workspace
   }
 
   private getReviewedSnapshot(
@@ -167,6 +241,35 @@ export class PullRequestLifecycleStore {
       signal
     )
     this.snapshots.set(reviewed.key, receipt.pullRequest)
+    this.invalidateWorkspace(reviewed.key)
+    return receipt
+  }
+
+  public async setState(
+    target: GitHubRepository,
+    account: Account,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    state: 'open' | 'closed',
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    const api = this.getAPI(target, account)
+    const reviewed = this.getReviewedSnapshot(
+      target,
+      account,
+      pullRequestNumber,
+      expectedHeadSHA
+    )
+    const receipt = await api.setPullRequestState(
+      target.owner.login,
+      target.name,
+      pullRequestNumber,
+      reviewed.value.headSHA,
+      state,
+      signal
+    )
+    this.snapshots.set(reviewed.key, receipt.pullRequest)
+    this.invalidateWorkspace(reviewed.key)
     return receipt
   }
 
@@ -185,14 +288,48 @@ export class PullRequestLifecycleStore {
       pullRequestNumber,
       expectedHeadSHA
     )
-    return api.submitPullRequestReview(
+    const safeReview = normalizeGitHubPullRequestReview(
+      review.event,
+      review.body,
+      review.comments,
+      review.replies
+    )
+    if (safeReview.comments !== undefined || safeReview.replies !== undefined) {
+      const workspace = this.workspaces.get(reviewed.key)
+      if (
+        workspace === undefined ||
+        workspace.headSHA !== reviewed.value.headSHA
+      ) {
+        throw new GitHubPullRequestContextChangedError()
+      }
+      const filePaths = new Set(workspace.files.map(file => file.path))
+      if (
+        safeReview.comments?.some(comment => !filePaths.has(comment.path)) ===
+        true
+      ) {
+        throw new GitHubPullRequestContextChangedError()
+      }
+      const reviewCommentIds = new Set(
+        workspace.reviewComments.map(comment => comment.id)
+      )
+      if (
+        safeReview.replies?.some(
+          reply => !reviewCommentIds.has(reply.inReplyToId)
+        ) === true
+      ) {
+        throw new GitHubPullRequestContextChangedError()
+      }
+    }
+    const receipt = await api.submitPullRequestReview(
       target.owner.login,
       target.name,
       pullRequestNumber,
       reviewed.value.headSHA,
-      review,
+      safeReview,
       signal
     )
+    this.invalidateWorkspace(reviewed.key)
+    return receipt
   }
 
   public async merge(
@@ -219,6 +356,7 @@ export class PullRequestLifecycleStore {
       signal
     )
     this.snapshots.delete(reviewed.key)
+    this.invalidateWorkspace(reviewed.key)
     return receipt
   }
 
@@ -230,5 +368,6 @@ export class PullRequestLifecycleStore {
     const key = this.getKey(target, account, pullRequestNumber)
     this.generations.set(key, (this.generations.get(key) ?? 0) + 1)
     this.snapshots.delete(key)
+    this.invalidateWorkspace(key)
   }
 }

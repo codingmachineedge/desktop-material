@@ -68,6 +68,31 @@ const ProofWorkflowYAML = [
   '      - run: echo guided-proof',
   '',
 ].join('\n')
+const ProofPullRequestTemplate = [
+  '---',
+  'name: Guided proof review',
+  'title: Guided proof change',
+  'reviewers: guided-proof-reviewer',
+  'assignees: proof-b',
+  'labels: guided-proof',
+  'milestone: 3',
+  'draft: true',
+  '---',
+  '## Summary',
+  '',
+  'Describe the bounded guided proof change.',
+  '',
+].join('\n')
+const ProofPullRequestBugTemplate = [
+  '---',
+  'name: Guided proof fix',
+  'labels: material-proof',
+  '---',
+  '## Fix',
+  '',
+  'Explain the deterministic fix.',
+  '',
+].join('\n')
 
 const activeGuidedProofGitChildren = new Set<ChildProcess>()
 
@@ -184,6 +209,7 @@ interface IProofPullRequest {
   reviewers: string[]
   assignees: string[]
   labels: string[]
+  milestone: number | null
 }
 
 interface IProofPullRequestReview {
@@ -191,6 +217,22 @@ interface IProofPullRequestReview {
   readonly pullRequestNumber: number
   readonly state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED'
   readonly body: string
+  readonly author: string
+  readonly submittedAt: string
+  readonly commitSha: string
+}
+
+interface IProofPullRequestReviewComment {
+  readonly id: number
+  readonly pullRequestNumber: number
+  readonly reviewId: number
+  readonly body: string
+  readonly author: string
+  readonly path: string
+  readonly line: number
+  readonly side: 'LEFT' | 'RIGHT'
+  readonly inReplyToId: number | null
+  readonly commitSha: string
 }
 
 interface IProofReleaseAsset {
@@ -566,6 +608,8 @@ class GuidedProofContext {
   public readonly releases: IProofRelease[]
   public readonly pullRequests: IProofPullRequest[]
   public readonly pullRequestReviews: IProofPullRequestReview[] = []
+  public readonly pullRequestReviewComments: IProofPullRequestReviewComment[] =
+    []
   public workflowEnabled = true
   private sequence = 0
   private ledgerWrites: Promise<void> = Promise.resolve()
@@ -685,8 +729,40 @@ class GuidedProofContext {
         reviewers: ['guided-proof-reviewer'],
         assignees: ['proof-b'],
         labels: ['guided-proof'],
+        milestone: 3,
       },
     ]
+    this.comments.set(8, [
+      {
+        id: 7801,
+        body: 'The native review workspace is ready for a deterministic pass.',
+        user: { login: 'guided-proof-reviewer' },
+        created_at: ProofEarlierDate,
+        updated_at: ProofEarlierDate,
+        html_url: `${this.ready.origin}/${ProofOwner}/${ProofRepository}/pull/8#issuecomment-7801`,
+      },
+    ])
+    this.pullRequestReviews.push({
+      id: 8801,
+      pullRequestNumber: 8,
+      state: 'COMMENTED',
+      body: 'Please verify the visible patch and checks.',
+      author: 'guided-proof-reviewer',
+      submittedAt: ProofEarlierDate,
+      commitSha: options.repository.headSha,
+    })
+    this.pullRequestReviewComments.push({
+      id: 8901,
+      pullRequestNumber: 8,
+      reviewId: 8801,
+      body: 'This line is intentionally available for an inline reply.',
+      author: 'guided-proof-reviewer',
+      path: 'README.md',
+      line: 1,
+      side: 'RIGHT',
+      inReplyToId: null,
+      commitSha: options.repository.headSha,
+    })
     const releaseAsset: IProofReleaseAsset = {
       id: 1901,
       name: 'guided-proof.txt',
@@ -1237,6 +1313,12 @@ function pullRequestPayload(
     assignees: pullRequest.assignees.map(login => ({ login })),
     requested_reviewers: pullRequest.reviewers.map(login => ({ login })),
     labels: pullRequest.labels.map(name => ({ name })),
+    milestone:
+      pullRequest.milestone === null
+        ? null
+        : context.milestones.find(
+            milestone => milestone.number === pullRequest.milestone
+          ) ?? null,
     draft: pullRequest.draft,
     merged: pullRequest.merged,
     mergeable: pullRequest.mergeable,
@@ -1248,6 +1330,37 @@ function pullRequestPayload(
       repo: { full_name: pullRequest.headRepository },
     },
     base: { ref: pullRequest.base },
+  }
+}
+
+function pullRequestReviewPayload(review: IProofPullRequestReview): unknown {
+  return {
+    id: review.id,
+    user: { login: review.author },
+    body: review.body,
+    state: review.state,
+    submitted_at: review.submittedAt,
+    commit_id: review.commitSha,
+  }
+}
+
+function pullRequestReviewCommentPayload(
+  comment: IProofPullRequestReviewComment
+): unknown {
+  return {
+    id: comment.id,
+    pull_request_review_id: comment.reviewId,
+    body: comment.body,
+    user: { login: comment.author },
+    created_at: ProofDate,
+    updated_at: ProofDate,
+    path: comment.path,
+    line: comment.line,
+    side: comment.side,
+    start_line: null,
+    in_reply_to_id: comment.inReplyToId,
+    commit_id: comment.commitSha,
+    diff_hunk: '@@ -1 +1 @@\n-Guided proof\n+Guided proof workspace',
   }
 }
 
@@ -1786,6 +1899,7 @@ async function createPullRequest(
     reviewers: [],
     assignees: [],
     labels: [],
+    milestone: null,
   }
   context.pullRequests.push(pullRequest)
   return pullRequest
@@ -1841,12 +1955,24 @@ async function updatePullRequestMetadata(
     throw new ProofRequestError(409, 'pull-request-already-merged')
   }
   const body = await readJSONObject(request)
-  requireOnlyFields(body, ['assignees', 'labels'])
+  requireOnlyFields(body, ['assignees', 'labels', 'milestone'])
   if (body.assignees === undefined || body.labels === undefined) {
     throw new ProofRequestError(422, 'missing-pull-request-metadata')
   }
   pullRequest.assignees = parsePullRequestLogins(context, body.assignees)
   pullRequest.labels = parsePullRequestLabels(context, body.labels)
+  if (body.milestone !== undefined) {
+    if (body.milestone === null) {
+      pullRequest.milestone = null
+    } else if (
+      Number.isSafeInteger(body.milestone) &&
+      context.milestones.some(milestone => milestone.number === body.milestone)
+    ) {
+      pullRequest.milestone = body.milestone as number
+    } else {
+      throw new ProofRequestError(422, 'unknown-pull-request-milestone')
+    }
+  }
 }
 
 interface IProofSearchToken {
@@ -2129,6 +2255,56 @@ async function handleIssuesAPI(
     sendJSON(response, 200, page === 1 ? issues.slice(0, perPage) : [])
     return true
   }
+  const contentsMatch = new RegExp(`^${repositoryPath}/contents/(.+)$`).exec(
+    path
+  )
+  if (contentsMatch !== null) {
+    audit.route = 'api-pull-request-template-content'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    requireOnlyQuery(url, ['ref'])
+    if ((url.searchParams.get('ref') ?? ProofBranch) !== ProofBranch) {
+      throw new ProofRequestError(404, 'template-ref-not-found')
+    }
+    const requestedPath = decodeURIComponent(contentsMatch[1])
+    const filePayload = (templatePath: string, content: string) => ({
+      type: 'file',
+      name: templatePath.slice(templatePath.lastIndexOf('/') + 1),
+      path: templatePath,
+      size: Buffer.byteLength(content, 'utf8'),
+      encoding: 'base64',
+      content: Buffer.from(content, 'utf8').toString('base64'),
+    })
+    if (requestedPath === '.github/pull_request_template.md') {
+      sendJSON(
+        response,
+        200,
+        filePayload(requestedPath, ProofPullRequestTemplate)
+      )
+      return true
+    }
+    if (requestedPath === '.github/PULL_REQUEST_TEMPLATE') {
+      sendJSON(response, 200, [
+        {
+          type: 'file',
+          name: 'guided-fix.md',
+          path: '.github/PULL_REQUEST_TEMPLATE/guided-fix.md',
+          size: Buffer.byteLength(ProofPullRequestBugTemplate, 'utf8'),
+        },
+      ])
+      return true
+    }
+    if (requestedPath === '.github/PULL_REQUEST_TEMPLATE/guided-fix.md') {
+      sendJSON(
+        response,
+        200,
+        filePayload(requestedPath, ProofPullRequestBugTemplate)
+      )
+      return true
+    }
+    return false
+  }
   if (path === `${repositoryPath}/pulls`) {
     audit.route = 'api-pull-requests'
     if (!requireMethod(request, response, ['GET', 'POST'])) {
@@ -2210,19 +2386,163 @@ async function handleIssuesAPI(
     sendJSON(response, 200, pullRequestPayload(context, pullRequest))
     return true
   }
-  const pullRequestReviewsMatch = new RegExp(
-    `^${repositoryPath}/pulls/([1-9][0-9]*)/reviews$`
+  const pullRequestFilesMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/files$`
   ).exec(path)
-  if (pullRequestReviewsMatch !== null) {
-    audit.route = 'api-pull-request-review'
+  if (pullRequestFilesMatch !== null) {
+    audit.route = 'api-pull-request-files'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    pullRequestByNumber(context, Number.parseInt(pullRequestFilesMatch[1], 10))
+    requireOnlyQuery(url, ['per_page', 'page'])
+    const perPage = boundedIntegerQuery(url, 'per_page', 1, 100, 50)
+    const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
+    const files = [
+      {
+        sha: context.options.repository.headSha,
+        filename: 'README.md',
+        previous_filename: null,
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+        changes: 2,
+        patch: '@@ -1 +1 @@\n-Guided proof\n+Guided proof workspace for review',
+      },
+    ]
+    const offset = (page - 1) * perPage
+    sendJSON(response, 200, files.slice(offset, offset + perPage))
+    return true
+  }
+  const pullRequestCommitsMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/commits$`
+  ).exec(path)
+  if (pullRequestCommitsMatch !== null) {
+    audit.route = 'api-pull-request-commits'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    pullRequestByNumber(
+      context,
+      Number.parseInt(pullRequestCommitsMatch[1], 10)
+    )
+    requireOnlyQuery(url, ['per_page', 'page'])
+    const perPage = boundedIntegerQuery(url, 'per_page', 1, 100, 50)
+    const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
+    const commits = [
+      {
+        sha: context.options.repository.headSha,
+        author: { login: 'proof-a' },
+        commit: {
+          message: 'Prepare deterministic pull request review workspace',
+          author: {
+            name: 'Proof Account A',
+            email: 'proof-a@example.invalid',
+            date: ProofEarlierDate,
+          },
+        },
+      },
+    ]
+    const offset = (page - 1) * perPage
+    sendJSON(response, 200, commits.slice(offset, offset + perPage))
+    return true
+  }
+  const pullRequestReviewRepliesMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/comments/([1-9][0-9]*)/replies$`
+  ).exec(path)
+  if (pullRequestReviewRepliesMatch !== null) {
+    audit.route = 'api-pull-request-review-reply'
     if (!requireMethod(request, response, ['POST'])) {
       return true
     }
     requireOnlyQuery(url, [])
     const pullRequest = pullRequestByNumber(
       context,
+      Number.parseInt(pullRequestReviewRepliesMatch[1], 10)
+    )
+    const parentId = Number.parseInt(pullRequestReviewRepliesMatch[2], 10)
+    const parent = context.pullRequestReviewComments.find(
+      comment =>
+        comment.pullRequestNumber === pullRequest.number &&
+        comment.id === parentId
+    )
+    if (parent === undefined) {
+      throw new ProofRequestError(404, 'pull-request-review-comment-not-found')
+    }
+    const body = await readJSONObject(request)
+    requireOnlyFields(body, ['body'])
+    const comment: IProofPullRequestReviewComment = {
+      id: 8901 + context.pullRequestReviewComments.length,
+      pullRequestNumber: pullRequest.number,
+      reviewId: parent.reviewId,
+      body: boundedString(body.body, ProofIssueBodyMaximumLength),
+      author: 'proof-b',
+      path: parent.path,
+      line: parent.line,
+      side: parent.side,
+      inReplyToId: parent.id,
+      commitSha: context.options.repository.headSha,
+    }
+    context.pullRequestReviewComments.push(comment)
+    sendJSON(response, 201, pullRequestReviewCommentPayload(comment))
+    return true
+  }
+  const pullRequestReviewCommentsMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/comments$`
+  ).exec(path)
+  if (pullRequestReviewCommentsMatch !== null) {
+    audit.route = 'api-pull-request-review-comments'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    const pullRequest = pullRequestByNumber(
+      context,
+      Number.parseInt(pullRequestReviewCommentsMatch[1], 10)
+    )
+    requireOnlyQuery(url, ['per_page', 'page'])
+    const perPage = boundedIntegerQuery(url, 'per_page', 1, 100, 50)
+    const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
+    const comments = context.pullRequestReviewComments.filter(
+      comment => comment.pullRequestNumber === pullRequest.number
+    )
+    const offset = (page - 1) * perPage
+    sendJSON(
+      response,
+      200,
+      comments
+        .slice(offset, offset + perPage)
+        .map(pullRequestReviewCommentPayload)
+    )
+    return true
+  }
+  const pullRequestReviewsMatch = new RegExp(
+    `^${repositoryPath}/pulls/([1-9][0-9]*)/reviews$`
+  ).exec(path)
+  if (pullRequestReviewsMatch !== null) {
+    audit.route = 'api-pull-request-review'
+    if (!requireMethod(request, response, ['GET', 'POST'])) {
+      return true
+    }
+    const pullRequest = pullRequestByNumber(
+      context,
       Number.parseInt(pullRequestReviewsMatch[1], 10)
     )
+    if (request.method === 'GET') {
+      requireOnlyQuery(url, ['per_page', 'page'])
+      const perPage = boundedIntegerQuery(url, 'per_page', 1, 100, 50)
+      const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
+      const reviews = context.pullRequestReviews.filter(
+        review => review.pullRequestNumber === pullRequest.number
+      )
+      const offset = (page - 1) * perPage
+      sendJSON(
+        response,
+        200,
+        reviews.slice(offset, offset + perPage).map(pullRequestReviewPayload)
+      )
+      return true
+    }
+    requireOnlyQuery(url, [])
     if (
       pullRequest.state !== 'open' ||
       pullRequest.merged ||
@@ -2231,7 +2551,10 @@ async function handleIssuesAPI(
       throw new ProofRequestError(409, 'pull-request-review-unavailable')
     }
     const body = await readJSONObject(request)
-    requireOnlyFields(body, ['event', 'body'])
+    requireOnlyFields(body, ['event', 'body', 'commit_id', 'comments'])
+    if (body.commit_id !== context.options.repository.headSha) {
+      throw new ProofRequestError(409, 'pull-request-head-changed')
+    }
     const event = boundedString(body.event, 32)
     if (!['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event)) {
       throw new ProofRequestError(422, 'invalid-pull-request-review-event')
@@ -2242,6 +2565,17 @@ async function handleIssuesAPI(
       true
     )
     if (event === 'REQUEST_CHANGES' && reviewBody.trim() === '') {
+      throw new ProofRequestError(422, 'missing-pull-request-review-body')
+    }
+    const comments = body.comments === undefined ? [] : body.comments
+    if (!Array.isArray(comments) || comments.length > 25) {
+      throw new ProofRequestError(422, 'invalid-pull-request-review-comments')
+    }
+    if (
+      event === 'COMMENT' &&
+      reviewBody.trim() === '' &&
+      comments.length === 0
+    ) {
       throw new ProofRequestError(422, 'missing-pull-request-review-body')
     }
     const state =
@@ -2255,9 +2589,48 @@ async function handleIssuesAPI(
       pullRequestNumber: pullRequest.number,
       state,
       body: reviewBody,
+      author: 'proof-b',
+      submittedAt: ProofDate,
+      commitSha: context.options.repository.headSha,
+    }
+    const pendingComments = new Array<IProofPullRequestReviewComment>()
+    for (const rawComment of comments) {
+      if (
+        typeof rawComment !== 'object' ||
+        rawComment === null ||
+        Array.isArray(rawComment)
+      ) {
+        throw new ProofRequestError(422, 'invalid-pull-request-review-comment')
+      }
+      const pending = rawComment as Record<string, unknown>
+      requireOnlyFields(pending, ['path', 'line', 'side', 'body'])
+      if (
+        pending.path !== 'README.md' ||
+        !Number.isSafeInteger(pending.line) ||
+        (pending.line as number) < 1 ||
+        !['LEFT', 'RIGHT'].includes(pending.side as string)
+      ) {
+        throw new ProofRequestError(422, 'invalid-pull-request-review-comment')
+      }
+      pendingComments.push({
+        id:
+          8901 +
+          context.pullRequestReviewComments.length +
+          pendingComments.length,
+        pullRequestNumber: pullRequest.number,
+        reviewId: review.id,
+        body: boundedString(pending.body, ProofIssueBodyMaximumLength),
+        author: 'proof-b',
+        path: pending.path,
+        line: pending.line as number,
+        side: pending.side as 'LEFT' | 'RIGHT',
+        inReplyToId: null,
+        commitSha: context.options.repository.headSha,
+      })
     }
     context.pullRequestReviews.push(review)
-    sendJSON(response, 200, { id: review.id, state: review.state })
+    context.pullRequestReviewComments.push(...pendingComments)
+    sendJSON(response, 200, pullRequestReviewPayload(review))
     return true
   }
   const pullRequestMergeMatch = new RegExp(
@@ -2338,11 +2711,19 @@ async function handleIssuesAPI(
       return true
     }
     const issueNumber = Number.parseInt(commentsMatch[1], 10)
-    const issue = issueByNumber(context, issueNumber)
+    const issue = context.issues.find(
+      candidate => candidate.number === issueNumber
+    )
+    const pullRequest = context.pullRequests.find(
+      candidate => candidate.number === issueNumber
+    )
+    if (issue === undefined && pullRequest === undefined) {
+      throw new ProofRequestError(404, 'issue-not-found')
+    }
     const comments = context.comments.get(issueNumber) ?? []
     if (request.method === 'GET') {
       requireOnlyQuery(url, ['per_page', 'page'])
-      const perPage = boundedIntegerQuery(url, 'per_page', 1, 30, 30)
+      const perPage = boundedIntegerQuery(url, 'per_page', 1, 100, 30)
       const page = boundedIntegerQuery(url, 'page', 1, 10, 1)
       sendJSON(response, 200, page === 1 ? comments.slice(0, perPage) : [])
       return true
@@ -2360,12 +2741,17 @@ async function handleIssuesAPI(
       user: { login: 'proof-b' },
       created_at: ProofDate,
       updated_at: ProofDate,
-      html_url: `${issue.html_url}#issuecomment-${7701 + comments.length}`,
+      html_url: `${
+        issue?.html_url ??
+        `${context.ready.origin}/${ProofOwner}/${ProofRepository}/pull/${issueNumber}`
+      }#issuecomment-${7701 + comments.length}`,
     }
     comments.push(comment)
     context.comments.set(issueNumber, comments)
-    issue.comments = comments.length
-    issue.updated_at = ProofDate
+    if (issue !== undefined) {
+      issue.comments = comments.length
+      issue.updated_at = ProofDate
+    }
     sendJSON(response, 201, comment)
     return true
   }
@@ -2392,6 +2778,26 @@ async function handleIssuesAPI(
       response,
       200,
       page === 1 ? context.assignees.map(login => ({ login })) : []
+    )
+    return true
+  }
+  if (path === `${repositoryPath}/collaborators`) {
+    audit.route = 'api-pull-request-reviewer-candidates'
+    if (!requireMethod(request, response, ['GET'])) {
+      return true
+    }
+    requireOnlyQuery(url, ['affiliation', 'per_page', 'page'])
+    if ((url.searchParams.get('affiliation') ?? 'all') !== 'all') {
+      throw new ProofRequestError(400, 'invalid-affiliation')
+    }
+    boundedIntegerQuery(url, 'per_page', 1, 100, 100)
+    const page = boundedIntegerQuery(url, 'page', 1, 5, 1)
+    sendJSON(
+      response,
+      200,
+      page === 1
+        ? ['proof-b', 'guided-proof-reviewer'].map(login => ({ login }))
+        : []
     )
     return true
   }

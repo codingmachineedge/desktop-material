@@ -41,6 +41,12 @@ import {
 } from './operations'
 import { RepositoryBundleImport } from './bundle-import'
 import { RepositoryShallowHistory } from './shallow-history'
+import { RepositoryPatchSeries } from './patch-series'
+import { CustomGitCommands } from './custom-git-commands'
+import {
+  ITagLifecycleDispatcher,
+  TagLifecycleManager,
+} from '../tag/tag-lifecycle-manager'
 import { CheapLfs, ICheapLfsDispatcher } from './cheap-lfs'
 import { Account } from '../../models/account'
 import { Repository, isSubmoduleRepository } from '../../models/repository'
@@ -51,6 +57,7 @@ import {
   readPersistedFilterMode,
 } from '../lib/filter-list-mode'
 import { t } from '../../lib/i18n'
+import { GitHubProjectsWorkspace } from '../github-projects'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -90,6 +97,9 @@ const DirectRepositoryToolMutationIDs = new Set<CLIWorkbenchOperation['id']>([
   'history-unshallow',
   'notes-edit',
   'notes-remove',
+  'patch-import',
+  'patch-session',
+  'custom-git-command',
 ])
 
 /** Classify every named CLI recipe that can change a repository checkout. */
@@ -119,6 +129,10 @@ type RepositoryToolsHubToolID =
   | 'shallow-history'
   | 'export-artifacts'
   | 'bundle-import'
+  | 'patch-series'
+  | 'custom-git-presets'
+  | 'tag-lifecycle'
+  | 'github-projects'
   | 'submodule-manager'
   | 'subtree-manager'
   | 'cheap-lfs'
@@ -253,6 +267,14 @@ const UnsortedHubEntries: ReadonlyArray<IRepositoryToolsHubEntry> = [
     icon: octicons.codescan,
   },
   {
+    id: 'custom-git-presets',
+    title: 'Custom Git presets',
+    description:
+      'Save and run reviewed, allowlisted Git argument presets without a shell or editable executable.',
+    category: 'Search & inspect',
+    icon: octicons.terminal,
+  },
+  {
     id: 'commit-notes',
     title: 'Edit commit notes',
     description:
@@ -283,6 +305,14 @@ const UnsortedHubEntries: ReadonlyArray<IRepositoryToolsHubEntry> = [
       'Bring one branch from a Git bundle file into this repository as a new local branch.',
     category: 'Share & transfer',
     icon: octicons.download,
+  },
+  {
+    id: 'patch-series',
+    title: 'Exchange patch series',
+    description:
+      'Export commits ahead of upstream or apply an ordered, reviewed set of Git patch files.',
+    category: 'Share & transfer',
+    icon: octicons.diff,
   },
 ]
 
@@ -330,6 +360,25 @@ const CheapLfsHubEntry: IRepositoryToolsHubEntry = {
     'Store a large file as a GitHub Release asset and commit only a small pointer in its place, then materialize it back on demand.',
   category: 'Large files & storage',
   icon: octicons.fileZip,
+}
+
+const TagLifecycleHubEntry: IRepositoryToolsHubEntry = {
+  id: 'tag-lifecycle',
+  title: 'Tag lifecycle',
+  description:
+    'Inventory, create, move, sign, push, fetch, prune, and delete local and remote tags.',
+  category: 'Status & branches',
+  icon: octicons.tag,
+}
+
+function getGitHubProjectsHubEntry(): IRepositoryToolsHubEntry {
+  return {
+    id: 'github-projects',
+    title: t('projects.title'),
+    description: t('projects.description'),
+    category: 'Search & inspect',
+    icon: octicons.projectRoadmap,
+  }
 }
 
 const RepositoryToolsHubCategories: ReadonlyArray<RepositoryToolsHubCategoryFilter> =
@@ -413,6 +462,15 @@ export interface IRepositoryToolsProps {
     readonly dispatcher: ICheapLfsDispatcher
     readonly available: boolean
   }
+
+  /** Typed tag operations supplied by the application dispatcher. */
+  readonly tagLifecycleDispatcher?: ITagLifecycleDispatcher
+
+  /** Account context for the bounded, read-only GitHub Projects workspace. */
+  readonly githubProjects?: {
+    readonly repository: Repository
+    readonly accounts: ReadonlyArray<Account>
+  }
 }
 
 type OperationStatus =
@@ -439,6 +497,8 @@ interface IRepositoryToolsState {
   readonly error: string | null
   readonly bundleImportBusy: boolean
   readonly shallowHistoryBusy: boolean
+  readonly patchSeriesBusy: boolean
+  readonly customGitCommandsBusy: boolean
   readonly searchActive: boolean
   readonly searchPattern: string
   readonly searchRevision: string
@@ -500,6 +560,8 @@ export class RepositoryTools extends React.Component<
       error: null,
       bundleImportBusy: false,
       shallowHistoryBusy: false,
+      patchSeriesBusy: false,
+      customGitCommandsBusy: false,
       searchActive: false,
       searchPattern: '',
       searchRevision: '',
@@ -553,6 +615,8 @@ export class RepositoryTools extends React.Component<
         error: null,
         bundleImportBusy: false,
         shallowHistoryBusy: false,
+        patchSeriesBusy: false,
+        customGitCommandsBusy: false,
         searchActive: false,
         searchPattern: '',
         searchRevision: '',
@@ -614,7 +678,9 @@ export class RepositoryTools extends React.Component<
     return (
       this.runId !== null ||
       this.state.bundleImportBusy ||
-      this.state.shallowHistoryBusy
+      this.state.shallowHistoryBusy ||
+      this.state.patchSeriesBusy ||
+      this.state.customGitCommandsBusy
     )
   }
 
@@ -627,6 +693,18 @@ export class RepositoryTools extends React.Component<
   private onShallowHistoryBusyChanged = (shallowHistoryBusy: boolean) => {
     if (this.state.shallowHistoryBusy !== shallowHistoryBusy) {
       this.setState({ shallowHistoryBusy })
+    }
+  }
+
+  private onPatchSeriesBusyChanged = (patchSeriesBusy: boolean) => {
+    if (this.state.patchSeriesBusy !== patchSeriesBusy) {
+      this.setState({ patchSeriesBusy })
+    }
+  }
+
+  private onCustomGitCommandsBusyChanged = (customGitCommandsBusy: boolean) => {
+    if (this.state.customGitCommandsBusy !== customGitCommandsBusy) {
+      this.setState({ customGitCommandsBusy })
     }
   }
 
@@ -727,8 +805,21 @@ export class RepositoryTools extends React.Component<
       isSubmoduleRepository(this.props.repository) ||
       cheapLfs === undefined ||
       cheapLfs.available !== true
+    const tagLifecycleHidden =
+      this.props.repository === undefined ||
+      this.props.tagLifecycleDispatcher === undefined
+    const githubProjectsHidden =
+      isSubmoduleRepository(this.props.repository) ||
+      this.props.githubProjects === undefined ||
+      this.props.githubProjects.repository.gitHubRepository === null
 
-    if (submodulesHidden && subtreesHidden && cheapLfsHidden) {
+    if (
+      submodulesHidden &&
+      subtreesHidden &&
+      cheapLfsHidden &&
+      tagLifecycleHidden &&
+      githubProjectsHidden
+    ) {
       return RepositoryToolsHubEntries
     }
 
@@ -737,6 +828,8 @@ export class RepositoryTools extends React.Component<
       ...(submodulesHidden ? [] : [SubmoduleManagerHubEntry]),
       ...(subtreesHidden ? [] : [SubtreeManagerHubEntry]),
       ...(cheapLfsHidden ? [] : [CheapLfsHubEntry]),
+      ...(tagLifecycleHidden ? [] : [TagLifecycleHubEntry]),
+      ...(githubProjectsHidden ? [] : [getGitHubProjectsHubEntry()]),
     ].sort(compareHubEntries)
   }
 
@@ -1507,6 +1600,19 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderGitHubProjects() {
+    const projects = this.props.githubProjects
+    if (projects === undefined) {
+      return null
+    }
+    return (
+      <GitHubProjectsWorkspace
+        repository={projects.repository}
+        accounts={projects.accounts}
+      />
+    )
+  }
+
   private renderExport() {
     return (
       <section
@@ -1580,6 +1686,59 @@ export class RepositoryTools extends React.Component<
         onRefreshRepository={this.props.onRefreshRepository}
         onBusyChanged={this.onBundleImportBusyChanged}
         chooseBundleToImport={this.props.chooseBundleToImport}
+      />
+    )
+  }
+
+  private renderTagLifecycle() {
+    const repository = this.props.repository
+    const dispatcher = this.props.tagLifecycleDispatcher
+    if (repository === undefined || dispatcher === undefined) {
+      return null
+    }
+    return (
+      <TagLifecycleManager
+        repository={repository}
+        dispatcher={dispatcher}
+        readOnly={this.temporaryToolsReadOnlyMessage !== null}
+        onRefreshRepository={this.props.onRefreshRepository}
+      />
+    )
+  }
+
+  private renderPatchSeries() {
+    return (
+      <RepositoryPatchSeries
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          !this.state.gitAvailable ||
+          this.temporaryToolsReadOnlyMessage !== null
+        }
+        client={this.temporarySafeClient}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onPatchSeriesBusyChanged}
+      />
+    )
+  }
+
+  private renderCustomGitCommands() {
+    return (
+      <CustomGitCommands
+        repositoryPath={this.props.repositoryPath}
+        disabled={
+          this.runId !== null ||
+          this.state.bundleImportBusy ||
+          this.state.shallowHistoryBusy ||
+          this.state.patchSeriesBusy ||
+          !this.state.gitAvailable ||
+          this.temporaryToolsReadOnlyMessage !== null
+        }
+        client={this.temporarySafeClient}
+        onRefreshRepository={this.props.onRefreshRepository}
+        onBusyChanged={this.onCustomGitCommandsBusyChanged}
       />
     )
   }
@@ -2114,6 +2273,8 @@ export class RepositoryTools extends React.Component<
         {selected === 'submodule-manager' && this.renderSubmoduleManager()}
         {selected === 'subtree-manager' && this.renderSubtreeManager()}
         {selected === 'cheap-lfs' && this.renderCheapLfs()}
+        {selected === 'tag-lifecycle' && this.renderTagLifecycle()}
+        {selected === 'github-projects' && this.renderGitHubProjects()}
         {selected === 'export-artifacts' && this.renderExport()}
         <div
           className="repository-tools-panel"
@@ -2127,10 +2288,22 @@ export class RepositoryTools extends React.Component<
         >
           {this.renderImport()}
         </div>
+        <div
+          className="repository-tools-panel"
+          hidden={selected !== 'patch-series'}
+        >
+          {this.renderPatchSeries()}
+        </div>
+        <div
+          className="repository-tools-panel"
+          hidden={selected !== 'custom-git-presets'}
+        >
+          {this.renderCustomGitCommands()}
+        </div>
         {this.renderConfirmation()}
         {this.renderArchiveConfirmation()}
         {this.renderNoteConfirmation()}
-        {this.renderResults()}
+        {selected !== 'github-projects' && this.renderResults()}
       </section>
     )
   }

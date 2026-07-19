@@ -33,6 +33,11 @@ import { IFileContents } from './syntax-highlighting'
 import { SubmoduleDiff } from './submodule-diff'
 import { Octicon } from '../octicons'
 import * as OcticonSymbol from '../octicons/octicons.generated'
+import { StructuredDiff } from './structured-diff'
+import {
+  buildStructuredDiff,
+  MaxStructuredDiffBytes,
+} from './structured-diff-data'
 
 // image used when no diff is displayed
 const NoDiffImage = encodePathAsUrl(__dirname, 'static/ufo-alert.svg')
@@ -228,6 +233,11 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
   }
 
   private renderText(diff: ITextDiff) {
+    const structuredDiff = this.renderStructuredTextDiff(diff)
+    if (structuredDiff !== null) {
+      return structuredDiff
+    }
+
     if (diff.hunks.length === 0) {
       if (
         this.props.file.status.kind === AppFileStatusKind.New ||
@@ -272,6 +282,38 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
     }
 
     return this.renderTextDiff(diff)
+  }
+
+  private renderStructuredTextDiff(diff: ITextDiff): React.ReactNode | null {
+    const contents = this.props.fileContents
+    if (
+      contents === null ||
+      diff.hunks.length === 0 ||
+      contents.oldContentsArePartial === true ||
+      contents.newContentsArePartial === true ||
+      (contents.oldContentsByteLength ?? 0) > MaxStructuredDiffBytes ||
+      (contents.newContentsByteLength ?? 0) > MaxStructuredDiffBytes
+    ) {
+      return null
+    }
+
+    const result = buildStructuredDiff(
+      this.props.file.path,
+      contents.oldContents.join('\n'),
+      contents.newContents.join('\n')
+    )
+    if (result.kind === 'code') {
+      return null
+    }
+
+    return (
+      <StructuredDiff
+        key={this.props.file.id}
+        data={result.data}
+        readOnly={this.props.readOnly}
+        codeDiff={this.renderTextDiff(diff)}
+      />
+    )
   }
 
   private renderSubmoduleDiff(diff: ISubmoduleDiff) {

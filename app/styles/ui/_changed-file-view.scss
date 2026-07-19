@@ -1,0 +1,124 @@
+.changed-file-view-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container-low);
+
+  button {
+    appearance: none;
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    font: inherit;
+    font-size: 11px;
+    line-height: 18px;
+    white-space: nowrap;
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+    }
+
+    &.selected {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 1px;
+    }
+  }
+}
+
+.changes-panel-header .changed-file-view-toggle {
+  margin-left: auto;
+}
+
+.changed-file-list-layout {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+
+  > .file-list {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+.changed-file-list-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.changed-file-tree-directory {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0 8px 0 calc(8px + var(--changed-file-tree-indent, 0px));
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+
+  .octicon {
+    flex: 0 0 auto;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.changed-file-tree-file {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding-left: var(--changed-file-tree-indent, 0px);
+
+  > .file {
+    width: 100%;
+  }
+
+  // The containing directory row carries the path in tree mode. Keeping only
+  // the basename here avoids repeating long prefixes while the list's full
+  // accessible name and context-menu target remain unchanged.
+  .path-text-component .dirname {
+    display: none;
+  }
+}
+
+#history .changed-file-list-layout {
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+
+  > .file-list {
+    border-right: 0;
+  }
+}
+
+.pull-request-files-changed .changed-file-list-layout {
+  border-right: var(--base-border);
+
+  > .file-list {
+    border-right: 0;
+  }
+}

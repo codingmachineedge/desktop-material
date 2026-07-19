@@ -17,6 +17,7 @@ import {
   accountFilterFor,
   filterRepositoryGroups,
   repositoryService,
+  RepositoryStatusFilter,
 } from '../../src/ui/repositories-list/repository-list-filters'
 
 const makeAccount = (
@@ -441,6 +442,89 @@ describe('repository list grouping', () => {
     )
     assert.ok(
       filtered.every(group => group.items[0].repository.id === hosted.id)
+    )
+  })
+
+  it('combines status filters with persisted visibility without regrouping', () => {
+    const clean = new Repository('clean', 501, null, false)
+    const changed = new Repository('changed', 502, null, false)
+    const ahead = new Repository('ahead', 503, null, false)
+    const behind = new Repository('behind', 504, null, false)
+    const missing = new Repository('missing', 505, null, true)
+    const cloning = new CloningRepository(
+      '/tmp/cloning-status',
+      'https://example.test/cloning-status.git'
+    )
+    const state = new Map<number, ILocalRepositoryState>([
+      [
+        clean.id,
+        {
+          aheadBehind: { ahead: 0, behind: 0 },
+          changedFilesCount: 0,
+          branchName: 'main',
+          defaultBranchName: 'main',
+        },
+      ],
+      [
+        changed.id,
+        {
+          aheadBehind: { ahead: 0, behind: 0 },
+          changedFilesCount: 2,
+          branchName: 'main',
+          defaultBranchName: 'main',
+        },
+      ],
+      [
+        ahead.id,
+        {
+          aheadBehind: { ahead: 2, behind: 0 },
+          changedFilesCount: 0,
+          branchName: 'main',
+          defaultBranchName: 'main',
+        },
+      ],
+      [
+        behind.id,
+        {
+          aheadBehind: { ahead: 0, behind: 3 },
+          changedFilesCount: 0,
+          branchName: 'main',
+          defaultBranchName: 'main',
+        },
+      ],
+    ])
+    const groups = groupRepositories(
+      [clean, changed, ahead, behind, missing, cloning],
+      state,
+      [],
+      true,
+      [ahead.id]
+    )
+    const idsFor = (
+      statusFilters: ReadonlyArray<RepositoryStatusFilter>,
+      showHiddenRepositories = false
+    ) =>
+      filterRepositoryGroups(groups, [], 'all', 'all', {
+        statusFilters,
+        hiddenRepositoryIds: [ahead.id],
+        showHiddenRepositories,
+      }).flatMap(group => group.items.map(item => item.repository.id))
+
+    assert.deepEqual(idsFor(['changed']), [changed.id])
+    assert.deepEqual(idsFor(['ahead']), [])
+    assert.deepEqual(idsFor(['ahead'], true), [ahead.id, ahead.id])
+    assert.deepEqual(idsFor(['behind']), [behind.id])
+    assert.deepEqual(
+      new Set(idsFor(['clean'], true)),
+      new Set([clean.id, ahead.id, behind.id])
+    )
+    assert.deepEqual(
+      new Set(idsFor(['missing-or-cloning'])),
+      new Set([missing.id, cloning.id])
+    )
+    assert.deepEqual(
+      new Set(idsFor(['changed', 'behind'])),
+      new Set([changed.id, behind.id])
     )
   })
 })

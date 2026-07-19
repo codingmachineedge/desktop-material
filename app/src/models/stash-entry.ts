@@ -16,11 +16,19 @@ export interface IStashEntry {
   /** The bounded ISO timestamp recorded on the stash commit, when available. */
   readonly createdAt?: string | null
 
+  /** Whether Desktop Material or another Git client created this stash. */
+  readonly origin?: 'desktop' | 'external'
+
   /** The list of files this stash touches */
   readonly files: StashedFileChanges
 
   readonly tree: string
   readonly parents: ReadonlyArray<string>
+}
+
+/** Legacy entries without an origin were created by Desktop. */
+export function isDesktopManagedStash(stashEntry: IStashEntry): boolean {
+  return stashEntry.origin !== 'external'
 }
 
 /** Whether file changes for a stash entry are loaded or not */

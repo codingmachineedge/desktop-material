@@ -10,6 +10,8 @@ export type FoundEditor = {
    * The executable associated with the editor to launch
    */
   path: string
+  /** Launch this Windows editor against a path inside this WSL distribution. */
+  wslDistribution?: string
 }
 
 interface IErrorMetadata {

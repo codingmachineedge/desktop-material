@@ -11,6 +11,7 @@ async function createFixture(): Promise<{
   readonly repositoryPath: string
   readonly exportDirectory: string
   readonly bundlePath: string
+  readonly patchPaths: ReadonlyArray<string>
 }> {
   const root = await mkdtemp(join(tmpdir(), 'desktop-operation-registry-'))
   const repositoryPath = join(root, 'repository')
@@ -19,7 +20,12 @@ async function createFixture(): Promise<{
   await mkdir(join(repositoryPath, '.git'), { recursive: true })
   await mkdir(exportDirectory, { recursive: true })
   await writeFile(bundlePath, 'fixture')
-  return { root, repositoryPath, exportDirectory, bundlePath }
+  const patchPaths = [
+    join(exportDirectory, '0001-first.patch'),
+    join(exportDirectory, '0002-second.patch'),
+  ]
+  await Promise.all(patchPaths.map(path => writeFile(path, 'From fixture\n')))
+  return { root, repositoryPath, exportDirectory, bundlePath, patchPaths }
 }
 
 describe('CLI workbench operation registry', () => {
@@ -277,6 +283,49 @@ describe('CLI workbench operation registry', () => {
           ['notes', 'remove', '--', 'HEAD'],
           true,
         ],
+        [
+          {
+            id: 'patch-export',
+            destination: join(fixture.exportDirectory, 'review'),
+          },
+          [
+            'format-patch',
+            '--no-signature',
+            '--numbered',
+            `--output-directory=${join(
+              fixture.exportDirectory,
+              'review.patches'
+            )}`,
+            '@{upstream}..HEAD',
+          ],
+          true,
+        ],
+        [
+          { id: 'patch-import', patchPaths: fixture.patchPaths },
+          [
+            'am',
+            '--3way',
+            '--keep-cr',
+            '--no-gpg-sign',
+            '--',
+            ...fixture.patchPaths,
+          ],
+          true,
+        ],
+        [
+          { id: 'patch-session', operation: 'continue' },
+          ['am', '--continue'],
+          true,
+        ],
+        [
+          {
+            id: 'custom-git-command',
+            command: 'log',
+            args: ['--oneline', '--decorate', '-25'],
+          },
+          ['log', '--oneline', '--decorate', '-25'],
+          true,
+        ],
       ]
 
       for (const [operation, args, requiresConfirmation] of cases) {
@@ -365,6 +414,41 @@ describe('CLI workbench operation registry', () => {
           id: 'archive-export',
           format: 'zip',
           destination: join(fixture.repositoryPath, '.git', 'private.zip'),
+        },
+        {
+          id: 'patch-export',
+          destination: join(fixture.repositoryPath, '.git', 'private'),
+        },
+        { id: 'patch-import', patchPaths: [] },
+        { id: 'patch-import', patchPaths: ['relative.patch'] },
+        { id: 'patch-import', patchPaths: [fixture.bundlePath] },
+        {
+          id: 'patch-import',
+          patchPaths: [fixture.patchPaths[0], fixture.patchPaths[0]],
+        },
+        { id: 'patch-session', operation: 'reset' },
+        { id: 'patch-session', operation: 'abort', force: true },
+        { id: 'custom-git-command', command: 'alias', args: ['payload'] },
+        {
+          id: 'custom-git-command',
+          command: 'log',
+          args: ['--git-dir=../outside'],
+        },
+        {
+          id: 'custom-git-command',
+          command: 'show',
+          args: ['https://secret@example.test/repo'],
+        },
+        {
+          id: 'custom-git-command',
+          command: 'diff',
+          args: ['../../outside'],
+        },
+        {
+          id: 'custom-git-command',
+          command: 'status',
+          args: [],
+          shell: true,
         },
       ]
 

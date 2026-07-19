@@ -12,7 +12,7 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
 
 ## Product scope
 
-The complete M0–M20 roadmap is shipped on `main`. The compact status summary is
+The complete M0–M21 roadmap is shipped on `main`. The compact status summary is
 below; the implementation ledger is in [`PLAN.md`](PLAN.md), and detailed
 acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
 
@@ -39,6 +39,28 @@ and [CodeQL](https://github.com/codingmachineedge/desktop-material/actions/runs/
 then published the immutable [Windows release `v3.6.3-beta3-b0000000165`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000165).
 The detailed Pages, wiki, asset, and cleanup receipts are maintained in
 [`HANDOFF.md`](HANDOFF.md).
+
+**Advanced Git and collaboration workflows (M21)**
+
+- Keep multiple provider identities bound to the right repository; pin, hide,
+  filter, and switch large repository sets; search current-branch or all-ref
+  History; inspect remote-only commits; and run a reviewed pull/fetch batch
+  across an exact repository subset
+- Review and create pull requests without leaving the app: inspect files in a
+  tree, expand diff context, comment, reply, resolve, approve, request changes,
+  edit metadata, inspect checks, receive activity notifications, and safely
+  check out an exact branch or commit from another fork
+- Stash only selected files, name and manage multiple stashes—including stashes
+  created outside Desktop Material—and manage the complete local/remote tag
+  lifecycle with reviewed destructive operations and recovery receipts
+- Compare CSV/TSV data structurally, preview TGA images, open files through a
+  broader editor catalog or WSL, work with network/WSL repository paths, manage
+  the global ignore file, import/export patch series, run allowlisted custom Git
+  command presets, and delete reviewed local branches in bulk
+- Browse live GitHub Projects and a bounded last-known-good offline cache, while
+  retaining existing Copilot commit-message controls and one-click editor
+  actions. The [30-item demand ledger](docs/features/github-desktop-demand-backlog.md)
+  links each request to its behavior, safety boundary, and verification contract
 
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu

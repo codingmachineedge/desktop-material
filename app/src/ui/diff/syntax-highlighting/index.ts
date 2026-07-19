@@ -37,6 +37,12 @@ export interface IFileContents {
   readonly file: ChangedFile
   readonly oldContents: ReadonlyArray<string>
   readonly newContents: ReadonlyArray<string>
+  /** Source byte counts before UTF-8 line splitting and newline normalization. */
+  readonly oldContentsByteLength?: number
+  readonly newContentsByteLength?: number
+  /** True when the bounded content read may not contain the complete file. */
+  readonly oldContentsArePartial?: boolean
+  readonly newContentsArePartial?: boolean
   readonly canBeExpanded: boolean
 }
 
@@ -123,6 +129,12 @@ export async function getFileContents(
     file,
     oldContents: oldContents?.toString('utf8').split(/\r?\n/) ?? [],
     newContents: newContents?.toString('utf8').split(/\r?\n/) ?? [],
+    oldContentsByteLength: oldContents?.length ?? 0,
+    newContentsByteLength: newContents?.length ?? 0,
+    oldContentsArePartial:
+      oldContents !== null && oldContents.length >= MaxHighlightContentLength,
+    newContentsArePartial:
+      newContents !== null && newContents.length >= MaxHighlightContentLength,
     canBeExpanded:
       newContents !== null &&
       newContents.length <= MaxDiffExpansionNewContentLength,

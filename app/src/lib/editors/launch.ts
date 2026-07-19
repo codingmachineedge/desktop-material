@@ -6,6 +6,7 @@ import {
   ICustomIntegration,
   parseCustomIntegrationArguments,
 } from '../custom-integration'
+import { getWslEditorArguments, resolveWslPath } from './wsl'
 
 async function launchEditor(
   editorPath: string,
@@ -118,8 +119,21 @@ async function launchExecutableAndReturnStdout(
  * @param fullPath A folder or file path to pass as an argument when launching the editor.
  * @param editor The external editor to launch.
  */
-export const launchExternalEditor = (fullPath: string, editor: FoundEditor) =>
-  launchEditor(editor.path, [fullPath], `'${editor.editor}'`, __DARWIN__)
+export const launchExternalEditor = async (
+  fullPath: string,
+  editor: FoundEditor
+) => {
+  if (__WIN32__ && editor.wslDistribution !== undefined) {
+    const linuxPath = await resolveWslPath(fullPath, editor.wslDistribution)
+    return launchEditor(
+      editor.path,
+      getWslEditorArguments(editor.wslDistribution, linuxPath),
+      `'${editor.editor}'`,
+      false
+    )
+  }
+  return launchEditor(editor.path, [fullPath], `'${editor.editor}'`, __DARWIN__)
+}
 
 /**
  * Open a given file or folder in the desired custom external editor.

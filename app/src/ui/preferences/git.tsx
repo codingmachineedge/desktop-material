@@ -12,6 +12,7 @@ import {
   shellFriendlyNames,
   SupportedHooksEnvShell,
 } from '../../lib/hooks/config'
+import { GlobalIgnoreEditor } from './global-ignore'
 
 interface IGitProps {
   readonly name: string
@@ -155,6 +156,7 @@ export class Git extends React.Component<IGitProps> {
           <span>Author</span>
           <span>Default branch</span>
           <span>Hooks</span>
+          <span>Global ignore</span>
         </TabBar>
         <div className="git-preferences-content">{this.renderCurrentTab()}</div>
       </DialogContent>
@@ -168,6 +170,8 @@ export class Git extends React.Component<IGitProps> {
       return this.renderDefaultBranchSetting()
     } else if (this.selectedTabIndex === 2) {
       return this.renderHooksSettings()
+    } else if (this.selectedTabIndex === 3) {
+      return <GlobalIgnoreEditor />
     }
 
     return null

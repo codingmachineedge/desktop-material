@@ -3,6 +3,7 @@ import classNames from 'classnames'
 
 import { Commit, CommitOneLine, ICommitContext } from '../../models/commit'
 import {
+  HistoryScope,
   HistoryTabMode,
   ICompareState,
   ICompareBranch,
@@ -46,6 +47,13 @@ import { Octicon } from '../octicons'
 import { getBoolean, setBoolean } from '../../lib/local-storage'
 import { RegexBuilder } from '../lib/regex-builder/regex-builder'
 import { isAttributableEmailFor } from '../../lib/email'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translateForAccessibleName,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import { LocalizedText } from '../lib/localized-text'
 
 interface ICompareSidebarProps {
   readonly repository: Repository
@@ -118,6 +126,9 @@ interface ICompareSidebarState {
 
   /** Whether the full regex-builder dialog is open. */
   readonly isRegexBuilderOpen: boolean
+
+  /** Active persisted language mode for the new history-scope controls. */
+  readonly languageMode: LanguageMode
 }
 
 /** localStorage key used to persist the History commit filter mode. */
@@ -155,7 +166,15 @@ export class CompareSidebar extends React.Component<
       commitFilterTagged: false,
       commitFilterMine: false,
       isRegexBuilderOpen: false,
+      languageMode: getPersistedLanguageMode(),
     }
+  }
+
+  public componentDidMount() {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
   }
 
   public componentWillReceiveProps(nextProps: ICompareSidebarProps) {
@@ -251,12 +270,25 @@ export class CompareSidebar extends React.Component<
   public componentWillUnmount() {
     this.isUnmounted = true
     this.textbox = null
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
 
     // by hiding the branch list here when the component is torn down
     // we ensure any ahead/behind computation work is discarded
     this.props.dispatcher.updateCompareForm(this.props.repository, {
       showBranchList: false,
     })
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
+    }
   }
 
   public render() {
@@ -474,6 +506,7 @@ export class CompareSidebar extends React.Component<
 
     return (
       <div className="history-commit-filter">
+        {this.renderHistoryScopeControl()}
         <div className="history-commit-filter-row">
           <TextBox
             className="history-commit-filter-field"
@@ -524,6 +557,56 @@ export class CompareSidebar extends React.Component<
         {this.renderCommitRegexBuilder()}
       </div>
     )
+  }
+
+  private renderHistoryScopeControl() {
+    const scope = this.props.compareState.historyScope
+
+    return (
+      <div
+        className="history-scope-control"
+        role="group"
+        aria-label={translateForAccessibleName(
+          'history.scope',
+          {},
+          this.state.languageMode
+        )}
+      >
+        <Button
+          ariaPressed={scope === HistoryScope.CurrentBranch}
+          onClick={this.onShowCurrentBranchHistory}
+        >
+          <LocalizedText
+            translationKey="history.scope.currentBranch"
+            languageMode={this.state.languageMode}
+          />
+        </Button>
+        <Button
+          ariaPressed={scope === HistoryScope.AllRefs}
+          onClick={this.onShowAllRefsHistory}
+        >
+          <LocalizedText
+            translationKey="history.scope.allRefs"
+            languageMode={this.state.languageMode}
+          />
+        </Button>
+      </div>
+    )
+  }
+
+  private onShowCurrentBranchHistory = () => {
+    this.setHistoryScope(HistoryScope.CurrentBranch)
+  }
+
+  private onShowAllRefsHistory = () => {
+    this.setHistoryScope(HistoryScope.AllRefs)
+  }
+
+  private setHistoryScope(scope: HistoryScope) {
+    this.exhaustedSearchQuery = null
+    this.props.dispatcher
+      .setHistoryScope(this.props.repository, scope)
+      .catch(error => defaultErrorHandler(error, this.props.dispatcher))
   }
 
   /**
@@ -690,11 +773,14 @@ export class CompareSidebar extends React.Component<
     // / amend) until the filter is cleared to avoid operating on the wrong
     // commit. Read-only actions (checkout, view, copy SHA, cherry-pick) stay
     // available.
-    const allowHistoryOps = isHistory && !isCommitFilterActive
+    const allowHistoryOps =
+      isHistory &&
+      this.props.compareState.historyScope === HistoryScope.CurrentBranch &&
+      !isCommitFilterActive
 
     return (
       <>
-        {isHistory && commitSHAs.length > 0 ? this.renderCommitFilter() : null}
+        {isHistory ? this.renderCommitFilter() : null}
         <CommitList
           ref={this.commitListRef}
           gitHubRepository={this.props.repository.gitHubRepository}

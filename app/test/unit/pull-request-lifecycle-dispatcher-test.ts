@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 
 import { IGitHubPullRequestLifecycle } from '../../src/lib/github-pull-request'
+import { IGitHubPullRequestWorkspace } from '../../src/lib/github-pull-request-workspace'
 import { Account } from '../../src/models/account'
 import { GitHubRepository } from '../../src/models/github-repository'
 import { Owner } from '../../src/models/owner'
@@ -72,6 +73,22 @@ const lifecycle: IGitHubPullRequestLifecycle = {
   metadata: { reviewers: [], assignees: [], labels: [] },
 }
 
+const workspace: IGitHubPullRequestWorkspace = {
+  headSHA: 'a'.repeat(40),
+  files: [],
+  commits: [],
+  reviews: [],
+  issueComments: [],
+  reviewComments: [],
+  capped: {
+    files: false,
+    commits: false,
+    reviews: false,
+    issueComments: false,
+    reviewComments: false,
+  },
+}
+
 function createDispatcher() {
   const dispatcher = new Dispatcher(
     {
@@ -89,6 +106,19 @@ function createDispatcher() {
     account: Account
     pullRequestNumber: number
   }>()
+  const workspaceCalls = new Array<{
+    target: GitHubRepository
+    account: Account
+    pullRequestNumber: number
+    expectedHeadSHA: string
+  }>()
+  const stateCalls = new Array<{
+    target: GitHubRepository
+    account: Account
+    pullRequestNumber: number
+    expectedHeadSHA: string
+    state: 'open' | 'closed'
+  }>()
   Reflect.set(dispatcher, 'pullRequestLifecycleStore', {
     async inspect(
       target: GitHubRepository,
@@ -98,8 +128,41 @@ function createDispatcher() {
       inspectCalls.push({ target, account, pullRequestNumber })
       return lifecycle
     },
+    async inspectWorkspace(
+      target: GitHubRepository,
+      account: Account,
+      pullRequestNumber: number,
+      expectedHeadSHA: string
+    ) {
+      workspaceCalls.push({
+        target,
+        account,
+        pullRequestNumber,
+        expectedHeadSHA,
+      })
+      return workspace
+    },
+    async setState(
+      target: GitHubRepository,
+      account: Account,
+      pullRequestNumber: number,
+      expectedHeadSHA: string,
+      state: 'open' | 'closed'
+    ) {
+      stateCalls.push({
+        target,
+        account,
+        pullRequestNumber,
+        expectedHeadSHA,
+        state,
+      })
+      return {
+        pullRequest: { ...lifecycle, state },
+        warnings: [],
+      }
+    },
   })
-  return { dispatcher, inspectCalls }
+  return { dispatcher, inspectCalls, workspaceCalls, stateCalls }
 }
 
 describe('pull request lifecycle dispatcher routing', () => {
@@ -113,7 +176,8 @@ describe('pull request lifecycle dispatcher routing', () => {
     ) as RepositoryWithGitHubRepository
     const pullRequest = createPullRequest(target)
     const account = createAccount()
-    const { dispatcher, inspectCalls } = createDispatcher()
+    const { dispatcher, inspectCalls, workspaceCalls, stateCalls } =
+      createDispatcher()
 
     assert.equal(
       await dispatcher.inspectGitHubPullRequest(
@@ -124,6 +188,40 @@ describe('pull request lifecycle dispatcher routing', () => {
       lifecycle
     )
     assert.deepEqual(inspectCalls, [{ target, account, pullRequestNumber: 42 }])
+    assert.equal(
+      await dispatcher.inspectGitHubPullRequestWorkspace(
+        repository,
+        pullRequest,
+        account,
+        lifecycle.headSHA
+      ),
+      workspace
+    )
+    assert.deepEqual(workspaceCalls, [
+      {
+        target,
+        account,
+        pullRequestNumber: 42,
+        expectedHeadSHA: lifecycle.headSHA,
+      },
+    ])
+    const closed = await dispatcher.setGitHubPullRequestState(
+      repository,
+      pullRequest,
+      account,
+      lifecycle.headSHA,
+      'closed'
+    )
+    assert.equal(closed.pullRequest.state, 'closed')
+    assert.deepEqual(stateCalls, [
+      {
+        target,
+        account,
+        pullRequestNumber: 42,
+        expectedHeadSHA: lifecycle.headSHA,
+        state: 'closed',
+      },
+    ])
   })
 
   it('rejects cross-target and cross-endpoint routing before the store', () => {

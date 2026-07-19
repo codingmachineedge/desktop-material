@@ -83,6 +83,7 @@ import {
   normalizeGitHubPullRequestReview,
   normalizeGitHubPullRequestUpdate,
   validateCreatedGitHubPullRequest,
+  validateGitHubPullRequestBranch,
   validateGitHubPullRequestHeadSHA,
   validateGitHubPullRequestLifecycle,
   validateGitHubPullRequestMergeReceipt,
@@ -90,6 +91,27 @@ import {
   validateGitHubPullRequestReviewReceipt,
 } from './github-pull-request'
 import { boundedGitHubPullRequestResponse } from './github-pull-request-json'
+import {
+  creationContextFromIssueMetadata,
+  GitHubPullRequestCreationMetadataMaximumPages,
+  GitHubPullRequestCreationMetadataPageSize,
+  GitHubPullRequestTemplateMaximumCount,
+  IGitHubPullRequestCreationContext,
+  IGitHubPullRequestTemplate,
+  parseGitHubPullRequestTemplate,
+  parseGitHubPullRequestTemplateDirectory,
+  parseGitHubPullRequestTemplateFile,
+} from './github-pull-request-creation'
+import {
+  GitHubPullRequestWorkspaceMaximumPages,
+  GitHubPullRequestWorkspacePageSize,
+  IGitHubPullRequestWorkspace,
+  parseGitHubPullRequestCommits,
+  parseGitHubPullRequestFiles,
+  parseGitHubPullRequestIssueComments,
+  parseGitHubPullRequestReviewComments,
+  parseGitHubPullRequestReviews,
+} from './github-pull-request-workspace'
 import {
   ActionsArtifactPageSize,
   IActionsArtifactList,
@@ -342,6 +364,11 @@ if (!ClientID || !ClientID.length || !ClientSecret || !ClientSecret.length) {
 }
 
 export type GitHubAccountType = 'User' | 'Organization'
+
+/** Hard caps for the reviewed fork-branch browser. */
+export const MaximumForkNetworkRepositories = 100
+export const MaximumForkNetworkBranches = 250
+const ForkNetworkPageSize = 50
 
 /**
  * Bound the effective-rules response even if a server supplies an unending
@@ -879,6 +906,24 @@ export interface IAPIBranch {
    *  - `false` indicates no branch protection set
    */
   readonly protected: boolean
+}
+
+/**
+ * Branch identity returned by GitHub's repository-network branch endpoints.
+ * Unlike the legacy branch summary above, this shape includes the exact head
+ * object ID needed by a reviewed checkout.
+ */
+export interface IAPIForkNetworkBranch extends IAPIBranch {
+  readonly commit: {
+    readonly sha: string
+  }
+}
+
+/** One deliberately bounded GitHub repository-network response. */
+export interface IAPIForkNetworkPage<T> {
+  readonly items: ReadonlyArray<T>
+  /** True when another API page may exist beyond the enforced local cap. */
+  readonly truncated: boolean
 }
 
 /** Repository rule information returned by the GitHub API */
@@ -2422,7 +2467,8 @@ export class API {
     const safeMetadata = normalizeGitHubPullRequestMetadata(
       metadata.reviewers,
       metadata.assignees,
-      metadata.labels
+      metadata.labels,
+      metadata.milestone
     )
     const requestBody = {
       title: pullRequest.title,
@@ -2491,13 +2537,18 @@ export class API {
         )
         await boundedGitHubPullRequestResponse(response, signal)
       } catch {
+        signal?.throwIfAborted()
         warnings.push(
           'The pull request was created, but reviewers were not requested.'
         )
       }
     }
 
-    if (metadata.assignees.length > 0 || metadata.labels.length > 0) {
+    if (
+      metadata.assignees.length > 0 ||
+      metadata.labels.length > 0 ||
+      metadata.milestone !== undefined
+    ) {
       try {
         const response = await this.ghRequest(
           'PATCH',
@@ -2506,6 +2557,9 @@ export class API {
             body: {
               assignees: metadata.assignees,
               labels: metadata.labels,
+              ...(metadata.milestone === undefined
+                ? {}
+                : { milestone: metadata.milestone }),
             },
             customHeaders: { Accept: 'application/vnd.github+json' },
             signal,
@@ -2513,12 +2567,198 @@ export class API {
         )
         await boundedGitHubPullRequestResponse(response, signal)
       } catch {
+        signal?.throwIfAborted()
         warnings.push(
-          'The pull request was created, but assignees or labels were not applied.'
+          'The pull request was created, but assignees, labels, or milestone were not applied.'
         )
       }
     }
     return warnings
+  }
+
+  /**
+   * Discover bounded PR templates and provider-backed metadata for one exact
+   * base ref. Missing or permission-gated optional capabilities never prevent
+   * the core pull request composer from loading.
+   */
+  public async inspectPullRequestCreation(
+    owner: string,
+    name: string,
+    base: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestCreationContext> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeBase = validateGitHubPullRequestBranch(base, 'base')
+    const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}`
+    const warnings = new Array<string>()
+    const unavailable = new Array<
+      'templates' | 'reviewers' | 'labels' | 'assignees' | 'milestones'
+    >()
+    const optionalFailure = (error: unknown): boolean => {
+      signal?.throwIfAborted()
+      return (
+        error instanceof APIError &&
+        [403, 404, 410].includes(error.responseStatus)
+      )
+    }
+
+    let issueMetadata: IGitHubIssueMetadata
+    try {
+      issueMetadata = await this.fetchIssueMetadata(safeOwner, safeName, signal)
+    } catch (error) {
+      signal?.throwIfAborted()
+      unavailable.push('labels', 'assignees', 'milestones')
+      warnings.push(
+        optionalFailure(error)
+          ? 'Some repository metadata is unavailable for this account.'
+          : 'Repository metadata could not be loaded. Pull request creation is still available.'
+      )
+      issueMetadata = {
+        labels: [],
+        assignees: [],
+        milestones: [],
+        labelsCapped: false,
+        assigneesCapped: false,
+        milestonesCapped: false,
+        unavailable: [],
+      }
+    }
+
+    const reviewers = new Array<string>()
+    let reviewerCapped = false
+    try {
+      for (
+        let page = 1;
+        page <= GitHubPullRequestCreationMetadataMaximumPages;
+        page++
+      ) {
+        const response = await this.ghRequest(
+          'GET',
+          `${root}/collaborators?affiliation=all&per_page=${GitHubPullRequestCreationMetadataPageSize}&page=${page}`,
+          { signal }
+        )
+        const parsed = parseGitHubIssueAssigneePage(
+          await boundedGitHubPullRequestResponse(response, signal)
+        )
+        reviewers.push(...parsed)
+        if (parsed.length < GitHubPullRequestCreationMetadataPageSize) {
+          break
+        }
+        if (page === GitHubPullRequestCreationMetadataMaximumPages) {
+          reviewerCapped = true
+        }
+      }
+      if (
+        new Set(reviewers.map(login => login.toLowerCase())).size !==
+        reviewers.length
+      ) {
+        throw new Error('GitHub returned duplicate reviewer candidates.')
+      }
+    } catch (error) {
+      signal?.throwIfAborted()
+      reviewers.length = 0
+      unavailable.push('reviewers')
+      warnings.push(
+        optionalFailure(error)
+          ? 'Reviewer suggestions are unavailable for this account.'
+          : 'Reviewer suggestions could not be loaded. Pull request creation is still available.'
+      )
+    }
+
+    const encodeContentPath = (path: string) =>
+      path
+        .split('/')
+        .map(part => encodeURIComponent(part))
+        .join('/')
+    const readContents = async (path: string): Promise<unknown | null> => {
+      try {
+        const response = await this.ghRequest(
+          'GET',
+          `${root}/contents/${encodeContentPath(path)}?ref=${encodeURIComponent(
+            safeBase
+          )}`,
+          { signal }
+        )
+        return await boundedGitHubPullRequestResponse(response, signal)
+      } catch (error) {
+        signal?.throwIfAborted()
+        if (error instanceof APIError && error.responseStatus === 404) {
+          return null
+        }
+        throw error
+      }
+    }
+    const templates = new Array<IGitHubPullRequestTemplate>()
+    const templatePaths = new Array<string>()
+    try {
+      for (const path of [
+        'pull_request_template.md',
+        '.github/pull_request_template.md',
+        'docs/pull_request_template.md',
+      ]) {
+        const value = await readContents(path)
+        if (value !== null) {
+          templatePaths.push(path)
+        }
+      }
+      for (const directory of [
+        '.github/PULL_REQUEST_TEMPLATE',
+        'PULL_REQUEST_TEMPLATE',
+        'docs/PULL_REQUEST_TEMPLATE',
+      ]) {
+        const value = await readContents(directory)
+        if (value !== null) {
+          templatePaths.push(
+            ...parseGitHubPullRequestTemplateDirectory(value, directory)
+          )
+        }
+      }
+      for (const path of [...new Set(templatePaths)].slice(
+        0,
+        GitHubPullRequestTemplateMaximumCount
+      )) {
+        try {
+          const value = await readContents(path)
+          if (value !== null) {
+            templates.push(
+              parseGitHubPullRequestTemplate(
+                parseGitHubPullRequestTemplateFile(value, path)
+              )
+            )
+          }
+        } catch (error) {
+          signal?.throwIfAborted()
+          if (error instanceof APIError || error instanceof TypeError) {
+            throw error
+          }
+          warnings.push(
+            'One pull request template was ignored because it was invalid.'
+          )
+        }
+      }
+    } catch (error) {
+      signal?.throwIfAborted()
+      templates.length = 0
+      unavailable.push('templates')
+      warnings.push(
+        optionalFailure(error)
+          ? 'Pull request templates are unavailable for this account.'
+          : 'Pull request templates could not be loaded. The blank composer is still available.'
+      )
+    }
+
+    return creationContextFromIssueMetadata(
+      issueMetadata,
+      templates,
+      reviewers,
+      reviewerCapped,
+      unavailable,
+      warnings
+    )
   }
 
   /** Load one exact pull request for the native lifecycle workbench. */
@@ -2553,6 +2793,198 @@ export class API {
       safeNumber,
       getHTMLURL(this.endpoint)
     )
+  }
+
+  private async fetchPullRequestWorkspaceCollection(
+    path: string,
+    signal?: AbortSignal
+  ): Promise<{
+    readonly value: ReadonlyArray<unknown>
+    readonly capped: boolean
+  }> {
+    const value = new Array<unknown>()
+    for (let page = 1; page <= GitHubPullRequestWorkspaceMaximumPages; page++) {
+      signal?.throwIfAborted()
+      const response = await this.ghRequest(
+        'GET',
+        `${path}?per_page=${GitHubPullRequestWorkspacePageSize}&page=${page}`,
+        {
+          customHeaders: { Accept: 'application/vnd.github+json' },
+          signal,
+        }
+      )
+      const pageValue = await boundedGitHubPullRequestResponse(response, signal)
+      if (
+        !Array.isArray(pageValue) ||
+        pageValue.length > GitHubPullRequestWorkspacePageSize
+      ) {
+        throw new Error(
+          'GitHub returned an invalid pull request workspace page.'
+        )
+      }
+      value.push(...pageValue)
+
+      const link = response.headers.get('Link')
+      const parsedLink = link === null ? null : splitLinkHeaderValues(link)
+      const hasDeclaredNext =
+        parsedLink !== null &&
+        parsedLink.values.some(part => linkPartHasRelation(part, 'next'))
+      if (
+        parsedLink !== null &&
+        (!parsedLink.structurallyValid ||
+          parsedLink.values.some(linkPartHasMalformedRelation))
+      ) {
+        throw new Error(
+          'GitHub returned invalid pull request workspace pagination.'
+        )
+      }
+      const next = getNextPagePathFromLink(response, this.endpoint)
+      if (hasDeclaredNext && next === null) {
+        throw new Error(
+          'GitHub returned invalid pull request workspace pagination.'
+        )
+      }
+      if (next === null) {
+        return { value, capped: false }
+      }
+      if (page === GitHubPullRequestWorkspaceMaximumPages) {
+        return { value, capped: true }
+      }
+    }
+    return { value, capped: true }
+  }
+
+  /**
+   * Load the bounded review surface for one exact head. Every collection is
+   * paginated independently and the head is revalidated around the requests.
+   */
+  public async inspectPullRequestWorkspace(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestWorkspace> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+
+    const root = `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+      safeName
+    )}`
+    const [files, commits, reviews, issueComments, reviewComments] =
+      await Promise.all([
+        this.fetchPullRequestWorkspaceCollection(
+          `${root}/pulls/${safeNumber}/files`,
+          signal
+        ),
+        this.fetchPullRequestWorkspaceCollection(
+          `${root}/pulls/${safeNumber}/commits`,
+          signal
+        ),
+        this.fetchPullRequestWorkspaceCollection(
+          `${root}/pulls/${safeNumber}/reviews`,
+          signal
+        ),
+        this.fetchPullRequestWorkspaceCollection(
+          `${root}/issues/${safeNumber}/comments`,
+          signal
+        ),
+        this.fetchPullRequestWorkspaceCollection(
+          `${root}/pulls/${safeNumber}/comments`,
+          signal
+        ),
+      ])
+    const revalidated = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (revalidated.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    return {
+      headSHA: safeHeadSHA,
+      files: parseGitHubPullRequestFiles(files.value),
+      commits: parseGitHubPullRequestCommits(commits.value),
+      reviews: parseGitHubPullRequestReviews(reviews.value),
+      issueComments: parseGitHubPullRequestIssueComments(issueComments.value),
+      reviewComments: parseGitHubPullRequestReviewComments(
+        reviewComments.value
+      ),
+      capped: {
+        files: files.capped,
+        commits: commits.capped,
+        reviews: reviews.capped,
+        issueComments: issueComments.capped,
+        reviewComments: reviewComments.capped,
+      },
+    }
+  }
+
+  /** Close or reopen an unchanged, unmerged pull request. */
+  public async setPullRequestState(
+    owner: string,
+    name: string,
+    pullRequestNumber: number,
+    expectedHeadSHA: string,
+    state: 'open' | 'closed',
+    signal?: AbortSignal
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    signal?.throwIfAborted()
+    const safeOwner = validateGitHubRepositoryPart(owner, 'owner')
+    const safeName = validateGitHubRepositoryPart(name, 'repository')
+    const safeNumber = validateGitHubPullRequestNumber(pullRequestNumber)
+    const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
+    if (!['open', 'closed'].includes(state)) {
+      throw new Error('Choose whether to close or reopen this pull request.')
+    }
+    const current = await this.inspectPullRequest(
+      safeOwner,
+      safeName,
+      safeNumber,
+      signal
+    )
+    if (current.headSHA !== safeHeadSHA) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    if (current.merged) {
+      throw new Error('A merged pull request cannot be reopened or closed.')
+    }
+    const response = await this.ghRequest(
+      'PATCH',
+      `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+        safeName
+      )}/pulls/${safeNumber}`,
+      {
+        body: { state },
+        customHeaders: { Accept: 'application/vnd.github+json' },
+        signal,
+      }
+    )
+    const updated = validateGitHubPullRequestLifecycle(
+      await boundedGitHubPullRequestResponse(response, signal),
+      safeOwner,
+      safeName,
+      safeNumber,
+      getHTMLURL(this.endpoint)
+    )
+    if (updated.headSHA !== safeHeadSHA || updated.state !== state) {
+      throw new GitHubPullRequestContextChangedError()
+    }
+    return { pullRequest: updated, warnings: [] }
   }
 
   /** Update reviewed PR fields and exact metadata lists for one head snapshot. */
@@ -2704,7 +3136,9 @@ export class API {
     const safeHeadSHA = validateGitHubPullRequestHeadSHA(expectedHeadSHA)
     const safeReview = normalizeGitHubPullRequestReview(
       review.event,
-      review.body
+      review.body,
+      review.comments,
+      review.replies
     )
     const current = await this.inspectPullRequest(
       safeOwner,
@@ -2724,19 +3158,96 @@ export class API {
         safeName
       )}/pulls/${safeNumber}/reviews`,
       {
-        body: safeReview,
+        body: {
+          event: safeReview.event,
+          body: safeReview.body,
+          commit_id: safeHeadSHA,
+          ...(safeReview.comments === undefined
+            ? {}
+            : { comments: safeReview.comments }),
+        },
         customHeaders: { Accept: 'application/vnd.github+json' },
         signal,
       }
     )
     const value = await boundedGitHubPullRequestResponse(response, signal)
-    return validateGitHubPullRequestReviewReceipt(
+    const receipt = validateGitHubPullRequestReviewReceipt(
       value,
       safeOwner,
       safeName,
       safeNumber,
       getHTMLURL(this.endpoint)
     )
+    const warnings = new Array<string>()
+    if (safeReview.replies !== undefined) {
+      let afterReview: IGitHubPullRequestLifecycle | null = null
+      try {
+        afterReview = await this.inspectPullRequest(
+          safeOwner,
+          safeName,
+          safeNumber,
+          signal
+        )
+      } catch {
+        signal?.throwIfAborted()
+        warnings.push(
+          'The review was submitted, but queued replies were not posted because the pull request head could not be revalidated.'
+        )
+      }
+      if (afterReview !== null && afterReview.headSHA !== safeHeadSHA) {
+        warnings.push(
+          'The review was submitted, but queued replies were not posted because the pull request head changed.'
+        )
+      } else if (
+        afterReview !== null &&
+        (afterReview.state !== 'open' || afterReview.merged)
+      ) {
+        warnings.push(
+          'The review was submitted, but queued replies were not posted because the pull request state changed.'
+        )
+      } else if (afterReview !== null) {
+        for (const reply of safeReview.replies) {
+          try {
+            const replyResponse = await this.ghRequest(
+              'POST',
+              `repos/${encodeURIComponent(safeOwner)}/${encodeURIComponent(
+                safeName
+              )}/pulls/${safeNumber}/comments/${reply.inReplyToId}/replies`,
+              {
+                body: { body: reply.body },
+                customHeaders: { Accept: 'application/vnd.github+json' },
+                signal,
+              }
+            )
+            const replyValue = await boundedGitHubPullRequestResponse(
+              replyResponse,
+              signal
+            )
+            const replyIdentifier =
+              typeof replyValue === 'object' &&
+              replyValue !== null &&
+              !Array.isArray(replyValue)
+                ? (replyValue as { readonly id?: unknown }).id
+                : null
+            if (
+              typeof replyIdentifier !== 'number' ||
+              !Number.isSafeInteger(replyIdentifier) ||
+              replyIdentifier <= 0
+            ) {
+              throw new Error(
+                'GitHub returned an invalid pull request review reply.'
+              )
+            }
+          } catch {
+            signal?.throwIfAborted()
+            warnings.push(
+              `Review reply ${reply.inReplyToId} was not posted. Check GitHub before retrying it.`
+            )
+          }
+        }
+      }
+    }
+    return warnings.length === 0 ? receipt : { ...receipt, warnings }
   }
 
   /** Merge one unchanged, ready pull request with an allowlisted method. */
@@ -4183,6 +4694,121 @@ export class API {
     }
 
     return null
+  }
+
+  /**
+   * Fetch a small, fixed number of numeric pages without following an
+   * untrusted Link header. Repository-network discovery intentionally uses
+   * this stricter pagination boundary because it can otherwise fan out into a
+   * very large number of fork and branch records.
+   */
+  private async fetchBoundedForkNetworkPages<T>(
+    path: string,
+    maximumItems: number,
+    signal?: AbortSignal
+  ): Promise<IAPIForkNetworkPage<T>> {
+    const items = new Array<T>()
+    const maximumPages = Math.ceil(maximumItems / ForkNetworkPageSize)
+    let truncated = false
+
+    for (let page = 1; page <= maximumPages; page++) {
+      const pagePath = urlWithQueryString(path, {
+        per_page: String(ForkNetworkPageSize),
+        page: String(page),
+      })
+      const response = await this.ghRequest('GET', pagePath, {
+        signal,
+        reloadCache: true,
+      })
+      const value: unknown = await parsedResponse<unknown>(response)
+      if (!Array.isArray(value)) {
+        throw new Error(
+          'Expected a repository-network API page to be an array.'
+        )
+      }
+
+      const remaining = maximumItems - items.length
+      items.push(...(value.slice(0, remaining) as ReadonlyArray<T>))
+      if (value.length > remaining) {
+        truncated = true
+        break
+      }
+      if (value.length < ForkNetworkPageSize) {
+        break
+      }
+      if (items.length === maximumItems) {
+        // A full final page cannot prove that the server has no next page.
+        truncated = true
+        break
+      }
+    }
+
+    return { items, truncated }
+  }
+
+  /** List a bounded set of forks in one exact GitHub repository network. */
+  public fetchForkNetworkRepositories(
+    owner: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<IAPIForkNetworkPage<IAPIFullRepository>> {
+    const path = `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      name
+    )}/forks?sort=newest`
+    return this.fetchBoundedForkNetworkPages<IAPIFullRepository>(
+      path,
+      MaximumForkNetworkRepositories,
+      signal
+    )
+  }
+
+  /** List a bounded set of exact branch heads for one selected fork. */
+  public fetchForkNetworkBranches(
+    owner: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<IAPIForkNetworkPage<IAPIForkNetworkBranch>> {
+    const path = `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      name
+    )}/branches`
+    return this.fetchBoundedForkNetworkPages<IAPIForkNetworkBranch>(
+      path,
+      MaximumForkNetworkBranches,
+      signal
+    )
+  }
+
+  /** Fetch live metadata for the exact fork selected during review. */
+  public async fetchForkNetworkRepository(
+    owner: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<IAPIFullRepository> {
+    const path = `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      name
+    )}`
+    const response = await this.ghRequest('GET', path, {
+      signal,
+      reloadCache: true,
+    })
+    return await parsedResponse<IAPIFullRepository>(response)
+  }
+
+  /** Revalidate one exact fork branch immediately before local mutation. */
+  public async fetchForkNetworkBranch(
+    owner: string,
+    name: string,
+    branch: string,
+    signal?: AbortSignal
+  ): Promise<IAPIForkNetworkBranch> {
+    const path = `repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+      name
+    )}/branches/${encodeURIComponent(branch)}`
+    const response = await this.ghRequest('GET', path, {
+      signal,
+      reloadCache: true,
+    })
+    return await parsedResponse<IAPIForkNetworkBranch>(response)
   }
 
   /** Fetch live metadata for one exact repository without legacy fallbacks. */

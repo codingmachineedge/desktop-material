@@ -23,10 +23,12 @@ import {
   git,
   checkoutBranch,
   deleteLocalBranch,
+  deleteReviewedLocalBranches,
   deleteRemoteBranch,
 } from '../../../src/lib/git'
 import { assertNonNullable } from '../../../src/lib/fatal-error'
 import { TestStatsStore } from '../../helpers/test-stats-store'
+import { createTempDirectory } from '../../helpers/temp'
 
 describe('git/branch', () => {
   describe('tip', () => {
@@ -187,6 +189,100 @@ describe('git/branch', () => {
       await deleteLocalBranch(repository, branch.name)
 
       assert.equal((await getBranches(repository, ref)).length, 0)
+    })
+  })
+
+  describe('deleteReviewedLocalBranches', () => {
+    it('deletes only exact reviewed local tips and returns recovery IDs', async t => {
+      const path = await setupFixtureRepository(t, 'test-repo')
+      const repository = new Repository(path, -1, null, false)
+      await createBranch(repository, 'cleanup/one', null)
+      await createBranch(repository, 'cleanup/two', null)
+      const branches = (await getBranches(repository)).filter(branch =>
+        branch.name.startsWith('cleanup/')
+      )
+
+      const results = await deleteReviewedLocalBranches(
+        repository,
+        branches.map(branch => ({
+          name: branch.name,
+          expectedSha: branch.tip.sha,
+        }))
+      )
+
+      assert.deepEqual(
+        results.map(result => result.status),
+        ['deleted', 'deleted']
+      )
+      assert(
+        results.every(result => /Deleted at [0-9a-f]{12}/.test(result.detail))
+      )
+      assert.equal(
+        (await getBranches(repository)).filter(branch =>
+          branch.name.startsWith('cleanup/')
+        ).length,
+        0
+      )
+      assert.equal(
+        (await getBranches(repository, 'refs/heads/master')).length,
+        1
+      )
+    })
+
+    it('fails the complete review before mutation when one tip moved', async t => {
+      const path = await setupFixtureRepository(t, 'test-repo')
+      const repository = new Repository(path, -1, null, false)
+      await createBranch(repository, 'cleanup/stale', null)
+      await createBranch(repository, 'cleanup/still-valid', null)
+      const branches = (await getBranches(repository)).filter(branch =>
+        branch.name.startsWith('cleanup/')
+      )
+      await exec(['commit', '--allow-empty', '-m', 'move tip'], path)
+      await exec(['branch', '--force', 'cleanup/stale', 'HEAD'], path)
+
+      await assert.rejects(() =>
+        deleteReviewedLocalBranches(
+          repository,
+          branches.map(branch => ({
+            name: branch.name,
+            expectedSha: branch.tip.sha,
+          }))
+        )
+      )
+      assert.equal(
+        (await getBranches(repository)).filter(branch =>
+          branch.name.startsWith('cleanup/')
+        ).length,
+        2
+      )
+    })
+
+    it('protects branches checked out in linked worktrees', async t => {
+      const path = await setupFixtureRepository(t, 'test-repo')
+      const repository = new Repository(path, -1, null, false)
+      await createBranch(repository, 'cleanup/linked', null)
+      const [branch] = await getBranches(
+        repository,
+        'refs/heads/cleanup/linked'
+      )
+      assertNonNullable(branch, 'Could not create linked-worktree branch')
+      const worktreePath = await createTempDirectory(t)
+      await exec(
+        ['worktree', 'add', worktreePath, 'cleanup/linked'],
+        repository.path
+      )
+
+      await assert.rejects(
+        () =>
+          deleteReviewedLocalBranches(repository, [
+            { name: branch.name, expectedSha: branch.tip.sha },
+          ]),
+        /checked out in a worktree/
+      )
+      assert.equal(
+        (await getBranches(repository, 'refs/heads/cleanup/linked')).length,
+        1
+      )
     })
   })
 

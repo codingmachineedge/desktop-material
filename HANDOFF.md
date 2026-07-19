@@ -2,7 +2,7 @@
 
 ## Outcome
 
-The complete **M0 through M20** Material and guided Git/GitHub roadmap is shipped
+The complete **M0 through M21** Material and guided Git/GitHub roadmap is shipped
 on `main`; it turns audited capabilities into named, interactive app functions.
 The separately guarded expert GitHub API Explorer is contextualized by the
 selected repository and bound to its selected account and provider host. It
@@ -34,9 +34,34 @@ temporary and return to their persisted root through the profile-customizable
 Back control. The final post-build child/read-only/Back regression, later
 fresh-bundle duplicate Open/Back race regression, and owned runtime cleanup are
 also complete.
-Remote `main`, CI, installer release, CodeQL, Pages, wiki, and final
-repository-publication proof is still pending and is not claimed by this active
-handoff.
+
+## 2026-07-19 advanced workflow completeness (M21)
+
+The supplied GitHub Desktop demand brief is closed item by item in the
+[30-item feature ledger](docs/features/github-desktop-demand-backlog.md). The
+wave extends the existing Desktop/store/dispatcher boundaries rather than
+adding a generic command console or application HTTP endpoint:
+
+- Account-bound repository context, scalable repository filters/visibility,
+  reviewed batch sync, all-ref History, and exact fork branch/SHA checkout.
+- Native pull-request review and creation with bounded templates/metadata,
+  comments/reviews/checks/activity context, stale-generation guards, and
+  partial-success receipts.
+- Selective, named, and external stash interoperability; full tag inventory,
+  create/move/sign/push/fetch/prune/delete; and worktree-aware reviewed bulk
+  local-branch deletion with recovery SHAs.
+- Changed-file trees, persisted expanded context, structured CSV/TSV comparison,
+  TGA decoding, broader editor discovery, WSL/network path handling, global
+  ignores, allowlisted Git command presets, and reviewed patch import/export.
+- Read-only live GitHub Projects with explicit partial/error states and a
+  sanitized, size/entry/time-bounded last-known-good offline cache.
+
+Mutation paths use typed fixed arguments rather than a shell, bind confirmation
+to repository/account/ref identities, re-read live state before acting, cap
+provider pagination and cached content, and keep credentials, raw provider
+responses, and disposable paths out of renderer-visible receipts. Every new
+surface listens to the persisted English, playful Hong Kong Cantonese, and
+compact bilingual mode contract with English fallback.
 
 ## 2026-07-19 cheap-LFS commit routing fix
 

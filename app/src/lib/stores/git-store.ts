@@ -26,7 +26,7 @@ import {
   ICommitMessage,
   DefaultCommitMessage,
 } from '../../models/commit-message'
-import { ComparisonMode } from '../app-state'
+import { ComparisonMode, HistoryScope } from '../app-state'
 
 import { IAppShell } from '../app-shell'
 import {
@@ -71,8 +71,21 @@ import {
   getConfigValue,
   removeRemote,
   createTag,
+  createLifecycleTag,
+  deleteReviewedLifecycleTag,
+  deleteRemoteLifecycleTag,
+  fetchLifecycleTags,
   getAllTags,
+  getTagLifecycleInventory,
   deleteTag,
+  moveLifecycleTag,
+  pushLifecycleTags,
+  ICreateTagLifecycleOptions,
+  IMoveTagLifecycleOptions,
+  IRemoteTagDeletionReview,
+  ITagLifecycleInventory,
+  ITagRefReview,
+  ITagPushReview,
   MergeResult,
   createBranch,
   updateRemoteHEAD,
@@ -162,6 +175,8 @@ export class GitStore extends BaseStore {
 
   private _desktopStashEntries = new Map<string, ReadonlyArray<IStashEntry>>()
 
+  private _foreignStashEntries: ReadonlyArray<IStashEntry> = []
+
   private _stashEntryCount = 0
 
   private _foreignStashEntryCount = 0
@@ -247,6 +262,41 @@ export class GitStore extends BaseStore {
 
     this.storeCommits(commits)
     return commits.map(c => c.sha)
+  }
+
+  /**
+   * Load a bounded History page from either the checked-out branch or every
+   * branch/tag ref. The all-refs query deliberately excludes reflogs, stash
+   * refs, replacement refs, and other implementation refs so the expanded
+   * view remains a repository history rather than an object-database browser.
+   */
+  public async loadHistoryBatch(scope: HistoryScope, skip: number) {
+    if (scope === HistoryScope.CurrentBranch) {
+      return this.loadCommitBatch('HEAD', skip)
+    }
+
+    const requestKey = `history/${scope}/skip/${skip}`
+    if (this.requestsInFight.has(requestKey)) {
+      return null
+    }
+
+    this.requestsInFight.add(requestKey)
+    const commits = await this.performFailableOperation(() =>
+      getCommits(this.repository, undefined, CommitBatchSize, skip, [
+        '--branches',
+        '--remotes',
+        '--tags',
+        '--topo-order',
+      ])
+    )
+    this.requestsInFight.delete(requestKey)
+
+    if (!commits) {
+      return null
+    }
+
+    this.storeCommits(commits)
+    return commits.map(commit => commit.sha)
   }
 
   public async refreshTags() {
@@ -377,6 +427,131 @@ export class GitStore extends BaseStore {
     this.removeTagToPush(name)
 
     this.statsStore.increment('tagsDeleted')
+  }
+
+  /** Load the bounded tag-manager inventory; remote access is opt-in. */
+  public getTagLifecycleInventory(
+    includeRemote: boolean
+  ): Promise<ITagLifecycleInventory> {
+    return getTagLifecycleInventory(
+      this.repository,
+      includeRemote ? this.defaultRemote : null
+    )
+  }
+
+  /** Create a reviewed lightweight, annotated, or signed annotated tag. */
+  public async createLifecycleTag(options: ICreateTagLifecycleOptions) {
+    const result = await this.performFailableOperation(async () => {
+      await createLifecycleTag(this.repository, options)
+      return true
+    })
+    if (result !== true) {
+      return false
+    }
+    await this.refreshTags()
+    this.addTagToPush(options.name)
+    this.statsStore.increment('tagsCreatedInDesktop')
+    return true
+  }
+
+  /** Move a reviewed tag, rejecting stale inventory snapshots. */
+  public async moveLifecycleTag(options: IMoveTagLifecycleOptions) {
+    const result = await this.performFailableOperation(async () => {
+      await moveLifecycleTag(this.repository, options)
+      return true
+    })
+    if (result !== true) {
+      return false
+    }
+    await this.refreshTags()
+    this.addTagToPush(options.name)
+    return true
+  }
+
+  /** Delete one exact reviewed local tag object. */
+  public async deleteReviewedLifecycleTag(review: ITagRefReview) {
+    const result = await this.performFailableOperation(async () => {
+      await deleteReviewedLifecycleTag(this.repository, review)
+      return true
+    })
+    if (result !== true) {
+      return false
+    }
+    await this.refreshTags()
+    this.removeTagToPush(review.name)
+    this.statsStore.increment('tagsDeleted')
+    return true
+  }
+
+  /** Push one or more exact reviewed local tag objects. */
+  public async pushLifecycleTags(reviews: ReadonlyArray<ITagPushReview>) {
+    const remote = this.defaultRemote
+    if (remote === null) {
+      this.emitError(
+        new Error('This repository has no remote to push tags to.')
+      )
+      return false
+    }
+    const result = await this.performFailableOperation(async () => {
+      await pushLifecycleTags(this.repository, remote, reviews)
+      return true
+    })
+    if (result !== true) {
+      return false
+    }
+    for (const review of reviews) {
+      this.removeTagToPush(review.name)
+    }
+    return true
+  }
+
+  /** Fetch remote tags, optionally pruning reviewed stale local tags. */
+  public async fetchLifecycleTags(
+    prune: boolean,
+    reviewedLocalTags: ReadonlyArray<ITagRefReview>
+  ) {
+    const remote = this.defaultRemote
+    if (remote === null) {
+      this.emitError(
+        new Error('This repository has no remote to fetch tags from.')
+      )
+      return false
+    }
+    const result = await this.performFailableOperation(async () => {
+      await fetchLifecycleTags(
+        this.repository,
+        remote,
+        prune,
+        reviewedLocalTags
+      )
+      return true
+    })
+    if (result !== true) {
+      return false
+    }
+    await this.refreshTags()
+    if (prune && this._localTags !== null) {
+      this._tagsToPush = this._tagsToPush.filter(name =>
+        this._localTags?.has(name)
+      )
+      storeTagsToPush(this.repository, this._tagsToPush)
+      this.emitUpdate()
+    }
+    return true
+  }
+
+  /** Delete one reviewed remote tag after an exact object revalidation. */
+  public async deleteRemoteLifecycleTag(review: IRemoteTagDeletionReview) {
+    const remote = this.defaultRemote
+    if (remote === null) {
+      this.emitError(new Error('This repository has no remote tag to delete.'))
+      return false
+    }
+    const result = await this.performFailableOperation(async () => {
+      await deleteRemoteLifecycleTag(this.repository, remote, review)
+      return true
+    })
+    return result === true
   }
 
   /** The list of ordered SHAs. */
@@ -510,7 +685,7 @@ export class GitStore extends BaseStore {
   }
 
   private addTagToPush(tagName: string) {
-    this._tagsToPush = [...this._tagsToPush, tagName]
+    this._tagsToPush = [...new Set([...this._tagsToPush, tagName])]
 
     storeTagsToPush(this.repository, this._tagsToPush)
     this.emitUpdate()
@@ -1206,12 +1381,15 @@ export class GitStore extends BaseStore {
   public async loadStashEntries(): Promise<void> {
     const map = new Map<string, IStashEntry[]>()
     const stash = await getStashes(this.repository)
+    const existingBySha = new Map(
+      [...this.allDesktopStashEntries, ...this._foreignStashEntries].map(
+        entry => [entry.stashSha, entry] as const
+      )
+    )
 
     for (const entry of stash.desktopEntries) {
       const entries = map.get(entry.branchName) ?? []
-      const existing = this._desktopStashEntries
-        .get(entry.branchName)
-        ?.find(candidate => candidate.stashSha === entry.stashSha)
+      const existing = existingBySha.get(entry.stashSha)
       entries.push(
         existing === undefined ? entry : { ...entry, files: existing.files }
       )
@@ -1219,6 +1397,12 @@ export class GitStore extends BaseStore {
     }
 
     this._desktopStashEntries = map
+    this._foreignStashEntries = stash.foreignEntries.map(entry => {
+      const existing = existingBySha.get(entry.stashSha)
+      return existing === undefined
+        ? entry
+        : { ...entry, files: existing.files }
+    })
     this._stashEntryCount = stash.stashEntryCount
     this._foreignStashEntryCount = stash.foreignStashEntryCount
     this._stashInventoryTruncated = stash.isTruncated
@@ -1248,6 +1432,11 @@ export class GitStore extends BaseStore {
   /** Desktop-managed entries across every branch, grouped in map order. */
   public get allDesktopStashEntries(): ReadonlyArray<IStashEntry> {
     return [...this._desktopStashEntries.values()].flat()
+  }
+
+  /** Every bounded repository stash, including entries from other Git clients. */
+  public get allStashEntries(): ReadonlyArray<IStashEntry> {
+    return [...this.allDesktopStashEntries, ...this._foreignStashEntries]
   }
 
   public get foreignStashEntryCount(): number {
@@ -1288,6 +1477,40 @@ export class GitStore extends BaseStore {
   ): Promise<IStashEntry | null> {
     if (stashEntry.files.kind !== StashedChangesLoadStates.NotLoaded) {
       return stashEntry
+    }
+
+    if (stashEntry.origin === 'external') {
+      this._foreignStashEntries = this._foreignStashEntries.map(entry =>
+        entry.stashSha === stashEntry.stashSha
+          ? {
+              ...entry,
+              files: { kind: StashedChangesLoadStates.Loading } as const,
+            }
+          : entry
+      )
+      this.emitUpdate()
+      const files = await getStashedFiles(this.repository, stashEntry.stashSha)
+      if (
+        !this._foreignStashEntries.some(
+          entry => entry.stashSha === stashEntry.stashSha
+        )
+      ) {
+        return null
+      }
+      this._foreignStashEntries = this._foreignStashEntries.map(entry =>
+        entry.stashSha === stashEntry.stashSha
+          ? {
+              ...entry,
+              files: { kind: StashedChangesLoadStates.Loaded, files } as const,
+            }
+          : entry
+      )
+      this.emitUpdate()
+      return (
+        this._foreignStashEntries.find(
+          entry => entry.stashSha === stashEntry.stashSha
+        ) ?? null
+      )
     }
 
     const { branchName } = stashEntry

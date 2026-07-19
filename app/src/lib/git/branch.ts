@@ -8,6 +8,20 @@ import { envForRemoteOperation } from './environment'
 import { createForEachRefParser } from './git-delimiter-parser'
 import { IRemote } from '../../models/remote'
 import { coerceToString } from './coerce-to-string'
+import { listWorktrees } from './worktree'
+
+export const MaximumReviewedBranchDeletions = 100
+
+export interface IReviewedBranchDeletion {
+  readonly name: string
+  readonly expectedSha: string
+}
+
+export interface IReviewedBranchDeletionResult {
+  readonly name: string
+  readonly status: 'deleted' | 'failed'
+  readonly detail: string
+}
 
 /**
  * Create a new branch from the given start point.
@@ -104,6 +118,123 @@ export async function deleteLocalBranch(
 ): Promise<true> {
   await git(['branch', '-D', branchName], repository.path, 'deleteLocalBranch')
   return true
+}
+
+function normalizeReviewedBranchDeletion(
+  value: IReviewedBranchDeletion
+): IReviewedBranchDeletion {
+  const name = value.name.trim()
+  const expectedSha = value.expectedSha.trim().toLowerCase()
+  if (
+    name.length === 0 ||
+    name.length > 1_024 ||
+    name === 'HEAD' ||
+    name.startsWith('-') ||
+    /[\0-\x20\x7f~^:?*\[\\]/.test(name) ||
+    name.includes('..') ||
+    name.includes('@{') ||
+    name.endsWith('/') ||
+    name.endsWith('.') ||
+    name.split('/').some(part => part.length === 0 || part.endsWith('.lock')) ||
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(expectedSha)
+  ) {
+    throw new Error('A reviewed branch identity is invalid.')
+  }
+  return { name, expectedSha }
+}
+
+/**
+ * Delete only exact reviewed local branch identities. All candidates are
+ * revalidated before the first mutation and each update-ref includes the old
+ * object ID, so a concurrent branch move is never deleted accidentally.
+ */
+export async function deleteReviewedLocalBranches(
+  repository: Repository,
+  reviewedBranches: ReadonlyArray<IReviewedBranchDeletion>
+): Promise<ReadonlyArray<IReviewedBranchDeletionResult>> {
+  if (
+    reviewedBranches.length === 0 ||
+    reviewedBranches.length > MaximumReviewedBranchDeletions
+  ) {
+    throw new Error(
+      `Review between 1 and ${MaximumReviewedBranchDeletions} local branches.`
+    )
+  }
+  const reviewed = reviewedBranches.map(normalizeReviewedBranchDeletion)
+  if (new Set(reviewed.map(branch => branch.name)).size !== reviewed.length) {
+    throw new Error('Reviewed branch names must be unique.')
+  }
+
+  const current = await git(
+    ['symbolic-ref', '--quiet', '--short', 'HEAD'],
+    repository.path,
+    'reviewBulkBranchDeletion',
+    { successExitCodes: new Set([0, 1]) }
+  )
+  const currentName = current.exitCode === 0 ? current.stdout.trim() : null
+  if (reviewed.some(branch => branch.name === currentName)) {
+    throw new Error('The checked-out branch cannot be deleted.')
+  }
+
+  const checkedOutRefs = new Set(
+    (await listWorktrees(repository)).flatMap(worktree =>
+      worktree.branch === null ? [] : [worktree.branch]
+    )
+  )
+  if (
+    reviewed.some(branch => checkedOutRefs.has(formatAsLocalRef(branch.name)))
+  ) {
+    throw new Error('A branch checked out in a worktree cannot be deleted.')
+  }
+
+  const { formatArgs, parse } = createForEachRefParser({
+    name: '%(refname:short)',
+    sha: '%(objectname)',
+  })
+  const inventory = await git(
+    ['for-each-ref', ...formatArgs, 'refs/heads'],
+    repository.path,
+    'reviewBulkBranchDeletion'
+  )
+  const live = new Map(
+    parse(inventory.stdout).map(branch => [
+      branch.name,
+      branch.sha.toLowerCase(),
+    ])
+  )
+  for (const branch of reviewed) {
+    if (live.get(branch.name) !== branch.expectedSha) {
+      throw new Error(
+        'The reviewed branch list changed. Refresh and review it again.'
+      )
+    }
+  }
+
+  const results: IReviewedBranchDeletionResult[] = []
+  for (const branch of reviewed) {
+    try {
+      await git(
+        ['update-ref', '-d', formatAsLocalRef(branch.name), branch.expectedSha],
+        repository.path,
+        'deleteReviewedLocalBranches'
+      )
+      log.info(
+        `Deleted reviewed local branch ${branch.name} (was ${branch.expectedSha})`
+      )
+      results.push({
+        name: branch.name,
+        status: 'deleted',
+        detail: `Deleted at ${branch.expectedSha.slice(0, 12)}.`,
+      })
+    } catch {
+      results.push({
+        name: branch.name,
+        status: 'failed',
+        detail: 'The branch moved or could not be deleted.',
+      })
+    }
+  }
+  return results
 }
 
 /**

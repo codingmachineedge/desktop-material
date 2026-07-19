@@ -17,7 +17,7 @@ repositories without entering the saved repository list, with a profile-customiz
 to the persisted root. The completed parity roadmap turns audited Git, `gh`, REST, and GraphQL capabilities
 into named app functions rather than a searchable command or endpoint catalogue.
 
-> **Status:** Desktop Material is in **active development**, with the complete M0–M20 roadmap and
+> **Status:** Desktop Material is in **active development**, with the complete M0–M21 roadmap and
 > the verified post-M19 adaptive customization maintenance release published on `main`. Its exact
 > production build, off-screen interaction review, compact/zoomed geometry checks, and inspected
 > screenshot evidence are recorded alongside the implementation ledger and historical receipts in
@@ -31,6 +31,15 @@ into named app functions rather than a searchable command or endpoint catalogue.
 > ordering defect. Correction `98d93ccc` passed the full CI matrix and CodeQL, then published
 > [`v3.6.3-beta3-b0000000165`](https://github.com/codingmachineedge/desktop-material/releases/tag/v3.6.3-beta3-b0000000165).
 > Exact Pages, wiki, asset, and cleanup receipts are in `HANDOFF.md`.
+
+M21 closes the complete 30-item GitHub Desktop demand brief: exact account and
+repository identity, native PR review/creation/activity, selective and external
+stashes, full tag lifecycle, scalable repository/branch/history navigation,
+fork checkout, reviewed batch sync, tree/CSV/TGA diff ergonomics, editor and WSL
+integration, global ignores, custom commands, patch exchange, bulk branch
+cleanup, network paths, and live/offline GitHub Projects. The
+[feature ledger](https://github.com/codingmachineedge/desktop-material/blob/main/docs/features/github-desktop-demand-backlog.md)
+links every request to a dedicated safety and verification contract.
 
 ![Desktop Material workspace with a profile-customized app identity and favorite repository tab](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 

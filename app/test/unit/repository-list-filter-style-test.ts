@@ -34,4 +34,19 @@ describe('repository list scope filter styles', () => {
       /<RepositoriesList[\s\S]*?accounts=\{this\.state\.accounts\}/
     )
   })
+
+  it('wraps accessible status chips and identifies recovered hidden rows', () => {
+    assert.match(
+      style,
+      /\.repository-list-status-chips\s*\{[\s\S]*?display: flex;[\s\S]*?flex-wrap: wrap;/
+    )
+    assert.match(
+      style,
+      /\.repository-status-chip,[\s\S]*?\.repository-hidden-toggle\s*\{[\s\S]*?min-height: 30px;[\s\S]*?&:focus-visible\s*\{[\s\S]*?outline: 2px solid var\(--md-sys-color-primary\);[\s\S]*?&\[aria-pressed='true'\]/
+    )
+    assert.match(
+      style,
+      /\.repository-hidden-pill\s*\{[\s\S]*?border-radius: 999px;[\s\S]*?flex: 0 0 auto;/
+    )
+  })
 })

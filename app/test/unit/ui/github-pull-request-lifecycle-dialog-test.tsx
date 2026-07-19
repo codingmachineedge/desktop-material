@@ -10,6 +10,7 @@ import {
   IGitHubPullRequestReviewReceipt,
   IGitHubPullRequestUpdate,
 } from '../../../src/lib/github-pull-request'
+import { IGitHubPullRequestWorkspace } from '../../../src/lib/github-pull-request-workspace'
 import { Account } from '../../../src/models/account'
 import { GitHubRepository } from '../../../src/models/github-repository'
 import { Owner } from '../../../src/models/owner'
@@ -113,6 +114,68 @@ function snapshot(
   }
 }
 
+function workspace(): IGitHubPullRequestWorkspace {
+  return {
+    headSHA: 'a'.repeat(40),
+    files: [
+      {
+        sha: 'b'.repeat(40),
+        path: 'README.md',
+        previousPath: null,
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+        changes: 2,
+        patch: '@@ -1 +1 @@\n-old\n+new',
+      },
+    ],
+    commits: [
+      {
+        sha: 'a'.repeat(40),
+        message: 'Review workspace',
+        authorLogin: 'octocat',
+        authorName: 'Octo Cat',
+        authoredAt: '2026-01-01T00:00:00Z',
+      },
+    ],
+    reviews: [
+      {
+        id: 5,
+        state: 'COMMENTED',
+        body: 'Initial review',
+        author: 'reviewer',
+        submittedAt: '2026-01-01T00:00:00Z',
+        commitSHA: 'a'.repeat(40),
+      },
+    ],
+    issueComments: [],
+    reviewComments: [
+      {
+        id: 7,
+        reviewId: 5,
+        body: 'Please explain this line.',
+        author: 'reviewer',
+        createdAt: '2026-01-01T00:01:00Z',
+        updatedAt: '2026-01-01T00:01:00Z',
+        path: 'README.md',
+        line: 1,
+        side: 'RIGHT',
+        startLine: null,
+        inReplyToId: null,
+        commitSHA: 'a'.repeat(40),
+        diffHunk: '@@ -1 +1 @@',
+      },
+    ],
+    capped: {
+      files: false,
+      commits: false,
+      reviews: false,
+      issueComments: false,
+      reviewComments: false,
+    },
+  }
+}
+
 class TestDispatcher {
   public inspectCalls = 0
   public updateCalls = new Array<{
@@ -127,11 +190,24 @@ class TestDispatcher {
     expectedHeadSHA: string
     method: string
   }>()
+  public stateCalls = new Array<{
+    expectedHeadSHA: string
+    state: 'open' | 'closed'
+  }>()
   public inspectResult = Promise.resolve(snapshot())
+  public workspaceResult = Promise.resolve(workspace())
+  public workspaceError: Error | null = null
 
   public inspectGitHubPullRequest() {
     this.inspectCalls++
     return this.inspectResult
+  }
+
+  public async inspectGitHubPullRequestWorkspace() {
+    if (this.workspaceError !== null) {
+      throw this.workspaceError
+    }
+    return this.workspaceResult
   }
 
   public async updateGitHubPullRequest(
@@ -168,6 +244,20 @@ class TestDispatcher {
     }
   }
 
+  public async setGitHubPullRequestState(
+    _repository: Repository,
+    _pullRequest: PullRequest,
+    _account: Account,
+    expectedHeadSHA: string,
+    state: 'open' | 'closed'
+  ): Promise<IGitHubPullRequestMutationReceipt> {
+    this.stateCalls.push({ expectedHeadSHA, state })
+    return {
+      pullRequest: snapshot({ state }),
+      warnings: [],
+    }
+  }
+
   public async mergeGitHubPullRequest(
     _repository: Repository,
     _pullRequest: PullRequest,
@@ -185,6 +275,19 @@ class TestDispatcher {
 
   public async openInBrowser() {
     return true
+  }
+
+  public tryGetCommitStatus() {
+    return null
+  }
+
+  public subscribeToCommitStatus(
+    _repository: GitHubRepository,
+    _headSHA: string,
+    callback: (check: null) => void
+  ) {
+    callback(null)
+    return { dispose: () => undefined }
   }
 }
 
@@ -266,8 +369,10 @@ describe('GitHubPullRequestLifecycleDialog', () => {
     const dispatcher = new TestDispatcher()
     render(dialog(dispatcher))
     await waitFor(() =>
-      assert.ok(screen.getByRole('heading', { name: 'Submit a review' }))
+      assert.ok(screen.getByRole('tab', { name: /Conversation/ }))
     )
+    fireEvent.click(screen.getByRole('tab', { name: /Conversation/ }))
+    assert.ok(screen.getByRole('heading', { name: 'Submit a review' }))
 
     fireEvent.change(
       screen.getByRole('combobox', { name: 'Review decision' }),
@@ -287,6 +392,7 @@ describe('GitHubPullRequestLifecycleDialog', () => {
       body: 'Looks good',
     })
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }))
     fireEvent.click(screen.getByRole('button', { name: 'Prepare merge' }))
     const mergeButton = screen.getByRole('button', {
       name: 'Merge pull request',
@@ -338,5 +444,135 @@ describe('GitHubPullRequestLifecycleDialog', () => {
       assert.match(document.body.textContent ?? '', /matching GitHub account/i)
     )
     assert.equal(dispatcher.inspectCalls, 0)
+  })
+
+  it('queues exact-file inline comments and replies in one confirmed review', async () => {
+    const dispatcher = new TestDispatcher()
+    render(dialog(dispatcher))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('tab', { name: 'Files (1)' }))
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Files (1)' }))
+    assert.ok(screen.getByLabelText('Patch for README.md'))
+    fireEvent.change(screen.getByLabelText('Inline comment line'), {
+      target: { value: '1' },
+    })
+    fireEvent.change(screen.getByLabelText('Inline review comment'), {
+      target: { value: 'Please keep this wording.' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Queue inline comment' })
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Conversation (2)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reply to comment 7' }))
+    fireEvent.change(screen.getByLabelText('Reply to review comment 7'), {
+      target: { value: 'Explained in the queued change.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Queue reply' }))
+    fireEvent.change(screen.getByLabelText('Review comment'), {
+      target: { value: 'Review with inline context.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Review submission' }))
+    assert.match(
+      document.body.textContent ?? '',
+      /1 inline comments · 1 replies/
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review' }))
+
+    await waitFor(() => assert.equal(dispatcher.reviewCalls.length, 1))
+    assert.deepEqual(dispatcher.reviewCalls[0].review, {
+      event: 'COMMENT',
+      body: 'Review with inline context.',
+      comments: [
+        {
+          path: 'README.md',
+          line: 1,
+          side: 'RIGHT',
+          body: 'Please keep this wording.',
+        },
+      ],
+      replies: [{ inReplyToId: 7, body: 'Explained in the queued change.' }],
+    })
+  })
+
+  it('confirms closing an unchanged pull request and exposes checks context', async () => {
+    const dispatcher = new TestDispatcher()
+    render(dialog(dispatcher))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Close pull request' }))
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Close pull request' }))
+    assert.ok(screen.getByRole('heading', { name: 'Confirm close' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close pull request' }))
+    await waitFor(() => assert.equal(dispatcher.stateCalls.length, 1))
+    assert.deepEqual(dispatcher.stateCalls[0], {
+      expectedHeadSHA: 'a'.repeat(40),
+      state: 'closed',
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Checks' }))
+    assert.match(
+      document.body.textContent ?? '',
+      /No check results are available/
+    )
+  })
+
+  it('reports a successful review and fails closed when the refresh cannot load', async () => {
+    const dispatcher = new TestDispatcher()
+    render(dialog(dispatcher))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('tab', { name: /Conversation/ }))
+    )
+    fireEvent.click(screen.getByRole('tab', { name: /Conversation/ }))
+    fireEvent.change(screen.getByLabelText('Review comment'), {
+      target: { value: 'This review succeeds before refresh.' },
+    })
+    dispatcher.workspaceError = new Error('offline after mutation')
+    fireEvent.click(screen.getByRole('button', { name: 'Review submission' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review' }))
+
+    await waitFor(() => assert.equal(dispatcher.reviewCalls.length, 1))
+    await waitFor(() =>
+      assert.match(
+        document.body.textContent ?? '',
+        /Review #9 submitted as approved/i
+      )
+    )
+    assert.match(
+      document.body.textContent ?? '',
+      /change succeeded, but the latest review workspace could not be loaded/i
+    )
+    assert.equal(
+      screen.queryByRole('button', { name: 'Review submission' }),
+      null
+    )
+  })
+
+  it('moves through the tablist with standard arrow, Home, and End keys', async () => {
+    const dispatcher = new TestDispatcher()
+    render(dialog(dispatcher))
+    const overview = await screen.findByRole('tab', { name: 'Overview' })
+    fireEvent.keyDown(overview, { key: 'ArrowRight' })
+    assert.equal(
+      screen
+        .getByRole('tab', { name: 'Files (1)' })
+        .getAttribute('aria-selected'),
+      'true'
+    )
+    assert.ok(screen.getByRole('heading', { name: 'Changed files' }))
+
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Files (1)' }), {
+      key: 'End',
+    })
+    assert.equal(
+      screen.getByRole('tab', { name: 'Checks' }).getAttribute('aria-selected'),
+      'true'
+    )
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Checks' }), {
+      key: 'Home',
+    })
+    assert.equal(overview.getAttribute('aria-selected'), 'true')
   })
 })

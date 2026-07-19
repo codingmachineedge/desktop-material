@@ -797,6 +797,149 @@
   }
 }
 
+.structured-diff {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+
+  .structured-diff-toolbar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    padding: var(--spacing) var(--spacing-double);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    background: var(--md-sys-color-surface-container-low);
+
+    .button-component {
+      min-height: 30px;
+      padding: 0 var(--spacing);
+
+      &.selected {
+        color: var(--md-sys-color-on-primary-container);
+        background: var(--md-sys-color-primary-container);
+        border-color: var(--md-sys-color-primary);
+      }
+    }
+  }
+
+  .structured-diff-selection-hint {
+    margin-left: var(--spacing-double);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-sm);
+  }
+
+  .structured-diff-table-scroll {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    background: var(--md-sys-color-surface);
+  }
+
+  .structured-diff-table {
+    width: max-content;
+    min-width: 100%;
+    border-spacing: 0;
+    color: var(--md-sys-color-on-surface);
+    font-family: var(--font-family-monospace);
+    font-size: var(--font-size-sm);
+
+    th,
+    td {
+      box-sizing: border-box;
+      min-width: 120px;
+      max-width: 420px;
+      padding: var(--spacing-half) var(--spacing);
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      vertical-align: top;
+      border-right: 1px solid var(--md-sys-color-outline-variant);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      text-align: left;
+      color: var(--md-sys-color-on-surface-variant);
+      background: var(--md-sys-color-surface-container-high);
+    }
+
+    .structured-diff-row-number {
+      left: 0;
+      z-index: 1;
+      min-width: 56px;
+      width: 56px;
+      text-align: right;
+      color: var(--md-sys-color-on-surface-variant);
+      background: var(--md-sys-color-surface-container-low);
+      font-variant-numeric: tabular-nums;
+    }
+
+    thead .structured-diff-row-number {
+      z-index: 3;
+    }
+
+    tbody .structured-diff-row-number {
+      position: sticky;
+    }
+
+    tr.structured-diff-row-added td {
+      background: var(--diff-add-bg);
+    }
+
+    tr.structured-diff-row-removed td {
+      background: var(--diff-del-bg);
+    }
+
+    tr.structured-diff-row-changed td {
+      background: var(--diff-hunk-bg);
+    }
+
+    td.structured-diff-cell-added {
+      box-shadow: inset 3px 0 var(--dm-green);
+    }
+
+    td.structured-diff-cell-removed {
+      box-shadow: inset 3px 0 var(--md-sys-color-error);
+    }
+
+    td.structured-diff-cell-changed {
+      background: color-mix(in srgb, var(--dm-amber-container) 65%, var(--md-sys-color-surface));
+      box-shadow: inset 3px 0 var(--dm-amber);
+    }
+
+    ins,
+    del {
+      display: block;
+      color: inherit;
+    }
+
+    ins {
+      text-decoration: none;
+    }
+
+    del {
+      opacity: 0.75;
+    }
+
+    .structured-diff-previous-value + .structured-diff-current-value {
+      margin-top: var(--spacing-half);
+      padding-top: var(--spacing-half);
+      border-top: 1px dashed var(--md-sys-color-outline);
+    }
+  }
+}
+
+@media (max-width: 520px) {
+  .structured-diff .structured-diff-selection-hint {
+    display: none;
+  }
+}
+
 .seamless-diff-switcher {
   display: flex;
   flex-direction: column;
