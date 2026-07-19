@@ -84,6 +84,11 @@ handoff.
   the exact installed Copilot core version and retries registry installation
   up to three times. This addresses the Windows ARM64 job's floating-version
   drift and one-shot package-install failure.
+- Source commit `c2c6033431` passed CI run `29705698712`, including the formerly
+  failing Windows ARM64 setup/build/package job, both Windows x64 jobs, both
+  macOS architectures, lint, unit/script tests, and packaged E2E smoke tests.
+  Code scanning run `29705698711` and Build Installers run `29706427612` also
+  completed successfully.
 - SSH working copies remain under **Repository Settings → Remote**. Optional
   Docker Compose deployment targets that same host; public domain, DNS, TLS,
   reverse-proxy, and port configuration intentionally remain server-owned.
