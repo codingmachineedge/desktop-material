@@ -38,7 +38,7 @@ describe('repository CI status', () => {
   it('shows real updater download state in the top progress bar', () => {
     assert.match(
       appSource,
-      /updateState\.status !== UpdateStatus\.UpdateAvailable[\s\S]*?className="update-download-progress"/
+      /updateState\.status !== UpdateStatus\.UpdateAvailable[\s\S]*?className="update-download-progress"[\s\S]*?t\('update\.downloadingLabel'\)/
     )
   })
 })

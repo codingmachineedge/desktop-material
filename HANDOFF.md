@@ -30,6 +30,20 @@ provenance rather than current status.
 
 ## 2026-07-18 repository-page CI status
 
+### Internationalization follow-up
+
+- The CI status tooltip/result vocabulary, update-download progress
+  accessibility text, Appearance setting label, inheritance option, and palette
+  names now use a typed catalog selected from `navigator.language`.
+- English, Traditional Chinese (`zh-HK` and `zh-TW`), and Simplified Chinese are
+  included. Locale normalization and interpolation are unit-tested, and every
+  unsupported locale falls back to the complete English catalog.
+- The exact low-level MCP preflight passed at server SHA `beed66ca6ed`; its
+  production Webpack build remained CPU-active but exceeded 8 GB and stopped
+  making normal progress, so only that revalidated owned process tree was
+  terminated. The focused 14-test set, ESLint, `git diff --check`, and the full
+  repository TypeScript `--noEmit` compile all pass.
+
 - The selected repository's branch control now shows the existing compact,
   state-coloured CI logo for the current commit even when that branch has no
   pull request. Pull-request branches retain their existing interactive badge.

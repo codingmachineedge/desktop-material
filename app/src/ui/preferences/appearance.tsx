@@ -30,6 +30,7 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { AppIdentity } from './app-identity'
 import { RepositoryLogoStudio } from '../repository-logo/repository-logo-studio'
+import { t } from '../../lib/i18n'
 
 type AppearanceSelectKey = Exclude<
   keyof IAppearanceCustomization,
@@ -461,15 +462,15 @@ export class Appearance extends React.Component<
           ])}
           {this.renderCustomizationSelect(
             'updateProgressPalette',
-            'Update progress color',
+            t('appearance.updateProgressColor'),
             [
-              { value: 'accent', label: 'Use accent color' },
-              { value: 'blue', label: 'Blue' },
-              { value: 'violet', label: 'Violet' },
-              { value: 'teal', label: 'Teal' },
-              { value: 'green', label: 'Green' },
-              { value: 'amber', label: 'Amber' },
-              { value: 'rose', label: 'Rose' },
+              { value: 'accent', label: t('appearance.useAccentColor') },
+              { value: 'blue', label: t('color.blue') },
+              { value: 'violet', label: t('color.violet') },
+              { value: 'teal', label: t('color.teal') },
+              { value: 'green', label: t('color.green') },
+              { value: 'amber', label: t('color.amber') },
+              { value: 'rose', label: t('color.rose') },
             ]
           )}
           {this.renderCustomizationSelect('surfacePalette', 'Surface color', [

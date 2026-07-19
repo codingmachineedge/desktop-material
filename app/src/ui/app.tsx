@@ -28,6 +28,7 @@ import { OpencodeFixDialog } from './build-run/opencode-fix-dialog'
 import { assertNever } from '../lib/fatal-error'
 import { shell } from '../lib/app-shell'
 import { updateStore, UpdateStatus } from './lib/update-store'
+import { t } from '../lib/i18n'
 import { RetryAction } from '../models/retry-actions'
 import { FetchType } from '../models/fetch'
 import { shouldRenderApplicationMenu } from './lib/features'
@@ -4325,8 +4326,8 @@ export class App extends React.Component<IAppProps, IAppState> {
       <div
         className="update-download-progress"
         role="progressbar"
-        aria-label="Downloading app update"
-        aria-valuetext="Downloading"
+        aria-label={t('update.downloadingLabel')}
+        aria-valuetext={t('update.downloadingValue')}
       >
         <span />
       </div>

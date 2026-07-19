@@ -7,6 +7,7 @@ import type { Disposable } from 'event-kit'
 import { Dispatcher } from '../dispatcher'
 import { ICombinedRefCheck, IRefCheck } from '../../lib/ci-checks/ci-checks'
 import { APICheckConclusion, IAPIWorkflowJobStep } from '../../lib/api'
+import { t, TranslationKey } from '../../lib/i18n'
 
 interface ICIStatusProps {
   /** The classname for the underlying element. */
@@ -111,7 +112,7 @@ export class CIStatus extends React.PureComponent<
           this.props.className
         )}
         symbol={getSymbolForCheck(check)}
-        title={`CI checks: ${getLabelForCheck(check)}`}
+        title={t('ci.status', { status: getLabelForCheck(check) })}
       />
     )
   }
@@ -120,26 +121,36 @@ export class CIStatus extends React.PureComponent<
 export function getLabelForCheck(check: {
   readonly conclusion: APICheckConclusion | null
 }): string {
+  let key: TranslationKey
   switch (check.conclusion) {
     case 'timed_out':
-      return 'timed out'
+      key = 'ci.timedOut'
+      break
     case 'action_required':
-      return 'action required'
+      key = 'ci.actionRequired'
+      break
     case 'failure':
-      return 'failed'
+      key = 'ci.failed'
+      break
     case 'neutral':
-      return 'neutral'
+      key = 'ci.neutral'
+      break
     case 'success':
-      return 'successful'
+      key = 'ci.successful'
+      break
     case 'cancelled':
-      return 'cancelled'
+      key = 'ci.cancelled'
+      break
     case 'skipped':
-      return 'skipped'
+      key = 'ci.skipped'
+      break
     case 'stale':
-      return 'stale'
+      key = 'ci.stale'
+      break
+    default:
+      key = 'ci.inProgress'
   }
-
-  return 'in progress'
+  return t(key)
 }
 
 export function getSymbolForCheck(

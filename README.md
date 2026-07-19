@@ -33,6 +33,9 @@ maintenance acceptance items are complete.
 
 **Appearance customization**
 - Fourteen app defaults in **Settings → Appearance**: accent color, update-progress color, surface color, surface depth, interface font, code/diff font, animation, toolbar labels, toolbar density, repository-list density, tab density, tab width, tab-close-button behavior, and opt-in Desktop Material feature highlighting. The thin top-edge bar appears only while an app update is downloading and defaults to the active accent color
+- The current-commit CI tooltip and update-download controls follow the Windows
+  locale in English, Traditional Chinese (Hong Kong/Taiwan), or Simplified
+  Chinese, with a safe English fallback for other locales
 - **Highlight Desktop Material features** is off by default. Turn it on to add a non-animated accent edge and an `M` or **Material** badge to explicitly classified fork-only navigation, repository-tab tools, notifications, toolbar, menu, and command entry points; upstream and mixed GitHub Desktop controls stay neutral
 - A live **App identity** editor for the in-app logo, app name, logo geometry/border/shadow, colors, font, width, weight, case, size, spacing, opacity, emphasis, highlight, and text effects. Identity follows the active profile and restores across restart; signed binaries and the operating-system icon remain unchanged
 - A safe vector **Custom repository logo** studio with presets, editable mark/text layers, colors, transforms, live preview, undo/redo, bounded JSON import/export, a profile default, and per-repository inheritance. The resolved design follows the repository into its tab and repository-list row; executable/raw SVG is never stored

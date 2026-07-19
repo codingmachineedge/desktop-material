@@ -102,6 +102,9 @@ The whole shell has an **animated light/dark theme**. Everything below tells you
 While an app update downloads, a thin indeterminate progress bar appears at the
 top of the workspace. Choose **Settings → Appearance → Update progress color**
 to inherit the accent or select blue, violet, teal, green, amber, or rose.
+These update controls and the current-commit CI status tooltip automatically use
+English, Traditional Chinese, or Simplified Chinese from the operating-system
+locale; unsupported locales fall back to English.
 
 ![Desktop Material workspace with a profile-customized app identity and favorite repository tab](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 
