@@ -6,7 +6,8 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$SourceRoot,
   [ValidateRange(0, 65535)]
-  [int]$Port = 0
+  [int]$Port = 0,
+  [switch]$CopilotEnabled
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,6 +48,9 @@ $arguments = @(
   '--port', $Port,
   '--html-url', 'http://material-provider.invalid'
 )
+if ($CopilotEnabled) {
+  $arguments += '--copilot-enabled'
+}
 $startOptions = @{
   FilePath = $PythonExecutable
   ArgumentList = $arguments
@@ -76,6 +80,7 @@ $state = Get-Content -LiteralPath $ready -Raw | ConvertFrom-Json
   port = [int]$state.port
   endpoint = [string]$state.endpoint
   htmlUrl = [string]$state.htmlUrl
+  copilotEnabled = [bool]$state.copilotEnabled
   owner = [string]$state.owner
   repository = [string]$state.repository
   featureBranch = [string]$state.featureBranch

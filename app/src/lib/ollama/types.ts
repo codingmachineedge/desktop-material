@@ -91,14 +91,24 @@ export interface IOllamaPullOptions extends IOllamaRequestOptions {
   readonly onProgress?: (progress: IOllamaPullProgress) => void
 }
 
+/** The fetch response subset consumed by the bounded Ollama client. */
+export interface IOllamaResponse {
+  readonly body: ReadableStream<Uint8Array> | null
+  readonly headers: Headers
+  readonly ok: boolean
+  readonly status: number
+}
+
 export type OllamaFetch = (
   input: RequestInfo | URL,
   init?: RequestInit
-) => Promise<Response>
+) => Promise<IOllamaResponse>
 
 export interface IOllamaClientOptions {
   readonly fetcher?: OllamaFetch
   readonly requestTimeoutMs?: number
+  /** Total deadline for the potentially slow first model load. */
+  readonly loadTimeoutMs?: number
   readonly pullInactivityTimeoutMs?: number
   readonly pullTotalTimeoutMs?: number
 }

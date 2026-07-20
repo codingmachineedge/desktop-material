@@ -15461,8 +15461,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     const updated = [...this.byokProviders]
     updated[idx] = provider
+    saveBYOKProviders(updated)
     this.byokProviders = updated
-    saveBYOKProviders(this.byokProviders)
 
     // If the user removed the model that was selected for any feature, fall
     // back to the default for that feature.

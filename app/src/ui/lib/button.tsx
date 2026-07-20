@@ -49,6 +49,9 @@ export interface IButtonProps {
   /** CSS class names */
   readonly className?: string
 
+  /** Stable automation hook. Accessible names remain the user-facing contract. */
+  readonly dataVerification?: string
+
   /** The type of button size, e.g., normal or small. */
   readonly size?: 'normal' | 'small'
 
@@ -252,6 +255,7 @@ export class Button extends React.Component<IButtonProps, {}> {
       <button
         id={this.props.id}
         className={className}
+        data-verification={this.props.dataVerification}
         onClick={disabled ? preventDefault : this.onClick}
         onKeyDown={this.props.onKeyDown}
         onContextMenu={disabled ? preventDefault : this.onContextMenu}

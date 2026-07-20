@@ -12,6 +12,7 @@ import {
   IOllamaPullOptions,
   IOllamaPullProgress,
   IOllamaRequestOptions,
+  IOllamaResponse,
   IOllamaRunningModel,
   IOllamaVersion,
   OllamaClientError,
@@ -29,6 +30,7 @@ import {
 } from './validation'
 
 export const DefaultOllamaRequestTimeoutMs = 30_000
+export const DefaultOllamaLoadTimeoutMs = 10 * 60 * 1_000
 export const DefaultOllamaPullInactivityTimeoutMs = 120_000
 export const DefaultOllamaPullTotalTimeoutMs = 6 * 60 * 60 * 1_000
 export const MaxOllamaJsonBodyBytes = 2 * 1_024 * 1_024
@@ -185,7 +187,7 @@ function combineBytes(
   return combined
 }
 
-async function cancelResponseBody(response: Response): Promise<void> {
+async function cancelResponseBody(response: IOllamaResponse): Promise<void> {
   try {
     await response.body?.cancel()
   } catch {
@@ -204,7 +206,7 @@ async function cancelReader(
 }
 
 async function assertContentLength(
-  response: Response,
+  response: IOllamaResponse,
   maximumBytes: number
 ): Promise<void> {
   const raw = response.headers.get('content-length')
@@ -229,7 +231,7 @@ async function assertContentLength(
 }
 
 async function readBoundedBody(
-  response: Response,
+  response: IOllamaResponse,
   maximumBytes: number,
   context: IRequestContext
 ): Promise<Uint8Array> {
@@ -299,7 +301,9 @@ function serverError(): OllamaClientError {
   return new OllamaClientError('server', 'Ollama rejected the request.')
 }
 
-async function httpError(response: Response): Promise<OllamaClientError> {
+async function httpError(
+  response: IOllamaResponse
+): Promise<OllamaClientError> {
   await cancelResponseBody(response)
   return new OllamaClientError(
     'http',
@@ -340,7 +344,7 @@ function parseNdjsonLine(bytes: Uint8Array): unknown | undefined {
 }
 
 async function readPullProgress(
-  response: Response,
+  response: IOllamaResponse,
   context: IRequestContext,
   options: IOllamaPullOptions
 ): Promise<IOllamaPullProgress> {
@@ -453,6 +457,7 @@ export class OllamaClient implements IOllamaClient {
 
   private readonly fetcher: OllamaFetch
   private readonly requestTimeoutMs: number
+  private readonly loadTimeoutMs: number
   private readonly pullInactivityTimeoutMs: number
   private readonly pullTotalTimeoutMs: number
 
@@ -462,6 +467,10 @@ export class OllamaClient implements IOllamaClient {
     this.requestTimeoutMs = resolveTimeout(
       options.requestTimeoutMs,
       DefaultOllamaRequestTimeoutMs
+    )
+    this.loadTimeoutMs = resolveTimeout(
+      options.loadTimeoutMs,
+      DefaultOllamaLoadTimeoutMs
     )
     this.pullInactivityTimeoutMs = resolveTimeout(
       options.pullInactivityTimeoutMs,
@@ -559,7 +568,10 @@ export class OllamaClient implements IOllamaClient {
     model: string,
     options: IOllamaRequestOptions = {}
   ): Promise<void> {
-    return this.generateKeepAlive(model, -1, options)
+    return this.generateKeepAlive(model, -1, {
+      ...options,
+      timeoutMs: options.timeoutMs ?? this.loadTimeoutMs,
+    })
   }
 
   public unload(
@@ -638,7 +650,7 @@ export class OllamaClient implements IOllamaClient {
     options: IOllamaRequestOptions,
     totalTimeoutMs: number,
     inactivityTimeoutMs: number | undefined,
-    handle: (response: Response, context: IRequestContext) => Promise<T>
+    handle: (response: IOllamaResponse, context: IRequestContext) => Promise<T>
   ): Promise<T> {
     throwIfAborted(options.signal)
     const context = createRequestContext(

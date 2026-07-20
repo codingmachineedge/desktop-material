@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { describe, it } from 'node:test'
+import { describe, it, mock } from 'node:test'
 import {
   MaxOllamaJsonBodyBytes,
   MaxOllamaNdjsonLineBytes,
@@ -312,6 +312,54 @@ describe('Ollama client lifecycle operations', () => {
     )
     for (const request of requests) {
       assertSafeRequest(request)
+    }
+  })
+
+  it('uses a dedicated load deadline and honors an explicit override', async () => {
+    mock.timers.enable()
+    try {
+      const signals = new Array<AbortSignal>()
+      const fetcher: OllamaFetch = async (_input, init = {}) =>
+        new Promise<Response>((_resolve, reject) => {
+          assert.ok(init.signal instanceof AbortSignal)
+          signals.push(init.signal)
+          init.signal.addEventListener(
+            'abort',
+            () => reject(new Error('stop')),
+            {
+              once: true,
+            }
+          )
+        })
+      const client = new OllamaClient('http://localhost:11434', {
+        fetcher,
+        requestTimeoutMs: 10,
+        loadTimeoutMs: 200,
+      })
+
+      const defaultDeadline = client.load('llama3.2')
+      mock.timers.tick(10)
+      assert.equal(signals[0].aborted, false)
+      mock.timers.tick(190)
+      assert.equal(signals[0].aborted, true)
+      await assert.rejects(defaultDeadline, (error: unknown) => {
+        assert.ok(error instanceof OllamaClientError)
+        assert.equal(error.kind, 'timeout')
+        return true
+      })
+
+      const explicitDeadline = client.load('llama3.2', { timeoutMs: 25 })
+      mock.timers.tick(24)
+      assert.equal(signals[1].aborted, false)
+      mock.timers.tick(1)
+      assert.equal(signals[1].aborted, true)
+      await assert.rejects(explicitDeadline, (error: unknown) => {
+        assert.ok(error instanceof OllamaClientError)
+        assert.equal(error.kind, 'timeout')
+        return true
+      })
+    } finally {
+      mock.timers.reset()
     }
   })
 

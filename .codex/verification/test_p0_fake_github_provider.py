@@ -51,6 +51,42 @@ class ProviderStateTests(unittest.TestCase):
         response = self.state.dispatch("OPTIONS", self.repo_path, {})
         self.assertEqual(response.status, 204)
 
+    def test_copilot_capability_is_opt_in_and_identity_safe(self) -> None:
+        default_response = self.state.dispatch(
+            "POST", "/api/v3/graphql", self.headers
+        )
+        default_viewer = self.json(default_response)["data"]["viewer"]
+        self.assertFalse(default_viewer["isCopilotDesktopEnabled"])
+        self.assertEqual(default_viewer["copilotLicenseType"], "none")
+
+        enabled_state = provider.ProviderState(
+            self.artifact, copilot_enabled=True
+        )
+        enabled_response = enabled_state.dispatch(
+            "POST", "/api/v3/graphql", self.headers
+        )
+        enabled_viewer = self.json(enabled_response)["data"]["viewer"]
+        self.assertTrue(enabled_viewer["isCopilotDesktopEnabled"])
+        self.assertEqual(
+            enabled_viewer["copilotLicenseType"], "COPILOT_INDIVIDUAL"
+        )
+        self.assertEqual(enabled_viewer["copilotEndpoints"], {"api": ""})
+        default_features = self.state.dispatch(
+            "GET", "/api/v3/desktop_internal/features", self.headers
+        )
+        enabled_features = enabled_state.dispatch(
+            "GET", "/api/v3/desktop_internal/features", self.headers
+        )
+        self.assertEqual(self.json(default_features), {"features": []})
+        self.assertEqual(
+            self.json(enabled_features),
+            {
+                "features": [
+                    "desktop_enable_copilot_sdk_commit_message_generation"
+                ]
+            },
+        )
+
     def test_repository_and_branch_rules_are_purpose_built(self) -> None:
         repository = self.state.dispatch("GET", self.repo_path, self.headers)
         self.assertEqual(repository.status, 200)
