@@ -1334,7 +1334,8 @@ function assertFinalSurface(receipt) {
     receipt.themeDark !== true ||
     receipt.innerWidth !== CaptureWidth ||
     receipt.innerHeight !== CaptureHeight ||
-    receipt.devicePixelRatio !== 1 ||
+    typeof receipt.devicePixelRatio !== 'number' ||
+    Math.abs(receipt.devicePixelRatio - 1) >= 0.001 ||
     receipt.managerBusy !== 'false' ||
     receipt.endpointStatus !== 'Connected' ||
     !receipt.metrics?.includes('0.12.6') ||
@@ -1531,7 +1532,7 @@ async function prepareAndCapture(client, capturePath) {
   await waitForExpression(
     client,
     `innerWidth === ${CaptureWidth} && innerHeight === ${CaptureHeight} &&
-      devicePixelRatio === 1`,
+      Math.abs(devicePixelRatio - 1) < 0.001`,
     'exact Ollama capture viewport'
   )
   await evaluate(

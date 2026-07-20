@@ -415,6 +415,13 @@ describe('Ollama manager attach-only verifier contract', () => {
 
   it('rejects clipped, inaccessible, or private final surfaces', () => {
     assert.doesNotThrow(() => assertFinalSurface(validSurface()))
+    assert.doesNotThrow(() =>
+      assertFinalSurface({ ...validSurface(), devicePixelRatio: 1.00000003 })
+    )
+    assert.throws(
+      () => assertFinalSurface({ ...validSurface(), devicePixelRatio: 1.01 }),
+      /failed its gate/
+    )
     assert.throws(
       () => assertFinalSurface({ ...validSurface(), privacySafe: false }),
       /failed its gate/
