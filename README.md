@@ -17,9 +17,13 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
 
 ## Product scope
 
-The complete M0–M21 roadmap is shipped on `main`. The compact status summary is
-below; the implementation ledger is in [`PLAN.md`](PLAN.md), and detailed
-acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
+The complete M0–M21 roadmap is shipped on `main`. M22 owner-scoped management
+keeps its separately tracked visual-publication acceptance, and M23 adds the
+full Ollama model manager described below. M23 has completed its production
+build, deterministic lifecycle, privacy, layout, and cleanup acceptance; final
+exact-`main` CI, Pages, and wiki publication checks remain pending. The compact
+status summary is below; the implementation ledger is in [`PLAN.md`](PLAN.md),
+and detailed acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
 
 The M20 platform wave and earlier post-M19 adaptive customization maintenance
 release described below are shipped on `main`. Their exact production build,
@@ -66,6 +70,29 @@ The detailed Pages, wiki, asset, and cleanup receipts are maintained in
   retaining existing Copilot commit-message controls and one-click editor
   actions. The [30-item demand ledger](docs/features/github-desktop-demand-backlog.md)
   links each request to its behavior, safety boundary, and verification contract
+
+**Local Ollama model lifecycle (M23)**
+
+- Add an **Ollama (local)** provider in **Settings → Copilot → Providers**, then
+  open its purpose-built **Manage models** workspace without writing native API
+  requests
+- Inspect endpoint health/version, installed and running inventories, searchable
+  model details, runtime allocation, capabilities, and bounded metadata with
+  separate unavailable and partial states
+- Pull with streamed progress and cancellation; copy or guarded-rename a model;
+  load or unload it; and delete only after confirming the exact model name
+- Synchronize Ollama's installed inventory back to that provider's selectable
+  Copilot models. Management requires an exact loopback `/v1` base and derives
+  only fixed native `/api/*` routes; remote HTTP/HTTPS hosts, arbitrary
+  prefixes, credentials, queries, and fragments are rejected. The complete
+  workspace follows English, playful Hong Kong Cantonese, or bilingual mode.
+  See the
+  [feature guide](docs/features/integrations/ollama-model-manager.md)
+
+The accepted off-screen manager capture is a privacy-safe synthetic scene at
+1452×1001. Its full health, inventory, search, running-state, pull cancellation
+and rollback, completed pull, copy, rename, load, unload, confirmed-delete, and
+provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 
 **Material Design 3 Expressive shell**
 - App-bar branding with an inline pill menu
@@ -195,9 +222,10 @@ The detailed Pages, wiki, asset, and cleanup receipts are maintained in
 
 ## Roadmap
 
-The complete M0–M21 status, completed maintenance work, and acceptance rules now
-live in [`ROADMAP.md`](ROADMAP.md). Detailed implementation and verification
-receipts remain in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
+The complete M0–M21 status, M22 visual-publication acceptance, M23 Ollama model
+manager, completed maintenance work, and acceptance rules now live in
+[`ROADMAP.md`](ROADMAP.md). Detailed implementation and verification receipts
+remain in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 
 ## Screenshots
 
@@ -246,9 +274,9 @@ automation, and account isolation. The diagrams are reproducible with
 | --- |
 | <img src="docs/assets/screenshots/advanced-workflows.png" alt="Tag lifecycle workspace showing local, pushed, and remote-only tags with bounded actions" width="720"><br><sub>Local and remote inventory · reviewed mutations · responsive workflow surface</sub> |
 
-| Repository folder discovery | Submodule and subtree management | Cheap-LFS preparation |
-| --- | --- | --- |
-| <img src="docs/assets/screenshots/material-repository-folder-detection.png" alt="Add local repository dialog showing two Git repositories discovered beneath one selected parent folder" width="360"><br><sub>Bounded scan · link-safe traversal · bulk add</sub> | <img src="docs/assets/screenshots/material-repository-submodule-management.png" alt="Wider Repository Settings Submodules tab with the Back element's anchored appearance editor open beside it" width="360"><br><sub>Right-click editor · no list import · embedded subtrees</sub> | <img src="docs/assets/screenshots/material-cheap-lfs-preparing.png" alt="Commit composer preparing one oversized file for cheap LFS before the final branch commit" width="360"><br><sub>Raw release assets · ordered splitting · honest commit phase</sub> |
+| Local Ollama model lifecycle |
+| --- |
+| <img src="docs/assets/screenshots/material-ollama-model-manager.png" alt="Ollama model manager with endpoint health, installed and running model inventory, selected model details, and lifecycle actions" width="720"><br><sub>Health · inventory · pull · copy/rename · load/unload · confirmed delete</sub> |
 
 <details>
 <summary><strong>Open 30 more verified screenshots</strong></summary>

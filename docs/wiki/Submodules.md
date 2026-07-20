@@ -154,8 +154,6 @@ ordinary language, theme, scale, and layout preferences. The Back owner has its
 own local Git repository and **History** action; undo, redo, and restore affect
 only its style and label and append audit commits.
 
-![The wider Repository Settings Submodules surface with the Back element's appearance editor anchored beside its preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
-
 Temporary mode is intentionally inspection-first. Repository Tools remains
 available for safe reading, while branch/tag/stash/history rewrites, remotes,
 worktrees, nested-repository mutation, automation, shell/editor launch, and

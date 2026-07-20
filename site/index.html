@@ -391,7 +391,10 @@
             immutable Windows release <code>v3.6.3-beta3-b0000000165</code>. M21
             now closes all 30 demand-backed advanced workflow requests across
             identity, pull requests, stashes and tags, navigation, diffs,
-            integrations, and Projects.
+            integrations, and Projects. M23 adds a full local Ollama model
+            lifecycle workspace with an exact loopback-only provider endpoint,
+            synchronized Copilot provider models, and English, Hong Kong
+            Cantonese, or bilingual presentation.
           </p>
           <div class="feature-grid">
             <article class="card">
@@ -796,6 +799,24 @@
                 provider's repositories without exposing credentials. GitHub
                 browser sign-in uses the bounded repository, user, workflow,
                 notifications, and read-only organization feature scopes.
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="glyph" aria-hidden="true">
+                <svg class="material-icon"><use href="#icon-robot"></use></svg>
+              </div>
+              <h3>Local Ollama models <span class="tag">M23</span></h3>
+              <p>
+                Inspect endpoint health and version, search installed models,
+                filter to running models, review bounded details, pull with
+                cancellable progress, copy or rename, load or unload, and
+                confirm deletion. The installed inventory stays synchronized
+                with that Ollama provider's selectable Copilot models, while
+                management accepts only its exact loopback
+                <code>/v1</code> base. The accepted synthetic off-screen scene
+                verifies the full lifecycle with no overlapping or horizontally
+                overflowing controls.
               </p>
             </article>
 
@@ -1670,60 +1691,6 @@
 
             <figure class="shot">
               <a
-                href="docs/assets/screenshots/material-repository-submodule-management.png"
-                target="_blank"
-                rel="noopener"
-              >
-                <img
-                  src="docs/assets/screenshots/material-repository-submodule-management.png"
-                  alt="Wider Repository Settings Submodules tab with the Back element's anchored appearance editor open beside it"
-                  loading="lazy"
-                />
-              </a>
-              <figcaption>
-                Submodule and subtree management
-                <span class="tag">Temporary · Context editor · Subtrees</span>
-              </figcaption>
-            </figure>
-
-            <figure class="shot">
-              <a
-                href="docs/assets/screenshots/material-repository-folder-detection.png"
-                target="_blank"
-                rel="noopener"
-              >
-                <img
-                  src="docs/assets/screenshots/material-repository-folder-detection.png"
-                  alt="Add local repository dialog showing two repositories found beneath one parent folder"
-                  loading="lazy"
-                />
-              </a>
-              <figcaption>
-                Repository folder discovery
-                <span class="tag">Bounded scan · Bulk add</span>
-              </figcaption>
-            </figure>
-
-            <figure class="shot">
-              <a
-                href="docs/assets/screenshots/material-cheap-lfs-preparing.png"
-                target="_blank"
-                rel="noopener"
-              >
-                <img
-                  src="docs/assets/screenshots/material-cheap-lfs-preparing.png"
-                  alt="Commit composer preparing one oversized file for cheap LFS before the final branch commit"
-                  loading="lazy"
-                />
-              </a>
-              <figcaption>
-                Cheap-LFS preparation
-                <span class="tag">Raw assets · Ordered splitting</span>
-              </figcaption>
-            </figure>
-
-            <figure class="shot">
-              <a
                 href="docs/assets/screenshots/material-shallow-clone-safe.png"
                 target="_blank"
                 rel="noopener"
@@ -1977,6 +1944,27 @@
               </a>
               <figcaption>
                 Issues <span class="tag">Search · review · edit</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/material-ollama-model-manager.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-ollama-model-manager.png"
+                  alt="Ollama model manager showing endpoint health, installed and running model inventory, selected model details, and lifecycle actions"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Ollama model manager
+                <span class="tag"
+                  >Headless verified · Pull · Load/unload · Copy/rename ·
+                  Delete</span
+                >
               </figcaption>
             </figure>
 

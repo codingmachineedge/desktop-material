@@ -4,7 +4,7 @@
 
 Treat every gallery entry as part of a workflow: find the capability, open its named surface, review the exact scope, and keep the resulting evidence.
 
-This page maps 68 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 66 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
@@ -74,8 +74,6 @@ active profile's style, label, and explicit language mode.
 | `material-clone-account-fallback.png` | Generic HTTPS clone completed through exact-origin signed-in account fallback |
 | `add-submodule-dialog.png` | Clone-style Add Submodule review with source, checkout path, and branch |
 | `material-submodule-context.png` | Initialized submodule opened temporarily with context and Back to the persisted root |
-| `material-repository-submodule-management.png` | Wider Repository Settings with the Back element's anchored editor and embedded subtrees |
-| `material-repository-folder-detection.png` | Bounded parent-folder scan with two discovered Git repositories ready for bulk add |
 | `material-pull-all-account-fallback.png` | Pull all with per-repository results and exact-origin account retry |
 | `material-sparse-checkout-safe.png` | Validated cone-mode sparse-checkout review |
 | `material-history-deepen.png` | Deepen-history result without exposing the account used |
@@ -97,7 +95,6 @@ active profile's style, label, and explicit language mode.
 | `material-repository-tools.png` | Named Repository Tools administration hub |
 | `material-repository-tools-scroll.png` | Short-height Repository Tools scrolled to its reachable final results surface |
 | `material-workspace-changes.png` | Material Changes workspace and commit flow |
-| `material-cheap-lfs-preparing.png` | Oversized-file cheap-LFS preparation shown separately from the final branch commit |
 | `material-history.png` | Core History browsing and selected-commit inspection |
 | `material-history-context-actions.png` | Selection-aware History commit More/right-click actions and button hint |
 | `material-settings.png` | Responsive Material Settings dialog |
@@ -112,6 +109,7 @@ active profile's style, label, and explicit language mode.
 | `material-error-notice.png` | Scoped stale Git lock recovery from a bottom-right error notice |
 | `material-github-notifications.png` | Account-aware GitHub notifications |
 | `material-provider-accounts.png` | GitHub, GitLab, and Bitbucket account controls |
+| `material-ollama-model-manager.png` | Ollama health, installed/running inventory, model details, and guarded lifecycle actions |
 | `material-agent-access.png` | Local MCP and REST agent access controls |
 | `material-multi-window-menu.png` | Open repositories and worktrees in another window |
 | `material-scale-200-autofit.png` | 200% requested scale safely auto-fitted at minimum size |
@@ -148,10 +146,6 @@ customization/history context use the same profile/repository ownership model.
 
 ![Initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
 
-![Wider Repository Settings Submodules tab with the Back element's appearance editor anchored beside its preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
-
-![Two Git repositories found beneath a selected parent folder and ready for one bulk add](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-folder-detection.png)
-
 ![Pull all showing a neutral exact-origin signed-in account fallback result](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
 
 ![Validated cone-mode sparse-checkout review](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
@@ -165,8 +159,6 @@ Git creates the branch commit. New uploads use raw bytes, retain one asset when
 it fits the release limit, and use ordered raw ranges when it does not. The
 composer names preparation, upload, and verification separately, then reserves
 **Committing to _branch_** for the small pointer commit.
-
-![Commit composer preparing an oversized file for cheap LFS before the final branch commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-cheap-lfs-preparing.png)
 
 ## Repository administration
 
@@ -263,6 +255,30 @@ recovery.
 ![Repository-bound Releases dashboard with status summary, selected metadata, and assets](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-releases.png)
 
 ![Issue detail, comments, and reviewed lifecycle controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-issues.png)
+
+## Local Ollama model lifecycle
+
+**Settings → Copilot → Providers → Manage models** opens a bounded workspace for
+one configured Ollama endpoint. Health/version, installed inventory, running
+state, search/filter, and model details stay separately refreshable. Pull shows
+streamed progress and supports cancellation; copy and copy-then-delete rename,
+load/unload, and exact-name confirmed deletion keep partial and failure states
+visible. Successful inventory changes synchronize installed names back to the
+provider's selectable Copilot models.
+
+Management accepts only an exact loopback `/v1` provider base. The manager
+derives that loopback origin and appends fixed native `/api/*` routes; every
+remote HTTP or HTTPS host, arbitrary prefix, saved `/api` base,
+credential-bearing URL, query, and fragment fails validation. The complete
+surface follows English, playful Hong Kong Cantonese, and bilingual language
+modes, with keyboard access and live status announcements.
+
+The accepted 1452×1001 synthetic-only capture passed original-resolution
+privacy review. Its geometry receipt reports the manager, Preferences shell,
+and lifecycle controls contained above the footer, with zero overlaps and no
+horizontal overflow.
+
+![Ollama model manager showing endpoint health, installed and running inventory, model details, and lifecycle actions](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-ollama-model-manager.png)
 
 ## Provider triage
 

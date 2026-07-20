@@ -16,8 +16,11 @@ focuses on what Desktop Material adds on top.
 
 **Feature guide**
 
-The complete M0–M21 roadmap is published on `main`. This guide also covers the verified adaptive
-maintenance set and M21 workflow closure: appearance and profile app identity, favorite/portable tabs, Material entry surfaces, guarded tab management, workflow-run
+The complete M0–M21 roadmap is published on `main`. M22 keeps its separate
+visual-publication acceptance, and this guide includes the M23 Ollama model
+manager. It also covers the verified adaptive maintenance set and M21 workflow
+closure: appearance and profile app identity, favorite/portable tabs, Material
+entry surfaces, guarded tab management, workflow-run
 cancellation, reviewed rebase, repository-account propagation, bounded OAuth scopes, compact
 surface corrections, temporary submodule navigation, and its explicit language and Back-control
 appearance modes, plus the repository-contextual GitHub API Explorer. Exact build, off-screen UI,
@@ -31,13 +34,14 @@ remote CI caught a macOS error-ordering defect without publishing; correction
 `98d93ccc` passed its full remote CI gate and published
 `v3.6.3-beta3-b0000000165`. Exact publication receipts are in `HANDOFF.md`.
 
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 68-function visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 66-function visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
 - [Install on Windows](#install-on-windows)
 - [Material first run](#material-first-run)
 - [Signing in](#signing-in)
+- [Local Ollama model management](#local-ollama-model-management)
 - [Repository tabs](#repository-tabs)
 - [Appearance customization](#appearance-customization)
 - [Settings history](#settings-history)
@@ -248,6 +252,56 @@ explicit binding is never silently replaced.
 
 ---
 
+## Local Ollama model management
+
+Open **Settings → Copilot → Providers**, choose **Add provider…**, select
+**Ollama (local)**, and save the preset. Its default URL is
+`http://127.0.0.1:11434/v1`; Ollama runs locally without an API key. Choose
+**Manage models** on the saved provider to open the lifecycle workspace.
+
+The manager keeps service discovery, inventory, and mutations explicit:
+
+1. Check the endpoint health and Ollama version. Installed and running models
+   load independently, so a partial response does not erase usable data.
+2. Search all installed models or filter to running models. Select one to
+   inspect bounded size, digest, family, format, parameter, quantization,
+   capability, license, and runtime details when Ollama reports them.
+3. Pull a model by name and follow streamed progress; cancel only that pull if
+   needed. Copy a model, or rename it through copy-then-delete with a visible
+   partial result if the original cannot be removed.
+4. Load or unload the selected model. Delete requires inline confirmation that
+   names the exact model and warns that the action cannot be undone.
+
+After an inventory-changing operation, Desktop Material synchronizes the
+installed Ollama names back to that provider's selectable Copilot models. The
+installed inventory is authoritative, while settings for still-matching model
+identifiers are retained. A successful Ollama request followed by a failed
+provider-settings update is reported as a split outcome rather than a complete
+success.
+
+Only HTTP or HTTPS loopback endpoints (`localhost`, `127.0.0.1`, or `[::1]`)
+are accepted. The saved provider path must be exactly `/v1`; the manager derives
+that loopback origin and appends only fixed native `/api/*` routes. Every remote
+host, arbitrary prefix, saved `/api` base, embedded credential, query string,
+and URL fragment is rejected. Stale requests are aborted when the provider
+changes, response text stays bounded, and credentials are never added to
+management URLs or logs.
+
+Every label, validation message, progress announcement, confirmation, and
+accessible name follows the selected **English**, playful **Hong Kong
+Cantonese**, or **English / 香港粵語** mode. The manager is keyboard reachable
+and reflows for compact Preferences windows.
+
+The accepted 1452×1001 off-screen scene exercised health, inventory, search,
+running-state filtering, pull cancellation and rollback, completed pull, copy,
+rename, load, unload, confirmed deletion, and provider synchronization. It uses
+synthetic fixture data, passes privacy inspection, and has no overlapping or
+horizontally overflowing manager controls.
+
+![Ollama model manager with endpoint health, installed and running inventory, details, and lifecycle controls](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-ollama-model-manager.png)
+
+---
+
 ## Repository tabs
 
 The workspace is **browser-like and tabbed**. Each tab is **bound to a repository and an account**,
@@ -269,8 +323,6 @@ folder rather than one repository. Desktop Material performs a bounded scan that
 symbolic links or junctions, skips generated/dependency folders, and stops descending when it finds
 a repository. Review the relative paths in the result, then add all discovered repositories in one
 step. You can still edit the path and use the normal single-repository flow at any time.
-
-![Two repositories discovered beneath one selected parent folder](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-folder-detection.png)
 
 ### Rename a tab
 
@@ -689,8 +741,6 @@ stored as one raw asset, while a larger file is split into ordered raw ranges. D
 range and the complete file before replacing the pointer. Existing compressed cheap-LFS pointers
 remain readable for backward compatibility.
 
-![Commit composer preparing an oversized file for cheap LFS before the branch commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-cheap-lfs-preparing.png)
-
 ---
 
 ## Notification centre
@@ -975,7 +1025,6 @@ list.
   Uninitialized, stale, invalid-Git, traversal, sibling-prefix, and symlink/junction escape targets
   fail without changing repository persistence, and the manager stays available for recovery.
 
-![Wider Repository Settings with the Back element's appearance editor anchored beside its preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution. Build & Run discovers common nested projects across Node, Deno, Rust, Go, .NET, Python, JVM, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; choose a profile by its displayed project folder when several projects share a language or toolchain.
 - Open **Repository tools** for the full set of named, reviewed Git functions. Diagnostics cover the
   status summary, repository health check, commit-signature audit, branch sync overview, contributor

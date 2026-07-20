@@ -23,6 +23,63 @@ not Prettier-clean. Pages `29710664112` passed and installer run `29710722904`
 skipped. The correction formats that generator without changing any generated
 SVG content; the repository-wide Prettier gate and a fresh generator run pass.
 
+## 2026-07-20 M23 — local acceptance complete; remote publication pending
+
+This is the live handoff for the user-directed **full Ollama model manager**
+wave. Its scope is Ollama model lifecycle management only; the separate
+submodule-manager and general regex-builder requests are not part of M23.
+
+- **Settings → Copilot → Providers** now includes an **Ollama (local)** preset
+  and opens a dedicated **Manage models** workspace for a saved provider.
+  Health/version, installed and running inventories, search plus a running-only
+  filter, selected-model details, streamed pull/cancel, copy, guarded rename,
+  load/unload, exact-name confirmed deletion, and provider-model
+  synchronization are implemented.
+- Native management is loopback-only. The saved provider URL must use an exact
+  `/v1` base on `localhost`, `127.0.0.0/8`, or `[::1]`; remote HTTP and HTTPS
+  hosts, arbitrary prefixes, a saved `/api` base, embedded credentials, query
+  strings, and fragments are rejected. The manager derives the loopback origin
+  and calls only fixed native `/api/*` routes. Provider credentials are not
+  placed in management URLs, process arguments, logs, or documentation.
+- The manager preserves independent partial/unavailable states, bounds response
+  and displayed metadata, aborts stale provider work, keeps pull cancellation
+  scoped to the active pull, and reports a successful Ollama mutation followed
+  by a failed provider save as a split outcome. All manager labels,
+  confirmations, announcements, and accessible names follow English, playful
+  Hong Kong Cantonese, or bilingual mode.
+- Exact application source `27ffc1af7dd1223809c69ea0f72ddab369869f31`
+  completed the required production build through the exact low-level MCP
+  server in 213.16 seconds. The deterministic loopback Ollama exercise then
+  verified endpoint health/version, installed and running inventories,
+  search/filter/details, pull cancellation with rollback, completed pull,
+  copy, guarded rename, load, unload, exact-name confirmed deletion, and
+  authoritative provider-model synchronization.
+- The accepted off-screen capture is
+  `docs/assets/screenshots/material-ollama-model-manager.png`: **1452×1001**,
+  **128,903 bytes**, SHA-256
+  `f1735c664248cd1b10a64e672dbbab24c95dabab99a62deeaf93557145a36509`.
+  Original-resolution inspection confirms the synthetic-only scene contains no
+  personal path, account, email, credential, token, or user repository content.
+  The verifier reports the manager, Preferences shell, and lifecycle controls
+  contained above the footer, zero overlaps, `horizontalOverflow: false`, and
+  `privacySafe: true`.
+- Owned verification cleanup is complete: the app window, hidden desktop,
+  provider and Ollama fixtures, synthetic credential, loopback listeners, and
+  disposable Temp roots were removed. This receipt does not claim final Git
+  branch/worktree topology cleanup, which belongs to the final integration.
+- README, Pages, the feature guide/index, roadmap/plan, and the actual Markdown
+  wiki sources now reference that exact asset. The wiki image uses the raw
+  `main` URL under the canonical `Ding-Ding-Projects/desktop-material`
+  repository. Final exact-`main` Windows CI, Pages publication, separate wiki
+  synchronization, and their public asset checks remain pending and must be
+  recorded only after the final integration SHA is pushed.
+- Publication-source validation passes 15 focused Pages/gallery/wiki tests,
+  targeted Prettier, and Markdownlint for the new feature index and guide. An
+  independent audit resolved 187 local documentation/site references with zero
+  missing targets, and all nine linked official Ollama API pages returned HTTP
+  200. The accepted screenshot still matches the dimensions, byte count, and
+  SHA-256 above after branch reconciliation.
+
 ## 2026-07-20 M22 handoff — implementation pushed; visual refresh paused
 
 This section is the live handoff for the current user-directed wave. Do not
@@ -1659,8 +1716,8 @@ is reserved for spatial code, diff, or log content.
 
 ## Headless verification environment
 
-- Project: `C:\Users\Administrator\Documents\GitHub\desktop-material`
-- MCP checkout: `C:\Users\Administrator\Documents\GitHub\lowlevel-computer-use-mcp`
+- Project: `%USERPROFILE%\Documents\GitHub\desktop-material`
+- MCP checkout: `%USERPROFILE%\Documents\GitHub\lowlevel-computer-use-mcp`
 - MCP SHA used by the P0 gate: `806d9ba85e4afbc2af58d7499496babfa7c68891`
 - MCP endpoint: `http://127.0.0.1:8765/mcp`
 - Skill and client: `.codex/skills/verify-desktop-material-headless/`
@@ -1984,7 +2041,7 @@ preserved tree `28e5840b55d989cc8ef0514f1f3c2ca5673a41b8` exactly.
 
 The stash was dropped after its commit became reachable from `main`. The clean
 detached worktree at
-`C:\Users\Administrator\.codex\worktrees\3e3c\desktop-material`, its empty
+`%USERPROFILE%\.codex\worktrees\3e3c\desktop-material`, its empty
 parent directory, and stale worktree metadata were removed. The final audit at
 that baseline reported zero dirty files, zero stashes, no unmerged local or
 remote branches, one local branch (`main`), one remote branch (`origin/main`),

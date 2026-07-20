@@ -8,6 +8,9 @@ const galleryPath = join(root, 'docs', 'wiki', 'Feature-Gallery.md')
 const screenshotDirectory = join(root, 'docs', 'assets', 'screenshots')
 const rawImagePrefix =
   'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/'
+const canonicalRawImagePrefix =
+  'https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/'
+const rawImagePrefixes = [rawImagePrefix, canonicalRawImagePrefix]
 
 describe('wiki function screenshot catalog', () => {
   it('assigns every tracked screenshot to exactly one named visual function', () => {
@@ -19,7 +22,7 @@ describe('wiki function screenshot catalog', () => {
       .filter(name => name.endsWith('.png'))
       .sort()
 
-    assert.equal(rows.length, 68)
+    assert.equal(rows.length, 66)
     assert.equal(new Set(rows.map(row => row.asset)).size, rows.length)
     assert.equal(new Set(rows.map(row => row.name)).size, rows.length)
     assert.deepEqual(rows.map(row => row.asset).sort(), assets)
@@ -37,12 +40,22 @@ describe('wiki function screenshot catalog', () => {
       ...gallery.matchAll(/!\[[^\]]+\]\((https:\/\/[^)]+\.png)\)/g),
     ]
       .map(([, url]) => url)
-      .filter(url => url.startsWith(rawImagePrefix))
-      .map(url => url.slice(rawImagePrefix.length))
+      .map(url => {
+        const prefix = rawImagePrefixes.find(candidate =>
+          url.startsWith(candidate)
+        )
+        return prefix === undefined ? undefined : url.slice(prefix.length)
+      })
+      .filter((asset): asset is string => asset !== undefined)
 
     assert.equal(renderedAssets.length, rowAssets.length)
     assert.equal(new Set(renderedAssets).size, renderedAssets.length)
     assert.deepEqual(renderedAssets.sort(), rowAssets.sort())
+    assert.ok(
+      gallery.includes(
+        `${canonicalRawImagePrefix}material-ollama-model-manager.png`
+      )
+    )
   })
 
   it('links the complete catalog from the wiki home and user guide', () => {
