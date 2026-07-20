@@ -92,6 +92,13 @@ describe('Actions artifact responsive styles', () => {
 })
 
 describe('Actions run inspector responsive styles', () => {
+  it('lets the split panes grow into the available Actions viewport', () => {
+    assert.match(
+      source,
+      /\.actions-content\s*\{[\s\S]*?display: flex;[\s\S]*?flex: 1 1 250px;[\s\S]*?min-height: 0;[\s\S]*?overflow: hidden;/
+    )
+  })
+
   it('wraps the attempt selector, job pager, and every job action group', () => {
     assert.match(
       source,

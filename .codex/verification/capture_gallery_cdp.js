@@ -2069,10 +2069,16 @@ async function openInspectorRun() {
   )
   const opened = await evaluate(`(() => {
     const title = ${JSON.stringify(InspectorRunTitle)}
+    const list = document.querySelector('.actions-run-list')
     const run = [...document.querySelectorAll('button.actions-run-select')]
       .find(button => button.textContent?.includes(title))
-    if (!(run instanceof HTMLElement)) return false
-    run.scrollIntoView({ block: 'center' })
+    if (!(list instanceof HTMLElement) || !(run instanceof HTMLElement)) return false
+    const listBounds = list.getBoundingClientRect()
+    const runBounds = run.getBoundingClientRect()
+    list.scrollTop += runBounds.top - listBounds.top -
+      Math.max(0, (list.clientHeight - runBounds.height) / 2)
+    const content = document.querySelector('.actions-content')
+    if (content instanceof HTMLElement) content.scrollTop = 0
     run.click()
     return true
   })()`)
@@ -2088,6 +2094,74 @@ async function openInspectorRun() {
       ready.inspectorJobCount
     } loaded of ${ready.inspectorJobCount} jobs for attempt 2') === true)`,
     'Actions inspector attempt-two jobs',
+    30000
+  )
+  await evaluate(`new Promise(resolve => {
+    const stabilize = () => {
+      const content = document.querySelector('.actions-content')
+      const list = document.querySelector('.actions-run-list')
+      const run = [...document.querySelectorAll('button.actions-run-select')]
+        .find(button => button.textContent?.includes(${JSON.stringify(
+          InspectorRunTitle
+        )}))
+      const details = document.querySelector('.actions-run-details')
+      if (content instanceof HTMLElement) content.scrollTop = 0
+      if (details instanceof HTMLElement) details.scrollTop = 0
+      if (list instanceof HTMLElement && run instanceof HTMLElement) {
+        const listBounds = list.getBoundingClientRect()
+        const runBounds = run.getBoundingClientRect()
+        list.scrollTop += runBounds.top - listBounds.top -
+          Math.max(0, (list.clientHeight - runBounds.height) / 2)
+      }
+    }
+    stabilize()
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      stabilize()
+      resolve(true)
+    }))
+  })`)
+  await sleep(520)
+  await waitFor(
+    `(() => {
+      const content = document.querySelector('.actions-content')
+      const list = document.querySelector('.actions-run-list')
+      const run = [...document.querySelectorAll('button.actions-run-select')]
+        .find(button => button.textContent?.includes(${JSON.stringify(
+          InspectorRunTitle
+        )}))
+      const details = document.querySelector('.actions-run-details')
+      const title = details?.querySelector('.actions-details-header h2')
+      const pagination = details?.querySelector('.actions-job-pagination')
+      const cards = details?.querySelectorAll('.actions-job-card')
+      if (!(content instanceof HTMLElement) || !(list instanceof HTMLElement) ||
+          !(run instanceof HTMLButtonElement) || !(details instanceof HTMLElement) ||
+          !(pagination instanceof HTMLElement)) return false
+      const contentBounds = content.getBoundingClientRect()
+      const listBounds = list.getBoundingClientRect()
+      const runBounds = run.getBoundingClientRect()
+      const detailsBounds = details.getBoundingClientRect()
+      const titleBounds = title?.getBoundingClientRect()
+      const paginationBounds = pagination.getBoundingClientRect()
+      const inside = (inner, outer) =>
+        inner.width > 0 && inner.height > 0 &&
+        inner.left >= outer.left - 0.5 && inner.top >= outer.top - 0.5 &&
+        inner.right <= outer.right + 0.5 && inner.bottom <= outer.bottom + 0.5
+      return content.scrollTop === 0 && details.scrollTop === 0 &&
+        contentBounds.height > 300 &&
+        title?.textContent?.trim() === ${JSON.stringify(InspectorRunTitle)} &&
+        run.getAttribute('aria-pressed') === 'true' &&
+        pagination.textContent?.includes('50 loaded of ${
+          ready.inspectorJobCount
+        } jobs for attempt 2') === true &&
+        cards?.length === 50 &&
+        details.querySelector('.actions-loading, .actions-job-error, [role="alert"]') === null &&
+        inside(runBounds, listBounds) && inside(titleBounds, detailsBounds) &&
+        inside(listBounds, contentBounds) && inside(detailsBounds, contentBounds) &&
+        inside(paginationBounds, detailsBounds) &&
+        contentBounds.left >= 0 && contentBounds.top >= 0 &&
+        contentBounds.right <= window.innerWidth && contentBounds.bottom <= window.innerHeight
+    })()`,
+    'visible Actions inspector split panes',
     30000
   )
 }
