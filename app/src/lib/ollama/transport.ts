@@ -162,18 +162,22 @@ export const nodeOllamaFetch: OllamaFetch = async (input, init = {}) => {
         return
       }
 
-      const hasBody = status !== 204 && status !== 304
-      const responseBody = hasBody
-        ? (Readable.toWeb(incoming) as ReadableStream<Uint8Array>)
-        : null
       try {
-        resolve(
-          new Response(responseBody, {
-            status,
-            statusText: incoming.statusMessage,
-            headers: responseHeaders(incoming.headers),
-          })
-        )
+        const hasBody = status !== 204 && status !== 304
+        const responseBody = hasBody
+          ? (Readable.toWeb(incoming) as ReadableStream<Uint8Array>)
+          : null
+        // Electron's Chromium realm does not recognize Node's WHATWG stream as
+        // a browser BodyInit. Passing it to new Response silently turns the
+        // body into "[object ReadableStream]", so expose only the response
+        // fields the bounded Ollama client consumes and read the Node stream
+        // directly.
+        resolve({
+          body: responseBody,
+          headers: responseHeaders(incoming.headers),
+          ok: status >= 200 && status < 300,
+          status,
+        })
       } catch {
         incoming.destroy()
         reject(transportError())

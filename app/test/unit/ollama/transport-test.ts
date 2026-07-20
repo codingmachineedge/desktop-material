@@ -63,6 +63,52 @@ async function eventually(promise: Promise<void>): Promise<void> {
 }
 
 describe('native Ollama renderer transport', () => {
+  it('reads Node response streams without the browser Response constructor', async () => {
+    const fixture = await listen((request, response) => {
+      if (request.url === '/api/version') {
+        response.writeHead(200, { 'Content-Type': 'application/json' })
+        response.end('{"version":"0.12.6"}')
+        return
+      }
+      response.writeHead(200, { 'Content-Type': 'application/x-ndjson' })
+      response.end('{"status":"success"}\n')
+    })
+    const originalResponse = globalThis.Response
+    globalThis.Response = new Proxy(originalResponse, {
+      construct: () => {
+        throw new Error('Browser Response must not wrap a Node stream.')
+      },
+    })
+
+    try {
+      const client = new OllamaClient(fixture.endpoint)
+      assert.equal((await client.health()).version, '0.12.6')
+      assert.equal((await client.pull('material-chat:7b')).done, true)
+    } finally {
+      globalThis.Response = originalResponse
+      await close(fixture.server)
+    }
+  })
+
+  it('maps native error statuses through the structural response', async () => {
+    const fixture = await listen((_request, response) => {
+      response.writeHead(503, { 'Content-Type': 'application/json' })
+      response.end('{"error":"offline"}')
+    })
+
+    try {
+      const client = new OllamaClient(fixture.endpoint)
+      await assert.rejects(client.health(), (error: unknown) => {
+        assert.ok(error instanceof OllamaClientError)
+        assert.equal(error.kind, 'http')
+        assert.equal(error.status, 503)
+        return true
+      })
+    } finally {
+      await close(fixture.server)
+    }
+  })
+
   it('uses Node HTTP by default and streams without browser CORS headers', async () => {
     const requests = new Array<{
       readonly path: string | undefined
