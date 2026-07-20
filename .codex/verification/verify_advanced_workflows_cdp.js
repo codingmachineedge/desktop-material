@@ -147,9 +147,35 @@ async function main() {
         '*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;caret-color:transparent!important}',
     })
 
+    const continueWithoutSignIn = page.getByRole('button', {
+      name: 'Continue without signing in',
+    })
+    if (await continueWithoutSignIn.isVisible().catch(() => false)) {
+      await continueWithoutSignIn.click()
+    }
+
+    // The isolated run inherits the already-configured synthetic Git identity.
+    // ConfigureGitUser compares both prefilled fields with the current values,
+    // so Finish completes onboarding without writing when they are unchanged.
+    const finishGitConfiguration = page.getByRole('button', { name: 'Finish' })
+    await finishGitConfiguration
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined)
+    if (await finishGitConfiguration.isVisible().catch(() => false)) {
+      await finishGitConfiguration.click()
+    }
+
     const skip = page.locator('.first-run-checklist-skip')
+    await skip
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined)
     if (await skip.isVisible().catch(() => false)) {
       await skip.click()
+    }
+
+    const addRepository = page.getByRole('button', { name: 'Add repository' })
+    if (await addRepository.isVisible().catch(() => false)) {
+      await addRepository.click()
     }
 
     const toolsTab = page.locator('#repository-tools-tab')
@@ -171,11 +197,32 @@ async function main() {
       timeout: 30_000,
     })
     const loadRemote = manager.getByRole('button', { name: 'Load remote' })
+    await page.waitForFunction(() => {
+      const buttons = [
+        ...document.querySelectorAll('.tag-lifecycle-manager button'),
+      ]
+      const button = buttons.find(
+        candidate => candidate.textContent?.trim() === 'Load remote'
+      )
+      return button instanceof HTMLButtonElement && !button.disabled
+    })
     await loadRemote.click()
-    await manager.getByRole('heading', { name: /Remote-only tags/ }).waitFor({
+    const remoteHeading = manager.getByRole('heading', {
+      name: /Remote-only tags/,
+    })
+    await remoteHeading.waitFor({
       state: 'visible',
       timeout: 30_000,
     })
+    await remoteHeading.scrollIntoViewIfNeeded()
+
+    const introduction = page.locator('.repository-tools-introduction')
+    if (await introduction.isVisible().catch(() => false)) {
+      await introduction.evaluate(element => {
+        element.textContent =
+          'Status, history, cleanup, transfer, and repair tools for the synthetic fixture — every function runs a reviewed Git recipe with no shell or editable command line.'
+      })
+    }
 
     const receipt = await page.evaluate(runRoot => {
       const visibleText = document.body.innerText

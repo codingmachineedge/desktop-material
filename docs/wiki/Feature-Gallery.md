@@ -1,6 +1,6 @@
 # Guided Feature Gallery
 
-This page maps 64 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 65 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
@@ -17,7 +17,8 @@ contract rejects missing, duplicate, or unassigned assets.
 > the repository-contextual GitHub API Explorer, filtered notification bulk triage, and
 > configurable bottom-right error notices, runtime tab search, History commit actions, and
 > true-bottom Repository Tools scrolling. It now also includes the safe custom repository-logo
-> studio, named API app functions, and temporary submodule repository context.
+> studio, named API app functions, temporary submodule repository context, and the M21 local,
+> pushed, and remote-only tag lifecycle workspace.
 > Exact build, interaction, and
 > privacy receipts are retained in `HANDOFF.md`; each promoted release records its own main, CI,
 > Pages, and wiki verification without implying that later maintenance work is complete.
@@ -74,6 +75,7 @@ active profile's style, label, and explicit language mode.
 | `material-remote-manager.png` | Reviewed named-remote administration |
 | `material-native-pull-request.png` | Native pull-request creation with bounded metadata |
 | `material-stash-manager.png` | Repository-wide stash selection and exact-entry actions |
+| `advanced-workflows.png` | Tag lifecycle inventory with local-only, pushed, and remote-only states and bounded actions |
 | `material-actions-job-log.png` | Searchable in-app Actions job log |
 | `material-github-api-explorer.png` | Repository-bound REST/GraphQL API Explorer with mutation review and bounded responses |
 | `material-api-app-functions.png` | Named repository-bound API functions extending the app through reviewed contracts |
@@ -162,6 +164,8 @@ path; it never force-pushes automatically.
 ![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
 
 ![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
+
+![Advanced tag lifecycle workspace with local-only, pushed, and remote-only states](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/advanced-workflows.png)
 
 ![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
 

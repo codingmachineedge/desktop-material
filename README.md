@@ -192,7 +192,7 @@ The detailed Pages, wiki, asset, and cleanup receipts are maintained in
 
 ## Roadmap
 
-The complete M0–M20 status, completed maintenance work, and acceptance rules now
+The complete M0–M21 status, completed maintenance work, and acceptance rules now
 live in [`ROADMAP.md`](ROADMAP.md). Detailed implementation and verification
 receipts remain in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 
@@ -232,6 +232,10 @@ set.
 | Temporary submodule repository navigation |
 | --- |
 | <img src="docs/assets/screenshots/material-submodule-context.png" alt="Initialized submodule opened temporarily in the workspace with a context bar and Back control to the persisted root repository" width="720"><br><sub>No repository import · customizable Back control · root return</sub> |
+
+| Advanced Git and collaboration workflows |
+| --- |
+| <img src="docs/assets/screenshots/advanced-workflows.png" alt="Tag lifecycle workspace showing local, pushed, and remote-only tags with bounded actions" width="720"><br><sub>Local and remote inventory · reviewed mutations · responsive workflow surface</sub> |
 
 <details>
 <summary><strong>Open 30 more verified screenshots</strong></summary>

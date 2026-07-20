@@ -56,10 +56,10 @@ function createProps(showPopup: (popup: { type: PopupType }) => void) {
 }
 
 describe('RepositoriesList batch actions', () => {
-  it('renders both the Pull all and Commit & push all buttons', () => {
+  it('renders both the Sync repositories and Commit & push all buttons', () => {
     render(<RepositoriesList {...createProps(() => {})} />)
 
-    assert.ok(screen.getByRole('button', { name: /Pull all/ }))
+    assert.ok(screen.getByRole('button', { name: /Sync repositories/ }))
     assert.ok(screen.getByRole('button', { name: /Commit & push all/ }))
   })
 

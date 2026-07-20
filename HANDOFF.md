@@ -63,6 +63,63 @@ responses, and disposable paths out of renderer-visible receipts. Every new
 surface listens to the persisted English, playful Hong Kong Cantonese, and
 compact bilingual mode contract with English fallback.
 
+### Integrated verification and off-screen acceptance
+
+- The M21 checkpoint rebased cleanly onto upstream `fcd490f162`; a post-rebase
+  audit proved the shared cheap-LFS commit path and stale-lock recovery blocks
+  byte-identical to upstream while retaining all 30 workflow items. One stale
+  test label was corrected from **Pull all** to the shipped **Sync
+  repositories** action; no product behavior changed in that follow-up.
+- The complete unit gate discovered 592 files in three batches: 4,161 tests,
+  4,160 passed, zero failed, and one intentional skip across 1,053 suites.
+  Script compilation and all 16 script tests passed. Repository-wide Prettier,
+  ESLint, root TypeScript, feature-doc Markdownlint, and `git diff --check`
+  also passed.
+- Fixed MCP preflight returned `startup_status.ok=true`. Scheduled task
+  `LowLevelComputerUseMCP` runs the exact venv Python from checkout
+  `8d6940be6a5f6e7c37de3f73acd2259fa7651efe` with
+  `-m lowlevel_computer_use_mcp.server --http --host 127.0.0.1 --port 8765`.
+  The required no-download command
+  `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`
+  returned `client_ok=true`, exit 0, and no timeout in 226.5 seconds, producing
+  the unpackaged app in `out`. Yarn 1.22.22 was restored only from an existing
+  local npm cache and delegated to the repository-pinned Yarn 1.21.1; the exact
+  temporary shim/package were removed after the final gate, with no `yarn`
+  command left on `PATH`.
+- The deterministic fixture contained three local tags (including one
+  local-only tag), two pushed tags, and one remote-only tag. The never-shown
+  desktop `DesktopMaterialBacklog-20260719-175748` was created exactly once;
+  launch PID `3908` resolved dynamically to HWND `50136490`. The required
+  960×660 client-only pre-input capture was nonblank. Win32 accepted but
+  Chromium ignored the HWND-bound click, so the documented attach-only hook
+  completed onboarding, imported only the owned fixture, opened Tag lifecycle,
+  and loaded the remote inventory. The prefilled Git identity matched the
+  existing synthetic values, leaving the global config byte-identical at
+  SHA-256 `0eda438ed46fca8f6b6e002ae5d54c6a05c9e56dbeeab3165a869a858582b9b8`.
+- The promoted light capture is
+  `docs/assets/screenshots/advanced-workflows.png`, 1440×960, 113,275 bytes,
+  SHA-256 `4351b54c8c4af0f784b23185ed820adc1854418b3bdb68f0260a843eeb07b968`.
+  It passed English-mode, exact local/remote heading, path-redaction, and
+  horizontal-overflow checks. A separately inspected 960×660 dark reflow was
+  76,151 bytes with SHA-256
+  `2de7260d75664811a71deb9aabb2f5fb1a12a199bfb876d27b795add4793b39e` and
+  also had no horizontal overflow or private path.
+- Graceful HWND close failed closed as expected on the off-screen desktop.
+  After revalidating the same HWND and title, only saved PID `3908` was
+  terminated; the desktop reported zero windows and closed once, and CDP port
+  `61929` had zero listeners. Containment-checked cleanup removed the exact
+  owned run root and independently verified it absent. README, Pages, Home,
+  User Guide, and the separate 65-function gallery source all reference the
+  promoted capture. The application checkpoint reached `origin/main` as
+  `7c98044bcebe5f65e51aee60af1036080fbd5110` while the final evidence tree was
+  still being reviewed, triggering CI `29709506204`, code scanning
+  `29709506207`, and Pages `29709506220`. Their conclusions, the downstream
+  installer/release, the final evidence commit, raw/Pages image parity, and
+  separate-wiki delivery remain post-commit checks. The project publishes one
+  unique release for every successful push, so the application checkpoint and
+  its final evidence follow-up must each own exactly one distinct release if
+  both CI runs pass; this receipt makes no premature success claim.
+
 ## 2026-07-19 cheap-LFS commit routing fix
 
 - Scheduled commit-and-push and multi-repository commit-and-push-all no longer

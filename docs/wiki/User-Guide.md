@@ -6,8 +6,8 @@ focuses on what Desktop Material adds on top.
 
 **Feature guide**
 
-The complete M0–M21 roadmap is published on `main`. This guide also covers the current locally
-accepted maintenance changeset: adaptive appearance and profile app identity, favorite/portable tabs, Material entry surfaces, guarded tab management, workflow-run
+The complete M0–M21 roadmap is published on `main`. This guide also covers the verified adaptive
+maintenance set and M21 workflow closure: appearance and profile app identity, favorite/portable tabs, Material entry surfaces, guarded tab management, workflow-run
 cancellation, reviewed rebase, repository-account propagation, bounded OAuth scopes, compact
 surface corrections, temporary submodule navigation, and its explicit language and Back-control
 appearance modes, plus the repository-contextual GitHub API Explorer. Exact build, off-screen UI,
@@ -21,7 +21,7 @@ remote CI caught a macOS error-ordering defect without publishing; correction
 `98d93ccc` passed its full remote CI gate and published
 `v3.6.3-beta3-b0000000165`. Exact publication receipts are in `HANDOFF.md`.
 
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 64-function visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 65-function visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
@@ -80,6 +80,8 @@ M21 adds progressively disclosed controls around the familiar Desktop flow:
 
 The complete [30-item feature ledger](https://github.com/codingmachineedge/desktop-material/blob/main/docs/features/github-desktop-demand-backlog.md)
 links to behavior, recovery, security, and test details for every workflow.
+
+![Advanced tag lifecycle workspace with local, pushed, and remote-only tags](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/advanced-workflows.png)
 
 ---
 

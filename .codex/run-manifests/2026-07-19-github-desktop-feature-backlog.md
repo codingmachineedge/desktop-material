@@ -20,4 +20,55 @@
 
 ## Completion receipts
 
-Pending implementation, verification, publication, and cleanup.
+- The 30-item inventory is implemented and mapped one-to-one in
+  `docs/features/github-desktop-demand-backlog.md`, with categorized behavior,
+  recovery, security, and verification documents. The checkpoint rebased
+  cleanly onto remote `fcd490f162`; an explicit semantic audit retained
+  upstream cheap-LFS commit routing and stale-lock recovery unchanged.
+- Integrated local gates passed: 592 unit files across three batches, 4,161
+  tests (4,160 pass, zero fail, one skip), 1,053 suites, 16/16 script tests,
+  root and script TypeScript, repository-wide ESLint and Prettier, feature-doc
+  Markdownlint, and diff whitespace checks. The only full-sweep regression was
+  a stale test expecting **Pull all** after the reviewed action became **Sync
+  repositories**; the corrected focused test passes 2/2.
+- Fixed MCP preflight returned `startup_status.ok=true`; task
+  `LowLevelComputerUseMCP` is running the fixed venv Python and loopback HTTP
+  arguments from checkout
+  `8d6940be6a5f6e7c37de3f73acd2259fa7651efe`. The exact required no-download
+  production command returned `ok=true`, `returncode=0`, `timed_out=false`, and
+  `client_ok=true` in 226.5 seconds and built to `out`. Yarn 1.22.22 came only
+  from an existing local npm cache, delegated to pinned Yarn 1.21.1, and its
+  exact temporary shim/package were removed after the final gate; `yarn` no
+  longer resolves from `PATH`.
+- Owned root
+  `C:\Users\Administrator\AppData\Local\Temp\desktop-material-feature-backlog-20260719-175748`
+  contained only the deterministic fixture, bare remote, isolated user data,
+  captures, and ledger. Desktop `DesktopMaterialBacklog-20260719-175748` was
+  created once; PID `3908` resolved to HWND `50136490`. The initial 960×660
+  client-only capture was nonblank. HWND-only input was attempted first and
+  ignored by Chromium, after which the attach-only verifier completed the
+  isolated first run without changing the prefilled synthetic global Git
+  identity, imported only the fixture, and opened the live tag lifecycle view.
+- The verifier proved English mode, three local tags, one remote-only tag on
+  `origin`, no horizontal overflow, and no visible private path. The accepted
+  1440×960 light capture was promoted byte-identically as
+  `docs/assets/screenshots/advanced-workflows.png` (113,275 bytes, SHA-256
+  `4351b54c8c4af0f784b23185ed820adc1854418b3bdb68f0260a843eeb07b968`).
+  The separately inspected 960×660 dark reflow was 76,151 bytes, SHA-256
+  `2de7260d75664811a71deb9aabb2f5fb1a12a199bfb876d27b795add4793b39e`,
+  and also passed geometry/privacy review.
+- The revalidated HWND close failed closed, so only saved launch PID `3908`
+  was terminated. The desktop then reported zero windows and closed once; CDP
+  port `61929` reported zero listeners. Containment-checked cleanup removed the
+  exact owned run root and verified it absent. The tracked gallery contract
+  passes with 65 distinct images, and README, Pages, Home, User Guide, and
+  Feature Gallery all contain the new evidence reference.
+- During final evidence review, the application checkpoint reached
+  `origin/main` as `7c98044bcebe5f65e51aee60af1036080fbd5110` and triggered CI
+  `29709506204`, code scanning `29709506207`, and Pages `29709506220`. The
+  reviewed evidence/gallery follow-up still requires its own ordinary push;
+  after that, verify both exact heads, Pages, and exactly one new immutable
+  non-draft installer release per successful push (two distinct releases total
+  beyond baseline `v3.6.3-beta3-b0000000171` if both runs pass), plus raw/Pages
+  image parity, separate-wiki delivery, and final topology cleanup. No remote
+  conclusion is claimed by this pre-final-push receipt.
