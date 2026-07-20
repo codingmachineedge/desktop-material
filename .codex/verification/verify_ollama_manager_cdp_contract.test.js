@@ -150,6 +150,7 @@ function validSurface() {
     detailsText: 'material-chat:7b 7B Q4_K_M completion tools',
     managerContained: true,
     preferencesContained: true,
+    managerAboveFooter: true,
     documentOverflow: false,
     bodyOverflow: false,
     managerOverflow: false,
@@ -158,6 +159,7 @@ function validSurface() {
       name: value,
     })),
     controlsContained: true,
+    controlsAboveFooter: true,
     controlsNamed: true,
     overlaps: [],
     managerLabelled: true,
@@ -432,6 +434,16 @@ describe('Ollama manager attach-only verifier contract', () => {
     )
     assert.throws(
       () => assertFinalSurface({ ...validSurface(), filterLabelled: false }),
+      /failed its gate/
+    )
+    assert.throws(
+      () =>
+        assertFinalSurface({ ...validSurface(), managerAboveFooter: false }),
+      /failed its gate/
+    )
+    assert.throws(
+      () =>
+        assertFinalSurface({ ...validSurface(), controlsAboveFooter: false }),
       /failed its gate/
     )
   })
