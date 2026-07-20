@@ -2254,13 +2254,40 @@ scene('app-identity', async () => {
 
 scene('multi-window-menu', async () => {
   await ensureRepository()
-  ;(await clickAria('Open a repository in a new tab', { optional: true })) ||
-    (await clickAria('Open in a new window', { optional: true })) ||
-    (await clickAria('Windows', { optional: true }))
-  await sleep(1200)
+  await clickAria('Open a repository in a new tab')
+  const selectedRepository =
+    '#foldout-container .repository-list [role="option"][aria-selected="true"][data-context-menu-owner="true"]'
+  await waitFor(
+    `document.querySelector(${JSON.stringify(selectedRepository)}) !== null`,
+    'selected repository row in the repository sheet'
+  )
+  await contextMenuSelector(selectedRepository)
+  await waitFor(
+    `(() => {
+      const menu = document.querySelector('.material-context-menu[role="menu"]')
+      const item = [...(menu?.querySelectorAll('button.context-menu-item') ?? [])]
+        .find(button =>
+          button.querySelector('.context-menu-item-label')?.textContent?.trim() ===
+            'Open in new window'
+        )
+      if (!(menu instanceof HTMLElement) || !(item instanceof HTMLButtonElement)) {
+        return false
+      }
+      const menuBounds = menu.getBoundingClientRect()
+      const itemBounds = item.getBoundingClientRect()
+      return !item.disabled && item.getAttribute('aria-disabled') !== 'true' &&
+        menuBounds.width > 0 && menuBounds.height > 0 &&
+        itemBounds.width > 0 && itemBounds.height > 0 &&
+        itemBounds.left >= menuBounds.left && itemBounds.top >= menuBounds.top &&
+        itemBounds.right <= menuBounds.right && itemBounds.bottom <= menuBounds.bottom &&
+        menuBounds.left >= 0 && menuBounds.top >= 0 &&
+        menuBounds.right <= window.innerWidth && menuBounds.bottom <= window.innerHeight
+    })()`,
+    'enabled Open in new window repository command'
+  )
   await parkPointer()
   await capture('material-multi-window-menu')
-  await pressEscape(1)
+  await closeAllDialogs()
 })
 
 scene('toolbar-overflow', async () => {

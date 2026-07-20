@@ -143,6 +143,29 @@ test('provider triage capture waits for the exact settled surface', () => {
   )
 })
 
+test('multi-window capture opens the selected repository context menu', () => {
+  const multiWindow = sceneSource('multi-window-menu')
+  for (const contract of [
+    "clickAria('Open a repository in a new tab')",
+    '#foldout-container .repository-list [role="option"][aria-selected="true"][data-context-menu-owner="true"]',
+    'contextMenuSelector(selectedRepository)',
+    'document.querySelector(\'.material-context-menu[role="menu"]\')',
+    "querySelector('.context-menu-item-label')",
+    "'Open in new window'",
+    'enabled Open in new window repository command',
+  ]) {
+    assert.ok(
+      multiWindow.includes(contract),
+      `multi-window menu misses ${contract}`
+    )
+  }
+  assert.ok(
+    multiWindow.indexOf('enabled Open in new window repository command') <
+      multiWindow.indexOf("capture('material-multi-window-menu')"),
+    'the exact repository command gate must run before capture'
+  )
+})
+
 test('new prerequisite scenes use deterministic synthetic owner flows', () => {
   const expected = new Map([
     ['anchored-appearance', 'material-customization'],
