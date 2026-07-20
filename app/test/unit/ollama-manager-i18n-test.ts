@@ -5,7 +5,6 @@ import {
   cantoneseTranslations,
   englishTranslations,
 } from '../../src/lib/i18n-resources'
-import { buildOllamaModelManagerStrings } from '../../src/ui/copilot/ollama-model-manager'
 
 const ollamaManagerTranslationKeys: ReadonlyArray<TranslationKey> = [
   'ollama.manager.openAction',
@@ -153,24 +152,6 @@ describe('Ollama model manager internationalization', () => {
     assert.equal(
       translate('ollama.manager.unavailableInventory', 'cantonese'),
       '暫時攞唔到模型清單。'
-    )
-  })
-
-  it('builds every runtime manager string from the selected typed catalog', () => {
-    const strings = buildOllamaModelManagerStrings((key, variables) =>
-      translate(key, 'cantonese', variables)
-    )
-
-    assert.equal(strings.title, 'Ollama 模型管理員')
-    assert.equal(strings.refresh, '重新整理')
-    assert.equal(strings.showing(3, 8), '顯示緊 3/8 個模型')
-    assert.equal(
-      strings.copySucceeded('llama3.2:latest', 'demo:copy'),
-      '已由 llama3.2:latest 複製去 demo:copy。'
-    )
-    assert.equal(
-      strings.confirmDelete('demo:private'),
-      '要由呢個 Ollama 端點刪除 demo:private 嗎？刪咗冇得返轉頭。'
     )
   })
 

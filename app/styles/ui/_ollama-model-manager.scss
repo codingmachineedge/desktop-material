@@ -1,37 +1,3 @@
-#ollama-model-manager {
-  width: min(
-    1040px,
-    max(
-      1px,
-      calc(
-        100vw - 24px - var(--non-modal-sheet-cascade-offset, 0px)
-      )
-    )
-  );
-  min-width: min(
-    720px,
-    max(
-      1px,
-      calc(
-        100vw - 24px - var(--non-modal-sheet-cascade-offset, 0px)
-      )
-    )
-  );
-  max-width: max(
-    1px,
-    calc(100vw - 24px - var(--non-modal-sheet-cascade-offset, 0px))
-  );
-  max-height: max(
-    1px,
-    calc(100vh - 24px - var(--non-modal-sheet-cascade-offset, 0px))
-  );
-
-  .ollama-model-manager-dialog-content {
-    min-width: 0;
-    overflow: auto;
-  }
-}
-
 .ollama-model-manager {
   container: ollama-model-manager / inline-size;
   display: flex;
@@ -370,6 +336,37 @@
     gap: 3px;
   }
 
+  .ollama-model-search-field {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+
+    > input {
+      min-width: 120px;
+      flex: 1 1 150px;
+    }
+
+    &.invalid > input {
+      border-color: var(--md-sys-color-error);
+    }
+
+    .filter-mode-control {
+      flex: 1 1 auto;
+    }
+
+    .filter-regex-builder-label {
+      display: none;
+    }
+  }
+
+  .ollama-filter-error {
+    color: var(--md-sys-color-error);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+  }
+
   .ollama-inventory-count {
     grid-column: 1 / -1;
     color: var(--md-sys-color-on-surface-variant);
@@ -613,7 +610,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 
-    .ollama-model-editor {
+    form {
       display: flex;
       min-width: 0;
       flex-direction: column;

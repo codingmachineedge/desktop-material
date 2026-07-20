@@ -1,9 +1,10 @@
 import * as React from 'react'
 import {
   encodeModelKey,
-  isOllamaBYOKProvider,
   isLocalBaseUrl,
+  isOllamaBYOKProvider,
   parseModelKey,
+  type IBYOKModel,
   type IBYOKProvider,
 } from '../../lib/copilot/byok'
 import {
@@ -11,6 +12,7 @@ import {
   LanguageModeChangedEvent,
   translate,
 } from '../../lib/i18n'
+import { createOllamaClient } from '../../lib/ollama'
 import { enableCopilotConflictResolution } from '../../lib/feature-flag'
 import { isGHES } from '../../lib/endpoint-capabilities'
 import {
@@ -20,6 +22,13 @@ import {
 } from '../../lib/stores/copilot-store'
 import type { Account } from '../../models/account'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import {
+  OllamaModelManager,
+  type IOllamaManagerProvider,
+  type IOllamaModelManagerClient,
+  type IOllamaManagerProviderModel,
+} from '../copilot/ollama-model-manager'
+import { getOllamaModelManagerStrings } from '../copilot/ollama-model-manager-localization'
 import { DialogContent, DialogPreferredFocusClassName } from '../dialog'
 import { Button } from '../lib/button'
 import { CallToAction } from '../lib/call-to-action'
@@ -57,11 +66,16 @@ interface ICopilotPreferencesProps {
   readonly onAddBYOKProvider: () => void
   readonly onEditBYOKProvider: (provider: IBYOKProvider) => void
   readonly onDeleteBYOKProvider: (provider: IBYOKProvider) => void
-  readonly onManageOllamaProvider: (provider: IBYOKProvider) => void
+  readonly onUpdateBYOKProvider: (
+    provider: IBYOKProvider
+  ) => Promise<void> | void
+  /** Optional native-client seam for focused Preferences tests. */
+  readonly ollamaClientFactory?: (endpoint: string) => IOllamaModelManagerClient
 }
 
 interface ICopilotPreferencesState {
   readonly selectedTabIndex: number
+  readonly managedOllamaProviderId: string | null
   readonly languageMode: LanguageMode
 }
 
@@ -81,26 +95,49 @@ export class CopilotPreferences extends React.Component<
     super(props)
     this.state = {
       selectedTabIndex: 0,
+      managedOllamaProviderId: null,
       languageMode: getPersistedLanguageMode(),
     }
   }
 
-  public componentDidMount(): void {
+  public componentDidMount() {
     document.addEventListener(
       LanguageModeChangedEvent,
       this.onLanguageModeChanged
     )
   }
 
-  public componentWillUnmount(): void {
+  public componentDidUpdate() {
+    if (
+      this.state.managedOllamaProviderId !== null &&
+      this.getManagedOllamaProvider() === null
+    ) {
+      this.setState({ managedOllamaProviderId: null })
+    }
+  }
+
+  public componentWillUnmount() {
     document.removeEventListener(
       LanguageModeChangedEvent,
       this.onLanguageModeChanged
     )
   }
 
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
+    }
+  }
+
   private onTabClicked = (index: number) => {
-    this.setState({ selectedTabIndex: index })
+    this.setState({
+      selectedTabIndex: index,
+      managedOllamaProviderId:
+        index === 1 ? this.state.managedOllamaProviderId : null,
+    })
   }
 
   private onCommitMessageModelChanged = (model: string) => {
@@ -127,31 +164,67 @@ export class CopilotPreferences extends React.Component<
   private onDeleteBYOKProviderClick = (provider: IBYOKProvider) => () =>
     this.props.onDeleteBYOKProvider(provider)
 
-  private onManageOllamaProviderClick = (provider: IBYOKProvider) => () =>
-    this.props.onManageOllamaProvider(provider)
+  private onManageOllamaProviderClick = (providerId: string) => () => {
+    this.setState({ managedOllamaProviderId: providerId })
+  }
+
+  private onBackToBYOKProvidersClick = () => {
+    this.setState({ managedOllamaProviderId: null })
+  }
+
+  private createManagerClient = (provider: IOllamaManagerProvider) => {
+    const factory = this.props.ollamaClientFactory ?? createOllamaClient
+    return factory(provider.baseUrl)
+  }
+
+  private onProviderModelsChanged = async (
+    provider: IOllamaManagerProvider,
+    models: ReadonlyArray<IOllamaManagerProviderModel>
+  ) => {
+    const currentProvider = this.props.byokProviders.find(
+      candidate => candidate.id === provider.id
+    )
+    if (
+      currentProvider === undefined ||
+      !isOllamaBYOKProvider(currentProvider) ||
+      currentProvider.baseUrl !== provider.baseUrl
+    ) {
+      return
+    }
+
+    const currentModels = new Map(
+      currentProvider.models.map(model => [model.id, model])
+    )
+    const synchronizedModels: ReadonlyArray<IBYOKModel> = models.map(model => {
+      const existing = currentModels.get(model.id)
+      return existing?.reasoningEffort === undefined
+        ? { id: model.id, name: model.name }
+        : {
+            id: model.id,
+            name: model.name,
+            reasoningEffort: existing.reasoningEffort,
+          }
+    })
+
+    await this.props.onUpdateBYOKProvider({
+      ...currentProvider,
+      models: synchronizedModels,
+    })
+  }
 
   public render() {
     const accessState = this.getCopilotAccessState()
-
-    if (accessState !== 'enabled') {
-      return (
-        <DialogContent className="copilot-tab">
-          <div className="copilot-tab-content">
-            <div className="copilot-section">
-              {this.renderAccessState(accessState)}
-            </div>
-          </div>
-        </DialogContent>
-      )
-    }
-
     const showBYOK = this.props.showBYOKSettings
 
     if (!showBYOK) {
       return (
         <DialogContent className="copilot-tab">
           <div className="copilot-tab-content">
-            <div className="copilot-section">{this.renderModelPicker()}</div>
+            <div className="copilot-section">
+              {accessState === 'enabled'
+                ? this.renderModelPicker()
+                : this.renderAccessState(accessState)}
+            </div>
           </div>
         </DialogContent>
       )
@@ -167,17 +240,21 @@ export class CopilotPreferences extends React.Component<
           <span>Providers</span>
         </TabBar>
         <div className="copilot-tab-content">
-          <div className="copilot-section">{this.renderCurrentTab()}</div>
+          <div className="copilot-section">
+            {this.renderCurrentTab(accessState)}
+          </div>
         </div>
       </DialogContent>
     )
   }
 
-  private renderCurrentTab() {
+  private renderCurrentTab(accessState: CopilotAccessState) {
     if (this.state.selectedTabIndex === 1) {
       return this.renderBYOKProviders()
     }
-    return this.renderModelPicker()
+    return accessState === 'enabled'
+      ? this.renderModelPicker()
+      : this.renderAccessState(accessState)
   }
 
   private getCopilotAccessState(): CopilotAccessState {
@@ -448,6 +525,23 @@ export class CopilotPreferences extends React.Component<
   }
 
   private renderBYOKProviders() {
+    const managedProvider = this.getManagedOllamaProvider()
+    if (managedProvider !== null) {
+      return (
+        <>
+          <Button onClick={this.onBackToBYOKProvidersClick}>
+            {translate('ollama.manager.backAction', this.state.languageMode)}
+          </Button>
+          <OllamaModelManager
+            provider={managedProvider}
+            clientFactory={this.createManagerClient}
+            onProviderModelsChanged={this.onProviderModelsChanged}
+            strings={getOllamaModelManagerStrings(this.state.languageMode)}
+          />
+        </>
+      )
+    }
+
     const { byokProviders } = this.props
     return (
       <>
@@ -488,16 +582,8 @@ export class CopilotPreferences extends React.Component<
         </div>
         <div className="copilot-byok-entry-actions">
           {isOllamaBYOKProvider(provider) && (
-            <Button
-              size="small"
-              className="copilot-byok-manage-button"
-              dataVerification="ollama-manager-entry"
-              onClick={this.onManageOllamaProviderClick(provider)}
-            >
-              {translate(
-                'ollama.manager.openAction',
-                this.state.languageMode
-              )}
+            <Button onClick={this.onManageOllamaProviderClick(provider.id)}>
+              {translate('ollama.manager.openAction', this.state.languageMode)}
             </Button>
           )}
           <Button
@@ -517,6 +603,19 @@ export class CopilotPreferences extends React.Component<
     )
   }
 
+  private getManagedOllamaProvider(): IBYOKProvider | null {
+    const providerId = this.state.managedOllamaProviderId
+    if (providerId === null) {
+      return null
+    }
+    const provider = this.props.byokProviders.find(
+      candidate => candidate.id === providerId
+    )
+    return provider !== undefined && isOllamaBYOKProvider(provider)
+      ? provider
+      : null
+  }
+
   private formatProviderType(provider: IBYOKProvider): string {
     switch (provider.type) {
       case 'openai':
@@ -526,13 +625,5 @@ export class CopilotPreferences extends React.Component<
       case 'anthropic':
         return 'Anthropic'
     }
-  }
-
-  private onLanguageModeChanged = (event: Event) => {
-    this.setState({
-      languageMode: normalizeLanguageMode(
-        (event as CustomEvent<unknown>).detail
-      ),
-    })
   }
 }

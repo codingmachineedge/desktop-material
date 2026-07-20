@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -39,7 +40,7 @@ class OllamaFixtureStateTests(unittest.TestCase):
         )
         for model in tags:
             self.assertEqual(model["name"], model["model"])
-            self.assertRegex(model["digest"], r"^[0-9a-f]{64}$")
+            self.assertRegex(model["digest"], r"^sha256:[0-9a-f]{64}$")
             self.assertEqual(model["details"]["format"], "gguf")
             self.assertTrue(model["details"]["family"].startswith("material"))
             self.assertTrue(model["details"]["parameter_size"])
@@ -68,7 +69,7 @@ class OllamaFixtureStateTests(unittest.TestCase):
     def test_pull_has_bounded_monotonic_progress_and_commits_atomically(self) -> None:
         plan = self.state.begin_pull({"model": "material-code:1.5b"})
         progress = [frame for frame in plan.frames if "completed" in frame]
-        self.assertGreaterEqual(len(plan.frames), 6)
+        self.assertEqual(len(plan.frames), fixture.PULL_PROGRESS_INTERVALS + 5)
         self.assertEqual(plan.frames[0], {"status": "pulling manifest"})
         self.assertEqual(plan.frames[-1], {"status": "success"})
         self.assertEqual(
@@ -86,6 +87,10 @@ class OllamaFixtureStateTests(unittest.TestCase):
             [model["name"] for model in self.state.tags()["models"]],
         )
         self.assertEqual(self.state.snapshot()["activePulls"], [])
+        operations = [
+            event.get("operation") for event in self.state.audit_log.snapshot()
+        ]
+        self.assertEqual(operations, ["pull-start", "pull-complete"])
 
     def test_abandoned_pull_releases_reservation_without_installing(self) -> None:
         plan = self.state.begin_pull({"model": "material-code:1.5b"})
@@ -95,6 +100,10 @@ class OllamaFixtureStateTests(unittest.TestCase):
             "material-code:1.5b",
             [model["name"] for model in self.state.tags()["models"]],
         )
+        operations = [
+            event.get("operation") for event in self.state.audit_log.snapshot()
+        ]
+        self.assertEqual(operations, ["pull-start", "pull-cancelled"])
 
     def test_copy_load_unload_and_delete_lifecycle(self) -> None:
         self.state.copy_model(
@@ -125,6 +134,10 @@ class OllamaFixtureStateTests(unittest.TestCase):
         self.assertNotIn(
             "material-vision-copy:3b", self.state.snapshot()["installedModels"]
         )
+        operations = [
+            event.get("operation") for event in self.state.audit_log.snapshot()
+        ]
+        self.assertEqual(operations, ["copy", "load", "unload", "delete"])
 
     def test_not_found_conflict_and_malformed_state_operations(self) -> None:
         cases = (
@@ -188,6 +201,7 @@ class OllamaFixtureStateTests(unittest.TestCase):
             }
         )
         self.state.generate({"model": "material-vision:3b", "keep_alive": -1})
+        self.state.set_fault_mode("partial")
         self.state.reset()
         self.assertEqual(
             self.state.snapshot(),
@@ -201,8 +215,22 @@ class OllamaFixtureStateTests(unittest.TestCase):
                 "runningModels": ["material-chat:7b"],
                 "activePulls": [],
                 "pullableModels": ["material-code:1.5b"],
+                "faultMode": "none",
             },
         )
+
+    def test_fault_modes_are_bounded_and_audited(self) -> None:
+        for mode in fixture.FAULT_MODES:
+            snapshot = self.state.set_fault_mode(mode)
+            self.assertEqual(snapshot["faultMode"], mode)
+        with self.assertRaises(fixture.FixtureAPIError) as failure:
+            self.state.set_fault_mode("unknown")
+        self.assertEqual(failure.exception.status, 400)
+        events = self.state.audit_log.snapshot()
+        self.assertEqual(
+            [event["sequence"] for event in events], list(range(1, len(events) + 1))
+        )
+        self.assertTrue(all(event["kind"] == "mutation" for event in events))
 
 
 class OllamaFixtureHTTPTests(unittest.TestCase):
@@ -302,6 +330,12 @@ class OllamaFixtureHTTPTests(unittest.TestCase):
         progress = [frame for frame in frames if "completed" in frame]
         self.assertEqual(progress[0]["completed"], 0)
         self.assertEqual(progress[-1]["completed"], progress[-1]["total"])
+        self.assertTrue(
+            all(
+                frame["digest"].startswith("sha256:")
+                for frame in progress
+            )
+        )
 
         status, _, shown = self.json_request(
             "POST", "/api/show", {"model": "material-code:1.5b"}
@@ -447,12 +481,20 @@ class OllamaFixtureHTTPTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         first_line = response.readline()
         self.assertEqual(json.loads(first_line)["status"], "pulling manifest")
+        response.close()
         connection.close()
 
         deadline = time.monotonic() + 2
         while self.state.snapshot()["activePulls"] and time.monotonic() < deadline:
             time.sleep(0.02)
         self.assertEqual(self.state.snapshot()["activePulls"], [])
+        self.assertNotIn(
+            "material-code:1.5b", self.state.snapshot()["installedModels"]
+        )
+        operations = [
+            event.get("operation") for event in self.state.audit_log.snapshot()
+        ]
+        self.assertIn("pull-cancelled", operations)
         status, _, health = self.json_request("GET", "/__fixture__/health")
         self.assertEqual(status, 200)
         self.assertEqual(health["status"], "ok")
@@ -476,6 +518,97 @@ class OllamaFixtureHTTPTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(set(malformed), {"error"})
 
+    def test_fault_profiles_cover_unavailable_partial_malformed_and_error(self) -> None:
+        def set_fault(mode: str) -> None:
+            status, _, state = self.json_request(
+                "POST", "/__fixture__/fault", {"mode": mode}
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(state["faultMode"], mode)
+
+        set_fault("unavailable")
+        for path in ("/api/version", "/api/tags", "/api/ps"):
+            status, _, result = self.json_request("GET", path)
+            self.assertEqual(status, 503)
+            self.assertEqual(set(result), {"error"})
+
+        set_fault("partial")
+        self.assertEqual(self.request("GET", "/api/version")[0], 200)
+        self.assertEqual(self.request("GET", "/api/tags")[0], 200)
+        self.assertEqual(self.request("GET", "/api/ps")[0], 503)
+
+        set_fault("malformed")
+        status, _, body = self.request("GET", "/api/tags")
+        self.assertEqual(status, 200)
+        with self.assertRaises(json.JSONDecodeError):
+            json.loads(body)
+
+        set_fault("error")
+        status, _, result = self.json_request(
+            "POST",
+            "/api/copy",
+            {"source": "material-vision:3b", "destination": "blocked:3b"},
+        )
+        self.assertEqual(status, 500)
+        self.assertEqual(set(result), {"error"})
+        self.assertNotIn("blocked:3b", self.state.snapshot()["installedModels"])
+
+        status, _, rejected = self.json_request(
+            "POST", "/__fixture__/fault", {"mode": "unknown"}
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(set(rejected), {"error"})
+
+    def test_stream_failure_emits_error_frame_and_never_installs(self) -> None:
+        status, _, _ = self.json_request(
+            "POST", "/__fixture__/fault", {"mode": "stream-failure"}
+        )
+        self.assertEqual(status, 200)
+        status, _, body = self.request(
+            "POST",
+            "/api/pull",
+            {"model": "material-code:1.5b", "stream": True},
+        )
+        self.assertEqual(status, 200)
+        frames = [json.loads(line) for line in body.splitlines()]
+        self.assertGreaterEqual(len(frames), 3)
+        self.assertEqual(set(frames[-1]), {"error"})
+        self.assertNotIn(
+            "material-code:1.5b", self.state.snapshot()["installedModels"]
+        )
+        operations = [
+            event.get("operation") for event in self.state.audit_log.snapshot()
+        ]
+        self.assertIn("pull-failed", operations)
+
+    def test_audit_endpoint_records_requests_without_request_bodies(self) -> None:
+        self.json_request(
+            "POST",
+            "/api/copy",
+            {"source": "material-vision:3b", "destination": "audit-copy:3b"},
+        )
+        status, _, audit = self.json_request("GET", "/__fixture__/audit")
+        self.assertEqual(status, 200)
+        events = audit["events"]
+        self.assertTrue(any(event.get("operation") == "copy" for event in events))
+        self.assertTrue(
+            any(
+                event["kind"] == "request"
+                and event["method"] == "POST"
+                and event["path"] == "/api/copy"
+                and event["status"] == 200
+                for event in events
+            )
+        )
+        request_events = [event for event in events if event["kind"] == "request"]
+        self.assertTrue(request_events)
+        self.assertTrue(
+            all(
+                not ({"requestBody", "source", "destination", "model"} & set(event))
+                for event in request_events
+            )
+        )
+
     def test_unknown_routes_and_wrong_methods_are_json_errors(self) -> None:
         status, _, missing = self.json_request("GET", "/api/missing")
         self.assertEqual(status, 404)
@@ -486,6 +619,12 @@ class OllamaFixtureHTTPTests(unittest.TestCase):
 
 
 class OllamaFixtureStartupTests(unittest.TestCase):
+    def test_temp_alias_is_canonicalized_without_being_treated_as_a_link(self) -> None:
+        requested = Path(os.path.abspath(os.environ["TEMP"]))
+        resolved = requested.resolve(strict=True)
+        self.assertTrue(fixture._same_path(requested, resolved))
+        self.assertFalse(fixture._path_has_link_or_junction(requested))
+
     def test_standard_library_only_and_non_loopback_binds_are_rejected(self) -> None:
         tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
         imported_roots = set()
@@ -495,7 +634,6 @@ class OllamaFixtureStartupTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported_roots.add(node.module.split(".")[0])
         self.assertTrue(imported_roots <= sys.stdlib_module_names | {"__future__"})
-        self.assertNotIn("socket", imported_roots)
         self.assertNotIn("subprocess", imported_roots)
         with self.assertRaisesRegex(ValueError, "only to 127.0.0.1"):
             fixture.OllamaFixtureHTTPServer(("0.0.0.0", 0))
@@ -522,8 +660,17 @@ class OllamaFixtureStartupTests(unittest.TestCase):
             explicit.server_close()
 
     def test_ready_receipt_and_stdout_metadata_exclude_personal_paths(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            ready_file = Path(temporary) / "ready.json"
+        with tempfile.TemporaryDirectory(
+            prefix="desktop-material-ollama-startup-",
+            dir=os.environ["TEMP"],
+        ) as temporary:
+            run_root = Path(temporary)
+            ready_file = run_root / fixture.OWNED_DIRECTORY_NAME / fixture.READY_FILE_NAME
+            mutation_log = (
+                run_root
+                / fixture.OWNED_DIRECTORY_NAME
+                / fixture.MUTATION_LOG_FILE_NAME
+            )
             process = subprocess.Popen(
                 [
                     sys.executable,
@@ -532,8 +679,12 @@ class OllamaFixtureStartupTests(unittest.TestCase):
                     "0",
                     "--pull-frame-delay-ms",
                     "0",
+                    "--run-root",
+                    str(run_root),
                     "--ready-file",
                     str(ready_file),
+                    "--mutation-log",
+                    str(mutation_log),
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -560,6 +711,14 @@ class OllamaFixtureStartupTests(unittest.TestCase):
                         "port",
                         "endpoint",
                         "version",
+                        "runId",
+                        "runRootName",
+                        "mutationLog",
+                        "faultMode",
+                        "faultModes",
+                        "pullFrameDelayMs",
+                        "pullFrameCount",
+                        "minimumPullDurationMs",
                         "seedModels",
                         "runningModels",
                         "pullableModels",
@@ -569,6 +728,13 @@ class OllamaFixtureStartupTests(unittest.TestCase):
                 self.assertNotIn(str(Path.home()).lower(), serialized)
                 self.assertNotIn(str(Path(temporary)).lower(), serialized)
                 self.assertNotIn("\\", serialized)
+                self.assertEqual(receipt["runRootName"], run_root.name)
+                self.assertEqual(
+                    receipt["mutationLog"],
+                    f"{fixture.OWNED_DIRECTORY_NAME}/{fixture.MUTATION_LOG_FILE_NAME}",
+                )
+                self.assertEqual(receipt["faultMode"], "none")
+                self.assertEqual(receipt["faultModes"], list(fixture.FAULT_MODES))
                 self.assertEqual(receipt["bind"], fixture.LOOPBACK_ADDRESS)
                 self.assertEqual(
                     receipt["endpoint"],
@@ -583,6 +749,23 @@ class OllamaFixtureStartupTests(unittest.TestCase):
                 self.assertEqual(response.status, 200)
                 self.assertEqual(json.loads(response.read())["status"], "ok")
                 connection.close()
+
+                deadline = time.monotonic() + 2
+                while not mutation_log.exists() and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                events = [
+                    json.loads(line)
+                    for line in mutation_log.read_text(encoding="utf-8").splitlines()
+                ]
+                self.assertEqual(events[0]["operation"], "start")
+                self.assertEqual(events[0]["runRootName"], run_root.name)
+                self.assertTrue(
+                    any(
+                        event["kind"] == "request"
+                        and event["path"] == "/__fixture__/health"
+                        for event in events
+                    )
+                )
             finally:
                 process.terminate()
                 try:
@@ -594,6 +777,63 @@ class OllamaFixtureStartupTests(unittest.TestCase):
                     process.stdout.close()
                 if process.stderr is not None:
                     process.stderr.close()
+
+    def test_owned_paths_reject_wrong_roots_paths_and_existing_receipts(self) -> None:
+        temp_root = Path(os.environ["TEMP"])
+        with tempfile.TemporaryDirectory(
+            prefix="not-owned-ollama-", dir=temp_root
+        ) as invalid:
+            invalid_root = Path(invalid)
+            with self.assertRaisesRegex(ValueError, "directly owned TEMP child"):
+                fixture.resolve_owned_paths(
+                    invalid_root,
+                    invalid_root / "ollama" / "ready.json",
+                    invalid_root / "ollama" / "mutations.jsonl",
+                )
+
+        with tempfile.TemporaryDirectory(
+            prefix="desktop-material-ollama-paths-", dir=temp_root
+        ) as temporary:
+            run_root = Path(temporary)
+            ready = run_root / "ollama" / "ready.json"
+            mutation_log = run_root / "ollama" / "mutations.jsonl"
+            with self.assertRaisesRegex(ValueError, "exact owned Ollama ready"):
+                fixture.resolve_owned_paths(
+                    run_root, run_root / "ready.json", mutation_log
+                )
+            with self.assertRaisesRegex(ValueError, "exact owned Ollama audit"):
+                fixture.resolve_owned_paths(
+                    run_root, ready, run_root / "mutations.jsonl"
+                )
+
+            paths = fixture.resolve_owned_paths(run_root, ready, mutation_log)
+            self.assertEqual(paths.run_root, run_root.resolve())
+            fixture.write_startup_metadata(paths.ready_file, {"fixture": "test"})
+            with self.assertRaisesRegex(FileExistsError, "ready file already exists"):
+                fixture.resolve_owned_paths(run_root, ready, mutation_log)
+
+    def test_disk_audit_log_is_exclusive_deterministic_and_flushed(self) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="desktop-material-ollama-audit-", dir=os.environ["TEMP"]
+        ) as temporary:
+            run_root = Path(temporary)
+            paths = fixture.resolve_owned_paths(
+                run_root,
+                run_root / "ollama" / "ready.json",
+                run_root / "ollama" / "mutations.jsonl",
+            )
+            audit = fixture.FixtureAuditLog(paths.mutation_log)
+            audit.record("mutation", operation="copy", source="a", destination="b")
+            audit.record("request", method="POST", path="/api/copy", status=200)
+            audit.close()
+            lines = [
+                json.loads(line)
+                for line in paths.mutation_log.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual([event["sequence"] for event in lines], [1, 2])
+            self.assertTrue(all(event["time"] == fixture.FIXED_TIME for event in lines))
+            with self.assertRaises(FileExistsError):
+                fixture.FixtureAuditLog(paths.mutation_log)
 
 
 if __name__ == "__main__":

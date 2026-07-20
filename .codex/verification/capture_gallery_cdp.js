@@ -69,6 +69,114 @@ const providerRequestLog = runRoot
   ? path.join(runRoot, 'provider', 'requests.jsonl')
   : null
 
+function readOwnedOllamaFixture(requestedRunRoot) {
+  if (requestedRunRoot === undefined) {
+    return null
+  }
+
+  let tempRoot
+  let ownedRunRoot
+  try {
+    tempRoot = fs.realpathSync.native(os.tmpdir())
+    ownedRunRoot = fs.realpathSync.native(path.resolve(requestedRunRoot))
+  } catch {
+    fail('The owned Ollama fixture run root could not be resolved.')
+  }
+
+  const rootName = path.basename(ownedRunRoot)
+  if (
+    path.dirname(ownedRunRoot).toLowerCase() !== tempRoot.toLowerCase() ||
+    !/^desktop-material-ollama-[A-Za-z0-9][A-Za-z0-9._-]{5,120}$/.test(rootName)
+  ) {
+    fail(
+      'The Ollama fixture must be a direct Temp child named desktop-material-ollama-*.'
+    )
+  }
+
+  const ownedDirectory = path.join(ownedRunRoot, 'ollama')
+  const readyPath = path.join(ownedDirectory, 'ready.json')
+  for (const [candidate, kind] of [
+    [ownedRunRoot, 'directory'],
+    [ownedDirectory, 'directory'],
+    [readyPath, 'file'],
+  ]) {
+    let item
+    try {
+      item = fs.lstatSync(candidate)
+    } catch {
+      fail(`The owned Ollama ${kind} is missing.`)
+    }
+    if (
+      item.isSymbolicLink() ||
+      (kind === 'directory' ? !item.isDirectory() : !item.isFile())
+    ) {
+      fail(`The owned Ollama ${kind} failed its real-path contract.`)
+    }
+  }
+  if (
+    fs.realpathSync.native(ownedDirectory).toLowerCase() !==
+      ownedDirectory.toLowerCase() ||
+    fs.realpathSync.native(readyPath).toLowerCase() !== readyPath.toLowerCase()
+  ) {
+    fail('The owned Ollama fixture contains a symlink or junction.')
+  }
+
+  let receipt
+  let endpoint
+  try {
+    receipt = JSON.parse(fs.readFileSync(readyPath, 'utf8'))
+    endpoint = new URL(receipt.endpoint)
+  } catch {
+    fail('The owned Ollama fixture readiness receipt is invalid.')
+  }
+  if (
+    receipt.fixture !== 'desktop-material-ollama' ||
+    receipt.protocolVersion !== 1 ||
+    receipt.runRootName !== rootName ||
+    receipt.bind !== '127.0.0.1' ||
+    !Number.isSafeInteger(receipt.port) ||
+    receipt.port < 1 ||
+    receipt.port > 65535 ||
+    !Number.isSafeInteger(receipt.pid) ||
+    receipt.pid < 1 ||
+    receipt.mutationLog !== 'ollama/mutations.jsonl' ||
+    endpoint.protocol !== 'http:' ||
+    endpoint.hostname !== '127.0.0.1' ||
+    endpoint.port !== String(receipt.port) ||
+    endpoint.pathname !== '/' ||
+    endpoint.username !== '' ||
+    endpoint.password !== '' ||
+    endpoint.search !== '' ||
+    endpoint.hash !== ''
+  ) {
+    fail('The owned Ollama fixture failed its loopback identity contract.')
+  }
+
+  return Object.freeze({
+    runRoot: ownedRunRoot,
+    endpoint: endpoint.origin,
+    receipt: Object.freeze(receipt),
+  })
+}
+
+const ollamaFixture = readOwnedOllamaFixture(args.get('ollama-run-root'))
+if (ollamaFixture !== null && ready?.copilotEnabled !== true) {
+  fail('The P0 provider must be started with Copilot enabled for Ollama proof.')
+}
+const ollamaProvider =
+  ollamaFixture === null
+    ? null
+    : Object.freeze({
+        id: 'material-ollama-fixture',
+        name: 'Material Ollama',
+        type: 'openai',
+        integration: 'ollama',
+        baseUrl: `${ollamaFixture.endpoint}/v1`,
+        wireApi: 'completions',
+        authKind: 'none',
+        models: [],
+      })
+
 function assertOwnedDisposableFixture() {
   if (runRoot === undefined || fixturePath === null) {
     fail('Fixture mutation requires a named disposable Temp run root.')
@@ -412,6 +520,8 @@ const DefaultWidth = 1440
 const DefaultHeight = 960
 const CaptureWidth = Number(args.get('width') ?? DefaultWidth)
 const CaptureHeight = Number(args.get('height') ?? DefaultHeight)
+let currentViewportWidth = CaptureWidth
+let currentViewportHeight = CaptureHeight
 
 const CanonicalGalleryScenes = Object.freeze([
   'welcome',
@@ -628,6 +738,98 @@ function getJSON(target) {
   })
 }
 
+function requestOllamaFixture(method, target, body = null) {
+  if (ollamaFixture === null) {
+    fail('The Ollama scene requires an owned loopback fixture.')
+  }
+  const endpoint = new URL(ollamaFixture.endpoint)
+  const payload = body === null ? null : Buffer.from(JSON.stringify(body))
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: '127.0.0.1',
+        port: Number(endpoint.port),
+        path: target,
+        method,
+        timeout: 5000,
+        headers:
+          payload === null
+            ? { Accept: 'application/json' }
+            : {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'Content-Length': payload.byteLength,
+              },
+      },
+      response => {
+        const chunks = []
+        let size = 0
+        response.on('data', chunk => {
+          size += chunk.byteLength
+          if (size > 1024 * 1024) {
+            request.destroy(
+              new Error('The Ollama fixture response exceeded 1 MiB.')
+            )
+            return
+          }
+          chunks.push(chunk)
+        })
+        response.on('end', () => {
+          if (response.statusCode !== 200) {
+            reject(
+              new Error(
+                `The Ollama fixture returned HTTP ${response.statusCode}.`
+              )
+            )
+            return
+          }
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+          } catch (error) {
+            reject(error)
+          }
+        })
+      }
+    )
+    request.on('timeout', () =>
+      request.destroy(new Error('The Ollama fixture request timed out.'))
+    )
+    request.on('error', reject)
+    request.end(payload ?? undefined)
+  })
+}
+
+async function waitForOllamaFixture(predicate, label, timeout = 10000) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    const state = await requestOllamaFixture('GET', '/__fixture__/state')
+    if (predicate(state)) {
+      return state
+    }
+    await sleep(200)
+  }
+  fail(`Timed out waiting for Ollama fixture ${label}.`)
+}
+
+function assertBaseOllamaFixtureState(state, label) {
+  const expectedInstalled = [
+    'material-chat:7b',
+    'material-embed:latest',
+    'material-vision:3b',
+  ]
+  if (
+    state?.fixture !== 'desktop-material-ollama' ||
+    JSON.stringify(state.installedModels) !==
+      JSON.stringify(expectedInstalled) ||
+    JSON.stringify(state.runningModels) !==
+      JSON.stringify(['material-chat:7b']) ||
+    JSON.stringify(state.activePulls) !== JSON.stringify([]) ||
+    state.faultMode !== 'none'
+  ) {
+    fail(`Ollama fixture ${label} was not canonical: ${JSON.stringify(state)}`)
+  }
+}
+
 class CDPClient {
   constructor(url) {
     this.socket = new WebSocket(url, {
@@ -726,6 +928,8 @@ async function setViewport(width = DefaultWidth, height = DefaultHeight) {
     deviceScaleFactor: 1,
     mobile: false,
   })
+  currentViewportWidth = width
+  currentViewportHeight = height
   await sleep(350)
 }
 
@@ -782,6 +986,22 @@ async function assertCapturePrivacy(name) {
 
 function sha256File(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+}
+
+function pngDimensions(file) {
+  const bytes = fs.readFileSync(file)
+  const signature = '89504e470d0a1a0a'
+  if (
+    bytes.byteLength < 24 ||
+    bytes.subarray(0, 8).toString('hex') !== signature ||
+    bytes.subarray(12, 16).toString('ascii') !== 'IHDR'
+  ) {
+    fail(`Capture ${path.basename(file)} is not a valid PNG.`)
+  }
+  return {
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+  }
 }
 
 /** Remove unrelated transient chrome and focus paint from documentation frames. */
@@ -844,6 +1064,21 @@ async function capture(name) {
   const shot = await client.send('Page.captureScreenshot', { format: 'png' })
   const file = path.join(outDir, `${name}.png`)
   fs.writeFileSync(file, Buffer.from(shot.data, 'base64'), { flag: 'wx' })
+  const dimensions = pngDimensions(file)
+  if (
+    dimensions.width !== currentViewportWidth ||
+    dimensions.height !== currentViewportHeight
+  ) {
+    fail(
+      `Capture ${name}.png has unexpected dimensions: ${JSON.stringify({
+        expected: {
+          width: currentViewportWidth,
+          height: currentViewportHeight,
+        },
+        actual: dimensions,
+      })}`
+    )
+  }
   const digest = sha256File(file)
   const duplicate = capturedHashes.get(digest)
   if (duplicate !== undefined) {
@@ -852,7 +1087,9 @@ async function capture(name) {
   capturedHashes.set(digest, name)
   capturedNames.push(name)
   const size = fs.statSync(file).size
-  process.stdout.write(`CAPTURED ${name}.png ${size}b\n`)
+  process.stdout.write(
+    `CAPTURED ${name}.png ${size}b ${dimensions.width}x${dimensions.height}\n`
+  )
   if (size < 20000) {
     process.stdout.write(`WARN ${name}.png is suspiciously small\n`)
   }
@@ -967,6 +1204,57 @@ async function clickEnabledSelector(selector) {
   if (!clicked) {
     fail(`Unable to click enabled control ${selector}.`)
   }
+}
+
+const ThemeToggleSelector =
+  'button.theme-toggle-button[aria-label="Toggle theme"]'
+
+async function setThemeThroughToggle(theme) {
+  if (!['light', 'dark', 'system'].includes(theme)) {
+    fail(`Unsupported capture theme: ${theme}`)
+  }
+  const expectedLabel = `${theme[0].toUpperCase()}${theme.slice(1)} theme`
+  const expectedBodyClass =
+    theme === 'dark' ? 'theme-dark' : theme === 'light' ? 'theme-light' : null
+
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    const selected = await evaluate(`(() => {
+      const button = document.querySelector(${JSON.stringify(
+        ThemeToggleSelector
+      )})
+      return button instanceof HTMLButtonElement &&
+        button.textContent.trim() === ${JSON.stringify(expectedLabel)} &&
+        localStorage.getItem('theme') === ${JSON.stringify(theme)}
+    })()`)
+    if (selected) {
+      if (expectedBodyClass !== null) {
+        await waitFor(
+          `document.body.classList.contains(${JSON.stringify(
+            expectedBodyClass
+          )})`,
+          `applied ${theme} capture theme`
+        )
+      }
+      return
+    }
+    if (attempt === 3) {
+      break
+    }
+
+    const previousLabel = await evaluate(
+      `document.querySelector(${JSON.stringify(
+        ThemeToggleSelector
+      )})?.textContent?.trim() ?? null`
+    )
+    await clickEnabledSelector(ThemeToggleSelector)
+    await waitFor(
+      `document.querySelector(${JSON.stringify(
+        ThemeToggleSelector
+      )})?.textContent?.trim() !== ${JSON.stringify(previousLabel)}`,
+      `theme toggle transition toward ${theme}`
+    )
+  }
+  fail(`Unable to settle the capture theme at ${theme}.`)
 }
 
 /** Exercise list rows whose selection contract is owned by mouse down/up. */
@@ -1312,14 +1600,19 @@ async function seedProfile() {
   )
 
   const profileChanged = await evaluate(`(() => {
+    let changed = false
+    if (localStorage.getItem('autoSwitchTheme') !== null) {
+      localStorage.removeItem('autoSwitchTheme')
+      changed = true
+    }
     const expected = {
       'has-shown-welcome-flow': '1',
       'theme': 'light',
+      'language-mode-v1': 'english',
       'zoom-auto-fit-enabled': '1',
       'stats-opt-out': '1',
       'has-sent-stats-opt-in-ping': '1'
     }
-    let changed = false
     for (const [key, value] of Object.entries(expected)) {
       if (localStorage.getItem(key) !== value) {
         localStorage.setItem(key, value)
@@ -1340,14 +1633,34 @@ async function seedProfile() {
       localStorage.setItem('users', expectedUsers)
       changed = true
     }
+    const expectedOllamaProvider = ${JSON.stringify(ollamaProvider)}
+    if (expectedOllamaProvider !== null) {
+      const expectedProviders = JSON.stringify([expectedOllamaProvider])
+      let storedProviders = null
+      try {
+        storedProviders = JSON.parse(
+          localStorage.getItem('copilot-byok-providers') || 'null'
+        )
+      } catch {}
+      if (JSON.stringify(storedProviders) !== expectedProviders) {
+        localStorage.setItem('copilot-byok-providers', expectedProviders)
+        changed = true
+      }
+    }
     return changed
   })()`)
 
   const changed = providerRemoteChanged || profileChanged
   if (changed) {
-    await evaluate('window.location.reload(), true')
+    const beforeSeedReloadTimeOrigin = await evaluate('performance.timeOrigin')
+    await client.send('Page.reload', { ignoreCache: true })
     await sleep(4500)
     await client.send('Runtime.enable')
+    await waitFor(
+      `performance.timeOrigin > ${JSON.stringify(beforeSeedReloadTimeOrigin)}`,
+      'seeded profile renderer reload',
+      25000
+    )
   }
   if (
     await clickText('Continue without signing in', {
@@ -1388,6 +1701,9 @@ async function seedProfile() {
       // surface. Re-read that shared metadata through the store's public
       // cross-window contract, then match the already-open repository.
       await appStore.accountsStore.reloadFromStore()
+      if (${ollamaFixture !== null}) {
+        await appStore.accountsStore.refresh()
+      }
       const accounts = await appStore.accountsStore.getAll()
       const fixtureAccount = accounts.find(value =>
         value.login === ${JSON.stringify(account.login)} &&
@@ -1405,6 +1721,10 @@ async function seedProfile() {
         fixtureTokenPresent:
           typeof fixtureAccount?.token === 'string' &&
           fixtureAccount.token.length > 0,
+        fixtureCopilotFeatureEnabled:
+          fixtureAccount?.features?.includes(
+            'desktop_enable_copilot_sdk_commit_message_generation'
+          ) === true,
         repositoryMatched: Boolean(freshRepository?.gitHubRepository),
         selectedRepositoryMatched: Boolean(
           appStore.selectedRepository?.gitHubRepository
@@ -1416,6 +1736,8 @@ async function seedProfile() {
       hydrated?.accountCount !== 1 ||
       hydrated?.fixtureAccountMatched !== true ||
       hydrated?.fixtureTokenPresent !== true ||
+      (ollamaFixture !== null &&
+        hydrated?.fixtureCopilotFeatureEnabled !== true) ||
       hydrated?.repositoryMatched !== true ||
       hydrated?.selectedRepositoryMatched !== true
     ) {
@@ -2084,6 +2406,401 @@ scene('anchored-appearance', async () => {
 
 scene('settings-accounts', async () => {
   await captureSettingsTab('Accounts', 'material-provider-accounts')
+})
+
+scene('ollama-manager', async () => {
+  if (ollamaFixture === null || ollamaProvider === null) {
+    fail('The Ollama manager scene requires --ollama-run-root.')
+  }
+
+  const resetState = await requestOllamaFixture(
+    'POST',
+    '/__fixture__/reset',
+    {}
+  )
+  assertBaseOllamaFixtureState(resetState, 'pre-exercise reset')
+  const auditBefore = await requestOllamaFixture('GET', '/__fixture__/audit')
+  const auditStartSequence = Math.max(
+    0,
+    ...(auditBefore?.events ?? []).map(event => Number(event.sequence) || 0)
+  )
+
+  await setViewport(1452, 1001)
+  await setThemeThroughToggle('dark')
+
+  try {
+    await captureSettingsTab(
+      'Copilot',
+      'material-ollama-model-manager',
+      async () => {
+        await clickText('Providers', { within: '#preferences' })
+        await waitFor(
+          `(() => {
+            const root = document.querySelector('#preferences')
+            const tab = [...(root?.querySelectorAll('button[role="tab"]') ?? [])]
+              .find(candidate => candidate.textContent.trim() === 'Providers')
+            return tab?.getAttribute('aria-selected') === 'true'
+          })()`,
+          'selected Copilot Providers tab'
+        )
+        await clickText('Manage models', { within: '#preferences' })
+
+        const managerReady = `(() => {
+          const manager = document.querySelector('[data-verification="ollama-manager"]')
+          const rows = [...document.querySelectorAll(
+            '[data-verification="ollama-model-row"]'
+          )]
+          const names = rows.map(row => row.getAttribute('data-model'))
+          const details = document.querySelector('[data-verification="ollama-details"]')
+          const refresh = document.querySelector('[data-verification="ollama-refresh"]')
+          return manager?.getAttribute('aria-busy') === 'false' &&
+            refresh instanceof HTMLButtonElement && !refresh.disabled &&
+            refresh.textContent.trim() === 'Refresh' &&
+            document.querySelector('[data-verification="ollama-endpoint-status"]')
+              ?.textContent?.trim() === 'Connected' &&
+            JSON.stringify(names) === JSON.stringify([
+              'material-chat:7b',
+              'material-embed:latest',
+              'material-vision:3b'
+            ]) &&
+            rows[0]?.getAttribute('aria-pressed') === 'true' &&
+            details?.textContent?.includes('material-chat:7b') === true &&
+            document.querySelector('.ollama-details-state') === null
+        })()`
+        await waitFor(managerReady, 'initial Ollama manager inventory', 30000)
+
+        await setInput('[data-verification="ollama-filter"]', 'vision')
+        await waitFor(
+          `(() => {
+            const rows = [...document.querySelectorAll(
+              '[data-verification="ollama-model-row"]'
+            )]
+            return document.querySelector('.ollama-inventory-count')
+              ?.textContent?.trim() === 'Showing 1 of 3 models' &&
+              rows.length === 1 && rows[0].getAttribute('data-model') ===
+                'material-vision:3b'
+          })()`,
+          'filtered Ollama inventory'
+        )
+        await setInput('[data-verification="ollama-filter"]', '')
+        await setSelect('[data-verification="ollama-scope"]', 'running')
+        await waitFor(
+          `(() => {
+            const rows = [...document.querySelectorAll(
+              '[data-verification="ollama-model-row"]'
+            )]
+            return document.querySelector('.ollama-inventory-count')
+              ?.textContent?.trim() === 'Showing 1 of 3 models' &&
+              rows.length === 1 && rows[0].getAttribute('data-model') ===
+                'material-chat:7b'
+          })()`,
+          'running-only Ollama inventory'
+        )
+        await setSelect('[data-verification="ollama-scope"]', 'all')
+        await waitFor(managerReady, 'restored full Ollama inventory')
+
+        await setInput(
+          '[data-verification="ollama-pull-name"]',
+          'material-code:1.5b'
+        )
+        await clickEnabledSelector('[data-verification="ollama-pull"]')
+        await waitFor(
+          `document.querySelector('[data-verification="ollama-pull-progress"] progress') !== null &&
+           document.querySelector('[data-verification="ollama-pull-cancel"]') instanceof HTMLButtonElement`,
+          'visible cancellable Ollama pull progress'
+        )
+        await clickEnabledSelector('[data-verification="ollama-pull-cancel"]')
+        const cancellationState = `(() => {
+            const manager = document.querySelector('[data-verification="ollama-manager"]')
+            const notice = document.querySelector('[data-verification="ollama-notice"]')
+            const refresh = document.querySelector('[data-verification="ollama-refresh"]')
+            const rows = document.querySelectorAll(
+              '[data-verification="ollama-model-row"]'
+            )
+            const state = {
+              busy: manager?.getAttribute('aria-busy') ?? null,
+              refreshDisabled:
+                refresh instanceof HTMLButtonElement ? refresh.disabled : null,
+              refreshText: refresh?.textContent?.trim() ?? null,
+              notice: notice?.textContent?.trim() ?? null,
+              progressVisible:
+                document.querySelector(
+                  '[data-verification="ollama-pull-progress"]'
+                ) !== null,
+              rowCount: rows.length,
+            }
+            return {
+              ...state,
+              settled: state.busy === 'false' &&
+              refresh instanceof HTMLButtonElement && !refresh.disabled &&
+                state.refreshText === 'Refresh' &&
+                state.notice?.includes('canceled') === true &&
+                !state.progressVisible && state.rowCount === 3
+            }
+          })()`
+        try {
+          await waitFor(
+            `(${cancellationState}).settled`,
+            'completed Ollama pull cancellation'
+          )
+        } catch {
+          const diagnostic = await evaluate(`({
+            state: ${cancellationState},
+            preferencesPresent:
+              document.querySelector('#preferences') !== null,
+          })`).catch(error => ({
+            diagnosticError: error?.message ?? String(error),
+          }))
+          fail(
+            `Timed out waiting for completed Ollama pull cancellation: ${JSON.stringify(
+              diagnostic
+            )}`
+          )
+        }
+        const afterCancellation = await waitForOllamaFixture(
+          state =>
+            JSON.stringify(state?.activePulls) === JSON.stringify([]) &&
+            state?.installedModels?.includes('material-code:1.5b') !== true,
+          'pull cancellation cleanup'
+        )
+        assertBaseOllamaFixtureState(
+          afterCancellation,
+          'after pull cancellation'
+        )
+
+        await clickEnabledSelector(
+          '[data-verification="ollama-model-row"][data-model="material-embed:latest"]'
+        )
+        await waitFor(
+          `document.querySelector('[data-verification="ollama-model-row"][data-model="material-embed:latest"]')?.getAttribute('aria-pressed') === 'true' &&
+           document.querySelector('.ollama-details-state') === null`,
+          'selected copy source model'
+        )
+        await setInput(
+          '[data-verification="ollama-copy-name"]',
+          'material-gallery-copy:latest'
+        )
+        await clickEnabledSelector('[data-verification="ollama-copy"]')
+        await waitFor(
+          `(() => {
+            const manager = document.querySelector('[data-verification="ollama-manager"]')
+            const copy = document.querySelector(
+              '[data-verification="ollama-model-row"][data-model="material-gallery-copy:latest"]'
+            )
+            const notice = document.querySelector('[data-verification="ollama-notice"]')
+            return manager?.getAttribute('aria-busy') === 'false' &&
+              copy instanceof HTMLButtonElement &&
+              document.querySelector('.ollama-inventory-count')
+                ?.textContent?.trim() === 'Showing 4 of 4 models' &&
+              notice?.textContent?.includes('Copied material-embed:latest') === true
+          })()`,
+          'copied Ollama model'
+        )
+
+        await clickEnabledSelector(
+          '[data-verification="ollama-model-row"][data-model="material-gallery-copy:latest"]'
+        )
+        await waitFor(
+          `document.querySelector('[data-verification="ollama-model-row"][data-model="material-gallery-copy:latest"]')?.getAttribute('aria-pressed') === 'true' &&
+           document.querySelector('.ollama-details-state') === null`,
+          'selected copied Ollama model'
+        )
+        await clickEnabledSelector('[data-verification="ollama-load"]')
+        await waitFor(
+          `(() => {
+            const row = document.querySelector(
+              '[data-verification="ollama-model-row"][data-model="material-gallery-copy:latest"]'
+            )
+            const notice = document.querySelector('[data-verification="ollama-notice"]')
+            return document.querySelector('[data-verification="ollama-manager"]')
+                ?.getAttribute('aria-busy') === 'false' &&
+              row?.querySelector('.ollama-running-badge') !== null &&
+              notice?.textContent?.includes('Loaded material-gallery-copy:latest') === true
+          })()`,
+          'loaded copied Ollama model'
+        )
+        await clickEnabledSelector('[data-verification="ollama-unload"]')
+        await waitFor(
+          `(() => {
+            const row = document.querySelector(
+              '[data-verification="ollama-model-row"][data-model="material-gallery-copy:latest"]'
+            )
+            const notice = document.querySelector('[data-verification="ollama-notice"]')
+            return document.querySelector('[data-verification="ollama-manager"]')
+                ?.getAttribute('aria-busy') === 'false' &&
+              row?.querySelector('.ollama-running-badge') === null &&
+              notice?.textContent?.includes('Unloaded material-gallery-copy:latest') === true
+          })()`,
+          'unloaded copied Ollama model'
+        )
+
+        await clickEnabledSelector('[data-verification="ollama-delete"]')
+        await waitFor(
+          `document.querySelector('[data-verification="ollama-delete-dialog"][role="alertdialog"]') !== null &&
+           document.activeElement === document.querySelector('[data-verification="ollama-delete-confirm"]')`,
+          'focused Ollama delete confirmation'
+        )
+        await clickEnabledSelector(
+          '[data-verification="ollama-delete-confirm"]'
+        )
+        await waitFor(
+          `(() => {
+            const notice = document.querySelector('[data-verification="ollama-notice"]')
+            return document.querySelector('[data-verification="ollama-manager"]')
+                ?.getAttribute('aria-busy') === 'false' &&
+              document.querySelector(
+                '[data-verification="ollama-model-row"][data-model="material-gallery-copy:latest"]'
+              ) === null &&
+              document.querySelector('[data-verification="ollama-delete-dialog"]') === null &&
+              document.querySelector('.ollama-inventory-count')
+                ?.textContent?.trim() === 'Showing 3 of 3 models' &&
+              notice?.textContent?.includes('Deleted material-gallery-copy:latest') === true
+          })()`,
+          'deleted copied Ollama model'
+        )
+
+        const auditAfter = await requestOllamaFixture(
+          'GET',
+          '/__fixture__/audit'
+        )
+        const operations = (auditAfter?.events ?? [])
+          .filter(event => Number(event.sequence) > auditStartSequence)
+          .filter(event => event.kind === 'mutation')
+          .map(event => event.operation)
+        for (const expected of [
+          'pull-start',
+          'pull-cancelled',
+          'copy',
+          'load',
+          'unload',
+          'delete',
+        ]) {
+          if (!operations.includes(expected)) {
+            fail(
+              `Ollama UI exercise did not record ${expected}: ${JSON.stringify(
+                operations
+              )}`
+            )
+          }
+        }
+
+        const finalReset = await requestOllamaFixture(
+          'POST',
+          '/__fixture__/reset',
+          {}
+        )
+        assertBaseOllamaFixtureState(finalReset, 'final reset')
+        await setInput('[data-verification="ollama-pull-name"]', '')
+        await setInput('[data-verification="ollama-filter"]', '')
+        await setSelect('[data-verification="ollama-scope"]', 'all')
+        await clickEnabledSelector('[data-verification="ollama-refresh"]')
+        await waitFor(managerReady, 'refreshed canonical Ollama inventory')
+        await clickEnabledSelector(
+          '[data-verification="ollama-model-row"][data-model="material-chat:7b"]'
+        )
+
+        await waitFor(
+          `(() => {
+            const manager = document.querySelector('[data-verification="ollama-manager"]')
+            const preferences = document.querySelector('#preferences')
+            const rows = [...document.querySelectorAll(
+              '[data-verification="ollama-model-row"]'
+            )]
+            const details = document.querySelector('[data-verification="ollama-details"]')
+            const refresh = document.querySelector('[data-verification="ollama-refresh"]')
+            const managerBounds = manager?.getBoundingClientRect()
+            const preferencesBounds = preferences?.getBoundingClientRect()
+            const contained = bounds => bounds !== undefined &&
+              bounds.width > 0 && bounds.height > 0 &&
+              bounds.left >= -0.5 && bounds.top >= -0.5 &&
+              bounds.right <= window.innerWidth + 0.5 &&
+              bounds.bottom <= window.innerHeight + 0.5
+            return manager?.getAttribute('aria-busy') === 'false' &&
+              refresh instanceof HTMLButtonElement && !refresh.disabled &&
+              refresh.textContent.trim() === 'Refresh' &&
+              document.querySelector('.ollama-health-indicator.is-connected') !== null &&
+              document.querySelector('[data-verification="ollama-endpoint-status"]')
+                ?.textContent?.trim() === 'Connected' &&
+              document.querySelector('.ollama-endpoint-metrics')?.textContent
+                ?.includes('0.12.6') === true &&
+              document.querySelector('.ollama-inventory-count')
+                ?.textContent?.trim() === 'Showing 3 of 3 models' &&
+              JSON.stringify(rows.map(row => row.getAttribute('data-model'))) ===
+                JSON.stringify([
+                  'material-chat:7b',
+                  'material-embed:latest',
+                  'material-vision:3b'
+                ]) &&
+              rows[0]?.getAttribute('aria-pressed') === 'true' &&
+              rows[0]?.querySelector('.ollama-running-badge') !== null &&
+              details?.textContent?.includes('material-chat:7b') === true &&
+              details?.textContent?.includes('7B') === true &&
+              details?.textContent?.includes('Q4_K_M') === true &&
+              details?.textContent?.includes('completion') === true &&
+              details?.textContent?.includes('tools') === true &&
+              document.querySelector('.ollama-details-state') === null &&
+              document.querySelector('[data-verification="ollama-notice"]') === null &&
+              document.querySelector('[data-verification="ollama-pull-progress"]') === null &&
+              document.querySelector('[data-verification="ollama-delete-dialog"]') === null &&
+              document.querySelector('[data-verification="ollama-filter"]')?.value === '' &&
+              document.querySelector('[data-verification="ollama-scope"]')?.value === 'all' &&
+              document.body.classList.contains('theme-dark') &&
+              localStorage.getItem('theme') === 'dark' &&
+              window.innerWidth === 1452 && window.innerHeight === 1001 &&
+              contained(managerBounds) && contained(preferencesBounds) &&
+              document.documentElement.scrollWidth <= window.innerWidth + 1 &&
+              document.body.scrollWidth <= window.innerWidth + 1
+          })()`,
+          'settled unclipped dark Ollama manager overview',
+          30000
+        )
+        await evaluate(`(() => {
+          for (const node of document.querySelectorAll(
+            '#preferences .tab-container, #preferences .copilot-tab-content'
+          )) {
+            node.scrollTop = 0
+            node.scrollLeft = 0
+          }
+          return true
+        })()`)
+        await evaluate(
+          `new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`
+        )
+        await waitFor(
+          `(() => {
+            const dialog = document.querySelector('#preferences')
+            const refresh = document.querySelector('[data-verification="ollama-refresh"]')
+            const scrollers = [...document.querySelectorAll(
+              '#preferences .tab-container, #preferences .copilot-tab-content'
+            )]
+            const activeFiniteAnimations = dialog
+              ?.getAnimations({ subtree: true })
+              .filter(animation => {
+                const iterations = animation.effect?.getTiming().iterations ?? 1
+                return iterations !== Infinity &&
+                  (animation.pending || animation.playState === 'running')
+              }) ?? []
+            return refresh instanceof HTMLButtonElement &&
+              !refresh.disabled && refresh.textContent.trim() === 'Refresh' &&
+              scrollers.every(node => node.scrollTop === 0 && node.scrollLeft === 0) &&
+              activeFiniteAnimations.length === 0
+          })()`,
+          'post-scroll stable Ollama capture surface'
+        )
+        await parkPointer()
+      }
+    )
+  } finally {
+    await closeAllDialogs().catch(() => undefined)
+    const dark = await evaluate(
+      `document.body.classList.contains('theme-dark')`
+    ).catch(() => false)
+    if (dark) {
+      await setThemeThroughToggle('system')
+      await setThemeThroughToggle('light')
+    }
+    await restoreCaptureViewport()
+  }
 })
 
 scene('settings-automation', async () => {

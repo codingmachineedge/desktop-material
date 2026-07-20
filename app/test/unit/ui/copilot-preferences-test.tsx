@@ -25,6 +25,12 @@ import {
 import { Account } from '../../../src/models/account'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
 import { setNumberFormatPreference } from '../../../src/models/formatting-preferences'
+import type { IOllamaModelManagerClient } from '../../../src/ui/copilot/ollama-model-manager'
+import { LanguageModeChangedEvent } from '../../../src/lib/i18n'
+import {
+  LanguageModeStorageKey,
+  setLanguageModePreference,
+} from '../../../src/lib/language-preference'
 
 interface IAccountOptions {
   readonly isCopilotDesktopEnabled?: boolean
@@ -141,12 +147,53 @@ const ollamaProvider: IBYOKProvider = {
   id: 'ollama-id',
   name: 'Ollama',
   type: 'openai',
+  integration: 'ollama',
   baseUrl: 'http://localhost:11434/v1',
   authKind: 'none',
   models: [
     { id: 'llama3', name: 'Llama 3' },
     { id: 'phi-4', name: 'Phi 4' },
   ],
+}
+
+class TestOllamaManagerClient implements IOllamaModelManagerClient {
+  public constructor(
+    private readonly installedModels: ReadonlyArray<{
+      readonly name: string
+      readonly model: string
+    }> = [
+      { name: 'llama3', model: 'llama3' },
+      { name: 'phi-4', model: 'phi-4' },
+    ]
+  ) {}
+
+  public async health() {
+    return { version: '0.5.0' }
+  }
+
+  public async list() {
+    return this.installedModels
+  }
+
+  public async listRunning() {
+    return []
+  }
+
+  public async show() {
+    return {}
+  }
+
+  public async pull() {
+    return undefined
+  }
+
+  public async copy() {}
+
+  public async delete() {}
+
+  public async load() {}
+
+  public async unload() {}
 }
 
 class TestListResizeObserver implements ResizeObserver {
@@ -245,6 +292,7 @@ function defaults() {
     onAddBYOKProvider: () => {},
     onEditBYOKProvider: () => {},
     onDeleteBYOKProvider: () => {},
+    onUpdateBYOKProvider: () => {},
   }
 }
 
@@ -452,7 +500,39 @@ describe('CopilotPreferences', () => {
     assert.strictEqual(screen.queryByRole('combobox'), null)
     assert.strictEqual(
       view.container.querySelectorAll('[role="tab"]').length,
-      0
+      2
+    )
+  })
+
+  it('keeps BYOK providers accessible when Copilot account access is unavailable', () => {
+    const view = render(
+      <CopilotPreferences
+        {...defaults()}
+        copilotModels={null}
+        accounts={[
+          makeAccount({
+            endpoint: 'http://localhost:58439/api/v3',
+            id: 2,
+            login: 'material-verifier-p0',
+            isCopilotDesktopEnabled: undefined,
+            copilotLicenseType: undefined,
+          }),
+        ]}
+        byokProviders={[ollamaProvider]}
+        showBYOKSettings={true}
+      />
+    )
+
+    assert.ok(
+      screen.getByText(
+        'Sign in to an account with a Copilot license to configure Copilot settings.'
+      )
+    )
+    fireEvent.click(
+      within(view.container).getByRole('tab', { name: 'Providers' })
+    )
+    assert.ok(
+      within(view.container).getByRole('button', { name: 'Manage models' })
     )
   })
 
@@ -940,6 +1020,224 @@ describe('CopilotPreferences', () => {
     assert.ok(addButton)
     fireEvent.click(addButton!)
     assert.strictEqual(called, 1)
+  })
+
+  it('opens and closes the Ollama manager inside the Providers tab', async () => {
+    const client = new TestOllamaManagerClient()
+    const view = render(
+      <CopilotPreferences
+        {...defaults()}
+        byokProviders={[ollamaProvider]}
+        showBYOKSettings={true}
+        ollamaClientFactory={() => client}
+      />
+    )
+    const providersTab = within(view.container).getByRole('tab', {
+      name: 'Providers',
+    })
+
+    fireEvent.click(providersTab)
+    fireEvent.click(
+      within(view.container).getByRole('button', { name: 'Manage models' })
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Ollama model manager' }))
+    )
+    assert.strictEqual(within(view.container).getAllByRole('tab').length, 2)
+    assert.ok(
+      within(view.container).getByRole('button', {
+        name: 'Back to providers',
+      })
+    )
+
+    fireEvent.click(within(view.container).getByRole('tab', { name: 'Models' }))
+    assert.strictEqual(
+      screen.queryByRole('heading', { name: 'Ollama model manager' }),
+      null
+    )
+    fireEvent.click(providersTab)
+    assert.strictEqual(
+      screen.queryByRole('heading', { name: 'Ollama model manager' }),
+      null
+    )
+    fireEvent.click(
+      within(view.container).getByRole('button', { name: 'Manage models' })
+    )
+    assert.ok(screen.getByRole('heading', { name: 'Ollama model manager' }))
+
+    fireEvent.click(
+      within(view.container).getByRole('button', {
+        name: 'Back to providers',
+      })
+    )
+    assert.strictEqual(
+      screen.queryByRole('heading', { name: 'Ollama model manager' }),
+      null
+    )
+    assert.ok(
+      within(view.container).getByRole('button', { name: 'Manage models' })
+    )
+  })
+
+  it('does not offer the manager for a provider without explicit Ollama integration', () => {
+    const genericProvider: IBYOKProvider = {
+      ...ollamaProvider,
+      id: 'generic-openai-id',
+      name: 'Generic local endpoint',
+      integration: undefined,
+    }
+    const view = render(
+      <CopilotPreferences
+        {...defaults()}
+        byokProviders={[genericProvider]}
+        showBYOKSettings={true}
+      />
+    )
+
+    fireEvent.click(
+      within(view.container).getByRole('tab', { name: 'Providers' })
+    )
+
+    assert.strictEqual(
+      within(view.container).queryByRole('button', { name: 'Manage models' }),
+      null
+    )
+  })
+
+  it('synchronizes authoritative inventory while preserving reasoning effort', async () => {
+    const provider: IBYOKProvider = {
+      ...ollamaProvider,
+      models: [{ id: 'llama3', name: 'Llama Three', reasoningEffort: 'high' }],
+    }
+    const client = new TestOllamaManagerClient([
+      { name: 'llama3', model: 'llama3' },
+      { name: 'qwen2.5', model: 'qwen2.5' },
+    ])
+    const updates: IBYOKProvider[] = []
+    const view = render(
+      <CopilotPreferences
+        {...defaults()}
+        byokProviders={[provider]}
+        showBYOKSettings={true}
+        ollamaClientFactory={() => client}
+        onUpdateBYOKProvider={updated => {
+          updates.push(updated)
+        }}
+      />
+    )
+
+    fireEvent.click(
+      within(view.container).getByRole('tab', { name: 'Providers' })
+    )
+    fireEvent.click(
+      within(view.container).getByRole('button', { name: 'Manage models' })
+    )
+
+    await waitFor(() => assert.strictEqual(updates.length, 1))
+    assert.deepStrictEqual(updates[0], {
+      ...provider,
+      models: [
+        { id: 'llama3', name: 'llama3', reasoningEffort: 'high' },
+        { id: 'qwen2.5', name: 'qwen2.5' },
+      ],
+    })
+  })
+
+  it('exits the manager when its provider is removed or loses Ollama integration', async () => {
+    const client = new TestOllamaManagerClient()
+    const props = {
+      ...defaults(),
+      byokProviders: [ollamaProvider],
+      showBYOKSettings: true,
+      ollamaClientFactory: () => client,
+    }
+    const view = render(<CopilotPreferences {...props} />)
+
+    fireEvent.click(
+      within(view.container).getByRole('tab', { name: 'Providers' })
+    )
+    fireEvent.click(
+      within(view.container).getByRole('button', { name: 'Manage models' })
+    )
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Ollama model manager' }))
+    )
+
+    view.rerender(
+      <CopilotPreferences
+        {...props}
+        byokProviders={[{ ...ollamaProvider, integration: undefined }]}
+      />
+    )
+
+    await waitFor(() =>
+      assert.strictEqual(
+        screen.queryByRole('heading', { name: 'Ollama model manager' }),
+        null
+      )
+    )
+    assert.strictEqual(
+      within(view.container).queryByRole('button', { name: 'Manage models' }),
+      null
+    )
+
+    view.rerender(<CopilotPreferences {...props} byokProviders={[]} />)
+    assert.ok(
+      screen.getByText(/Add a custom provider to use your own API keys/)
+    )
+  })
+
+  it('localizes manager navigation and content when the language changes', async t => {
+    const previousLanguageMode = localStorage.getItem(LanguageModeStorageKey)
+    t.after(() => {
+      if (previousLanguageMode === null) {
+        localStorage.removeItem(LanguageModeStorageKey)
+      } else {
+        localStorage.setItem(LanguageModeStorageKey, previousLanguageMode)
+      }
+    })
+    setLanguageModePreference('cantonese')
+
+    const client = new TestOllamaManagerClient()
+    const view = render(
+      <CopilotPreferences
+        {...defaults()}
+        byokProviders={[ollamaProvider]}
+        showBYOKSettings={true}
+        ollamaClientFactory={() => client}
+      />
+    )
+    fireEvent.click(
+      within(view.container).getByRole('tab', { name: 'Providers' })
+    )
+    fireEvent.click(
+      within(view.container).getByRole('button', { name: '管理模型' })
+    )
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Ollama 模型管理員' }))
+    )
+    assert.ok(
+      within(view.container).getByRole('button', { name: '返去供應商' })
+    )
+
+    setLanguageModePreference('bilingual')
+    document.dispatchEvent(
+      new CustomEvent(LanguageModeChangedEvent, { detail: 'bilingual' })
+    )
+
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('heading', {
+          name: 'Ollama model manager · Ollama 模型管理員',
+        })
+      )
+    )
+    assert.ok(
+      within(view.container).getByRole('button', {
+        name: 'Back to providers · 返去供應商',
+      })
+    )
   })
 
   describe('conflict resolution model picker', () => {

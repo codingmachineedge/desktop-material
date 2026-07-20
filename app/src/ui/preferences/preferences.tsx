@@ -681,7 +681,7 @@ export class Preferences extends React.Component<
             onAddBYOKProvider={this.onAddBYOKProvider}
             onEditBYOKProvider={this.onEditBYOKProvider}
             onDeleteBYOKProvider={this.onDeleteBYOKProvider}
-            onManageOllamaProvider={this.onManageOllamaProvider}
+            onUpdateBYOKProvider={this.onUpdateBYOKProvider}
           />
         )
         break
@@ -1163,11 +1163,14 @@ export class Preferences extends React.Component<
     })
   }
 
-  private onManageOllamaProvider = (provider: IBYOKProvider) => {
-    this.props.dispatcher.showPopup({
-      type: PopupType.OllamaModelManager,
+  private onUpdateBYOKProvider = async (provider: IBYOKProvider) => {
+    const updated = await this.props.dispatcher.updateCopilotBYOKProvider(
       provider,
-    })
+      undefined
+    )
+    if (!updated) {
+      throw new Error('The Ollama provider model list could not be saved.')
+    }
   }
 
   private onSelectedTabSizeChanged = (tabSize: number) => {
