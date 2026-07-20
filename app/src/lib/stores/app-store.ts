@@ -1960,7 +1960,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     if (selectWorkingDirectory) {
       this._selectWorkingDirectoryFiles(repository)
     } else if (selectStashEntry) {
-      this._selectStashedFile(repository)
+      this._selectStashedFile(repository, undefined, undefined, true)
     } else {
       this.emitUpdate()
     }
@@ -4607,13 +4607,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
    *  @param file  A file to select when showing the stash entry.
    *               If undefined this method will preserve the previously selected
    *               file or pick the first changed file if no selection exists.
+   *  @param preserveSelectedSection Keep a non-Changes section active when an
+   *                                 internal Git-store refresh replaces stash
+   *                                 metadata for the existing selection.
    *
    * Note: This shouldn't be called directly. See `Dispatcher`.
    */
   public async _selectStashedFile(
     repository: Repository,
     stashEntry?: IStashEntry,
-    file?: CommittedFileChange | null
+    file?: CommittedFileChange | null,
+    preserveSelectedSection: boolean = false
   ): Promise<void> {
     if (!this.isTemporaryRepositoryActive(repository)) {
       return
@@ -4632,9 +4636,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
     if (!this.isTemporaryRepositoryActive(repository)) {
       return
     }
-    this.repositoryStateCache.update(repository, () => ({
-      selectedSection: RepositorySectionTab.Changes,
-    }))
+    if (!preserveSelectedSection) {
+      this.repositoryStateCache.update(repository, () => ({
+        selectedSection: RepositorySectionTab.Changes,
+      }))
+    }
     this.repositoryStateCache.updateChangesState(repository, state => {
       let selectedStashedFile: CommittedFileChange | null = null
       const { selection } = state
