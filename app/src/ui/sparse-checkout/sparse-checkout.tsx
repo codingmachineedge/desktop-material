@@ -514,6 +514,73 @@ export class SparseCheckoutManager extends React.Component<
     return null
   }
 
+  private getGuideStep(): 1 | 2 | 3 {
+    if (this.state.busy) {
+      return 3
+    }
+    return this.state.pending === null ? 1 : 2
+  }
+
+  private renderGuide(state: ISparseCheckoutState) {
+    const activeStep = this.getGuideStep()
+    const firstStep = !state.enabled
+      ? {
+          title: 'Choose directories',
+          description: 'Pick what stays local',
+        }
+      : state.coneMode
+      ? {
+          title: 'Adjust directories',
+          description: 'Refine the current list',
+        }
+      : {
+          title: 'Restore the full tree',
+          description: 'Leave pattern mode safely',
+        }
+    const steps = [
+      firstStep,
+      { title: 'Review impact', description: 'Check the exact change' },
+      { title: 'Apply and refresh', description: 'Let Git update files' },
+    ]
+    return (
+      <nav
+        className="sparse-checkout-guide"
+        aria-label="Guided sparse checkout"
+        data-verification="sparse-checkout-guide"
+      >
+        <ol aria-label="Sparse checkout workflow">
+          {steps.map((step, index) => {
+            const number = (index + 1) as 1 | 2 | 3
+            const stateClass =
+              number === activeStep
+                ? 'is-active'
+                : number < activeStep
+                ? 'is-complete'
+                : ''
+            return (
+              <li
+                key={step.title}
+                className={stateClass}
+                aria-current={number === activeStep ? 'step' : undefined}
+              >
+                <span
+                  className="sparse-checkout-step-number"
+                  aria-hidden="true"
+                >
+                  {number}
+                </span>
+                <span className="sparse-checkout-step-copy">
+                  <strong>{step.title}</strong>
+                  <small>{step.description}</small>
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      </nav>
+    )
+  }
+
   private renderStatus(state: ISparseCheckoutState | null) {
     if (this.state.loading) {
       return <span className="sparse-checkout-badge">Detecting state…</span>
@@ -634,6 +701,7 @@ export class SparseCheckoutManager extends React.Component<
           aria-invalid={this.state.showValidation && invalid}
           disabled={this.state.busy || reviewing}
           maxLength={SparseCheckoutInputLengthLimit}
+          placeholder={'src\npackages/app\ndocs'}
           spellCheck={false}
           value={this.state.input}
           onChange={this.onInputChanged}
@@ -645,6 +713,10 @@ export class SparseCheckoutManager extends React.Component<
             : 'directories'}
         </span>
         {this.renderValidation()}
+        <p className="sparse-checkout-next-hint">
+          Next, review the exact selection and its local file impact before Git
+          changes the worktree.
+        </p>
         <div className="sparse-checkout-controls">
           <Button
             className="sparse-checkout-write-button"
@@ -701,6 +773,12 @@ export class SparseCheckoutManager extends React.Component<
         : this.state.sparseState?.enabled
         ? 'Update included directories?'
         : 'Enable cone-mode sparse checkout?'
+    const description =
+      pending.kind === 'disable'
+        ? 'Git will restore tracked paths to this working tree. Commits and repository history are unchanged.'
+        : pending.kind === 'reapply'
+        ? 'Git will make the working tree match the current sparse selection without changing that selection or repository history.'
+        : 'Git will rewrite this working tree to match the reviewed selection. Files may disappear locally or reappear, but commits and repository history are unchanged.'
     return (
       <section
         className="sparse-checkout-confirmation"
@@ -710,16 +788,8 @@ export class SparseCheckoutManager extends React.Component<
         aria-describedby="sparse-checkout-confirm-description"
       >
         <h2 id="sparse-checkout-confirm-title">{title}</h2>
-        <p id="sparse-checkout-confirm-description">
-          Git will rewrite this working tree. Files may disappear locally or
-          reappear, but commits and repository history are unchanged.
-        </p>
-        {pending.kind === 'set' ? (
-          <p>
-            Apply {pending.directories.length.toLocaleString()} reviewed{' '}
-            {pending.directories.length === 1 ? 'directory' : 'directories'}.
-          </p>
-        ) : null}
+        <p id="sparse-checkout-confirm-description">{description}</p>
+        {pending.kind === 'set' ? this.renderDirectoryReview(pending) : null}
         <div className="sparse-checkout-controls">
           <Button
             className="sparse-checkout-confirm-button"
@@ -735,6 +805,68 @@ export class SparseCheckoutManager extends React.Component<
           <Button onClick={this.cancelReview}>Go back</Button>
         </div>
       </section>
+    )
+  }
+
+  private renderDirectoryReview(pending: IPendingSparseCheckoutMutation) {
+    const sparseState = this.state.sparseState
+    const currentDirectories =
+      sparseState?.enabled === true && sparseState.coneMode
+        ? sparseState.entries
+        : []
+    const current = new Set(currentDirectories)
+    const reviewed = new Set(pending.directories)
+    const added = pending.directories.filter(
+      directory => !current.has(directory)
+    )
+    const removed = currentDirectories.filter(
+      directory => !reviewed.has(directory)
+    )
+    const unchanged = pending.directories.length - added.length
+    const visibleDirectories = pending.directories.slice(0, 12)
+    const hiddenCount = pending.directories.length - visibleDirectories.length
+    return (
+      <div
+        className="sparse-checkout-review"
+        data-verification="sparse-checkout-review"
+      >
+        <p>
+          <strong>
+            {pending.directories.length.toLocaleString()} selected directory{' '}
+            {pending.directories.length === 1 ? 'root' : 'roots'} will be
+            applied.
+          </strong>{' '}
+          Cone mode may also keep required parent files visible.
+        </p>
+        <dl className="sparse-checkout-review-metrics">
+          <div>
+            <dt>Added</dt>
+            <dd>{added.length.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt>Removed</dt>
+            <dd>{removed.length.toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt>Unchanged</dt>
+            <dd>{unchanged.toLocaleString()}</dd>
+          </div>
+        </dl>
+        <h3>Reviewed directory selection</h3>
+        <ul aria-label="Reviewed directory selection">
+          {visibleDirectories.map(directory => (
+            <li key={directory}>
+              <code>{directory}</code>
+            </li>
+          ))}
+        </ul>
+        {hiddenCount > 0 ? (
+          <p className="sparse-checkout-note">
+            Plus {hiddenCount.toLocaleString()} more reviewed{' '}
+            {hiddenCount === 1 ? 'directory' : 'directories'}.
+          </p>
+        ) : null}
+      </div>
     )
   }
 
@@ -810,6 +942,9 @@ export class SparseCheckoutManager extends React.Component<
           ) : null}
         </div>
         <div className="sparse-checkout-content">
+          {sparseState !== null && blocked === null
+            ? this.renderGuide(sparseState)
+            : null}
           <p className="sparse-checkout-introduction">
             Cone mode keeps selected directories plus required parent files in
             this worktree. It never rewrites commits.

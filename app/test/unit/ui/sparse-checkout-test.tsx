@@ -5,7 +5,13 @@ import * as React from 'react'
 import { Repository } from '../../../src/models/repository'
 import { parseSparseCheckoutDirectories } from '../../../src/lib/git/sparse-checkout-parser'
 import { DialogStackContext } from '../../../src/ui/dialog'
-import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '../../helpers/ui/render'
 
 class TestSparseCheckoutError extends Error {}
 
@@ -86,11 +92,35 @@ describe('SparseCheckoutManager', () => {
     const editor = await screen.findByRole('textbox', {
       name: 'Included directories',
     })
+    const workflow = screen.getByRole('list', {
+      name: 'Sparse checkout workflow',
+    })
+    assert.equal(within(workflow).getAllByRole('listitem').length, 3)
+    assert.equal(
+      within(workflow)
+        .getByText('Choose directories')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
     fireEvent.change(editor, { target: { value: 'src\\ui/' } })
     const review = screen.getByRole('button', { name: 'Review enable' })
     fireEvent.click(review)
 
     assert.ok(screen.getByRole('alertdialog'))
+    assert.equal(
+      within(workflow)
+        .getByText('Review impact')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
+    assert.ok(screen.getByText('1 selected directory root will be applied.'))
+    assert.ok(
+      within(
+        screen.getByRole('list', { name: 'Reviewed directory selection' })
+      ).getByText('src/ui')
+    )
     const confirm = screen.getByRole('button', {
       name: 'Apply directory selection',
     })
@@ -123,6 +153,13 @@ describe('SparseCheckoutManager', () => {
       name: 'Cancel operation',
     })
     await waitFor(() => assert.equal(document.activeElement, cancel))
+    assert.equal(
+      within(workflow)
+        .getByText('Apply and refresh')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
     assert.deepEqual(inputs, ['src/ui'])
 
     const closeShortcut = __DARWIN__

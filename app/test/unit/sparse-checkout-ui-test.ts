@@ -45,6 +45,10 @@ describe('Sparse checkout native UI contracts', () => {
     assert.match(component, /Review directory update/)
     assert.match(component, /Review reapply/)
     assert.match(component, /Review disable/)
+    assert.match(component, /aria-label="Sparse checkout workflow"/)
+    assert.match(component, /aria-current=/)
+    assert.match(component, /data-verification="sparse-checkout-review"/)
+    assert.match(component, /Reviewed directory selection/)
   })
 
   it('keeps all commands shell-free with fixed argv and stdin patterns', () => {
@@ -68,5 +72,10 @@ describe('Sparse checkout native UI contracts', () => {
     )
     assert.match(styles, /@media \(max-height: 560px\)/)
     assert.match(styles, /overflow-wrap: anywhere/)
+    assert.match(
+      styles,
+      /\.sparse-checkout-guide[\s\S]*grid-template-columns: repeat\(3/
+    )
+    assert.match(styles, /\.sparse-checkout-review[\s\S]*max-height: 150px/)
   })
 })
