@@ -44,6 +44,21 @@ describe('repository logo studio style contract', () => {
     )
   })
 
+  it('keeps one scroll owner and protects heading glyphs in the anchored portal', async () => {
+    const styles = await readFile(
+      Path.join(app, 'styles/ui/_anchored-appearance-editor.scss'),
+      'utf8'
+    )
+    assert.match(
+      styles,
+      /\.anchored-appearance-editor\.repository-logo-anchored-editor\s*\{[\s\S]*?\.repository-logo-studio\s*\{[\s\S]*?padding: 2px 6px;/
+    )
+    assert.match(
+      styles,
+      /\.anchored-appearance-editor\.repository-logo-anchored-editor\s*\{[\s\S]*?\.repository-logo-editor-scroll\s*\{[\s\S]*?max-height: none;[\s\S]*?overflow-y: visible;[\s\S]*?padding-right: 0;[\s\S]*?scrollbar-gutter: auto;/
+    )
+  })
+
   it('imports the owned logo styles without modifying global dialog rules', async () => {
     const index = await readFile(Path.join(app, 'styles/_ui.scss'), 'utf8')
     assert.match(index, /@import 'ui\/repository-logo';/)

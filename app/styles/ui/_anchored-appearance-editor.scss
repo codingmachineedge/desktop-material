@@ -173,7 +173,20 @@
   .repository-logo-studio {
     border: 0;
     background: transparent;
-    padding: 2px;
+    // Keep glyph overhangs away from the clipping edge. Two pixels let the
+    // leading C in the studio heading touch the edge at Windows text scales.
+    padding: 2px 6px;
+  }
+
+  // This portal already has one bounded scroll owner in
+  // anchored-appearance-editor-content. Letting the workbench create another
+  // one puts two adjacent vertical scrollbars beside the controls and makes
+  // wheel/keyboard ownership ambiguous.
+  .repository-logo-editor-scroll {
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+    scrollbar-gutter: auto;
   }
 }
 
