@@ -168,10 +168,12 @@ class ProviderState:
         artifact_path: Path,
         *,
         html_url: str = FIXTURE_HTML_URL,
+        copilot_enabled: bool = False,
     ) -> None:
         self.artifact_path = artifact_path
         self.token = FIXTURE_TOKEN
         self.html_url = html_url.rstrip("/")
+        self.copilot_enabled = copilot_enabled
         self.pull_requests: list[dict[str, Any]] = []
         self._lock = threading.Lock()
         self.inspector_page_two_failures_remaining = 1
@@ -1115,13 +1117,16 @@ class ProviderState:
         if method == "GET" and resource == "/desktop_internal/features":
             return json_response({"features": []})
         if method == "POST" and resource == "/graphql":
+            copilot_enabled = self.copilot_enabled
             return json_response(
                 {
                     "data": {
                         "viewer": {
                             "copilotEndpoints": {"api": ""},
-                            "copilotLicenseType": "none",
-                            "isCopilotDesktopEnabled": False,
+                            "copilotLicenseType": (
+                                "COPILOT_INDIVIDUAL" if copilot_enabled else "none"
+                            ),
+                            "isCopilotDesktopEnabled": copilot_enabled,
                         }
                     }
                 }
@@ -1882,6 +1887,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--ready-file", type=Path, required=True)
     parser.add_argument("--html-url", default=FIXTURE_HTML_URL)
     parser.add_argument("--git", default="git")
+    parser.add_argument(
+        "--copilot-enabled",
+        action="store_true",
+        help="Expose a synthetic Copilot-enabled account for isolated UI verification.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1952,7 +1962,11 @@ def main(argv: list[str]) -> int:
     request_log = ensure_contained(args.request_log, owned_root)
     ready_file = ensure_contained(args.ready_file, owned_root)
     make_deterministic_artifact(artifact_file)
-    state = ProviderState(artifact_file, html_url=args.html_url)
+    state = ProviderState(
+        artifact_file,
+        html_url=args.html_url,
+        copilot_enabled=args.copilot_enabled,
+    )
     server = FixtureHTTPServer(
         (args.bind, args.port),
         state,
@@ -1973,6 +1987,7 @@ def main(argv: list[str]) -> int:
         "port": port,
         "endpoint": endpoint,
         "htmlUrl": args.html_url,
+        "copilotEnabled": args.copilot_enabled,
         "owner": OWNER,
         "repository": REPOSITORY,
         "featureBranch": FEATURE_BRANCH,
