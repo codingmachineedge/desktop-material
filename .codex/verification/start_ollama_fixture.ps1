@@ -62,8 +62,9 @@ $startOptions = @{
   PassThru = $true
 }
 $process = Start-Process @startOptions
-$startedAt = $process.StartTime.ToUniversalTime().ToString('o')
+$launcherStartedAt = $process.StartTime.ToUniversalTime().ToString('o')
 $deadline = [DateTime]::UtcNow.AddSeconds(15)
+$ready = $null
 try {
   while (-not (Test-Path -LiteralPath $paths.Ready -PathType Leaf)) {
     if ($process.HasExited) {
@@ -80,16 +81,50 @@ try {
     Start-Sleep -Milliseconds 100
   }
   $ready = Read-OwnedOllamaReadyReceipt -Paths $paths
-  if ([int]$ready.pid -ne $process.Id) {
-    throw "Ready PID $([int]$ready.pid) does not match launcher PID $($process.Id)."
+  $workerPid = [int]$ready.pid
+  $worker = Get-Process -Id $workerPid -ErrorAction Stop
+  $workerInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $workerPid"
+  if (
+    $null -eq $workerInfo -or
+    [string]::IsNullOrWhiteSpace($workerInfo.CommandLine) -or
+    [string]::IsNullOrWhiteSpace($workerInfo.ExecutablePath)
+  ) {
+    throw "Unable to validate ready fixture PID $workerPid."
+  }
+  foreach ($requiredValue in @(
+    $fixtureItem.FullName,
+    $paths.Root,
+    $paths.Ready,
+    $paths.MutationLog
+  )) {
+    if ($workerInfo.CommandLine.IndexOf(
+      $requiredValue,
+      [StringComparison]::OrdinalIgnoreCase
+    ) -lt 0) {
+      throw "Ready fixture PID $workerPid does not own $requiredValue"
+    }
+  }
+  if (
+    $workerPid -ne $process.Id -and
+    [uint32]$workerInfo.ParentProcessId -ne [uint32]$process.Id
+  ) {
+    throw "Ready fixture PID $workerPid is not the launcher or its direct child."
+  }
+  $workerExecutable = [IO.Path]::GetFullPath($workerInfo.ExecutablePath)
+  $workerExecutableItem = Get-Item -LiteralPath $workerExecutable -ErrorAction Stop
+  if ($workerExecutableItem.PSIsContainer -or (Test-OllamaReparsePoint $workerExecutableItem)) {
+    throw "Ready fixture executable must be a real file: $workerExecutable"
   }
   $launcher = [ordered]@{
     fixture = $script:OllamaFixtureId
     protocolVersion = $script:OllamaFixtureProtocolVersion
-    pid = $process.Id
-    processStartTimeUtc = $startedAt
+    pid = $workerPid
+    processStartTimeUtc = $worker.StartTime.ToUniversalTime().ToString('o')
+    launcherPid = $process.Id
+    launcherProcessStartTimeUtc = $launcherStartedAt
     runRootName = $paths.RootName
-    pythonExecutable = $pythonItem.FullName
+    pythonExecutable = $workerExecutable
+    requestedPythonExecutable = $pythonItem.FullName
     fixtureScript = $fixtureItem.FullName
   }
   [IO.File]::WriteAllText(
@@ -98,6 +133,24 @@ try {
     [Text.UTF8Encoding]::new($false)
   )
 } catch {
+  if ($null -ne $ready -and [int]$ready.pid -gt 0) {
+    $candidatePid = [int]$ready.pid
+    $candidate = Get-CimInstance Win32_Process -Filter "ProcessId = $candidatePid"
+    if (
+      $null -ne $candidate -and
+      $candidate.CommandLine -and
+      $candidate.CommandLine.IndexOf(
+        $fixtureItem.FullName,
+        [StringComparison]::OrdinalIgnoreCase
+      ) -ge 0 -and
+      $candidate.CommandLine.IndexOf(
+        $paths.Root,
+        [StringComparison]::OrdinalIgnoreCase
+      ) -ge 0
+    ) {
+      Stop-Process -Id $candidatePid -Force -ErrorAction SilentlyContinue
+    }
+  }
   if (-not $process.HasExited) {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
   }
