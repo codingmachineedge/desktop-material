@@ -12,7 +12,7 @@
       <text x="76" y="252" font-size="27" font-weight="700" fill="#10233f">React UI</text>
       <text x="76" y="304" font-size="21" fill="#475569">Send an intent</text>
       <rect x="76" y="330" width="222" height="10" rx="5" fill="#bae6fd"/>
-      <path d="M 326 260 H 386" stroke="#57c7ff" stroke-width="8" stroke-linecap="round"/><path d="M 374 246 L 390 260 L 374 274" fill="none" stroke="#57c7ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 326 260 H 386" stroke="#57c7ff" stroke-width="8" stroke-linecap="round"/><path d="M 374 246 L 390 260 L 374 274" fill="none" stroke="#57c7ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
 <g>
       <rect x="408" y="142" width="278" height="236" rx="30" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
@@ -21,7 +21,7 @@
       <text x="436" y="252" font-size="27" font-weight="700" fill="#10233f">Dispatcher</text>
       <text x="436" y="304" font-size="21" fill="#475569">Validate and route</text>
       <rect x="436" y="330" width="222" height="10" rx="5" fill="#bae6fd"/>
-      <path d="M 686 260 H 746" stroke="#57c7ff" stroke-width="8" stroke-linecap="round"/><path d="M 734 246 L 750 260 L 734 274" fill="none" stroke="#57c7ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 686 260 H 746" stroke="#57c7ff" stroke-width="8" stroke-linecap="round"/><path d="M 734 246 L 750 260 L 734 274" fill="none" stroke="#57c7ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
 <g>
       <rect x="768" y="142" width="278" height="236" rx="30" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
@@ -30,7 +30,7 @@
       <text x="796" y="252" font-size="27" font-weight="700" fill="#10233f">AppStore</text>
       <text x="796" y="304" font-size="21" fill="#475569">Perform the work</text>
       <rect x="796" y="330" width="222" height="10" rx="5" fill="#bae6fd"/>
-      <path d="M 1046 260 H 1106" stroke="#57c7ff" stroke-width="8" stroke-linecap="round"/><path d="M 1094 246 L 1110 260 L 1094 274" fill="none" stroke="#57c7ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 1046 260 H 1106" stroke="#57c7ff" stroke-width="8" stroke-linecap="round"/><path d="M 1094 246 L 1110 260 L 1094 274" fill="none" stroke="#57c7ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
 <g>
       <rect x="1128" y="142" width="278" height="236" rx="30" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
@@ -39,6 +39,6 @@
       <text x="1156" y="252" font-size="27" font-weight="700" fill="#10233f">Fresh state</text>
       <text x="1156" y="304" font-size="21" fill="#475569">Render the result</text>
       <rect x="1156" y="330" width="222" height="10" rx="5" fill="#86efac"/>
-      
+
     </g></g>
 </svg>

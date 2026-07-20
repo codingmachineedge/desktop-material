@@ -31,7 +31,7 @@ function render(title, stages, details) {
       <text x="${x + 28}" y="252" font-size="27" font-weight="700" fill="#10233f">${escape(stage)}</text>
       <text x="${x + 28}" y="304" font-size="21" fill="#475569">${escape(details[index])}</text>
       <rect x="${x + 28}" y="330" width="222" height="10" rx="5" fill="${index === stages.length - 1 ? '#86efac' : '#bae6fd'}"/>
-      ${arrow}
+${arrow}
     </g>`
   }).join('\n')
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="512" viewBox="0 0 1536 512" role="img" aria-labelledby="title desc">
