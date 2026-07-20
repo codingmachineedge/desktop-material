@@ -9,29 +9,70 @@ import {
 import { OllamaClientError } from '../../../src/lib/ollama/types'
 
 describe('Ollama endpoint trust', () => {
-  it('canonicalizes loopback origins and the exact /v1 BYOK base', () => {
+  it('normalizes root, native, and Copilot-compatible endpoints', () => {
     assert.equal(
-      normalizeOllamaEndpoint('http://localhost:11434/v1/'),
+      normalizeOllamaEndpoint(' HTTP://LOCALHOST:11434/v1/ '),
       'http://localhost:11434'
     )
     assert.equal(
-      normalizeOllamaEndpoint('http://127.42.8.9:11434/'),
+      normalizeOllamaEndpoint('http://127.42.8.9:11434/api'),
       'http://127.42.8.9:11434'
     )
     assert.equal(
-      normalizeOllamaEndpoint('https://[::1]:11434/v1'),
-      'https://[::1]:11434'
+      normalizeOllamaEndpoint('https://models.example.com/ollama/v1/'),
+      'https://models.example.com/ollama'
     )
     assert.equal(
-      getOllamaManagementEndpoint('http://localhost:11434/v1'),
-      'http://localhost:11434'
+      normalizeOllamaEndpoint('http://[::1]:11434/v1'),
+      'http://[::1]:11434'
+    )
+    assert.equal(
+      getOllamaManagementEndpoint('https://models.example.com/ollama/v1'),
+      'https://models.example.com/ollama'
+    )
+    assert.equal(
+      getOllamaManagementEndpoint('http://localhost.:11434/v1'),
+      'http://localhost.:11434'
     )
   })
 
-  it('builds only fixed native API routes', () => {
+  it('requires a terminal /v1 path for Copilot management endpoints', () => {
+    for (const endpoint of [
+      'http://localhost:11434/',
+      'http://localhost:11434/api',
+      'http://localhost:11434/v1/models',
+    ]) {
+      assert.throws(
+        () => getOllamaManagementEndpoint(endpoint),
+        (error: unknown) =>
+          error instanceof OllamaClientError && error.kind === 'endpoint'
+      )
+    }
     assert.equal(
-      getOllamaApiUrl('http://localhost:11434', 'tags'),
-      'http://localhost:11434/api/tags'
+      getOllamaManagementEndpoint('http://localhost:11434/ollama/v1/'),
+      'http://localhost:11434/ollama'
+    )
+  })
+
+  it('builds only fixed native API routes under an optional base path', () => {
+    assert.equal(
+      getOllamaApiUrl('https://models.example.com/ollama', 'tags'),
+      'https://models.example.com/ollama/api/tags'
+    )
+    assert.equal(
+      getOllamaApiUrl(
+        normalizeOllamaEndpoint('http://localhost:11434/v1'),
+        'version'
+      ),
+      'http://localhost:11434/api/version'
+    )
+    const providerBase = getOllamaManagementEndpoint(
+      'https://models.example.com/team/api/v1'
+    )
+    assert.equal(providerBase, 'https://models.example.com/team/api')
+    assert.equal(
+      getOllamaApiUrl(providerBase, 'tags'),
+      'https://models.example.com/team/api/api/tags'
     )
     assert.throws(
       () => getOllamaApiUrl('http://localhost:11434', 'unknown' as never),
@@ -40,40 +81,53 @@ describe('Ollama endpoint trust', () => {
     )
   })
 
-  it('rejects remote HTTP and HTTPS endpoints', () => {
-    for (const endpoint of [
-      'http://192.168.1.5:11434/v1',
-      'http://example.com:11434/v1',
-      'https://models.example.com/v1',
-      'https://10.0.0.2:11434/v1',
-    ]) {
-      assert.equal(isTrustedOllamaEndpoint(endpoint), false, endpoint)
-    }
+  it('allows HTTPS remotely but restricts HTTP to loopback addresses', () => {
+    assert.equal(isTrustedOllamaEndpoint('https://models.example.com/v1'), true)
+    assert.equal(
+      isTrustedOllamaEndpoint('https://10.0.0.2:11434/ollama/v1'),
+      true
+    )
+    assert.equal(isTrustedOllamaEndpoint('http://localhost:11434/v1'), true)
+    assert.equal(isTrustedOllamaEndpoint('http://127.42.8.9:11434'), true)
+    assert.equal(isTrustedOllamaEndpoint('http://192.168.1.5:11434'), false)
+    assert.equal(isTrustedOllamaEndpoint('http://example.com:11434'), false)
   })
 
-  it('rejects URL credentials, query strings, fragments, and whitespace', () => {
-    for (const endpoint of [
-      'http://alice:secret@localhost:11434/v1',
-      'http://localhost:11434/v1?token=secret',
-      'http://localhost:11434/v1#secret',
-      ' http://localhost:11434/v1',
-      'http://localhost:11434/v1 ',
-      'http://localhost.:11434/v1',
-    ]) {
-      assert.equal(isTrustedOllamaEndpoint(endpoint), false, endpoint)
-    }
+  it('accepts loopback and HTTPS reverse-proxy base paths', () => {
+    assert.equal(
+      normalizeOllamaEndpoint('http://localhost:11434/ollama'),
+      'http://localhost:11434/ollama'
+    )
+    assert.equal(
+      normalizeOllamaEndpoint('https://models.example.com/team/ollama/api'),
+      'https://models.example.com/team/ollama'
+    )
+    assert.equal(
+      normalizeOllamaEndpoint('http://localhost:11434/v1/models'),
+      'http://localhost:11434/v1/models'
+    )
   })
 
-  it('rejects arbitrary paths and native API bases', () => {
+  it('rejects credentials, query strings, and fragments without echoing them', () => {
+    const credentialed =
+      'https://alice:super-secret@models.example.com/ollama/v1'
+    assert.throws(
+      () => normalizeOllamaEndpoint(credentialed),
+      (error: unknown) => {
+        assert.ok(error instanceof OllamaClientError)
+        assert.equal(error.kind, 'endpoint')
+        assert.equal(error.message.includes('alice'), false)
+        assert.equal(error.message.includes('super-secret'), false)
+        return true
+      }
+    )
+
     for (const endpoint of [
-      'http://localhost:11434/api',
-      'http://localhost:11434/ollama',
-      'http://localhost:11434/ollama/v1',
-      'http://localhost:11434/v1/models',
+      'https://models.example.com/v1?token=secret',
+      'https://models.example.com/v1#secret',
     ]) {
       assert.equal(isTrustedOllamaEndpoint(endpoint), false, endpoint)
     }
-    assert.throws(() => getOllamaManagementEndpoint('http://localhost:11434/'))
   })
 
   it('rejects unsupported schemes and malformed values without echoing them', () => {

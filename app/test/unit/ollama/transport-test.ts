@@ -172,13 +172,6 @@ describe('native Ollama renderer transport', () => {
         })
       )
       await assert.rejects(
-        nodeOllamaFetch(`${fixture.endpoint}/prefix/api/version`, {
-          method: 'GET',
-          redirect: 'error',
-          credentials: 'omit',
-        })
-      )
-      await assert.rejects(
         nodeOllamaFetch(`${fixture.endpoint}/api/version?token=secret`, {
           method: 'GET',
           redirect: 'error',
@@ -193,6 +186,29 @@ describe('native Ollama renderer transport', () => {
         })
       )
       assert.equal(requests, 0)
+    } finally {
+      await close(fixture.server)
+    }
+  })
+
+  it('preserves reverse-proxy paths ending in api and binds route methods', async () => {
+    const paths = new Array<string | undefined>()
+    const fixture = await listen((request, response) => {
+      paths.push(request.url)
+      response.end('{"version":"0.9.1"}')
+    })
+
+    try {
+      const client = new OllamaClient(`${fixture.endpoint}/team/api/v1`)
+      assert.equal((await client.health()).version, '0.9.1')
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/team/api/api/delete`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
+      assert.deepEqual(paths, ['/team/api/api/version'])
     } finally {
       await close(fixture.server)
     }

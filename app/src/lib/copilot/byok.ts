@@ -260,9 +260,9 @@ export function isValidBYOKBaseUrl(value: string): boolean {
 }
 
 /**
- * Derive the native management origin for a valid Ollama BYOK provider.
+ * Derive the native management base for a valid Ollama BYOK provider.
  * Provider URLs remain OpenAI-compatible `/v1` URLs while management calls
- * are made only against the canonical local origin.
+ * use the same trusted loopback-HTTP or HTTPS endpoint and proxy prefix.
  */
 export function getOllamaManagementEndpointForProvider(
   provider: IBYOKProvider

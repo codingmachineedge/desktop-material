@@ -81,7 +81,7 @@ describe('byok storage', () => {
     assert.strictEqual(isOllamaBYOKProvider(sampleProvider), false)
   })
 
-  it('rejects unsafe Ollama integration configurations without changing generic BYOK', () => {
+  it('accepts trusted Ollama proxy endpoints and rejects unsafe configurations', () => {
     const ollama: IBYOKProvider = {
       ...sampleProvider,
       id: 'ollama',
@@ -90,8 +90,17 @@ describe('byok storage', () => {
       authKind: 'none',
       integration: 'ollama',
     }
+    const remote: IBYOKProvider = {
+      ...ollama,
+      id: 'remote',
+      baseUrl: 'https://models.example.com/team/api/v1',
+    }
+    const proxied: IBYOKProvider = {
+      ...ollama,
+      id: 'proxied',
+      baseUrl: 'http://localhost:11434/ollama/v1',
+    }
     const invalid: ReadonlyArray<IBYOKProvider> = [
-      { ...ollama, id: 'remote', baseUrl: 'https://models.example.com/v1' },
       {
         ...ollama,
         id: 'credentials',
@@ -102,23 +111,23 @@ describe('byok storage', () => {
         id: 'query',
         baseUrl: 'http://localhost:11434/v1?token=secret',
       },
-      {
-        ...ollama,
-        id: 'path',
-        baseUrl: 'http://localhost:11434/ollama/v1',
-      },
       { ...ollama, id: 'auth', authKind: 'apiKey' as const },
       { ...ollama, id: 'type', type: 'anthropic' as const },
     ]
 
     localStorage.setItem(
       StorageKey,
-      JSON.stringify([sampleProvider, ollama, ...invalid])
+      JSON.stringify([sampleProvider, ollama, remote, proxied, ...invalid])
     )
 
     assert.deepStrictEqual(
       loadBYOKProviders().map(provider => provider.id),
-      ['p1', 'ollama']
+      ['p1', 'ollama', 'remote', 'proxied']
+    )
+    assert.strictEqual(isOllamaBYOKProvider(remote), true)
+    assert.strictEqual(
+      getOllamaManagementEndpointForProvider(remote),
+      'https://models.example.com/team/api'
     )
     assert.strictEqual(isOllamaBYOKProvider(invalid[0]), false)
     assert.strictEqual(isValidBYOKBaseUrl(sampleProvider.baseUrl), true)
