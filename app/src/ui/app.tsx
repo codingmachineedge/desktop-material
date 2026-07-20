@@ -137,6 +137,7 @@ import { NotificationCentrePanel } from './notifications/notification-centre-pan
 import { ErrorNoticeStack } from './error-notice-stack'
 import { CrashProofBoundary } from './crash-proof-boundary'
 import { Button } from './lib/button'
+import { PopoverAnchorPosition } from './lib/popover'
 import { MergeAllDialog } from './merge-all'
 import { PullAllDialog } from './pull-all'
 import { CommitAndPushAllDialog } from './commit-push-all'
@@ -5219,6 +5220,20 @@ export class App extends React.Component<IAppProps, IAppState> {
       : null
   }
 
+  private getAppearanceEditorAnchorPosition(
+    target: AppearanceEditorTarget
+  ): PopoverAnchorPosition {
+    const ownsToolbar =
+      (target.kind === 'repository' &&
+        target.elementId === RepositoryAppearanceElementId.Toolbar) ||
+      (target.kind === 'profile' &&
+        target.elementId === ProfileAppearanceElementId.Toolbar)
+
+    return ownsToolbar
+      ? PopoverAnchorPosition.BottomLeft
+      : PopoverAnchorPosition.RightTop
+  }
+
   private renderAppearanceEditor(): JSX.Element | null {
     const target = this.appearanceEditorTarget
     if (
@@ -5259,6 +5274,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           onClose={this.closeAppearanceEditor}
           onMutation={this.refreshFeatureAppearanceTarget}
           contentOwnsHeader={true}
+          anchorPosition={this.getAppearanceEditorAnchorPosition(target)}
         >
           {this.renderFeatureAppearanceEditorContents}
         </AnchoredAppearanceEditor>
@@ -5281,6 +5297,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           onClose={this.closeAppearanceEditor}
           onMutation={this.refreshRepositoryAppearanceTarget}
           contentOwnsHeader={true}
+          anchorPosition={this.getAppearanceEditorAnchorPosition(target)}
         >
           {this.renderRepositoryAppearanceEditorContents}
         </AnchoredAppearanceEditor>
@@ -5307,6 +5324,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         repositoryPath={repositoryPath}
         onClose={this.closeAppearanceEditor}
         contentOwnsHeader={true}
+        anchorPosition={this.getAppearanceEditorAnchorPosition(target)}
       >
         {this.renderProfileAppearanceEditorWithControls}
       </AnchoredAppearanceEditor>

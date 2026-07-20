@@ -638,6 +638,35 @@ async function waitForPrivacySafeAnchoredEditor(label) {
     `document.querySelector('.anchored-appearance-editor') !== null`,
     label
   )
+  await waitFor(
+    `(() => {
+      const editor = document.querySelector('.anchored-appearance-editor')
+      const popover = editor?.closest('.popover-component')
+      if (!(editor instanceof HTMLElement) || !(popover instanceof HTMLElement)) {
+        return false
+      }
+      const editorBounds = editor.getBoundingClientRect()
+      const popoverBounds = popover.getBoundingClientRect()
+      const editorStyle = getComputedStyle(editor)
+      const popoverStyle = getComputedStyle(popover)
+      const visible = style =>
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        Number(style.opacity) > 0
+      const inViewport = bounds =>
+        bounds.width > 0 &&
+        bounds.height > 0 &&
+        bounds.left >= -0.5 &&
+        bounds.top >= -0.5 &&
+        bounds.right <= window.innerWidth + 0.5 &&
+        bounds.bottom <= window.innerHeight + 0.5
+      return visible(editorStyle) &&
+        visible(popoverStyle) &&
+        inViewport(editorBounds) &&
+        inViewport(popoverBounds)
+    })()`,
+    `${label} positioned inside the viewport`
+  )
   const state = await evaluate(`(() => {
     const editor = document.querySelector('.anchored-appearance-editor')
     const repository = editor?.querySelector(
@@ -1617,6 +1646,10 @@ scene('anchored-appearance', async () => {
   await contextMenuSelector('#desktop-app-toolbar')
   await waitForPrivacySafeAnchoredEditor(
     'repository toolbar owner appearance editor'
+  )
+  await waitFor(
+    `document.querySelector('.anchored-appearance-editor')?.textContent?.includes('Repository toolbar appearance') === true`,
+    'repository toolbar appearance title'
   )
   await sleep(900)
   await parkPointer()

@@ -60,6 +60,22 @@ describe('tab session, folder drop, and customization context contracts', () => 
     assert.match(appSource, /getRepositoryAppearanceHistorySource/)
     assert.match(appSource, /getFeatureAppearanceHistorySource/)
     assert.match(appSource, /AnchoredAppearanceEditor/)
+    assert.match(
+      appSource,
+      /import \{ PopoverAnchorPosition \} from '\.\/lib\/popover'/
+    )
+    assert.match(
+      appSource,
+      /target\.kind === 'repository'[\s\S]*?RepositoryAppearanceElementId\.Toolbar[\s\S]*?target\.kind === 'profile'[\s\S]*?ProfileAppearanceElementId\.Toolbar/
+    )
+    assert.match(
+      appSource,
+      /return ownsToolbar[\s\S]*?PopoverAnchorPosition\.BottomLeft[\s\S]*?PopoverAnchorPosition\.RightTop/
+    )
+    assert.match(
+      appSource,
+      /anchorPosition=\{this\.getAppearanceEditorAnchorPosition\(target\)\}/
+    )
     assert.doesNotMatch(appSource, /RepositorySettingsTab\.Appearance/)
     assert.match(tabStrip, /getTabStyleHistorySource/)
     assert.match(tabStrip, /getTabStyleRepositoryPath/)

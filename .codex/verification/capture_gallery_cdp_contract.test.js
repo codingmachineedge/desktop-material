@@ -105,6 +105,24 @@ test('appearance captures open the actual owners instead of retired settings tab
   assert.ok(!source.includes("scene('settings-appearance'"))
 })
 
+test('appearance captures require a visible in-viewport owner editor', () => {
+  for (const contract of [
+    "editor?.closest('.popover-component')",
+    'bounds.width > 0',
+    'bounds.left >= -0.5',
+    'bounds.right <= window.innerWidth + 0.5',
+    'repository toolbar appearance title',
+  ]) {
+    assert.ok(source.includes(contract), `missing appearance gate: ${contract}`)
+  }
+  const scene = sceneSource('anchored-appearance')
+  assert.ok(
+    scene.indexOf('repository toolbar appearance title') <
+      scene.indexOf("capture('material-customization')"),
+    'the toolbar editor must be visible before capture'
+  )
+})
+
 test('new prerequisite scenes use deterministic synthetic owner flows', () => {
   const expected = new Map([
     ['anchored-appearance', 'material-customization'],
