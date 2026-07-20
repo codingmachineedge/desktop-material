@@ -427,6 +427,26 @@ test('repository sheet capture rejects clipped batch actions', () => {
   )
 })
 
+test('branch sheet capture rejects clipped or overlapping footer actions', () => {
+  const scene = sceneSource('branches-sheet')
+  for (const contract of [
+    "document.querySelector('#foldout-container .foldout')",
+    "document.querySelector('.branches-container .merge-button-row')",
+    "'.branches-container .merge-all-button'",
+    "'.branches-container .new-branch-button'",
+    'layout.row.scrollWidth > layout.row.clientWidth + 1',
+    'intersects(layout.newBranch, layout.merge)',
+    'Branch sheet controls are clipped or overlapping',
+  ]) {
+    assert.ok(scene.includes(contract), `branch sheet misses ${contract}`)
+  }
+  assert.ok(
+    scene.indexOf('Branch sheet controls are clipped or overlapping') <
+      scene.indexOf("capture('material-branches-sheet')"),
+    'the branch layout gate must run before capture'
+  )
+})
+
 test('Actions captures prove inspector pagination, logs, reviews, and cancellation', () => {
   for (const contract of [
     'async function openInspectorRun()',

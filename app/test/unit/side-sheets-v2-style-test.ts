@@ -67,6 +67,21 @@ describe('repository + branch side sheets v2 styles', () => {
     )
   })
 
+  it('keeps both merge actions and the New-branch FAB inside the branch sheet', () => {
+    assert.match(
+      branchesStyle,
+      /#foldout-container \.branches-container[\s\S]*?\.merge-button-row\s*\{[\s\S]*?display: grid;[\s\S]*?width: 100%;[\s\S]*?min-width: 0;[\s\S]*?flex: 0 0 auto;[\s\S]*?grid-template-columns: minmax\(0, 1fr\);[\s\S]*?gap: var\(--spacing\);/
+    )
+    assert.match(
+      branchesStyle,
+      /\.merge-button-row\s*\{[\s\S]*?> \.button-component\s*\{[\s\S]*?width: 100%;[\s\S]*?max-width: 100%;[\s\S]*?margin-right: 0;[\s\S]*?align-self: stretch;[\s\S]*?justify-self: stretch;/
+    )
+    assert.match(
+      branchesStyle,
+      /--dm-merge-bar-height: calc\(var\(--button-height\) \* 2 \+ var\(--spacing\) \* 3 \+ 1px\);/
+    )
+  })
+
   it('renders the no-pull-requests empty state as an illustrated blank slate', () => {
     assert.match(
       branchesStyle,

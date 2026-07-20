@@ -1451,6 +1451,75 @@ scene('branches-sheet', async () => {
   await ensureRepository()
   await menuEvent('show-branches')
   await sleep(1200)
+  const layout = await evaluate(`(() => {
+    const sheet = document.querySelector('#foldout-container .foldout')
+    const row = document.querySelector('.branches-container .merge-button-row')
+    const merge = document.querySelector('.branches-container .merge-button')
+    const mergeAll = document.querySelector(
+      '.branches-container .merge-all-button'
+    )
+    const newBranch = document.querySelector(
+      '.branches-container .new-branch-button'
+    )
+    const elements = { sheet, row, merge, mergeAll, newBranch }
+    if (Object.values(elements).some(value => !(value instanceof HTMLElement))) {
+      return null
+    }
+    const bounds = element => {
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        visible:
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          Number(style.opacity) > 0,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      }
+    }
+    return Object.fromEntries(
+      Object.entries(elements).map(([name, element]) => [name, bounds(element)])
+    )
+  })()`)
+  const within = (child, parent) =>
+    child.left >= parent.left - 0.5 &&
+    child.right <= parent.right + 0.5 &&
+    child.top >= parent.top - 0.5 &&
+    child.bottom <= parent.bottom + 0.5
+  const intersects = (first, second) =>
+    first.left < second.right - 0.5 &&
+    first.right > second.left + 0.5 &&
+    first.top < second.bottom - 0.5 &&
+    first.bottom > second.top + 0.5
+  const names = ['row', 'merge', 'mergeAll', 'newBranch']
+  if (
+    layout === null ||
+    names.some(
+      name =>
+        !layout[name].visible ||
+        layout[name].width <= 0 ||
+        layout[name].height <= 0 ||
+        !within(layout[name], layout.sheet)
+    ) ||
+    layout.row.scrollWidth > layout.row.clientWidth + 1 ||
+    layout.row.scrollHeight > layout.row.clientHeight + 1 ||
+    intersects(layout.newBranch, layout.merge) ||
+    intersects(layout.newBranch, layout.mergeAll)
+  ) {
+    fail(
+      `Branch sheet controls are clipped or overlapping: ${JSON.stringify(
+        layout
+      )}`
+    )
+  }
   await capture('material-branches-sheet')
   await closeAllDialogs()
 })

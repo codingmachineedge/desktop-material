@@ -621,14 +621,32 @@
     }
   }
 
-  // The persistent "Choose a branch to merge into <branch>" bar (.merge-button-row)
-  // is a full-width footer at the bottom of the sheet. When it is present, the
-  // bottom-right FAB collides with it, so lift the FAB clear above the bar and
-  // give the branch list matching bottom padding. The bar's height is the merge
-  // button (--button-height) + var(--spacing) padding top/bottom + its 1px top
-  // border.
+  // Own the two merge actions as a single-column footer. Generic Row styles
+  // otherwise right-align each intrinsic-width button, which can make a long
+  // branch name extend beyond the fixed-width foldout.
+  .merge-button-row {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing);
+
+    > .button-component {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin-right: 0;
+      align-self: stretch;
+      justify-self: stretch;
+    }
+  }
+
+  // The persistent merge footer contains two buttons, one gap, vertical
+  // padding, and a top border. Lift the New-branch FAB by that complete height
+  // and give the list matching clearance.
   &:has(.merge-button-row) {
-    --dm-merge-bar-height: calc(var(--button-height) + var(--spacing) * 2 + 1px);
+    --dm-merge-bar-height: calc(var(--button-height) * 2 + var(--spacing) * 3 + 1px);
 
     .new-branch-button {
       bottom: calc(var(--dm-merge-bar-height) + 18px);
