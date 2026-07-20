@@ -46,6 +46,17 @@ function requestUrl(input: RequestInfo | URL): URL {
       : input instanceof URL
       ? input.href
       : input.url
+
+  const schemeSeparator = value.indexOf('://')
+  if (schemeSeparator === -1) {
+    throw transportError()
+  }
+  const authorityStart = schemeSeparator + 3
+  const pathStart = value.indexOf('/', authorityStart)
+  const authorityEnd = pathStart === -1 ? value.length : pathStart
+  const authority = value.slice(authorityStart, authorityEnd)
+  const rawPath = pathStart === -1 ? '' : value.slice(pathStart)
+
   let url: URL
   try {
     url = new URL(value)
@@ -54,10 +65,15 @@ function requestUrl(input: RequestInfo | URL): URL {
   }
   if (
     (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    authority.includes('@') ||
     url.username.length > 0 ||
     url.password.length > 0 ||
+    value.includes('?') ||
+    value.includes('#') ||
+    value.includes('\\') ||
     url.hash.length > 0 ||
     url.search.length > 0 ||
+    rawPath !== url.pathname ||
     NativeApiMethods[url.pathname] === undefined ||
     !isTrustedOllamaEndpoint(url.origin)
   ) {
