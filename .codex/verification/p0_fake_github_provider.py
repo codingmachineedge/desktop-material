@@ -9,6 +9,7 @@ admits only the explicitly modeled in-memory pull request and Actions mutations.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -1629,6 +1630,61 @@ class FixtureRequestHandler(BaseHTTPRequestHandler):
             )
             self._send(response)
             return
+        content_encoding = self.headers.get("Content-Encoding")
+        if content_encoding is not None:
+            if content_encoding.strip().lower() != "gzip":
+                response = json_response(
+                    {"message": "Unsupported Git request encoding"},
+                    HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                )
+                self.server.append_log(
+                    {
+                        "kind": "git",
+                        "method": self.command,
+                        "path": self.path,
+                        "status": int(response.status),
+                        "returncode": None,
+                        "stderr": "Unsupported Git request encoding",
+                    }
+                )
+                self._send(response)
+                return
+            try:
+                body = gzip.decompress(body)
+            except (EOFError, OSError):
+                response = json_response(
+                    {"message": "Invalid gzip Git request body"},
+                    HTTPStatus.BAD_REQUEST,
+                )
+                self.server.append_log(
+                    {
+                        "kind": "git",
+                        "method": self.command,
+                        "path": self.path,
+                        "status": int(response.status),
+                        "returncode": None,
+                        "stderr": "Invalid gzip Git request body",
+                    }
+                )
+                self._send(response)
+                return
+            if len(body) > MAX_REQUEST_BODY_BYTES:
+                response = json_response(
+                    {"message": "Git request body is too large"},
+                    HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                )
+                self.server.append_log(
+                    {
+                        "kind": "git",
+                        "method": self.command,
+                        "path": self.path,
+                        "status": int(response.status),
+                        "returncode": None,
+                        "stderr": "Decompressed Git request body is too large",
+                    }
+                )
+                self._send(response)
+                return
         env = os.environ.copy()
         env.update(
             {

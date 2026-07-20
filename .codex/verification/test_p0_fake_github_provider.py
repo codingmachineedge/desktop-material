@@ -689,6 +689,11 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                 run("fetch", "--deepen=2", "origin", cwd=clone)
                 after = int(run("rev-list", "--count", "HEAD", cwd=clone))
                 self.assertGreater(after, before)
+                run("fetch", "--unshallow", "origin", cwd=clone)
+                self.assertEqual(
+                    run("rev-parse", "--is-shallow-repository", cwd=clone),
+                    "false",
+                )
 
                 loopback_identity = (
                     f"http://localhost/{provider.OWNER}/"
