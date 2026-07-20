@@ -992,10 +992,12 @@ export class SparseCheckoutManager extends React.Component<
             </Button>
           ) : null}
         </div>
+        {sparseState !== null && blocked === null ? (
+          <div className="sparse-checkout-guide-container">
+            {this.renderGuide(sparseState)}
+          </div>
+        ) : null}
         <div className="sparse-checkout-content">
-          {sparseState !== null && blocked === null
-            ? this.renderGuide(sparseState)
-            : null}
           <p className="sparse-checkout-introduction">
             Cone mode keeps selected directories plus required parent files in
             this worktree. It never rewrites commits.

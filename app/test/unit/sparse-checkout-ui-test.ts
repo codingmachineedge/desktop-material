@@ -84,11 +84,11 @@ describe('Sparse checkout native UI contracts', () => {
     )
     assert.match(
       styles,
-      /\.sparse-checkout-guide\s*\{[\s\S]*?position: sticky;[\s\S]*?top: -16px;/
+      /\.sparse-checkout-guide-container\s*\{[\s\S]*?flex: none;[\s\S]*?padding: 16px 16px 0;/
     )
     assert.match(
-      styles,
-      /@container sparse-checkout-panel \(max-width: 460px\)[\s\S]*?\.sparse-checkout-guide\s*\{[\s\S]*?position: static;/
+      component,
+      /className="sparse-checkout-guide-container"[\s\S]*?className="sparse-checkout-content"/
     )
     assert.match(styles, /\.sparse-checkout-review[\s\S]*max-height: 150px/)
   })

@@ -9,13 +9,14 @@
   min-width: 0;
 }
 
+.sparse-checkout-guide-container {
+  min-width: 0;
+  flex: none;
+  padding: 16px 16px 0;
+}
+
 .sparse-checkout-guide {
-  position: sticky;
-  z-index: 1;
-  // Pull the sticky rail through the scroller padding so content cannot peek
-  // above it while a focused review action scrolls into view.
-  top: -16px;
-  margin-bottom: 14px;
+  margin: 0;
   padding: 10px;
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--md-sys-shape-corner-large);
@@ -520,12 +521,12 @@
     flex-direction: column;
   }
 
-  .sparse-checkout-guide {
-    position: static;
+  .sparse-checkout-guide-container {
+    padding: 10px 10px 0;
+  }
 
-    ol {
-      grid-template-columns: minmax(0, 1fr);
-    }
+  .sparse-checkout-guide ol {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sparse-checkout-controls .button-component,
