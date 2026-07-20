@@ -619,6 +619,12 @@ class OllamaFixtureHTTPTests(unittest.TestCase):
 
 
 class OllamaFixtureStartupTests(unittest.TestCase):
+    def test_temp_alias_is_canonicalized_without_being_treated_as_a_link(self) -> None:
+        requested = Path(os.path.abspath(os.environ["TEMP"]))
+        resolved = requested.resolve(strict=True)
+        self.assertTrue(fixture._same_path(requested, resolved))
+        self.assertFalse(fixture._path_has_link_or_junction(requested))
+
     def test_standard_library_only_and_non_loopback_binds_are_rejected(self) -> None:
         tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
         imported_roots = set()
