@@ -261,11 +261,21 @@ test('every capture waits fail closed for all bundled design fonts', () => {
   assert.notEqual(captureEnd, -1)
   const block = source.slice(prepareStart, captureEnd)
 
+  assert.ok(!block.includes("typeof FontFaceSet === 'undefined'"))
+  assert.ok(!block.includes('instanceof FontFaceSet'))
   for (const contract of [
-    'document.fonts.load',
-    'await document.fonts.ready',
+    'const fonts = document.fonts',
+    '!fonts',
+    "typeof fonts.load !== 'function'",
+    "typeof fonts.check !== 'function'",
+    "typeof fonts.ready?.then !== 'function'",
+    'fonts.load',
+    'fonts.check',
+    'await fonts.ready',
     "receipt?.status !== 'loaded'",
+    'receipt?.faces?.length !== BundledCaptureFonts.length',
     'face.count < 1',
+    'face.check !== true',
     "status !== 'loaded'",
     'const fontReceipt = await prepareCaptureSurface(name)',
     'fonts: fontReceipt',

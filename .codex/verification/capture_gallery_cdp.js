@@ -1331,21 +1331,28 @@ function pngDimensions(file) {
 /** Remove unrelated transient chrome and focus paint from documentation frames. */
 async function waitForBundledCaptureFonts(name) {
   const receipt = await evaluate(`(async () => {
-    if (typeof FontFaceSet === 'undefined' || !(document.fonts instanceof FontFaceSet)) {
+    const fonts = document.fonts
+    if (
+      !fonts ||
+      typeof fonts.load !== 'function' ||
+      typeof fonts.check !== 'function' ||
+      typeof fonts.ready?.then !== 'function'
+    ) {
       return { status: null, faces: [], error: 'FontFaceSet unavailable' }
     }
     const requested = ${JSON.stringify(BundledCaptureFonts)}
     const faces = []
     for (const font of requested) {
-      const loaded = await document.fonts.load(font.descriptor, font.sample)
+      const loaded = await fonts.load(font.descriptor, font.sample)
       faces.push({
         family: font.family,
         count: loaded.length,
         statuses: loaded.map(face => face.status),
+        check: fonts.check(font.descriptor, font.sample),
       })
     }
-    await document.fonts.ready
-    return { status: document.fonts.status, faces, error: null }
+    await fonts.ready
+    return { status: fonts.status, faces, error: null }
   })()`)
   if (
     receipt?.status !== 'loaded' ||
@@ -1353,7 +1360,9 @@ async function waitForBundledCaptureFonts(name) {
     receipt?.faces?.length !== BundledCaptureFonts.length ||
     receipt.faces.some(
       face =>
-        face.count < 1 || face.statuses.some(status => status !== 'loaded')
+        face.count < 1 ||
+        face.check !== true ||
+        face.statuses.some(status => status !== 'loaded')
     )
   ) {
     fail(
