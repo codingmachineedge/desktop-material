@@ -164,7 +164,8 @@ export interface IBoundedMergeRequestContext {
   readonly capped: ReadonlyArray<MergeRequestCappedCollection>
 }
 
-const LegacyDraftPrefix = /^(?:(?:draft|wip):\s*)+/i
+const LegacyDraftPrefix =
+  /^(?:(?:draft|wip):\s*|\[(?:draft|wip)\]\s*|\((?:draft|wip)\)\s*)+/i
 const ShaPattern = /^[0-9a-f]{40,64}$/i
 
 function hasControlCharacters(value: string): boolean {
@@ -283,7 +284,8 @@ export function boundMergeRequestEditorContext(
 
 /**
  * Prefer the explicit draft flag. Older GitLab servers are supported by
- * recognizing and removing the legacy `Draft:` or `WIP:` title prefix.
+ * recognizing and removing repeated GitLab `[Draft]`, `Draft:`, `(Draft)`,
+ * or legacy WIP title prefixes.
  */
 export function normalizeMergeRequestInitialValue(
   input: IMergeRequestEditorInitialValue = {}

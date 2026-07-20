@@ -77,7 +77,7 @@ describe('merge request structural model', () => {
     assert.deepStrictEqual(bounded.capped, ['sourceBranches', 'reviewers'])
   })
 
-  it('prefers an explicit draft flag and supports legacy Draft and WIP titles', () => {
+  it('prefers an explicit draft flag and strips repeated Draft and WIP forms', () => {
     assert.deepStrictEqual(
       normalizeMergeRequestInitialValue({
         title: 'Draft: Ship the safe editor',
@@ -93,12 +93,18 @@ describe('merge request structural model', () => {
         assigneeIds: [],
       }
     )
-    assert.strictEqual(
-      normalizeMergeRequestInitialValue({
-        title: 'WIP: Draft: Ship the compatible editor',
-      }).title,
-      'Ship the compatible editor'
-    )
+    for (const title of [
+      'WIP: Draft: Ship the compatible editor',
+      '[Draft] Ship the compatible editor',
+      '(Draft) Ship the compatible editor',
+      '[WIP] Ship the compatible editor',
+      '(WIP) Ship the compatible editor',
+      '[Draft] (WIP) Draft: Ship the compatible editor',
+    ]) {
+      const normalized = normalizeMergeRequestInitialValue({ title })
+      assert.strictEqual(normalized.title, 'Ship the compatible editor')
+      assert.strictEqual(normalized.draft, true)
+    }
     assert.strictEqual(
       normalizeMergeRequestInitialValue({
         title: 'Draft: This is the literal title',
