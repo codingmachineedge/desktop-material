@@ -350,6 +350,8 @@ describe('Ollama manager attach-only verifier contract', () => {
       source,
       /querySelector\('#preferences-tab-copilot'\)[\s\S]*?closest\('button\[role="tab"\]'\)[\s\S]*?aria-selected/
     )
+    assert.match(source, /'zoom-factor': '1'/)
+    assert.match(source, /'zoom-auto-fit-enabled': '0'/)
     assert.doesNotThrow(
       () => new Function(`return (${FinalSurfaceExpression})`)
     )
