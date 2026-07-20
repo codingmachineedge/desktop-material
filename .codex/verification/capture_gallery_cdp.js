@@ -1911,11 +1911,7 @@ scene('repositories-sheet', async () => {
 })
 
 scene('settings', async () => {
-  await ensureRepository()
-  await menuEvent('show-preferences')
-  await sleep(1400)
-  await capture('material-settings')
-  await closeAllDialogs()
+  await captureSettingsTab('Git', 'material-settings')
 })
 
 /** Open Settings on a named tab and capture. */
@@ -1926,11 +1922,40 @@ async function captureSettingsTab(tabLabel, name, beforeCapture = null) {
     `document.querySelector('#preferences') !== null`,
     'settings dialog'
   )
-  await sleep(700)
-  if (tabLabel !== null) {
-    await clickText(tabLabel, { within: '#preferences' })
-    await sleep(900)
-  }
+  await clickText(tabLabel, { within: '#preferences' })
+
+  const tabId = `preferences-tab-${tabLabel.toLowerCase().replace(/\s+/g, '-')}`
+  const selectedTabReady = `(() => {
+    const dialog = document.querySelector('#preferences')
+    const label = document.getElementById(${JSON.stringify(tabId)})
+    const tab = label?.closest('button[role="tab"]')
+    const panel = dialog?.querySelector('[role="tabpanel"]')
+    if (!(dialog instanceof HTMLDialogElement) ||
+        !(label instanceof HTMLElement) ||
+        !(tab instanceof HTMLButtonElement) ||
+        !(panel instanceof HTMLElement)) {
+      return false
+    }
+    const bounds = panel.getBoundingClientRect()
+    const activeFiniteAnimations = dialog
+      .getAnimations({ subtree: true })
+      .filter(animation => {
+        const iterations = animation.effect?.getTiming().iterations ?? 1
+        return iterations !== Infinity &&
+          (animation.pending || animation.playState === 'running')
+      })
+    return label.textContent.trim() === ${JSON.stringify(tabLabel)} &&
+      tab.classList.contains('selected') &&
+      tab.getAttribute('aria-selected') === 'true' &&
+      panel.getAttribute('aria-labelledby') === ${JSON.stringify(tabId)} &&
+      bounds.width > 0 && bounds.height > 0 &&
+      activeFiniteAnimations.length === 0
+  })()`
+  await waitFor(selectedTabReady, `selected ${tabLabel} settings tab`)
+  await evaluate(
+    `new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`
+  )
+  await waitFor(selectedTabReady, `stable selected ${tabLabel} settings tab`)
   if (beforeCapture !== null) {
     await beforeCapture()
   }

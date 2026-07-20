@@ -106,6 +106,50 @@ test('appearance captures open the actual owners instead of retired settings tab
   assert.ok(!source.includes("scene('settings-appearance'"))
 })
 
+test('settings captures select distinct settled Preferences tabs', () => {
+  const settings = sceneSource('settings')
+  const accounts = sceneSource('settings-accounts')
+  const helperStart = source.indexOf('async function captureSettingsTab(')
+  const helperEnd = source.indexOf(
+    "\nscene('settings-agent-access'",
+    helperStart
+  )
+  assert.notEqual(helperStart, -1)
+  assert.notEqual(helperEnd, -1)
+  const helper = source.slice(helperStart, helperEnd)
+
+  assert.ok(settings.includes("captureSettingsTab('Git', 'material-settings')"))
+  assert.ok(
+    accounts.includes(
+      "captureSettingsTab('Accounts', 'material-provider-accounts')"
+    )
+  )
+
+  for (const contract of [
+    'preferences-tab-${tabLabel',
+    'label?.closest(\'button[role="tab"]\')',
+    "tab.classList.contains('selected')",
+    "tab.getAttribute('aria-selected') === 'true'",
+    "panel.getAttribute('aria-labelledby')",
+    'bounds.width > 0 && bounds.height > 0',
+    '.getAnimations({ subtree: true })',
+    'iterations !== Infinity',
+    'activeFiniteAnimations.length === 0',
+    'selected ${tabLabel} settings tab',
+    'stable selected ${tabLabel} settings tab',
+    'requestAnimationFrame(() => requestAnimationFrame(',
+  ]) {
+    assert.ok(helper.includes(contract), `settings tab gate misses ${contract}`)
+  }
+  assert.ok(!helper.includes('await sleep(700)'))
+  assert.ok(!helper.includes('await sleep(900)'))
+  assert.ok(
+    helper.indexOf('stable selected ${tabLabel} settings tab') <
+      helper.indexOf('await capture(name)'),
+    'the exact stable tab gate must pass before capture'
+  )
+})
+
 test('appearance captures require a visible in-viewport owner editor', () => {
   for (const contract of [
     "editor?.closest('.popover-component')",
