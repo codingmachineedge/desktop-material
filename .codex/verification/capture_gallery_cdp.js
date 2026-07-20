@@ -1580,9 +1580,34 @@ scene('error-notice', async () => {
   }
   await ensureRepository()
   await menuEvent('show-changes')
+  const originalBranch = execFileSync(
+    'git',
+    ['-C', fixturePath, 'rev-parse', '--abbrev-ref', 'HEAD'],
+    { encoding: 'utf8' }
+  ).trim()
+  const recoveryBranch = 'gallery/stale-lock-evidence'
+  if (originalBranch === recoveryBranch) {
+    fail('Stale-lock evidence branch unexpectedly owns the starting fixture.')
+  }
+  execFileSync(
+    'git',
+    ['-C', fixturePath, 'checkout', '--quiet', '-B', recoveryBranch],
+    { stdio: 'ignore' }
+  )
+  await evaluate(`require('electron').ipcRenderer.emit('focus'), true`)
+  await waitFor(
+    `document.querySelector('.commit-button')?.textContent?.includes(${JSON.stringify(
+      recoveryBranch
+    )}) === true`,
+    'unprotected stale-lock evidence branch'
+  )
   await setInput(
-    'input[aria-label="Commit summary"]',
+    '[role="group"][aria-label="Create commit"] input[placeholder="Summary (required)"]',
     'Verify stale lock recovery'
+  )
+  await waitFor(
+    `document.querySelector('.commit-button') instanceof HTMLButtonElement && !document.querySelector('.commit-button').disabled && document.querySelector('.commit-button').getAttribute('aria-disabled') !== 'true'`,
+    'enabled stale-lock commit action'
   )
 
   const lockPath = path.join(fixturePath, '.git', 'index.lock')
@@ -1592,7 +1617,7 @@ scene('error-notice', async () => {
   const staleTime = new Date(Date.now() - 120_000)
   fs.utimesSync(lockPath, staleTime, staleTime)
 
-  await clickSelector('.commit-button')
+  await clickEnabledSelector('.commit-button')
   await waitFor(
     `[...document.querySelectorAll('.error-notice button')].some(button => button.textContent.trim() === 'Remove lock file')`,
     'real stale-lock recovery notice',
@@ -1631,6 +1656,23 @@ scene('error-notice', async () => {
     fail('Remove lock file did not remove the verified stale index.lock.')
   }
   await closeAllDialogs()
+  execFileSync(
+    'git',
+    ['-C', fixturePath, 'checkout', '--quiet', originalBranch],
+    { stdio: 'ignore' }
+  )
+  execFileSync(
+    'git',
+    ['-C', fixturePath, 'branch', '--delete', '--force', recoveryBranch],
+    { stdio: 'ignore' }
+  )
+  await evaluate(`require('electron').ipcRenderer.emit('focus'), true`)
+  await waitFor(
+    `document.querySelector('.commit-button')?.textContent?.includes(${JSON.stringify(
+      originalBranch
+    )}) === true`,
+    'restored canonical fixture branch'
+  )
 })
 
 scene('responsive-overflow', async () => {

@@ -325,6 +325,11 @@ test('canonical workflow scenes use current reviewed controls and outcomes', () 
     "document.querySelector('.rebase-route')",
     "document.querySelector('.rebase-ahead-behind')",
     "document.querySelector('.rebase-commit-preview')",
+    '[role="group"][aria-label="Create commit"] input[placeholder="Summary (required)"]',
+    "const recoveryBranch = 'gallery/stale-lock-evidence'",
+    "'enabled stale-lock commit action'",
+    "clickEnabledSelector('.commit-button')",
+    "'restored canonical fixture branch'",
   ]) {
     assert.ok(source.includes(contract), `missing reviewed state: ${contract}`)
   }
@@ -334,6 +339,7 @@ test('canonical workflow scenes use current reviewed controls and outcomes', () 
     'Deepen by 25',
     'Fetch all remaining history',
     'Review deployments',
+    'input[aria-label="Commit summary"]',
   ]) {
     assert.ok(!source.includes(stale), `stale control remains: ${stale}`)
   }
