@@ -124,3 +124,22 @@ before this manifest can be marked complete.
   and the one headless desktop was closed. Final checks found no owned PIDs,
   process command-line references, or listeners on ports `58441`, `55326`, or
   `60586`; reopening the desktop name failed with Win32 error 2 as expected.
+
+## Publication closure
+
+- Product-bearing `main` commit
+  `255ad0c2283dd3a86328808a373a5438526bdaec` passed CI run
+  `29778132934`, including lint, Windows x64/arm64 build and packaging, the full
+  x64 unit/script suite, installation, and packaged x64 E2E. Exact-source
+  CodeQL run `29778132660` also passed.
+- Canonical wiki commit `18af0a88ed87fff019043060f537deee28844e4f`
+  is public. The raw User Guide and Feature Gallery return HTTP 200 and contain
+  the Ollama section plus the expected raw-`main` image reference.
+- Pages run `29777642060` passed for integrated source containing the final M23
+  site and screenshot. The live site and deployed PNG return HTTP 200; the PNG
+  is 128,903 bytes and matches SHA-256
+  `f1735c664248cd1b10a64e672dbbab24c95dabab99a62deeaf93557145a36509`.
+- The receipt-only `main` commit containing this closure is the final M23
+  publication SHA. Its attached exact-SHA CI, CodeQL, Pages, and gated Windows
+  installer/release workflow runs are the immutable final receipts. No later
+  documentation commit is required, avoiding a self-invalidating receipt loop.

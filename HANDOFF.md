@@ -23,7 +23,7 @@ not Prettier-clean. Pages `29710664112` passed and installer run `29710722904`
 skipped. The correction formats that generator without changing any generated
 SVG content; the repository-wide Prettier gate and a fresh generator run pass.
 
-## 2026-07-20 M23 — local acceptance complete; remote publication pending
+## 2026-07-20 M23 — complete and published
 
 This is the live handoff for the user-directed **full Ollama model manager**
 wave. Its scope is Ollama model lifecycle management only; the separate
@@ -68,11 +68,25 @@ submodule-manager and general regex-builder requests are not part of M23.
   disposable Temp roots were removed. This receipt does not claim final Git
   branch/worktree topology cleanup, which belongs to the final integration.
 - README, Pages, the feature guide/index, roadmap/plan, and the actual Markdown
-  wiki sources now reference that exact asset. The wiki image uses the raw
-  `main` URL under the canonical `Ding-Ding-Projects/desktop-material`
-  repository. Final exact-`main` Windows CI, Pages publication, separate wiki
-  synchronization, and their public asset checks remain pending and must be
-  recorded only after the final integration SHA is pushed.
+  wiki sources reference that exact asset. Canonical wiki commit
+  `18af0a88ed87fff019043060f537deee28844e4f` is public, and both the User Guide
+  and Feature Gallery return HTTP 200 with the Ollama section and raw-`main`
+  image reference. Pages run
+  [`29777642060`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29777642060)
+  passed; the live site and its deployed PNG return HTTP 200, and the deployed
+  image is 128,903 bytes with the accepted SHA-256 above.
+- Product-bearing `main` commit
+  `255ad0c2283dd3a86328808a373a5438526bdaec` passed the complete Windows gate
+  in [CI run
+  `29778132934`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29778132934):
+  lint, Windows x64/arm64 builds and packages, the full x64 unit/script suite,
+  installation, and packaged x64 E2E all succeeded. Its exact CodeQL run
+  [`29778132660`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29778132660)
+  also passed.
+- The receipt-only `main` commit containing this paragraph is the final M23
+  publication SHA. Its attached exact-SHA CI, CodeQL, Pages, and gated Windows
+  installer/release workflows are the final remote receipts; no follow-up
+  documentation commit is needed to record them and invalidate that proof.
 - Publication-source validation passes 15 focused Pages/gallery/wiki tests,
   targeted Prettier, and Markdownlint for the new feature index and guide. An
   independent audit resolved 187 local documentation/site references with zero
