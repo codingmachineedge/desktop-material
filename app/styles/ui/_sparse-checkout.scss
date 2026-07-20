@@ -12,7 +12,9 @@
 .sparse-checkout-guide {
   position: sticky;
   z-index: 1;
-  top: 0;
+  // Pull the sticky rail through the scroller padding so content cannot peek
+  // above it while a focused review action scrolls into view.
+  top: -16px;
   margin-bottom: 14px;
   padding: 10px;
   border: 1px solid var(--md-sys-color-outline-variant);

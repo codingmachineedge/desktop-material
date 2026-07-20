@@ -84,7 +84,7 @@ describe('Sparse checkout native UI contracts', () => {
     )
     assert.match(
       styles,
-      /\.sparse-checkout-guide\s*\{[\s\S]*?position: sticky;[\s\S]*?top: 0;/
+      /\.sparse-checkout-guide\s*\{[\s\S]*?position: sticky;[\s\S]*?top: -16px;/
     )
     assert.match(
       styles,
