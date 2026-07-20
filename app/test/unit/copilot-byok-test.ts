@@ -3,6 +3,7 @@ import { afterEach, describe, it } from 'node:test'
 import {
   encodeModelKey,
   isLocalBaseUrl,
+  isOllamaBYOKProvider,
   isValidBYOKBaseUrl,
   loadBYOKProviders,
   parseModelKey,
@@ -55,6 +56,35 @@ describe('byok storage', () => {
         { id: 'x', name: 'Bad', type: 'openai' }, // missing baseUrl, models
       ])
     )
+    assert.deepStrictEqual(loadBYOKProviders(), [sampleProvider])
+  })
+
+  it('round-trips the Ollama integration marker', () => {
+    const provider: IBYOKProvider = {
+      ...sampleProvider,
+      id: 'ollama',
+      name: 'Ollama',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      authKind: 'none',
+      integration: 'ollama',
+    }
+
+    saveBYOKProviders([provider])
+
+    assert.deepStrictEqual(loadBYOKProviders(), [provider])
+    assert.strictEqual(isOllamaBYOKProvider(provider), true)
+    assert.strictEqual(isOllamaBYOKProvider(sampleProvider), false)
+  })
+
+  it('rejects unknown provider integration markers', () => {
+    localStorage.setItem(
+      StorageKey,
+      JSON.stringify([
+        sampleProvider,
+        { ...sampleProvider, id: 'unknown', integration: 'untrusted' },
+      ])
+    )
+
     assert.deepStrictEqual(loadBYOKProviders(), [sampleProvider])
   })
 })

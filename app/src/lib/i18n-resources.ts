@@ -707,6 +707,11 @@ export type TranslationKey =
   | 'tagLifecycle.remoteOnlyHeading'
   | 'tagLifecycle.noRemoteMatches'
   | 'tagLifecycle.remoteTruncated'
+  | 'ollama.providerType'
+  | 'ollama.authenticationHeading'
+  | 'ollama.authenticationDescription'
+  | 'ollama.modelsSyncDescription'
+  | 'ollama.modelsEmpty'
   | 'subtree.title'
   | 'color.blue'
   | 'color.violet'
@@ -1592,6 +1597,14 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'tagLifecycle.noRemoteMatches': 'No remote-only tags match this filter.',
   'tagLifecycle.remoteTruncated':
     'Showing the first 500 remote tags. Remote deletion is disabled for undisplayed tags, and bulk push/prune stay unavailable until the inventory is complete.',
+  'ollama.providerType': 'Ollama (local)',
+  'ollama.authenticationHeading': 'Authentication',
+  'ollama.authenticationDescription':
+    "Ollama runs locally without an API key. Desktop Material will only use its native management API at this provider's configured URL.",
+  'ollama.modelsSyncDescription':
+    'Installed Ollama models will be synchronized from the model manager after you add this provider.',
+  'ollama.modelsEmpty':
+    'No models synchronized yet. Add this provider, then open its model manager.',
   'subtree.title': 'Subtrees',
   'color.blue': 'Blue',
   'color.violet': 'Violet',
@@ -2384,6 +2397,14 @@ export const cantoneseTranslations: Readonly<
   'tagLifecycle.noRemoteMatches': '冇只限遠端嘅標籤符合呢個篩選。',
   'tagLifecycle.remoteTruncated':
     '只顯示頭 500 個遠端標籤。未顯示嘅標籤唔可以刪除；清單完整之前，批次 push 同清理亦會保持停用。',
+  'ollama.providerType': 'Ollama（本機）',
+  'ollama.authenticationHeading': '驗證',
+  'ollama.authenticationDescription':
+    'Ollama 喺本機運行，唔需要 API key。Desktop Material 只會用呢個供應商已設定網址嘅原生管理 API。',
+  'ollama.modelsSyncDescription':
+    '加咗呢個供應商之後，模型管理員會同步已安裝嘅 Ollama 模型。',
+  'ollama.modelsEmpty':
+    '未同步任何模型。加咗呢個供應商之後，再開啟佢嘅模型管理員。',
   'subtree.title': '子樹',
   'color.blue': '藍色',
   'color.violet': '紫色',

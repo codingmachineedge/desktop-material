@@ -13,12 +13,14 @@ import {
   BYOKProviderType,
   BYOKAuthKind,
   BYOKWireApi,
+  isOllamaBYOKProvider,
   isValidBYOKBaseUrl,
   requiresNewBYOKSecret,
 } from '../../lib/copilot/byok'
 import { formatReasoningEffort } from '../../lib/stores/copilot-store'
 import { Dispatcher } from '../dispatcher'
 import { PopupType } from '../../models/popup'
+import { t } from '../../lib/i18n'
 
 interface IEditCopilotBYOKProviderDialogProps {
   readonly dispatcher: Dispatcher
@@ -31,9 +33,11 @@ interface IEditCopilotBYOKProviderDialogProps {
   readonly onDismissed: () => void
 }
 
+type BYOKProviderEditorType = BYOKProviderType | 'ollama'
+
 interface IEditCopilotBYOKProviderDialogState {
   readonly name: string
-  readonly type: BYOKProviderType
+  readonly type: BYOKProviderEditorType
   readonly baseUrl: string
   readonly wireApi: BYOKWireApi
   readonly azureApiVersion: string
@@ -107,7 +111,7 @@ class ModelRow extends React.Component<IModelRowProps> {
  * Returns a hint URL appropriate for the given provider type, used as the
  * placeholder in the Base URL field.
  */
-function getBaseUrlPlaceholder(type: BYOKProviderType): string {
+function getBaseUrlPlaceholder(type: BYOKProviderEditorType): string {
   switch (type) {
     case 'openai':
       return 'https://api.openai.com/v1'
@@ -115,6 +119,8 @@ function getBaseUrlPlaceholder(type: BYOKProviderType): string {
       return 'https://<resource>.openai.azure.com/'
     case 'anthropic':
       return 'https://api.anthropic.com'
+    case 'ollama':
+      return 'http://127.0.0.1:11434/v1'
   }
 }
 export class EditCopilotBYOKProviderDialog extends React.Component<
@@ -128,11 +134,17 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
 
     this.state = {
       name: provider?.name ?? '',
-      type: provider?.type ?? 'openai',
+      type:
+        provider !== null && isOllamaBYOKProvider(provider)
+          ? 'ollama'
+          : provider?.type ?? 'openai',
       baseUrl: provider?.baseUrl ?? '',
       wireApi: provider?.wireApi ?? 'completions',
       azureApiVersion: provider?.azureApiVersion ?? '',
-      authKind: provider?.authKind ?? 'apiKey',
+      authKind:
+        provider !== null && isOllamaBYOKProvider(provider)
+          ? 'none'
+          : provider?.authKind ?? 'apiKey',
       secret: '',
       requestTimeoutSeconds:
         provider?.requestTimeoutSeconds !== undefined
@@ -198,6 +210,7 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
             <option value="openai">OpenAI / OpenAI-compatible</option>
             <option value="azure">Azure</option>
             <option value="anthropic">Anthropic</option>
+            <option value="ollama">{t('ollama.providerType')}</option>
           </Select>
         </Row>
         <Row>
@@ -248,6 +261,17 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
   }
 
   private renderAuthenticationSection(isEditing: boolean) {
+    if (this.state.type === 'ollama') {
+      return (
+        <fieldset className="copilot-byok-fieldset">
+          <legend>{t('ollama.authenticationHeading')}</legend>
+          <p className="copilot-byok-section-hint">
+            {t('ollama.authenticationDescription')}
+          </p>
+        </fieldset>
+      )
+    }
+
     return (
       <fieldset className="copilot-byok-fieldset">
         <Row>
@@ -284,16 +308,20 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
   }
 
   private renderModelsSection() {
+    const isOllama = this.state.type === 'ollama'
     return (
       <fieldset className="copilot-byok-fieldset copilot-byok-models">
         <legend>Models</legend>
         <p className="copilot-byok-section-hint">
-          Tell Desktop which models this provider offers. Each one will appear
-          in the model picker for Copilot features.
+          {isOllama
+            ? t('ollama.modelsSyncDescription')
+            : 'Tell Desktop which models this provider offers. Each one will appear in the model picker for Copilot features.'}
         </p>
         {this.state.models.length === 0 ? (
           <p className="copilot-byok-empty">
-            No models yet. Add at least one to use this provider.
+            {isOllama
+              ? t('ollama.modelsEmpty')
+              : 'No models yet. Add at least one to use this provider.'}
           </p>
         ) : (
           <ul className="copilot-byok-entry-list">
@@ -308,9 +336,11 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
             ))}
           </ul>
         )}
-        <Button onClick={this.onAddModel}>
-          {__DARWIN__ ? 'Add Model…' : 'Add model…'}
-        </Button>
+        {!isOllama && (
+          <Button onClick={this.onAddModel}>
+            {__DARWIN__ ? 'Add Model…' : 'Add model…'}
+          </Button>
+        )}
       </fieldset>
     )
   }
@@ -318,7 +348,22 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
   private onNameChanged = (name: string) => this.setState({ name })
 
   private onTypeChanged = (event: React.FormEvent<HTMLSelectElement>) => {
-    this.setState({ type: event.currentTarget.value as BYOKProviderType })
+    const type = event.currentTarget.value as BYOKProviderEditorType
+    if (type === 'ollama') {
+      this.setState(state => ({
+        type,
+        name: state.name.trim() === '' ? 'Ollama' : state.name,
+        baseUrl:
+          state.baseUrl.trim() === ''
+            ? 'http://127.0.0.1:11434/v1'
+            : state.baseUrl,
+        authKind: 'none',
+        wireApi: 'completions',
+        errorMessage: null,
+      }))
+      return
+    }
+    this.setState({ type })
   }
 
   private onBaseUrlChanged = (baseUrl: string) => this.setState({ baseUrl })
@@ -399,11 +444,16 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
     const provider: IBYOKProvider = {
       id,
       name: this.state.name.trim(),
-      type: this.state.type,
+      type: this.state.type === 'ollama' ? 'openai' : this.state.type,
       baseUrl: this.state.baseUrl.trim(),
-      authKind: this.state.authKind,
+      authKind: this.state.type === 'ollama' ? 'none' : this.state.authKind,
       models: trimmedModels,
-      ...(this.state.type === 'openai' ? { wireApi: this.state.wireApi } : {}),
+      ...(this.state.type === 'openai' || this.state.type === 'ollama'
+        ? { wireApi: this.state.wireApi }
+        : {}),
+      ...(this.state.type === 'ollama'
+        ? { integration: 'ollama' as const }
+        : {}),
       ...(this.state.type === 'azure' &&
       this.state.azureApiVersion.trim() !== ''
         ? { azureApiVersion: this.state.azureApiVersion.trim() }
@@ -445,7 +495,7 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
     }
 
     const trimmedModels = this.state.models.filter(m => m.id.trim() !== '')
-    if (trimmedModels.length === 0) {
+    if (trimmedModels.length === 0 && this.state.type !== 'ollama') {
       return 'Please add at least one model.'
     }
 

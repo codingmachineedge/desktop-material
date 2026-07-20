@@ -14,6 +14,9 @@ export type BYOKWireApi = 'completions' | 'responses'
  */
 export type BYOKAuthKind = 'apiKey' | 'bearer' | 'none'
 
+/** Optional first-party management surface attached to a BYOK provider. */
+export type BYOKProviderIntegration = 'ollama'
+
 /**
  * A user-declared model offered by a BYOK provider. Because we don't probe
  * the provider's `/models` endpoint, the user supplies the metadata.
@@ -50,6 +53,12 @@ export interface IBYOKProvider {
   readonly azureApiVersion?: string
   /** How the provider is authenticated. */
   readonly authKind: BYOKAuthKind
+  /**
+   * Optional provider-specific management surface. Ollama providers continue
+   * to use the SDK's OpenAI-compatible wire type while opting into native
+   * model lifecycle management here.
+   */
+  readonly integration?: BYOKProviderIntegration
   /**
    * Optional per-provider request timeout in seconds. Used as the timeout
    * for SDK calls that target this provider (e.g. commit message generation).
@@ -249,6 +258,11 @@ export function isValidBYOKBaseUrl(value: string): boolean {
   }
 }
 
+/** Whether this provider explicitly opts into the native Ollama manager. */
+export function isOllamaBYOKProvider(provider: IBYOKProvider): boolean {
+  return provider.integration === 'ollama'
+}
+
 function isBYOKModel(value: unknown): value is IBYOKModel {
   if (typeof value !== 'object' || value === null) {
     return false
@@ -290,6 +304,9 @@ function isBYOKProvider(value: unknown): value is IBYOKProvider {
     p.authKind !== 'bearer' &&
     p.authKind !== 'none'
   ) {
+    return false
+  }
+  if (p.integration !== undefined && p.integration !== 'ollama') {
     return false
   }
   if (
