@@ -1237,7 +1237,7 @@ async function validateAppearanceLanguageSurface() {
   process.stdout.write(
     `LANGUAGE_SURFACE ${JSON.stringify(appearanceLanguageSurfaceReceipt)}\n`
   )
-  await pressEscape()
+  await clickSelector('#preferences .preferences-close-button')
   await waitFor(
     `document.querySelector('#preferences') === null`,
     'Appearance language verification dialog closure'

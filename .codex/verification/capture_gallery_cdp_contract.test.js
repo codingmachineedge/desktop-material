@@ -173,6 +173,24 @@ test('canonical Appearance verification waits for the welcome transition', () =>
     /completed scene \$\{name\}`,[\s\S]*requireAppearanceSurface: appearanceLanguageValidated/
   )
   assert.match(main, /validated Appearance language surface after welcome/)
+
+  const validationStart = source.indexOf(
+    'async function validateAppearanceLanguageSurface()'
+  )
+  const validationEnd = source.indexOf(
+    'async function setViewport(',
+    validationStart
+  )
+  const validation = source.slice(validationStart, validationEnd)
+  const semanticClose = validation.indexOf(
+    "await clickSelector('#preferences .preferences-close-button')"
+  )
+  const closedGate = validation.indexOf(
+    "document.querySelector('#preferences') === null",
+    semanticClose
+  )
+  assert.ok(semanticClose >= 0 && closedGate > semanticClose)
+  assert.ok(!validation.includes('await pressEscape()'))
 })
 
 test('every requested scene resets before its runner executes', () => {
