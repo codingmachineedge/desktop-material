@@ -67,7 +67,6 @@ export interface IOllamaModelInformation {
   readonly parameters?: string
   readonly details?: IOllamaModelDetails
   readonly capabilities?: ReadonlyArray<string>
-  readonly modelInfo?: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -114,6 +113,7 @@ export interface IOllamaModelManagerStrings {
   readonly title: string
   readonly subtitle: string
   readonly endpoint: string
+  readonly configuredEndpoint: string
   readonly connected: string
   readonly unavailable: string
   readonly checking: string
@@ -201,6 +201,7 @@ export const DefaultOllamaModelManagerStrings: IOllamaModelManagerStrings = {
   title: 'Ollama model manager',
   subtitle: 'Install, inspect, and control models on this Ollama provider.',
   endpoint: 'Endpoint',
+  configuredEndpoint: 'Configured endpoint',
   connected: 'Connected',
   unavailable: 'Unavailable',
   checking: 'Checking…',
@@ -358,6 +359,11 @@ interface ISettledResult<T> {
   readonly value: T | null
 }
 
+interface IInventoryRefreshResult {
+  readonly inventorySucceeded: boolean
+  readonly providerModelsSynchronized: boolean
+}
+
 const MaximumLicenseCharacters = 1200
 const MaximumMetadataCharacters = 180
 const MaximumCapabilities = 10
@@ -395,6 +401,26 @@ function boundedText(value: string, maximum: number): string {
   return trimmed.length <= maximum
     ? trimmed
     : `${trimmed.slice(0, maximum).trimEnd()}…`
+}
+
+/** Strip credentials and request-specific data before an endpoint is shown. */
+export function formatSafeOllamaEndpoint(
+  value: string,
+  fallback: string
+): string {
+  try {
+    const endpoint = new URL(value)
+    if (
+      (endpoint.protocol !== 'http:' && endpoint.protocol !== 'https:') ||
+      endpoint.origin === 'null'
+    ) {
+      return fallback
+    }
+    const path = endpoint.pathname === '/' ? '' : endpoint.pathname
+    return boundedText(`${endpoint.origin}${path}`, MaximumMetadataCharacters)
+  } catch {
+    return fallback
+  }
 }
 
 function finiteNonNegative(value: number | undefined): number | null {
@@ -518,16 +544,21 @@ export class OllamaModelManager extends React.Component<
     return { ...DefaultOllamaModelManagerStrings, ...this.props.strings }
   }
 
-  private resolveClient(): IOllamaModelManagerClient | null {
+  private resolveClient(
+    provider: IOllamaManagerProvider
+  ): IOllamaModelManagerClient | null {
     try {
-      return (
-        this.props.client ??
-        this.props.clientFactory?.(this.props.provider) ??
-        null
-      )
+      return this.props.client ?? this.props.clientFactory?.(provider) ?? null
     } catch {
       return null
     }
+  }
+
+  private isCurrentProvider(provider: IOllamaManagerProvider): boolean {
+    return (
+      this.props.provider.id === provider.id &&
+      this.props.provider.baseUrl === provider.baseUrl
+    )
   }
 
   private invalidateRequests() {
@@ -542,7 +573,11 @@ export class OllamaModelManager extends React.Component<
     this.operationController = null
   }
 
-  private refreshInventory = async (preserveNotice: boolean) => {
+  private refreshInventory = async (
+    preserveNotice: boolean,
+    operationGuard?: () => boolean
+  ): Promise<IInventoryRefreshResult> => {
+    const provider = this.props.provider
     const requestId = ++this.refreshRequestId
     this.refreshController?.abort()
     this.detailController?.abort()
@@ -556,10 +591,19 @@ export class OllamaModelManager extends React.Component<
       notice: preserveNotice ? state.notice : null,
     }))
 
-    const client = this.resolveClient()
+    const isCurrent = () =>
+      requestId === this.refreshRequestId &&
+      !controller.signal.aborted &&
+      this.isCurrentProvider(provider) &&
+      (operationGuard?.() ?? true)
+
+    const client = this.resolveClient(provider)
     if (client === null) {
-      if (requestId !== this.refreshRequestId) {
-        return
+      if (!isCurrent()) {
+        return {
+          inventorySucceeded: false,
+          providerModelsSynchronized: false,
+        }
       }
       this.refreshController = null
       this.setState({
@@ -577,7 +621,10 @@ export class OllamaModelManager extends React.Component<
           message: this.getStrings().refreshError,
         },
       })
-      return
+      return {
+        inventorySucceeded: false,
+        providerModelsSynchronized: false,
+      }
     }
 
     const options = { signal: controller.signal }
@@ -587,10 +634,12 @@ export class OllamaModelManager extends React.Component<
       settle(client.listRunning(options)),
     ])
 
-    if (requestId !== this.refreshRequestId || controller.signal.aborted) {
-      return
+    if (!isCurrent()) {
+      return {
+        inventorySucceeded: false,
+        providerModelsSynchronized: false,
+      }
     }
-    this.refreshController = null
 
     const models = inventory.succeeded
       ? normalizeModels(inventory.value ?? [])
@@ -604,6 +653,18 @@ export class OllamaModelManager extends React.Component<
     const phase: InventoryPhase =
       failures === 0 ? 'available' : failures === 3 ? 'unavailable' : 'partial'
     const selectedModel = this.resolveSelectedModel(models)
+    const providerModelsSynchronized =
+      inventory.succeeded && models !== null
+        ? await this.synchronizeProviderModels(provider, models, isCurrent)
+        : false
+
+    if (!isCurrent()) {
+      return {
+        inventorySucceeded: inventory.succeeded,
+        providerModelsSynchronized: false,
+      }
+    }
+    this.refreshController = null
 
     this.setState(
       {
@@ -625,13 +686,68 @@ export class OllamaModelManager extends React.Component<
           selectedModel === this.state.selectedModel
             ? this.state.renameName
             : '',
+        notice:
+          inventory.succeeded && !providerModelsSynchronized
+            ? {
+                kind: 'partial',
+                message: this.getStrings().configurationPartial,
+              }
+            : preserveNotice
+            ? this.state.notice
+            : phase === 'unavailable'
+            ? {
+                kind: 'error',
+                message: this.getStrings().refreshError,
+              }
+            : null,
       },
       () => {
-        if (selectedModel !== null) {
-          void this.loadModelInformation(selectedModel)
+        if (selectedModel !== null && isCurrent()) {
+          void this.loadModelInformation(selectedModel, provider)
         }
       }
     )
+    return {
+      inventorySucceeded: inventory.succeeded,
+      providerModelsSynchronized,
+    }
+  }
+
+  private async synchronizeProviderModels(
+    provider: IOllamaManagerProvider,
+    models: ReadonlyArray<INormalizedModel>,
+    isCurrent: () => boolean
+  ): Promise<boolean> {
+    const seen = new Set<string>()
+    const next = models.reduce<IOllamaManagerProviderModel[]>(
+      (result, model) => {
+        if (!seen.has(model.name)) {
+          seen.add(model.name)
+          result.push({ id: model.name, name: model.name })
+        }
+        return result
+      },
+      []
+    )
+    const unchanged =
+      provider.models.length === next.length &&
+      provider.models.every(
+        (model, index) =>
+          model.id === next[index].id && model.name === next[index].name
+      )
+
+    if (unchanged) {
+      return true
+    }
+    if (!isCurrent()) {
+      return false
+    }
+    try {
+      await this.props.onProviderModelsChanged(provider, next)
+    } catch {
+      return false
+    }
+    return isCurrent()
   }
 
   private resolveSelectedModel(
@@ -646,13 +762,18 @@ export class OllamaModelManager extends React.Component<
       : models[0].name
   }
 
-  private loadModelInformation = async (model: string) => {
-    const client = this.resolveClient()
+  private loadModelInformation = async (
+    model: string,
+    provider: IOllamaManagerProvider
+  ) => {
+    const client = this.resolveClient(provider)
     if (client === null) {
-      this.setState({
-        detailsLoading: false,
-        detailsUnavailable: true,
-      })
+      if (this.isCurrentProvider(provider)) {
+        this.setState({
+          detailsLoading: false,
+          detailsUnavailable: true,
+        })
+      }
       return
     }
 
@@ -668,6 +789,7 @@ export class OllamaModelManager extends React.Component<
     if (
       requestId !== this.detailRequestId ||
       controller.signal.aborted ||
+      !this.isCurrentProvider(provider) ||
       this.state.selectedModel !== model
     ) {
       return
@@ -707,9 +829,9 @@ export class OllamaModelManager extends React.Component<
             <span className="ollama-endpoint-name">
               {boundedText(this.props.provider.name, MaximumMetadataCharacters)}
               {' · '}
-              {boundedText(
+              {formatSafeOllamaEndpoint(
                 this.props.provider.baseUrl,
-                MaximumMetadataCharacters
+                strings.configuredEndpoint
               )}
             </span>
           </div>
@@ -1224,13 +1346,18 @@ export class OllamaModelManager extends React.Component<
           </p>
         </div>
         <div>
-          <Button size="small" onClick={this.onCancelDelete}>
+          <Button
+            size="small"
+            onClick={this.onCancelDelete}
+            onKeyDown={this.onDeleteConfirmationKeyDown}
+          >
             {strings.cancel}
           </Button>
           <Button
             size="small"
             className="destructive"
             onClick={this.onConfirmDelete}
+            onKeyDown={this.onDeleteConfirmationKeyDown}
             onButtonRef={this.onConfirmDeleteButtonRef}
           >
             {strings.deleteConfirm}
@@ -1314,7 +1441,7 @@ export class OllamaModelManager extends React.Component<
         renameName: '',
         deleteConfirmation: null,
       },
-      () => void this.loadModelInformation(model)
+      () => void this.loadModelInformation(model, this.props.provider)
     )
   }
 
@@ -1398,6 +1525,16 @@ export class OllamaModelManager extends React.Component<
     )
   }
 
+  private onDeleteConfirmationKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>
+  ) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      this.onCancelDelete()
+    }
+  }
+
   private onConfirmDelete = () => {
     const model = this.state.selectedModel
     if (model !== null && model === this.state.deleteConfirmation) {
@@ -1454,7 +1591,8 @@ export class OllamaModelManager extends React.Component<
     source: string,
     destination?: string
   ) => {
-    const client = this.resolveClient()
+    const provider = this.props.provider
+    const client = this.resolveClient(provider)
     if (client === null) {
       this.setState({
         notice: { kind: 'error', message: this.getStrings().operationError },
@@ -1467,7 +1605,10 @@ export class OllamaModelManager extends React.Component<
     }
     const { id, controller } = started
     const options = { signal: controller.signal }
-    let configurationUpdated = true
+    const isCurrent = () =>
+      id === this.operationRequestId &&
+      !controller.signal.aborted &&
+      this.isCurrentProvider(provider)
     let renamePartial = false
 
     try {
@@ -1477,47 +1618,68 @@ export class OllamaModelManager extends React.Component<
             ...options,
             onProgress: this.onPullProgress(id),
           })
-          configurationUpdated = await this.updateProviderModels(source)
+          if (!isCurrent()) {
+            return
+          }
           break
         case 'copy':
           await client.copy(source, destination!, options)
-          configurationUpdated = await this.updateProviderModels(destination!)
+          if (!isCurrent()) {
+            return
+          }
           break
         case 'rename':
           await client.copy(source, destination!, options)
+          if (!isCurrent()) {
+            return
+          }
           try {
             await client.delete(source, options)
-            configurationUpdated = await this.updateProviderModels(
-              destination!,
-              source
-            )
+            if (!isCurrent()) {
+              return
+            }
           } catch {
+            if (!isCurrent()) {
+              return
+            }
             renamePartial = true
-            configurationUpdated = await this.updateProviderModels(destination!)
           }
           break
         case 'load':
           await client.load(source, options)
+          if (!isCurrent()) {
+            return
+          }
           break
         case 'unload':
           await client.unload(source, options)
+          if (!isCurrent()) {
+            return
+          }
           break
         case 'delete':
           await client.delete(source, options)
-          configurationUpdated = await this.updateProviderModels(
-            undefined,
-            source
-          )
+          if (!isCurrent()) {
+            return
+          }
           break
       }
 
-      if (id !== this.operationRequestId || controller.signal.aborted) {
+      if (!isCurrent()) {
         return
       }
-      await this.refreshInventory(true)
-      if (id !== this.operationRequestId || controller.signal.aborted) {
+      const refresh = await this.refreshInventory(true, isCurrent)
+      if (!isCurrent()) {
         return
       }
+      const changesInstalledModels =
+        kind === 'pull' ||
+        kind === 'copy' ||
+        kind === 'rename' ||
+        kind === 'delete'
+      const configurationUpdated =
+        !changesInstalledModels ||
+        (refresh.inventorySucceeded && refresh.providerModelsSynchronized)
       this.operationController = null
       this.setState({
         operation: null,
@@ -1538,7 +1700,7 @@ export class OllamaModelManager extends React.Component<
             },
       })
     } catch {
-      if (id !== this.operationRequestId || controller.signal.aborted) {
+      if (!isCurrent()) {
         return
       }
       this.operationController = null
@@ -1570,23 +1732,6 @@ export class OllamaModelManager extends React.Component<
         },
       })
     }
-
-  private async updateProviderModels(
-    add?: string,
-    remove?: string
-  ): Promise<boolean> {
-    const models = this.props.provider.models.filter(
-      model => model.id !== remove && model.id !== add
-    )
-    const next =
-      add === undefined ? models : [...models, { id: add, name: add }]
-    try {
-      await this.props.onProviderModelsChanged(this.props.provider, next)
-      return true
-    } catch {
-      return false
-    }
-  }
 
   private successMessage(
     kind: OperationKind,
