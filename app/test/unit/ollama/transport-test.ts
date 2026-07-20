@@ -211,6 +211,12 @@ describe('native Ollama renderer transport', () => {
         )
       )
       await assert.rejects(
+        nodeOllamaFetch(
+          `http://@127.0.0.1:${new URL(fixture.endpoint).port}/api/version`,
+          { redirect: 'error', credentials: 'omit' }
+        )
+      )
+      await assert.rejects(
         nodeOllamaFetch(`${fixture.endpoint}/api/version`, {
           redirect: 'error',
           credentials: 'omit',
@@ -226,6 +232,27 @@ describe('native Ollama renderer transport', () => {
       )
       await assert.rejects(
         nodeOllamaFetch(`${fixture.endpoint}/api/version?token=secret`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/api/version?`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/api/version#`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/prefix/../api/version`, {
           method: 'GET',
           redirect: 'error',
           credentials: 'omit',
