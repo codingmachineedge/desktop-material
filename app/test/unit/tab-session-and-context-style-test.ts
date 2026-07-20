@@ -42,23 +42,30 @@ describe('tab session, folder drop, and customization context contracts', () => 
     assert.match(shell, /body\.repository-folder-dragging/)
   })
 
-  it('provides profile/repository customization and local Git history context', async () => {
-    const [appSource, tabStrip, brand] = await Promise.all([
+  it('anchors independently versioned appearance editors to their owners', async () => {
+    const [appSource, tabStrip, tab, brand] = await Promise.all([
       readFile(Path.join(app, 'src/ui/app.tsx'), 'utf8'),
       readFile(
         Path.join(app, 'src/ui/repository-tabs/repository-tab-strip.tsx'),
         'utf8'
       ),
+      readFile(
+        Path.join(app, 'src/ui/repository-tabs/repository-tab.tsx'),
+        'utf8'
+      ),
       readFile(Path.join(app, 'src/ui/window/app-brand.tsx'), 'utf8'),
     ])
     assert.match(appSource, /onCustomizationContextMenu/)
-    assert.match(appSource, /Local Git repository:/)
-    assert.match(appSource, /Profile Git history:/)
-    assert.match(appSource, /RepositorySettingsTab\.Appearance/)
-    assert.match(tabStrip, /View Appearance and Tab History/)
-    // The per-tab entry scopes the history popup to just that tab.
-    assert.match(tabStrip, /scope: \{ kind: 'tab', tabId: tab\.id, label \}/)
-    assert.match(tabStrip, /Profile Git history:/)
+    assert.match(appSource, /getProfileAppearanceHistorySource/)
+    assert.match(appSource, /getRepositoryAppearanceHistorySource/)
+    assert.match(appSource, /getFeatureAppearanceHistorySource/)
+    assert.match(appSource, /AnchoredAppearanceEditor/)
+    assert.doesNotMatch(appSource, /RepositorySettingsTab\.Appearance/)
+    assert.match(tabStrip, /getTabStyleHistorySource/)
+    assert.match(tabStrip, /getTabStyleRepositoryPath/)
+    assert.match(tabStrip, /AnchoredAppearanceEditor/)
+    assert.match(tab, /data-context-menu-owner="tab-title-appearance"/)
+    assert.match(tab, /Customize tab appearance/)
     assert.match(brand, /data-customization-surface="app-identity"/)
   })
 })

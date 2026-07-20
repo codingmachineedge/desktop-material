@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import * as path from 'path'
-import { appendFile, writeFile } from 'fs/promises'
+import { appendFile, symlink, truncate, writeFile } from 'fs/promises'
 
 import { Repository } from '../../../src/models/repository'
 import {
@@ -36,6 +36,7 @@ import { getStatusOrThrow } from '../../helpers/status'
 import { GitError as DugiteError, exec } from 'dugite'
 import { makeCommit, switchTo } from '../../helpers/repository-scaffolding'
 import { join } from 'node:path'
+import { ReceiveLimit } from '../../../src/lib/large-files'
 
 async function getTextDiff(
   repo: Repository,
@@ -201,6 +202,57 @@ describe('git/diff', () => {
   })
 
   describe('getWorkingDirectoryDiff', () => {
+    it('does not invoke Git diff for a file above the receive limit', async t => {
+      const repo = await setupEmptyRepository(t)
+      const filePath = join(repo.path, 'windows.iso')
+      await writeFile(filePath, '')
+      await truncate(filePath, ReceiveLimit + 1)
+      const file = new WorkingDirectoryFileChange(
+        'windows.iso',
+        { kind: AppFileStatusKind.Untracked },
+        DiffSelection.fromInitialSelection(DiffSelectionType.All)
+      )
+
+      const diff = await getWorkingDirectoryDiff(repo, file)
+
+      assert.equal(diff.kind, DiffType.Unrenderable)
+    })
+
+    it('does not classify a symlink by the size of its target', async t => {
+      const repo = await setupEmptyRepository(t)
+      const targetPath = join(repo.path, 'large-target.iso')
+      const linkPath = join(repo.path, 'large-target-link')
+      await writeFile(targetPath, '')
+      await truncate(targetPath, ReceiveLimit + 1)
+
+      try {
+        await symlink(targetPath, linkPath, 'file')
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          (error.code === 'EPERM' ||
+            error.code === 'EACCES' ||
+            error.code === 'ENOSYS')
+        ) {
+          t.skip('This machine does not allow file symlinks')
+          return
+        }
+        throw error
+      }
+
+      const file = new WorkingDirectoryFileChange(
+        'large-target-link',
+        { kind: AppFileStatusKind.Untracked },
+        DiffSelection.fromInitialSelection(DiffSelectionType.All)
+      )
+
+      const diff = await getWorkingDirectoryDiff(repo, file)
+
+      assert.notEqual(diff.kind, DiffType.Unrenderable)
+    })
+
     it('counts lines for new file', async t => {
       const testRepoPath = await setupFixtureRepository(t, 'repo-with-changes')
       const repository = new Repository(testRepoPath, -1, null, false)

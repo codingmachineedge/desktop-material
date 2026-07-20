@@ -9,9 +9,12 @@ import {
   IRepositoryTab,
   ITabTitleStyle,
   emptyProfileTabsState,
+  normalizeTabTitleStyle,
 } from '../../models/repository-tab'
 import { PrimaryWindowScope } from '../window-scope'
 import { ITabSessionFile, TabSessionImportMode } from '../tab-session-file'
+import { IVersionedStoreHistorySource } from '../../ui/version-history'
+import { ElementAppearanceCoordinator } from './element-appearance-coordinator'
 
 /** Additional repository names/aliases that may be searched for a tab. */
 export type RepositoryTabMatchKeyResolver = (
@@ -97,16 +100,19 @@ function stableSortPinGroups(
 
 /**
  * Holds the browser-style repository tab strip for the active profile. Every
- * mutation is persisted through the profile store, which auto-commits it to the
- * profile's git repository.
+ * structural mutation is persisted through the profile store. When an element
+ * coordinator is available, each title appearance is overlaid from and
+ * committed to that tab's own local Git repository instead.
  */
 export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
   private state: IProfileTabsState = emptyProfileTabsState
+  private readonly tabStyleRevisions = new Map<string, number>()
 
   public constructor(
     private readonly profileStore: ProfileStore,
     private readonly windowScope: string = PrimaryWindowScope,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
+    private readonly elementAppearanceCoordinator?: ElementAppearanceCoordinator
   ) {
     super()
   }
@@ -123,19 +129,84 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
   public async initialize(): Promise<void> {
     const loaded = await this.profileStore.readTabs(this.windowScope)
     if (loaded !== null) {
-      this.state = { ...loaded, tabs: groupPinnedTabs(loaded.tabs) }
+      this.tabStyleRevisions.clear()
+      this.state = await this.withDedicatedTabStyles(loaded)
       this.emitUpdate(this.state)
+      await this.migrateLegacyTabStyles(loaded)
     }
   }
 
   /** Re-read tabs from disk (e.g. after a profile switch or history restore). */
   public async reloadFromDisk(): Promise<void> {
     const loaded = await this.profileStore.readTabs(this.windowScope)
+    this.tabStyleRevisions.clear()
     this.state =
       loaded === null
         ? emptyProfileTabsState
-        : { ...loaded, tabs: groupPinnedTabs(loaded.tabs) }
+        : await this.withDedicatedTabStyles(loaded)
     this.emitUpdate(this.state)
+    if (loaded !== null) {
+      await this.migrateLegacyTabStyles(loaded)
+    }
+  }
+
+  /**
+   * Seed one dedicated title repository per tab from the legacy profile file,
+   * then overlay the dedicated value into the renderer state. Once a tab owns
+   * a repository, tabs.json can never overwrite its appearance during reload.
+   */
+  private async withDedicatedTabStyles(
+    state: IProfileTabsState
+  ): Promise<IProfileTabsState> {
+    const coordinator = this.elementAppearanceCoordinator
+    if (coordinator === undefined) {
+      return { ...state, tabs: groupPinnedTabs(state.tabs) }
+    }
+
+    // Profile switches are handled asynchronously by the coordinator. Flush
+    // first so a reload cannot accidentally seed a tab into the prior profile.
+    await coordinator.flush()
+    const tabs = await Promise.all(
+      state.tabs.map(async tab => {
+        const appearance = await coordinator.ensureTabTitleElement(
+          tab.id,
+          normalizeTabTitleStyle(tab.titleStyle)
+        )
+        return { ...tab, titleStyle: appearance.style }
+      })
+    )
+    return { ...state, tabs: groupPinnedTabs(tabs) }
+  }
+
+  /** Keep the shared profile repository structural after successful seeding. */
+  private async migrateLegacyTabStyles(
+    loaded: IProfileTabsState
+  ): Promise<void> {
+    if (
+      this.elementAppearanceCoordinator === undefined ||
+      !loaded.tabs.some(tab => tab.titleStyle !== null)
+    ) {
+      return
+    }
+
+    await this.profileStore.writeTabs(
+      this.structuralState(this.state),
+      'Move tab appearance to element repositories',
+      this.windowScope
+    )
+  }
+
+  /** tabs.json owns tab structure only; titleStyle is an element-repo field. */
+  private structuralState(state: IProfileTabsState): IProfileTabsState {
+    if (this.elementAppearanceCoordinator === undefined) {
+      return state
+    }
+    return {
+      ...state,
+      tabs: state.tabs.map(tab =>
+        tab.titleStyle === null ? tab : { ...tab, titleStyle: null }
+      ),
+    }
   }
 
   /**
@@ -181,7 +252,11 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
   ): Promise<void> {
     this.state = next
     this.emitUpdate(this.state)
-    await this.profileStore.writeTabs(next, description, this.windowScope)
+    await this.profileStore.writeTabs(
+      this.structuralState(next),
+      description,
+      this.windowScope
+    )
   }
 
   /**
@@ -212,6 +287,12 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
       customLabel: null,
       titleStyle: null,
       openedAt: this.now(),
+    }
+    if (this.elementAppearanceCoordinator !== undefined) {
+      await this.elementAppearanceCoordinator.ensureTabTitleElement(
+        tab.id,
+        null
+      )
     }
     await this.persist(
       { tabs: [...this.state.tabs, tab], activeTabId: tab.id },
@@ -248,6 +329,7 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
       { tabs, activeTabId },
       `Close tab: ${closed.customLabel ?? '#' + closed.repositoryId}`
     )
+    this.tabStyleRevisions.delete(id)
     return activeTabId
   }
 
@@ -331,6 +413,9 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     }
 
     await this.persist({ tabs, activeTabId }, description)
+    for (const id of closableIds) {
+      this.tabStyleRevisions.delete(id)
+    }
     return activeTabId
   }
 
@@ -640,15 +725,34 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
         ? this.state.activeTabId
         : tabs[0]?.id ?? null)
 
+    let nextState: IProfileTabsState = { tabs, activeTabId }
+    if (this.elementAppearanceCoordinator !== undefined) {
+      // A portable import carries appearance as seed data for a new tab and as
+      // an explicit edit for a matching tab. Each imported title still lands
+      // in that tab's own repository rather than in the session commit.
+      for (const { entry, repository } of resolved) {
+        const tab = nextState.tabs.find(
+          candidate => candidate.repositoryId === repository.id
+        )
+        if (tab !== undefined) {
+          await this.elementAppearanceCoordinator.setTabTitleElement(
+            tab.id,
+            entry.titleStyle
+          )
+        }
+      }
+      nextState = await this.withDedicatedTabStyles(nextState)
+    }
+
     await this.persist(
-      { tabs, activeTabId },
+      nextState,
       mode === 'replace' ? 'Replace tab session' : 'Merge tab session'
     )
     const selectedRepository =
       repositories.find(
         repository =>
           repository.id ===
-          tabs.find(tab => tab.id === activeTabId)?.repositoryId
+          nextState.tabs.find(tab => tab.id === activeTabId)?.repositoryId
       ) ?? null
     return {
       importedCount: resolved.length,
@@ -733,15 +837,95 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     id: string,
     style: ITabTitleStyle | null
   ): Promise<void> {
-    const tabs = this.state.tabs.map(t =>
-      t.id === id
-        ? {
-            ...t,
-            titleStyle:
-              style === null ? null : { ...(t.titleStyle ?? {}), ...style },
-          }
-        : t
+    const current = this.state.tabs.find(tab => tab.id === id)
+    if (current === undefined) {
+      return
+    }
+
+    const titleStyle =
+      style === null
+        ? null
+        : normalizeTabTitleStyle({ ...(current.titleStyle ?? {}), ...style })
+    const tabs = this.state.tabs.map(tab =>
+      tab.id === id ? { ...tab, titleStyle } : tab
     )
-    await this.persist({ ...this.state, tabs }, 'Update tab appearance')
+
+    if (this.elementAppearanceCoordinator === undefined) {
+      await this.persist({ ...this.state, tabs }, 'Update tab appearance')
+      return
+    }
+
+    // Renderer state updates immediately, but the only durable write is the
+    // exact tab element's setting.json and its dedicated Git history.
+    const revision = (this.tabStyleRevisions.get(id) ?? 0) + 1
+    this.tabStyleRevisions.set(id, revision)
+    this.state = { ...this.state, tabs }
+    this.emitUpdate(this.state)
+    try {
+      await this.elementAppearanceCoordinator.setTabTitleElement(id, titleStyle)
+    } catch (error) {
+      // Do not let an older failed edit overwrite a newer optimistic edit. If
+      // this is still the latest request, snap the renderer back to the last
+      // durable value before surfacing the error.
+      if (this.tabStyleRevisions.get(id) === revision) {
+        const durable =
+          await this.elementAppearanceCoordinator.ensureTabTitleElement(
+            id,
+            current.titleStyle
+          )
+        this.state = {
+          ...this.state,
+          tabs: this.state.tabs.map(tab =>
+            tab.id === id ? { ...tab, titleStyle: durable.style } : tab
+          ),
+        }
+        this.emitUpdate(this.state)
+      }
+      throw error
+    }
+  }
+
+  /** Full mutable history for one tab title's dedicated local Git repository. */
+  public getTabStyleHistorySource(
+    id: string
+  ): IVersionedStoreHistorySource | null {
+    if (!this.state.tabs.some(tab => tab.id === id)) {
+      return null
+    }
+    return (
+      this.elementAppearanceCoordinator?.getTabTitleHistorySource(id) ?? null
+    )
+  }
+
+  /** Absolute path of one tab title's dedicated local Git repository. */
+  public getTabStyleRepositoryPath(id: string): string | null {
+    if (!this.state.tabs.some(tab => tab.id === id)) {
+      return null
+    }
+    return (
+      this.elementAppearanceCoordinator?.getTabTitleRepositoryPath(id) ?? null
+    )
+  }
+
+  /** Overlay an undo/redo/restore result without writing the profile file. */
+  public async reloadTabStyleFromElement(id: string): Promise<void> {
+    const coordinator = this.elementAppearanceCoordinator
+    const current = this.state.tabs.find(tab => tab.id === id)
+    if (coordinator === undefined || current === undefined) {
+      return
+    }
+
+    const appearance = await coordinator.ensureTabTitleElement(
+      id,
+      current.titleStyle
+    )
+    this.tabStyleRevisions.set(id, (this.tabStyleRevisions.get(id) ?? 0) + 1)
+    this.state = {
+      ...this.state,
+      tabs: this.state.tabs.map(tab =>
+        tab.id === id ? { ...tab, titleStyle: appearance.style } : tab
+      ),
+    }
+    this.emitUpdate(this.state)
   }
 }

@@ -312,6 +312,54 @@ describe('repository-list custom logos', () => {
     })
   })
 
+  it('waits for the dedicated coordinator, then reloads its logo on a profile invalidation', async () => {
+    const repo = repository('/work/coordinator-startup', 10)
+    const legacyLoader = new ImmediateLogoLoader(design('#101010'))
+    let ready = false
+    let coordinatorLogo = design('#202020')
+    let coordinatorReads = 0
+    const coordinatorDispatcher = {
+      isElementAppearanceCoordinatorReady: () => ready,
+      getResolvedRepositoryElementAppearance: async () => {
+        coordinatorReads++
+        return { logo: coordinatorLogo, listNameStyle: null }
+      },
+    } as unknown as Dispatcher
+    const renderRow = (revision: number) => (
+      <RepositoryListItem
+        repository={repo}
+        needsDisambiguation={false}
+        matches={noMatches}
+        aheadBehind={null}
+        changedFilesCount={0}
+        branchName={null}
+        repositoryLogoLoader={legacyLoader}
+        repositoryLogoChange={{ revision, repositoryPath: null }}
+        dispatcher={coordinatorDispatcher}
+      />
+    )
+    const view = render(renderRow(0))
+
+    await new Promise(resolve => window.setTimeout(resolve, 75))
+    assert.equal(legacyLoader.loadCalls.length, 0)
+    assert.equal(coordinatorReads, 0)
+    assert.equal(view.container.querySelector('.repository-list-logo'), null)
+
+    ready = true
+    await waitFor(() =>
+      assert.ok(view.container.querySelector('[fill="#202020"]'))
+    )
+    assert.equal(legacyLoader.loadCalls.length, 0)
+    assert.equal(coordinatorReads, 1)
+
+    coordinatorLogo = design('#303030')
+    view.rerender(renderRow(1))
+    await waitFor(() =>
+      assert.ok(view.container.querySelector('[fill="#303030"]'))
+    )
+    assert.equal(coordinatorReads, 2)
+  })
+
   it('applies the repository list-name typography to the row name', async () => {
     const loader = new ImmediateLogoLoader(design('#5a5a5a'))
     loader.listNameStyle = {

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import * as React from 'react'
 
 import { ProfileStore } from '../../../src/lib/stores/profile-store'
+import { ElementAppearanceCoordinator } from '../../../src/lib/stores/element-appearance-coordinator'
 import { RepositoryStateCache } from '../../../src/lib/stores/repository-state-cache'
 import { RepositoryTabsStore } from '../../../src/lib/stores/repository-tabs-store'
 import { CloningRepository } from '../../../src/models/cloning-repository'
@@ -12,6 +13,7 @@ import {
 } from '../../../src/models/repository-tab'
 import { Repository } from '../../../src/models/repository'
 import { TipState } from '../../../src/models/tip'
+import { IVersionedStoreHistorySource } from '../../../src/ui/version-history'
 import { ArrangeTabsPopover } from '../../../src/ui/repository-tabs/arrange-tabs-popover'
 import {
   CloseTabsContainingPopover,
@@ -59,14 +61,20 @@ function makeTab(
 
 async function createStore(
   tabs: ReadonlyArray<IRepositoryTab>,
-  activeTabId: string | null = tabs[0]?.id ?? null
+  activeTabId: string | null = tabs[0]?.id ?? null,
+  elementAppearanceCoordinator?: ElementAppearanceCoordinator
 ): Promise<RepositoryTabsStore> {
   const initial: IProfileTabsState = { tabs, activeTabId }
   const profileStore = {
     readTabs: () => Promise.resolve(initial),
     writeTabs: () => Promise.resolve(),
   } as unknown as ProfileStore
-  const store = new RepositoryTabsStore(profileStore)
+  const store = new RepositoryTabsStore(
+    profileStore,
+    'primary',
+    Date.now,
+    elementAppearanceCoordinator
+  )
   await store.initialize()
   return store
 }
@@ -567,6 +575,103 @@ describe('TabSearchPopover', () => {
     assert.equal(
       input.getAttribute('aria-activedescendant'),
       'tab-search-result-0'
+    )
+  })
+})
+
+describe('RepositoryTab title appearance', () => {
+  it('opens the title-owned anchored editor and its independent Git history', async () => {
+    const alpha = new Repository('/work/alpha', 1, null, false)
+    let style: IRepositoryTab['titleStyle'] = null
+    const historySource: IVersionedStoreHistorySource = {
+      getHistory: async () => ({
+        entries: [],
+        total: 0,
+        hasMore: false,
+        canUndo: false,
+        canRedo: false,
+      }),
+      getFiles: async () => [],
+      getDiff: async () => '',
+      undoLastChange: async () => undefined,
+      redoLastChange: async () => undefined,
+      restoreTo: async () => undefined,
+    }
+    const coordinator = {
+      flush: async () => undefined,
+      ensureTabTitleElement: async (
+        _tabId: string,
+        seed: IRepositoryTab['titleStyle']
+      ) => ({ style: style ?? seed }),
+      setTabTitleElement: async (
+        _tabId: string,
+        next: IRepositoryTab['titleStyle']
+      ) => {
+        style = next
+      },
+      getTabTitleHistorySource: () => historySource,
+      getTabTitleRepositoryPath: () =>
+        'C:\\appearance-elements\\alpha-tab\\title-style',
+    } as unknown as ElementAppearanceCoordinator
+    const store = await createStore(
+      [makeTab('alpha-tab', alpha)],
+      'alpha-tab',
+      coordinator
+    )
+    const dispatcher = {
+      selectRepository: () => undefined,
+      showFoldout: () => undefined,
+      setNotificationCentreOpen: () => undefined,
+    } as unknown as Dispatcher
+    const stateManager = {
+      get: () => {
+        throw new Error('status cache should not be read by the style editor')
+      },
+    } as unknown as RepositoryStateCache
+
+    render(
+      <RepositoryTabStrip
+        tabsStore={store}
+        repositories={[alpha]}
+        dispatcher={dispatcher}
+        repositoryStateManager={stateManager}
+        unreadNotificationCount={0}
+        isNotificationCentreOpen={false}
+      />
+    )
+
+    const label = screen.getByText('alpha')
+    assert.equal(label.classList.contains('repository-tab-label'), true)
+    fireEvent.contextMenu(label)
+
+    assert.ok(screen.getByText('Tab appearance'))
+    assert.ok(
+      screen.getByText('C:\\appearance-elements\\alpha-tab\\title-style')
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open tab appearance history' })
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('dialog', { name: 'alpha tab title history' }))
+    )
+    assert.ok(screen.getByText('Element-local Git history'))
+    assert.ok(screen.getByRole('button', { name: 'Undo' }))
+    assert.ok(screen.getByRole('button', { name: 'Redo' }))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Close alpha tab title history' })
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Close alpha tab title' })
+    )
+    await waitFor(() => assert.equal(document.activeElement, label))
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: 'alpha' }))
+    assert.equal(
+      screen.queryByText('Tab appearance'),
+      null,
+      'the surrounding frame keeps its tab-command context menu'
     )
   })
 })

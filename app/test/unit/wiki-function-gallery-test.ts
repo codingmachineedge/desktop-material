@@ -19,7 +19,7 @@ describe('wiki function screenshot catalog', () => {
       .filter(name => name.endsWith('.png'))
       .sort()
 
-    assert.equal(rows.length, 65)
+    assert.equal(rows.length, 68)
     assert.equal(new Set(rows.map(row => row.asset)).size, rows.length)
     assert.equal(new Set(rows.map(row => row.name)).size, rows.length)
     assert.deepEqual(rows.map(row => row.asset).sort(), assets)

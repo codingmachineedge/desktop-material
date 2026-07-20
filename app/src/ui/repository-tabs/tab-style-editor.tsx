@@ -33,6 +33,10 @@ interface ITabStyleEditorProps {
   readonly onStyleChange: (style: ITabTitleStyle) => void
   readonly onReset: () => void
   readonly onClose: () => void
+  /** Render only the editor body when an AnchoredAppearanceEditor owns chrome. */
+  readonly embedded?: boolean
+  /** Open this exact tab title's dedicated local Git history manager. */
+  readonly onShowHistory?: () => void
 }
 
 interface ITabStyleEditorState {
@@ -595,17 +599,22 @@ export class TabStyleEditor extends React.Component<
         ? configuredSpacing
         : DefaultTabCharacterSpacing
 
-    return (
-      <Popover
-        anchor={this.props.anchor}
-        anchorPosition={PopoverAnchorPosition.BottomLeft}
-        decoration={PopoverDecoration.Balloon}
-        ariaLabelledby="tab-style-editor-title"
-        onClickOutside={this.props.onClose}
-      >
-        <div className="tab-style-editor">
-          <div className="tab-style-header">
-            <h3 id="tab-style-editor-title">Tab appearance</h3>
+    const editor = (
+      <div className="tab-style-editor">
+        <div className="tab-style-header">
+          <h3 id="tab-style-editor-title">Tab appearance</h3>
+          <div className="tab-style-header-actions">
+            {this.props.onShowHistory !== undefined && (
+              <button
+                type="button"
+                className="tab-style-reset tab-style-history"
+                onClick={this.props.onShowHistory}
+                aria-label="Open tab appearance history"
+              >
+                <Octicon symbol={octicons.history} />
+                History
+              </button>
+            )}
             <button
               type="button"
               className="tab-style-reset"
@@ -615,101 +624,108 @@ export class TabStyleEditor extends React.Component<
               Clear
             </button>
           </div>
-
-          {this.renderPreview()}
-
-          <div className="tab-style-row tab-style-buttons">
-            {this.renderToggle('bold', 'B', 'style-bold', 'Bold')}
-            {this.renderToggle('italic', 'I', 'style-italic', 'Italic')}
-            {this.renderToggle(
-              'underline',
-              'U',
-              'style-underline',
-              'Underline'
-            )}
-            {this.renderToggle(
-              'strikeThrough',
-              <Octicon symbol={octicons.strikethrough} />,
-              'style-strike',
-              'Strikethrough'
-            )}
-            <span className="tab-style-divider" />
-            {this.renderAlign('left')}
-            {this.renderAlign('center')}
-            {this.renderAlign('right')}
-          </div>
-
-          {this.renderFontPicker()}
-
-          <div className="tab-style-row tab-style-size">
-            <label htmlFor="tab-style-size-input">Size</label>
-            <input
-              id="tab-style-size-input"
-              type="range"
-              min={MinTabFontSize}
-              max={MaxTabFontSize}
-              step={1}
-              value={size}
-              onChange={this.onSizeChange}
-            />
-            <span className="tab-style-size-value">{size}px</span>
-          </div>
-
-          <fieldset className="tab-style-control-group">
-            <legend>Letter case</legend>
-            <div className="tab-style-choice-row">
-              {this.renderCaseChoice('normal', 'Aa', 'Normal case')}
-              {this.renderCaseChoice('uppercase', 'AA', 'Uppercase')}
-              {this.renderCaseChoice('lowercase', 'aa', 'Lowercase')}
-              {this.renderCaseChoice('capitalize', 'Ab', 'Capitalize words')}
-              {this.renderToggle(
-                'smallCaps',
-                'SC',
-                'style-small-caps',
-                'Small caps'
-              )}
-            </div>
-          </fieldset>
-
-          <div className="tab-style-row tab-style-size tab-style-spacing">
-            <label htmlFor="tab-style-spacing-input">Spacing</label>
-            <input
-              id="tab-style-spacing-input"
-              type="range"
-              min={MinTabCharacterSpacing}
-              max={MaxTabCharacterSpacing}
-              step={0.25}
-              value={characterSpacing}
-              onChange={this.onCharacterSpacingChange}
-            />
-            <output
-              className="tab-style-size-value"
-              htmlFor="tab-style-spacing-input"
-            >
-              {characterSpacing}px
-            </output>
-          </div>
-
-          <fieldset className="tab-style-control-group">
-            <legend>Text effect</legend>
-            <div className="tab-style-choice-row tab-style-effect-row">
-              {this.renderEffectChoice('none', 'None', 'No text effect')}
-              {this.renderEffectChoice(
-                'soft-shadow',
-                'Soft',
-                'Soft text shadow'
-              )}
-              {this.renderEffectChoice(
-                'strong-shadow',
-                'Strong',
-                'Strong text shadow'
-              )}
-            </div>
-          </fieldset>
-
-          {this.renderColors('color')}
-          {this.renderColors('backgroundColor')}
         </div>
+
+        {this.renderPreview()}
+
+        <div className="tab-style-row tab-style-buttons">
+          {this.renderToggle('bold', 'B', 'style-bold', 'Bold')}
+          {this.renderToggle('italic', 'I', 'style-italic', 'Italic')}
+          {this.renderToggle('underline', 'U', 'style-underline', 'Underline')}
+          {this.renderToggle(
+            'strikeThrough',
+            <Octicon symbol={octicons.strikethrough} />,
+            'style-strike',
+            'Strikethrough'
+          )}
+          <span className="tab-style-divider" />
+          {this.renderAlign('left')}
+          {this.renderAlign('center')}
+          {this.renderAlign('right')}
+        </div>
+
+        {this.renderFontPicker()}
+
+        <div className="tab-style-row tab-style-size">
+          <label htmlFor="tab-style-size-input">Size</label>
+          <input
+            id="tab-style-size-input"
+            type="range"
+            min={MinTabFontSize}
+            max={MaxTabFontSize}
+            step={1}
+            value={size}
+            onChange={this.onSizeChange}
+          />
+          <span className="tab-style-size-value">{size}px</span>
+        </div>
+
+        <fieldset className="tab-style-control-group">
+          <legend>Letter case</legend>
+          <div className="tab-style-choice-row">
+            {this.renderCaseChoice('normal', 'Aa', 'Normal case')}
+            {this.renderCaseChoice('uppercase', 'AA', 'Uppercase')}
+            {this.renderCaseChoice('lowercase', 'aa', 'Lowercase')}
+            {this.renderCaseChoice('capitalize', 'Ab', 'Capitalize words')}
+            {this.renderToggle(
+              'smallCaps',
+              'SC',
+              'style-small-caps',
+              'Small caps'
+            )}
+          </div>
+        </fieldset>
+
+        <div className="tab-style-row tab-style-size tab-style-spacing">
+          <label htmlFor="tab-style-spacing-input">Spacing</label>
+          <input
+            id="tab-style-spacing-input"
+            type="range"
+            min={MinTabCharacterSpacing}
+            max={MaxTabCharacterSpacing}
+            step={0.25}
+            value={characterSpacing}
+            onChange={this.onCharacterSpacingChange}
+          />
+          <output
+            className="tab-style-size-value"
+            htmlFor="tab-style-spacing-input"
+          >
+            {characterSpacing}px
+          </output>
+        </div>
+
+        <fieldset className="tab-style-control-group">
+          <legend>Text effect</legend>
+          <div className="tab-style-choice-row tab-style-effect-row">
+            {this.renderEffectChoice('none', 'None', 'No text effect')}
+            {this.renderEffectChoice('soft-shadow', 'Soft', 'Soft text shadow')}
+            {this.renderEffectChoice(
+              'strong-shadow',
+              'Strong',
+              'Strong text shadow'
+            )}
+          </div>
+        </fieldset>
+
+        {this.renderColors('color')}
+        {this.renderColors('backgroundColor')}
+      </div>
+    )
+
+    if (this.props.embedded === true) {
+      return editor
+    }
+
+    return (
+      <Popover
+        anchor={this.props.anchor}
+        anchorPosition={PopoverAnchorPosition.BottomLeft}
+        decoration={PopoverDecoration.Balloon}
+        ariaLabelledby="tab-style-editor-title"
+        onClickOutside={this.props.onClose}
+      >
+        {editor}
       </Popover>
     )
   }

@@ -15,6 +15,12 @@ account propagation, OAuth scope alignment, and compact-surface corrections are
 shipped and retain their historical build, headless, `main`, CI, Pages, wiki,
 and cleanup receipts below and in `HANDOFF.md`.
 
+The current appearance architecture supersedes the original aggregate design.
+Every customizable owner is edited from an anchored right-click surface and has
+its own versioned setting, local Git repository, and history manager. General
+Appearance now contains ordinary preferences; Repository Settings has no
+Appearance tab.
+
 The July 18–19 maintenance target also implements temporary navigation from an
 initialized submodule back to its persisted root repository, exact persisted
 English/Hong Kong Cantonese/bilingual language modes, and per-profile Back
@@ -75,13 +81,14 @@ is applicable.
 | **Later** | **IMPLEMENTATION COMPLETE** | Exact merge-tree conflict paths, guided bisect, complete repository-wide Stash Manager, guarded Remote Manager, safe Repository Hooks Manager, richer GitHub Issues, and exact-account GitHub/GitLab/Bitbucket triage. |
 | **Closing acceptance** | **COMPLETE** | Exact source/build and isolated off-screen interaction are accepted with 14 inspected synthetic-only captures. Final documentation/image-union gates, `main`, CI/Pages/wiki/release verification, artifact purge, and owned-resource cleanup all passed. |
 
-## Post-M19 customization and adaptive-surface ledger
+## Current customization and adaptive-surface ledger
 
 | Work | Implementation state | Audited behavior and paths |
 | --- | --- | --- |
-| **Active-profile appearance defaults** | **COMPLETE; VERIFIED** | A strict versioned setting supplies 12 defaults: accent palette, surface palette, elevation, UI font, monospace font, motion, toolbar labels, toolbar density, repository-list density, tab density, tab width, and tab-close behavior. It is included in the active profile's allowlisted settings snapshot and local Git history. See `app/src/models/appearance-customization.ts`, `app/src/lib/profiles/profile-settings-registry.ts`, and `app/src/ui/preferences/appearance.tsx`. |
-| **Repository appearance inheritance** | **COMPLETE; VERIFIED** | Six allowlisted fields — accent palette, surface palette, toolbar labels, toolbar density, tab density, and tab width — can inherit the app default or override it through **Repository Settings → Appearance**. Explicit values are bounded, parsed as untrusted data, and stored only under `desktop-material.appearance` in local `.git/config`; they are not committed or shared. See `app/src/lib/appearance-customization.ts` and `app/src/ui/repository-settings/appearance.tsx`. |
-| **Word-style per-tab appearance** | **COMPLETE; VERIFIED** | The per-tab editor exposes bold, italic, underline, size, font family, alignment, and independent foreground/background targeting with curated/recent palettes, a custom color input, validation, persistence in the active profile, and return-to-default controls. See `app/src/models/repository-tab.ts`, `app/src/lib/stores/repository-tabs-store.ts`, `app/src/ui/repository-tabs/tab-style-editor.tsx`, and `app/styles/ui/_repository-tabs.scss`. |
+| **Owner-scoped profile appearance** | **COMPLETE; VERIFIED** | Right-clicking an actual customizable owner opens its editor beside that element. App workspace, update progress, toolbar, repository list, repository tabs, code/diff typography, temporary-submodule Back control, app identity, default repository logo, and individually identified feature controls each use a strict versioned `setting.json`, a separate local Git repository, and owner-only inspect/undo/redo/restore history. General **Settings → Appearance** contains ordinary preferences rather than these custom visual studios. See `app/src/models/element-appearance.ts`, `app/src/lib/stores/dedicated-setting-store.ts`, `app/src/lib/stores/element-appearance-coordinator.ts`, and `app/src/ui/appearance/`. |
+| **Repository appearance inheritance** | **COMPLETE; VERIFIED** | Each repository instance has independent workspace, toolbar, tab-strip, list-name, and logo owners, keyed by a stable local appearance UUID. Nullable values inherit their profile owner and can open that profile default from the anchored editor. Legacy aggregate/config values migrate into the dedicated stores; there is no **Repository Settings → Appearance** tab and `desktop-material.appearance` is no longer authoritative. See `app/src/lib/stores/element-appearance-coordinator.ts`, `app/src/ui/appearance/repository-element-appearance-editors.tsx`, and `app/src/ui/repositories-list/repository-list-item.tsx`. |
+| **Word-style per-tab appearance** | **COMPLETE; VERIFIED** | Right-clicking the actual tab label opens an anchored editor for that tab alone. Bold, italic, underline, size, font family, alignment, and independent foreground/background controls remain bounded, while the title style now has its own local Git repository and inspect/undo/redo/restore history instead of sharing aggregate profile history. See `app/src/lib/stores/repository-tabs-store.ts`, `app/src/ui/repository-tabs/tab-style-editor.tsx`, and `app/styles/ui/_repository-tabs.scss`. |
+| **Ordinary language preference** | **COMPLETE; VERIFIED** | English, playful Hong Kong Cantonese, and bilingual remain explicit choices under general Appearance. `language-mode-v1` is separate from custom element appearance, English remains the fallback, and the former aggregate appearance value is only a bounded migration source. See `app/src/lib/language-preference.ts`, `app/src/lib/i18n.ts`, and `app/src/ui/preferences/appearance.tsx`. |
 | **Measured toolbar More behavior** | **COMPLETE; VERIFIED** | The app bar measures usable width and real ellipsized label pressure, recalculates from scratch on size/copy/density changes, uses the compact footprint for Icons only, and moves Build & Run before Commit & Push. Overflowed originals stay mounted off-layout; focus follows an action across the boundary; widening or shorter copy restores controls deterministically; an open **More** surface stays stable until close. See `app/src/ui/toolbar/toolbar.tsx` and `app/src/ui/toolbar/toolbar-overflow-layout.ts`. |
 | **Material Welcome and public landing** | **COMPLETE; VERIFIED** | Welcome is a pure Material task card plus tonal workspace preview with compact and reduced-motion fallbacks. The static landing page uses a Material app bar, expressive hero surface, principle cards, screenshot evidence gallery, tonal call to action, and footer while preserving the existing static-site architecture. See `app/src/ui/welcome/`, `app/styles/ui/_welcome.scss`, and `site/`. |
 | **Guarded tab close workflows** | **COMPLETE; VERIFIED** | The original regex **Close Tabs Containing…** path remains available and now shares pinned-tab protection. The inverse **Close all tabs except those containing…** flow applies a case-insensitive literal substring across visible label, repository alias/name, and local path; an accessible Material confirmation exposes live kept/closed/protected counts and a bounded preview, and cannot confirm an empty or zero-match query. See `app/src/lib/stores/repository-tabs-store.ts` and `app/src/ui/repository-tabs/close-tabs-containing-popover.tsx`. |
@@ -91,7 +98,7 @@ is applicable.
 | **Provider triage account propagation** | **COMPLETE; VERIFIED** | Triage resolves the canonical `endpoint#id` binding saved by Repository Settings and reacts to repository replacement/binding updates without requiring a reopen. One usable exact provider/endpoint match may auto-bind an unassigned repository; multiple matches require a labelled **Use this account** choice; no match, stale token, permission, and organization-SSO states route to recovery. Existing explicit valid bindings are never silently replaced, and repository/account generations are revalidated before load/save. See `app/src/lib/stores/provider-triage-store.ts`, `app/src/lib/stores/app-store.ts`, and `app/src/ui/repository-tools/provider-triage.tsx`. |
 | **GitHub OAuth scope alignment** | **COMPLETE; VERIFIED** | Browser authorization requests the bounded feature scope set `repo user workflow notifications read:org`, covering repository/user operations, workflow-file updates, the GitHub inbox, and read-only organization context. The allowlist deliberately excludes delete/admin/key/package/codespace/audit/gist families. See `app/src/lib/github-oauth-scopes.ts` and `app/src/lib/api.ts`. |
 | **Compact-surface responsive corrections** | **COMPLETE; VERIFIED** | Repository Tools owns short-window vertical scrolling; Remote Manager gives name/URL/control columns usable minima and stacks before arbitrary character collapse; Regex Builder constrains itself to the renderer, reflows its category/token grid, scrolls the body, and keeps the tester/footer reachable. All three retain named controls, keyboard order, focus visibility, and no page-level horizontal overflow. See `app/styles/ui/_repository-tools.scss`, `app/styles/ui/dialogs/_repository-settings.scss`, and `app/styles/ui/_regex-builder.scss`. |
-| **Acceptance captures** | **COMPLETE; INSPECTED** | Seven privacy-safe 1440×960 captures were rendered from and inspected against exact tested source `c5205838dfc5ee2b7ce80ce488215a2cd903bb26`. Their dimensions, byte counts, hashes, and interaction receipt follow below and in `HANDOFF.md`. |
+| **Historical acceptance captures** | **COMPLETE; INSPECTED** | Seven privacy-safe 1440×960 captures were rendered from and inspected against exact tested source `c5205838dfc5ee2b7ce80ce488215a2cd903bb26`. Their dimensions, byte counts, hashes, and interaction receipt follow below and in `HANDOFF.md`; they document that milestone rather than the current owner-scoped editor. |
 
 | Capture | Dimensions | Bytes | SHA-256 |
 | --- | ---: | ---: | --- |
@@ -108,7 +115,7 @@ is applicable.
 | Work | Implementation state | Behavior and required acceptance |
 | --- | --- | --- |
 | **Temporary submodule repository navigation** | **COMPLETE; LOCALLY VERIFIED** | **Open as repository** is available only for an initialized checked-out submodule. The child is an ephemeral repository object: no repository-database row, repository-list/Recent/tab entry, or persisted last selection is written. A context bar returns to the persisted root repository, including after nested temporary navigation. Stale selection, invalid Git state, traversal, sibling-prefix, and symlink/junction escape targets fail closed. Every mutating, process-launching, persistence, cache, and asynchronous lifecycle boundary now revalidates or rejects a temporary child; Repository Tools remains read-only there. Run `20260718-232824-ci-10-pass-submodule-navigation` covered open, Back, restart, persistence, keyboard, compact, dark, scale, stale, lifecycle, and post-build regression behavior. See `app/src/models/repository.ts`, `app/src/lib/git/submodule.ts`, `app/src/lib/stores/app-store.ts`, `app/src/lib/stores/git-store-cache.ts`, `app/src/ui/dispatcher/dispatcher.ts`, `app/src/ui/repository-settings/submodules.tsx`, and `docs/features/repository-management/submodule-repository-navigation.md`. |
-| **Language and Back-control appearance** | **COMPLETE; LOCALLY VERIFIED** | The strict active-profile appearance value adds exact **English**, **Playful Hong Kong Cantonese**, and **Bilingual** modes plus **Tonal**/**Filled accent**/**Outlined** Back styles and **Back to parent**/**Parent name**/**Icon only** labels. English is the fallback, bilingual copy is compact, icon-only retains a destination-specific accessible name, and semantic localized spans keep separators and accessibility text correct. Resources are separate from rendering logic. The ten-pass run covered live/save/cancel, legacy fallback, all language modes, compact geometry, and 200%-requested auto-fit. See `app/src/models/language-mode.ts`, `app/src/models/appearance-customization.ts`, `app/src/lib/i18n.ts`, `app/src/lib/i18n-resources.ts`, `app/src/ui/lib/localized-text.tsx`, and `app/src/ui/preferences/appearance.tsx`. |
+| **Historical language and Back-control receipt** | **COMPLETE; LOCALLY VERIFIED** | At this July milestone, the strict aggregate active-profile appearance value added exact **English**, **Playful Hong Kong Cantonese**, and **Bilingual** modes plus **Tonal**/**Filled accent**/**Outlined** Back styles and **Back to parent**/**Parent name**/**Icon only** labels. English was the fallback, bilingual copy was compact, icon-only retained a destination-specific accessible name, and semantic localized spans kept separators and accessibility text correct. The ten-pass run covered live/save/cancel, legacy fallback, all language modes, compact geometry, and 200%-requested auto-fit. This is a historical receipt; the current implementation separates ordinary language preference from the Back element's dedicated repository. See `app/src/models/language-mode.ts`, `app/src/models/appearance-customization.ts`, `app/src/lib/i18n.ts`, `app/src/lib/i18n-resources.ts`, `app/src/ui/lib/localized-text.tsx`, and `app/src/ui/preferences/appearance.tsx`. |
 | **Packaged E2E updater port selection** | **COMPLETE; REMOTELY VERIFIED** | A CI setup action asks the operating system for a currently available `127.0.0.1` port and exports one exact `/update` URL for both the production build and mock updater server. The mock accepts only the bounded loopback HTTP endpoint and derives its origin/control URL from that value. The correction CI’s Windows x64 packaged-E2E job passed, proving the per-job loopback URL at build and runtime. See `.github/actions/setup-e2e-update-port/`, `.github/workflows/ci.yml`, and `app/test/e2e/mock-update-server.ts`. |
 | **Release publication gating** | **COMPLETE; REMOTELY VERIFIED** | Automatic installer publication starts only after successful CI for a same-repository `main` push, including documentation-only pushes. Manual dispatch runs the reusable CI gate first. The workflow verifies the intended SHA and `origin/main`, refuses an existing immutable tag, and repeats those fail-closed checks immediately before publication; it also requires non-empty installer assets and has one release publication action. The failed initial CI created only a skipped downstream run; successful correction CI `29696805239` drove Build Installers `29697597981`, which published five non-empty assets under immutable tag `v3.6.3-beta3-b0000000165`. See `.github/workflows/build-installers.yml` and `.github/workflows/release-pr.yml`. |
 
@@ -250,6 +257,12 @@ details are recorded in `HANDOFF.md`.
   exact scheme, host, and port are eligible. The successful account key is
   persisted before initial repository matching and retained by single, batch,
   missing-repository, and retry-clone paths.
+- The agent and Remote site expose saved-host SSH cloning only through
+  `list-ssh-hosts` and `clone-to-ssh`. The list returns display-safe metadata
+  from validated saved definitions; cloning accepts a credential-free URL, a
+  validated absolute or home-relative POSIX path, and an optional branch.
+  Connection secrets stay in the operating-system credential flow and
+  credential-shaped errors are redacted.
 - Account selection, profile mutation serialization, export rendering,
   provider routing, submodule display, repository tooltips, and other integration
   regressions found during the merge waves were fixed before the final build.
@@ -258,9 +271,12 @@ details are recorded in `HANDOFF.md`.
 
 1. Account identity is `getAccountKey(account) = endpoint#id`; provider ports do
    not fall back to login-only identity.
-2. Profile settings, tabs, flushes, history actions, and multi-window mutations
-   use the same serialized profile queue.
-3. `VersionedStoreHistory` remains the shared settings/notification history UI.
+2. Shared profile settings, structural tab state, flushes, and multi-window
+   mutations use the serialized profile queue. Appearance mutations serialize
+   inside the exact owner's dedicated store, so one owner's history action
+   cannot rewrite another owner.
+3. `VersionedStoreHistory` remains the shared history engine, including the
+   independently bound history in each anchored appearance editor.
 4. Batch clone consumes sanitized URL-only items; exports never contain tokens.
 5. Filter modes and regex parsing use the shared bounded search infrastructure.
 6. Automation posts results to the notification centre and never lets a
@@ -269,8 +285,9 @@ details are recorded in `HANDOFF.md`.
    size-bounded, and redacted.
 8. Desktop Plus behavior is adapted under its MIT license, but visuals continue
    to use Desktop Material's `--md-sys-*` token system.
-9. No token may be written to a profile repository, notification repository,
-   export file, screenshot, log, or agent response.
+9. No token may be written to a profile repository, appearance-element
+   repository, notification repository, export file, screenshot, log, or agent
+   response.
 10. Pull All account fallback remains HTTPS-only and exact-origin. Its forced
     account selector is internal to the trampoline, is never placed in a Git
     child environment, and is removed after the operation. Missing same-origin
@@ -283,20 +300,23 @@ details are recorded in `HANDOFF.md`.
     Account selectors stay internal to the trampoline; the successful stable
     account key is persisted for later repository matching and retries without
     exposing a token, login, selector, or credentials dialog.
-12. Appearance defaults remain a strict, versioned, allowlisted active-profile
-    value. The profile's local Git history is the app-wide audit trail; it must
-    not absorb repository-local overrides or credentials.
-13. Repository appearance overrides remain limited to six allowlisted fields
-    under `desktop-material.appearance` in local `.git/config`. Missing values
-    inherit active-profile defaults; invalid, oversized, or unsupported
-    payloads fail back to inheritance.
+12. Each customizable visual owner has one strict versioned `setting.json`, one
+    dedicated local Git repository, and one history source. Editors open beside
+    the actual right-clicked owner; general Appearance contains ordinary
+    preferences rather than a monolithic visual editor.
+13. Repository workspace, toolbar, tab-strip, list-name, and logo owners are
+    keyed by a stable local appearance UUID. Nullable fields inherit their
+    profile owner. Legacy aggregate profile values and
+    `desktop-material.appearance` are migration/compatibility inputs only, and
+    Repository Settings has no Appearance tab.
 14. Responsive app-bar layout is measurement-driven. Core repository,
     worktree, branch, and sync controls remain pinned; Build & Run moves to
     **More** before Commit & Push, and every resize recomputes restoration from
     the full ordered descriptor set without remounting live controls.
 15. Tab foreground and background colors remain bounded by the shared color
-    validator and persist with the tab model through the serialized profile
-    store.
+    validator. Each tab title style persists in its own dedicated Git repository
+    and has independent inspect/undo/redo/restore history; structural tab state
+    remains in the serialized profile store.
 16. Bulk tab close treats pinned tabs as protected. The inverse literal query
     cannot degrade into close-all, and tab arrangement never crosses a pin-group
     boundary unless the user explicitly changes pin state.
@@ -322,7 +342,8 @@ details are recorded in `HANDOFF.md`.
     initialized child worktree contained by the selected root repository. It
     never enters repository persistence, Recent, or last-selection state, and
     Back always targets the persisted root rather than another temporary child.
-24. Language mode is an explicit, versioned active-profile value with exactly
+24. Language mode is an ordinary explicit profile preference under
+    `language-mode-v1`, separate from custom element appearance, with exactly
     English, playful Hong Kong Cantonese, and bilingual choices. English is the
     fallback; the host locale does not silently replace a saved selection.
 25. Packaged updater E2E builds and their mock server consume the same validated
@@ -332,6 +353,11 @@ details are recorded in `HANDOFF.md`.
     SHA. Failed CI publishes nothing; immutable tags are not reused; required
     installable assets must exist and be non-empty; one eligible run has one
     release publication action.
+27. `list-ssh-hosts` exposes only bounded display metadata from validated saved
+    SSH definitions. `clone-to-ssh` accepts only a returned unambiguous host ID,
+    credential-free Git URL, validated POSIX destination, and optional branch;
+    it never accepts or returns an SSH secret and redacts credential-shaped
+    failures.
 
 ## M19 accepted app-source evidence
 

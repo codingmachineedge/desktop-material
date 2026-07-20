@@ -60,7 +60,11 @@ describe('appearance customization style contracts', () => {
       ),
     ])
 
-    assert.match(highlights, /body\[data-dm-highlight-features\]/)
+    assert.doesNotMatch(highlights, /body\[data-dm-highlight-features\]/)
+    assert.match(
+      highlights,
+      /\[data-dm-feature\]\[data-dm-feature-highlighted\]/
+    )
     assert.doesNotMatch(highlights, /@keyframes|animation:/)
     assert.match(highlights, /content: 'M'/)
     assert.match(highlights, /content: 'Material'/)
@@ -70,9 +74,9 @@ describe('appearance customization style contracts', () => {
     )
     assert.match(
       highlights,
-      /\.repository-tab-strip button\[data-dm-feature\][\s\S]*?box-shadow:/
+      /\.repository-tab-strip button\[data-dm-feature\]\[data-dm-feature-highlighted\][\s\S]*?box-shadow:/
     )
-    assert.match(appearance, /Highlight Desktop Material features/)
+    assert.doesNotMatch(appearance, /Highlight Desktop Material features/)
 
     for (const id of [
       'actions-tab',
@@ -114,7 +118,7 @@ describe('appearance customization style contracts', () => {
     assert.match(notificationBell, /data-dm-feature=\{true\}/)
   })
 
-  it('explains app and repository appearance scope in a Material tonal note', async () => {
+  it('routes custom visuals to element-owned anchored editors', async () => {
     const [appearance, preferences] = await Promise.all([
       readFile(Path.join(app, 'src/ui/preferences/appearance.tsx'), 'utf8'),
       readFile(Path.join(styles, 'ui/_preferences.scss'), 'utf8'),
@@ -122,8 +126,8 @@ describe('appearance customization style contracts', () => {
 
     assert.match(appearance, /className="appearance-scope-note"/)
     assert.match(appearance, /role="note"/)
-    assert.match(appearance, /active profile&apos;s local Git/)
-    assert.match(appearance, /Repository Settings/)
+    assert.match(appearance, /right-click that element/)
+    assert.match(appearance, /Each element keeps its settings/)
 
     assert.match(
       preferences,

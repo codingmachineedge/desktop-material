@@ -28,17 +28,9 @@ import { ShowBranchNameInRepoListSetting } from '../../models/show-branch-name-i
 import { IAppearanceCustomization } from '../../models/appearance-customization'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
-import { AppIdentity } from './app-identity'
-import { RepositoryLogoStudio } from '../repository-logo/repository-logo-studio'
-import { t, translate } from '../../lib/i18n'
+import { translate } from '../../lib/i18n'
 
-type AppearanceSelectKey = Exclude<
-  keyof IAppearanceCustomization,
-  | 'version'
-  | 'appIdentity'
-  | 'repositoryLogo'
-  | 'highlightDesktopMaterialFeatures'
->
+type AppearanceSelectKey = 'languageMode'
 
 interface IAppearanceProps {
   readonly selectedTheme: ApplicationTheme
@@ -104,7 +96,8 @@ export class Appearance extends React.Component<
     const key = event.currentTarget.name as AppearanceSelectKey
     this.props.onAppearanceCustomizationChanged({
       ...this.props.appearanceCustomization,
-      [key]: event.currentTarget.value,
+      [key]: event.currentTarget
+        .value as IAppearanceCustomization[AppearanceSelectKey],
     })
   }
 
@@ -129,65 +122,6 @@ export class Appearance extends React.Component<
     )
   }
 
-  private onAppIdentityChanged = (
-    appIdentity: IAppearanceCustomization['appIdentity']
-  ) => {
-    this.props.onAppearanceCustomizationChanged({
-      ...this.props.appearanceCustomization,
-      appIdentity,
-    })
-  }
-
-  private onDefaultRepositoryLogoChanged = (
-    repositoryLogo: IAppearanceCustomization['repositoryLogo']
-  ) => {
-    this.props.onAppearanceCustomizationChanged({
-      ...this.props.appearanceCustomization,
-      repositoryLogo,
-    })
-  }
-
-  private onHighlightDesktopMaterialFeaturesChanged = (
-    event: React.FormEvent<HTMLInputElement>
-  ) => {
-    this.props.onAppearanceCustomizationChanged({
-      ...this.props.appearanceCustomization,
-      highlightDesktopMaterialFeatures: event.currentTarget.checked,
-    })
-  }
-
-  private renderFeatureHighlighting() {
-    return (
-      <section
-        className="appearance-feature-highlighting"
-        aria-labelledby="appearance-feature-highlighting-heading"
-      >
-        <div className="appearance-feature-highlighting-copy">
-          <h2 id="appearance-feature-highlighting-heading">
-            Feature discovery
-          </h2>
-          <p id="appearance-feature-highlighting-description">
-            Adds an accent edge and a Material badge to primary navigation,
-            toolbar, and command entry points that aren&apos;t available in
-            stock GitHub Desktop. This doesn&apos;t change how the features
-            work.
-          </p>
-        </div>
-        <Checkbox
-          className="desktop-material-feature-toggle"
-          label="Highlight Desktop Material features"
-          ariaDescribedBy="appearance-feature-highlighting-description"
-          value={
-            this.props.appearanceCustomization.highlightDesktopMaterialFeatures
-              ? CheckboxValue.On
-              : CheckboxValue.Off
-          }
-          onChange={this.onHighlightDesktopMaterialFeaturesChanged}
-        />
-      </section>
-    )
-  }
-
   private renderLanguageAndNavigation() {
     const languageMode = this.props.appearanceCustomization.languageMode
     const localize = (key: Parameters<typeof translate>[0]) =>
@@ -204,44 +138,6 @@ export class Appearance extends React.Component<
               { value: 'english', label: localize('language.english') },
               { value: 'cantonese', label: localize('language.cantonese') },
               { value: 'bilingual', label: localize('language.bilingual') },
-            ]
-          )}
-          {this.renderCustomizationSelect(
-            'submoduleBackButtonStyle',
-            localize('appearance.submoduleBackStyle'),
-            [
-              {
-                value: 'tonal',
-                label: localize('submodule.backStyleTonal'),
-              },
-              {
-                value: 'filled',
-                label: localize('submodule.backStyleFilled'),
-              },
-              {
-                value: 'outlined',
-                label: localize('submodule.backStyleOutlined'),
-              },
-            ]
-          )}
-        </Row>
-        <Row>
-          {this.renderCustomizationSelect(
-            'submoduleBackButtonLabel',
-            localize('appearance.submoduleBackLabel'),
-            [
-              {
-                value: 'back-to-parent',
-                label: localize('submodule.backLabelFull'),
-              },
-              {
-                value: 'parent-name',
-                label: localize('submodule.backLabelParent'),
-              },
-              {
-                value: 'icon-only',
-                label: localize('submodule.backLabelIcon'),
-              },
             ]
           )}
         </Row>
@@ -511,133 +407,6 @@ export class Appearance extends React.Component<
     )
   }
 
-  private renderColorAndSurfaces() {
-    return (
-      <div className="appearance-section appearance-customization-section">
-        <h2>Color and surfaces</h2>
-        <Row>
-          {this.renderCustomizationSelect('accentPalette', 'Accent color', [
-            { value: 'blue', label: 'Blue' },
-            { value: 'violet', label: 'Violet' },
-            { value: 'teal', label: 'Teal' },
-            { value: 'green', label: 'Green' },
-            { value: 'amber', label: 'Amber' },
-            { value: 'rose', label: 'Rose' },
-          ])}
-          {this.renderCustomizationSelect(
-            'updateProgressPalette',
-            t('appearance.updateProgressColor'),
-            [
-              { value: 'accent', label: t('appearance.useAccentColor') },
-              { value: 'blue', label: t('color.blue') },
-              { value: 'violet', label: t('color.violet') },
-              { value: 'teal', label: t('color.teal') },
-              { value: 'green', label: t('color.green') },
-              { value: 'amber', label: t('color.amber') },
-              { value: 'rose', label: t('color.rose') },
-            ]
-          )}
-          {this.renderCustomizationSelect('surfacePalette', 'Surface color', [
-            { value: 'tonal', label: 'Tonal' },
-            { value: 'neutral', label: 'Neutral' },
-          ])}
-        </Row>
-        {this.renderCustomizationSelect('elevation', 'Surface depth', [
-          { value: 'standard', label: 'Standard' },
-          { value: 'subtle', label: 'Subtle' },
-          { value: 'flat', label: 'Flat' },
-        ])}
-      </div>
-    )
-  }
-
-  private renderTypography() {
-    return (
-      <div className="appearance-section appearance-customization-section">
-        <h2>Typography</h2>
-        <Row>
-          {this.renderCustomizationSelect('uiFont', 'Interface font', [
-            { value: 'material', label: 'Material (Roboto)' },
-            { value: 'system', label: 'System' },
-          ])}
-          {this.renderCustomizationSelect(
-            'monospaceFont',
-            'Code and diff font',
-            [
-              { value: 'platform', label: 'Platform default' },
-              { value: 'consolas', label: 'Consolas' },
-              { value: 'sf-mono', label: 'SF Mono' },
-            ]
-          )}
-        </Row>
-      </div>
-    )
-  }
-
-  private renderToolbarAndTabs() {
-    return (
-      <div className="appearance-section appearance-customization-section">
-        <h2>Toolbar and tabs</h2>
-        <Row>
-          {this.renderCustomizationSelect('toolbarLabels', 'Toolbar labels', [
-            { value: 'auto', label: 'Automatic' },
-            { value: 'labels', label: 'Prefer labels' },
-            { value: 'icons', label: 'Icons only' },
-          ])}
-          {this.renderCustomizationSelect('toolbarDensity', 'Toolbar density', [
-            { value: 'comfortable', label: 'Comfortable' },
-            { value: 'compact', label: 'Compact' },
-          ])}
-        </Row>
-        <Row>
-          {this.renderCustomizationSelect(
-            'repositoryListDensity',
-            'Repository list density',
-            [
-              { value: 'comfortable', label: 'Comfortable' },
-              { value: 'compact', label: 'Compact' },
-            ]
-          )}
-          {this.renderCustomizationSelect('tabDensity', 'Tab density', [
-            { value: 'comfortable', label: 'Comfortable' },
-            { value: 'compact', label: 'Compact' },
-          ])}
-        </Row>
-        <Row>
-          {this.renderCustomizationSelect('tabWidth', 'Tab width', [
-            { value: 'compact', label: 'Compact' },
-            { value: 'standard', label: 'Standard' },
-            { value: 'wide', label: 'Wide' },
-          ])}
-          {this.renderCustomizationSelect(
-            'tabCloseButtons',
-            'Tab close buttons',
-            [
-              { value: 'hover', label: 'On hover' },
-              { value: 'always', label: 'Always' },
-              { value: 'active', label: 'Active tab only' },
-            ]
-          )}
-        </Row>
-      </div>
-    )
-  }
-
-  private renderMotion() {
-    return (
-      <div className="appearance-section appearance-customization-section">
-        <h2>Motion</h2>
-        {this.renderCustomizationSelect('motion', 'Animation', [
-          { value: 'system', label: 'Follow system setting' },
-          { value: 'reduced', label: 'Reduce motion' },
-        ])}
-        <p className="appearance-customization-caption">
-          Reduced motion can be enabled here or by your operating system.
-        </p>
-      </div>
-    )
-  }
-
   private renderFormatting() {
     if (!enableFormattingPreferences()) {
       return null
@@ -779,34 +548,20 @@ export class Appearance extends React.Component<
           aria-labelledby="appearance-scope-note-title"
         >
           <span className="appearance-scope-note-icon">
-            <Octicon symbol={octicons.history} height={20} />
+            <Octicon symbol={octicons.paintbrush} height={20} />
           </span>
           <div>
-            <h2 id="appearance-scope-note-title">App defaults</h2>
+            <h2 id="appearance-scope-note-title">Element appearance</h2>
             <p>
-              Changes here are saved in your active profile&apos;s local Git
-              history. For repository-only overrides, open{' '}
-              <strong>Repository Settings → Appearance</strong>.
+              To customize a visual element, right-click that element and open
+              its anchored appearance editor. Each element keeps its settings
+              and history separate.
             </p>
           </div>
         </aside>
-        {this.renderFeatureHighlighting()}
         {this.renderLanguageAndNavigation()}
-        <AppIdentity
-          value={this.props.appearanceCustomization.appIdentity}
-          onChange={this.onAppIdentityChanged}
-        />
-        <RepositoryLogoStudio
-          value={this.props.appearanceCustomization.repositoryLogo}
-          repositoryName="Example repository"
-          onChange={this.onDefaultRepositoryLogoChanged}
-        />
         {this.renderScaling()}
         {this.renderSelectedTheme()}
-        {this.renderColorAndSurfaces()}
-        {this.renderTypography()}
-        {this.renderToolbarAndTabs()}
-        {this.renderMotion()}
         {this.renderRepositoryList()}
         {this.renderBranchSorting()}
         {this.renderFormatting()}

@@ -20,7 +20,11 @@ import {
 import { Account } from '../../models/account'
 import { Author, UnknownAuthor } from '../../models/author'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
-import { CommitOptions, IFileListFilterState } from '../../lib/app-state'
+import {
+  CommitOperationPhase,
+  CommitOptions,
+  IFileListFilterState,
+} from '../../lib/app-state'
 import {
   isSafeFileExtension,
   DefaultEditorLabel,
@@ -172,6 +176,7 @@ interface IFilterChangesListProps {
   readonly dispatcher: Dispatcher
   readonly availableWidth: number
   readonly isCommitting: boolean
+  readonly commitOperationPhase: CommitOperationPhase | null
   readonly hookProgress: HookProgress | null
   readonly onShowCommitProgress?: (() => void) | undefined
   readonly isGeneratingCommitMessage: boolean
@@ -1072,6 +1077,7 @@ export class FilterChangesList extends React.Component<
       repositoryAccount,
       dispatcher,
       isCommitting,
+      commitOperationPhase,
       hookProgress,
       isGeneratingCommitMessage,
       commitToAmend,
@@ -1149,6 +1155,7 @@ export class FilterChangesList extends React.Component<
         focusCommitMessage={this.props.focusCommitMessage}
         autocompletionProviders={this.props.autocompletionProviders}
         isCommitting={isCommitting}
+        commitOperationPhase={commitOperationPhase}
         hookProgress={hookProgress}
         onShowCommitProgress={this.props.onShowCommitProgress}
         isGeneratingCommitMessage={isGeneratingCommitMessage}

@@ -8,6 +8,54 @@
   }
 }
 
+dialog#add-existing-repository.add-existing-repository-with-scan {
+  width: min(560px, calc(100vw - var(--spacing-double)));
+
+  .repository-folder-scan-row {
+    align-items: center;
+    gap: var(--spacing);
+
+    small {
+      color: var(--text-secondary-color);
+      line-height: 1.35;
+    }
+  }
+
+  .repository-folder-scan-results {
+    max-height: 190px;
+    margin-top: var(--spacing);
+    padding: var(--spacing);
+    overflow-y: auto;
+    border: var(--base-border);
+    border-radius: var(--border-radius);
+    background: var(--box-alt-background-color);
+
+    ul {
+      margin: var(--spacing-half) 0 0;
+      padding-left: var(--spacing-double);
+    }
+
+    li {
+      overflow: hidden;
+      font-family: var(--font-family-monospace);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    p {
+      margin: var(--spacing-half) 0 0;
+      color: var(--text-secondary-color);
+    }
+  }
+
+  @media (max-width: 520px) {
+    .repository-folder-scan-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+  }
+}
+
 .clone-github-repo {
   &.filter-list {
     max-width: 100%;

@@ -48,6 +48,33 @@ describe('compact dialog responsive contracts', () => {
     )
   })
 
+  it('widens Repository Settings while keeping submodule and subtree tools responsive', () => {
+    const repositorySettings = readStyle('dialogs/_repository-settings.scss')
+    const submoduleBackButton = readStyle('_submodule-back-button.scss')
+    const subtreeManager = readStyle('_subtree-manager.scss')
+
+    assert.match(
+      repositorySettings,
+      /#repository-settings\s*\{[\s\S]*?width: min\(960px, calc\(100vw - var\(--spacing-double\)\)\);/
+    )
+    assert.match(
+      submoduleBackButton,
+      /\.submodule-back-appearance-editor\s*\{[\s\S]*?width: min\(280px, calc\(var\(--available-width, 100vw\) - 32px\)\);[\s\S]*?max-height: min\(360px, calc\(var\(--available-height, 100vh\) - 32px\)\);[\s\S]*?overflow-y: auto;/
+    )
+    assert.match(
+      submoduleBackButton,
+      /@media \(max-width: 420px\), \(max-height: 480px\)[\s\S]*?max-width: calc\(100vw - 36px\);[\s\S]*?max-height: calc\(var\(--available-height, 100vh\) - 20px\);/
+    )
+    assert.match(
+      subtreeManager,
+      /#subtree-manager,\s*#repository-settings\s*\{[\s\S]*?\.subtrees-manager\s*\{[\s\S]*?min-width: 0;/
+    )
+    assert.match(
+      subtreeManager,
+      /@container repository-settings-pane \(max-width: 620px\)\s*\{[\s\S]*?\.subtree-row-body\s*\{[\s\S]*?flex-direction: column;[\s\S]*?\.subtree-editor-fields\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/
+    )
+  })
+
   it('bounds recovered workflow dialogs at narrow width and compact height', () => {
     const actions = readStyle('_actions-view.scss')
 

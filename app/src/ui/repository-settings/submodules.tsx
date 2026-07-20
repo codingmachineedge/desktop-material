@@ -22,17 +22,27 @@ import {
 } from '../lib/filter-list-mode'
 import {
   t,
+  translate,
   translateForAccessibleName,
   TranslationKey,
   TranslationVariables,
 } from '../../lib/i18n'
 import { LocalizedText } from '../lib/localized-text'
+import { IAppearanceCustomization } from '../../models/appearance-customization'
+import { SubmoduleBackButton } from '../submodules/submodule-back-button'
+import { ProfileAppearanceElementId } from '../../models/element-appearance'
 
 interface ISubmodulesProps {
   readonly repository: Repository
   readonly dispatcher: Dispatcher
   /** Dismisses only the popup which owns this submodule surface. */
   readonly onRepositoryOpened: () => void
+  /** Staged active-profile appearance, supplied by Repository Settings. */
+  readonly appearanceCustomization?: IAppearanceCustomization
+  /** Stages a profile appearance change until Repository Settings is saved. */
+  readonly onAppearanceCustomizationChanged?: (
+    customization: IAppearanceCustomization
+  ) => void
 }
 
 interface ISubmodulesState {
@@ -526,6 +536,122 @@ export class Submodules extends React.Component<
     return results.map(result => result.item)
   }
 
+  private onBackAppearanceHistoryMutation = () => {
+    const onChanged = this.props.onAppearanceCustomizationChanged
+    const current = this.props.appearanceCustomization
+    const getElement = this.props.dispatcher.getProfileAppearanceElement
+    if (
+      onChanged === undefined ||
+      current === undefined ||
+      !this.isElementAppearanceCoordinatorReady() ||
+      typeof getElement !== 'function'
+    ) {
+      return
+    }
+    const restored = getElement.call(
+      this.props.dispatcher,
+      ProfileAppearanceElementId.SubmoduleBackButton
+    )
+    onChanged({ ...current, ...restored })
+  }
+
+  /**
+   * Repository Settings is also rendered with deliberately minimal dispatcher
+   * doubles in unit and embedding contexts. Treat the element coordinator as
+   * an optional capability there; the production Dispatcher always provides
+   * it after startup.
+   */
+  private isElementAppearanceCoordinatorReady(): boolean {
+    const isReady = this.props.dispatcher.isElementAppearanceCoordinatorReady
+    return (
+      typeof isReady === 'function' &&
+      isReady.call(this.props.dispatcher) === true
+    )
+  }
+
+  private getBackAppearanceHistorySource() {
+    const getHistory = this.props.dispatcher.getProfileAppearanceHistorySource
+    return this.isElementAppearanceCoordinatorReady() &&
+      typeof getHistory === 'function'
+      ? getHistory.call(
+          this.props.dispatcher,
+          ProfileAppearanceElementId.SubmoduleBackButton
+        )
+      : undefined
+  }
+
+  private getBackAppearanceRepositoryPath(): string | undefined {
+    const getPath = this.props.dispatcher.getProfileAppearanceRepositoryPath
+    return this.isElementAppearanceCoordinatorReady() &&
+      typeof getPath === 'function'
+      ? getPath.call(
+          this.props.dispatcher,
+          ProfileAppearanceElementId.SubmoduleBackButton
+        )
+      : undefined
+  }
+
+  private renderAppearanceCustomizer(): JSX.Element | null {
+    const customization = this.props.appearanceCustomization
+    if (
+      customization === undefined ||
+      this.props.onAppearanceCustomizationChanged === undefined
+    ) {
+      return null
+    }
+
+    const mode = customization.languageMode
+    const localize = (key: TranslationKey) => translate(key, mode)
+    const parentName = this.props.repository.alias ?? this.props.repository.name
+
+    return (
+      <section
+        className="submodule-appearance-customizer"
+        aria-labelledby="submodule-appearance-heading"
+      >
+        <div className="submodule-appearance-copy">
+          <h3 id="submodule-appearance-heading">
+            <Octicon symbol={octicons.paintbrush} />
+            {localize('submodule.appearanceHeading')}
+          </h3>
+          <p>{localize('submodule.appearanceDescription')}</p>
+        </div>
+        <div
+          className="submodule-appearance-preview"
+          role="group"
+          aria-label={translateForAccessibleName(
+            'submodule.appearancePreview',
+            {},
+            mode
+          )}
+        >
+          <span className="submodule-appearance-preview-title">
+            {localize('submodule.appearancePreview')}
+          </span>
+          <div className="submodule-repository-context">
+            <SubmoduleBackButton
+              appearanceCustomization={customization}
+              parentName={parentName}
+              onAppearanceCustomizationChanged={
+                this.props.onAppearanceCustomizationChanged
+              }
+              historySource={this.getBackAppearanceHistorySource()}
+              repositoryPath={this.getBackAppearanceRepositoryPath()}
+              onHistoryMutation={this.onBackAppearanceHistoryMutation}
+            />
+            <p>
+              <LocalizedText
+                translationKey="submodule.viewingContext"
+                variables={{ child: 'library', parent: parentName }}
+                languageMode={mode}
+              />
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   private renderList(): JSX.Element {
     const { submodules, isLoading } = this.state
 
@@ -567,6 +693,7 @@ export class Submodules extends React.Component<
     return (
       <DialogContent>
         <div className="submodules-settings">
+          {this.renderAppearanceCustomizer()}
           <section className="submodules-section">
             <div className="submodules-section-header">
               <h3 className="submodules-section-title">
@@ -604,6 +731,10 @@ export class Submodules extends React.Component<
                 )}
               </div>
             </div>
+            <p className="submodules-temporary-open-note">
+              <Octicon symbol={octicons.info} />
+              <LocalizedText translationKey="submodule.temporaryOpenDescription" />
+            </p>
             {this.renderSummary()}
             {this.renderFilterControls()}
             {this.state.error !== null && (
@@ -724,7 +855,7 @@ function SubmoduleRow(props: ISubmoduleRowProps) {
           tooltip={
             submodule.status === 'uninitialized'
               ? t('submodule.openUnavailable')
-              : t('submodule.openAsRepository')
+              : t('submodule.temporaryOpenDescription')
           }
         >
           <Octicon symbol={octicons.repo} />

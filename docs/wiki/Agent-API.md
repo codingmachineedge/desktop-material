@@ -33,8 +33,9 @@ state flow and safety checks as human ones:
 
 - **Discovery and selection** — `list-accounts`, `list-repositories`, `list-tabs`, `get-status`,
   `open-repository`, `select-repository`, `select-tab`, and `close-tab`.
-- **Clone** — `clone` one URL into an explicit path, or `clone-batch` up to 50 repositories in
-  parallel or sequential mode.
+- **Clone** — `clone` one URL into an explicit local path, `clone-batch` up to 50 repositories in
+  parallel or sequential mode, and the saved-host pair `list-ssh-hosts` / `clone-to-ssh` for a
+  remote SSH working copy.
 - **Git** — `commit`, `fetch`, `pull`, `push`, `list-branches`, `create-branch`, and `merge-branch`.
   Commands accept a repository ID or path so an agent does not have to depend on UI selection.
 - **Automation** — `get-automation-status` reads effective settings and operation phases;
@@ -48,6 +49,51 @@ state flow and safety checks as human ones:
 
 Where the app already gates an action (for example the [Automation](Automation) preconditions), the
 agent path is subject to the **same gates** — it cannot force an operation the UI would refuse.
+
+## Clone to a saved SSH host
+
+First save and test a host in **Repository Settings → Remote → SSH Working Copy**. The agent
+commands do not create hosts or accept connection credentials. `list-ssh-hosts` takes an empty
+object and discovers validated definitions attached to repositories currently available to the
+profile. It returns only bounded display metadata:
+
+```json
+[
+  {
+    "id": "0123456789abcdef0123456789abcdef",
+    "name": "Build host",
+    "address": "build.example.test:2222",
+    "available": true
+  }
+]
+```
+
+The response deliberately omits the SSH user, identity-file path, saved destination, source remote,
+and deployment settings. A duplicate host identifier from different repository definitions is
+ambiguous and is omitted rather than guessed.
+
+Call `clone-to-ssh` with one returned `hostId`, a credential-free Git URL, an absolute or
+home-relative POSIX destination, and an optional branch:
+
+```json
+{
+  "hostId": "0123456789abcdef0123456789abcdef",
+  "url": "ssh://git@code.example.test/team/project.git",
+  "path": "~/work/project",
+  "branch": "main"
+}
+```
+
+The URL may use HTTPS, SSH, Git, or SCP-style SSH syntax, but embedded passwords, tokens, query
+strings, fragments, local paths, and option-shaped values are rejected. The destination must start
+with `/` or `~/`, may not contain empty, `.` or `..` segments, and must not already exist. Branches
+are validated before reaching the remote shell.
+
+Desktop Material executes the saved OpenSSH definition with agent forwarding and connection
+sharing disabled. Passwords and key passphrases remain in the operating-system credential flow;
+they are not command arguments or results. Common private-key, credential-URL, bearer, password,
+passphrase, and provider-token shapes are redacted from failures before an agent response is
+returned.
 
 ## Named API app functions
 

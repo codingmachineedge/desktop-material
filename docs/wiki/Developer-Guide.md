@@ -79,21 +79,21 @@ Desktop Material stores each account's **settings, tabs, and notifications as th
 repositories** under Electron's `userData` directory. This is what powers the fork's versioned
 settings:
 
-- Every settings or tab change **auto-commits** to that account's profile repo.
+- Ordinary settings and structural tab changes **auto-commit** to that account's profile repo.
 - The **history manager** (Settings → History) is `git log` over that repo — **undo/redo** walk the
   commits, and **restore** checks out an earlier state (see `settings-history-manager.png`).
 - The **notification centre** is backed by its own repo in the same way. Filtered bulk read/unread,
   delete, and clear operations go through its store so each user action produces one ordered,
   history-backed mutation rather than a sequence of per-row commits.
-- The strict `appearance-customization-v1` value is allowlisted by
-  `app/src/lib/profiles/profile-settings-registry.ts`, captured in the active profile's
-  `settings.json`, and described as an appearance-customization change in Git history. It includes
-  the profile's normalized default repository-logo document.
+- `language-mode-v1` remains an ordinary allowlisted preference. The old
+  `appearance-customization-v1` aggregate is a bounded migration/startup projection only and is
+  deliberately excluded from new profile snapshots.
 - `named-api-functions-v1` is another allowlisted profile value. Its transactional store validates
   the complete bounded document before replacing the previous catalog and publishes an empty
   catalog when restored or externally edited state is invalid.
-- Per-tab title/background styling is written with the tab to `tabs.json`; the bounded recent-color
-  list is another allowlisted profile setting.
+- Per-tab title/background styling is migrated out of `tabs.json` into that tab's dedicated element
+  repository; `tabs.json` remains structural. The bounded recent-color list is an ordinary profile
+  setting.
 - Optional `isPinned` and `openedAt` values share that serialized tab model. Missing legacy values
   keep migration-safe defaults and profile serialization preserves unknown newer fields. Close and
   arrange mutations must use `RepositoryTabsStore` so they remain ordered on the same profile queue
@@ -103,12 +103,13 @@ Because these are real git repos, the audit trail and restore semantics come "fo
 rather than from a bespoke persistence format. When adding data that should be versioned per account,
 persist it into the relevant profile repo and commit through the same path.
 
-Repository appearance overrides are deliberately outside that profile repository. The six scalar
-fields — accent palette, surface palette, toolbar labels, toolbar density, tab density, and tab
-width — plus the optional normalized repository-logo design are serialized under
-`desktop-material.appearance` in the selected repository's local `.git/config`. Missing fields
-inherit the active-profile defaults. Never move this value into a tracked repository file or treat
-per-tab background color as a repository override.
+Appearance lives under `userData/appearance-elements/<profile>/`. Every profile owner, stable
+feature ID, repository element, and tab title owns an ordinary directory containing only its own
+`.git` and versioned `setting.json`. `DedicatedSettingStore` serializes writes/history mutations,
+uses crash-safe persistence, and makes undo/redo/restore append audit commits. Repository elements
+use a local `desktop-material.appearance-id` UUID so their separate workspace, toolbar, tabs,
+list-name, and logo repositories survive a path move. The old `desktop-material.appearance` value
+is accepted only as a migration seed/compatibility projection.
 
 ---
 
@@ -148,7 +149,7 @@ The current maintenance additions in this section are implemented but remain sub
 integrated production/headless/publication gate. Historical gallery references do not imply that
 new acceptance has already completed.
 
-The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 63
+The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 67
 synthetic, user-facing visual functions and states associated with these subsystems. Each function
 owns one distinct tracked PNG; missing, duplicate, and unassigned assets fail the catalog contract.
 Keep captures free of personal paths, account identifiers, credentials, signed URLs, and unbounded
@@ -178,19 +179,20 @@ publication, release, or cleanup evidence.
   `app/src/ui/error-notice-stack.tsx` renders dismissible bottom-right alerts. Retry,
   authentication, and remediation choices must remain dialogs.
 - **Appearance and adaptive Material shell** —
-  `app/src/models/appearance-customization.ts` owns the strict versioned model for the 13 profile
-  defaults: accent palette, surface palette, elevation, interface font, monospace font, motion,
-  toolbar labels, toolbar density, repository-list density, tab density, tab width, tab close
-  buttons, and default-off Desktop Material feature highlighting. The profile also carries a
-  default repository logo; `app/src/models/repository-logo.ts` owns its
+  `app/src/models/element-appearance.ts` defines narrow profile, feature, repository, and tab-owner
+  documents; `app/src/lib/stores/element-appearance-coordinator.ts` maps each to a separate
+  `DedicatedSettingStore`. **Settings → Appearance** exposes ordinary preferences only. The actual
+  owner opens `AnchoredAppearanceEditor` by right-click or `Shift+F10`, with its own repository path
+  and `VersionedStoreHistory`. Repository Settings has no Appearance tab. The profile default
+  repository logo still uses `app/src/models/repository-logo.ts` and its
   versioned code-native vector model: bounded backgrounds and at most eight allowlisted mark/text
   layers, with strict color, transform, typography, text, and 16 KiB document normalization.
-  `app/src/lib/appearance-customization.ts` resolves the six scalar repository-local overrides and
-  optional local logo; `app/src/ui/repository-logo/` renders the safe SVG projection, full studio,
+  `app/src/ui/repository-logo/` renders the safe SVG projection, full studio,
   and bounded 128-entry shared async cache. It never accepts raw SVG or image bytes.
   `app/src/ui/app-theme.tsx` applies only normalized data attributes and tokens, including the
-  feature-highlighting body gate. A centralized allowlist and explicit entry-point markers keep
-  upstream and mixed controls neutral; Preferences and Repository Settings expose the two scopes.
+  finite profile/repository attributes. Feature highlighting is gated per
+  `[data-dm-feature][data-dm-feature-highlighted]`, never by one global body switch. Explicit
+  entry-point markers keep upstream and mixed controls neutral.
   `app/src/ui/toolbar/toolbar-overflow-layout.ts` keeps
   the width/priority calculation pure while `toolbar.tsx` owns ResizeObserver, More-surface focus,
   and restoration. The first-run React surface lives in `app/src/ui/welcome/` and retains the
@@ -317,8 +319,9 @@ The Material Design 3 look is built from a layered SCSS system under `app/styles
   large 16px, full 999px), type, and motion. This is the token layer everything else consumes.
 - **`_material-shell.scss`** — the **application shell** built from those tokens: the tabbed
   workspace chrome, surfaces, elevation, and layout that give the app its M3 structure. Normalized
-  appearance values become `data-dm-*` attributes on the document body; selectors map those
-  finite values back to tokens instead of accepting arbitrary CSS.
+  resolved profile/repository appearance values become finite `data-dm-*` attributes on the
+  document body; per-feature owners use their own data attribute. Selectors map only those bounded
+  values back to tokens instead of accepting arbitrary CSS.
 - **`app/styles/ui/` partials** — one partial **per component** (`_changes.scss`, `_dialog.scss`,
   `_branches.scss`, `_ci-status.scss`, …). Components pull colors and shape from the token layer
   rather than hard-coding hex values.

@@ -84,18 +84,18 @@ const groupPrefixes = new Map([
 ])
 
 const expectedNestedSurfaceIds = [
+  'appearance.anchored-element-editor',
+  'appearance.element-history',
   'file-history.blame',
   'file-history.history',
   'notifications.github',
   'notifications.local',
   'popup.batch-clone-recovery',
-  'preferences.appearance.logo-studio',
   'preferences.copilot.models',
   'preferences.copilot.providers',
   'preferences.git.author',
   'preferences.git.default-branch',
   'preferences.git.hooks',
-  'repository-settings.appearance.logo-studio',
   'repository.api.functions',
   'repository.api.graphql',
   'repository.api.rest',
@@ -318,7 +318,7 @@ describe('responsive surface smoke catalog', () => {
     assert.deepEqual(classifiedTestEvents, registeredTestEvents)
   })
 
-  it('covers exact nested routes and direct logo/function panel selectors', () => {
+  it('covers exact nested routes and direct contextual editor selectors', () => {
     assert.deepEqual(
       catalog.nestedSurfaces.map(surface => surface.id).sort(),
       expectedNestedSurfaceIds
@@ -360,8 +360,8 @@ describe('responsive surface smoke catalog', () => {
         .map(surface => [surface.id, surface])
     )
     assert.deepEqual([...direct.keys()].sort(), [
-      'preferences.appearance.logo-studio',
-      'repository-settings.appearance.logo-studio',
+      'appearance.anchored-element-editor',
+      'appearance.element-history',
       'repository.api.functions',
     ])
     assert.equal(
@@ -373,20 +373,20 @@ describe('responsive surface smoke catalog', () => {
       '.github-api-functions'
     )
     assert.equal(
-      direct.get('preferences.appearance.logo-studio')?.ownerSelector,
-      '#preferences'
+      direct.get('appearance.anchored-element-editor')?.ownerSelector,
+      '.anchored-appearance-editor'
     )
     assert.equal(
-      direct.get('preferences.appearance.logo-studio')?.selector,
-      '.repository-logo-studio'
+      direct.get('appearance.anchored-element-editor')?.selector,
+      '.element-appearance-editor'
     )
     assert.equal(
-      direct.get('repository-settings.appearance.logo-studio')?.ownerSelector,
-      '#repository-settings'
+      direct.get('appearance.element-history')?.ownerSelector,
+      '.appearance-element-history-dialog'
     )
     assert.equal(
-      direct.get('repository-settings.appearance.logo-studio')?.selector,
-      '.repository-logo-studio'
+      direct.get('appearance.element-history')?.selector,
+      '.versioned-store-history-toolbar'
     )
   })
 
@@ -445,7 +445,7 @@ describe('responsive surface smoke catalog', () => {
       [...metadata.keys()].filter(id => id !== 'popup.batch-clone-recovery')
         .length,
       79,
-      'The existing 79-row matrix must remain intact beside the recovery popup.'
+      'The 79 product surfaces remain cataloged beside the recovery popup.'
     )
 
     const baseline = verifier.decorateLedger(metadataRows(metadata), metadata)

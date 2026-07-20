@@ -205,6 +205,9 @@ export class MenuListItem extends React.Component<IMenuListItemProps, {}> {
         data-dm-feature={
           isDesktopMaterialFeatureEntryPoint(item.id) ? true : undefined
         }
+        data-dm-feature-id={
+          isDesktopMaterialFeatureEntryPoint(item.id) ? item.id : undefined
+        }
       >
         {this.getIcon(item)}
         <div className="label">{this.renderLabel()}</div>

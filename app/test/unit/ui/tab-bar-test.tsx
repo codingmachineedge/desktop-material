@@ -79,4 +79,24 @@ describe('TabBar', () => {
 
     assert.deepEqual(clicks, [2])
   })
+
+  it('fences pointer, keyboard, and drag navigation while disabled', () => {
+    const { clicks } = renderTabBar({
+      allowDragOverSwitching: true,
+      disabled: true,
+    })
+    const tabs = screen.getAllByRole('tab')
+
+    fireEvent.click(tabs[1])
+    fireEvent.keyDown(tabs[0], { key: 'ArrowRight' })
+    dragAndDropManager.dragStarted()
+    fireEvent.mouseEnter(tabs[2])
+    advanceTimersBy(500)
+
+    assert.deepEqual(clicks, [])
+    for (const tab of tabs) {
+      assert.equal(tab.getAttribute('disabled'), '')
+      assert.equal(tab.getAttribute('aria-disabled'), 'true')
+    }
+  })
 })

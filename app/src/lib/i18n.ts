@@ -4,6 +4,7 @@ import {
   englishTranslations,
   TranslationKey,
 } from './i18n-resources'
+import { getLanguageModePreference } from './language-preference'
 
 export type { TranslationKey } from './i18n-resources'
 
@@ -11,7 +12,6 @@ export type SupportedLocale = 'en' | 'zh-HK'
 export const LanguageModeChangedEvent = 'desktop-material-language-mode-changed'
 
 const BilingualSeparator = ' · '
-const AppearanceStorageKey = 'appearance-customization-v1'
 const BilingualVariableMarker: unique symbol = Symbol(
   'desktop-material.bilingual-variable'
 )
@@ -163,27 +163,7 @@ export function getPersistedLanguageMode(): LanguageMode {
   if (typeof localStorage === 'undefined') {
     return 'english'
   }
-
-  try {
-    const serialized = localStorage.getItem(AppearanceStorageKey)
-    if (serialized === null || serialized.length > 32_768) {
-      return 'english'
-    }
-    const parsed: unknown = JSON.parse(serialized)
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      return 'english'
-    }
-    const record = parsed as Record<string, unknown>
-    return record.version === 1
-      ? normalizeLanguageMode(record.languageMode)
-      : 'english'
-  } catch {
-    return 'english'
-  }
+  return getLanguageModePreference()
 }
 
 export function t(

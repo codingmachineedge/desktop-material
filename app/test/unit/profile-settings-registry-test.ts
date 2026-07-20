@@ -27,6 +27,7 @@ describe('captureSettingsSnapshot', () => {
       theme: 'dark',
       'underline-links': '1',
       'appearance-customization-v1': '{"version":1}',
+      'language-mode-v1': 'cantonese',
       'error-presentation-style': 'notice',
       'zoom-factor': '1.25',
       'last-selected-repository-id': '42',
@@ -38,7 +39,8 @@ describe('captureSettingsSnapshot', () => {
     assert.equal(snapshot['tab-size'], '2')
     assert.equal(snapshot['theme'], 'dark')
     assert.equal(snapshot['underline-links'], '1')
-    assert.equal(snapshot['appearance-customization-v1'], '{"version":1}')
+    assert.equal(snapshot['appearance-customization-v1'], undefined)
+    assert.equal(snapshot['language-mode-v1'], 'cantonese')
     assert.equal(snapshot['error-presentation-style'], 'notice')
     assert.equal(snapshot['zoom-factor'], '1.25')
     assert.equal(snapshot['last-selected-repository-id'], undefined)

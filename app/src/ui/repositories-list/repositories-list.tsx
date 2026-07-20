@@ -384,6 +384,7 @@ export class RepositoriesList extends React.Component<
         languageMode={this.state.languageMode}
         repositoryLogoChange={this.state.repositoryLogoChange}
         repositoryLogoLoader={this.logoLoader}
+        dispatcher={this.props.dispatcher}
       />
     )
   }

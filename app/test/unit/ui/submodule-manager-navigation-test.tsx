@@ -3,13 +3,25 @@ import { afterEach, beforeEach, describe, it } from 'node:test'
 import * as React from 'react'
 
 import { IManagedSubmodule } from '../../../src/lib/git'
+import { translate, translateForAccessibleName } from '../../../src/lib/i18n'
+import { LanguageModeStorageKey } from '../../../src/lib/language-preference'
 import { PopupManager } from '../../../src/lib/popup-manager'
 import { PopupType } from '../../../src/models/popup'
 import { Repository } from '../../../src/models/repository'
+import {
+  DefaultAppearanceCustomization,
+  IAppearanceCustomization,
+} from '../../../src/models/appearance-customization'
 import { Dispatcher } from '../../../src/ui/dispatcher'
 import { Submodules } from '../../../src/ui/repository-settings/submodules'
 import { SubmoduleManagerDialog } from '../../../src/ui/submodules/submodule-manager-dialog'
-import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '../../helpers/ui/render'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -76,6 +88,7 @@ const clonedSibling: IManagedSubmodule = {
 afterEach(() => {
   restoreIpcSend?.()
   restoreDialogShow?.()
+  localStorage.removeItem(LanguageModeStorageKey)
   localStorage.removeItem('appearance-customization-v1')
 })
 
@@ -85,10 +98,7 @@ describe('Submodule Manager temporary repository navigation', () => {
       getSubmodules: async () => [cloned, uninitialized],
     } as unknown as Dispatcher
 
-    localStorage.setItem(
-      'appearance-customization-v1',
-      JSON.stringify({ version: 1, languageMode: 'cantonese' })
-    )
+    localStorage.setItem(LanguageModeStorageKey, 'cantonese')
     const cantoneseView = render(
       <Submodules
         repository={parent}
@@ -119,15 +129,12 @@ describe('Submodule Manager temporary repository navigation', () => {
     assert.equal(screen.getAllByRole('button', { name: '移除' }).length, 2)
     assert.ok(
       screen.getByRole('button', {
-        name: '當獨立 repo 打開: vendor/docs',
+        name: '打開並管理: vendor/docs',
       })
     )
     cantoneseView.unmount()
 
-    localStorage.setItem(
-      'appearance-customization-v1',
-      JSON.stringify({ version: 1, languageMode: 'bilingual' })
-    )
+    localStorage.setItem(LanguageModeStorageKey, 'bilingual')
     const bilingualView = render(
       <Submodules
         repository={parent}
@@ -160,7 +167,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
     assert.ok(
       screen.getByRole('button', {
-        name: 'Open as repository: vendor/docs',
+        name: 'Open & manage: vendor/docs',
       })
     )
     const sync = screen.getAllByRole('button', { name: 'Sync' })[0]
@@ -168,11 +175,115 @@ describe('Submodule Manager temporary repository navigation', () => {
     assert.equal(sync.querySelector('[lang="zh-HK"]')?.textContent, '同步')
   })
 
-  it('localizes the standalone manager title and close action', async () => {
-    localStorage.setItem(
-      'appearance-customization-v1',
-      JSON.stringify({ version: 1, languageMode: 'bilingual' })
+  it('stages Back button appearance with a live temporary-workspace preview', async () => {
+    const changes = new Array<IAppearanceCustomization>()
+    const dispatcher = {
+      getSubmodules: async () => [cloned],
+    } as unknown as Dispatcher
+
+    function AppearanceHarness() {
+      const [appearance, setAppearance] =
+        React.useState<IAppearanceCustomization>({
+          ...DefaultAppearanceCustomization,
+          submoduleBackButtonStyle: 'tonal',
+          submoduleBackButtonLabel: 'back-to-parent',
+        })
+
+      return (
+        <Submodules
+          repository={parent}
+          dispatcher={dispatcher}
+          onRepositoryOpened={() => undefined}
+          appearanceCustomization={appearance}
+          onAppearanceCustomizationChanged={next => {
+            changes.push(next)
+            setAppearance(next)
+          }}
+        />
+      )
+    }
+
+    const view = render(<AppearanceHarness />)
+    await screen.findByText('vendor/library')
+
+    assert.ok(
+      screen.getByText(
+        /opens the submodule temporarily.*never added to your repository list/i
+      )
     )
+    const preview = screen.getByRole('group', { name: 'Preview' })
+    const previewButton = within(preview).getByRole('button', {
+      name: 'Back to parent',
+    })
+    assert.equal(screen.queryByLabelText('Submodule Back button style'), null)
+
+    fireEvent.contextMenu(previewButton)
+
+    fireEvent.change(screen.getByLabelText('Submodule Back button style'), {
+      target: { value: 'filled' },
+    })
+    fireEvent.change(screen.getByLabelText('Submodule Back button label'), {
+      target: { value: 'parent-name' },
+    })
+
+    await waitFor(() => {
+      assert.equal(changes.at(-1)?.submoduleBackButtonStyle, 'filled')
+      assert.equal(changes.at(-1)?.submoduleBackButtonLabel, 'parent-name')
+    })
+    assert.ok(previewButton.classList.contains('submodule-context-back-filled'))
+    assert.equal(
+      previewButton.querySelector('.submodule-context-back-label')?.textContent,
+      'parent'
+    )
+
+    view.unmount()
+    render(
+      <Submodules
+        repository={parent}
+        dispatcher={dispatcher}
+        onRepositoryOpened={() => undefined}
+        appearanceCustomization={{
+          ...DefaultAppearanceCustomization,
+          languageMode: 'cantonese',
+        }}
+        onAppearanceCustomizationChanged={() => undefined}
+      />
+    )
+    assert.ok(
+      await screen.findByRole('heading', {
+        name: translate('submodule.appearanceHeading', 'cantonese'),
+      })
+    )
+    const cantonesePreview = screen.getByRole('group', {
+      name: translateForAccessibleName(
+        'submodule.appearancePreview',
+        {},
+        'cantonese'
+      ),
+    })
+    fireEvent.contextMenu(
+      within(cantonesePreview).getByRole('button', {
+        name: translateForAccessibleName(
+          'submodule.backToParent',
+          { parent: 'parent' },
+          'cantonese'
+        ),
+      })
+    )
+    assert.ok(
+      screen.getByLabelText(
+        translate('appearance.submoduleBackStyle', 'cantonese')
+      )
+    )
+    assert.ok(
+      screen.getByLabelText(
+        translate('appearance.submoduleBackLabel', 'cantonese')
+      )
+    )
+  })
+
+  it('localizes the standalone manager title and close action', async () => {
+    localStorage.setItem(LanguageModeStorageKey, 'bilingual')
     const dispatcher = {
       getSubmodules: async () => [],
     } as unknown as Dispatcher
@@ -226,10 +337,10 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
 
     const openCloned = await screen.findByRole('button', {
-      name: 'Open as repository: vendor/library',
+      name: 'Open & manage: vendor/library',
     })
     const openUnavailable = screen.getByRole('button', {
-      name: 'Open as repository: vendor/docs',
+      name: 'Open & manage: vendor/docs',
     })
     assert.equal(openCloned.getAttribute('aria-disabled'), null)
     assert.equal(openUnavailable.getAttribute('aria-disabled'), 'true')
@@ -285,10 +396,10 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
 
     const sourceOpen = await screen.findByRole('button', {
-      name: 'Open as repository: vendor/library',
+      name: 'Open & manage: vendor/library',
     })
     const siblingOpen = screen.getByRole('button', {
-      name: 'Open as repository: vendor/shared',
+      name: 'Open & manage: vendor/shared',
     })
     const add = screen.getByRole('button', { name: 'Add submodule…' })
     const updateAll = screen.getByRole('button', { name: 'Update all' })
@@ -370,7 +481,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Open as repository: vendor/library',
+        name: 'Open & manage: vendor/library',
       })
     )
 
@@ -407,7 +518,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Open as repository: vendor/library',
+        name: 'Open & manage: vendor/library',
       })
     )
 
@@ -418,10 +529,7 @@ describe('Submodule Manager temporary repository navigation', () => {
   })
 
   it('announces operation failures with semantic bilingual copy', async () => {
-    localStorage.setItem(
-      'appearance-customization-v1',
-      JSON.stringify({ version: 1, languageMode: 'bilingual' })
-    )
+    localStorage.setItem(LanguageModeStorageKey, 'bilingual')
     const dispatcher = {
       getSubmodules: async () => [cloned],
       updateSubmodules: async () => {

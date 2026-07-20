@@ -22,12 +22,11 @@ supported runtime; see [Windows-only platform support](features/integrations/win
 - **[Feature documentation](features/README.md)** - categorized user workflows,
   persistence boundaries, failure modes, security notes, and acceptance targets
 
-The appearance model now includes 17 active-profile defaults in local
-Git-backed history. Its language and two temporary-submodule Back fields passed
-the local acceptance run described below. The earlier accepted customization work
-also includes six repository-local overrides with app-default inheritance and
-Word-style profile-backed per-tab typography with independent text/background
-colors. The measured app bar moves Build & Run and then Commit & Push into
+Appearance is now owner-scoped. Right-clicking an actual visual opens an editor
+beside it; every profile element, feature entry point, repository element, and
+tab title has its own strict setting, local Git repository, and mutable history.
+Ordinary language/theme/scale preferences stay in Settings, and Repository
+Settings no longer has a monolithic Appearance tab. The measured app bar moves Build & Run and then Commit & Push into
 **More** before clipping and restores those mounted actions as space returns.
 The pure Material Welcome and landing redesigns share the same token and surface
 language.
@@ -47,8 +46,9 @@ The locally accepted repository-navigation change adds
 **Open as repository** to initialized Submodule Manager rows. The resulting
 workspace is temporary: it does not enter the repository list, Recent group, or
 persisted last selection, and a profile-customizable Back control returns to the
-persisted root repository. The same Appearance section provides explicit
-English, playful Hong Kong Cantonese, and compact bilingual language modes.
+persisted root repository. Right-clicking Back opens its dedicated editor and
+history beside it; explicit English, playful Hong Kong Cantonese, and compact
+bilingual language remain ordinary preferences.
 Behavior, persistence, containment checks, and failure recovery are documented
 in [Temporary submodule repository navigation](features/repository-management/submodule-repository-navigation.md).
 The earlier accepted exact production build, ten-pass off-screen evidence, and

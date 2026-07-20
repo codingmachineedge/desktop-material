@@ -36,24 +36,30 @@ than trying to restore it.
 
 ## Appearance and language configuration
 
-The active profile persists three exact language modes under
-**Settings → Appearance → Language and navigation**:
+**Settings → Appearance** keeps language as an ordinary explicit preference,
+separate from custom element appearance. It offers three exact modes:
 
 - **English**;
 - **Playful Hong Kong Cantonese**; and
 - **Bilingual**, which presents compact English and Cantonese copy together.
 
-English is the safe fallback. The language choice is explicit and is not
-silently replaced by the operating-system locale.
+English is the safe fallback. The language choice is stored under the bounded
+`language-mode-v1` preference, is not silently replaced by the operating-system
+locale, and can migrate once from the former aggregate appearance value.
 
-The same section configures the temporary-context Back control:
+To customize the temporary-context Back control, right-click the visible Back
+button. Its editor opens beside that button and offers:
 
 - style: **Tonal**, **Filled accent**, or **Outlined**; and
 - label: **Back to parent**, **Parent name**, or **Icon only**.
 
-These are profile settings, so they follow the existing local, Git-backed
-profile history. They are not repository-local appearance overrides. The
-icon-only option retains a descriptive accessible name and tooltip.
+The Back control is one profile-level appearance owner. Its versioned
+`setting.json` and `.git` directory live in a dedicated local element repository,
+separate from every other visual owner and from the ordinary language
+preference. The anchored editor exposes that one owner's repository path plus
+its own inspect, undo, redo, and restore history. It does not use a monolithic
+Appearance panel or **Repository Settings → Appearance**. The icon-only option
+retains a descriptive accessible name and tooltip.
 
 ## Validation and security
 

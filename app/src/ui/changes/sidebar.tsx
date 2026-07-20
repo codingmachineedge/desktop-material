@@ -8,6 +8,7 @@ import {
   isRebaseConflictState,
   ChangesSelectionKind,
   CommitOptions,
+  CommitOperationPhase,
 } from '../../lib/app-state'
 import { Repository } from '../../models/repository'
 import { Dispatcher } from '../dispatcher'
@@ -59,6 +60,7 @@ interface IChangesSidebarProps {
   readonly issuesStore: IssuesStore
   readonly availableWidth: number
   readonly isCommitting: boolean
+  readonly commitOperationPhase: CommitOperationPhase | null
   readonly hookProgress: HookProgress | null
   readonly onShowCommitProgress: (() => void) | undefined
   readonly isGeneratingCommitMessage: boolean
@@ -488,6 +490,7 @@ export class ChangesSidebar extends React.Component<IChangesSidebarProps, {}> {
           onIgnoreFile={this.onIgnoreFile}
           onIgnorePattern={this.onIgnorePattern}
           isCommitting={this.props.isCommitting}
+          commitOperationPhase={this.props.commitOperationPhase}
           hookProgress={this.props.hookProgress}
           onShowCommitProgress={this.props.onShowCommitProgress}
           isGeneratingCommitMessage={this.props.isGeneratingCommitMessage}

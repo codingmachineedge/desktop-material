@@ -19,6 +19,17 @@ const appSource = readFileSync(
   join(process.cwd(), 'app', 'src', 'ui', 'app.tsx'),
   'utf8'
 )
+const submoduleBackButtonSource = readFileSync(
+  join(
+    process.cwd(),
+    'app',
+    'src',
+    'ui',
+    'submodules',
+    'submodule-back-button.tsx'
+  ),
+  'utf8'
+)
 const repositorySettingsSource = readFileSync(
   join(
     process.cwd(),
@@ -61,13 +72,14 @@ describe('repository CI status', () => {
 
   it('keeps submodule navigation semantic while accessible names stay concise', () => {
     assert.match(
-      appSource,
+      submoduleBackButtonSource,
       /accessibleLabel = translateForAccessibleName\([\s\S]*?'submodule\.backToParent'/
     )
     assert.match(
-      appSource,
+      submoduleBackButtonSource,
       /<LocalizedText[\s\S]*?translationKey="submodule\.backToParent"/
     )
+    assert.match(appSource, /<SubmoduleBackButton/)
     assert.match(
       appSource,
       /aria-label=\{translateForAccessibleName\([\s\S]*?'submodule\.navigation'/
@@ -132,6 +144,7 @@ describe('repository CI status', () => {
     } finally {
       view.unmount()
       localStorage.removeItem('appearance-customization-v1')
+      localStorage.removeItem('language-mode-v1')
     }
   })
 })

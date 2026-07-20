@@ -7,7 +7,10 @@ import { IRemote } from '../../../src/models/remote'
 import { Popup, PopupType } from '../../../src/models/popup'
 import { Repository } from '../../../src/models/repository'
 import { Dispatcher } from '../../../src/ui/dispatcher'
-import { SubtreeManagerDialog } from '../../../src/ui/subtrees/subtree-manager-dialog'
+import {
+  SubtreeManager,
+  SubtreeManagerDialog,
+} from '../../../src/ui/subtrees/subtree-manager-dialog'
 import { AddSubtreeDialog } from '../../../src/ui/subtrees/add-subtree-dialog'
 import {
   fireEvent,
@@ -20,6 +23,22 @@ import {
 let restoreIpcSend: (() => void) | null = null
 let restoreDialogShow: (() => void) | null = null
 let restoreWindowResizeObserver: (() => void) | null = null
+
+interface IDeferred<T> {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T) => void
+  readonly reject: (reason: Error) => void
+}
+
+function deferred<T>(): IDeferred<T> {
+  let resolve!: (value: T) => void
+  let reject!: (reason: Error) => void
+  const promise = new Promise<T>((onResolve, onReject) => {
+    resolve = onResolve
+    reject = onReject
+  })
+  return { promise, resolve, reject }
+}
 
 class DialogResizeObserver implements ResizeObserver {
   public constructor(private readonly callback: ResizeObserverCallback) {}
@@ -219,6 +238,27 @@ async function findRow(prefix: string): Promise<HTMLElement> {
 }
 
 describe('SubtreeManagerDialog', () => {
+  it('reuses the full management surface without nesting a dialog', async () => {
+    const { dispatcher } = createDispatcher()
+    const view = render(
+      <section id="repository-settings">
+        <SubtreeManager
+          repository={repository}
+          dispatcher={dispatcher}
+          accounts={[]}
+          listRemotes={async () => remotes}
+        />
+      </section>
+    )
+
+    const row = await findRow('vendor/lib')
+    assert.equal(view.container.querySelector('dialog'), null)
+    assert.ok(within(row).getByRole('button', { name: /pull…/i }))
+    assert.ok(within(row).getByRole('button', { name: /push…/i }))
+    assert.ok(within(row).getByRole('button', { name: /split…/i }))
+    assert.ok(screen.getByRole('button', { name: /add subtree…/i }))
+  })
+
   it('lists the discovered subtrees with their recorded SHAs', async () => {
     const { dispatcher } = createDispatcher()
     renderManager(dispatcher)
@@ -346,6 +386,204 @@ describe('SubtreeManagerDialog', () => {
 
     assert.equal(calls.showPopup.length, 1)
     assert.equal(calls.showPopup[0].type, PopupType.AddSubtree)
+  })
+
+  it('fences every mutation and the standalone host while one operation runs', async () => {
+    const pull = deferred<void>()
+    const operationStates = new Array<boolean>()
+    let pullCalls = 0
+    let splitCalls = 0
+    let dismissed = 0
+    const dispatcher = {
+      isSubtreeAvailable: async () => true,
+      getSubtrees: async () => subtrees,
+      pullSubtree: async () => {
+        pullCalls++
+        return pull.promise
+      },
+      splitSubtree: async () => {
+        splitCalls++
+        return 'unused'
+      },
+      showPopup: () => undefined,
+    } as unknown as Dispatcher
+
+    render(
+      <SubtreeManagerDialog
+        repository={repository}
+        dispatcher={dispatcher}
+        accounts={[]}
+        onDismissed={() => {
+          dismissed++
+        }}
+        listRemotes={async () => remotes}
+        onOperationStateChanged={inProgress => operationStates.push(inProgress)}
+      />
+    )
+
+    const vendor = await findRow('vendor/lib')
+    const scripts = await findRow('tools/scripts')
+    fireEvent.click(within(vendor).getByRole('button', { name: /pull/i }))
+    fireEvent.change(screen.getByLabelText('Ref'), {
+      target: { value: 'main' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^pull subtree$/i }))
+
+    await waitFor(() => assert.equal(pullCalls, 1))
+    assert.deepEqual(operationStates, [true])
+
+    for (const name of [/pull/i, /push/i, /split/i]) {
+      assert.equal(
+        within(scripts)
+          .getByRole('button', { name })
+          .getAttribute('aria-disabled'),
+        'true'
+      )
+    }
+    assert.equal(
+      screen
+        .getByRole('button', { name: /add subtree/i })
+        .getAttribute('aria-disabled'),
+      'true'
+    )
+    assert.equal(
+      screen
+        .getByRole('button', { name: /^pull subtree$/i })
+        .getAttribute('aria-disabled'),
+      'true'
+    )
+    assert.equal(
+      screen
+        .getByRole('button', { name: /^cancel$/i })
+        .getAttribute('aria-disabled'),
+      'true'
+    )
+
+    fireEvent.click(within(scripts).getByRole('button', { name: /split/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }))
+    assert.equal(splitCalls, 0)
+    assert.equal(dismissed, 0)
+
+    pull.resolve()
+    await waitFor(() => assert.deepEqual(operationStates, [true, false]))
+    assert.ok(await screen.findByText(/pulled main into vendor\/lib/i))
+  })
+
+  it('announces streamed progress politely and failures assertively', async () => {
+    const pull = deferred<void>()
+    const dispatcher = {
+      isSubtreeAvailable: async () => true,
+      getSubtrees: async () => subtrees,
+      pullSubtree: async (
+        _repository: Repository,
+        _prefix: string,
+        _source: string,
+        _ref: string,
+        options?: { progressCallback?: (line: string) => void }
+      ) => {
+        options?.progressCallback?.('Receiving upstream objects...')
+        return pull.promise
+      },
+      showPopup: () => undefined,
+    } as unknown as Dispatcher
+
+    renderManager(dispatcher)
+    const vendor = await findRow('vendor/lib')
+    fireEvent.click(within(vendor).getByRole('button', { name: /pull/i }))
+    fireEvent.change(screen.getByLabelText('Ref'), {
+      target: { value: 'main' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^pull subtree$/i }))
+
+    const progress = await screen.findByText('Receiving upstream objects...')
+    assert.equal(progress.getAttribute('role'), 'status')
+    assert.equal(progress.getAttribute('aria-live'), 'polite')
+
+    pull.reject(new Error('upstream disconnected'))
+    const error = await screen.findByRole('alert')
+    assert.match(error.textContent ?? '', /upstream disconnected/i)
+    assert.equal(error.getAttribute('aria-live'), 'assertive')
+  })
+
+  it('ignores stale subtree loads when a newer refresh finishes first', async () => {
+    const initial = deferred<ReadonlyArray<IManagedSubtree>>()
+    const refresh = deferred<ReadonlyArray<IManagedSubtree>>()
+    let loadCount = 0
+    const popups = new Array<Popup>()
+    const dispatcher = {
+      isSubtreeAvailable: async () => true,
+      getSubtrees: async () => {
+        loadCount++
+        return loadCount === 1 ? initial.promise : refresh.promise
+      },
+      showPopup: (nextPopup: Popup) => {
+        popups.push(nextPopup)
+      },
+    } as unknown as Dispatcher
+
+    render(
+      <SubtreeManager
+        repository={repository}
+        dispatcher={dispatcher}
+        accounts={[]}
+        listRemotes={async () => remotes}
+      />
+    )
+
+    await waitFor(() => assert.equal(loadCount, 1))
+    fireEvent.click(screen.getByRole('button', { name: /add subtree/i }))
+    assert.equal(popups.length, 1)
+    const popup = popups[0]
+    assert.ok(popup.type === PopupType.AddSubtree)
+    const refreshLoad = popup.onAdded()
+    await waitFor(() => assert.equal(loadCount, 2))
+
+    refresh.resolve([subtrees[1]])
+    await refreshLoad
+    assert.ok(await screen.findByText('vendor/lib'))
+    initial.resolve([subtrees[0]])
+
+    await waitFor(() => {
+      assert.ok(screen.getByText('vendor/lib'))
+      assert.equal(screen.queryByText('tools/scripts'), null)
+    })
+  })
+
+  it('does not reload or update the unmounted surface when an operation settles', async () => {
+    const pull = deferred<void>()
+    const operationStates = new Array<boolean>()
+    let loadCount = 0
+    const dispatcher = {
+      isSubtreeAvailable: async () => true,
+      getSubtrees: async () => {
+        loadCount++
+        return subtrees
+      },
+      pullSubtree: async () => pull.promise,
+      showPopup: () => undefined,
+    } as unknown as Dispatcher
+
+    const view = render(
+      <SubtreeManager
+        repository={repository}
+        dispatcher={dispatcher}
+        accounts={[]}
+        listRemotes={async () => remotes}
+        onOperationStateChanged={inProgress => operationStates.push(inProgress)}
+      />
+    )
+    const vendor = await findRow('vendor/lib')
+    fireEvent.click(within(vendor).getByRole('button', { name: /pull/i }))
+    fireEvent.change(screen.getByLabelText('Ref'), {
+      target: { value: 'main' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^pull subtree$/i }))
+    await waitFor(() => assert.deepEqual(operationStates, [true]))
+
+    view.unmount()
+    pull.resolve()
+    await waitFor(() => assert.deepEqual(operationStates, [true, false]))
+    assert.equal(loadCount, 1)
   })
 
   it('disables every action when git subtree is unavailable', async () => {

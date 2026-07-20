@@ -391,7 +391,16 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
       font-weight: var(--font-weight-semibold);
     }
 
+    .tab-style-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
     .tab-style-reset {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       min-height: 36px;
       padding: 4px 12px;
       border: none;
@@ -405,6 +414,11 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 
       &:hover {
         background: var(--md-sys-color-surface-container-high);
+      }
+
+      .octicon {
+        width: 14px;
+        height: 14px;
       }
     }
   }

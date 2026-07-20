@@ -28,6 +28,10 @@ export type TranslationKey =
   | 'submodule.backLabelParent'
   | 'submodule.backLabelIcon'
   | 'submodule.openAsRepository'
+  | 'submodule.temporaryOpenDescription'
+  | 'submodule.appearanceHeading'
+  | 'submodule.appearanceDescription'
+  | 'submodule.appearancePreview'
   | 'submodule.openUnavailable'
   | 'submodule.openFailed'
   | 'submodule.returnFailed'
@@ -679,6 +683,7 @@ export type TranslationKey =
   | 'tagLifecycle.remoteOnlyHeading'
   | 'tagLifecycle.noRemoteMatches'
   | 'tagLifecycle.remoteTruncated'
+  | 'subtree.title'
   | 'color.blue'
   | 'color.violet'
   | 'color.teal'
@@ -705,7 +710,7 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'appearance.languageMode': 'Language',
   'appearance.languageModeDescription':
     'Choose English, playful Hong Kong Cantonese, or a compact bilingual view.',
-  'appearance.languageAndNavigation': 'Language and navigation',
+  'appearance.languageAndNavigation': 'Language',
   'appearance.submoduleBackStyle': 'Submodule Back button style',
   'appearance.submoduleBackLabel': 'Submodule Back button label',
   'language.english': 'English',
@@ -717,7 +722,13 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'submodule.backLabelFull': 'Back to parent',
   'submodule.backLabelParent': 'Parent name',
   'submodule.backLabelIcon': 'Icon only',
-  'submodule.openAsRepository': 'Open as repository',
+  'submodule.openAsRepository': 'Open & manage',
+  'submodule.temporaryOpenDescription':
+    'Opens the submodule temporarily in this workspace. It is never added to your repository list.',
+  'submodule.appearanceHeading': 'Back button appearance',
+  'submodule.appearanceDescription':
+    'Right-click the preview Back button to open its editor beside the button. Save applies this to the active profile.',
+  'submodule.appearancePreview': 'Preview',
   'submodule.openUnavailable': 'Clone this submodule before opening it',
   'submodule.openFailed': 'Could not open {child} as a repository: {error}',
   'submodule.returnFailed': 'Could not return to {parent}: {error}',
@@ -1517,6 +1528,7 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'tagLifecycle.noRemoteMatches': 'No remote-only tags match this filter.',
   'tagLifecycle.remoteTruncated':
     'Showing the first 500 remote tags. Remote deletion is disabled for undisplayed tags, and bulk push/prune stay unavailable until the inventory is complete.',
+  'subtree.title': 'Subtrees',
   'color.blue': 'Blue',
   'color.violet': 'Violet',
   'color.teal': 'Teal',
@@ -1546,7 +1558,7 @@ export const cantoneseTranslations: Readonly<
   'appearance.languageMode': '語言',
   'appearance.languageModeDescription':
     '揀英文、玩味港式廣東話，或者慳位雙語模式。',
-  'appearance.languageAndNavigation': '語言同導覽',
+  'appearance.languageAndNavigation': '語言',
   'appearance.submoduleBackStyle': '子模組返回掣款式',
   'appearance.submoduleBackLabel': '子模組返回掣文字',
   'language.english': '英文',
@@ -1558,7 +1570,13 @@ export const cantoneseTranslations: Readonly<
   'submodule.backLabelFull': '返去主 repo',
   'submodule.backLabelParent': '顯示主 repo 名',
   'submodule.backLabelIcon': '淨圖示',
-  'submodule.openAsRepository': '當獨立 repo 打開',
+  'submodule.openAsRepository': '打開並管理',
+  'submodule.temporaryOpenDescription':
+    '會喺呢個工作區臨時打開子模組；絕對唔會加落 repo 清單。',
+  'submodule.appearanceHeading': '返回掣外觀',
+  'submodule.appearanceDescription':
+    '右擊預覽返回掣，就會喺掣旁邊打開編輯器。按「儲存」先套用到目前 profile。',
+  'submodule.appearancePreview': '預覽',
   'submodule.openUnavailable': '要先複製呢個子模組先開得',
   'submodule.openFailed': '未能將 {child} 當 repo 打開：{error}',
   'submodule.returnFailed': '未能返去 {parent}：{error}',
@@ -2302,6 +2320,7 @@ export const cantoneseTranslations: Readonly<
   'tagLifecycle.noRemoteMatches': '冇只限遠端嘅標籤符合呢個篩選。',
   'tagLifecycle.remoteTruncated':
     '只顯示頭 500 個遠端標籤。未顯示嘅標籤唔可以刪除；清單完整之前，批次 push 同清理亦會保持停用。',
+  'subtree.title': '子樹',
   'color.blue': '藍色',
   'color.violet': '紫色',
   'color.teal': '藍綠色',

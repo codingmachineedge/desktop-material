@@ -21,6 +21,7 @@ import {
   ICheapLfsPointerEntry,
 } from '../../lib/cheap-lfs/operations'
 import { shell } from '../../lib/app-shell'
+import type { IResolvedRepositoryAppearance } from '../../lib/appearance-customization'
 import {
   CompareAction,
   HistoryScope,
@@ -78,6 +79,7 @@ import {
 import { Shell } from '../../lib/shells'
 import { ILaunchStats, StatsStore } from '../../lib/stats'
 import { AppStore } from '../../lib/stores/app-store'
+import type { ElementAppearanceCoordinator } from '../../lib/stores/element-appearance-coordinator'
 import { ProfileStore } from '../../lib/stores/profile-store'
 import { RepositoryTabsStore } from '../../lib/stores/repository-tabs-store'
 import { BuildRunStore } from '../../lib/stores/build-run-store'
@@ -129,6 +131,15 @@ import type {
   IAppearanceCustomization,
   IRepositoryAppearanceOverrides,
 } from '../../models/appearance-customization'
+import {
+  ProfileAppearanceElementId,
+  RepositoryAppearanceElementId,
+} from '../../models/element-appearance'
+import type {
+  IFeatureHighlightAppearance,
+  IProfileAppearanceElementSettings,
+  IRepositoryAppearanceElementSettings,
+} from '../../models/element-appearance'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import type { CloneOptions } from '../../models/clone-options'
 import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
@@ -145,7 +156,7 @@ import {
 } from '../../models/remote'
 import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
 import { Popup, PopupType, SettingsHistoryScope } from '../../models/popup'
-import { IProfileHistoryPage } from '../../models/profile'
+import { IProfileHistoryPage, ProfileKey } from '../../models/profile'
 import { INotificationInput } from '../../models/notification-centre'
 import { INotificationAutomationRule } from '../../lib/notifications/automation/notification-automation'
 import { ErrorPresentationStyle } from '../../models/error-presentation'
@@ -170,6 +181,7 @@ import {
 } from '../../models/status'
 import { TipState, IValidBranch } from '../../models/tip'
 import { Banner, BannerType } from '../../models/banner'
+import type { IVersionedStoreHistorySource } from '../version-history/versioned-store-history'
 
 import { ApplicationTheme } from '../lib/application-theme'
 import { installCLI } from '../lib/install-cli'
@@ -350,7 +362,8 @@ export class Dispatcher {
     private readonly profileStore: ProfileStore,
     private readonly repositoryTabsStore: RepositoryTabsStore,
     private readonly buildRunStore: BuildRunStore,
-    private readonly namedAPIFunctionsStore?: NamedAPIFunctionsStore
+    private readonly namedAPIFunctionsStore?: NamedAPIFunctionsStore,
+    private readonly elementAppearanceCoordinator?: ElementAppearanceCoordinator
   ) {
     this.incrementMetric = statsStore.increment.bind(statsStore)
   }
@@ -446,9 +459,174 @@ export class Dispatcher {
     return this.profileStore.getActiveProfileRepositoryPath()
   }
 
+  /** Stable identity used to fence profile-owned asynchronous UI work. */
+  public getActiveProfileKey(): ProfileKey {
+    return this.profileStore.getActiveProfileKey()
+  }
+
+  /** Whether independent per-element appearance repositories are ready. */
+  public isElementAppearanceCoordinatorReady(): boolean {
+    return this.elementAppearanceCoordinator?.getState().initialized === true
+  }
+
+  /** Read one profile-owned appearance value from its dedicated repository. */
+  public getProfileAppearanceElement<K extends ProfileAppearanceElementId>(
+    id: K
+  ): IProfileAppearanceElementSettings[K] {
+    return this.requireElementAppearanceCoordinator().getProfileElement(id)
+  }
+
+  /** Commit one profile-owned appearance value without touching other owners. */
+  public setProfileAppearanceElement<K extends ProfileAppearanceElementId>(
+    id: K,
+    value: IProfileAppearanceElementSettings[K],
+    description?: string
+  ): Promise<void> {
+    return this.requireElementAppearanceCoordinator().setProfileElement(
+      id,
+      value,
+      description
+    )
+  }
+
+  /** Mutable history adapter for one profile appearance owner. */
+  public getProfileAppearanceHistorySource(
+    id: ProfileAppearanceElementId
+  ): IVersionedStoreHistorySource {
+    return this.requireElementAppearanceCoordinator().getProfileHistorySource(
+      id
+    )
+  }
+
+  /** Local Git repository containing one profile appearance owner. */
+  public getProfileAppearanceRepositoryPath(
+    id: ProfileAppearanceElementId
+  ): string {
+    return this.requireElementAppearanceCoordinator().getProfileRepositoryPath(
+      id
+    )
+  }
+
+  /** Ensure and read one independently versioned feature highlight owner. */
+  public getFeatureAppearanceElement(
+    featureId: string,
+    seed?: boolean
+  ): Promise<IFeatureHighlightAppearance> {
+    return this.requireElementAppearanceCoordinator().ensureFeatureElement(
+      featureId,
+      seed
+    )
+  }
+
+  /** Commit the highlight state for exactly one feature entry point. */
+  public setFeatureAppearanceElement(
+    featureId: string,
+    highlighted: boolean
+  ): Promise<void> {
+    return this.requireElementAppearanceCoordinator().setFeatureElement(
+      featureId,
+      highlighted
+    )
+  }
+
+  /** Mutable history adapter for one feature entry point. */
+  public getFeatureAppearanceHistorySource(
+    featureId: string
+  ): IVersionedStoreHistorySource {
+    return this.requireElementAppearanceCoordinator().getFeatureHistorySource(
+      featureId
+    )
+  }
+
+  /** Local Git repository containing one feature highlight setting. */
+  public getFeatureAppearanceRepositoryPath(featureId: string): string {
+    return this.requireElementAppearanceCoordinator().getFeatureRepositoryPath(
+      featureId
+    )
+  }
+
+  /** Ensure and read every independent appearance owner for a repository. */
+  public getRepositoryAppearanceElements(
+    repository: Repository,
+    legacyOverrides?: IRepositoryAppearanceOverrides
+  ): Promise<IRepositoryAppearanceElementSettings> {
+    return this.requireElementAppearanceCoordinator().ensureRepositoryElements(
+      repository,
+      legacyOverrides
+    )
+  }
+
+  /** Resolve list-row values against their independent profile defaults. */
+  public async getResolvedRepositoryElementAppearance(
+    repository: Repository,
+    legacyOverrides?: IRepositoryAppearanceOverrides
+  ): Promise<IResolvedRepositoryAppearance> {
+    const coordinator = this.requireElementAppearanceCoordinator()
+    const elements = await coordinator.ensureRepositoryElements(
+      repository,
+      legacyOverrides
+    )
+    const repositoryLogo =
+      elements[RepositoryAppearanceElementId.Logo].logo ??
+      coordinator.getProfileElement(
+        ProfileAppearanceElementId.DefaultRepositoryLogo
+      )
+    return {
+      logo: repositoryLogo,
+      listNameStyle: elements[RepositoryAppearanceElementId.ListName].style,
+    }
+  }
+
+  /** Commit exactly one repository-owned appearance value. */
+  public setRepositoryAppearanceElement<
+    K extends RepositoryAppearanceElementId
+  >(
+    repository: Repository,
+    id: K,
+    value: IRepositoryAppearanceElementSettings[K]
+  ): Promise<void> {
+    return this.requireElementAppearanceCoordinator().setRepositoryElement(
+      repository,
+      id,
+      value
+    )
+  }
+
+  /** Mutable history adapter for one repository appearance owner. */
+  public getRepositoryAppearanceHistorySource(
+    repository: Repository,
+    id: RepositoryAppearanceElementId
+  ): Promise<IVersionedStoreHistorySource> {
+    return this.requireElementAppearanceCoordinator().getRepositoryHistorySource(
+      repository,
+      id
+    )
+  }
+
+  /** Local Git repository containing one repository appearance owner. */
+  public getRepositoryAppearanceRepositoryPath(
+    repository: Repository,
+    id: RepositoryAppearanceElementId
+  ): Promise<string> {
+    return this.requireElementAppearanceCoordinator().getRepositoryElementPath(
+      repository,
+      id
+    )
+  }
+
   /** Load the paths changed by a settings-profile commit. */
   public getSettingsHistoryFiles(sha: string): Promise<ReadonlyArray<string>> {
     return this.profileStore.getSettingsHistoryFiles(sha)
+  }
+
+  private requireElementAppearanceCoordinator(): ElementAppearanceCoordinator {
+    if (
+      this.elementAppearanceCoordinator === undefined ||
+      !this.elementAppearanceCoordinator.getState().initialized
+    ) {
+      throw new Error('Element appearance settings are not initialized.')
+    }
+    return this.elementAppearanceCoordinator
   }
 
   /** Load a unified settings-profile diff, optionally narrowed to one file. */

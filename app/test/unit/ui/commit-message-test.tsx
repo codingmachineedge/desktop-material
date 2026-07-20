@@ -26,9 +26,22 @@ type CopilotButtonProps = {
 
 type CommitMessageTestInstance = {
   readonly renderCopilotButton: () => React.ReactElement | null
+  readonly getButtonText: () => React.ReactNode
+  readonly getButtonTitle: () => string
   readonly onCopilotButtonClick: (
     event: Pick<React.MouseEvent<HTMLButtonElement>, 'preventDefault'>
   ) => Promise<void>
+}
+
+type CommitMessageLifecycleTestInstance = CommitMessageTestInstance & {
+  props: CommitMessageProps
+  state: { isCommittingStatusMessage: string }
+  setState: (state: { isCommittingStatusMessage: string }) => void
+  componentDidUpdate: (
+    previousProps: CommitMessageProps,
+    previousState: unknown
+  ) => Promise<void>
+  updateRepoRuleFailures: () => Promise<void>
 }
 
 function createAccount() {
@@ -92,6 +105,7 @@ function createProps(
     repositoryAccount: null,
     autocompletionProviders: [],
     isCommitting: false,
+    commitOperationPhase: null,
     hookProgress: null,
     onShowCommitProgress: undefined,
     isGeneratingCommitMessage: true,
@@ -177,6 +191,190 @@ afterEach(() => {
 })
 
 describe('CommitMessage', () => {
+  it('names cheap-LFS preprocessing instead of claiming Git is committing to main', () => {
+    const preparing = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitOperationPhase: {
+            kind: 'cheap-lfs',
+            progress: {
+              phase: 'preparing',
+              completedFiles: 0,
+              totalFiles: 1,
+              currentPath: 'windows.iso',
+              transferredBytes: 0,
+              totalBytes: 200,
+            },
+          },
+        })
+      )
+    )
+    assert.equal(
+      preparing.getButtonText(),
+      'Preparing 1 large file for cheap LFS'
+    )
+    assert.doesNotMatch(preparing.getButtonTitle(), /Committing.*main/)
+
+    const uploading = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitOperationPhase: {
+            kind: 'cheap-lfs',
+            progress: {
+              phase: 'uploading',
+              completedFiles: 0,
+              totalFiles: 1,
+              currentPath: 'windows.iso',
+              transferredBytes: 101,
+              totalBytes: 200,
+            },
+          },
+        })
+      )
+    )
+    assert.equal(
+      uploading.getButtonText(),
+      'Uploading 1 large file to cheap LFS (50%)'
+    )
+
+    const verifying = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitOperationPhase: {
+            kind: 'cheap-lfs',
+            progress: {
+              phase: 'uploading',
+              completedFiles: 0,
+              totalFiles: 1,
+              currentPath: 'windows.iso',
+              transferredBytes: 200,
+              totalBytes: 200,
+            },
+          },
+        })
+      )
+    )
+    assert.equal(
+      verifying.getButtonText(),
+      'Verifying 1 large file for cheap LFS'
+    )
+
+    const committingPointer = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitOperationPhase: {
+            kind: 'git-commit',
+            cheapLfsPointerCount: 1,
+          },
+        })
+      )
+    )
+    assert.equal(
+      committingPointer.getButtonText(),
+      'Committing 1 cheap-LFS pointer to main'
+    )
+  })
+
+  it('uses amend-aware cheap-LFS progress and pointer wording', () => {
+    const amendingUpload = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitToAmend: {} as CommitMessageProps['commitToAmend'],
+          commitOperationPhase: {
+            kind: 'cheap-lfs',
+            progress: {
+              phase: 'uploading',
+              completedFiles: 0,
+              totalFiles: 1,
+              currentPath: 'windows.iso',
+              transferredBytes: 100,
+              totalBytes: 200,
+            },
+          },
+        })
+      )
+    )
+    assert.equal(
+      amendingUpload.getButtonText(),
+      'Uploading 1 large file to cheap LFS (50%) before amending'
+    )
+
+    const amendingPointer = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitToAmend: {} as CommitMessageProps['commitToAmend'],
+          commitOperationPhase: {
+            kind: 'git-commit',
+            cheapLfsPointerCount: 1,
+          },
+        })
+      )
+    )
+    assert.equal(
+      amendingPointer.getButtonText(),
+      'Amending last commit with 1 cheap-LFS pointer'
+    )
+  })
+
+  it('announces the visible upload-to-verification transition', async () => {
+    const uploadingProps = createProps({
+      isCommitting: true,
+      isGeneratingCommitMessage: false,
+      commitOperationPhase: {
+        kind: 'cheap-lfs',
+        progress: {
+          phase: 'uploading',
+          completedFiles: 0,
+          totalFiles: 1,
+          currentPath: 'windows.iso',
+          transferredBytes: 100,
+          totalBytes: 200,
+        },
+      },
+    })
+    const verifyingProps = createProps({
+      ...uploadingProps,
+      commitOperationPhase: {
+        kind: 'cheap-lfs',
+        progress: {
+          phase: 'uploading',
+          completedFiles: 0,
+          totalFiles: 1,
+          currentPath: 'windows.iso',
+          transferredBytes: 200,
+          totalBytes: 200,
+        },
+      },
+    })
+    const component = new CommitMessage(
+      uploadingProps
+    ) as unknown as CommitMessageLifecycleTestInstance
+    const previousState = component.state
+
+    component.props = verifyingProps
+    component.setState = state => Object.assign(component.state, state)
+    component.updateRepoRuleFailures = async () => undefined
+
+    await component.componentDidUpdate(uploadingProps, previousState)
+
+    assert.equal(
+      component.state.isCommittingStatusMessage,
+      'Verifying 1 large file for cheap LFS'
+    )
+  })
+
   it('does not allow cancelling commit message generation when the Copilot SDK is disabled', async () => {
     delete process.env[PreviewFeaturesEnv]
 

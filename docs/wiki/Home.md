@@ -81,7 +81,7 @@ for details and the manual-download path.
 | --- | --- |
 | [Install on Windows](User-Guide#install-on-windows) | Fully automatic PowerShell install, integrity checks, architecture limits, and manual download. |
 | [User Guide](User-Guide) | Task-oriented walkthrough for the Material welcome, appearance scopes, adaptive toolbar, accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
-| [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 65 named visual functions and states, with automated missing/duplicate coverage checks. |
+| [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 68 named visual functions and states, with automated missing/duplicate coverage checks. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |
 | [Submodules](Submodules) | The simplest page in the wiki — what submodules are (toy boxes inside toy boxes), pre-clone badges, temporary open-and-Back navigation, the Submodule Manager, configuration, fixes, and submodule vs subtree, all in pictures. |
 | [Regex Guide](Regex-Guide) | Filter chips, substring/regex modes, the regex builder, and the search surfaces that use them. |
@@ -123,35 +123,22 @@ receipts as acceptance evidence.
 
 ### Appearance, onboarding, and adaptive layout
 
-Open **Settings → Appearance** to set the 17 app defaults carried by the active profile: **accent
-palette**, **update-progress palette**, **surface palette**, **surface depth**, **interface font**,
-**code and diff font**, **motion**, **toolbar labels**, **toolbar density**, **repository-list
-density**, **tab density**, **tab width**, **tab close-button visibility**, **language mode**,
-**submodule Back style**, **submodule Back label**, and default-off **Desktop Material feature
-highlighting**. Language is an explicit persisted choice among **English**, playful **Hong Kong
-Cantonese**, and compact **Bilingual** copy; English is the fallback rather than a silent
-operating-system-locale replacement. The Back control can be **Tonal**, **Filled accent**, or
-**Outlined**, with **Back to parent**, the parent name, or an icon-only presentation that retains
-its accessible destination. The optional discovery treatment adds an accent edge plus an `M` or **Material**
-badge only to explicitly reviewed fork-only navigation, toolbar, settings, menu, and command entry
-points; it does not change their behavior or label upstream/mixed controls. All 17 settings are
-captured in that profile's local Git history, so switching profiles switches the appearance context
-and Settings History can audit or restore it.
+**Settings → Appearance** now keeps only ordinary language, theme, scale, list, sorting,
+formatting, and diff preferences. Custom visuals stay with their owners. Right-click the actual app
+identity/workspace, progress bar, toolbar, repository list, tab strip, code/diff surface, repository
+name or logo, tab title, reviewed Material entry point, or temporary-submodule Back control—or use
+`Shift+F10`—to open its editor beside it.
 
-For a project-specific workspace, open **Repository settings → Appearance**. Its six optional
-overrides are **accent palette**, **surface palette**, **toolbar labels**, **toolbar density**, **tab
-density**, and **tab width**. Each unset field inherits the active-profile default. The overrides
-live in the repository's local `.git/config`; they are not committed or shared with collaborators.
-Per-tab text and background palettes, custom colors, and recent colors remain profile tab data
-rather than repository overrides.
+Every owner has its own strict setting, local Git repository path, and History manager. Profile,
+feature, repository-instance, and tab-instance changes never share a mutable timeline; undo, redo,
+and restore append audit commits. Repository workspace, toolbar, tabs, list-name, and logo owners
+can inherit their matching profile owner. A local appearance UUID keeps those histories stable when
+the working copy moves. Repository Settings therefore has no Appearance tab.
 
-The same page now includes a live **App identity** editor. It can replace the in-app name and logo,
-then tune logo shape, size, inset, rotation, border, shadow, and colors plus name font, width,
-weight, case, size, spacing, opacity, emphasis, highlight, and effects. The identity follows the
-active profile and its local Git history, restores across restart, and deliberately does not rename
-the signed executable or operating-system icon. Right-clicking an appropriate shell or repository
-surface offers its customization route and identifies the exact profile or local Git repository
-whose history owns that setting.
+The app identity editor can replace the in-app name and logo, then tune geometry, colors,
+typography, spacing, emphasis, and effects. It restores with the profile but does not rename the
+signed executable or operating-system icon. An inherited repository logo can open the profile
+default editor beside that same actual logo.
 
 ![Profile-customized app identity restored in the Material workspace](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 
@@ -161,7 +148,7 @@ the tonal workspace preview hides when a compact window needs the space.
 
 ![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-welcome.png)
 
-![Appearance preferences with explicit language and temporary-submodule Back button controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance editor anchored beside its actual owner with History and a dedicated local Git path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ![Measured narrow toolbar with Build and Run and Commit and Push in the More actions surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
 
@@ -224,10 +211,12 @@ the tonal workspace preview hides when a compact window needs the space.
   the same GitHub.com, Enterprise, URL, and GitLab/Bitbucket selection model as Clone, then review a
   safe repository-relative path and optional branch with exact-account routing, bounded progress,
   cancellation, and managed-list refresh.
-- **Temporary submodule navigation** — choose **Open as repository** on an initialized Submodule
-  Manager row to work in that child without adding it to the repository list, Recent, or persisted
-  last selection. The context bar returns to the saved root repository; invalid or escaping paths
-  fail closed without a partial import.
+- **Temporary submodule navigation** — in the wider **Repository settings → Submodules** surface,
+  choose **Open & manage** on an initialized child to work there without adding it to the repository
+  list, Recent, or persisted last selection. Right-click the Back preview to open its element-owned
+  editor beside it; changes remain staged until Save. Adjacent **Subtrees** embeds add, pull, push,
+  and split management. Back returns
+  to the saved root; invalid or escaping paths fail closed without a partial import.
 
 ![Word-style tab appearance editor with typography, alignment, and independent text and background palettes](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-appearance-word.png)
 

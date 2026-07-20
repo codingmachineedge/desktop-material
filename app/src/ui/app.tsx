@@ -58,7 +58,17 @@ import { CloneRepositoryTab } from '../models/clone-repository-tab'
 import { batchCloneNeedsAttention } from '../models/batch-clone'
 import { CloningRepository } from '../models/cloning-repository'
 import { IErrorNotice, IErrorNoticeAction } from '../models/error-notice'
-import { resolveAppearanceCustomization } from '../models/appearance-customization'
+import {
+  IAppearanceCustomization,
+  IRepositoryAppearanceOverrides,
+  resolveAppearanceCustomization,
+} from '../models/appearance-customization'
+import {
+  IProfileAppearanceElementSettings,
+  IRepositoryAppearanceElementSettings,
+  ProfileAppearanceElementId,
+  RepositoryAppearanceElementId,
+} from '../models/element-appearance'
 import {
   isRepositoryFileDrag,
   uniqueDroppedRepositoryPaths,
@@ -103,6 +113,7 @@ import { AppMenuBar } from './app-menu'
 import { UpdateAvailable, renderBanner } from './banners'
 import { Preferences } from './preferences'
 import { SettingsHistoryDialog } from './settings-history'
+import { IVersionedStoreHistorySource } from './version-history'
 import { NotificationHistoryDialog } from './notifications/notification-history-dialog'
 import { NotificationAutomationsDialog } from './notifications/notification-automations-dialog'
 import { LogHistoryDialog } from './log-history/log-history-dialog'
@@ -151,6 +162,22 @@ import {
 } from './clone-repository'
 import { SubmoduleManagerDialog } from './submodules/submodule-manager-dialog'
 import { SubmoduleConfigDialog } from './submodules/submodule-config-dialog'
+import { SubmoduleBackButton } from './submodules/submodule-back-button'
+import {
+  AnchoredAppearanceEditor,
+  AppIdentityAppearanceEditor,
+  AppWorkspaceAppearanceEditor,
+  CodeDiffAppearanceEditor,
+  DefaultRepositoryLogoAppearanceEditor,
+  FeatureHighlightingAppearanceEditor,
+  RepositoryListAppearanceEditor,
+  RepositoryTabsAppearanceEditor,
+  RepositoryTabsOverrideAppearanceEditor,
+  RepositoryToolbarAppearanceEditor,
+  RepositoryWorkspaceAppearanceEditor,
+  ToolbarAppearanceEditor,
+  UpdateProgressAppearanceEditor,
+} from './appearance'
 import { LocalizedText } from './lib/localized-text'
 import { SubtreeManagerDialog } from './subtrees/subtree-manager-dialog'
 import { AddSubtreeDialog } from './subtrees/add-subtree-dialog'
@@ -276,7 +303,7 @@ import { offsetFromNow } from '../lib/offset-from'
 import { getNumber } from '../lib/local-storage'
 import { IconPreviewDialog } from './octicons/icon-preview-dialog'
 import { isCertificateErrorSuppressedFor } from '../lib/suppress-certificate-error'
-import { clipboard, webUtils } from 'electron'
+import { webUtils } from 'electron'
 import { showTestUI } from './lib/test-ui-components/test-ui-components'
 import { ConfirmCommitFilteredChanges } from './changes/confirm-commit-filtered-changes-dialog'
 import { AboutTestDialog } from './about/about-test-dialog'
@@ -323,6 +350,10 @@ const UpdateCheckInterval = 4 * HourInMilliseconds
  */
 const SendStatsInterval = 4 * HourInMilliseconds
 
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error))
+}
+
 interface IAppProps {
   readonly dispatcher: Dispatcher
   readonly repositoryStateManager: RepositoryStateCache
@@ -338,6 +369,41 @@ interface IAppProps {
   readonly issueWorkflowsStore: GitHubIssuesStore
   readonly startTime: number
 }
+
+type ProfileAppearanceEditorTarget = {
+  readonly kind: 'profile'
+  readonly elementId: ProfileAppearanceElementId
+  readonly anchor: HTMLElement
+  readonly profileKey: string
+}
+
+type FeatureAppearanceEditorTarget = {
+  readonly kind: 'feature'
+  readonly featureId: string
+  readonly label: string
+  readonly anchor: HTMLElement
+  readonly highlighted: boolean
+  readonly profileKey: string
+}
+
+type RepositoryAppearanceEditorTarget = {
+  readonly kind: 'repository'
+  readonly elementId:
+    | typeof RepositoryAppearanceElementId.Workspace
+    | typeof RepositoryAppearanceElementId.Toolbar
+    | typeof RepositoryAppearanceElementId.Tabs
+  readonly repository: Repository
+  readonly anchor: HTMLElement
+  readonly values: IRepositoryAppearanceElementSettings
+  readonly historySource: IVersionedStoreHistorySource
+  readonly repositoryPath: string
+  readonly profileKey: string
+}
+
+type AppearanceEditorTarget =
+  | ProfileAppearanceEditorTarget
+  | FeatureAppearanceEditorTarget
+  | RepositoryAppearanceEditorTarget
 
 export const dialogTransitionTimeout = {
   enter: 250,
@@ -393,6 +459,12 @@ export class App extends React.Component<IAppProps, IAppState> {
 
   private repositoryViewRef = React.createRef<RepositoryView>()
   private repositoryDropdownRef = React.createRef<ToolbarDropdown>()
+  /** Transient anchored editor state; durable values live in element stores. */
+  private appearanceEditorTarget: AppearanceEditorTarget | null = null
+  private readonly featureAppearanceValues = new Map<string, boolean>()
+  private readonly featureAppearanceLoads = new Map<string, number>()
+  private appearanceProfileKey = this.props.dispatcher.getActiveProfileKey()
+  private featureAppearanceGeneration = 0
   private readonly submoduleReturnInFlight = new SubmoduleReturnInFlightGuard(
     () => {
       if (this.mounted) {
@@ -1433,6 +1505,7 @@ export class App extends React.Component<IAppProps, IAppState> {
     })
 
     this.updateWindowTitle()
+    window.requestAnimationFrame(() => this.syncFeatureAppearanceOwners())
   }
 
   private clearRepositoryFileDrag() {
@@ -1460,95 +1533,290 @@ export class App extends React.Component<IAppProps, IAppState> {
       return
     }
 
-    const surface = event.target.closest<HTMLElement>(
-      '[data-customization-surface]'
-    )
-    const repositoryElement = event.target.closest('#repository')
-    const inDesktop =
-      surface !== null ||
-      repositoryElement !== null ||
-      event.target.closest('#desktop-app-contents, #desktop-app-title-bar') !==
-        null
-    if (!inDesktop) {
-      return
-    }
-
-    event.preventDefault()
-    const isGenericAppSurface =
-      surface?.dataset.customizationSurface === 'app-workspace'
-    const label =
-      !isGenericAppSurface && surface !== null
-        ? surface.dataset.customizationLabel ?? 'App element'
-        : repositoryElement !== null
-        ? 'Repository workspace'
-        : 'App workspace'
-    const scope =
-      !isGenericAppSurface && surface !== null
-        ? surface.dataset.customizationScope ?? 'profile'
-        : repositoryElement !== null
-        ? 'repository'
-        : 'profile'
-
-    if (scope === 'repository') {
-      const repository = this.getRepository()
-      if (!(repository instanceof Repository)) {
+    const feature = event.target.closest<HTMLElement>('[data-dm-feature]')
+    if (feature !== null) {
+      const featureId = this.getStableFeatureElementId(feature)
+      if (featureId === null) {
         return
       }
-      void showContextualMenu([
-        {
-          label: `Customize ${label}…`,
-          action: () =>
-            this.showRepositorySettings(RepositorySettingsTab.Appearance),
-        },
-        {
-          label: 'View Repository Commit History',
-          action: () => void this.showHistory(false),
-        },
-        { type: 'separator' },
-        {
-          label: `Local Git repository: ${repository.path}`,
-          enabled: false,
-        },
-        {
-          label: 'Copy Local Repository Path',
-          action: () => clipboard.writeText(repository.path),
-        },
-      ])
+      event.preventDefault()
+      event.stopPropagation()
+      this.prepareAppearanceAnchor(feature)
+      const profileKey = this.props.dispatcher.getActiveProfileKey()
+      void this.props.dispatcher
+        .getFeatureAppearanceElement(featureId)
+        .then(value => {
+          if (
+            !this.mounted ||
+            !feature.isConnected ||
+            this.props.dispatcher.getActiveProfileKey() !== profileKey
+          ) {
+            return
+          }
+          this.appearanceEditorTarget = {
+            kind: 'feature',
+            featureId,
+            label:
+              feature.dataset.customizationLabel ??
+              feature.getAttribute('aria-label') ??
+              feature.textContent?.trim() ??
+              'Desktop Material feature',
+            anchor: feature,
+            highlighted: value.highlighted,
+            profileKey,
+          }
+          this.forceUpdate()
+        })
+        .catch(error => this.props.dispatcher.postError(asError(error)))
       return
     }
 
-    const profilePath = this.props.dispatcher.getActiveProfileRepositoryPath()
-    void showContextualMenu([
-      {
-        label: `Customize ${label}…`,
-        action: () =>
-          this.props.dispatcher.showPopup({
-            type: PopupType.Preferences,
-            initialSelectedTab: PreferencesTab.Appearance,
-          }),
-      },
-      {
-        label: 'View Appearance and Tab History…',
-        action: () =>
-          this.props.dispatcher.showPopup({ type: PopupType.SettingsHistory }),
-      },
-      { type: 'separator' },
-      {
-        label:
-          profilePath === null
-            ? 'Profile history repository unavailable'
-            : `Profile Git history: ${profilePath}`,
-        enabled: false,
-      },
-      {
-        label: 'Copy Profile History Repository Path',
-        enabled: profilePath !== null,
-        action:
-          profilePath === null
-            ? undefined
-            : () => clipboard.writeText(profilePath),
-      },
+    const repositoryMatch = this.findRepositoryAppearanceOwner(event.target)
+    const repository = this.getRepository()
+    if (
+      repositoryMatch !== null &&
+      repository instanceof Repository
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.prepareAppearanceAnchor(repositoryMatch.anchor)
+      void this.openRepositoryAppearanceEditor(
+        repository,
+        repositoryMatch.elementId,
+        repositoryMatch.anchor
+      ).catch(error => this.props.dispatcher.postError(asError(error)))
+      return
+    }
+
+    const match = this.findProfileAppearanceOwner(event.target)
+    if (match === null) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    this.prepareAppearanceAnchor(match.anchor)
+    this.appearanceEditorTarget = {
+      kind: 'profile',
+      elementId: match.elementId,
+      anchor: match.anchor,
+      profileKey: this.props.dispatcher.getActiveProfileKey(),
+    }
+    this.forceUpdate()
+  }
+
+  private prepareAppearanceAnchor(anchor: HTMLElement) {
+    if (anchor.tabIndex < 0) {
+      anchor.tabIndex = -1
+    }
+  }
+
+  private getStableFeatureElementId(element: HTMLElement): string | null {
+    const explicit = element.dataset.dmFeatureId
+    if (explicit !== undefined && explicit.trim().length > 0) {
+      return explicit.trim()
+    }
+    if (element.id.length > 0) {
+      return element.id
+    }
+    const stableClass = [...element.classList].find(name =>
+      /^(repository-tab-|toolbar-|notification-)/.test(name)
+    )
+    return stableClass ?? null
+  }
+
+  private applyFeatureAppearance(featureId: string, highlighted: boolean) {
+    this.featureAppearanceValues.set(featureId, highlighted)
+    for (const element of document.querySelectorAll<HTMLElement>(
+      '[data-dm-feature]'
+    )) {
+      if (this.getStableFeatureElementId(element) !== featureId) {
+        continue
+      }
+      element.dataset.dmFeatureId = featureId
+      element.toggleAttribute('data-dm-feature-highlighted', highlighted)
+    }
+  }
+
+  /** Drop every transient owner when the active settings profile changes. */
+  private synchronizeAppearanceProfile(): boolean {
+    const profileKey = this.props.dispatcher.getActiveProfileKey()
+    if (profileKey === this.appearanceProfileKey) {
+      return false
+    }
+
+    this.appearanceProfileKey = profileKey
+    this.featureAppearanceGeneration++
+    this.featureAppearanceValues.clear()
+    this.featureAppearanceLoads.clear()
+    this.appearanceEditorTarget = null
+    return true
+  }
+
+  private syncFeatureAppearanceOwners() {
+    this.synchronizeAppearanceProfile()
+    if (!this.props.dispatcher.isElementAppearanceCoordinatorReady()) {
+      return
+    }
+    const ids = new Set<string>()
+    for (const element of document.querySelectorAll<HTMLElement>(
+      '[data-dm-feature]'
+    )) {
+      const id = this.getStableFeatureElementId(element)
+      if (id === null) {
+        continue
+      }
+      element.dataset.dmFeatureId = id
+      ids.add(id)
+      const cached = this.featureAppearanceValues.get(id)
+      if (cached !== undefined) {
+        element.toggleAttribute('data-dm-feature-highlighted', cached)
+      }
+    }
+
+    for (const id of ids) {
+      if (
+        this.featureAppearanceValues.has(id) ||
+        this.featureAppearanceLoads.has(id)
+      ) {
+        continue
+      }
+      const generation = this.featureAppearanceGeneration
+      this.featureAppearanceLoads.set(id, generation)
+      void this.props.dispatcher
+        .getFeatureAppearanceElement(id)
+        .then(value => {
+          if (
+            generation !== this.featureAppearanceGeneration ||
+            this.appearanceProfileKey !==
+              this.props.dispatcher.getActiveProfileKey()
+          ) {
+            return
+          }
+          this.applyFeatureAppearance(id, value.highlighted)
+        })
+        .catch(error => this.props.dispatcher.postError(asError(error)))
+        .finally(() => {
+          if (this.featureAppearanceLoads.get(id) === generation) {
+            this.featureAppearanceLoads.delete(id)
+          }
+        })
+    }
+  }
+
+  private findProfileAppearanceOwner(target: Element): {
+    readonly elementId: ProfileAppearanceElementId
+    readonly anchor: HTMLElement
+  } | null {
+    const candidates: ReadonlyArray<
+      readonly [string, ProfileAppearanceElementId]
+    > = [
+      [
+        '[data-customization-surface="app-identity"]',
+        ProfileAppearanceElementId.AppIdentity,
+      ],
+      ['.update-download-progress', ProfileAppearanceElementId.UpdateProgress],
+      ['#desktop-app-toolbar', ProfileAppearanceElementId.Toolbar],
+      ['.repository-list', ProfileAppearanceElementId.RepositoryList],
+      ['.repository-tab-strip', ProfileAppearanceElementId.RepositoryTabs],
+      [
+        '.diff-container, .code-viewer, .blob-wrapper',
+        ProfileAppearanceElementId.CodeDiff,
+      ],
+      ['#desktop-app-contents', ProfileAppearanceElementId.AppWorkspace],
+    ]
+    for (const [selector, elementId] of candidates) {
+      const anchor = target.closest<HTMLElement>(selector)
+      if (anchor !== null) {
+        return { elementId, anchor }
+      }
+    }
+    return null
+  }
+
+  private closeAppearanceEditor = () => {
+    if (this.appearanceEditorTarget === null) {
+      return
+    }
+    this.appearanceEditorTarget = null
+    if (this.mounted) {
+      this.forceUpdate()
+    }
+  }
+
+  private findRepositoryAppearanceOwner(target: Element): {
+    readonly elementId:
+      | typeof RepositoryAppearanceElementId.Workspace
+      | typeof RepositoryAppearanceElementId.Toolbar
+      | typeof RepositoryAppearanceElementId.Tabs
+    readonly anchor: HTMLElement
+  } | null {
+    if (
+      target.closest('.diff-container, .code-viewer, .blob-wrapper') !== null
+    ) {
+      return null
+    }
+    const toolbar = target.closest<HTMLElement>('#desktop-app-toolbar')
+    if (toolbar !== null) {
+      return {
+        elementId: RepositoryAppearanceElementId.Toolbar,
+        anchor: toolbar,
+      }
+    }
+    const tabs = target.closest<HTMLElement>('.repository-tab-strip')
+    if (tabs !== null) {
+      return {
+        elementId: RepositoryAppearanceElementId.Tabs,
+        anchor: tabs,
+      }
+    }
+    const workspace = target.closest<HTMLElement>('#repository')
+    return workspace === null
+      ? null
+      : {
+          elementId: RepositoryAppearanceElementId.Workspace,
+          anchor: workspace,
+        }
+  }
+
+  private async openRepositoryAppearanceEditor(
+    repository: Repository,
+    elementId: RepositoryAppearanceEditorTarget['elementId'],
+    anchor: HTMLElement
+  ) {
+    const profileKey = this.props.dispatcher.getActiveProfileKey()
+    const [values, historySource, repositoryPath] = await Promise.all([
+      this.props.dispatcher.getRepositoryAppearanceElements(repository),
+      this.props.dispatcher.getRepositoryAppearanceHistorySource(
+        repository,
+        elementId
+      ),
+      this.props.dispatcher.getRepositoryAppearanceRepositoryPath(
+        repository,
+        elementId
+      ),
     ])
+    const selectedRepository = this.getRepository()
+    if (
+      !this.mounted ||
+      !anchor.isConnected ||
+      this.props.dispatcher.getActiveProfileKey() !== profileKey ||
+      !(selectedRepository instanceof Repository) ||
+      selectedRepository.id !== repository.id ||
+      selectedRepository.path !== repository.path
+    ) {
+      return
+    }
+    this.appearanceEditorTarget = {
+      kind: 'repository',
+      elementId,
+      repository,
+      anchor,
+      values,
+      historySource,
+      repositoryPath,
+      profileKey,
+    }
+    this.forceUpdate()
   }
 
   public componentDidUpdate(prevProps: IAppProps, prevState: IAppState) {
@@ -1556,6 +1824,23 @@ export class App extends React.Component<IAppProps, IAppState> {
     if (this.getWindowTitle(prevState) !== this.getWindowTitle()) {
       this.updateWindowTitle()
     }
+    const profileChanged = this.synchronizeAppearanceProfile()
+    const target = this.appearanceEditorTarget
+    if (target?.kind === 'repository') {
+      const selectedRepository = this.getRepository()
+      if (
+        !(selectedRepository instanceof Repository) ||
+        selectedRepository.id !== target.repository.id ||
+        selectedRepository.path !== target.repository.path
+      ) {
+        this.appearanceEditorTarget = null
+      }
+    }
+    if (profileChanged && this.mounted) {
+      this.forceUpdate()
+      return
+    }
+    this.syncFeatureAppearanceOwners()
   }
 
   private getOnRefreshRepositoryFn(repository: Repository) {
@@ -2592,6 +2877,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             repository={repository}
             accounts={this.state.accounts}
             repositoryAccount={repositoryAccount}
+            appearanceCustomization={this.state.appearanceCustomization}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -4368,25 +4654,6 @@ export class App extends React.Component<IAppProps, IAppState> {
     const repository = selection.repository
     const parent = repository.parentRepository
     const parentName = parent.alias ?? parent.name
-    const accessibleLabel = translateForAccessibleName(
-      'submodule.backToParent',
-      { parent: parentName },
-      this.state.appearanceCustomization.languageMode
-    )
-    const labelPreference =
-      this.state.appearanceCustomization.submoduleBackButtonLabel
-    const visibleLabel: JSX.Element | string | null =
-      labelPreference === 'icon-only' ? null : labelPreference ===
-        'parent-name' ? (
-        parentName
-      ) : (
-        <LocalizedText
-          translationKey="submodule.backToParent"
-          variables={{ parent: parentName }}
-          languageMode={this.state.appearanceCustomization.languageMode}
-        />
-      )
-
     return (
       <aside
         className="submodule-repository-context"
@@ -4397,20 +4664,30 @@ export class App extends React.Component<IAppProps, IAppState> {
           this.state.appearanceCustomization.languageMode
         )}
       >
-        <Button
-          type="button"
-          className={`submodule-context-back submodule-context-back-${this.state.appearanceCustomization.submoduleBackButtonStyle}`}
-          onClick={this.onReturnToParentRepository}
+        <SubmoduleBackButton
+          appearanceCustomization={this.state.appearanceCustomization}
+          parentName={parentName}
+          onActivate={this.onReturnToParentRepository}
+          onAppearanceCustomizationChanged={
+            this.onSubmoduleBackAppearanceChanged
+          }
           disabled={this.submoduleReturnInFlight.pending}
-          ariaLabel={accessibleLabel}
-          tooltip={accessibleLabel}
           autoFocus={true}
-        >
-          <Octicon symbol={octicons.arrowLeft} />
-          {visibleLabel === null ? null : (
-            <span className="submodule-context-back-label">{visibleLabel}</span>
-          )}
-        </Button>
+          historySource={
+            this.props.dispatcher.isElementAppearanceCoordinatorReady()
+              ? this.props.dispatcher.getProfileAppearanceHistorySource(
+                  ProfileAppearanceElementId.SubmoduleBackButton
+                )
+              : undefined
+          }
+          repositoryPath={
+            this.props.dispatcher.isElementAppearanceCoordinatorReady()
+              ? this.props.dispatcher.getProfileAppearanceRepositoryPath(
+                  ProfileAppearanceElementId.SubmoduleBackButton
+                )
+              : undefined
+          }
+        />
         <p>
           <LocalizedText
             translationKey="submodule.viewingContext"
@@ -4419,6 +4696,14 @@ export class App extends React.Component<IAppProps, IAppState> {
           />
         </p>
       </aside>
+    )
+  }
+
+  private onSubmoduleBackAppearanceChanged = (
+    appearanceCustomization: IAppearanceCustomization
+  ) => {
+    void this.props.dispatcher.setAppearanceCustomization(
+      appearanceCustomization
     )
   }
 
@@ -4446,6 +4731,432 @@ export class App extends React.Component<IAppProps, IAppState> {
         notice.id
       )
     }
+  }
+
+  private setProfileAppearanceElement<K extends ProfileAppearanceElementId>(
+    id: K,
+    value: IProfileAppearanceElementSettings[K]
+  ) {
+    void this.props.dispatcher
+      .setProfileAppearanceElement(id, value)
+      .catch(error => this.props.dispatcher.postError(asError(error)))
+  }
+
+  private profileAppearanceTitle(id: ProfileAppearanceElementId): string {
+    switch (id) {
+      case ProfileAppearanceElementId.AppWorkspace:
+        return 'App workspace appearance'
+      case ProfileAppearanceElementId.UpdateProgress:
+        return 'Update progress appearance'
+      case ProfileAppearanceElementId.Toolbar:
+        return 'Toolbar appearance'
+      case ProfileAppearanceElementId.RepositoryList:
+        return 'Repository list appearance'
+      case ProfileAppearanceElementId.RepositoryTabs:
+        return 'Repository tabs appearance'
+      case ProfileAppearanceElementId.CodeDiff:
+        return 'Code and diff appearance'
+      case ProfileAppearanceElementId.SubmoduleBackButton:
+        return 'Submodule Back button appearance'
+      case ProfileAppearanceElementId.AppIdentity:
+        return 'App identity appearance'
+      case ProfileAppearanceElementId.DefaultRepositoryLogo:
+        return 'Default repository logo appearance'
+      default:
+        return assertNever(id, `Unknown appearance element: ${id}`)
+    }
+  }
+
+  private renderProfileAppearanceEditorContents(
+    id: ProfileAppearanceElementId,
+    showHistory: () => void
+  ): JSX.Element | null {
+    switch (id) {
+      case ProfileAppearanceElementId.AppWorkspace:
+        return (
+          <AppWorkspaceAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.UpdateProgress:
+        return (
+          <UpdateProgressAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.Toolbar:
+        return (
+          <ToolbarAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.RepositoryList:
+        return (
+          <RepositoryListAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.RepositoryTabs: {
+        const current = this.props.dispatcher.getProfileAppearanceElement(id)
+        return (
+          <RepositoryTabsAppearanceEditor
+            value={current}
+            onChange={value =>
+              this.setProfileAppearanceElement(id, { ...current, ...value })
+            }
+            onShowHistory={showHistory}
+          />
+        )
+      }
+      case ProfileAppearanceElementId.CodeDiff:
+        return (
+          <CodeDiffAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.AppIdentity:
+        return (
+          <AppIdentityAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.DefaultRepositoryLogo:
+        return (
+          <DefaultRepositoryLogoAppearanceEditor
+            value={this.props.dispatcher.getProfileAppearanceElement(id)}
+            onChange={value => this.setProfileAppearanceElement(id, value)}
+            onShowHistory={showHistory}
+          />
+        )
+      case ProfileAppearanceElementId.SubmoduleBackButton:
+        return null
+      default:
+        return assertNever(id, `Unknown appearance element: ${id}`)
+    }
+  }
+
+  private refreshFeatureAppearanceTarget = async () => {
+    const target = this.appearanceEditorTarget
+    if (
+      target?.kind !== 'feature' ||
+      target.profileKey !== this.props.dispatcher.getActiveProfileKey()
+    ) {
+      return
+    }
+    const value = await this.props.dispatcher.getFeatureAppearanceElement(
+      target.featureId
+    )
+    if (target.profileKey !== this.props.dispatcher.getActiveProfileKey()) {
+      return
+    }
+    this.applyFeatureAppearance(target.featureId, value.highlighted)
+    if (this.appearanceEditorTarget === target && this.mounted) {
+      this.appearanceEditorTarget = {
+        ...target,
+        highlighted: value.highlighted,
+      }
+      this.forceUpdate()
+    }
+  }
+
+  private repositoryElementsAsLegacyOverrides(
+    values: IRepositoryAppearanceElementSettings
+  ): IRepositoryAppearanceOverrides {
+    const workspace = values[RepositoryAppearanceElementId.Workspace]
+    const toolbar = values[RepositoryAppearanceElementId.Toolbar]
+    const tabs = values[RepositoryAppearanceElementId.Tabs]
+    const listName = values[RepositoryAppearanceElementId.ListName]
+    const logo = values[RepositoryAppearanceElementId.Logo]
+    return {
+      accentPalette: workspace.accentPalette ?? undefined,
+      surfacePalette: workspace.surfacePalette ?? undefined,
+      toolbarLabels: toolbar.toolbarLabels ?? undefined,
+      toolbarDensity: toolbar.toolbarDensity ?? undefined,
+      tabDensity: tabs.tabDensity ?? undefined,
+      tabWidth: tabs.tabWidth ?? undefined,
+      listNameStyle: listName.style ?? undefined,
+      repositoryLogo: logo.logo ?? undefined,
+    }
+  }
+
+  private refreshRepositoryAppearanceTarget = async () => {
+    const target = this.appearanceEditorTarget
+    if (target?.kind !== 'repository') {
+      return
+    }
+    const values = await this.mirrorRepositoryAppearance(target.repository)
+    if (this.appearanceEditorTarget === target && this.mounted) {
+      this.appearanceEditorTarget = { ...target, values }
+      this.forceUpdate()
+    }
+  }
+
+  private async mirrorRepositoryAppearance(
+    repository: Repository
+  ): Promise<IRepositoryAppearanceElementSettings> {
+    const values = await this.props.dispatcher.getRepositoryAppearanceElements(
+      repository
+    )
+    await this.props.dispatcher.setRepositoryAppearanceOverrides(
+      repository,
+      this.repositoryElementsAsLegacyOverrides(values)
+    )
+    return values
+  }
+
+  private setRepositoryAppearanceElement<
+    K extends RepositoryAppearanceElementId
+  >(
+    target: RepositoryAppearanceEditorTarget,
+    id: K,
+    value: IRepositoryAppearanceElementSettings[K]
+  ) {
+    const values = { ...target.values, [id]: value }
+    const next = { ...target, values }
+    this.appearanceEditorTarget = next
+    this.forceUpdate()
+    void this.props.dispatcher
+      .setRepositoryAppearanceElement(target.repository, id, value)
+      .then(() => this.mirrorRepositoryAppearance(target.repository))
+      .then(durableValues => {
+        if (this.appearanceEditorTarget === next) {
+          this.appearanceEditorTarget = {
+            ...next,
+            values: durableValues,
+          }
+          this.forceUpdate()
+        }
+      })
+      .catch(error => this.props.dispatcher.postError(asError(error)))
+  }
+
+  private editProfileDefaultForRepositoryTarget(
+    target: RepositoryAppearanceEditorTarget
+  ) {
+    const elementId =
+      target.elementId === RepositoryAppearanceElementId.Workspace
+        ? ProfileAppearanceElementId.AppWorkspace
+        : target.elementId === RepositoryAppearanceElementId.Toolbar
+        ? ProfileAppearanceElementId.Toolbar
+        : ProfileAppearanceElementId.RepositoryTabs
+    this.appearanceEditorTarget = {
+      kind: 'profile',
+      elementId,
+      anchor: target.anchor,
+      profileKey: target.profileKey,
+    }
+    this.forceUpdate()
+  }
+
+  private renderRepositoryAppearanceEditor(
+    target: RepositoryAppearanceEditorTarget,
+    showHistory: () => void
+  ): JSX.Element {
+    switch (target.elementId) {
+      case RepositoryAppearanceElementId.Workspace:
+        return (
+          <RepositoryWorkspaceAppearanceEditor
+            value={target.values[RepositoryAppearanceElementId.Workspace]}
+            inherited={this.props.dispatcher.getProfileAppearanceElement(
+              ProfileAppearanceElementId.AppWorkspace
+            )}
+            onChange={value =>
+              this.setRepositoryAppearanceElement(
+                target,
+                RepositoryAppearanceElementId.Workspace,
+                value
+              )
+            }
+            onEditProfileDefault={() =>
+              this.editProfileDefaultForRepositoryTarget(target)
+            }
+            onShowHistory={showHistory}
+          />
+        )
+      case RepositoryAppearanceElementId.Toolbar:
+        return (
+          <RepositoryToolbarAppearanceEditor
+            value={target.values[RepositoryAppearanceElementId.Toolbar]}
+            inherited={this.props.dispatcher.getProfileAppearanceElement(
+              ProfileAppearanceElementId.Toolbar
+            )}
+            onChange={value =>
+              this.setRepositoryAppearanceElement(
+                target,
+                RepositoryAppearanceElementId.Toolbar,
+                value
+              )
+            }
+            onEditProfileDefault={() =>
+              this.editProfileDefaultForRepositoryTarget(target)
+            }
+            onShowHistory={showHistory}
+          />
+        )
+      case RepositoryAppearanceElementId.Tabs:
+        return (
+          <RepositoryTabsOverrideAppearanceEditor
+            value={target.values[RepositoryAppearanceElementId.Tabs]}
+            inherited={this.props.dispatcher.getProfileAppearanceElement(
+              ProfileAppearanceElementId.RepositoryTabs
+            )}
+            onChange={value =>
+              this.setRepositoryAppearanceElement(
+                target,
+                RepositoryAppearanceElementId.Tabs,
+                value
+              )
+            }
+            onEditProfileDefault={() =>
+              this.editProfileDefaultForRepositoryTarget(target)
+            }
+            onShowHistory={showHistory}
+          />
+        )
+      default:
+        return assertNever(
+          target.elementId,
+          `Unknown repository appearance element: ${target.elementId}`
+        )
+    }
+  }
+
+  private renderAppearanceEditor(): JSX.Element | null {
+    const target = this.appearanceEditorTarget
+    if (
+      target === null ||
+      !target.anchor.isConnected ||
+      !this.props.dispatcher.isElementAppearanceCoordinatorReady() ||
+      target.profileKey !== this.props.dispatcher.getActiveProfileKey()
+    ) {
+      return null
+    }
+
+    if (target.kind === 'repository') {
+      const selectedRepository = this.getRepository()
+      if (
+        !(selectedRepository instanceof Repository) ||
+        selectedRepository.id !== target.repository.id ||
+        selectedRepository.path !== target.repository.path
+      ) {
+        return null
+      }
+    }
+
+    if (target.kind === 'feature') {
+      return (
+        <AnchoredAppearanceEditor
+          title={`${target.label} appearance`}
+          anchor={target.anchor}
+          historySource={this.props.dispatcher.getFeatureAppearanceHistorySource(
+            target.featureId
+          )}
+          repositoryPath={this.props.dispatcher.getFeatureAppearanceRepositoryPath(
+            target.featureId
+          )}
+          onClose={this.closeAppearanceEditor}
+          onMutation={this.refreshFeatureAppearanceTarget}
+          contentOwnsHeader={true}
+        >
+          {controls => (
+            <FeatureHighlightingAppearanceEditor
+              value={{
+                highlightDesktopMaterialFeatures: target.highlighted,
+              }}
+              onChange={value => {
+                this.applyFeatureAppearance(
+                  target.featureId,
+                  value.highlightDesktopMaterialFeatures
+                )
+                this.appearanceEditorTarget = {
+                  ...target,
+                  highlighted: value.highlightDesktopMaterialFeatures,
+                }
+                this.forceUpdate()
+                void this.props.dispatcher
+                  .setFeatureAppearanceElement(
+                    target.featureId,
+                    value.highlightDesktopMaterialFeatures
+                  )
+                  .catch(error =>
+                    this.props.dispatcher.postError(asError(error))
+                  )
+              }}
+              onShowHistory={controls.showHistory}
+            />
+          )}
+        </AnchoredAppearanceEditor>
+      )
+    }
+
+    if (target.kind === 'repository') {
+      const title =
+        target.elementId === RepositoryAppearanceElementId.Workspace
+          ? 'Repository workspace appearance'
+          : target.elementId === RepositoryAppearanceElementId.Toolbar
+          ? 'Repository toolbar appearance'
+          : 'Repository tabs appearance'
+      return (
+        <AnchoredAppearanceEditor
+          title={title}
+          anchor={target.anchor}
+          historySource={target.historySource}
+          repositoryPath={target.repositoryPath}
+          onClose={this.closeAppearanceEditor}
+          onMutation={this.refreshRepositoryAppearanceTarget}
+          contentOwnsHeader={true}
+        >
+          {controls =>
+            this.renderRepositoryAppearanceEditor(
+              target,
+              controls.showHistory
+            )
+          }
+        </AnchoredAppearanceEditor>
+      )
+    }
+
+    if (
+      this.renderProfileAppearanceEditorContents(
+        target.elementId,
+        () => undefined
+      ) === null
+    ) {
+      return null
+    }
+    return (
+      <AnchoredAppearanceEditor
+        title={this.profileAppearanceTitle(target.elementId)}
+        anchor={target.anchor}
+        historySource={this.props.dispatcher.getProfileAppearanceHistorySource(
+          target.elementId
+        )}
+        repositoryPath={this.props.dispatcher.getProfileAppearanceRepositoryPath(
+          target.elementId
+        )}
+        onClose={this.closeAppearanceEditor}
+        contentOwnsHeader={true}
+      >
+        {controls =>
+          this.renderProfileAppearanceEditorContents(
+            target.elementId,
+            controls.showHistory
+          )
+        }
+      </AnchoredAppearanceEditor>
+    )
   }
 
   private renderApp() {
@@ -4486,6 +5197,7 @@ export class App extends React.Component<IAppProps, IAppState> {
         >
           {this.renderNotificationCentre()}
         </CrashProofBoundary>
+        {this.renderAppearanceEditor()}
         {this.renderPopups()}
         {this.renderDragElement()}
         <div

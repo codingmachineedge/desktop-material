@@ -54,7 +54,7 @@
       }
     }
   }
-  width: min(600px, calc(100vw - var(--spacing-double)));
+  width: min(960px, calc(100vw - var(--spacing-double)));
 
   .dialog-content {
     min-width: 0;
@@ -808,6 +808,78 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+
+    .submodule-appearance-customizer {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+      padding: 14px;
+      background: var(--md-sys-color-surface-container-low);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+    }
+
+    .submodule-appearance-copy {
+      display: grid;
+      gap: 4px;
+
+      h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        color: var(--md-sys-color-on-surface);
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
+
+        .octicon {
+          color: var(--md-sys-color-on-surface-variant);
+        }
+      }
+
+      p {
+        margin: 0;
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: var(--font-size-sm);
+        line-height: 1.45;
+      }
+    }
+
+    .submodule-appearance-preview {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+
+      .submodule-appearance-preview-title {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+      }
+
+      .submodule-repository-context {
+        border: 1px solid var(--md-sys-color-outline-variant);
+        border-radius: var(--md-sys-shape-corner-medium);
+      }
+    }
+
+    .submodules-temporary-open-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 0;
+      padding: 9px 11px;
+      color: var(--md-sys-color-on-tertiary-container);
+      background: var(--md-sys-color-tertiary-container);
+      border-radius: var(--md-sys-shape-corner-medium);
+      font-size: var(--font-size-sm);
+      line-height: 1.4;
+
+      .octicon {
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
     }
 
     .submodules-section-header {

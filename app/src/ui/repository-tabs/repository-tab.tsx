@@ -22,6 +22,7 @@ import {
   getProfileRepositoryLogoSignature,
   repositoryLogoLoader,
 } from '../repository-logo/repository-logo-loader'
+import { Dispatcher } from '../dispatcher'
 
 interface IRepositoryTabProps {
   readonly tab: IRepositoryTab
@@ -50,6 +51,8 @@ interface IRepositoryTabProps {
     event: React.DragEvent<HTMLElement>
   ) => void
   readonly onDragEnd: () => void
+  /** Resolves repository-owned logo settings from their dedicated Git owner. */
+  readonly dispatcher?: Dispatcher
 }
 
 interface IRepositoryTabState {
@@ -107,7 +110,11 @@ export class RepositoryTab extends React.Component<
     // the normalized profile value here as well to keep inherited tab icons in
     // sync. loadLogo's request id still prevents an older repository read from
     // winning if the path and profile change close together.
-    if (previousPath !== nextPath || profileLogoChanged) {
+    if (
+      previousPath !== nextPath ||
+      profileLogoChanged ||
+      prevProps.dispatcher !== this.props.dispatcher
+    ) {
       if (previousPath !== null && previousPath !== nextPath) {
         repositoryLogoLoader.invalidate(previousPath)
       }
@@ -150,7 +157,17 @@ export class RepositoryTab extends React.Component<
       return
     }
     try {
-      const logoDesign = await repositoryLogoLoader.load(repository)
+      const dispatcher = this.props.dispatcher
+      const logoDesign =
+        dispatcher !== undefined &&
+        typeof dispatcher.isElementAppearanceCoordinatorReady === 'function' &&
+        dispatcher.isElementAppearanceCoordinatorReady()
+          ? (
+              await dispatcher.getResolvedRepositoryElementAppearance(
+                repository
+              )
+            ).logo
+          : await repositoryLogoLoader.load(repository)
       if (requestId === this.logoRequestId) {
         this.setState({ logoDesign })
       }
@@ -236,10 +253,19 @@ export class RepositoryTab extends React.Component<
 
   private onFormatClick = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation()
+    const frame = event.currentTarget.closest<HTMLElement>('.repository-tab')
+    const title = frame?.querySelector<HTMLElement>('.repository-tab-label')
     this.props.onOpenStyleEditor(
       this.props.tab,
-      event.currentTarget as HTMLElement
+      title ?? (event.currentTarget as HTMLElement)
     )
+  }
+
+  /** The visible title owns its editor; the surrounding frame keeps commands. */
+  private onLabelContextMenu = (event: React.MouseEvent<HTMLSpanElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    this.props.onOpenStyleEditor(this.props.tab, event.currentTarget)
   }
 
   private onDragStart = (event: React.DragEvent<HTMLElement>) => {
@@ -292,7 +318,12 @@ export class RepositoryTab extends React.Component<
 
     if (this.state.isRenaming) {
       return (
-        <div className={className} style={frameStyle} data-tab-id={tab.id}>
+        <div
+          className={className}
+          style={frameStyle}
+          data-tab-id={tab.id}
+          data-context-menu-owner="repository-tab-commands"
+        >
           {this.renderIcon()}
           <input
             className="repository-tab-rename"
@@ -313,6 +344,7 @@ export class RepositoryTab extends React.Component<
         className={className}
         style={frameStyle}
         data-tab-id={tab.id}
+        data-context-menu-owner="repository-tab-commands"
         role="tab"
         aria-selected={isActive}
         aria-label={`${this.label}${tab.isPinned === true ? ', pinned' : ''}${
@@ -353,6 +385,12 @@ export class RepositoryTab extends React.Component<
         <span
           className="repository-tab-label"
           style={tabTitleStyleToCss(tab.titleStyle)}
+          data-context-menu-owner="tab-title-appearance"
+          data-customization-surface="tab-title"
+          data-customization-label={`${this.label} tab title`}
+          data-customization-scope="tab"
+          tabIndex={-1}
+          onContextMenu={this.onLabelContextMenu}
         >
           {this.label}
         </span>

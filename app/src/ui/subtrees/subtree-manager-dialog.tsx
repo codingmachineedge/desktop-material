@@ -35,17 +35,30 @@ const CustomUrlSource = ''
 
 type SubtreeRowAction = 'pull' | 'push' | 'split'
 
-interface ISubtreeManagerDialogProps {
+export interface ISubtreeManagerProps {
   readonly repository: Repository
   readonly dispatcher: Dispatcher
   /** The signed-in accounts used to resolve a credential for the source. */
   readonly accounts: ReadonlyArray<Account>
-  readonly onDismissed: () => void
 
   /** Overrides remote discovery, primarily for tests. */
   readonly listRemotes?: (
     repository: Repository
   ) => Promise<ReadonlyArray<IRemote>>
+
+  /**
+   * Reports whether this surface owns an in-flight repository mutation. Hosts
+   * use this to fence navigation and dismissal until Git has finished.
+   */
+  readonly onOperationStateChanged?: (inProgress: boolean) => void
+}
+
+interface ISubtreeManagerDialogProps extends ISubtreeManagerProps {
+  readonly onDismissed: () => void
+}
+
+interface ISubtreeManagerHostState {
+  readonly operationInProgress: boolean
 }
 
 interface ISubtreeManagerDialogState {
@@ -61,8 +74,8 @@ interface ISubtreeManagerDialogState {
   /** The repository's named remotes, offered as pull/push sources. */
   readonly remotes: ReadonlyArray<IRemote>
 
-  /** The prefixes of subtrees with an in-flight per-row operation. */
-  readonly busyPrefixes: ReadonlySet<string>
+  /** The subtree whose mutation is in flight, if any. */
+  readonly activeOperationPrefix: string | null
 
   /** The latest streamed progress line from an operation, if any. */
   readonly progress: string | null
@@ -105,7 +118,7 @@ interface ISubtreeManagerDialogState {
 }
 
 /**
- * The repository-page subtree manager.
+ * The reusable subtree-management surface.
  *
  * Lists the subtrees recorded in the repository history (prefix plus the last
  * merged upstream split and the local commit recording it) and offers per-row
@@ -114,18 +127,25 @@ interface ISubtreeManagerDialogState {
  * results are reflected by reloading the list. When the bundled Git lacks
  * `git subtree` the discovery list still renders but every action is disabled.
  */
-export class SubtreeManagerDialog extends React.Component<
-  ISubtreeManagerDialogProps,
+export class SubtreeManager extends React.Component<
+  ISubtreeManagerProps,
   ISubtreeManagerDialogState
 > {
-  public constructor(props: ISubtreeManagerDialogProps) {
+  private isMounted = false
+  private subtreeLoadRequest = 0
+  private availabilityRequest = 0
+  private remotesRequest = 0
+  private operationGeneration = 0
+  private operationInFlight = false
+
+  public constructor(props: ISubtreeManagerProps) {
     super(props)
     this.state = {
       subtrees: null,
       isLoading: true,
       subtreeAvailable: null,
       remotes: [],
-      busyPrefixes: new Set<string>(),
+      activeOperationPrefix: null,
       progress: null,
       error: null,
       notice: null,
@@ -143,9 +163,17 @@ export class SubtreeManagerDialog extends React.Component<
   }
 
   public componentDidMount() {
-    this.loadSubtrees()
-    this.probeAvailability()
-    this.loadRemotes()
+    this.isMounted = true
+    void this.loadSubtrees()
+    void this.probeAvailability()
+    void this.loadRemotes()
+  }
+
+  public componentWillUnmount() {
+    this.isMounted = false
+    this.subtreeLoadRequest++
+    this.availabilityRequest++
+    this.remotesRequest++
   }
 
   private formatError(error: unknown): string {
@@ -153,13 +181,27 @@ export class SubtreeManagerDialog extends React.Component<
   }
 
   private loadSubtrees = async () => {
+    if (!this.isMounted) {
+      return
+    }
+
+    const request = ++this.subtreeLoadRequest
     this.setState({ isLoading: true })
     try {
       const subtrees = await this.props.dispatcher.getSubtrees(
         this.props.repository
       )
+
+      if (!this.isMounted || request !== this.subtreeLoadRequest) {
+        return
+      }
+
       this.setState({ subtrees, isLoading: false })
     } catch (e) {
+      if (!this.isMounted || request !== this.subtreeLoadRequest) {
+        return
+      }
+
       log.error(
         `SubtreeManager: unable to discover subtrees for ${this.props.repository.path}`,
         e
@@ -173,19 +215,35 @@ export class SubtreeManagerDialog extends React.Component<
   }
 
   private probeAvailability = async () => {
+    const request = ++this.availabilityRequest
     try {
       const subtreeAvailable = await this.props.dispatcher.isSubtreeAvailable()
+
+      if (!this.isMounted || request !== this.availabilityRequest) {
+        return
+      }
+
       this.setState({ subtreeAvailable })
     } catch (e) {
+      if (!this.isMounted || request !== this.availabilityRequest) {
+        return
+      }
+
       log.warn('SubtreeManager: unable to probe for git subtree support', e)
       this.setState({ subtreeAvailable: false })
     }
   }
 
   private loadRemotes = async () => {
+    const request = ++this.remotesRequest
     try {
       const list = this.props.listRemotes ?? getRemotes
       const remotes = await list(this.props.repository)
+
+      if (!this.isMounted || request !== this.remotesRequest) {
+        return
+      }
+
       this.setState(prev => ({
         remotes,
         sourceRemote:
@@ -194,6 +252,10 @@ export class SubtreeManagerDialog extends React.Component<
             : prev.sourceRemote,
       }))
     } catch (e) {
+      if (!this.isMounted || request !== this.remotesRequest) {
+        return
+      }
+
       log.warn(
         `SubtreeManager: unable to list remotes for ${this.props.repository.path}`,
         e
@@ -206,20 +268,48 @@ export class SubtreeManagerDialog extends React.Component<
     return origin?.name ?? remotes.at(0)?.name ?? CustomUrlSource
   }
 
-  private setPrefixBusy(prefix: string, busy: boolean) {
-    this.setState(prev => {
-      const busyPrefixes = new Set(prev.busyPrefixes)
-      if (busy) {
-        busyPrefixes.add(prefix)
-      } else {
-        busyPrefixes.delete(prefix)
-      }
-      return { busyPrefixes }
+  /**
+   * Claim the manager-wide mutation lock synchronously. React state updates
+   * are batched, so the instance field is the authoritative guard against two
+   * rapid actions starting before disabled controls rerender.
+   */
+  private beginOperation(prefix: string): number | null {
+    if (this.operationInFlight) {
+      return null
+    }
+
+    this.operationInFlight = true
+    const generation = ++this.operationGeneration
+    this.setState({
+      activeOperationPrefix: prefix,
+      error: null,
+      notice: null,
+      progress: null,
     })
+    this.props.onOperationStateChanged?.(true)
+    return generation
   }
 
-  private onProgress = (line: string) => {
-    this.setState({ progress: line })
+  private finishOperation(generation: number) {
+    if (generation !== this.operationGeneration) {
+      return
+    }
+
+    this.operationInFlight = false
+    if (this.isMounted) {
+      this.setState({ activeOperationPrefix: null, progress: null })
+    }
+    this.props.onOperationStateChanged?.(false)
+  }
+
+  private onProgress = (generation: number, line: string) => {
+    if (
+      this.isMounted &&
+      this.operationInFlight &&
+      generation === this.operationGeneration
+    ) {
+      this.setState({ progress: line })
+    }
   }
 
   private onFilterTextChanged = (filterText: string) => {
@@ -243,6 +333,10 @@ export class SubtreeManagerDialog extends React.Component<
     (this.state.subtrees ?? []).map(subtree => subtree.prefix)
 
   private onShowAddSubtree = () => {
+    if (this.operationInFlight || this.state.subtreeAvailable === false) {
+      return
+    }
+
     this.props.dispatcher.showPopup({
       type: PopupType.AddSubtree,
       repository: this.props.repository,
@@ -254,6 +348,10 @@ export class SubtreeManagerDialog extends React.Component<
     subtree: IManagedSubtree,
     action: SubtreeRowAction
   ) => {
+    if (this.operationInFlight || this.state.subtreeAvailable === false) {
+      return
+    }
+
     const { expandedPrefix, expandedAction } = this.state
     if (expandedPrefix === subtree.prefix && expandedAction === action) {
       this.collapseEditor()
@@ -343,8 +441,11 @@ export class SubtreeManagerDialog extends React.Component<
       return
     }
 
-    this.setPrefixBusy(prefix, true)
-    this.setState({ error: null, notice: null, progress: null })
+    const generation = this.beginOperation(prefix)
+    if (generation === null) {
+      return
+    }
+
     try {
       const accountKey = await this.resolveAccountKey(source)
       if (action === 'pull') {
@@ -356,7 +457,7 @@ export class SubtreeManagerDialog extends React.Component<
           {
             squash: this.state.squash,
             accountKey,
-            progressCallback: this.onProgress,
+            progressCallback: line => this.onProgress(generation, line),
           }
         )
       } else {
@@ -365,26 +466,33 @@ export class SubtreeManagerDialog extends React.Component<
           prefix,
           source,
           ref,
-          { accountKey, progressCallback: this.onProgress }
+          {
+            accountKey,
+            progressCallback: line => this.onProgress(generation, line),
+          }
         )
       }
-      this.collapseEditor()
-      this.setState({
-        notice:
-          action === 'pull'
-            ? `Pulled ${ref} into ${prefix}.`
-            : `Pushed ${prefix} to ${ref}.`,
-      })
-      await this.loadSubtrees()
+
+      if (this.isMounted && generation === this.operationGeneration) {
+        this.collapseEditor()
+        this.setState({
+          notice:
+            action === 'pull'
+              ? `Pulled ${ref} into ${prefix}.`
+              : `Pushed ${prefix} to ${ref}.`,
+        })
+        await this.loadSubtrees()
+      }
     } catch (e) {
-      this.setState({
-        error: `Failed ${
-          action === 'pull' ? 'pulling' : 'pushing'
-        } ${prefix}: ${this.formatError(e)}`,
-      })
+      if (this.isMounted && generation === this.operationGeneration) {
+        this.setState({
+          error: `Failed ${
+            action === 'pull' ? 'pulling' : 'pushing'
+          } ${prefix}: ${this.formatError(e)}`,
+        })
+      }
     } finally {
-      this.setPrefixBusy(prefix, false)
-      this.setState({ progress: null })
+      this.finishOperation(generation)
     }
   }
 
@@ -402,25 +510,36 @@ export class SubtreeManagerDialog extends React.Component<
       return
     }
 
-    this.setPrefixBusy(prefix, true)
-    this.setState({ error: null, notice: null })
+    const generation = this.beginOperation(prefix)
+    if (generation === null) {
+      return
+    }
+
     try {
       const sha = await this.props.dispatcher.splitSubtree(
         this.props.repository,
         prefix,
         { branch }
       )
-      this.collapseEditor()
-      this.setState({
-        notice: `Split ${prefix} into branch ${branch} at ${sha.slice(0, 8)}.`,
-      })
-      await this.loadSubtrees()
+
+      if (this.isMounted && generation === this.operationGeneration) {
+        this.collapseEditor()
+        this.setState({
+          notice: `Split ${prefix} into branch ${branch} at ${sha.slice(
+            0,
+            8
+          )}.`,
+        })
+        await this.loadSubtrees()
+      }
     } catch (e) {
-      this.setState({
-        error: `Failed splitting ${prefix}: ${this.formatError(e)}`,
-      })
+      if (this.isMounted && generation === this.operationGeneration) {
+        this.setState({
+          error: `Failed splitting ${prefix}: ${this.formatError(e)}`,
+        })
+      }
     } finally {
-      this.setPrefixBusy(prefix, false)
+      this.finishOperation(generation)
     }
   }
 
@@ -489,7 +608,7 @@ export class SubtreeManagerDialog extends React.Component<
     return results.map(result => result.item)
   }
 
-  private renderSourceEditor(): JSX.Element {
+  private renderSourceEditor(operationInProgress: boolean): JSX.Element {
     const { remotes, sourceRemote } = this.state
 
     return (
@@ -498,6 +617,7 @@ export class SubtreeManagerDialog extends React.Component<
           label="Source"
           value={sourceRemote}
           onChange={this.onSourceRemoteChanged}
+          disabled={operationInProgress}
         >
           {remotes.map(remote => (
             <option key={remote.name} value={remote.name}>
@@ -513,6 +633,7 @@ export class SubtreeManagerDialog extends React.Component<
             value={this.state.sourceUrl}
             onValueChanged={this.onSourceUrlChanged}
             spellcheck={false}
+            disabled={operationInProgress}
           />
         )}
       </>
@@ -522,7 +643,7 @@ export class SubtreeManagerDialog extends React.Component<
   private renderEditor(
     subtree: IManagedSubtree,
     action: SubtreeRowAction,
-    isBusy: boolean
+    operationInProgress: boolean
   ): JSX.Element {
     if (action === 'split') {
       return (
@@ -535,6 +656,7 @@ export class SubtreeManagerDialog extends React.Component<
               onValueChanged={this.onSplitBranchChanged}
               spellcheck={false}
               autoFocus={true}
+              disabled={operationInProgress}
             />
           </div>
           <p className="subtree-editor-help">
@@ -544,13 +666,17 @@ export class SubtreeManagerDialog extends React.Component<
           <div className="subtree-editor-actions">
             <Button
               type="button"
-              disabled={isBusy}
+              disabled={operationInProgress}
               onClick={this.onConfirmSplit}
             >
-              {isBusy ? <Loading /> : null}
+              {operationInProgress ? <Loading /> : null}
               Split subtree
             </Button>
-            <Button type="button" onClick={this.collapseEditor}>
+            <Button
+              type="button"
+              disabled={operationInProgress}
+              onClick={this.collapseEditor}
+            >
               Cancel
             </Button>
           </div>
@@ -563,13 +689,14 @@ export class SubtreeManagerDialog extends React.Component<
     return (
       <div className="subtree-row-editor">
         <div className="subtree-editor-fields">
-          {this.renderSourceEditor()}
+          {this.renderSourceEditor(operationInProgress)}
           <TextBox
             label="Ref"
             placeholder="main"
             value={this.state.ref}
             onValueChanged={this.onRefChanged}
             spellcheck={false}
+            disabled={operationInProgress}
           />
         </div>
         {action === 'pull' && (
@@ -577,14 +704,23 @@ export class SubtreeManagerDialog extends React.Component<
             label="Squash the pulled history into one commit"
             value={this.state.squash ? CheckboxValue.On : CheckboxValue.Off}
             onChange={this.onSquashChanged}
+            disabled={operationInProgress}
           />
         )}
         <div className="subtree-editor-actions">
-          <Button type="button" disabled={isBusy} onClick={confirm}>
-            {isBusy ? <Loading /> : null}
+          <Button
+            type="button"
+            disabled={operationInProgress}
+            onClick={confirm}
+          >
+            {operationInProgress ? <Loading /> : null}
             {action === 'pull' ? 'Pull subtree' : 'Push subtree'}
           </Button>
-          <Button type="button" onClick={this.collapseEditor}>
+          <Button
+            type="button"
+            disabled={operationInProgress}
+            onClick={this.collapseEditor}
+          >
             Cancel
           </Button>
         </div>
@@ -593,8 +729,9 @@ export class SubtreeManagerDialog extends React.Component<
   }
 
   private renderRow(subtree: IManagedSubtree): JSX.Element {
-    const isBusy = this.state.busyPrefixes.has(subtree.prefix)
-    const actionsDisabled = isBusy || this.state.subtreeAvailable === false
+    const operationInProgress = this.state.activeOperationPrefix !== null
+    const actionsDisabled =
+      operationInProgress || this.state.subtreeAvailable === false
     const expandedAction =
       this.state.expandedPrefix === subtree.prefix
         ? this.state.expandedAction
@@ -609,7 +746,7 @@ export class SubtreeManagerDialog extends React.Component<
         onToggleAction={this.onToggleAction}
       >
         {expandedAction !== null &&
-          this.renderEditor(subtree, expandedAction, isBusy)}
+          this.renderEditor(subtree, expandedAction, operationInProgress)}
       </SubtreeRow>
     )
   }
@@ -630,6 +767,7 @@ export class SubtreeManagerDialog extends React.Component<
       // renderAvailabilityError, so the add affordance is hidden there rather
       // than offering a button that would only be disabled.
       const canAdd = this.state.subtreeAvailable !== false
+      const operationInProgress = this.state.activeOperationPrefix !== null
       return (
         <div className="subtrees-empty-state">
           <p className="subtrees-empty">
@@ -639,6 +777,7 @@ export class SubtreeManagerDialog extends React.Component<
           {canAdd && (
             <Button
               type="button"
+              disabled={operationInProgress}
               onClick={this.onShowAddSubtree}
               tooltip="Choose a hosted repository or URL to add"
             >
@@ -666,13 +805,10 @@ export class SubtreeManagerDialog extends React.Component<
   }
 
   public render() {
+    const operationInProgress = this.state.activeOperationPrefix !== null
+
     return (
-      <Dialog
-        id="subtree-manager"
-        title={__DARWIN__ ? 'Subtree Manager' : 'Subtree manager'}
-        onSubmit={this.props.onDismissed}
-        onDismissed={this.props.onDismissed}
-      >
+      <>
         {this.renderAvailabilityError()}
         <DialogContent>
           <div className="subtrees-manager">
@@ -685,7 +821,10 @@ export class SubtreeManagerDialog extends React.Component<
                 <div className="subtrees-header-actions">
                   <Button
                     type="button"
-                    disabled={this.state.subtreeAvailable === false}
+                    disabled={
+                      operationInProgress ||
+                      this.state.subtreeAvailable === false
+                    }
                     onClick={this.onShowAddSubtree}
                     tooltip="Choose a hosted repository or URL to add"
                   >
@@ -696,23 +835,98 @@ export class SubtreeManagerDialog extends React.Component<
               </div>
               {this.renderFilterControls()}
               {this.state.error !== null && (
-                <p className="subtrees-error">{this.state.error}</p>
+                <p
+                  className="subtrees-error"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  {this.state.error}
+                </p>
               )}
               {this.state.notice !== null && (
-                <p className="subtrees-notice" role="status">
+                <p className="subtrees-notice" role="status" aria-live="polite">
                   {this.state.notice}
                 </p>
               )}
               {this.state.progress !== null && (
-                <p className="subtrees-progress">{this.state.progress}</p>
+                <p
+                  className="subtrees-progress"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {this.state.progress}
+                </p>
               )}
               {this.renderList()}
             </section>
           </div>
         </DialogContent>
+      </>
+    )
+  }
+}
+
+/**
+ * Standalone repository-page host for the shared subtree manager. Repository
+ * Settings renders {@link SubtreeManager} directly so both entry points expose
+ * the exact same management surface without nesting dialogs.
+ */
+export class SubtreeManagerDialog extends React.Component<
+  ISubtreeManagerDialogProps,
+  ISubtreeManagerHostState
+> {
+  private isMounted = false
+
+  public constructor(props: ISubtreeManagerDialogProps) {
+    super(props)
+    this.state = { operationInProgress: false }
+  }
+
+  public componentDidMount() {
+    this.isMounted = true
+  }
+
+  public componentWillUnmount() {
+    this.isMounted = false
+  }
+
+  private onOperationStateChanged = (operationInProgress: boolean) => {
+    if (this.isMounted) {
+      this.setState({ operationInProgress })
+    }
+    this.props.onOperationStateChanged?.(operationInProgress)
+  }
+
+  private onDismissed = () => {
+    if (!this.state.operationInProgress) {
+      this.props.onDismissed()
+    }
+  }
+
+  public render() {
+    const { operationInProgress } = this.state
+
+    return (
+      <Dialog
+        id="subtree-manager"
+        title={__DARWIN__ ? 'Subtree Manager' : 'Subtree manager'}
+        onSubmit={this.onDismissed}
+        onDismissed={this.onDismissed}
+        disabled={operationInProgress}
+        dismissDisabled={operationInProgress}
+        loading={operationInProgress}
+      >
+        <SubtreeManager
+          repository={this.props.repository}
+          dispatcher={this.props.dispatcher}
+          accounts={this.props.accounts}
+          listRemotes={this.props.listRemotes}
+          onOperationStateChanged={this.onOperationStateChanged}
+        />
         <DialogFooter>
           <OkCancelButtonGroup
             okButtonText="Close"
+            okButtonDisabled={operationInProgress}
             cancelButtonVisible={false}
           />
         </DialogFooter>

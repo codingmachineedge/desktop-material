@@ -1,9 +1,9 @@
 // Optional discovery treatment for entry points that are specific to Desktop
 // Material. Markers are inert and invisible unless the profile preference adds
-// the body gate. Compact chrome uses an "M" badge; roomier command surfaces
+// its own element setting. Compact chrome uses an "M" badge; roomier command surfaces
 // spell out "Material". The accent edge ensures the treatment is not color-only.
-body[data-dm-highlight-features] {
-  .repository-rail [data-dm-feature] {
+body {
+  .repository-rail [data-dm-feature][data-dm-feature-highlighted] {
     position: relative;
 
     .rail-pill {
@@ -37,7 +37,7 @@ body[data-dm-highlight-features] {
     }
   }
 
-  #preferences .preferences-rail [data-dm-feature] {
+  #preferences .preferences-rail [data-dm-feature][data-dm-feature-highlighted] {
     display: flex;
     align-items: center;
     width: 100%;
@@ -60,8 +60,8 @@ body[data-dm-highlight-features] {
     }
   }
 
-  .toolbar-item[data-dm-feature],
-  .toolbar-overflow-item[data-dm-feature] {
+  .toolbar-item[data-dm-feature][data-dm-feature-highlighted],
+  .toolbar-overflow-item[data-dm-feature][data-dm-feature-highlighted] {
     position: relative;
     border-radius: var(--md-sys-shape-corner-medium);
     box-shadow: inset 0 -3px 0 var(--md-sys-color-primary);
@@ -86,7 +86,7 @@ body[data-dm-highlight-features] {
     }
   }
 
-  .repository-tab-strip button[data-dm-feature] {
+  .repository-tab-strip button[data-dm-feature][data-dm-feature-highlighted] {
     position: relative;
     box-shadow: inset 0 -3px 0 var(--md-sys-color-primary);
 
@@ -111,8 +111,8 @@ body[data-dm-highlight-features] {
     }
   }
 
-  #app-menu-foldout .menu-item[data-dm-feature],
-  .command-palette-row[data-dm-feature] {
+  #app-menu-foldout .menu-item[data-dm-feature][data-dm-feature-highlighted],
+  .command-palette-row[data-dm-feature][data-dm-feature-highlighted] {
     position: relative;
     box-shadow: inset 3px 0 0 var(--md-sys-color-primary);
 
@@ -133,7 +133,7 @@ body[data-dm-highlight-features] {
     }
   }
 
-  #app-menu-foldout .menu-item[data-dm-feature] {
+  #app-menu-foldout .menu-item[data-dm-feature][data-dm-feature-highlighted] {
     padding-right: 38px;
 
     &::after {
@@ -145,7 +145,7 @@ body[data-dm-highlight-features] {
     }
   }
 
-  .command-palette-row[data-dm-feature] {
+  .command-palette-row[data-dm-feature][data-dm-feature-highlighted] {
     padding-right: 76px;
 
     &::after {
@@ -155,7 +155,7 @@ body[data-dm-highlight-features] {
 }
 
 @container preferences-dialog (max-width: 620px) {
-  body[data-dm-highlight-features] #preferences .preferences-rail [data-dm-feature] {
+  body #preferences .preferences-rail [data-dm-feature][data-dm-feature-highlighted] {
     position: relative;
 
     &::after {
@@ -179,7 +179,7 @@ body[data-dm-highlight-features] {
 }
 
 @media (max-height: 520px) {
-  body[data-dm-highlight-features] .repository-rail [data-dm-feature]::after {
+  body .repository-rail [data-dm-feature][data-dm-feature-highlighted]::after {
     top: -1px;
     right: 0;
   }

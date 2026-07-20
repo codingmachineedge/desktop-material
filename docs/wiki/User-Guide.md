@@ -31,7 +31,7 @@ remote CI caught a macOS error-ordering defect without publishing; correction
 `98d93ccc` passed its full remote CI gate and published
 `v3.6.3-beta3-b0000000165`. Exact publication receipts are in `HANDOFF.md`.
 
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 65-function visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 68-function visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
@@ -160,7 +160,7 @@ top of the workspace. Choose **Settings → Appearance → Update progress color
 to inherit the accent or select blue, violet, teal, green, amber, or rose.
 These update controls, the current-commit CI status tooltip, and the temporary
 submodule-navigation copy use the explicit language mode saved under
-**Language and navigation**: English, playful Hong Kong Cantonese, or a compact
+**Language**: English, playful Hong Kong Cantonese, or a compact
 bilingual presentation. English is the fallback; the operating-system locale
 does not silently replace the saved choice.
 
@@ -262,6 +262,16 @@ so a tab always opens in the identity that owns it.
 
 Tabs persist per account — reopening the app restores that account's tabs.
 
+### Auto-detect repositories in a folder
+
+Open **File → Add local repository…** and choose **Auto-detect repositories…**. Pick a parent
+folder rather than one repository. Desktop Material performs a bounded scan that does not follow
+symbolic links or junctions, skips generated/dependency folders, and stops descending when it finds
+a repository. Review the relative paths in the result, then add all discovered repositories in one
+step. You can still edit the path and use the normal single-repository flow at any time.
+
+![Two repositories discovered beneath one selected parent folder](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-folder-detection.png)
+
 ### Rename a tab
 
 Double-click a tab's title (or use its context menu → **Rename**) to edit the label **inline**. The
@@ -338,83 +348,43 @@ without destructively clearing a usable current session.
 
 ## Appearance customization
 
-### App defaults in the active profile
+### Ordinary preferences and visual owners
 
-Open **Settings → Appearance**. The callout at the top identifies these controls as app defaults
-for the active profile. All 17 are saved through the profile's local Git-backed settings history:
+**Settings → Appearance** contains ordinary preferences only: explicit English, Hong Kong
+Cantonese, or bilingual language mode; theme and scale; repository-list behavior; branch sorting;
+formatting; and diff tab size. Visual customization belongs to the thing being changed.
 
-1. **Accent color** — Blue, Violet, Teal, Green, Amber, or Rose.
-2. **Update progress color** — follow Accent or use any named accent palette.
-3. **Surface color** — Tonal or Neutral.
-4. **Surface depth** — Standard, Subtle, or Flat.
-5. **Interface font** — Material (Roboto) or the system font.
-6. **Code and diff font** — platform default, Consolas, or SF Mono.
-7. **Animation** — follow the system setting or reduce motion.
-8. **Toolbar labels** — Automatic, Prefer labels, or Icons only.
-9. **Toolbar density** — Comfortable or Compact.
-10. **Repository list density** — Comfortable or Compact.
-11. **Tab density** — Comfortable or Compact.
-12. **Tab width** — Compact, Standard, or Wide.
-13. **Tab close buttons** — On hover, Always, or Active tab only.
-14. **Language** — English, playful Hong Kong Cantonese, or Bilingual. The choice is explicit,
-    persisted, and falls back to English when saved data is unsupported.
-15. **Submodule Back button style** — Tonal, Filled accent, or Outlined.
-16. **Submodule Back button label** — Back to parent, Parent name, or Icon only. Icon only retains
-    a destination-specific accessible name and tooltip.
-17. **Highlight Desktop Material features** — off by default; when enabled, adds a non-animated
-    accent edge and an `M` or **Material** badge to reviewed entry points that are not present in
-    stock GitHub Desktop.
+Right-click an actual element—or focus it and press `Shift+F10`—to open its editor beside that
+owner. Supported owners include the app identity/workspace, update progress bar, toolbar,
+repository list, repository tab strip, code/diff surface, each reviewed Material feature entry
+point, each repository name and logo, each tab title, and the temporary-submodule Back control.
+Right-clicking a row or frame outside the specialized owner still opens its normal Git context
+menu.
 
-The highlight is a discovery aid only and does not change what a control does. Its conservative
-allowlist covers the custom Actions, Releases, Issues, API, Triage, and Tools repository
-destinations; repository-tab search, arrange, new-tab, notification, and settings-history controls;
-Agent access and Automation settings; fork-only toolbar controls; and reviewed custom
-menu/command-palette entries. Mixed or upstream controls such as Changes, History, Branches,
-Accounts, Git, and Appearance remain neutral.
+Each owner has one strict `setting.json` in its own local Git repository. The anchored editor shows
+and copies that exact path and opens the owner's **History** manager. Undo, redo, and restore append
+audit commits; they never reset or rewrite a successful timeline. Switching profiles switches the
+profile, feature, repository-element, and tab-element repository roots and closes stale editors.
 
-The same page also owns the active profile's **default repository logo**. Repositories inherit this
-editable vector design unless they save a local override, so switching profiles can change both the
-workspace defaults and the repository identity shown in tabs and the repository list.
-
-Changing profile switches these defaults with the rest of that account's settings. Open
-**Edit → Settings History…** (`Ctrl+Alt+Z`) to inspect, undo, redo, or restore an appearance change
-without rewriting the profile history.
-
-### App identity in the active profile
-
-At the top of **Settings → Appearance**, use the live **App identity** preview to customize the
-in-app name and logo. Logo controls cover visibility, built-in/custom artwork, shape, size, inset,
-rotation, gap, border, shadow, and colors. Name controls cover font, width, weight, case, size,
-spacing, opacity, bold/italic/underline/strikethrough/small-caps, highlight, and text effects. Use
-**Clear name formatting** for typography only or **Reset identity** for the entire identity.
-
-The result follows the active profile, participates in Settings History, and restores after an app
-restart. It does not rename the signed executable or operating-system icon. Right-click an
-appropriate shell element to open its customization route and see the owning profile Git-history
-path; repository surfaces instead identify that repository and can open its commit history.
+The app identity editor covers the code-native logo and in-app name, geometry, color, typography,
+spacing, emphasis, and effects. It does not rename the signed executable or operating-system icon.
 
 ![Profile-customized app identity restored in the Material workspace](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 
-### Repository-local overrides
+### Repository, logo, and tab owners
 
-Open **Repository settings → Appearance** when one project needs a different workspace. The page
-groups the six optional workspace-chrome overrides — **accent color**, **surface color**, **toolbar
-labels**, **toolbar density**, **tab density**, and **tab width** — and provides one action to
-inherit every profile default again. Each field starts at **Use app default** and independently
-inherits the active-profile value until changed.
+Repository Settings has no Appearance tab. Right-click the selected repository workspace,
+toolbar, or tab-strip background for its repository-specific values and an **Edit profile default**
+route. Right-click the actual repository-list name for Word-style typography or its actual logo for
+the safe vector studio. A repository can inherit the profile owner; **Edit profile default** keeps
+that profile editor anchored beside the same real logo.
 
-These six values and an optional custom repository-logo document are stored under
-`desktop-material.appearance` in the repository's local `.git/config`. They are not committed and
-are not shared with collaborators. Interface/code fonts, surface depth, motion, repository-list
-density, tab close-button behavior, and optional Desktop Material feature highlighting
-intentionally remain profile defaults; individual tab text/background styling remains in the
-profile's tab history.
+A local `desktop-material.appearance-id` UUID identifies the working copy across path moves. Each
+workspace, toolbar, tabs, list-name, and logo value still owns a separate local Git repository. The
+old aggregate `desktop-material.appearance` payload is read only as a migration/startup compatibility
+source, not as the mutable history.
 
-### Advanced repository logo studio
-
-The **Custom repository logo** studio appears in both **Settings → Appearance** (the profile
-default) and **Repository settings → Appearance** (the selected repository's local override). It is
-a full editable vector workbench rather than a group of logo dropdowns:
+The vector logo workbench provides:
 
 - Start from the repository-mark, monogram, or repository-name preset and watch the live preview.
 - Choose a rounded square, circle, square, or hexagon; use a solid or gradient fill; then tune
@@ -423,25 +393,26 @@ a full editable vector workbench rather than a group of logo dropdowns:
   source, font, weight, letter spacing, color, position, scale, rotation, and opacity.
 - Use **Undo** and **Redo** while experimenting. A repository override can return to **Inherit
   profile logo** without changing the profile design.
-- **Export JSON…** saves the portable design and **Import JSON…** validates a version 1 document
-  before adding it to the current settings edit. Save the settings window to apply an import.
+- **Export JSON…** for a portable design and bounded version-1 **Import JSON…**.
 
 Logo JSON is capped at 16 KiB, text and layer counts are bounded, and every value is normalized to
 the supported model. The studio never stores uploaded image bytes, HTML, or executable/raw SVG.
-Tabs and repository-list rows render only the app's own code-generated SVG projection of that safe
-model.
+Tabs and repository-list rows render only the app's code-generated SVG projection. Right-click an
+actual tab title for its own typography/color editor, dedicated repository, and history; structural
+tab state remains separate.
 
 ![Layered custom repository-logo studio with a live preview and safe vector controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 
-![Appearance preferences with explicit language and temporary-submodule Back button controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance editor anchored beside its actual owner with History and a dedicated local Git path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ---
 
 ## Settings history
 
-Desktop Material records every per-account settings and repository-tab change as a commit in that
-account's local settings repo. Open **Edit → Settings History…** or press `Ctrl+Alt+Z` to open the
-non-modal right-side sheet; the workspace remains usable while it is open.
+Desktop Material records ordinary per-account preferences and structural tab state in the account
+settings repository. Open **Edit → Settings History…** or press `Ctrl+Alt+Z` for that non-modal
+timeline. Visual owners deliberately do not share it: use the **History** action in an anchored
+appearance editor for that element's narrower Git repository.
 
 - Select a timeline entry to lazily load its changed files and diff.
 - Choose **Undo last** to reverse the latest logical change, or **Redo** to replay an undone change.
@@ -696,6 +667,16 @@ For quick, low-ceremony commits, use **one-click commit & push**:
 This is a convenience path built on the normal commit machinery — you can always fall back to
 writing the message yourself in the **Changes** view. For scheduled, unattended commits and pushes,
 see [Automation](Automation).
+
+When a selected file is larger than GitHub's ordinary 100 MiB object limit and release-backed
+**cheap LFS** is available, every commit entry point prepares it before invoking Git. The commit
+button reports **Preparing…**, upload progress, and final source verification; only the small-pointer
+commit says **Committing … to _branch_**. New uploads skip compression: a file fitting the release-asset cap is
+stored as one raw asset, while a larger file is split into ordered raw ranges. Downloads verify each
+range and the complete file before replacing the pointer. Existing compressed cheap-LFS pointers
+remain readable for backward compatibility.
+
+![Commit composer preparing an oversized file for cheap LFS before the branch commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-cheap-lfs-preparing.png)
 
 ---
 
@@ -960,22 +941,28 @@ list.
   `docker compose up --detach --build`. A mismatched branch or non-fast-forward update stops without
   a reset, force operation, or automatic checkout. **Deploy Docker now** runs the same bounded,
   output-redacted SSH recipe on demand.
-- Open **Repository settings → Submodules** and choose **Add submodule…** to browse GitHub.com,
+- Open the wider **Repository settings → Submodules** surface and choose **Add submodule…** to browse GitHub.com,
   Enterprise, GitLab, or Bitbucket with the appropriate exact account, or enter an HTTPS, SSH, or
   local Git URL. Review the repository-relative checkout path and optional branch; Desktop rechecks
   duplicate/occupied destinations immediately before Git, reports bounded clone progress, and lets
-  you cancel the running operation before refreshing the managed list. The same managed list opens
+  you cancel the running operation before refreshing the managed list. The same tab shows a Back
+  preview: right-click it (or press `Shift+F10`) to open that element's appearance editor beside
+  it. Changes remain staged with the rest of Repository Settings until **Save**. The adjacent
+  **Subtrees** tab embeds the full add, pull, push, and split manager. The same managed list opens
   as the Submodule Manager from the Tools tab's **Nested repositories** category, and clone-list
   rows show a submodule badge whose details dialog can clone any submodule as its own repository.
   New to submodules? The beginner-friendly [Submodules](Submodules) page walks the whole workflow
   in plain words and pictures.
-- On any initialized Submodule Manager row, choose **Open as repository** to use that checked-out
+- On any initialized Submodule Manager row, choose **Open & manage** to use that checked-out
   child in the current workspace without importing it. It does not enter the repository list,
   Recent, or the persisted last selection. The context bar's Back control returns to the saved
   root repository; repeated Open or Back activation is coalesced, so it cannot create another tab
-  or repository entry. Its style and label follow **Settings → Appearance → Language and navigation**.
+  or repository entry. Right-click the actual Back control to open the same anchored editor and
+  save its profile-wide style or label immediately.
   Uninitialized, stale, invalid-Git, traversal, sibling-prefix, and symlink/junction escape targets
   fail without changing repository persistence, and the manager stays available for recovery.
+
+![Wider Repository Settings with the Back element's appearance editor anchored beside its preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
 - Use the `.gitignore` manager and one-click Build & Run for project-aware cleanup and execution. Build & Run discovers common nested projects across Node, Deno, Rust, Go, .NET, Python, JVM, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; choose a profile by its displayed project folder when several projects share a language or toolchain.
 - Open **Repository tools** for the full set of named, reviewed Git functions. Diagnostics cover the
   status summary, repository health check, commit-signature audit, branch sync overview, contributor

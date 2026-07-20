@@ -4,7 +4,10 @@
 // language mirrors the submodule manager in dialogs/_repository-settings.scss.
 #subtree-manager {
   width: min(640px, calc(100vw - 40px));
+}
 
+#subtree-manager,
+#repository-settings {
   .subtrees-manager {
     display: flex;
     flex-direction: column;
@@ -253,6 +256,47 @@
 
   // --- Compact width ------------------------------------------------------
   @media (max-width: 620px) {
+    .subtrees-section-header {
+      align-items: stretch;
+      flex-direction: column;
+
+      .button-component,
+      .subtrees-header-actions {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .subtree-row-body {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .subtree-row-actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+
+      .button-component {
+        flex: 1 1 88px;
+        min-width: min(88px, 100%);
+      }
+    }
+
+    .subtree-editor-fields {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .subtree-editor-actions .button-component {
+      flex: 1 1 120px;
+      min-width: min(120px, 100%);
+      justify-content: center;
+    }
+  }
+
+  // The embedded Repository Settings surface can be narrow even when the
+  // application viewport is wide because the vertical tab rail consumes part
+  // of the dialog. Follow that pane's container as well as the viewport.
+  @container repository-settings-pane (max-width: 620px) {
     .subtrees-section-header {
       align-items: stretch;
       flex-direction: column;

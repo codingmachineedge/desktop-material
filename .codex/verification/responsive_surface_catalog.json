@@ -54,9 +54,9 @@
         { "member": "GitConfig", "label": "Git config" },
         { "member": "BuildRun", "label": "Build & run" },
         { "member": "Submodules", "label": "Submodules" },
+        { "member": "Subtrees", "label": "Subtrees" },
         { "member": "Automation", "label": "Automation" },
         { "member": "Metadata", "label": "Metadata" },
-        { "member": "Appearance", "label": "Appearance" },
         {
           "member": "ForkSettings",
           "label": "Fork behavior",
@@ -236,24 +236,26 @@
       "selector": ".github-api-functions"
     },
     {
-      "id": "preferences.appearance.logo-studio",
-      "parentId": "preferences.Appearance",
+      "id": "appearance.anchored-element-editor",
+      "parentId": "application",
       "kind": "editor",
-      "source": "app/src/ui/preferences/appearance.tsx",
-      "label": "Custom repository logo",
+      "source": "app/src/ui/appearance/anchored-appearance-editor.tsx#AnchoredAppearanceEditor",
+      "label": "Right-click element appearance editor",
       "risk": "stateful",
-      "ownerSelector": "#preferences",
-      "selector": ".repository-logo-studio"
+      "conditional": true,
+      "ownerSelector": ".anchored-appearance-editor",
+      "selector": ".element-appearance-editor"
     },
     {
-      "id": "repository-settings.appearance.logo-studio",
-      "parentId": "repository-settings.Appearance",
-      "kind": "editor",
-      "source": "app/src/ui/repository-settings/appearance.tsx",
-      "label": "Custom repository logo",
+      "id": "appearance.element-history",
+      "parentId": "appearance.anchored-element-editor",
+      "kind": "dialog",
+      "source": "app/src/ui/appearance/anchored-appearance-editor.tsx#AppearanceElementHistoryDialog",
+      "label": "Element-local Git appearance history",
       "risk": "stateful",
-      "ownerSelector": "#repository-settings",
-      "selector": ".repository-logo-studio"
+      "conditional": true,
+      "ownerSelector": ".appearance-element-history-dialog",
+      "selector": ".versioned-store-history-toolbar"
     },
     {
       "id": "file-history.history",

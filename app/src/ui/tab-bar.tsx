@@ -19,6 +19,9 @@ interface ITabBarProps {
 
   /** Navigate via drag over */
   readonly allowDragOverSwitching?: boolean
+
+  /** Prevent pointer, keyboard, and drag navigation between tabs. */
+  readonly disabled?: boolean
 }
 
 /**
@@ -54,6 +57,10 @@ export class TabBar extends React.Component<ITabBarProps, {}> {
     direction: 'next' | 'previous',
     index: number
   ) => {
+    if (this.props.disabled) {
+      return
+    }
+
     const children = React.Children.toArray(this.props.children)
 
     if (children.length === 0) {
@@ -75,7 +82,9 @@ export class TabBar extends React.Component<ITabBarProps, {}> {
   }
 
   private onTabClicked = (index: number) => {
-    this.props.onTabClicked(index)
+    if (!this.props.disabled) {
+      this.props.onTabClicked(index)
+    }
   }
 
   private onTabRef = (index: number, ref: HTMLButtonElement | null) => {
@@ -93,6 +102,7 @@ export class TabBar extends React.Component<ITabBarProps, {}> {
   private onMouseEnter = (index: number) => {
     if (
       index === this.props.selectedIndex ||
+      this.props.disabled === true ||
       !dragAndDropManager.isDragInProgress ||
       this.props.allowDragOverSwitching === undefined ||
       !this.props.allowDragOverSwitching
@@ -128,6 +138,7 @@ export class TabBar extends React.Component<ITabBarProps, {}> {
             onSelectAdjacent={this.onSelectAdjacentTab}
             onButtonRef={this.onTabRef}
             type={type}
+            disabled={this.props.disabled}
           >
             {child}
           </TabBarItem>

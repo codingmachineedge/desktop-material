@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import * as React from 'react'
 
+import { translate } from '../../../src/lib/i18n'
 import { BranchSortOrder } from '../../../src/models/branch-sort-order'
 import {
   DefaultAppearanceCustomization,
@@ -17,8 +18,8 @@ import { Appearance } from '../../../src/ui/preferences/appearance'
 import { ApplicationTheme } from '../../../src/ui/lib/application-theme'
 import { fireEvent, render, screen } from '../../helpers/ui/render'
 
-describe('Appearance feature highlighting preference', () => {
-  it('is default-off, explained, and preserves the appearance object when toggled', () => {
+describe('Appearance preferences', () => {
+  it('keeps ordinary preferences and routes visual customization to elements', () => {
     const changes = new Array<IAppearanceCustomization>()
     const commonProps = {
       selectedTheme: ApplicationTheme.Light,
@@ -55,57 +56,50 @@ describe('Appearance feature highlighting preference', () => {
       />
     )
 
-    const checkbox = screen.getByRole('checkbox', {
-      name: 'Highlight Desktop Material features',
-    }) as HTMLInputElement
-    assert.equal(checkbox.checked, false)
-    assert.ok(screen.getByText(/aren't available in stock GitHub Desktop/))
-
-    fireEvent.click(checkbox)
-    assert.equal(changes.length, 1)
-    assert.equal(changes[0].highlightDesktopMaterialFeatures, true)
-    assert.equal(
-      changes[0].accentPalette,
-      DefaultAppearanceCustomization.accentPalette
+    assert.ok(screen.getByText(/right-click that element/i))
+    assert.ok(screen.getByLabelText('Language'))
+    assert.ok(screen.getByRole('slider', { name: 'Scale' }))
+    assert.ok(screen.getByRole('radio', { name: /Light/i }))
+    assert.ok(
+      screen.getByRole('checkbox', { name: 'Show recent repositories' })
     )
+    assert.ok(screen.getByLabelText('Show branch name'))
+    assert.ok(screen.getByRole('heading', { name: 'Sort branches' }))
+    assert.ok(screen.getByLabelText('Tab size'))
+
+    const visualLabels = [
+      'Highlight Desktop Material features',
+      'Accent color',
+      'Update progress color',
+      'Surface color',
+      'Surface depth',
+      'Interface font',
+      'Code and diff font',
+      'Animation',
+      'Toolbar labels',
+      'Toolbar density',
+      'Repository list density',
+      'Tab density',
+      'Tab width',
+      'Tab close buttons',
+      'App name',
+      'Submodule Back button style',
+      'Submodule Back button label',
+    ]
+    for (const label of visualLabels) {
+      assert.equal(screen.queryByLabelText(label), null, label)
+    }
     assert.equal(
-      changes[0].repositoryLogo,
-      DefaultAppearanceCustomization.repositoryLogo
+      screen.queryByRole('heading', { name: 'Custom repository logo' }),
+      null
     )
 
     fireEvent.change(screen.getByLabelText('Language'), {
       target: { value: 'bilingual' },
     })
-    assert.equal(changes[1].languageMode, 'bilingual')
-    assert.equal(changes[1].submoduleBackButtonStyle, 'tonal')
-
-    fireEvent.change(screen.getByLabelText('Submodule Back button style'), {
-      target: { value: 'outlined' },
-    })
-    assert.equal(changes[2].submoduleBackButtonStyle, 'outlined')
-
-    fireEvent.change(screen.getByLabelText('Submodule Back button label'), {
-      target: { value: 'icon-only' },
-    })
-    assert.equal(changes[3].submoduleBackButtonLabel, 'icon-only')
-
-    view.rerender(
-      <Appearance
-        {...commonProps}
-        appearanceCustomization={{
-          ...DefaultAppearanceCustomization,
-          highlightDesktopMaterialFeatures: true,
-        }}
-      />
-    )
-    assert.equal(
-      (
-        screen.getByRole('checkbox', {
-          name: 'Highlight Desktop Material features',
-        }) as HTMLInputElement
-      ).checked,
-      true
-    )
+    assert.equal(changes[0].languageMode, 'bilingual')
+    assert.equal(changes[0].accentPalette, 'blue')
+    assert.equal(changes[0].submoduleBackButtonStyle, 'tonal')
 
     view.rerender(
       <Appearance
@@ -116,12 +110,31 @@ describe('Appearance feature highlighting preference', () => {
         }}
       />
     )
-    assert.ok(screen.getByRole('heading', { name: '語言同導覽' }))
-    assert.ok(screen.getByLabelText('語言'))
-    assert.ok(screen.getByLabelText('子模組返回掣款式'))
-    assert.ok(screen.getByLabelText('子模組返回掣文字'))
-    assert.ok(screen.getByRole('option', { name: '玩味港式廣東話' }))
-    assert.ok(screen.getByRole('option', { name: '返去主 repo' }))
+    assert.ok(
+      screen.getByRole('heading', {
+        name: translate('appearance.languageAndNavigation', 'cantonese'),
+      })
+    )
+    assert.ok(
+      screen.getByLabelText(translate('appearance.languageMode', 'cantonese'))
+    )
+    assert.equal(
+      screen.queryByLabelText(
+        translate('appearance.submoduleBackStyle', 'cantonese')
+      ),
+      null
+    )
+    assert.equal(
+      screen.queryByLabelText(
+        translate('appearance.submoduleBackLabel', 'cantonese')
+      ),
+      null
+    )
+    assert.ok(
+      screen.getByRole('option', {
+        name: translate('language.cantonese', 'cantonese'),
+      })
+    )
 
     view.rerender(
       <Appearance
@@ -134,15 +147,23 @@ describe('Appearance feature highlighting preference', () => {
     )
     assert.ok(
       screen.getByRole('heading', {
-        name: 'Language and navigation · 語言同導覽',
+        name: translate('appearance.languageAndNavigation', 'bilingual'),
       })
     )
-    assert.ok(screen.getByLabelText('Language · 語言'))
     assert.ok(
-      screen.getByLabelText('Submodule Back button style · 子模組返回掣款式')
+      screen.getByLabelText(translate('appearance.languageMode', 'bilingual'))
     )
-    assert.ok(
-      screen.getByLabelText('Submodule Back button label · 子模組返回掣文字')
+    assert.equal(
+      screen.queryByLabelText(
+        translate('appearance.submoduleBackStyle', 'bilingual')
+      ),
+      null
+    )
+    assert.equal(
+      screen.queryByLabelText(
+        translate('appearance.submoduleBackLabel', 'bilingual')
+      ),
+      null
     )
   })
 })

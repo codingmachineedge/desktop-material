@@ -682,6 +682,7 @@ export class RepositoryView extends React.Component<
         availableWidth={availableWidth}
         gitHubUserStore={this.props.gitHubUserStore}
         isCommitting={this.props.state.isCommitting}
+        commitOperationPhase={this.props.state.commitOperationPhase}
         hookProgress={this.props.state.hookProgress}
         onShowCommitProgress={
           this.props.state.subscribeToCommitOutput

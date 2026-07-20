@@ -47,8 +47,8 @@ describe('Pages accessibility contracts', () => {
       markup,
       /Build &amp; Run moves into More\s+first,[\s\S]*?Commit &amp; Push/
     )
-    assert.match(markup, /tab close buttons/)
-    assert.match(markup, /six project overrides\s+inherit safely/)
+    assert.match(markup, /dedicated setting, local Git path, and mutable history/)
+    assert.match(markup, /no monolithic repository Appearance tab/)
     assert.match(markup, /class="material-icon-sprite"/)
     assert.match(markup, /id="icon-palette"/)
     assert.match(markup, /id="theme-icon" href="#icon-dark-mode"/)

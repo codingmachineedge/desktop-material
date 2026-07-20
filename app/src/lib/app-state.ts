@@ -77,6 +77,7 @@ import { IUpdateState } from '../ui/lib/update-store'
 import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
 import type { IAutomationSettingsState } from './automation/automation-settings'
 import type { IMergeAllState } from './automation/merge-all'
+import type { ICheapLfsAutoPinProgress } from './cheap-lfs/operations'
 
 export enum SelectionType {
   Repository,
@@ -625,6 +626,18 @@ export type ConflictState =
   | RebaseConflictState
   | CherryPickConflictState
 
+/** The user-visible stage inside the broader commit operation lock. */
+export type CommitOperationPhase =
+  | { readonly kind: 'preparing' }
+  | {
+      readonly kind: 'cheap-lfs'
+      readonly progress: ICheapLfsAutoPinProgress
+    }
+  | {
+      readonly kind: 'git-commit'
+      readonly cheapLfsPointerCount: number
+    }
+
 export interface IRepositoryState {
   readonly oneClickCommitPushPhase: OneClickCommitPushPhase
   readonly mergeAllState: IMergeAllState | null
@@ -679,6 +692,9 @@ export interface IRepositoryState {
 
   /** Is a commit in progress? */
   readonly isCommitting: boolean
+
+  /** Which pre-commit, cheap-LFS, or Git stage is currently running. */
+  readonly commitOperationPhase: CommitOperationPhase | null
 
   /** Is generating a commit message? */
   readonly isGeneratingCommitMessage: boolean

@@ -50,24 +50,38 @@ repository configuration, profile history, logs, and screenshots.
 
 ## Appearance customization contract
 
-App-wide customization is profile-scoped. **Settings → Appearance** exposes 12
-versioned defaults: accent color, surface color, surface depth, interface font,
-code/diff font, animation, toolbar labels, toolbar density, repository-list
-density, tab density, tab width, and tab-close-button behavior. These values
-are part of the active profile's allowlisted settings snapshot and therefore
-participate in its local Git history, undo, redo, and restore workflow.
+Custom visuals belong to the element that renders them. Right-clicking an
+actual customizable owner opens a compact editor anchored beside that owner;
+outside click or Escape closes it and restores focus. Custom visual controls do
+not live in the general **Settings → Appearance** page or in a **Repository
+Settings → Appearance** tab.
 
-Repository-specific customization is deliberately narrower. **Repository
-Settings → Appearance** may override six fields: accent color, surface color,
-toolbar labels, toolbar density, tab density, and tab width. Every field offers
-**Use app default** inheritance. Explicit overrides stay in the repository's
-local `.git/config`; they are not committed or shared with collaborators and
-must never enter the profile repository.
+Every customizable owner stores one bounded, versioned `setting.json` in its
+own local Git repository below the app's `appearance-elements` user-data root.
+Its anchored editor exposes that exact repository path and an independent
+inspect, undo, redo, and restore history. App workspace, update progress,
+toolbar, repository list, repository tab strip, code/diff typography,
+temporary-submodule Back control, app identity, and default repository logo
+are distinct profile-level owners. Individually identified feature controls
+also have distinct stores rather than sharing one global feature toggle.
 
-Repository tabs retain their profile-backed typography controls and add
-independent text and background colors. Both targets support curated palettes,
-recent colors, a custom color picker, validation, and return to the Material
-default.
+Repository instances have separate workspace, toolbar, tab-strip, list-name,
+and logo owners. Their stores are keyed by a stable local appearance UUID so a
+repository move does not merge or reset its history. Nullable repository values
+inherit the relevant profile owner, and the anchored editor can jump to that
+profile default. Legacy aggregate profile values and bounded repository-config
+overrides are migration inputs and compatibility projections only; the
+owner-specific repositories are authoritative.
+
+Each tab title is another owner with its own Git repository and Word-style
+typography controls: bold, italic, underline, size, font family, alignment, and
+independent validated foreground/background colors. One tab's history actions
+cannot change another tab.
+
+Language remains an ordinary explicit preference under **Settings →
+Appearance**, stored separately as `language-mode-v1`. English is the fallback,
+and the former aggregate appearance value is consulted only as a bounded
+one-release migration source.
 
 The tab strip also follows a guarded organization contract. Pinned tabs form a
 protected leading group. The existing regex **Close Tabs Containing…** action
@@ -124,7 +138,7 @@ semantics. The public static landing page uses the same system through a
 Material app bar, expressive hero surface, design-principle cards, screenshot
 evidence gallery, tonal call to action, and footer.
 
-The inspected acceptance images are:
+The original post-M19 acceptance image set was:
 
 - `docs/assets/screenshots/material-welcome.png`
 - `docs/assets/screenshots/material-customization.png`
@@ -134,18 +148,19 @@ The inspected acceptance images are:
 - `docs/assets/screenshots/material-actions-cancel.png`
 - `docs/assets/screenshots/material-rebase-review.png`
 
-All seven were rendered from the exact tested production source, inspected at
-their original 1440×960 resolution, and privacy reviewed. Dimensions, hashes,
-source/build identity, and interaction receipts live in `HANDOFF.md` and the
-run manifest; publication receipts are recorded after direct `main`, Pages, and
-wiki promotion.
+All seven were rendered from that milestone's exact tested production source,
+inspected at their original 1440×960 resolution, and privacy reviewed. They are
+historical receipts, not a description of the current owner-scoped editor.
+Dimensions, hashes, source/build identity, and interaction receipts live in
+`HANDOFF.md` and the run manifest; current publication receipts are recorded
+after direct `main`, Pages, and wiki promotion.
 
 ## Delivery phases
 
 1. Material foundations: design tokens, theme modes, app frame, navigation.
 2. Repository workspace: changes, history, diff, branches, pull requests.
 3. Account profiles: account switcher, sign-in management, repository binding,
-   and local-Git-backed appearance defaults.
+   and owner-scoped local-Git appearance repositories.
 4. Remaining dialogs and flows: clone, publish, settings, merge, conflicts.
 5. Accessibility, keyboard navigation, automated tests, packaged builds.
 6. Pure Material Welcome and GitHub Pages landing surfaces, screenshots, and a

@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { clipboard } from 'electron'
 import { Disposable } from 'event-kit'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
@@ -14,6 +13,7 @@ import {
 } from '../../models/repository-tab'
 import { RepositoryTab } from './repository-tab'
 import { TabStyleEditor } from './tab-style-editor'
+import { AnchoredAppearanceEditor } from '../appearance'
 import {
   CloseTabsContainingPopover,
   CloseTabsExceptContainingPopover,
@@ -29,7 +29,6 @@ import {
   repositoryTabStatusRank,
   visibleTabLabel,
 } from './tab-action-helpers'
-import { PopupType } from '../../models/popup'
 
 interface IRepositoryTabStripProps {
   readonly tabsStore: RepositoryTabsStore
@@ -204,19 +203,30 @@ export class RepositoryTabStrip extends React.Component<
   private onStyleChange = (style: ITabTitleStyle) => {
     const { styleEditorTabId } = this.state
     if (styleEditorTabId !== null) {
-      this.props.tabsStore.setTabStyle(styleEditorTabId, style)
+      void this.props.tabsStore
+        .setTabStyle(styleEditorTabId, style)
+        .catch(err => log.error('Failed to customize tab appearance', err))
     }
   }
 
   private onStyleReset = () => {
     const { styleEditorTabId } = this.state
     if (styleEditorTabId !== null) {
-      this.props.tabsStore.setTabStyle(styleEditorTabId, null)
+      void this.props.tabsStore
+        .setTabStyle(styleEditorTabId, null)
+        .catch(err => log.error('Failed to clear tab appearance', err))
     }
   }
 
   private onStyleEditorClose = () => {
     this.setState({ styleEditorTabId: null, styleEditorAnchor: null })
+  }
+
+  private onStyleHistoryMutation = () => {
+    const { styleEditorTabId } = this.state
+    return styleEditorTabId === null
+      ? undefined
+      : this.props.tabsStore.reloadTabStyleFromElement(styleEditorTabId)
   }
 
   private openStyleEditor = (tab: IRepositoryTab, anchor: HTMLElement) => {
@@ -229,10 +239,10 @@ export class RepositoryTabStrip extends React.Component<
   ) => {
     event.preventDefault()
     const anchor = event.currentTarget as HTMLElement
+    const titleAnchor =
+      anchor.querySelector<HTMLElement>('.repository-tab-label') ?? anchor
     const { tabs } = this.state.tabs
     const index = tabs.findIndex(t => t.id === tab.id)
-    const label = this.labelForTab(tab)
-    const profilePath = this.props.dispatcher.getActiveProfileRepositoryPath()
 
     showContextualMenu([
       {
@@ -257,34 +267,7 @@ export class RepositoryTabStrip extends React.Component<
       {
         label: 'Customize Appearance…',
         icon: octicons.paintbrush,
-        action: () => this.openStyleEditor(tab, anchor),
-      },
-      {
-        // Keep the "View Appearance and Tab History" phrase (contract-tested)
-        // while making the per-tab scoping explicit in the label.
-        label: `View Appearance and Tab History for "${label}"…`,
-        icon: octicons.history,
-        action: () =>
-          this.props.dispatcher.showPopup({
-            type: PopupType.SettingsHistory,
-            scope: { kind: 'tab', tabId: tab.id, label },
-          }),
-      },
-      {
-        label:
-          profilePath === null
-            ? 'Profile history repository unavailable'
-            : `Profile Git history: ${profilePath}`,
-        enabled: false,
-      },
-      {
-        label: 'Copy Profile History Repository Path',
-        icon: octicons.copy,
-        enabled: profilePath !== null,
-        action:
-          profilePath === null
-            ? undefined
-            : () => clipboard.writeText(profilePath),
+        action: () => this.openStyleEditor(tab, titleAnchor),
       },
       { type: 'separator' },
       {
@@ -538,6 +521,37 @@ export class RepositoryTabStrip extends React.Component<
       return null
     }
 
+    const historySource =
+      this.props.tabsStore.getTabStyleHistorySource(styleEditorTabId)
+    const repositoryPath =
+      this.props.tabsStore.getTabStyleRepositoryPath(styleEditorTabId)
+
+    if (historySource !== null && repositoryPath !== null) {
+      return (
+        <AnchoredAppearanceEditor
+          title={`${this.labelForTab(tab)} tab title`}
+          anchor={styleEditorAnchor}
+          historySource={historySource}
+          repositoryPath={repositoryPath}
+          contentOwnsHeader={true}
+          onMutation={this.onStyleHistoryMutation}
+          onClose={this.onStyleEditorClose}
+        >
+          {controls => (
+            <TabStyleEditor
+              tab={tab}
+              anchor={null}
+              embedded={true}
+              onShowHistory={controls.showHistory}
+              onStyleChange={this.onStyleChange}
+              onReset={this.onStyleReset}
+              onClose={controls.close}
+            />
+          )}
+        </AnchoredAppearanceEditor>
+      )
+    }
+
     return (
       <TabStyleEditor
         tab={tab}
@@ -650,6 +664,7 @@ export class RepositoryTabStrip extends React.Component<
               onDragOver={this.onDragOver}
               onDrop={this.onDrop}
               onDragEnd={this.onDragEnd}
+              dispatcher={this.props.dispatcher}
             />
           ))}
         </div>

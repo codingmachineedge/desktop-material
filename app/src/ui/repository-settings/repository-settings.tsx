@@ -4,6 +4,7 @@ import { Remote } from './remote'
 import { GitIgnore } from './git-ignore'
 import { BuildRunSettings } from './build-run-settings'
 import { Submodules } from './submodules'
+import { SubtreeManager } from '../subtrees/subtree-manager-dialog'
 import { LocalizedText } from '../lib/localized-text'
 import { assertNever } from '../../lib/fatal-error'
 import {
@@ -57,9 +58,7 @@ import {
   EditorOverride,
   getEditorOverrideHash,
 } from '../../models/editor-override'
-import { IRepositoryAppearanceOverrides } from '../../models/appearance-customization'
-import { getRepositoryAppearanceOverrides } from '../../lib/appearance-customization'
-import { RepositoryAppearance } from './appearance'
+import { IAppearanceCustomization } from '../../models/appearance-customization'
 
 interface IRepositorySettingsProps {
   readonly initialSelectedTab?: RepositorySettingsTab
@@ -68,6 +67,7 @@ interface IRepositorySettingsProps {
   readonly repository: Repository
   readonly accounts: ReadonlyArray<Account>
   readonly repositoryAccount: Account | null
+  readonly appearanceCustomization: IAppearanceCustomization
   readonly onDismissed: () => void
 }
 
@@ -75,17 +75,18 @@ export enum RepositorySettingsTab {
   Remote = 0,
   IgnoredFiles,
   GitConfig,
-  // Note: BuildRun and Submodules are placed before the conditionally-rendered
-  // ForkSettings tab so the enum values keep matching the TabBar positions
+  // Note: BuildRun, Submodules, and Subtrees are placed before the
+  // conditionally-rendered ForkSettings tab so the enum values keep matching
+  // the TabBar positions
   // whether or not the fork tab is shown. Integrator note: if the remotes work
   // (b2:remotes) also inserts a tab here, keep the unconditionally-rendered
   // tabs contiguous and leave ForkSettings last; reconcile the numeric indices
   // so each enum value equals its TabBar position.
   BuildRun,
   Submodules,
+  Subtrees,
   Automation,
   Metadata,
-  Appearance,
   ForkSettings,
 }
 
@@ -98,6 +99,8 @@ interface IRepositorySettingsState {
   readonly ignoreText: string | null
   readonly ignoreTextHasChanged: boolean
   readonly disabled: boolean
+  /** True while the embedded subtree manager owns a Git mutation. */
+  readonly subtreeOperationInProgress: boolean
   readonly saveDisabled: boolean
   readonly gitConfigLocation: GitConfigLocation
   readonly committerName: string
@@ -114,9 +117,8 @@ interface IRepositorySettingsState {
   readonly buildRunPreferences: IBuildRunPreferences
   readonly buildRunPreferencesHaveChanged: boolean
   readonly automationOverrides: IAutomationSettingsOverrides
-  readonly appearanceOverrides: IRepositoryAppearanceOverrides
-  readonly appearanceOverridesHaveChanged: boolean
-  readonly isLoadingAppearanceOverrides: boolean
+  readonly appearanceCustomization: IAppearanceCustomization
+  readonly appearanceCustomizationHasChanged: boolean
   readonly defaultBranch: string
   readonly availableEditors: ReadonlyArray<string>
   readonly useDefaultEditor: boolean
@@ -130,6 +132,7 @@ export class RepositorySettings extends React.Component<
   IRepositorySettingsState
 > {
   private remoteManagementAbortController = new AbortController()
+  private isMounted = false
 
   public constructor(props: IRepositorySettingsProps) {
     super(props)
@@ -143,6 +146,7 @@ export class RepositorySettings extends React.Component<
       ignoreText: null,
       ignoreTextHasChanged: false,
       disabled: false,
+      subtreeOperationInProgress: false,
       forkContributionTarget: getForkContributionTarget(props.repository),
       saveDisabled: false,
       gitConfigLocation: GitConfigLocation.Global,
@@ -165,9 +169,8 @@ export class RepositorySettings extends React.Component<
       automationOverrides: loadRepositoryAutomationOverrides(
         props.repository.id
       ),
-      appearanceOverrides: {},
-      appearanceOverridesHaveChanged: false,
-      isLoadingAppearanceOverrides: true,
+      appearanceCustomization: props.appearanceCustomization,
+      appearanceCustomizationHasChanged: false,
       defaultBranch: props.repository.defaultBranch ?? '',
       availableEditors: [],
       useDefaultEditor: props.repository.customEditorOverride === null,
@@ -182,25 +185,12 @@ export class RepositorySettings extends React.Component<
     }
   }
 
+  public componentDidMount() {
+    this.isMounted = true
+  }
+
   public async componentWillMount() {
     await this.loadRemoteManagementSnapshot()
-
-    try {
-      const appearanceOverrides = await getRepositoryAppearanceOverrides(
-        this.props.repository
-      )
-      this.setState({
-        appearanceOverrides,
-        appearanceOverridesHaveChanged: false,
-        isLoadingAppearanceOverrides: false,
-      })
-    } catch (e) {
-      log.warn(
-        `RepositorySettings: unable to read appearance config for ${this.props.repository.path}`,
-        e
-      )
-      this.setState({ isLoadingAppearanceOverrides: false })
-    }
 
     try {
       const ignoreText = await readGitIgnoreAtRoot(this.props.repository)
@@ -262,6 +252,7 @@ export class RepositorySettings extends React.Component<
   }
 
   public componentWillUnmount() {
+    this.isMounted = false
     this.remoteManagementAbortController.abort()
   }
 
@@ -318,6 +309,8 @@ export class RepositorySettings extends React.Component<
     const showForkSettings = isRepositoryWithForkedGitHubRepository(
       this.props.repository
     )
+    const dialogBusy =
+      this.state.disabled || this.state.subtreeOperationInProgress
 
     return (
       <Dialog
@@ -325,7 +318,9 @@ export class RepositorySettings extends React.Component<
         title="Repository settings"
         onDismissed={this.props.onDismissed}
         onSubmit={this.onSubmit}
-        disabled={this.state.disabled}
+        disabled={dialogBusy}
+        dismissDisabled={this.state.subtreeOperationInProgress}
+        loading={this.state.subtreeOperationInProgress}
       >
         {this.renderErrors()}
 
@@ -334,6 +329,7 @@ export class RepositorySettings extends React.Component<
             onTabClicked={this.onTabClicked}
             selectedIndex={this.state.selectedTab}
             type={TabBarType.Vertical}
+            disabled={dialogBusy}
           >
             <span>
               <Octicon className="icon" symbol={octicons.server} />
@@ -356,16 +352,16 @@ export class RepositorySettings extends React.Component<
               <LocalizedText translationKey="submodule.title" />
             </span>
             <span>
+              <Octicon className="icon" symbol={octicons.gitMerge} />
+              <LocalizedText translationKey="subtree.title" />
+            </span>
+            <span>
               <Octicon className="icon" symbol={octicons.sync} />
               Automation
             </span>
             <span>
               <Octicon className="icon" symbol={octicons.gear} />
               Metadata
-            </span>
-            <span>
-              <Octicon className="icon" symbol={octicons.paintbrush} />
-              Appearance
             </span>
             {showForkSettings && (
               <span>
@@ -381,10 +377,12 @@ export class RepositorySettings extends React.Component<
           <OkCancelButtonGroup
             okButtonText="Save"
             okButtonDisabled={
+              this.state.subtreeOperationInProgress ||
               this.state.saveDisabled ||
               (this.state.remoteManagementDirty &&
                 this.state.remoteManagementPlan === null)
             }
+            cancelButtonDisabled={this.state.subtreeOperationInProgress}
           />
         </DialogFooter>
       </Dialog>
@@ -441,6 +439,20 @@ export class RepositorySettings extends React.Component<
             repository={this.props.repository}
             dispatcher={this.props.dispatcher}
             onRepositoryOpened={this.props.onDismissed}
+            appearanceCustomization={this.state.appearanceCustomization}
+            onAppearanceCustomizationChanged={
+              this.onAppearanceCustomizationChanged
+            }
+          />
+        )
+      }
+      case RepositorySettingsTab.Subtrees: {
+        return (
+          <SubtreeManager
+            repository={this.props.repository}
+            dispatcher={this.props.dispatcher}
+            accounts={this.props.accounts}
+            onOperationStateChanged={this.onSubtreeOperationStateChanged}
           />
         )
       }
@@ -466,18 +478,6 @@ export class RepositorySettings extends React.Component<
             onSelectedEditorChanged={this.onSelectedEditorChanged}
             onUseCustomEditorChanged={this.onUseCustomEditorChanged}
             onCustomEditorChanged={this.onCustomEditorChanged}
-          />
-        )
-      }
-      case RepositorySettingsTab.Appearance: {
-        return (
-          <RepositoryAppearance
-            overrides={this.state.appearanceOverrides}
-            isLoading={this.state.isLoadingAppearanceOverrides}
-            repositoryName={
-              this.props.repository.alias ?? this.props.repository.name
-            }
-            onChanged={this.onAppearanceOverridesChanged}
           />
         )
       }
@@ -579,6 +579,10 @@ export class RepositorySettings extends React.Component<
   }
 
   private onSubmit = async () => {
+    if (this.state.subtreeOperationInProgress) {
+      return
+    }
+
     if (
       this.state.remoteManagementDirty &&
       this.state.remoteManagementPlan === null
@@ -629,18 +633,18 @@ export class RepositorySettings extends React.Component<
       this.state.automationOverrides
     )
 
-    if (this.state.appearanceOverridesHaveChanged) {
+    if (this.state.appearanceCustomizationHasChanged) {
       try {
-        await this.props.dispatcher.setRepositoryAppearanceOverrides(
-          this.props.repository,
-          this.state.appearanceOverrides
+        await this.props.dispatcher.setAppearanceCustomization(
+          this.state.appearanceCustomization
         )
+        this.setState({ appearanceCustomizationHasChanged: false })
       } catch (e) {
         log.error(
-          `RepositorySettings: unable to save appearance config for ${this.props.repository.path}`,
+          'RepositorySettings: unable to save active-profile appearance',
           e
         )
-        errors.push(`Failed saving the repository appearance: ${e}`)
+        errors.push(`Failed saving the active-profile appearance: ${e}`)
       }
     }
 
@@ -802,17 +806,27 @@ export class RepositorySettings extends React.Component<
     this.setState({ automationOverrides })
   }
 
-  private onAppearanceOverridesChanged = (
-    appearanceOverrides: IRepositoryAppearanceOverrides
+  private onAppearanceCustomizationChanged = (
+    appearanceCustomization: IAppearanceCustomization
   ) => {
     this.setState({
-      appearanceOverrides,
-      appearanceOverridesHaveChanged: true,
+      appearanceCustomization,
+      appearanceCustomizationHasChanged: true,
     })
   }
 
+  private onSubtreeOperationStateChanged = (
+    subtreeOperationInProgress: boolean
+  ) => {
+    if (this.isMounted) {
+      this.setState({ subtreeOperationInProgress })
+    }
+  }
+
   private onTabClicked = (index: number) => {
-    this.setState({ selectedTab: index })
+    if (!this.state.subtreeOperationInProgress) {
+      this.setState({ selectedTab: index })
+    }
   }
 
   private onForkContributionTargetChanged = (

@@ -68,6 +68,7 @@ import {
 import {
   IAppearanceCustomization,
   IRepositoryAppearanceOverrides,
+  normalizeAppearanceCustomization,
 } from '../../models/appearance-customization'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import type { CloneOptions } from '../../models/clone-options'
@@ -677,6 +678,7 @@ import {
   setAppearanceCustomization,
   setRepositoryAppearanceOverrides,
 } from '../appearance-customization'
+import type { ElementAppearanceCoordinator } from './element-appearance-coordinator'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
@@ -967,6 +969,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private selectedTheme = ApplicationTheme.System
   private currentTheme: ApplicableTheme = ApplicationTheme.Light
   private appearanceCustomization = getAppearanceCustomization()
+  private appearanceCustomizationMutationVersion = 0
   private repositoryAppearanceOverrides: IRepositoryAppearanceOverrides = {}
   private selectedTabSize = tabSizeDefault
   private showRecentRepositories = true
@@ -1065,7 +1068,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
     private readonly copilotStore: CopilotStore,
     private readonly notificationCentreStore: NotificationCentreStore,
     private readonly notificationAutomationStore: NotificationAutomationStore,
-    private readonly logStore: LogStore
+    private readonly logStore: LogStore,
+    private readonly elementAppearanceCoordinator?: ElementAppearanceCoordinator
   ) {
     super()
 
@@ -1492,6 +1496,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   private wireupStoreEventHandlers() {
+    this.elementAppearanceCoordinator?.onDidUpdate(state => {
+      this.appearanceCustomization = state.appearance
+      this.emitUpdate()
+    })
+    this.elementAppearanceCoordinator?.onDidError(error =>
+      this.emitError(error)
+    )
+
     this.gitHubUserStore.onDidUpdate(() => {
       this.emitUpdate()
     })
@@ -4019,7 +4031,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.emitUpdate()
 
-    this.updateChangesWorkingDirectoryDiff(repository)
+    // A commit can spend time hashing and uploading a large cheap-LFS file.
+    // Status refreshes during those pre-Git phases must not repeatedly spawn a
+    // full-file `git diff` against the original multi-gigabyte binary. Once the
+    // real Git commit starts, refresh the diff normally so the post-commit
+    // selection cannot retain stale content.
+    const commitState = this.repositoryStateCache.get(repository)
+    if (
+      !commitState.isCommitting ||
+      commitState.commitOperationPhase?.kind === 'git-commit'
+    ) {
+      this.updateChangesWorkingDirectoryDiff(repository)
+    }
 
     return status
   }
@@ -4780,7 +4803,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     const gitStore = this.gitStoreCache.get(repository)
 
-    return this.withIsCommitting(repository, async () => {
+    let refreshAfterAutoPinFailure = false
+    const result = await this.withIsCommitting(repository, async () => {
       // Auto-pin any selected file too large to push to a GitHub Release before
       // committing, so the tree holds a committable pointer instead of an
       // unpushable binary. A pin failure aborts the commit — a half-pinned tree
@@ -4799,7 +4823,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
         this.emitError(
           error instanceof Error ? error : new Error(String(error))
         )
-        await this._refreshRepository(repository)
+        // A prior file in this batch might already have been replaced by its
+        // pointer. Defer the refresh until `withIsCommitting` clears the
+        // cheap-LFS phase; refreshing here would intentionally suppress the
+        // selected-file diff and leave the original large-file diff visible.
+        refreshAfterAutoPinFailure = true
         return false
       }
 
@@ -4825,6 +4853,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
           )
         this.postCheapLfsPinNotification(repository, pinned)
       }
+
+      this.repositoryStateCache.update(repository, () => ({
+        commitOperationPhase: {
+          kind: 'git-commit',
+          cheapLfsPointerCount: pinned.length,
+        },
+      }))
+      this.emitUpdate()
 
       const result = await gitStore.performFailableOperation(
         async () => {
@@ -4909,6 +4945,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       return result !== undefined
     })
+
+    if (
+      refreshAfterAutoPinFailure &&
+      this.isTemporaryRepositoryActive(repository)
+    ) {
+      await this._refreshRepository(repository)
+    }
+
+    return result
   }
 
   private async _refreshRepositoryAfterCommit(
@@ -8114,6 +8159,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     this.repositoryStateCache.update(repository, () => ({
       isCommitting: true,
+      commitOperationPhase: { kind: 'preparing' },
       hookProgress: null,
       subscribeToCommitOutput: null,
     }))
@@ -8125,6 +8171,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       if (this.isTemporaryRepositoryActive(repository)) {
         this.repositoryStateCache.update(repository, () => ({
           isCommitting: false,
+          commitOperationPhase: null,
           hookProgress: null,
           subscribeToCommitOutput: null,
         }))
@@ -11651,6 +11698,20 @@ export class AppStore extends TypedBaseStore<IAppState> {
             signal,
             onProgress
           ),
+      },
+      undefined,
+      progress => {
+        if (!this.isTemporaryRepositoryActive(repository)) {
+          return
+        }
+        const state = this.repositoryStateCache.get(repository)
+        if (!state.isCommitting) {
+          return
+        }
+        this.repositoryStateCache.update(repository, () => ({
+          commitOperationPhase: { kind: 'cheap-lfs', progress },
+        }))
+        this.emitUpdate()
       }
     )
   }
@@ -13439,7 +13500,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.selectedTheme = getPersistedThemeName()
     setPersistedTheme(this.selectedTheme)
     this.currentTheme = await getCurrentlyAppliedTheme()
-    this.appearanceCustomization = getAppearanceCustomization()
+    const elementAppearanceState = this.elementAppearanceCoordinator?.getState()
+    this.appearanceCustomization =
+      elementAppearanceState?.initialized === true
+        ? elementAppearanceState.appearance
+        : getAppearanceCustomization()
     this.selectedTabSize = getNumber(tabSizeKey, tabSizeDefault)
     this.zoomBaseFactor = clampZoom(getFloatNumber('zoom-factor', 1))
     this.autoFitZoomEnabled = getBoolean('zoom-auto-fit-enabled', true)
@@ -13539,10 +13604,40 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /** Set the application-wide appearance customization. */
-  public _setAppearanceCustomization(customization: IAppearanceCustomization) {
-    this.appearanceCustomization = setAppearanceCustomization(customization)
+  public async _setAppearanceCustomization(
+    customization: IAppearanceCustomization
+  ): Promise<void> {
+    if (this.elementAppearanceCoordinator === undefined) {
+      this.appearanceCustomization = setAppearanceCustomization(customization)
+      this.emitUpdate()
+      return
+    }
+
+    const version = ++this.appearanceCustomizationMutationVersion
+    this.appearanceCustomization =
+      normalizeAppearanceCustomization(customization)
     this.emitUpdate()
-    return Promise.resolve()
+
+    try {
+      const persisted =
+        await this.elementAppearanceCoordinator.setAppearanceProjection(
+          this.appearanceCustomization
+        )
+      if (version === this.appearanceCustomizationMutationVersion) {
+        this.appearanceCustomization = persisted
+        this.emitUpdate()
+      }
+    } catch (error) {
+      if (version === this.appearanceCustomizationMutationVersion) {
+        const state = this.elementAppearanceCoordinator.getState()
+        this.appearanceCustomization = state.appearance
+        this.emitUpdate()
+      }
+      const appearanceError =
+        error instanceof Error ? error : new Error(String(error))
+      this.emitError(appearanceError)
+      throw appearanceError
+    }
   }
 
   /** Persist appearance overrides in a repository's local Git config. */

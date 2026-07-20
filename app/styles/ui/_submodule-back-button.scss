@@ -1,0 +1,87 @@
+.submodule-back-button-owner {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+
+  .submodule-context-back.button-component {
+    max-width: 100%;
+  }
+}
+
+.submodule-back-appearance-editor {
+  display: grid;
+  gap: 12px;
+  width: min(280px, calc(var(--available-width, 100vw) - 32px));
+  min-width: 0;
+  max-width: calc(100vw - 52px);
+  max-height: min(360px, calc(var(--available-height, 100vh) - 32px));
+  padding-right: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--md-sys-color-on-surface);
+
+  .submodule-back-appearance-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    h3 {
+      min-width: 0;
+      margin: 0;
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .submodule-back-appearance-close.button-component {
+    flex: 0 0 auto;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 6px;
+    color: var(--md-sys-color-on-surface-variant);
+    background: transparent;
+    border-color: transparent;
+    border-radius: 999px;
+  }
+
+  .select-component {
+    width: 100%;
+    min-width: 0;
+
+    select {
+      width: 100%;
+      min-width: 0;
+    }
+  }
+}
+
+.popover-component:has(.submodule-back-appearance-editor) {
+  max-width: calc(100vw - 20px);
+  border-radius: 22px;
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-sys-elevation-level3);
+
+  .popover-content {
+    max-width: calc(100vw - 20px);
+    max-height: var(--available-height, calc(100vh - 20px));
+    padding: 16px;
+    overflow: hidden;
+    border-radius: 22px;
+  }
+}
+
+@media (max-width: 420px), (max-height: 480px) {
+  .submodule-back-appearance-editor {
+    gap: 10px;
+    width: min(280px, calc(var(--available-width, 100vw) - 20px));
+    max-width: calc(100vw - 36px);
+    max-height: calc(var(--available-height, 100vh) - 20px);
+  }
+
+  .popover-component:has(.submodule-back-appearance-editor) .popover-content {
+    padding: 10px;
+  }
+}

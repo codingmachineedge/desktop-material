@@ -110,14 +110,14 @@ The status pills, in toy terms:
 
 Each row offers **Clone** (for a box that is not downloaded) or **Update**, plus
 **Sync**, **Configure**, and **Remove**. A downloaded row also offers
-**Open as repository**. The header adds **Add submodule…** and **Update all**,
+**Open & manage**. The header adds **Add submodule…** and **Update all**,
 which clones and updates every box in one go.
 
 ---
 
 ## Open a submodule without adding another saved repository
 
-Press **Open as repository** on a downloaded submodule to look inside the small
+Press **Open & manage** on a downloaded submodule to look inside the small
 box with the normal Changes, History, branch, and repository tools. Desktop
 Material opens it only for the current workspace visit:
 
@@ -129,8 +129,8 @@ Material opens it only for the current workspace visit:
 A context bar names the submodule and the big box that opened it. Press its
 **Back to parent** control to return to that saved root repository. If you open
 a box inside another box, Back still returns to the original saved root rather
-than leaving a trail of temporary repository entries. If you click **Open as
-repository** or **Back to parent** twice by accident, Desktop Material treats it
+than leaving a trail of temporary repository entries. If you click **Open &
+manage** or **Back to parent** twice by accident, Desktop Material treats it
 as one trip: it does not add another tab or saved repository entry.
 
 ![An initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
@@ -143,12 +143,18 @@ saved repository list. If a child becomes unsafe after it is already open,
 Desktop Material clears that temporary context, returns to the saved root, and
 shows a localized error instead of continuing to use the stale worktree.
 
-Choose **Settings → Appearance → Language and navigation** to make the Back
-control **Tonal**, **Filled accent**, or **Outlined**, and label it **Back to
-parent**, with the parent name, or as an icon only. The icon-only choice still
-has an accessible name that says where it goes. The same section stores one of
-three explicit language modes in the active profile: **English**, playful
-**Hong Kong Cantonese**, or compact **Bilingual** copy.
+Right-click the actual Back control, or press `Shift+F10` while it is focused,
+to open that element's editor beside it. You can make it **Tonal**, **Filled
+accent**, or **Outlined**, and label it **Back to parent**, with the parent
+name, or as an icon only. The icon-only choice still has an accessible name
+that says where it goes. Repository Settings shows the same Back preview;
+right-clicking that preview opens the same anchored editor, but its changes are
+staged until you press **Save**. The general Appearance page keeps only the
+ordinary language, theme, scale, and layout preferences. The Back owner has its
+own local Git repository and **History** action; undo, redo, and restore affect
+only its style and label and append audit commits.
+
+![The wider Repository Settings Submodules surface with the Back element's appearance editor anchored beside its preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
 
 Temporary mode is intentionally inspection-first. Repository Tools remains
 available for safe reading, while branch/tag/stash/history rewrites, remotes,
@@ -254,7 +260,8 @@ How to choose, in one breath each:
 - Pick a **subtree** when you mostly want the files *in* your project and you would
   rather never explain submodules to anyone who clones it.
 
-The **Subtree manager** (Tools → **Nested repositories** → **Open subtree manager**)
+The **Subtree manager** is embedded directly under **Repository settings →
+Subtrees** and is also available from Tools → **Nested repositories** → **Open subtree manager**. It
 can **pull** fresh upstream changes into a subtree, **push** your local changes back,
 **split** a folder out into its own branch, or **add** another subtree.
 

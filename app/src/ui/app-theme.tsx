@@ -30,7 +30,6 @@ const appearanceAttributes = [
   'data-dm-language-mode',
   'data-dm-submodule-back-style',
   'data-dm-submodule-back-label',
-  'data-dm-highlight-features',
 ] as const
 
 /**
@@ -111,10 +110,6 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
       'data-dm-submodule-back-label',
       appearance.submoduleBackButtonLabel
     )
-    body.toggleAttribute(
-      'data-dm-highlight-features',
-      appearance.highlightDesktopMaterialFeatures
-    )
 
     if (previousLanguageMode !== appearance.languageMode) {
       document.dispatchEvent(
@@ -145,9 +140,7 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
       left.tabCloseButtons === right.tabCloseButtons &&
       left.languageMode === right.languageMode &&
       left.submoduleBackButtonStyle === right.submoduleBackButtonStyle &&
-      left.submoduleBackButtonLabel === right.submoduleBackButtonLabel &&
-      left.highlightDesktopMaterialFeatures ===
-        right.highlightDesktopMaterialFeatures
+      left.submoduleBackButtonLabel === right.submoduleBackButtonLabel
     )
   }
 

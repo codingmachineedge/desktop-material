@@ -195,6 +195,7 @@ describe('recent UI internationalization', () => {
 
   it('uses only an explicit persisted language mode', () => {
     localStorage.removeItem('appearance-customization-v1')
+    localStorage.removeItem('language-mode-v1')
     assert.equal(getPersistedLanguageMode(), 'english')
 
     localStorage.setItem(
@@ -202,12 +203,11 @@ describe('recent UI internationalization', () => {
       JSON.stringify({ version: 1, languageMode: 'cantonese' })
     )
     assert.equal(getPersistedLanguageMode(), 'cantonese')
+    assert.equal(localStorage.getItem('language-mode-v1'), 'cantonese')
 
-    localStorage.setItem(
-      'appearance-customization-v1',
-      JSON.stringify({ version: 1, languageMode: 'zh-CN' })
-    )
+    localStorage.setItem('language-mode-v1', 'zh-CN')
     assert.equal(getPersistedLanguageMode(), 'english')
     localStorage.removeItem('appearance-customization-v1')
+    localStorage.removeItem('language-mode-v1')
   })
 })

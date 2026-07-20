@@ -1,6 +1,8 @@
 import * as React from 'react'
+import * as Path from 'path'
 import { Dispatcher } from '../dispatcher'
 import { addSafeDirectory, getRepositoryType } from '../../lib/git'
+import { findRepositoriesInDirectory } from '../../lib/git/find-repositories'
 import { Button } from '../lib/button'
 import { TextBox } from '../lib/text-box'
 import { Row } from '../lib/row'
@@ -38,6 +40,10 @@ interface IAddExistingRepositoryProps {
    * Defaults to the empty string if not defined.
    */
   readonly path?: string
+
+  /** Optional seams used by focused UI tests. */
+  readonly chooseRepositoryFolder?: () => Promise<string | null>
+  readonly scanRepositoryFolder?: typeof findRepositoriesInDirectory
 }
 
 interface IAddExistingRepositoryState {
@@ -59,6 +65,11 @@ interface IAddExistingRepositoryState {
   readonly isTrustingRepository: boolean
   readonly networkPathKind: NetworkRepositoryPathKind | null
   readonly isCheckingRepository: boolean
+  readonly isScanningForRepositories: boolean
+  readonly discoveredRepositories: ReadonlyArray<string> | null
+  readonly scanRootPath?: string
+  readonly scanWasTruncated: boolean
+  readonly repositoryScanError: string | null
 }
 
 /** The component for adding an existing local repository. */
@@ -67,6 +78,7 @@ export class AddExistingRepository extends React.Component<
   IAddExistingRepositoryState
 > {
   private pathTextBoxRef = React.createRef<TextBox>()
+  private scanRequestId = 0
 
   public constructor(props: IAddExistingRepositoryProps) {
     super(props)
@@ -82,6 +94,10 @@ export class AddExistingRepository extends React.Component<
       isTrustingRepository: false,
       networkPathKind: null,
       isCheckingRepository: false,
+      isScanningForRepositories: false,
+      discoveredRepositories: null,
+      scanWasTruncated: false,
+      repositoryScanError: null,
     }
   }
 
@@ -97,6 +113,7 @@ export class AddExistingRepository extends React.Component<
       LanguageModeChangedEvent,
       this.onLanguageModeChanged
     )
+    this.scanRequestId++
   }
 
   private onLanguageModeChanged = (event: Event) => {
@@ -125,7 +142,15 @@ export class AddExistingRepository extends React.Component<
   }
 
   private async updatePath(path: string) {
-    this.setState({ path })
+    this.scanRequestId++
+    this.setState({
+      path,
+      isScanningForRepositories: false,
+      discoveredRepositories: null,
+      scanRootPath: undefined,
+      scanWasTruncated: false,
+      repositoryScanError: null,
+    })
   }
 
   private async validatePath(path: string): Promise<boolean> {
@@ -311,16 +336,95 @@ export class AddExistingRepository extends React.Component<
     )
   }
 
+  private renderRepositoryScanResults() {
+    const {
+      discoveredRepositories,
+      isScanningForRepositories,
+      scanRootPath,
+      scanWasTruncated,
+      repositoryScanError,
+    } = this.state
+
+    if (repositoryScanError !== null) {
+      return (
+        <div className="repository-folder-scan-results" role="alert">
+          {repositoryScanError}
+        </div>
+      )
+    }
+
+    if (isScanningForRepositories) {
+      return (
+        <div className="repository-folder-scan-results" role="status">
+          Looking for Git repositories...
+        </div>
+      )
+    }
+
+    if (discoveredRepositories === null) {
+      return null
+    }
+
+    if (discoveredRepositories.length === 0) {
+      return (
+        <div className="repository-folder-scan-results" role="status">
+          No Git repositories were found
+          {scanWasTruncated
+            ? ' in the folders that could be scanned. Some folders could not be read or safe scan limits were reached'
+            : ' in this folder'}
+          .
+        </div>
+      )
+    }
+
+    const repositoryCount = discoveredRepositories.length
+
+    return (
+      <div className="repository-folder-scan-results" role="status">
+        <strong>
+          Found {repositoryCount} Git{' '}
+          {repositoryCount === 1 ? 'repository' : 'repositories'}
+        </strong>
+        <ul aria-label="Detected Git repositories">
+          {discoveredRepositories.map(repositoryPath => {
+            const relativePath =
+              scanRootPath === undefined
+                ? repositoryPath
+                : Path.relative(scanRootPath, repositoryPath)
+
+            return (
+              <li key={repositoryPath} title={repositoryPath}>
+                {relativePath.length > 0
+                  ? relativePath
+                  : Path.basename(repositoryPath)}
+              </li>
+            )
+          })}
+        </ul>
+        {scanWasTruncated && (
+          <p>
+            Some folders could not be read or safe scan limits were reached. Add
+            these repositories, then scan a narrower folder to find more.
+          </p>
+        )}
+      </div>
+    )
+  }
+
   public render() {
     return (
       <Dialog
         id="add-existing-repository"
+        className="add-existing-repository-with-scan"
         title={__DARWIN__ ? 'Add Local Repository' : 'Add local repository'}
         onSubmit={this.addRepository}
         onDismissed={this.props.onDismissed}
         loading={
-          this.state.isTrustingRepository || this.state.isCheckingRepository
+          this.state.isTrustingRepository ||
+          this.state.isCheckingRepository ||
+          this.state.isScanningForRepositories
         }
+        disabled={this.state.isScanningForRepositories}
       >
         <DialogContent>
           <Row>
@@ -334,13 +438,24 @@ export class AddExistingRepository extends React.Component<
             />
             <Button onClick={this.showFilePicker}>Choose…</Button>
           </Row>
+          <Row className="repository-folder-scan-row">
+            <Button onClick={this.showRepositoryFolderPicker}>
+              Auto-detect repositories...
+            </Button>
+            <small>Choose a parent folder to find and add its Git repos.</small>
+          </Row>
           {this.renderErrors()}
           {this.renderNetworkNotice()}
+          {this.renderRepositoryScanResults()}
         </DialogContent>
 
         <DialogFooter>
           <OkCancelButtonGroup
-            okButtonText={__DARWIN__ ? 'Add Repository' : 'Add repository'}
+            okButtonText={this.addButtonText}
+            okButtonDisabled={
+              this.state.isScanningForRepositories ||
+              this.state.discoveredRepositories?.length === 0
+            }
           />
         </DialogFooter>
       </Dialog>
@@ -365,11 +480,111 @@ export class AddExistingRepository extends React.Component<
     this.updatePath(path)
   }
 
+  private showRepositoryFolderPicker = async () => {
+    const requestId = ++this.scanRequestId
+    this.setState({ repositoryScanError: null })
+
+    let path: string | null
+
+    try {
+      path = await (this.props.chooseRepositoryFolder?.() ??
+        showOpenDialog({ properties: ['openDirectory'] }))
+    } catch {
+      if (requestId === this.scanRequestId) {
+        this.setState({
+          isScanningForRepositories: false,
+          discoveredRepositories: null,
+          scanRootPath: undefined,
+          scanWasTruncated: false,
+          repositoryScanError:
+            "Desktop Material couldn't open the folder picker. Try again.",
+        })
+      }
+
+      return
+    }
+
+    if (requestId !== this.scanRequestId) {
+      return
+    }
+
+    if (path === null) {
+      return
+    }
+
+    const resolvedPath = this.resolvedPath(path)
+    this.setState({
+      path,
+      showNonGitRepositoryWarning: false,
+      isRepositoryBare: false,
+      isRepositoryUnsafe: false,
+      repositoryUnsafePath: undefined,
+      isScanningForRepositories: true,
+      discoveredRepositories: null,
+      scanRootPath: resolvedPath,
+      scanWasTruncated: false,
+      repositoryScanError: null,
+    })
+
+    let result
+
+    try {
+      result = await (
+        this.props.scanRepositoryFolder ?? findRepositoriesInDirectory
+      )(resolvedPath)
+    } catch {
+      if (requestId === this.scanRequestId) {
+        this.setState({
+          isScanningForRepositories: false,
+          discoveredRepositories: null,
+          scanWasTruncated: false,
+          repositoryScanError:
+            "Desktop Material couldn't scan this folder. Check that it can be read and try again.",
+        })
+      }
+
+      return
+    }
+
+    if (requestId !== this.scanRequestId) {
+      return
+    }
+
+    this.setState({
+      isScanningForRepositories: false,
+      discoveredRepositories: result.repositories,
+      scanWasTruncated: result.truncated,
+      repositoryScanError: null,
+    })
+  }
+
+  private get addButtonText() {
+    const repositoryCount = this.state.discoveredRepositories?.length
+
+    if (repositoryCount !== undefined && repositoryCount > 0) {
+      return `Add ${repositoryCount} ${
+        repositoryCount === 1 ? 'repository' : 'repositories'
+      }`
+    }
+
+    return __DARWIN__ ? 'Add Repository' : 'Add repository'
+  }
+
   private resolvedPath(path: string): string {
     return resolveRepositoryInputPath(untildify(path))
   }
 
   private addRepository = async () => {
+    const { discoveredRepositories } = this.state
+
+    if (discoveredRepositories !== null) {
+      if (discoveredRepositories.length === 0) {
+        return
+      }
+
+      return this.addResolvedRepositories(discoveredRepositories)
+    }
+
     const { path } = this.state
     const isValidPath = await this.validatePath(path)
 
@@ -378,11 +593,14 @@ export class AddExistingRepository extends React.Component<
       return
     }
 
+    const resolvedPath = this.resolvedPath(path)
+    return this.addResolvedRepositories([resolvedPath])
+  }
+
+  private addResolvedRepositories = async (paths: ReadonlyArray<string>) => {
     this.props.onDismissed()
     const { dispatcher } = this.props
-
-    const resolvedPath = this.resolvedPath(path)
-    const repositories = await dispatcher.addRepositories([resolvedPath])
+    const repositories = await dispatcher.addRepositories(paths)
 
     if (repositories.length > 0) {
       dispatcher.closeFoldout(FoldoutType.Repository)

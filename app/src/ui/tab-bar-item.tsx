@@ -17,14 +17,21 @@ interface ITabBarItemProps {
     button: HTMLButtonElement | null
   ) => void
   readonly type?: TabBarType
+  readonly disabled?: boolean
 }
 
 export class TabBarItem extends React.Component<ITabBarItemProps, {}> {
   private onClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    this.props.onClick(this.props.index)
+    if (!this.props.disabled) {
+      this.props.onClick(this.props.index)
+    }
   }
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (this.props.disabled) {
+      return
+    }
+
     const { type, index } = this.props
     const previousKey = type === TabBarType.Vertical ? 'ArrowUp' : 'ArrowLeft'
     const nextKey = type === TabBarType.Vertical ? 'ArrowDown' : 'ArrowRight'
@@ -60,6 +67,8 @@ export class TabBarItem extends React.Component<ITabBarItemProps, {}> {
         onMouseEnter={this.onMouseEnter}
         onMouseLeave={this.props.onMouseLeave}
         type="button"
+        disabled={this.props.disabled}
+        aria-disabled={this.props.disabled ? 'true' : undefined}
       >
         {this.props.children}
       </button>

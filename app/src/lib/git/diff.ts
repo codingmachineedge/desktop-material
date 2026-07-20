@@ -23,7 +23,7 @@ import {
 
 import { DiffParser } from '../diff-parser'
 import { getOldPathOrDefault } from '../get-old-path'
-import { readFile, writeFile, unlink } from 'fs/promises'
+import { lstat, readFile, writeFile, unlink } from 'fs/promises'
 import { getTempFilePath, readPartialFile } from '../file-system'
 import { forceUnwrap } from '../fatal-error'
 import { git } from './core'
@@ -39,6 +39,7 @@ import { unstageAll } from './reset'
 import { stageFiles } from './update-index'
 import { isAbsolute } from 'path'
 import { convertTGAToPNG, MaxTGAFileBytes, TGAConversionError } from '../tga'
+import { ReceiveLimit } from '../large-files'
 
 /**
  * V8 has a limit on the size of string it can create (~256MB), and unless we want to
@@ -347,6 +348,23 @@ export async function getWorkingDirectoryDiff(
   file: WorkingDirectoryFileChange,
   hideWhitespaceInDiff: boolean = false
 ): Promise<IDiff> {
+  const isSubmodule = file.status.submoduleStatus !== undefined
+
+  // Git's no-index diff reads an untracked binary in full before deciding it
+  // cannot render it. That turns selecting a multi-gigabyte cheap-LFS candidate
+  // into repeated 30+ second scans. Files above GitHub's receive limit cannot
+  // produce a useful Desktop diff, so classify them without invoking Git.
+  if (!isSubmodule && !file.isDeleted()) {
+    try {
+      const fileStats = await lstat(Path.join(repository.path, file.path))
+      if (!fileStats.isSymbolicLink() && fileStats.size > ReceiveLimit) {
+        return { kind: DiffType.Unrenderable }
+      }
+    } catch {
+      // Let Git produce the existing, more specific error for vanished paths.
+    }
+  }
+
   // `--no-ext-diff` should be provided wherever we invoke `git diff` so that any
   // diff.external program configured by the user is ignored
   const args = [
@@ -358,8 +376,6 @@ export async function getWorkingDirectoryDiff(
     '--no-color',
   ]
   const successExitCodes = new Set([0])
-  const isSubmodule = file.status.submoduleStatus !== undefined
-
   // For added submodules, we'll use the "default" parameters, which are able
   // to output the submodule commit.
   if (

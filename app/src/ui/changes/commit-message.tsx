@@ -24,7 +24,12 @@ import { Commit, ICommitContext } from '../../models/commit'
 import { startTimer } from '../lib/timing'
 import { CommitWarning, CommitWarningIcon } from './commit-warning'
 import { LinkButton } from '../lib/link-button'
-import { CommitOptions, Foldout, FoldoutType } from '../../lib/app-state'
+import {
+  CommitOperationPhase,
+  CommitOptions,
+  Foldout,
+  FoldoutType,
+} from '../../lib/app-state'
 import { IAvatarUser, getAvatarUserFromAuthor } from '../../models/avatar'
 import { showContextualMenu } from '../../lib/menu-item'
 import { Account, isEnterpriseAccount } from '../../models/account'
@@ -93,6 +98,14 @@ const addAuthorIcon: OcticonSymbolVariant = {
   ],
 }
 
+/** Cheap LFS uses upload progress completion while it re-hashes the source. */
+const isCheapLfsVerificationPhase = (phase: CommitOperationPhase | null) =>
+  phase?.kind === 'cheap-lfs' &&
+  phase.progress.phase === 'uploading' &&
+  phase.progress.currentPath !== null &&
+  phase.progress.totalBytes > 0 &&
+  phase.progress.transferredBytes >= phase.progress.totalBytes
+
 interface ICreateCommitOptions {
   warnUnknownAuthors: boolean
   warnFilesNotVisible: boolean
@@ -122,6 +135,7 @@ interface ICommitMessageProps {
   readonly repositoryAccount: Account | null
   readonly autocompletionProviders: ReadonlyArray<IAutocompletionProvider<any>>
   readonly isCommitting?: boolean
+  readonly commitOperationPhase: CommitOperationPhase | null
   readonly hookProgress: HookProgress | null
   readonly onShowCommitProgress: (() => void) | undefined
   readonly isGeneratingCommitMessage?: boolean
@@ -412,10 +426,19 @@ export class CommitMessage extends React.Component<
       this.coAuthorInputRef.current?.focus()
     }
 
+    const previousCommitPhase = prevProps.commitOperationPhase
+    const currentCommitPhase = this.props.commitOperationPhase
+    const commitPhaseChanged =
+      previousCommitPhase?.kind !== currentCommitPhase?.kind ||
+      (previousCommitPhase?.kind === 'cheap-lfs' &&
+        currentCommitPhase?.kind === 'cheap-lfs' &&
+        previousCommitPhase.progress.phase !==
+          currentCommitPhase.progress.phase) ||
+      isCheapLfsVerificationPhase(previousCommitPhase) !==
+        isCheapLfsVerificationPhase(currentCommitPhase)
     if (
-      prevProps.isCommitting !== this.props.isCommitting &&
       this.props.isCommitting &&
-      this.state.isCommittingStatusMessage === ''
+      (prevProps.isCommitting !== this.props.isCommitting || commitPhaseChanged)
     ) {
       this.setState({ isCommittingStatusMessage: this.getButtonTitle() })
     }
@@ -1582,6 +1605,69 @@ export class CommitMessage extends React.Component<
     return isAmending ? amendVerb : commitVerb
   }
 
+  /** Describe the real stage inside the broader commit operation lock. */
+  private getCommitOperationButtonText(): string | null {
+    if (!this.props.isCommitting) {
+      return null
+    }
+
+    const phase = this.props.commitOperationPhase
+    if (phase === null) {
+      return null
+    }
+
+    switch (phase.kind) {
+      case 'preparing': {
+        const count = this.props.filesToBeCommittedCount ?? 0
+        if (count < 1) {
+          return 'Preparing commit'
+        }
+        return `Preparing ${count} ${count === 1 ? 'file' : 'files'} for commit`
+      }
+      case 'cheap-lfs': {
+        const { progress } = phase
+        const count = progress.totalFiles
+        const files = `${count} large ${count === 1 ? 'file' : 'files'}`
+        const amendSuffix =
+          this.props.commitToAmend === null ? '' : ' before amending'
+        if (progress.phase === 'preparing') {
+          return `Preparing ${files} for cheap LFS${amendSuffix}`
+        }
+        if (isCheapLfsVerificationPhase(phase)) {
+          return `Verifying ${files} for cheap LFS${amendSuffix}`
+        }
+        const percentage =
+          progress.totalBytes > 0
+            ? Math.min(
+                100,
+                Math.floor(
+                  (progress.transferredBytes / progress.totalBytes) * 100
+                )
+              )
+            : 0
+        return `Uploading ${files} to cheap LFS (${percentage}%)${amendSuffix}`
+      }
+      case 'git-commit': {
+        const count = phase.cheapLfsPointerCount
+        if (count < 1) {
+          return null
+        }
+        if (this.props.commitToAmend !== null) {
+          return `Amending last commit with ${count} cheap-LFS ${
+            count === 1 ? 'pointer' : 'pointers'
+          }`
+        }
+        const destination =
+          this.props.branch === null ? '' : ` to ${this.props.branch}`
+        return `Committing ${count} cheap-LFS ${
+          count === 1 ? 'pointer' : 'pointers'
+        }${destination}`
+      }
+      default:
+        return assertNever(phase, 'Unknown commit operation phase')
+    }
+  }
+
   private getCommittingButtonText() {
     const { branch } = this.props
     const verb = this.getButtonVerb()
@@ -1632,6 +1718,11 @@ export class CommitMessage extends React.Component<
   }
 
   private getButtonText() {
+    const operationText = this.getCommitOperationButtonText()
+    if (operationText !== null) {
+      return operationText
+    }
+
     const { commitToAmend, commitButtonText } = this.props
 
     if (commitButtonText) {
@@ -1643,6 +1734,11 @@ export class CommitMessage extends React.Component<
   }
 
   private getButtonTitle(): string {
+    const operationText = this.getCommitOperationButtonText()
+    if (operationText !== null) {
+      return operationText
+    }
+
     const { commitToAmend, commitButtonText } = this.props
 
     if (commitButtonText) {
@@ -1670,7 +1766,10 @@ export class CommitMessage extends React.Component<
     ) {
       return `Select one or more files to commit`
     } else if (this.props.isCommitting) {
-      return `Committing changes…`
+      const operationText = this.getCommitOperationButtonText()
+      return operationText === null
+        ? `Committing changes…`
+        : `${operationText}…`
     }
 
     return undefined

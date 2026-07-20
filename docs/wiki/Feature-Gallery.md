@@ -4,7 +4,7 @@
 
 Treat every gallery entry as part of a workflow: find the capability, open its named surface, review the exact scope, and keep the resulting evidence.
 
-This page maps 65 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 68 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata; no personal path, credential, or account identifier belongs in the image set.
@@ -21,8 +21,9 @@ contract rejects missing, duplicate, or unassigned assets.
 > the repository-contextual GitHub API Explorer, filtered notification bulk triage, and
 > configurable bottom-right error notices, runtime tab search, History commit actions, and
 > true-bottom Repository Tools scrolling. It now also includes the safe custom repository-logo
-> studio, named API app functions, temporary submodule repository context, and the M21 local,
-> pushed, and remote-only tag lifecycle workspace.
+> studio, named API app functions, temporary submodule repository context, bounded repository
+> folder discovery, explicit cheap-LFS preparation before the final branch commit, and the M21
+> local, pushed, and remote-only tag lifecycle workspace.
 > Exact build, interaction, and
 > privacy receipts are retained in `HANDOFF.md`; each promoted release records its own main, CI,
 > Pages, and wiki verification without implying that later maintenance work is complete.
@@ -61,7 +62,7 @@ active profile's style, label, and explicit language mode.
 | --- | --- |
 | `material-app-identity-workspace.png` | Restart-restored profile app identity and favorite repository tab |
 | `material-welcome.png` | Material first-run task card and responsive workspace preview |
-| `material-customization.png` | Explicit language mode and temporary-submodule Back style/label controls |
+| `material-customization.png` | Editor anchored beside its actual visual owner with dedicated Git history and repository path |
 | `material-repository-logo-studio.png` | Layered custom repository-logo studio with live preview and safe transfer controls |
 | `material-toolbar-overflow.png` | Measured narrow toolbar with Build & Run and Commit & Push in More |
 | `material-tab-appearance-word.png` | Word-style tab typography, alignment, and independent color palettes |
@@ -73,6 +74,8 @@ active profile's style, label, and explicit language mode.
 | `material-clone-account-fallback.png` | Generic HTTPS clone completed through exact-origin signed-in account fallback |
 | `add-submodule-dialog.png` | Clone-style Add Submodule review with source, checkout path, and branch |
 | `material-submodule-context.png` | Initialized submodule opened temporarily with context and Back to the persisted root |
+| `material-repository-submodule-management.png` | Wider Repository Settings with the Back element's anchored editor and embedded subtrees |
+| `material-repository-folder-detection.png` | Bounded parent-folder scan with two discovered Git repositories ready for bulk add |
 | `material-pull-all-account-fallback.png` | Pull all with per-repository results and exact-origin account retry |
 | `material-sparse-checkout-safe.png` | Validated cone-mode sparse-checkout review |
 | `material-history-deepen.png` | Deepen-history result without exposing the account used |
@@ -94,6 +97,7 @@ active profile's style, label, and explicit language mode.
 | `material-repository-tools.png` | Named Repository Tools administration hub |
 | `material-repository-tools-scroll.png` | Short-height Repository Tools scrolled to its reachable final results surface |
 | `material-workspace-changes.png` | Material Changes workspace and commit flow |
+| `material-cheap-lfs-preparing.png` | Oversized-file cheap-LFS preparation shown separately from the final branch commit |
 | `material-history.png` | Core History browsing and selected-commit inspection |
 | `material-history-context-actions.png` | Selection-aware History commit More/right-click actions and button hint |
 | `material-settings.png` | Responsive Material Settings dialog |
@@ -144,11 +148,25 @@ customization/history context use the same profile/repository ownership model.
 
 ![Initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
 
+![Wider Repository Settings Submodules tab with the Back element's appearance editor anchored beside its preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
+
+![Two Git repositories found beneath a selected parent folder and ready for one bulk add](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-folder-detection.png)
+
 ![Pull all showing a neutral exact-origin signed-in account fallback result](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
 
 ![Validated cone-mode sparse-checkout review](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
 
 ![Deepen-history result without displaying the account used](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepen.png)
+
+## Large-file commit preparation
+
+Oversized files are prepared and uploaded through release-backed cheap LFS before
+Git creates the branch commit. New uploads use raw bytes, retain one asset when
+it fits the release limit, and use ordered raw ranges when it does not. The
+composer names preparation, upload, and verification separately, then reserves
+**Committing to _branch_** for the small pointer commit.
+
+![Commit composer preparing an oversized file for cheap LFS before the final branch commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-cheap-lfs-preparing.png)
 
 ## Repository administration
 
@@ -159,9 +177,12 @@ stacks a row before its name, fetch/push URLs, or controls collapse. Repository
 Tools owns short-window vertical scrolling so Diagnostics and later results stay
 reachable. **Repository settings → Submodules → Add submodule…** opens the
 same provider/URL chooser as Clone, then reviews the safe relative destination
-and optional tracked branch before Git starts. An initialized manager row can
-also open that child as a temporary repository without persistence; stale,
-invalid, or escaping targets fail closed and leave the manager available. The
+and optional tracked branch before Git starts. The wider settings surface also
+shows the profile-wide Back preview; right-clicking it opens that element's
+editor beside it, with edits staged until the settings dialog is saved. An initialized row's
+**Open & manage** action opens that child temporarily without adding it to the
+repository list, while the adjacent **Subtrees** tab embeds add, pull, push, and
+split management; stale, invalid, or escaping targets fail closed. The
 reviewed current-branch
 rebase uses searched target selection, ahead/behind context, a bounded commit
 preview, fresh safety/ref checks, and the existing conflict continue/abort
@@ -262,18 +283,17 @@ independent text/background palettes. The original regex close action remains;
 the inverse literal close flow adds live counts/preview and cannot confirm empty
 or zero-match input. Pinned/manual/keyboard arrangement plus stable one-shot
 label/opened/status sorts persist without continuously reacting to later status
-changes. App/profile appearance inheritance and measured toolbar overflow are
-shown with the matching inspected evidence below. The default-off feature
-discovery setting uses an explicit allowlist and adds a non-animated accent edge
-plus an `M` or **Material** badge without changing control behavior; mixed and
-upstream GitHub Desktop entry points remain neutral. The custom repository-logo
-studio composes bounded mark and text layers, transforms and colors in a live
-preview with undo/redo and safe JSON transfer; a profile default can be
-overridden locally per repository without accepting executable SVG.
+changes. Every visual editor is anchored beside its actual owner and opens that
+owner's independent local Git history; ordinary Appearance preferences remain
+separate. Feature entry points own independent highlight settings rather than a
+global body switch. The custom repository-logo studio composes bounded mark and
+text layers, transforms and colors in a live preview with undo/redo and safe
+JSON transfer; a repository can inherit or edit its profile default without
+accepting executable SVG. Measured toolbar overflow remains unchanged.
 
 ![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-welcome.png)
 
-![Appearance preferences with explicit language and temporary-submodule Back button controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance editor anchored beside its actual owner with History and a dedicated local Git path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ![Layered custom repository-logo studio with live preview and safe transfer controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 

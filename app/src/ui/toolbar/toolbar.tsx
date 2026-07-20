@@ -502,6 +502,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
         style={itemStyle}
         data-toolbar-item-id={id}
         data-dm-feature={desktopMaterialFeature ? true : undefined}
+        data-dm-feature-id={desktopMaterialFeature ? id : undefined}
         aria-hidden={isOverflowed ? true : undefined}
       >
         {element.props.children}
@@ -551,6 +552,11 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
                 data-toolbar-overflow-item-id={item.id}
                 data-dm-feature={
                   item.element.props.desktopMaterialFeature ? true : undefined
+                }
+                data-dm-feature-id={
+                  item.element.props.desktopMaterialFeature
+                    ? item.id
+                    : undefined
                 }
                 onClick={this.onOverflowItemClick}
               >

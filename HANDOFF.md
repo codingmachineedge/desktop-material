@@ -154,6 +154,38 @@ compact bilingual mode contract with English fallback.
   corrected evidence commit, raw/Pages image parity, its one uniquely tagged
   non-draft release, and separate-wiki delivery remain post-commit checks.
 
+## 2026-07-19 owner-scoped appearance, large-file, and repository-management release
+
+- Custom visuals no longer live in either monolithic Appearance tab. Right-click
+  or `Shift+F10` on the actual visual owner opens a bounded editor beside it.
+  Profile elements, feature IDs, repository elements, and individual tab titles
+  each own a strict `setting.json`, an independent local Git repository, and a
+  mutable History manager whose undo/redo/restore operations append audit
+  commits. Language remains an ordinary separate preference.
+- Repository workspaces, toolbars, tab strips, list names, and logos inherit
+  matching profile owners without sharing history. A local
+  `desktop-material.appearance-id` UUID keeps the five repositories stable across
+  path moves. Legacy aggregate values are migration/startup compatibility only.
+  The profile default logo remains reachable beside an inherited real logo.
+- Large selected files over 100 MiB auto-pin before every commit entry point.
+  New cheap-LFS uploads deliberately skip compression: Git's object compression
+  is not a general-purpose improvement over ZIP/RAR and would add a long opaque
+  pass for ISO/archive/media data. Files below the release cap upload as one raw
+  asset; larger files split into ordered raw parts below 2 GiB, with per-part and
+  whole-file verification during materialization. Legacy compressed pointers
+  remain readable.
+- Add Local Repository can perform bounded, link-safe parent-folder discovery
+  and bulk add. Repository Settings is wider, manages initialized submodules
+  temporarily without adding them to the saved list, anchors the Back owner's
+  editor beside its preview, and embeds the full Subtrees manager.
+- The in-app SSH working-copy manager supports clone/status/fetch/pull/push and
+  fast-forward-only Docker deployment. The remote site advertises redacted SSH
+  hosts and can request a credential-vault-backed clone without receiving a
+  password or key.
+- Final production build, off-screen capture hashes, unit/lint/type receipts,
+  exact pushed SHA, CI/CodeQL/Pages/release/wiki proof, and branch/worktree/stash
+  cleanup are recorded at the end of this section once publication completes.
+
 ## 2026-07-19 cheap-LFS commit routing fix
 
 - Scheduled commit-and-push and multi-repository commit-and-push-all no longer
@@ -174,7 +206,11 @@ compact bilingual mode contract with English fallback.
   was created, and no disposable fixture or user-data directory required
   cleanup.
 
-## 2026-07-19 adaptive cheap-LFS compression
+## 2026-07-19 adaptive cheap-LFS compression (superseded for new uploads)
+
+This intermediate implementation is retained as history. The later raw-upload
+changeset disables compression for every new asset while preserving reads of
+the compressed pointer records described below.
 
 - Cheap LFS now raw-DEFLATE-compresses each release asset at maximum level
   before upload and keeps that representation only when it is at least 1%

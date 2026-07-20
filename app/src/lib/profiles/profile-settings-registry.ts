@@ -55,10 +55,7 @@ export const profileSettingsRegistry: ReadonlyArray<IProfileSettingEntry> = [
 
   // Diff and appearance preferences
   { key: 'theme', label: 'appearance' },
-  {
-    key: 'appearance-customization-v1',
-    label: 'appearance customization',
-  },
+  { key: 'language-mode-v1', label: 'language' },
   { key: 'zoom-factor', label: 'interface scale' },
   { key: 'zoom-auto-fit-enabled', label: 'automatic interface scaling' },
   { key: 'show-recent-repositories', label: 'recent repository visibility' },

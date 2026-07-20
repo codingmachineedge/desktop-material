@@ -63,6 +63,29 @@ retain a compatibility fallback for the older `POST /api/v1/command/<name>`
 route. Capabilities come from `GET /api/v1/info`; unsupported SSH controls stay
 disabled instead of guessing at an unadvertised contract.
 
+### SSH host clone workflow
+
+SSH mode appears in the Clone surface only when the connected Desktop Material
+agent advertises both `list-ssh-hosts` and `clone-to-ssh`. Define and test hosts
+first in the desktop app under **Repository Settings → Remote → SSH Working
+Copy**. The site can select a saved definition; it cannot create or edit one.
+
+`list-ssh-hosts` takes no arguments and returns only a bounded host ID, display
+name, display address, and availability flag. It never returns the SSH user,
+identity-file path, saved destination, source remote, deployment settings,
+password, passphrase, or key. Definitions are discovered from repositories
+currently available to the desktop profile, and ambiguous duplicate IDs are
+omitted.
+
+`clone-to-ssh` sends the selected saved host ID, a credential-free Git URL, an
+absolute or `~/` POSIX destination, and an optional branch. The desktop agent
+revalidates the saved definition, URL, path, and branch, refuses an existing
+destination, disables SSH agent forwarding, and quotes dynamic remote-shell
+values. The remote host must already be able to authenticate to the Git source.
+Desktop Material's operating-system credential flow handles any SSH secret;
+the site never receives it. Credential-shaped failure output is redacted before
+it crosses the agent boundary.
+
 ### Unsafe YOLO LAN mode
 
 When public status says YOLO LAN mode is active, no bearer is required and every

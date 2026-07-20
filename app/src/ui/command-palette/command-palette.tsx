@@ -213,6 +213,11 @@ export class CommandPalette extends React.Component<
                       ? true
                       : undefined
                   }
+                  data-dm-feature-id={
+                    isDesktopMaterialFeatureEntryPoint(command.event)
+                      ? command.event
+                      : undefined
+                  }
                   onClick={this.onRowClick}
                 >
                   <span className="command-palette-group">{command.group}</span>

@@ -73,6 +73,7 @@ import { isSubmoduleRepository } from '../models/repository'
 import { ApiRepositoriesStore } from '../lib/stores/api-repositories-store'
 import { CommitStatusStore } from '../lib/stores/commit-status-store'
 import { PullRequestCoordinator } from '../lib/stores/pull-request-coordinator'
+import { ElementAppearanceCoordinator } from '../lib/stores/element-appearance-coordinator'
 
 import { sendNonFatalException } from '../lib/helpers/non-fatal-exception'
 import { enableUnhandledRejectionReporting } from '../lib/feature-flag'
@@ -309,10 +310,15 @@ const cloningRepositoriesStore = new CloningRepositoriesStore(() =>
 )
 
 const profileStore = new ProfileStore(accountsStore)
+const elementAppearanceCoordinator = new ElementAppearanceCoordinator(
+  profileStore
+)
 const namedAPIFunctionsStore = new NamedAPIFunctionsStore(localStorage)
 const repositoryTabsStore = new RepositoryTabsStore(
   profileStore,
-  getCurrentWindowScope()
+  getCurrentWindowScope(),
+  Date.now,
+  elementAppearanceCoordinator
 )
 
 const signInStore = new SignInStore()
@@ -388,7 +394,8 @@ const appStore = new AppStore(
   copilotStore,
   notificationCentreStore,
   notificationAutomationStore,
-  logStore
+  logStore,
+  elementAppearanceCoordinator
 )
 
 let lastEnsuredRepositoryId: number | null = null
@@ -425,7 +432,11 @@ appStore.onDidUpdate(state => {
 })
 
 const profileStoreInitialization = profileStore.initialize()
-profileStoreInitialization
+const elementAppearanceCoordinatorInitialization =
+  profileStoreInitialization.then(() =>
+    elementAppearanceCoordinator.initialize()
+  )
+elementAppearanceCoordinatorInitialization
   .then(() => {
     try {
       namedAPIFunctionsStore.migrate()
@@ -454,6 +465,13 @@ configureRendererShutdown([
     run: async () => {
       await profileStoreInitialization
       await profileStore.flush()
+    },
+  },
+  {
+    name: 'element appearance settings',
+    run: async () => {
+      await elementAppearanceCoordinatorInitialization
+      await elementAppearanceCoordinator.flush()
     },
   },
   {
@@ -496,7 +514,8 @@ const dispatcher = new Dispatcher(
   profileStore,
   repositoryTabsStore,
   buildRunStore,
-  namedAPIFunctionsStore
+  namedAPIFunctionsStore,
+  elementAppearanceCoordinator
 )
 
 installAgentCommandExecutor(

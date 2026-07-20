@@ -12,8 +12,14 @@ import { IRepositoryLogoDesign } from '../models/repository-logo'
 import { ITabTitleStyle } from '../models/repository-tab'
 import { getConfigValue, setConfigValue } from './git/config'
 import { pathExists } from './path-exists'
+import {
+  getLanguageModePreference,
+  LegacyAppearanceStorageKey,
+  setLanguageModePreference,
+} from './language-preference'
 
-export const AppearanceCustomizationStorageKey = 'appearance-customization-v1'
+/** Legacy/startup projection only; independent element stores are canonical. */
+export const AppearanceCustomizationStorageKey = LegacyAppearanceStorageKey
 export const RepositoryAppearanceConfigKey = 'desktop-material.appearance'
 export const RepositoryLogoChangedEvent =
   'desktop-material-repository-logo-changed'
@@ -38,16 +44,23 @@ function announceRepositoryLogoChanged(repositoryPath: string | null) {
 }
 
 export function getAppearanceCustomization(): IAppearanceCustomization {
-  return parseAppearanceCustomization(
+  const projection = parseAppearanceCustomization(
     localStorage.getItem(AppearanceCustomizationStorageKey)
   )
+  return normalizeAppearanceCustomization({
+    ...projection,
+    languageMode: getLanguageModePreference(),
+  })
 }
 
 export function setAppearanceCustomization(
   customization: IAppearanceCustomization
 ): IAppearanceCustomization {
   const previous = getAppearanceCustomization()
-  const normalized = normalizeAppearanceCustomization(customization)
+  const normalized = normalizeAppearanceCustomization({
+    ...customization,
+    languageMode: setLanguageModePreference(customization.languageMode),
+  })
   localStorage.setItem(
     AppearanceCustomizationStorageKey,
     JSON.stringify(normalized)
