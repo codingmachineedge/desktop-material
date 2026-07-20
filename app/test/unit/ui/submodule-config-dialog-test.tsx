@@ -8,6 +8,10 @@ import { Dispatcher } from '../../../src/ui/dispatcher'
 import { SubmoduleConfigDialog } from '../../../src/ui/submodules/submodule-config-dialog'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 import { LanguageModeChangedEvent } from '../../../src/lib/i18n'
+import {
+  LanguageModeStorageKey,
+  LegacyAppearanceStorageKey,
+} from '../../../src/lib/language-preference'
 
 let restoreIpcSend: (() => void) | null = null
 let restoreDialogShow: (() => void) | null = null
@@ -91,7 +95,8 @@ afterEach(() => {
   restoreIpcSend?.()
   restoreDialogShow?.()
   restoreWindowResizeObserver?.()
-  localStorage.removeItem('appearance-customization-v1')
+  localStorage.removeItem(LanguageModeStorageKey)
+  localStorage.removeItem(LegacyAppearanceStorageKey)
 })
 
 const repository = new Repository('C:/fixtures/superproject', 1, null, false)
@@ -210,9 +215,17 @@ function renderDialog(
 }
 
 describe('SubmoduleConfigDialog', () => {
+  beforeEach(() => {
+    // The file-level hook configures the shared DOM once for this suite. Reset
+    // the persisted preference for every nested test so the localization case
+    // cannot leak Cantonese into the English behavior cases that follow it.
+    localStorage.removeItem(LanguageModeStorageKey)
+    localStorage.removeItem(LegacyAppearanceStorageKey)
+  })
+
   it('reacts across Cantonese and semantic bilingual copy with concise accessible controls', async () => {
     localStorage.setItem(
-      'appearance-customization-v1',
+      LegacyAppearanceStorageKey,
       JSON.stringify({ version: 1, languageMode: 'cantonese' })
     )
     const { dispatcher } = createDispatcher()
