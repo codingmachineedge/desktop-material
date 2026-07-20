@@ -441,6 +441,28 @@ class ProviderStateTests(unittest.TestCase):
             )
             self.assertEqual(invalid.status, 422)
 
+    def test_generic_runs_have_empty_deployment_review_surfaces(self) -> None:
+        run_root = self.repo_path + f"/actions/runs/{provider.WORKFLOW_RUN_ID}"
+
+        for suffix in ("/pending_deployments", "/approvals"):
+            response = self.state.dispatch("GET", run_root + suffix, self.headers)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(self.json(response), [])
+
+        mutation = self.state.dispatch(
+            "POST",
+            run_root + "/pending_deployments",
+            self.headers,
+            json.dumps(
+                {
+                    "environment_ids": [provider.PENDING_ENVIRONMENT_IDS[0]],
+                    "state": "approved",
+                    "comment": "Generic runs stay read-only.",
+                }
+            ).encode("utf-8"),
+        )
+        self.assertEqual(mutation.status, 405)
+
     def test_job_log_redirect_content_and_exact_rerun_are_bounded(self) -> None:
         job_id = provider.INSPECTOR_CURRENT_JOB_SENTINEL_ID
         api_root = self.repo_path + f"/actions/jobs/{job_id}"

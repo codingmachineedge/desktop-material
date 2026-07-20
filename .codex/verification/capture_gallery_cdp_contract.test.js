@@ -653,6 +653,37 @@ test('Actions captures prove inspector pagination, logs, reviews, and cancellati
   assert.ok(!source.includes('WARN no cancellable run found'))
 })
 
+test('artifact page-two capture targets its exact card inside the details pane', () => {
+  const artifactPageTwo = sceneSource('actions-artifact-page-two')
+  for (const contract of [
+    "within: '.actions-run-details .actions-artifacts'",
+    "'#actions-artifact-${",
+    'ready.artifactSentinelId',
+    'ready.artifactCount',
+    'page-two-artifact-sentinel-with-a-deliberately-long-name-that-must-wrap-without-clipping-overlap-or-sideways-scrolling',
+    'complete exact artifact page-two inventory',
+    "document.querySelector('.actions-content')",
+    'content.scrollTop = 0',
+    'details.scrollTop += headingBounds.top - detailsBounds.top',
+    "heading?.closest('.actions-artifact-card')",
+    "'.actions-run-reviews .actions-inline-error'",
+    'visibleReviewErrors.length === 0',
+    'details.scrollWidth <= details.clientWidth + 1',
+    'grid.scrollWidth <= grid.clientWidth + 1',
+    'visible exact artifact page-two sentinel',
+  ]) {
+    assert.ok(
+      artifactPageTwo.includes(contract),
+      `artifact page-two gate misses ${contract}`
+    )
+  }
+  assert.ok(
+    artifactPageTwo.indexOf('visible exact artifact page-two sentinel') <
+      artifactPageTwo.indexOf("capture('material-actions-artifact-page-two')"),
+    'the exact artifact and error gate must run before capture'
+  )
+})
+
 test('advanced workflow and Cheap-LFS scenes use exact enabled controls', () => {
   const advanced = sceneSource('advanced-workflows')
   const advancedSelector =

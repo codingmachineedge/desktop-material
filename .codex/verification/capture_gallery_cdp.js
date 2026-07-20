@@ -3333,23 +3333,35 @@ scene('history-deepening', async () => {
 /** Ensure a workflow run's details pane is open in the Actions tab. */
 async function openFirstRun(index = 0) {
   await captureSection('Actions', null, 2500)
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const detailsOpen = await evaluate(`(() =>
-      [...document.querySelectorAll('.actions-view h2, .actions-view h3')]
-        .some(h => /jobs|attempt/i.test(h.textContent ?? '')) ||
-      document.querySelector('[class*=run-details]') !== null
-    )()`)
-    if (detailsOpen) {
-      return
+  await waitFor(
+    `document.querySelectorAll('button.actions-run-select').length > ${index}`,
+    'Actions run row for artifact evidence',
+    30000
+  )
+  const selectedTitle = await evaluate(`(() => {
+    const rows = [...document.querySelectorAll('button.actions-run-select')]
+    const row = rows[${index}] ?? rows[0]
+    if (!(row instanceof HTMLButtonElement)) return null
+    const title = row.querySelector('.actions-run-summary strong')?.textContent?.trim()
+    if (!title) return null
+    const openTitle = document.querySelector(
+      '.actions-run-details .actions-details-header h2'
+    )?.textContent?.trim()
+    if (row.getAttribute('aria-pressed') !== 'true' || openTitle !== title) {
+      row.click()
     }
-    await evaluate(`(() => {
-      const rows = [...document.querySelectorAll('button.actions-run-select')]
-      const row = rows[${index}] ?? rows[0]
-      if (row instanceof HTMLElement) row.click()
-      return true
-    })()`)
-    await sleep(3000)
+    return title
+  })()`)
+  if (typeof selectedTitle !== 'string' || selectedTitle.length === 0) {
+    fail('The exact Actions artifact fixture run is unavailable.')
   }
+  await waitFor(
+    `document.querySelector('.actions-run-details .actions-details-header h2')?.textContent?.trim() === ${JSON.stringify(
+      selectedTitle
+    )}`,
+    'exact Actions artifact fixture run details',
+    30000
+  )
 }
 
 scene('actions-artifacts', async () => {
@@ -3381,26 +3393,96 @@ scene('actions-artifact-download', async () => {
 scene('actions-artifact-page-two', async () => {
   await openFirstRun()
   for (let round = 0; round < 3; round++) {
-    const more = await clickText('Load more artifacts', { optional: true })
+    const more = await clickText('Load more artifacts', {
+      within: '.actions-run-details .actions-artifacts',
+      optional: true,
+    })
     if (!more) {
       break
     }
     await sleep(2200)
   }
-  await evaluate(`(() => {
-    const sentinel = [...document.querySelectorAll('*')]
-      .find(e => e.children.length === 0 && /sentinel/i.test(e.textContent ?? ''))
-    if (sentinel instanceof HTMLElement) sentinel.scrollIntoView({ block: 'center' })
+  await waitFor(
+    `(() => {
+      const artifacts = document.querySelector('.actions-run-details .actions-artifacts')
+      const pagination = artifacts?.querySelector('.actions-artifact-pagination')
+      const heading = artifacts?.querySelector('#actions-artifact-${ready.artifactSentinelId}')
+      return pagination?.textContent?.trim() === 'Showing ${ready.artifactCount} loaded of ${ready.artifactCount} artifacts.' &&
+        heading?.textContent?.trim() ===
+          'page-two-artifact-sentinel-with-a-deliberately-long-name-that-must-wrap-without-clipping-overlap-or-sideways-scrolling' &&
+        artifacts?.querySelectorAll('#actions-artifact-grid .actions-artifact-card').length === ${ready.artifactCount}
+    })()`,
+    'complete exact artifact page-two inventory',
+    30000
+  )
+  const positioned = await evaluate(`(() => {
+    const details = document.querySelector('.actions-run-details')
+    const content = document.querySelector('.actions-content')
+    const heading = details?.querySelector('#actions-artifact-${ready.artifactSentinelId}')
+    if (!(details instanceof HTMLElement) || !(content instanceof HTMLElement) ||
+        !(heading instanceof HTMLElement)) return false
+    content.scrollTop = 0
+    const detailsBounds = details.getBoundingClientRect()
+    const headingBounds = heading.getBoundingClientRect()
+    details.scrollTop += headingBounds.top - detailsBounds.top -
+      Math.max(0, (details.clientHeight - headingBounds.height) / 2)
     return true
   })()`)
-  await sleep(900)
+  if (!positioned) {
+    fail('The exact artifact page-two sentinel could not be positioned.')
+  }
+  await evaluate(
+    `new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`
+  )
+  await sleep(520)
+  await waitFor(
+    `(() => {
+      const details = document.querySelector('.actions-run-details')
+      const content = document.querySelector('.actions-content')
+      const artifacts = details?.querySelector('.actions-artifacts')
+      const grid = artifacts?.querySelector('#actions-artifact-grid')
+      const heading = grid?.querySelector('#actions-artifact-${ready.artifactSentinelId}')
+      const card = heading?.closest('.actions-artifact-card')
+      if (!(details instanceof HTMLElement) || !(content instanceof HTMLElement) ||
+          !(artifacts instanceof HTMLElement) || !(grid instanceof HTMLElement) ||
+          !(heading instanceof HTMLElement) || !(card instanceof HTMLElement)) return false
+      const detailsBounds = details.getBoundingClientRect()
+      const headingBounds = heading.getBoundingClientRect()
+      const cardBounds = card.getBoundingClientRect()
+      const visibleReviewErrors = [...details.querySelectorAll(
+        '.actions-run-reviews .actions-inline-error'
+      )].filter(error => {
+        const style = getComputedStyle(error)
+        const bounds = error.getBoundingClientRect()
+        return style.display !== 'none' && style.visibility !== 'hidden' &&
+          Number(style.opacity || 1) !== 0 && bounds.width > 0 && bounds.height > 0
+      })
+      return content.scrollTop === 0 &&
+        heading.textContent?.trim() ===
+          'page-two-artifact-sentinel-with-a-deliberately-long-name-that-must-wrap-without-clipping-overlap-or-sideways-scrolling' &&
+        headingBounds.width > 0 && headingBounds.height > 0 &&
+        headingBounds.left >= detailsBounds.left && headingBounds.top >= detailsBounds.top &&
+        headingBounds.right <= detailsBounds.right && headingBounds.bottom <= detailsBounds.bottom &&
+        cardBounds.width > 0 && cardBounds.height > 0 &&
+        cardBounds.left >= detailsBounds.left && cardBounds.right <= detailsBounds.right &&
+        cardBounds.bottom > detailsBounds.top && cardBounds.top < detailsBounds.bottom &&
+        details.scrollWidth <= details.clientWidth + 1 &&
+        grid.scrollWidth <= grid.clientWidth + 1 &&
+        artifacts.querySelector('.actions-inline-error[role="alert"]') === null &&
+        visibleReviewErrors.length === 0
+    })()`,
+    'visible exact artifact page-two sentinel',
+    30000
+  )
   await parkPointer()
   const pageTwo = await capture('material-actions-artifact-page-two')
   await evaluate(`(() => {
-    const heading = [...document.querySelectorAll('h2, h3, h4')]
-      .find(node => /artifact/i.test(node.textContent ?? ''))
-    if (!(heading instanceof HTMLElement)) return false
-    heading.scrollIntoView({ block: 'start' })
+    const details = document.querySelector('.actions-run-details')
+    const heading = details?.querySelector('#actions-artifacts-heading')
+    if (!(details instanceof HTMLElement) || !(heading instanceof HTMLElement)) return false
+    const detailsBounds = details.getBoundingClientRect()
+    const headingBounds = heading.getBoundingClientRect()
+    details.scrollTop += headingBounds.top - detailsBounds.top - 12
     return true
   })()`)
   await sleep(800)

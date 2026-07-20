@@ -1280,11 +1280,15 @@ class ProviderState:
         )
         if run_pending_match is not None:
             run_id = parse_route_identifier(run_pending_match.group(1))
-            if run_id != INSPECTOR_WORKFLOW_RUN_ID or query:
+            if not self.is_fixture_run_id(run_id) or query:
                 return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
             if method == "GET":
-                return self._pending_deployments()
-            if method == "POST":
+                return (
+                    self._pending_deployments()
+                    if run_id == INSPECTOR_WORKFLOW_RUN_ID
+                    else json_response([])
+                )
+            if method == "POST" and run_id == INSPECTOR_WORKFLOW_RUN_ID:
                 return self._review_pending_deployments(body)
 
         run_approvals_match = re.fullmatch(
@@ -1293,9 +1297,13 @@ class ProviderState:
         )
         if method == "GET" and run_approvals_match is not None:
             run_id = parse_route_identifier(run_approvals_match.group(1))
-            if run_id != INSPECTOR_WORKFLOW_RUN_ID or query:
+            if not self.is_fixture_run_id(run_id) or query:
                 return json_response({"message": "Not Found"}, HTTPStatus.NOT_FOUND)
-            return self._review_history_response()
+            return (
+                self._review_history_response()
+                if run_id == INSPECTOR_WORKFLOW_RUN_ID
+                else json_response([])
+            )
 
         job_logs_match = re.fullmatch(
             re.escape(f"{repo_root}/actions/jobs/") + r"(\d+)/logs",
