@@ -1,5 +1,5 @@
 import {
-  IOllamaJsonObject,
+  IOllamaMetadataEntry,
   IOllamaModel,
   IOllamaModelDetails,
   IOllamaModelInfo,
@@ -7,268 +7,363 @@ import {
   IOllamaRunningModel,
   IOllamaVersion,
   OllamaClientError,
-  OllamaJsonValue,
 } from './types'
 
-const MaxMetadataDepth = 12
-const MaxMetadataValues = 20_000
-const MaxMetadataKeyLength = 512
-const MaxIdentityLength = 1_024
+export const MaxOllamaObjectProperties = 256
+export const MaxOllamaModels = 512
+export const MaxOllamaFamilies = 32
+export const MaxOllamaCapabilities = 64
+export const MaxOllamaMetadataEntries = 256
+export const MaxOllamaModelNameLength = 512
+export const MaxOllamaIdentityLength = 1_024
+export const MaxOllamaMetadataKeyLength = 256
+export const MaxOllamaMetadataValueLength = 2_048
+export const MaxOllamaLargeTextLength = 64 * 1_024
+
+const MaxVersionLength = 256
+const MaxDateLength = 128
+const MaxDigestLength = 256
+const MaxProgressStatusLength = 512
 const UnsafeObjectKeys = new Set(['__proto__', 'constructor', 'prototype'])
-
-interface ISanitizationBudget {
-  remaining: number
-}
-
-export function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function sanitizeJsonValue(
-  value: unknown,
-  depth: number,
-  budget: ISanitizationBudget
-): OllamaJsonValue | undefined {
-  if (budget.remaining <= 0 || depth > MaxMetadataDepth) {
-    return undefined
-  }
-  budget.remaining--
-
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'boolean'
-  ) {
-    return value
-  }
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : undefined
-  }
-  if (Array.isArray(value)) {
-    const sanitized = new Array<OllamaJsonValue>()
-    for (const entry of value) {
-      const result = sanitizeJsonValue(entry, depth + 1, budget)
-      if (result !== undefined) {
-        sanitized.push(result)
-      }
-      if (budget.remaining <= 0) {
-        break
-      }
-    }
-    return sanitized
-  }
-  if (!isJsonObject(value)) {
-    return undefined
-  }
-
-  const sanitized: { [key: string]: OllamaJsonValue } = {}
-  for (const [key, entry] of Object.entries(value)) {
-    if (
-      key.length > MaxMetadataKeyLength ||
-      UnsafeObjectKeys.has(key) ||
-      budget.remaining <= 0
-    ) {
-      continue
-    }
-    const result = sanitizeJsonValue(entry, depth + 1, budget)
-    if (result !== undefined) {
-      sanitized[key] = result
-    }
-  }
-  return sanitized
-}
-
-export function sanitizeJsonObject(value: unknown): IOllamaJsonObject {
-  if (!isJsonObject(value)) {
-    return {}
-  }
-  const result = sanitizeJsonValue(value, 0, {
-    remaining: MaxMetadataValues,
-  })
-  return isJsonObject(result) ? (result as IOllamaJsonObject) : {}
-}
 
 function malformedResponse(message: string): OllamaClientError {
   return new OllamaClientError('response', message)
 }
 
-function optionalString(
-  record: Record<string, unknown>,
-  key: string,
-  maxLength: number = Number.MAX_SAFE_INTEGER
-): string | undefined {
-  const value = record[key]
-  if (typeof value !== 'string' || value.length > maxLength) {
-    return undefined
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function requireObject(
+  value: unknown,
+  message: string,
+  allowEmpty: boolean = true
+): Record<string, unknown> {
+  if (!isJsonObject(value)) {
+    throw malformedResponse(message)
+  }
+  const keys = Object.keys(value)
+  if (
+    (!allowEmpty && keys.length === 0) ||
+    keys.length > MaxOllamaObjectProperties
+  ) {
+    throw malformedResponse(message)
   }
   return value
 }
 
-function optionalNonNegativeNumber(
+function optionalString(
   record: Record<string, unknown>,
-  key: string
-): number | undefined {
+  key: string,
+  maximumLength: number,
+  message: string
+): string | undefined {
   const value = record[key]
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+  if (value === undefined || value === null) {
     return undefined
   }
+  if (typeof value !== 'string' || value.length > maximumLength) {
+    throw malformedResponse(message)
+  }
   return value
+}
+
+function requiredNonEmptyString(
+  record: Record<string, unknown>,
+  key: string,
+  maximumLength: number,
+  message: string
+): string {
+  const value = optionalString(record, key, maximumLength, message)
+  if (value === undefined || value.trim().length === 0) {
+    throw malformedResponse(message)
+  }
+  return value
+}
+
+function optionalSafeInteger(
+  record: Record<string, unknown>,
+  key: string,
+  message: string
+): number | undefined {
+  const value = record[key]
+  if (value === undefined || value === null) {
+    return undefined
+  }
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw malformedResponse(message)
+  }
+  return value as number
 }
 
 function optionalStringArray(
   record: Record<string, unknown>,
-  key: string
+  key: string,
+  maximumItems: number,
+  maximumItemLength: number,
+  message: string
 ): ReadonlyArray<string> | undefined {
   const value = record[key]
-  if (!Array.isArray(value)) {
+  if (value === undefined || value === null) {
     return undefined
   }
-  return value.filter(
-    (entry): entry is string =>
-      typeof entry === 'string' && entry.length <= MaxIdentityLength
-  )
+  if (!Array.isArray(value) || value.length > maximumItems) {
+    throw malformedResponse(message)
+  }
+  const result = new Array<string>()
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.length > maximumItemLength) {
+      throw malformedResponse(message)
+    }
+    result.push(entry)
+  }
+  return result
 }
 
-function parseDetails(value: unknown): IOllamaModelDetails | undefined {
-  if (!isJsonObject(value)) {
+function parseDetails(
+  value: unknown,
+  message: string
+): IOllamaModelDetails | undefined {
+  if (value === undefined || value === null) {
     return undefined
   }
+  const details = requireObject(value, message)
   return {
-    parentModel: optionalString(value, 'parent_model'),
-    format: optionalString(value, 'format'),
-    family: optionalString(value, 'family'),
-    families: optionalStringArray(value, 'families'),
-    parameterSize: optionalString(value, 'parameter_size'),
-    quantizationLevel: optionalString(value, 'quantization_level'),
-    metadata: sanitizeJsonObject(value),
+    parentModel: optionalString(
+      details,
+      'parent_model',
+      MaxOllamaIdentityLength,
+      message
+    ),
+    format: optionalString(details, 'format', MaxOllamaIdentityLength, message),
+    family: optionalString(details, 'family', MaxOllamaIdentityLength, message),
+    families: optionalStringArray(
+      details,
+      'families',
+      MaxOllamaFamilies,
+      MaxOllamaIdentityLength,
+      message
+    ),
+    parameterSize: optionalString(
+      details,
+      'parameter_size',
+      MaxOllamaIdentityLength,
+      message
+    ),
+    quantizationLevel: optionalString(
+      details,
+      'quantization_level',
+      MaxOllamaIdentityLength,
+      message
+    ),
   }
 }
 
-function parseModel(value: unknown): IOllamaModel | undefined {
-  if (!isJsonObject(value)) {
-    return undefined
-  }
-  const name = optionalString(value, 'name', MaxIdentityLength)
-  const model = optionalString(value, 'model', MaxIdentityLength)
+function parseModel(value: unknown, message: string): IOllamaModel {
+  const record = requireObject(value, message)
+  const name = optionalString(record, 'name', MaxOllamaModelNameLength, message)
+  const model = optionalString(
+    record,
+    'model',
+    MaxOllamaModelNameLength,
+    message
+  )
   const identity = name ?? model
   if (identity === undefined || identity.trim().length === 0) {
-    return undefined
+    throw malformedResponse(message)
   }
 
   return {
     name: name ?? identity,
     model: model ?? identity,
-    modifiedAt: optionalString(value, 'modified_at'),
-    size: optionalNonNegativeNumber(value, 'size'),
-    digest: optionalString(value, 'digest'),
-    details: parseDetails(value.details),
-    metadata: sanitizeJsonObject(value),
+    modifiedAt: optionalString(record, 'modified_at', MaxDateLength, message),
+    size: optionalSafeInteger(record, 'size', message),
+    digest: optionalString(record, 'digest', MaxDigestLength, message),
+    details: parseDetails(record.details, message),
   }
 }
 
-function requireModels(value: unknown): ReadonlyArray<unknown> {
-  if (!isJsonObject(value) || !Array.isArray(value.models)) {
-    throw malformedResponse('Ollama returned a malformed model list.')
+function requireModels(
+  value: unknown,
+  message: string
+): ReadonlyArray<unknown> {
+  const record = requireObject(value, message)
+  if (!Array.isArray(record.models) || record.models.length > MaxOllamaModels) {
+    throw malformedResponse(message)
   }
-  return value.models
+  return record.models
+}
+
+function parseMetadataEntries(
+  value: unknown,
+  message: string
+): ReadonlyArray<IOllamaMetadataEntry> {
+  if (value === undefined || value === null) {
+    return []
+  }
+  const record = requireObject(value, message)
+  const keys = Object.keys(record)
+  if (keys.length > MaxOllamaMetadataEntries) {
+    throw malformedResponse(message)
+  }
+
+  const entries = new Array<IOllamaMetadataEntry>()
+  for (const key of keys.sort()) {
+    if (
+      key.length === 0 ||
+      key.length > MaxOllamaMetadataKeyLength ||
+      UnsafeObjectKeys.has(key)
+    ) {
+      throw malformedResponse(message)
+    }
+    const value = record[key]
+    if (typeof value === 'string') {
+      if (value.length > MaxOllamaMetadataValueLength) {
+        throw malformedResponse(message)
+      }
+      entries.push({ key, value })
+    } else if (typeof value === 'boolean') {
+      entries.push({ key, value })
+    } else if (typeof value === 'number') {
+      if (!Number.isSafeInteger(value)) {
+        throw malformedResponse(message)
+      }
+      entries.push({ key, value })
+    }
+  }
+  return entries
+}
+
+export function normalizeOllamaModelName(value: string): string {
+  if (
+    value.length === 0 ||
+    value.length > MaxOllamaModelNameLength ||
+    value !== value.trim() ||
+    !/^[A-Za-z0-9][A-Za-z0-9._/@:-]*$/.test(value)
+  ) {
+    throw new OllamaClientError(
+      'validation',
+      'The Ollama model name is invalid.'
+    )
+  }
+  return value
 }
 
 export function parseVersionResponse(value: unknown): IOllamaVersion {
-  if (!isJsonObject(value)) {
-    throw malformedResponse('Ollama returned a malformed version response.')
+  const message = 'Ollama returned a malformed version response.'
+  const record = requireObject(value, message)
+  return {
+    version: requiredNonEmptyString(
+      record,
+      'version',
+      MaxVersionLength,
+      message
+    ),
   }
-  const version = optionalString(value, 'version', 256)
-  if (version === undefined || version.trim().length === 0) {
-    throw malformedResponse('Ollama returned a malformed version response.')
-  }
-  return { version, metadata: sanitizeJsonObject(value) }
 }
 
 export function parseModelsResponse(
   value: unknown
 ): ReadonlyArray<IOllamaModel> {
-  const models = new Array<IOllamaModel>()
-  for (const entry of requireModels(value)) {
-    const model = parseModel(entry)
-    if (model !== undefined) {
-      models.push(model)
-    }
-  }
-  return models
+  const message = 'Ollama returned a malformed model list.'
+  return requireModels(value, message).map(entry => parseModel(entry, message))
 }
 
 export function parseRunningModelsResponse(
   value: unknown
 ): ReadonlyArray<IOllamaRunningModel> {
-  const models = new Array<IOllamaRunningModel>()
-  for (const entry of requireModels(value)) {
-    const model = parseModel(entry)
-    if (model === undefined || !isJsonObject(entry)) {
-      continue
+  const message = 'Ollama returned a malformed running-model list.'
+  return requireModels(value, message).map(entry => {
+    const record = requireObject(entry, message)
+    return {
+      ...parseModel(record, message),
+      expiresAt: optionalString(record, 'expires_at', MaxDateLength, message),
+      sizeVram: optionalSafeInteger(record, 'size_vram', message),
+      contextLength: optionalSafeInteger(record, 'context_length', message),
     }
-    models.push({
-      ...model,
-      expiresAt: optionalString(entry, 'expires_at'),
-      sizeVram: optionalNonNegativeNumber(entry, 'size_vram'),
-      contextLength: optionalNonNegativeNumber(entry, 'context_length'),
-    })
-  }
-  return models
+  })
 }
 
 export function parseShowResponse(value: unknown): IOllamaModelInfo {
-  if (!isJsonObject(value) || Object.keys(value).length === 0) {
-    throw malformedResponse('Ollama returned malformed model information.')
-  }
+  const message = 'Ollama returned malformed model information.'
+  const record = requireObject(value, message, false)
   return {
-    modelfile: optionalString(value, 'modelfile'),
-    parameters: optionalString(value, 'parameters'),
-    template: optionalString(value, 'template'),
-    system: optionalString(value, 'system'),
-    license: optionalString(value, 'license'),
-    modifiedAt: optionalString(value, 'modified_at'),
-    capabilities: optionalStringArray(value, 'capabilities'),
-    details: parseDetails(value.details),
-    modelInfo: isJsonObject(value.model_info)
-      ? sanitizeJsonObject(value.model_info)
-      : undefined,
-    projectorInfo: isJsonObject(value.projector_info)
-      ? sanitizeJsonObject(value.projector_info)
-      : undefined,
-    metadata: sanitizeJsonObject(value),
+    modelfile: optionalString(
+      record,
+      'modelfile',
+      MaxOllamaLargeTextLength,
+      message
+    ),
+    parameters: optionalString(
+      record,
+      'parameters',
+      MaxOllamaLargeTextLength,
+      message
+    ),
+    template: optionalString(
+      record,
+      'template',
+      MaxOllamaLargeTextLength,
+      message
+    ),
+    system: optionalString(record, 'system', MaxOllamaLargeTextLength, message),
+    license: optionalString(
+      record,
+      'license',
+      MaxOllamaLargeTextLength,
+      message
+    ),
+    modifiedAt: optionalString(record, 'modified_at', MaxDateLength, message),
+    capabilities: optionalStringArray(
+      record,
+      'capabilities',
+      MaxOllamaCapabilities,
+      MaxOllamaIdentityLength,
+      message
+    ),
+    details: parseDetails(record.details, message),
+    modelInfo: parseMetadataEntries(record.model_info, message),
+    projectorInfo: parseMetadataEntries(record.projector_info, message),
   }
 }
 
 export function parsePullProgress(value: unknown): IOllamaPullProgress {
-  if (!isJsonObject(value)) {
-    throw malformedResponse('Ollama returned malformed pull progress.')
-  }
-  const status = optionalString(value, 'status', MaxIdentityLength)
-  if (status === undefined || status.trim().length === 0) {
-    throw malformedResponse('Ollama returned malformed pull progress.')
+  const message = 'Ollama returned malformed pull progress.'
+  const record = requireObject(value, message)
+  const status = requiredNonEmptyString(
+    record,
+    'status',
+    MaxProgressStatusLength,
+    message
+  )
+  const total = optionalSafeInteger(record, 'total', message)
+  const completed = optionalSafeInteger(record, 'completed', message)
+  if (total !== undefined && completed !== undefined && completed > total) {
+    throw malformedResponse(message)
   }
   return {
     status,
-    digest: optionalString(value, 'digest'),
-    total: optionalNonNegativeNumber(value, 'total'),
-    completed: optionalNonNegativeNumber(value, 'completed'),
-    metadata: sanitizeJsonObject(value),
+    digest: optionalString(record, 'digest', MaxDigestLength, message),
+    total,
+    completed,
+    done: status.toLowerCase() === 'success',
   }
 }
 
 export function validateGenerateResponse(value: unknown): void {
-  if (!isJsonObject(value) || Object.keys(value).length === 0) {
-    throw malformedResponse('Ollama returned a malformed generate response.')
-  }
-  if (value.done !== undefined && typeof value.done !== 'boolean') {
-    throw malformedResponse('Ollama returned a malformed generate response.')
+  const message = 'Ollama returned a malformed generate response.'
+  const record = requireObject(value, message, false)
+  if (record.done !== true) {
+    throw malformedResponse(message)
   }
 }
 
-export function getServerError(value: unknown): string | undefined {
-  if (!isJsonObject(value)) {
-    return undefined
-  }
-  const error = optionalString(value, 'error')
-  return error !== undefined && error.trim().length > 0 ? error : undefined
+/** Detect a provider-declared error without trusting its value shape. */
+export function hasServerError(value: unknown): boolean {
+  return (
+    isJsonObject(value) &&
+    Object.prototype.hasOwnProperty.call(value, 'error') &&
+    value.error !== undefined &&
+    value.error !== null
+  )
 }

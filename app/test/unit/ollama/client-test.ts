@@ -4,6 +4,7 @@ import {
   MaxOllamaErrorBodyBytes,
   MaxOllamaJsonBodyBytes,
   MaxOllamaNdjsonLineBytes,
+  MaxOllamaPullEvents,
   OllamaClient,
 } from '../../../src/lib/ollama/client'
 import {
@@ -11,6 +12,10 @@ import {
   OllamaClientError,
   OllamaFetch,
 } from '../../../src/lib/ollama/types'
+import {
+  MaxOllamaMetadataEntries,
+  MaxOllamaModels,
+} from '../../../src/lib/ollama/validation'
 
 interface ICapturedRequest {
   readonly url: string
@@ -45,7 +50,7 @@ function assertSafeRequest(request: ICapturedRequest): void {
 }
 
 describe('Ollama client discovery', () => {
-  it('projects version, installed models, running models, and model metadata', async () => {
+  it('projects version, installed models, running models, and bounded metadata', async () => {
     const requests = new Array<ICapturedRequest>()
     const fetcher: OllamaFetch = async (input, init = {}) => {
       const url = requestUrl(input)
@@ -64,16 +69,14 @@ describe('Ollama client discovery', () => {
                 details: {
                   format: 'gguf',
                   family: 'llama',
-                  families: ['llama', 42],
+                  families: ['llama'],
                   parameter_size: '3B',
                   quantization_level: 'Q4_K_M',
                   future_detail: true,
                 },
                 future_top_level: { retained: true },
               },
-              { model: 'nomic-embed-text:latest', size: 'not-a-number' },
-              { size: 1 },
-              null,
+              { model: 'nomic-embed-text:latest' },
             ],
           })
         case '/api/ps':
@@ -96,7 +99,7 @@ describe('Ollama client discovery', () => {
             template: '{{ .Prompt }}',
             license: 'Model license',
             modified_at: '2026-07-19T20:00:00Z',
-            capabilities: ['completion', 'tools', 7],
+            capabilities: ['completion', 'tools'],
             details: { family: 'llama', future_detail: 'kept' },
             model_info: {
               'general.architecture': 'llama',
@@ -117,7 +120,6 @@ describe('Ollama client discovery', () => {
 
     assert.equal(client.endpoint, 'http://localhost:11434')
     assert.equal(version.version, '0.9.1')
-    assert.equal(version.metadata.channel, 'stable')
 
     assert.equal(models.length, 2)
     assert.equal(models[0].name, 'llama3.2:latest')
@@ -125,8 +127,6 @@ describe('Ollama client discovery', () => {
     assert.equal(models[0].size, 2_048)
     assert.equal(models[0].details?.parameterSize, '3B')
     assert.deepEqual(models[0].details?.families, ['llama'])
-    assert.equal(models[0].details?.metadata.future_detail, true)
-    assert.deepEqual(models[0].metadata.future_top_level, { retained: true })
     assert.equal(models[1].name, 'nomic-embed-text:latest')
     assert.equal(models[1].size, undefined)
 
@@ -137,8 +137,11 @@ describe('Ollama client discovery', () => {
 
     assert.equal(shown.modelfile, 'FROM llama3.2')
     assert.deepEqual(shown.capabilities, ['completion', 'tools'])
-    assert.equal(shown.modelInfo?.['general.architecture'], 'llama')
-    assert.deepEqual(shown.metadata.future_show_field, ['kept'])
+    assert.deepEqual(shown.modelInfo, [
+      { key: 'general.architecture', value: 'llama' },
+      { key: 'llama.context_length', value: 8_192 },
+    ])
+    assert.deepEqual(shown.projectorInfo, [])
 
     assert.deepEqual(
       requests.map(request => [request.init.method, request.url]),
@@ -155,7 +158,7 @@ describe('Ollama client discovery', () => {
     assert.deepEqual(jsonBody(requests[3]), { model: 'llama3.2:latest' })
   })
 
-  it('rejects malformed JSON shapes while preserving partial model entries', async () => {
+  it('rejects malformed JSON shapes', async () => {
     const responses: ReadonlyArray<unknown> = [
       { version: 7 },
       { models: 'not-an-array' },
@@ -199,6 +202,36 @@ describe('Ollama client discovery', () => {
       return true
     })
   })
+
+  it('bounds model collections and projected metadata entries', async () => {
+    const responses = [
+      {
+        models: new Array(MaxOllamaModels + 1).fill({ model: 'llama3.2' }),
+      },
+      {
+        model_info: Object.fromEntries(
+          new Array(MaxOllamaMetadataEntries + 1)
+            .fill(undefined)
+            .map((_value, index) => [`field.${index}`, index])
+        ),
+      },
+    ]
+    let index = 0
+    const client = new OllamaClient('http://127.0.0.1:11434', {
+      fetcher: async () => jsonResponse(responses[index++]),
+    })
+
+    for (const operation of [
+      () => client.list(),
+      () => client.show('llama3.2'),
+    ]) {
+      await assert.rejects(operation, (error: unknown) => {
+        assert.ok(error instanceof OllamaClientError)
+        assert.equal(error.kind, 'response')
+        return true
+      })
+    }
+  })
 })
 
 describe('Ollama client lifecycle operations', () => {
@@ -213,7 +246,7 @@ describe('Ollama client lifecycle operations', () => {
     }
     const client = new OllamaClient('http://localhost:11434/v1', { fetcher })
 
-    await client.copy(' llama3.2 ', 'llama3.2-backup')
+    await client.copy('llama3.2', 'llama3.2-backup')
     await client.delete('llama3.2-backup')
     await client.load('llama3.2')
     await client.unload('llama3.2')
@@ -419,12 +452,49 @@ describe('Ollama pull streaming', () => {
     assert.equal(requests, 0)
   })
 
+  it('enforces a total pull deadline even while progress remains active', async () => {
+    let interval: ReturnType<typeof setInterval> | undefined
+    let streamCancelled = false
+    const client = new OllamaClient('http://localhost:11434', {
+      pullTotalTimeoutMs: 30,
+      pullInactivityTimeoutMs: 1_000,
+      fetcher: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              const progress = new TextEncoder().encode(
+                '{"status":"pulling layers"}\n'
+              )
+              controller.enqueue(progress)
+              interval = setInterval(() => controller.enqueue(progress), 5)
+            },
+            cancel() {
+              streamCancelled = true
+              if (interval !== undefined) {
+                clearInterval(interval)
+              }
+            },
+          })
+        ),
+    })
+
+    await assert.rejects(client.pull('llama3.2'), (error: unknown) => {
+      assert.ok(error instanceof OllamaClientError)
+      assert.equal(error.kind, 'timeout')
+      return true
+    })
+    assert.equal(streamCancelled, true)
+  })
+
   it('rejects malformed and oversized NDJSON progress lines', async () => {
     const bodies = [
       '{"status":\n',
       `${JSON.stringify({
         status: 'x'.repeat(MaxOllamaNdjsonLineBytes),
       })}\n`,
+      `${new Array(MaxOllamaPullEvents + 1)
+        .fill('{"status":"pulling layers"}')
+        .join('\n')}\n`,
     ]
     let index = 0
     const client = new OllamaClient('http://localhost:11434', {

@@ -1,14 +1,3 @@
-export type OllamaJsonPrimitive = string | number | boolean | null
-
-export type OllamaJsonValue =
-  | OllamaJsonPrimitive
-  | ReadonlyArray<OllamaJsonValue>
-  | IOllamaJsonObject
-
-export interface IOllamaJsonObject {
-  readonly [key: string]: OllamaJsonValue
-}
-
 export type OllamaClientErrorKind =
   | 'endpoint'
   | 'http'
@@ -37,7 +26,6 @@ export class OllamaClientError extends Error {
 
 export interface IOllamaVersion {
   readonly version: string
-  readonly metadata: IOllamaJsonObject
 }
 
 export interface IOllamaModelDetails {
@@ -47,7 +35,6 @@ export interface IOllamaModelDetails {
   readonly families?: ReadonlyArray<string>
   readonly parameterSize?: string
   readonly quantizationLevel?: string
-  readonly metadata: IOllamaJsonObject
 }
 
 export interface IOllamaModel {
@@ -57,13 +44,20 @@ export interface IOllamaModel {
   readonly size?: number
   readonly digest?: string
   readonly details?: IOllamaModelDetails
-  readonly metadata: IOllamaJsonObject
 }
 
 export interface IOllamaRunningModel extends IOllamaModel {
   readonly expiresAt?: string
   readonly sizeVram?: number
   readonly contextLength?: number
+}
+
+export type OllamaMetadataValue = string | number | boolean
+
+/** A normalized primitive metadata entry; raw provider objects are discarded. */
+export interface IOllamaMetadataEntry {
+  readonly key: string
+  readonly value: OllamaMetadataValue
 }
 
 export interface IOllamaModelInfo {
@@ -75,9 +69,8 @@ export interface IOllamaModelInfo {
   readonly modifiedAt?: string
   readonly capabilities?: ReadonlyArray<string>
   readonly details?: IOllamaModelDetails
-  readonly modelInfo?: IOllamaJsonObject
-  readonly projectorInfo?: IOllamaJsonObject
-  readonly metadata: IOllamaJsonObject
+  readonly modelInfo: ReadonlyArray<IOllamaMetadataEntry>
+  readonly projectorInfo: ReadonlyArray<IOllamaMetadataEntry>
 }
 
 export interface IOllamaPullProgress {
@@ -85,11 +78,12 @@ export interface IOllamaPullProgress {
   readonly digest?: string
   readonly total?: number
   readonly completed?: number
-  readonly metadata: IOllamaJsonObject
+  readonly done: boolean
 }
 
 export interface IOllamaRequestOptions {
   readonly signal?: AbortSignal
+  /** Total operation deadline. */
   readonly timeoutMs?: number
 }
 
@@ -106,9 +100,10 @@ export interface IOllamaClientOptions {
   readonly fetcher?: OllamaFetch
   readonly requestTimeoutMs?: number
   readonly pullInactivityTimeoutMs?: number
+  readonly pullTotalTimeoutMs?: number
 }
 
-/** The small operation surface consumed by the React model manager. */
+/** The bounded operation surface consumed by the model-manager store. */
 export interface IOllamaClient {
   readonly endpoint: string
 

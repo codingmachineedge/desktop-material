@@ -1,15 +1,31 @@
 import { OllamaClientError } from './types'
 
-const MaxEndpointLength = 2_048
+export const MaxOllamaEndpointLength = 2_048
+
+export const OllamaApiRoutes = {
+  version: '/api/version',
+  tags: '/api/tags',
+  ps: '/api/ps',
+  show: '/api/show',
+  pull: '/api/pull',
+  copy: '/api/copy',
+  delete: '/api/delete',
+  generate: '/api/generate',
+} as const
+
+export type OllamaOperation = keyof typeof OllamaApiRoutes
+
+function endpointError(message: string): OllamaClientError {
+  return new OllamaClientError('endpoint', message)
+}
 
 function isLoopbackHostname(hostname: string): boolean {
-  const normalized = hostname.toLowerCase().replace(/\.$/, '')
-  if (normalized === 'localhost') {
-    return true
-  }
-
-  // URL.hostname includes brackets around IPv6 literals in some runtimes.
-  if (normalized === '::1' || normalized === '[::1]') {
+  const normalized = hostname.toLowerCase()
+  if (
+    normalized === 'localhost' ||
+    normalized === '::1' ||
+    normalized === '[::1]'
+  ) {
     return true
   }
 
@@ -27,74 +43,69 @@ function isLoopbackHostname(hostname: string): boolean {
   })
 }
 
-function normalizeBasePath(pathname: string): string {
-  let path = pathname.replace(/\/+$/, '')
-
-  // Copilot uses Ollama's OpenAI-compatible `/v1` base while the model
-  // manager uses the native `/api` routes. Also accept an already-native
-  // `/api` base so callers do not accidentally produce `/api/api/...`.
-  let removedSuffix = true
-  while (removedSuffix) {
-    removedSuffix = false
-    for (const suffix of ['/v1', '/api']) {
-      if (path.endsWith(suffix)) {
-        path = path.slice(0, -suffix.length).replace(/\/+$/, '')
-        removedSuffix = true
-      }
-    }
-  }
-
-  return path
-}
-
-/**
- * Validates and canonicalizes an Ollama base URL for native API requests.
- * Plain HTTP is restricted to the local machine; remote endpoints require
- * HTTPS. URL credentials are rejected instead of risking disclosure.
- */
-export function normalizeOllamaEndpoint(value: string): string {
-  const candidate = value.trim()
-  if (candidate.length === 0 || candidate.length > MaxEndpointLength) {
-    throw new OllamaClientError('endpoint', 'The Ollama endpoint is invalid.')
+function parseTrustedEndpoint(value: string): URL {
+  if (
+    value.length === 0 ||
+    value.length > MaxOllamaEndpointLength ||
+    value !== value.trim()
+  ) {
+    throw endpointError('The Ollama endpoint is invalid.')
   }
 
   let parsed: URL
   try {
-    parsed = new URL(candidate)
+    parsed = new URL(value)
   } catch {
-    throw new OllamaClientError('endpoint', 'The Ollama endpoint is invalid.')
+    throw endpointError('The Ollama endpoint is invalid.')
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new OllamaClientError(
-      'endpoint',
-      'The Ollama endpoint must use HTTP or HTTPS.'
-    )
+    throw endpointError('The Ollama endpoint must use HTTP or HTTPS.')
+  }
+  if (!isLoopbackHostname(parsed.hostname)) {
+    throw endpointError('The Ollama endpoint must use a loopback address.')
   }
   if (parsed.username.length > 0 || parsed.password.length > 0) {
-    throw new OllamaClientError(
-      'endpoint',
-      'The Ollama endpoint must not contain URL credentials.'
-    )
+    throw endpointError('The Ollama endpoint must not contain URL credentials.')
   }
   if (parsed.search.length > 0 || parsed.hash.length > 0) {
-    throw new OllamaClientError(
-      'endpoint',
+    throw endpointError(
       'The Ollama endpoint must not contain a query or fragment.'
     )
   }
-  if (parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname)) {
-    throw new OllamaClientError(
-      'endpoint',
-      'Plain HTTP Ollama endpoints must use a loopback address.'
-    )
-  }
 
-  const path = normalizeBasePath(parsed.pathname)
-  return `${parsed.origin}${path}`
+  return parsed
 }
 
-/** Returns whether a configured endpoint meets the native client trust rules. */
+/**
+ * Canonicalize a native Ollama endpoint to its loopback origin. The client
+ * accepts either the native origin or the exact OpenAI-compatible `/v1` base.
+ * Arbitrary path prefixes are rejected because native paths are fixed below.
+ */
+export function normalizeOllamaEndpoint(value: string): string {
+  const parsed = parseTrustedEndpoint(value)
+  if (
+    parsed.pathname !== '/' &&
+    parsed.pathname !== '/v1' &&
+    parsed.pathname !== '/v1/'
+  ) {
+    throw endpointError(
+      'The Ollama endpoint must be an origin or use the /v1 API base.'
+    )
+  }
+  return parsed.origin
+}
+
+/** Derive the native management origin from an Ollama BYOK `/v1` URL. */
+export function getOllamaManagementEndpoint(value: string): string {
+  const parsed = parseTrustedEndpoint(value)
+  if (parsed.pathname !== '/v1' && parsed.pathname !== '/v1/') {
+    throw endpointError('The Ollama provider must use the /v1 API base.')
+  }
+  return parsed.origin
+}
+
+/** Returns whether an endpoint meets the native transport trust rules. */
 export function isTrustedOllamaEndpoint(value: string): boolean {
   try {
     normalizeOllamaEndpoint(value)
@@ -102,4 +113,16 @@ export function isTrustedOllamaEndpoint(value: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Resolve one of the fixed native routes against a trusted endpoint. */
+export function getOllamaApiUrl(
+  endpoint: string,
+  operation: OllamaOperation
+): string {
+  const route = OllamaApiRoutes[operation]
+  if (route === undefined) {
+    throw endpointError('The Ollama operation is invalid.')
+  }
+  return `${normalizeOllamaEndpoint(endpoint)}${route}`
 }

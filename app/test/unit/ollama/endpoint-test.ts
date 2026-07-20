@@ -1,6 +1,8 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import {
+  getOllamaApiUrl,
+  getOllamaManagementEndpoint,
   isTrustedOllamaEndpoint,
   normalizeOllamaEndpoint,
 } from '../../../src/lib/ollama/endpoint'
@@ -27,6 +29,14 @@ describe('Ollama endpoint normalization', () => {
     assert.equal(
       normalizeOllamaEndpoint('http://[::1]:11434/v1'),
       'http://[::1]:11434'
+    )
+    assert.equal(
+      getOllamaManagementEndpoint('https://models.example.com/ollama/v1'),
+      'https://models.example.com/ollama'
+    )
+    assert.equal(
+      getOllamaApiUrl('https://models.example.com/ollama', 'tags'),
+      'https://models.example.com/ollama/api/tags'
     )
   })
 

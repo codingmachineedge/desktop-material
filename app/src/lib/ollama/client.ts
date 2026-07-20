@@ -1,4 +1,9 @@
-import { normalizeOllamaEndpoint } from './endpoint'
+import {
+  getOllamaApiUrl,
+  normalizeOllamaEndpoint,
+  OllamaOperation,
+} from './endpoint'
+import { nodeOllamaFetch } from './transport'
 import {
   IOllamaClient,
   IOllamaClientOptions,
@@ -13,8 +18,8 @@ import {
   OllamaFetch,
 } from './types'
 import {
-  getServerError,
-  isJsonObject,
+  hasServerError,
+  normalizeOllamaModelName,
   parseModelsResponse,
   parsePullProgress,
   parseRunningModelsResponse,
@@ -25,35 +30,24 @@ import {
 
 export const DefaultOllamaRequestTimeoutMs = 30_000
 export const DefaultOllamaPullInactivityTimeoutMs = 120_000
-export const MaxOllamaJsonBodyBytes = 8 * 1024 * 1024
-export const MaxOllamaErrorBodyBytes = 16 * 1024
-export const MaxOllamaNdjsonLineBytes = 64 * 1024
+export const DefaultOllamaPullTotalTimeoutMs = 6 * 60 * 60 * 1_000
+export const MaxOllamaJsonBodyBytes = 2 * 1_024 * 1_024
+export const MaxOllamaErrorBodyBytes = 16 * 1_024
+export const MaxOllamaNdjsonLineBytes = 64 * 1_024
+export const MaxOllamaPullBytes = 8 * 1_024 * 1_024
+export const MaxOllamaPullEvents = 4_096
 
-const MaxModelNameLength = 1_024
 const MaxTimerDelayMs = 2_147_483_647
 const MaxErrorDetailLength = 512
 
 type OllamaMethod = 'GET' | 'POST' | 'DELETE'
-type OllamaOperation =
-  | 'version'
-  | 'tags'
-  | 'ps'
-  | 'show'
-  | 'pull'
-  | 'copy'
-  | 'delete'
-  | 'generate'
+type TimeoutKind = 'request' | 'pull-total' | 'pull-inactivity'
 
 interface IRequestContext {
   readonly signal: AbortSignal
   touch(): void
-  timedOut(): boolean
+  timeoutKind(): TimeoutKind | undefined
   dispose(): void
-}
-
-interface IBoundedBody {
-  readonly bytes: Uint8Array
-  readonly truncated: boolean
 }
 
 function abortError(): Error {
@@ -70,7 +64,11 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 
 function resolveTimeout(value: number | undefined, fallback: number): number {
   const timeout = value ?? fallback
-  if (!Number.isFinite(timeout) || timeout <= 0 || timeout > MaxTimerDelayMs) {
+  if (
+    !Number.isSafeInteger(timeout) ||
+    timeout <= 0 ||
+    timeout > MaxTimerDelayMs
+  ) {
     throw new OllamaClientError(
       'validation',
       'The Ollama request timeout is invalid.'
@@ -79,41 +77,37 @@ function resolveTimeout(value: number | undefined, fallback: number): number {
   return timeout
 }
 
-function validateModelName(value: string): string {
-  const model = value.trim()
-  if (
-    model.length === 0 ||
-    model.length > MaxModelNameLength ||
-    /[\u0000-\u001f\u007f]/.test(model)
-  ) {
-    throw new OllamaClientError(
-      'validation',
-      'The Ollama model name is invalid.'
-    )
-  }
-  return model
-}
-
 function createRequestContext(
   callerSignal: AbortSignal | undefined,
-  timeoutMs: number
+  totalTimeoutMs: number,
+  inactivityTimeoutMs?: number
 ): IRequestContext {
   const controller = new AbortController()
-  let timeout: ReturnType<typeof setTimeout> | undefined
-  let didTimeout = false
+  let timeoutKind: TimeoutKind | undefined
+  let inactivityTimer: ReturnType<typeof setTimeout> | undefined
 
-  const clearTimer = () => {
-    if (timeout !== undefined) {
-      clearTimeout(timeout)
-      timeout = undefined
+  const abortFor = (kind: TimeoutKind) => {
+    if (!controller.signal.aborted) {
+      timeoutKind = kind
+      controller.abort()
     }
   }
+  const totalTimer = setTimeout(
+    () =>
+      abortFor(inactivityTimeoutMs === undefined ? 'request' : 'pull-total'),
+    totalTimeoutMs
+  )
   const touch = () => {
-    clearTimer()
-    timeout = setTimeout(() => {
-      didTimeout = true
-      controller.abort()
-    }, timeoutMs)
+    if (inactivityTimeoutMs === undefined || controller.signal.aborted) {
+      return
+    }
+    if (inactivityTimer !== undefined) {
+      clearTimeout(inactivityTimer)
+    }
+    inactivityTimer = setTimeout(
+      () => abortFor('pull-inactivity'),
+      inactivityTimeoutMs
+    )
   }
   const callerAborted = () => controller.abort()
 
@@ -127,15 +121,62 @@ function createRequestContext(
   return {
     signal: controller.signal,
     touch,
-    timedOut: () => didTimeout,
+    timeoutKind: () => timeoutKind,
     dispose: () => {
-      clearTimer()
+      clearTimeout(totalTimer)
+      if (inactivityTimer !== undefined) {
+        clearTimeout(inactivityTimer)
+      }
       callerSignal?.removeEventListener('abort', callerAborted)
     },
   }
 }
 
-function combineBytes(chunks: ReadonlyArray<Uint8Array>, size: number) {
+async function raceWithAbort<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+  onAbort?: () => void | Promise<void>,
+  onLateResolve?: (value: T) => void | Promise<void>
+): Promise<T> {
+  throwIfAborted(signal)
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+    const aborted = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      void Promise.resolve(onAbort?.()).catch(() => undefined)
+      reject(abortError())
+    }
+    signal.addEventListener('abort', aborted, { once: true })
+
+    promise.then(
+      value => {
+        signal.removeEventListener('abort', aborted)
+        if (settled) {
+          void Promise.resolve(onLateResolve?.(value)).catch(() => undefined)
+          return
+        }
+        settled = true
+        resolve(value)
+      },
+      error => {
+        signal.removeEventListener('abort', aborted)
+        if (settled) {
+          return
+        }
+        settled = true
+        reject(error)
+      }
+    )
+  })
+}
+
+function combineBytes(
+  chunks: ReadonlyArray<Uint8Array>,
+  size: number
+): Uint8Array {
   const combined = new Uint8Array(size)
   let offset = 0
   for (const chunk of chunks) {
@@ -146,68 +187,86 @@ function combineBytes(chunks: ReadonlyArray<Uint8Array>, size: number) {
 }
 
 async function cancelResponseBody(response: Response): Promise<void> {
-  if (response.body === null) {
-    return
-  }
   try {
-    await response.body.cancel()
+    await response.body?.cancel()
   } catch {
-    // The transport may already have closed or aborted the body.
+    // The transport or caller may already have closed the body.
   }
 }
 
-async function readBoundedBody(
+async function cancelReader(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): Promise<void> {
+  try {
+    await reader.cancel()
+  } catch {
+    // The transport or caller may already have closed the stream.
+  }
+}
+
+async function assertContentLength(
   response: Response,
-  limit: number,
-  truncate: boolean,
-  touch: () => void
-): Promise<IBoundedBody> {
-  const contentLength = Number(response.headers.get('Content-Length'))
-  if (!truncate && Number.isFinite(contentLength) && contentLength > limit) {
+  maximumBytes: number
+): Promise<void> {
+  const raw = response.headers.get('content-length')
+  if (raw === null) {
+    return
+  }
+  if (!/^\d+$/.test(raw)) {
+    await cancelResponseBody(response)
+    throw new OllamaClientError(
+      'response',
+      'Ollama returned an invalid response size.'
+    )
+  }
+  const length = Number(raw)
+  if (!Number.isSafeInteger(length) || length > maximumBytes) {
     await cancelResponseBody(response)
     throw new OllamaClientError(
       'response',
       'The Ollama response exceeded the allowed size.'
     )
   }
+}
+
+async function readBoundedBody(
+  response: Response,
+  maximumBytes: number,
+  context: IRequestContext
+): Promise<Uint8Array> {
+  await assertContentLength(response, maximumBytes)
   if (response.body === null) {
-    return { bytes: new Uint8Array(), truncated: false }
+    return new Uint8Array()
   }
 
   const reader = response.body.getReader()
   const chunks = new Array<Uint8Array>()
-  let size = 0
-  while (true) {
-    const result = await reader.read()
-    touch()
-    if (result.done) {
-      return { bytes: combineBytes(chunks, size), truncated: false }
-    }
-    if (result.value.byteLength === 0) {
-      continue
-    }
-
-    const remaining = limit - size
-    if (result.value.byteLength > remaining) {
-      if (remaining > 0) {
-        chunks.push(result.value.slice(0, remaining))
-        size += remaining
+  let received = 0
+  try {
+    while (true) {
+      const next = await raceWithAbort(reader.read(), context.signal, () =>
+        cancelReader(reader)
+      )
+      throwIfAborted(context.signal)
+      if (next.done) {
+        return combineBytes(chunks, received)
       }
-      try {
-        await reader.cancel()
-      } catch {
-        // The body may have been closed concurrently by an abort.
-      }
-      if (!truncate) {
+      context.touch()
+      if (received + next.value.byteLength > maximumBytes) {
+        await cancelReader(reader)
         throw new OllamaClientError(
           'response',
           'The Ollama response exceeded the allowed size.'
         )
       }
-      return { bytes: combineBytes(chunks, size), truncated: true }
+      if (next.value.byteLength > 0) {
+        chunks.push(next.value)
+        received += next.value.byteLength
+      }
     }
-    chunks.push(result.value)
-    size += result.value.byteLength
+  } catch (error) {
+    await cancelReader(reader)
+    throw error
   }
 }
 
@@ -237,19 +296,6 @@ function decodeJson(bytes: Uint8Array): unknown {
   }
 }
 
-async function readJsonResponse(
-  response: Response,
-  touch: () => void
-): Promise<unknown> {
-  const body = await readBoundedBody(
-    response,
-    MaxOllamaJsonBodyBytes,
-    false,
-    touch
-  )
-  return decodeJson(body.bytes)
-}
-
 function sanitizeErrorDetail(value: string): string {
   let detail = value
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
@@ -270,11 +316,25 @@ function sanitizeErrorDetail(value: string): string {
   return detail
 }
 
-function serverError(message: string): OllamaClientError {
-  const detail = sanitizeErrorDetail(message)
+function providerErrorDetail(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return undefined
+  }
+  const record = value as Record<string, unknown>
+  const candidate =
+    typeof record.error === 'string'
+      ? record.error
+      : typeof record.message === 'string'
+      ? record.message
+      : undefined
+  return candidate === undefined ? undefined : sanitizeErrorDetail(candidate)
+}
+
+function serverError(value: unknown): OllamaClientError {
+  const detail = providerErrorDetail(value)
   return new OllamaClientError(
     'server',
-    detail.length > 0
+    detail !== undefined && detail.length > 0
       ? `Ollama rejected the request: ${detail}`
       : 'Ollama rejected the request.'
   )
@@ -282,51 +342,41 @@ function serverError(message: string): OllamaClientError {
 
 async function httpError(
   response: Response,
-  touch: () => void
+  context: IRequestContext
 ): Promise<OllamaClientError> {
-  const body = await readBoundedBody(
-    response,
-    MaxOllamaErrorBodyBytes,
-    true,
-    touch
-  )
   let detail: string | undefined
-  if (!body.truncated && body.bytes.byteLength > 0) {
-    try {
-      const value = decodeJson(body.bytes)
-      if (isJsonObject(value)) {
-        const candidate = getServerError(value) ?? value.message
-        if (typeof candidate === 'string') {
-          detail = sanitizeErrorDetail(candidate)
-        }
-      }
-    } catch {
-      // Non-JSON HTTP errors remain status-only and never echo response bodies.
+  try {
+    const value = decodeJson(
+      await readBoundedBody(response, MaxOllamaErrorBodyBytes, context)
+    )
+    detail = providerErrorDetail(value)
+  } catch (error) {
+    if (context.signal.aborted) {
+      throw error
     }
+    // Oversized, empty, or non-JSON error bodies remain status-only.
   }
-
-  const suffix = detail !== undefined && detail.length > 0 ? ` ${detail}` : ''
   return new OllamaClientError(
     'http',
-    `Ollama request failed with HTTP ${response.status}.${suffix}`,
+    `Ollama request failed with HTTP ${response.status}.${
+      detail !== undefined && detail.length > 0 ? ` ${detail}` : ''
+    }`,
     response.status
   )
 }
 
 function parseNdjsonLine(bytes: Uint8Array): unknown | undefined {
-  const withoutCarriageReturn =
+  const content =
     bytes.length > 0 && bytes[bytes.length - 1] === 13
       ? bytes.slice(0, -1)
       : bytes
-  if (withoutCarriageReturn.byteLength === 0) {
+  if (content.byteLength === 0) {
     return undefined
   }
 
   let text: string
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(
-      withoutCarriageReturn
-    )
+    text = new TextDecoder('utf-8', { fatal: true }).decode(content)
   } catch {
     throw new OllamaClientError(
       'response',
@@ -351,6 +401,7 @@ async function readPullProgress(
   context: IRequestContext,
   options: IOllamaPullOptions
 ): Promise<IOllamaPullProgress> {
+  await assertContentLength(response, MaxOllamaPullBytes)
   if (response.body === null) {
     throw new OllamaClientError(
       'response',
@@ -361,6 +412,8 @@ async function readPullProgress(
   const reader = response.body.getReader()
   const lineParts = new Array<Uint8Array>()
   let lineSize = 0
+  let totalBytes = 0
+  let eventCount = 0
   let lastProgress: IOllamaPullProgress | undefined
 
   const append = (part: Uint8Array) => {
@@ -383,9 +436,15 @@ async function readPullProgress(
     if (value === undefined) {
       return
     }
-    const error = getServerError(value)
-    if (error !== undefined) {
-      throw serverError(error)
+    eventCount++
+    if (eventCount > MaxOllamaPullEvents) {
+      throw new OllamaClientError(
+        'response',
+        'Ollama returned too many pull progress events.'
+      )
+    }
+    if (hasServerError(value)) {
+      throw serverError(value)
     }
     const progress = parsePullProgress(value)
     lastProgress = progress
@@ -397,43 +456,50 @@ async function readPullProgress(
         'The Ollama pull progress handler failed.'
       )
     }
-    throwIfAborted(options.signal)
+    throwIfAborted(context.signal)
   }
 
   try {
     while (true) {
-      const result = await reader.read()
-      context.touch()
-      if (result.done) {
+      const next = await raceWithAbort(reader.read(), context.signal, () =>
+        cancelReader(reader)
+      )
+      throwIfAborted(context.signal)
+      if (next.done) {
         if (lineSize > 0) {
           emit()
         }
-        if (lastProgress === undefined) {
+        if (lastProgress === undefined || !lastProgress.done) {
           throw new OllamaClientError(
             'response',
-            'Ollama returned an empty pull stream.'
+            'The Ollama pull stream ended before completion.'
           )
         }
         return lastProgress
       }
 
+      context.touch()
+      totalBytes += next.value.byteLength
+      if (totalBytes > MaxOllamaPullBytes) {
+        throw new OllamaClientError(
+          'response',
+          'The Ollama pull stream exceeded the allowed size.'
+        )
+      }
+
       let segmentStart = 0
-      for (let index = 0; index < result.value.byteLength; index++) {
-        if (result.value[index] !== 10) {
+      for (let index = 0; index < next.value.byteLength; index++) {
+        if (next.value[index] !== 10) {
           continue
         }
-        append(result.value.slice(segmentStart, index))
+        append(next.value.slice(segmentStart, index))
         emit()
         segmentStart = index + 1
       }
-      append(result.value.slice(segmentStart))
+      append(next.value.slice(segmentStart))
     }
   } catch (error) {
-    try {
-      await reader.cancel()
-    } catch {
-      // The request abort may already have errored the reader.
-    }
+    await cancelReader(reader)
     throw error
   }
 }
@@ -445,12 +511,11 @@ export class OllamaClient implements IOllamaClient {
   private readonly fetcher: OllamaFetch
   private readonly requestTimeoutMs: number
   private readonly pullInactivityTimeoutMs: number
+  private readonly pullTotalTimeoutMs: number
 
   public constructor(endpoint: string, options: IOllamaClientOptions = {}) {
     this.endpoint = normalizeOllamaEndpoint(endpoint)
-    this.fetcher =
-      options.fetcher ??
-      ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init))
+    this.fetcher = options.fetcher ?? nodeOllamaFetch
     this.requestTimeoutMs = resolveTimeout(
       options.requestTimeoutMs,
       DefaultOllamaRequestTimeoutMs
@@ -458,6 +523,10 @@ export class OllamaClient implements IOllamaClient {
     this.pullInactivityTimeoutMs = resolveTimeout(
       options.pullInactivityTimeoutMs,
       DefaultOllamaPullInactivityTimeoutMs
+    )
+    this.pullTotalTimeoutMs = resolveTimeout(
+      options.pullTotalTimeoutMs,
+      DefaultOllamaPullTotalTimeoutMs
     )
   }
 
@@ -490,7 +559,7 @@ export class OllamaClient implements IOllamaClient {
     return this.requestJson(
       'POST',
       'show',
-      { model: validateModelName(model) },
+      { model: normalizeOllamaModelName(model) },
       options,
       value => parseShowResponse(value)
     )
@@ -500,12 +569,17 @@ export class OllamaClient implements IOllamaClient {
     model: string,
     options: IOllamaPullOptions = {}
   ): Promise<IOllamaPullProgress> {
+    const totalTimeoutMs = resolveTimeout(
+      options.timeoutMs,
+      this.pullTotalTimeoutMs
+    )
     return this.request(
       'POST',
       'pull',
-      { model: validateModelName(model), stream: true },
+      { model: normalizeOllamaModelName(model), stream: true },
       options,
-      options.timeoutMs ?? this.pullInactivityTimeoutMs,
+      totalTimeoutMs,
+      this.pullInactivityTimeoutMs,
       (response, context) => readPullProgress(response, context, options)
     )
   }
@@ -519,8 +593,8 @@ export class OllamaClient implements IOllamaClient {
       'POST',
       'copy',
       {
-        source: validateModelName(source),
-        destination: validateModelName(destination),
+        source: normalizeOllamaModelName(source),
+        destination: normalizeOllamaModelName(destination),
       },
       options
     )
@@ -533,7 +607,7 @@ export class OllamaClient implements IOllamaClient {
     return this.requestVoid(
       'DELETE',
       'delete',
-      { model: validateModelName(model) },
+      { model: normalizeOllamaModelName(model) },
       options
     )
   }
@@ -561,7 +635,7 @@ export class OllamaClient implements IOllamaClient {
       'POST',
       'generate',
       {
-        model: validateModelName(model),
+        model: normalizeOllamaModelName(model),
         prompt: '',
         keep_alive: keepAlive,
         stream: false,
@@ -582,8 +656,9 @@ export class OllamaClient implements IOllamaClient {
       operation,
       body,
       options,
-      options.timeoutMs ?? this.requestTimeoutMs,
-      async response => cancelResponseBody(response)
+      resolveTimeout(options.timeoutMs, this.requestTimeoutMs),
+      undefined,
+      response => cancelResponseBody(response)
     )
   }
 
@@ -599,12 +674,14 @@ export class OllamaClient implements IOllamaClient {
       operation,
       body,
       options,
-      options.timeoutMs ?? this.requestTimeoutMs,
+      resolveTimeout(options.timeoutMs, this.requestTimeoutMs),
+      undefined,
       async (response, context) => {
-        const value = await readJsonResponse(response, context.touch)
-        const error = getServerError(value)
-        if (error !== undefined) {
-          throw serverError(error)
+        const value = decodeJson(
+          await readBoundedBody(response, MaxOllamaJsonBodyBytes, context)
+        )
+        if (hasServerError(value)) {
+          throw serverError(value)
         }
         return parse(value)
       }
@@ -616,12 +693,16 @@ export class OllamaClient implements IOllamaClient {
     operation: OllamaOperation,
     body: unknown,
     options: IOllamaRequestOptions,
-    requestedTimeoutMs: number,
+    totalTimeoutMs: number,
+    inactivityTimeoutMs: number | undefined,
     handle: (response: Response, context: IRequestContext) => Promise<T>
   ): Promise<T> {
     throwIfAborted(options.signal)
-    const timeoutMs = resolveTimeout(requestedTimeoutMs, this.requestTimeoutMs)
-    const context = createRequestContext(options.signal, timeoutMs)
+    const context = createRequestContext(
+      options.signal,
+      totalTimeoutMs,
+      inactivityTimeoutMs
+    )
     const request: RequestInit = {
       method,
       headers: {
@@ -637,22 +718,25 @@ export class OllamaClient implements IOllamaClient {
     }
 
     try {
-      const response = await this.fetcher(
-        `${this.endpoint}/api/${operation}`,
-        request
+      const response = await raceWithAbort(
+        this.fetcher(getOllamaApiUrl(this.endpoint, operation), request),
+        context.signal,
+        undefined,
+        cancelResponseBody
       )
+      throwIfAborted(context.signal)
       context.touch()
       if (!response.ok) {
-        throw await httpError(response, context.touch)
+        throw await httpError(response, context)
       }
       const result = await handle(response, context)
-      throwIfAborted(options.signal)
+      throwIfAborted(context.signal)
       return result
     } catch (error) {
       if (options.signal?.aborted === true) {
         throw abortError()
       }
-      if (context.timedOut()) {
+      if (context.timeoutKind() !== undefined) {
         throw new OllamaClientError('timeout', 'The Ollama request timed out.')
       }
       if (error instanceof OllamaClientError) {
