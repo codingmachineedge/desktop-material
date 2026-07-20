@@ -14,6 +14,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPConnection
 from pathlib import Path
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).with_name("fake_ollama_server.py")
@@ -22,6 +23,57 @@ assert SPEC is not None and SPEC.loader is not None
 fixture = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = fixture
 SPEC.loader.exec_module(fixture)
+
+
+WINDOWS_SHARING_VIOLATION = 32
+TEMPORARY_DIRECTORY_CLEANUP_TIMEOUT_SECONDS = 5.0
+TEMPORARY_DIRECTORY_CLEANUP_INITIAL_DELAY_SECONDS = 0.01
+TEMPORARY_DIRECTORY_CLEANUP_MAX_DELAY_SECONDS = 0.25
+
+
+def cleanup_temporary_directory_strictly(
+    temporary_directory: tempfile.TemporaryDirectory,
+    *,
+    retry_timeout_seconds: float = TEMPORARY_DIRECTORY_CLEANUP_TIMEOUT_SECONDS,
+) -> None:
+    """Remove a test-owned directory, retrying only transient Windows locks."""
+
+    path = Path(temporary_directory.name)
+    deadline = time.monotonic() + retry_timeout_seconds
+    delay = TEMPORARY_DIRECTORY_CLEANUP_INITIAL_DELAY_SECONDS
+    while True:
+        try:
+            temporary_directory.cleanup()
+            break
+        except PermissionError as error:
+            if (
+                os.name != "nt"
+                or error.winerror != WINDOWS_SHARING_VIOLATION
+                or time.monotonic() >= deadline
+            ):
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, TEMPORARY_DIRECTORY_CLEANUP_MAX_DELAY_SECONDS)
+    if path.exists():
+        raise AssertionError(f"temporary directory cleanup left a path behind: {path}")
+
+
+def terminate_process_strictly(process: subprocess.Popen[str]) -> None:
+    """Stop and reap a child before its redirected streams leave scope."""
+
+    try:
+        if process.poll() is None:
+            process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+    finally:
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
 
 
 class OllamaFixtureStateTests(unittest.TestCase):
@@ -659,19 +711,81 @@ class OllamaFixtureStartupTests(unittest.TestCase):
         finally:
             explicit.server_close()
 
+    @unittest.skipUnless(os.name == "nt", "Windows sharing semantics are required")
+    def test_strict_temp_cleanup_retries_then_removes_the_owned_root(self) -> None:
+        temporary_directory = tempfile.TemporaryDirectory(
+            prefix="desktop-material-ollama-cleanup-",
+            dir=os.environ["TEMP"],
+        )
+        path = Path(temporary_directory.name)
+        original_cleanup = temporary_directory.cleanup
+        cleanup_attempts = 0
+
+        def fail_once_with_sharing_violation() -> None:
+            nonlocal cleanup_attempts
+            cleanup_attempts += 1
+            if cleanup_attempts == 1:
+                error = PermissionError(13, "sharing violation", str(path))
+                error.winerror = WINDOWS_SHARING_VIOLATION
+                raise error
+            original_cleanup()
+
+        try:
+            with mock.patch.object(
+                temporary_directory,
+                "cleanup",
+                side_effect=fail_once_with_sharing_violation,
+            ):
+                cleanup_temporary_directory_strictly(temporary_directory)
+        finally:
+            if path.exists():
+                original_cleanup()
+        self.assertEqual(cleanup_attempts, 2)
+        self.assertFalse(path.exists())
+
+    @unittest.skipUnless(os.name == "nt", "Windows sharing semantics are required")
+    def test_strict_temp_cleanup_reraises_a_persistent_sharing_violation(
+        self,
+    ) -> None:
+        temporary_directory = tempfile.TemporaryDirectory(
+            prefix="desktop-material-ollama-cleanup-",
+            dir=os.environ["TEMP"],
+        )
+        path = Path(temporary_directory.name)
+        original_cleanup = temporary_directory.cleanup
+        error = PermissionError(13, "sharing violation", str(path))
+        error.winerror = WINDOWS_SHARING_VIOLATION
+        try:
+            with mock.patch.object(
+                temporary_directory,
+                "cleanup",
+                side_effect=error,
+            ) as cleanup:
+                with self.assertRaises(PermissionError) as failure:
+                    cleanup_temporary_directory_strictly(
+                        temporary_directory, retry_timeout_seconds=0
+                    )
+            self.assertIs(failure.exception, error)
+            self.assertEqual(cleanup.call_count, 1)
+            self.assertTrue(path.exists())
+        finally:
+            original_cleanup()
+        self.assertFalse(path.exists())
+
     def test_ready_receipt_and_stdout_metadata_exclude_personal_paths(self) -> None:
-        with tempfile.TemporaryDirectory(
+        temporary_directory = tempfile.TemporaryDirectory(
             prefix="desktop-material-ollama-startup-",
             dir=os.environ["TEMP"],
-        ) as temporary:
-            run_root = Path(temporary)
+        )
+        try:
+            run_root = Path(temporary_directory.name)
             ready_file = run_root / fixture.OWNED_DIRECTORY_NAME / fixture.READY_FILE_NAME
             mutation_log = (
                 run_root
                 / fixture.OWNED_DIRECTORY_NAME
                 / fixture.MUTATION_LOG_FILE_NAME
             )
-            process = subprocess.Popen(
+            with subprocess.Popen(
                 [
                     sys.executable,
                     str(MODULE_PATH),
@@ -689,94 +803,96 @@ class OllamaFixtureStartupTests(unittest.TestCase):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-            )
-            try:
-                deadline = time.monotonic() + 5
-                while not ready_file.exists() and time.monotonic() < deadline:
-                    if process.poll() is not None:
-                        stderr = process.stderr.read() if process.stderr else ""
-                        self.fail(f"fixture exited before readiness: {stderr}")
-                    time.sleep(0.02)
-                self.assertTrue(ready_file.exists(), "fixture ready receipt was not written")
-                receipt = json.loads(ready_file.read_text(encoding="utf-8"))
-                stdout_receipt = json.loads(process.stdout.readline())
-                self.assertEqual(receipt, stdout_receipt)
-                self.assertEqual(
-                    set(receipt),
-                    {
-                        "fixture",
-                        "protocolVersion",
-                        "pid",
-                        "bind",
-                        "port",
-                        "endpoint",
-                        "version",
-                        "runId",
-                        "runRootName",
-                        "mutationLog",
-                        "faultMode",
-                        "faultModes",
-                        "pullFrameDelayMs",
-                        "pullFrameCount",
-                        "minimumPullDurationMs",
-                        "seedModels",
-                        "runningModels",
-                        "pullableModels",
-                    },
-                )
-                serialized = json.dumps(receipt).lower()
-                self.assertNotIn(str(Path.home()).lower(), serialized)
-                self.assertNotIn(str(Path(temporary)).lower(), serialized)
-                self.assertNotIn("\\", serialized)
-                self.assertEqual(receipt["runRootName"], run_root.name)
-                self.assertEqual(
-                    receipt["mutationLog"],
-                    f"{fixture.OWNED_DIRECTORY_NAME}/{fixture.MUTATION_LOG_FILE_NAME}",
-                )
-                self.assertEqual(receipt["faultMode"], "none")
-                self.assertEqual(receipt["faultModes"], list(fixture.FAULT_MODES))
-                self.assertEqual(receipt["bind"], fixture.LOOPBACK_ADDRESS)
-                self.assertEqual(
-                    receipt["endpoint"],
-                    f"http://{fixture.LOOPBACK_ADDRESS}:{receipt['port']}",
-                )
-
-                connection = HTTPConnection(
-                    fixture.LOOPBACK_ADDRESS, receipt["port"], timeout=5
-                )
-                connection.request("GET", "/__fixture__/health")
-                response = connection.getresponse()
-                self.assertEqual(response.status, 200)
-                self.assertEqual(json.loads(response.read())["status"], "ok")
-                connection.close()
-
-                deadline = time.monotonic() + 2
-                while not mutation_log.exists() and time.monotonic() < deadline:
-                    time.sleep(0.02)
-                events = [
-                    json.loads(line)
-                    for line in mutation_log.read_text(encoding="utf-8").splitlines()
-                ]
-                self.assertEqual(events[0]["operation"], "start")
-                self.assertEqual(events[0]["runRootName"], run_root.name)
-                self.assertTrue(
-                    any(
-                        event["kind"] == "request"
-                        and event["path"] == "/__fixture__/health"
-                        for event in events
-                    )
-                )
-            finally:
-                process.terminate()
+            ) as process:
                 try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
-                if process.stdout is not None:
-                    process.stdout.close()
-                if process.stderr is not None:
-                    process.stderr.close()
+                    deadline = time.monotonic() + 5
+                    while not ready_file.exists() and time.monotonic() < deadline:
+                        if process.poll() is not None:
+                            stderr = process.stderr.read() if process.stderr else ""
+                            self.fail(f"fixture exited before readiness: {stderr}")
+                        time.sleep(0.02)
+                    self.assertTrue(
+                        ready_file.exists(), "fixture ready receipt was not written"
+                    )
+                    receipt = json.loads(ready_file.read_text(encoding="utf-8"))
+                    self.assertIsNotNone(process.stdout)
+                    assert process.stdout is not None
+                    stdout_receipt = json.loads(process.stdout.readline())
+                    self.assertEqual(receipt, stdout_receipt)
+                    self.assertEqual(
+                        set(receipt),
+                        {
+                            "fixture",
+                            "protocolVersion",
+                            "pid",
+                            "bind",
+                            "port",
+                            "endpoint",
+                            "version",
+                            "runId",
+                            "runRootName",
+                            "mutationLog",
+                            "faultMode",
+                            "faultModes",
+                            "pullFrameDelayMs",
+                            "pullFrameCount",
+                            "minimumPullDurationMs",
+                            "seedModels",
+                            "runningModels",
+                            "pullableModels",
+                        },
+                    )
+                    serialized = json.dumps(receipt).lower()
+                    self.assertNotIn(str(Path.home()).lower(), serialized)
+                    self.assertNotIn(str(run_root).lower(), serialized)
+                    self.assertNotIn("\\", serialized)
+                    self.assertEqual(receipt["runRootName"], run_root.name)
+                    self.assertEqual(
+                        receipt["mutationLog"],
+                        f"{fixture.OWNED_DIRECTORY_NAME}/{fixture.MUTATION_LOG_FILE_NAME}",
+                    )
+                    self.assertEqual(receipt["faultMode"], "none")
+                    self.assertEqual(receipt["faultModes"], list(fixture.FAULT_MODES))
+                    self.assertEqual(receipt["bind"], fixture.LOOPBACK_ADDRESS)
+                    self.assertEqual(
+                        receipt["endpoint"],
+                        f"http://{fixture.LOOPBACK_ADDRESS}:{receipt['port']}",
+                    )
+
+                    connection = HTTPConnection(
+                        fixture.LOOPBACK_ADDRESS, receipt["port"], timeout=5
+                    )
+                    response = None
+                    try:
+                        connection.request("GET", "/__fixture__/health")
+                        response = connection.getresponse()
+                        self.assertEqual(response.status, 200)
+                        self.assertEqual(json.loads(response.read())["status"], "ok")
+                    finally:
+                        if response is not None:
+                            response.close()
+                        connection.close()
+
+                    deadline = time.monotonic() + 2
+                    while not mutation_log.exists() and time.monotonic() < deadline:
+                        time.sleep(0.02)
+                    events = [
+                        json.loads(line)
+                        for line in mutation_log.read_text(encoding="utf-8").splitlines()
+                    ]
+                    self.assertEqual(events[0]["operation"], "start")
+                    self.assertEqual(events[0]["runRootName"], run_root.name)
+                    self.assertTrue(
+                        any(
+                            event["kind"] == "request"
+                            and event["path"] == "/__fixture__/health"
+                            for event in events
+                        )
+                    )
+                finally:
+                    terminate_process_strictly(process)
+        finally:
+            cleanup_temporary_directory_strictly(temporary_directory)
 
     def test_owned_paths_reject_wrong_roots_paths_and_existing_receipts(self) -> None:
         temp_root = Path(os.environ["TEMP"])
