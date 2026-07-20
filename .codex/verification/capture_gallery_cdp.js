@@ -2393,7 +2393,10 @@ scene('ollama-manager', async () => {
           )]
           const names = rows.map(row => row.getAttribute('data-model'))
           const details = document.querySelector('[data-verification="ollama-details"]')
+          const refresh = document.querySelector('[data-verification="ollama-refresh"]')
           return manager?.getAttribute('aria-busy') === 'false' &&
+            refresh instanceof HTMLButtonElement && !refresh.disabled &&
+            refresh.textContent.trim() === 'Refresh' &&
             document.querySelector('[data-verification="ollama-endpoint-status"]')
               ?.textContent?.trim() === 'Connected' &&
             JSON.stringify(names) === JSON.stringify([
@@ -2452,7 +2455,10 @@ scene('ollama-manager', async () => {
           `(() => {
             const manager = document.querySelector('[data-verification="ollama-manager"]')
             const notice = document.querySelector('[data-verification="ollama-notice"]')
+            const refresh = document.querySelector('[data-verification="ollama-refresh"]')
             return manager?.getAttribute('aria-busy') === 'false' &&
+              refresh instanceof HTMLButtonElement && !refresh.disabled &&
+              refresh.textContent.trim() === 'Refresh' &&
               notice?.textContent?.includes('canceled') === true &&
               document.querySelector('[data-verification="ollama-pull-progress"]') === null &&
               document.querySelectorAll('[data-verification="ollama-model-row"]').length === 3
@@ -2609,6 +2615,7 @@ scene('ollama-manager', async () => {
               '[data-verification="ollama-model-row"]'
             )]
             const details = document.querySelector('[data-verification="ollama-details"]')
+            const refresh = document.querySelector('[data-verification="ollama-refresh"]')
             const managerBounds = manager?.getBoundingClientRect()
             const preferencesBounds = preferences?.getBoundingClientRect()
             const contained = bounds => bounds !== undefined &&
@@ -2617,6 +2624,8 @@ scene('ollama-manager', async () => {
               bounds.right <= window.innerWidth + 0.5 &&
               bounds.bottom <= window.innerHeight + 0.5
             return manager?.getAttribute('aria-busy') === 'false' &&
+              refresh instanceof HTMLButtonElement && !refresh.disabled &&
+              refresh.textContent.trim() === 'Refresh' &&
               document.querySelector('.ollama-health-indicator.is-connected') !== null &&
               document.querySelector('[data-verification="ollama-endpoint-status"]')
                 ?.textContent?.trim() === 'Connected' &&
@@ -2662,6 +2671,30 @@ scene('ollama-manager', async () => {
           }
           return true
         })()`)
+        await evaluate(
+          `new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`
+        )
+        await waitFor(
+          `(() => {
+            const dialog = document.querySelector('#preferences')
+            const refresh = document.querySelector('[data-verification="ollama-refresh"]')
+            const scrollers = [...document.querySelectorAll(
+              '#preferences .tab-container, #preferences .copilot-tab-content'
+            )]
+            const activeFiniteAnimations = dialog
+              ?.getAnimations({ subtree: true })
+              .filter(animation => {
+                const iterations = animation.effect?.getTiming().iterations ?? 1
+                return iterations !== Infinity &&
+                  (animation.pending || animation.playState === 'running')
+              }) ?? []
+            return refresh instanceof HTMLButtonElement &&
+              !refresh.disabled && refresh.textContent.trim() === 'Refresh' &&
+              scrollers.every(node => node.scrollTop === 0 && node.scrollLeft === 0) &&
+              activeFiniteAnimations.length === 0
+          })()`,
+          'post-scroll stable Ollama capture surface'
+        )
         await parkPointer()
       }
     )

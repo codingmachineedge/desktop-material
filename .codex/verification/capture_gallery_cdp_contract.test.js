@@ -89,6 +89,16 @@ test('every capture suppresses unrelated Undo chrome and incidental focus paint'
   const privacy = capture.indexOf('await assertCapturePrivacy(name)')
   const screenshot = capture.indexOf("client.send('Page.captureScreenshot'")
   assert.ok(hygiene >= 0 && hygiene < privacy && privacy < screenshot)
+  for (const dimensionsContract of [
+    'const dimensions = pngDimensions(file)',
+    'dimensions.width !== currentViewportWidth',
+    'dimensions.height !== currentViewportHeight',
+  ]) {
+    assert.ok(
+      capture.includes(dimensionsContract),
+      `capture misses dimension gate: ${dimensionsContract}`
+    )
+  }
 })
 
 test('contaminated gallery scenes always restore the Changes base', () => {
@@ -759,6 +769,8 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
     "clickText('Manage models'",
     'material-ollama-model-manager',
     'ollama-endpoint-status',
+    'ollama-refresh',
+    "refresh.textContent.trim() === 'Refresh'",
     'ollama-pull-progress',
     'ollama-pull-cancel',
     'material-code:1.5b',
@@ -778,6 +790,7 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
     'finally {',
     "localStorage.getItem('theme') === 'system'",
     'await restoreCaptureViewport()',
+    'post-scroll stable Ollama capture surface',
   ]) {
     assert.ok(manager.includes(contract), `Ollama scene misses ${contract}`)
   }
