@@ -272,6 +272,148 @@ export type TranslationKey =
   | 'prCreate.openOnGitHub'
   | 'prCreate.partialSuccess'
   | 'prCreate.templateNotice'
+  | 'mrEditor.createTitle'
+  | 'mrEditor.editTitle'
+  | 'mrEditor.description'
+  | 'mrEditor.project'
+  | 'mrEditor.boundAccount'
+  | 'mrEditor.routeAria'
+  | 'mrEditor.formAria'
+  | 'mrEditor.sourceBranch'
+  | 'mrEditor.sourceEditLocked'
+  | 'mrEditor.targetBranch'
+  | 'mrEditor.titleField'
+  | 'mrEditor.descriptionField'
+  | 'mrEditor.charactersRemaining'
+  | 'mrEditor.markdownSupported'
+  | 'mrEditor.draftAction'
+  | 'mrEditor.reviewers'
+  | 'mrEditor.assignees'
+  | 'mrEditor.reviewersUnavailable'
+  | 'mrEditor.assigneesUnavailable'
+  | 'mrEditor.noneAvailable'
+  | 'mrEditor.keyboardHint'
+  | 'mrEditor.cancel'
+  | 'mrEditor.refresh'
+  | 'mrEditor.createAction'
+  | 'mrEditor.saveAction'
+  | 'mrEditor.creating'
+  | 'mrEditor.saving'
+  | 'mrEditor.created'
+  | 'mrEditor.saved'
+  | 'mrEditor.canceled'
+  | 'mrEditor.loading'
+  | 'mrEditor.emptyBranches'
+  | 'mrEditor.emptySource'
+  | 'mrEditor.emptyTarget'
+  | 'mrEditor.emptyDescription'
+  | 'mrEditor.errorTitle'
+  | 'mrEditor.errorAuthentication'
+  | 'mrEditor.errorPermission'
+  | 'mrEditor.errorNetwork'
+  | 'mrEditor.errorUnsupported'
+  | 'mrEditor.errorInvalidResponse'
+  | 'mrEditor.errorUnknown'
+  | 'mrEditor.staleTitle'
+  | 'mrEditor.staleDescription'
+  | 'mrEditor.partialTitle'
+  | 'mrEditor.partialUnavailable'
+  | 'mrEditor.partialCapped'
+  | 'mrEditor.readinessLabel'
+  | 'mrEditor.readinessChecking'
+  | 'mrEditor.readinessReady'
+  | 'mrEditor.readinessBlocked'
+  | 'mrEditor.readinessUnknown'
+  | 'mrEditor.blockerStatus'
+  | 'mrEditor.blockerCiMustPass'
+  | 'mrEditor.blockerCiRunning'
+  | 'mrEditor.blockerConflict'
+  | 'mrEditor.blockerDiscussions'
+  | 'mrEditor.blockerDraft'
+  | 'mrEditor.blockerExternalChecks'
+  | 'mrEditor.blockerJira'
+  | 'mrEditor.blockerRebase'
+  | 'mrEditor.blockerApproval'
+  | 'mrEditor.blockerNotOpen'
+  | 'mrEditor.blockerPolicy'
+  | 'mrEditor.blockerCommitsStatus'
+  | 'mrEditor.blockerRequestBlocked'
+  | 'mrEditor.blockerMergeTime'
+  | 'mrEditor.blockerRequestedChanges'
+  | 'mrEditor.blockerSecurityPipeline'
+  | 'mrEditor.blockerSecurityViolation'
+  | 'mrEditor.blockerStatusChecks'
+  | 'mrEditor.blockerLockedPaths'
+  | 'mrEditor.blockerLockedLfs'
+  | 'mrEditor.blockerTitleRegex'
+  | 'mrEditor.validationTitle'
+  | 'mrEditor.validationSource'
+  | 'mrEditor.validationTarget'
+  | 'mrEditor.validationBranchesDiffer'
+  | 'mrEditor.validationTitleRequired'
+  | 'mrEditor.validationTitleLength'
+  | 'mrEditor.validationTitleInvalid'
+  | 'mrEditor.validationBodyLength'
+  | 'mrEditor.validationBodyInvalid'
+  | 'mrEditor.validationReviewerLimit'
+  | 'mrEditor.validationAssigneeLimit'
+  | 'mrEditor.validationReviewerDuplicate'
+  | 'mrEditor.validationAssigneeDuplicate'
+  | 'mrEditor.validationReviewerInvalid'
+  | 'mrEditor.validationAssigneeInvalid'
+  | 'mrEditor.submitRejected'
+  | 'mrEditor.submitNetwork'
+  | 'mrEditor.submitStale'
+  | 'mrEditor.submitInvalidResponse'
+  | 'mrEditor.submitUnknown'
+  | 'mrLifecycle.title'
+  | 'mrLifecycle.loading'
+  | 'mrLifecycle.empty'
+  | 'mrLifecycle.emptyDescription'
+  | 'mrLifecycle.unavailable'
+  | 'mrLifecycle.unavailableDescription'
+  | 'mrLifecycle.stale'
+  | 'mrLifecycle.staleDescription'
+  | 'mrLifecycle.partial'
+  | 'mrLifecycle.summaryAria'
+  | 'mrLifecycle.state'
+  | 'mrLifecycle.stateOpened'
+  | 'mrLifecycle.stateClosed'
+  | 'mrLifecycle.stateMerged'
+  | 'mrLifecycle.stateLocked'
+  | 'mrLifecycle.draft'
+  | 'mrLifecycle.author'
+  | 'mrLifecycle.reviewers'
+  | 'mrLifecycle.assignees'
+  | 'mrLifecycle.none'
+  | 'mrLifecycle.approval'
+  | 'mrLifecycle.approvalUnavailable'
+  | 'mrLifecycle.approvalComplete'
+  | 'mrLifecycle.approvalProgress'
+  | 'mrLifecycle.approvedBy'
+  | 'mrLifecycle.pipeline'
+  | 'mrLifecycle.pipelineUnavailable'
+  | 'mrLifecycle.pipelineNone'
+  | 'mrLifecycle.pipelinePending'
+  | 'mrLifecycle.pipelineRunning'
+  | 'mrLifecycle.pipelinePassed'
+  | 'mrLifecycle.pipelineFailed'
+  | 'mrLifecycle.pipelineCanceled'
+  | 'mrLifecycle.pipelineSkipped'
+  | 'mrLifecycle.pipelineUnknown'
+  | 'mrLifecycle.readiness'
+  | 'mrLifecycle.updated'
+  | 'mrLifecycle.timeUnavailable'
+  | 'mrLifecycle.close'
+  | 'mrLifecycle.reopen'
+  | 'mrLifecycle.approve'
+  | 'mrLifecycle.unapprove'
+  | 'mrLifecycle.refresh'
+  | 'mrLifecycle.openCanonical'
+  | 'mrLifecycle.operationRunning'
+  | 'mrLifecycle.operationSuccess'
+  | 'mrLifecycle.operationCanceled'
+  | 'mrLifecycle.operationError'
   | 'forkCheckout.action'
   | 'forkCheckout.title'
   | 'forkCheckout.description'
@@ -1139,6 +1281,184 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'prCreate.partialSuccess':
     'The pull request was created, with follow-up notices:',
   'prCreate.templateNotice': 'Template notice: {notice}',
+  'mrEditor.createTitle': 'Create merge request',
+  'mrEditor.editTitle': 'Edit merge request',
+  'mrEditor.description':
+    'Prepare bounded merge-request details for this repository-bound GitLab account.',
+  'mrEditor.project': 'Project',
+  'mrEditor.boundAccount': 'Repository account',
+  'mrEditor.routeAria': 'Exact GitLab project and repository account',
+  'mrEditor.formAria': 'Merge request details',
+  'mrEditor.sourceBranch': 'Source branch',
+  'mrEditor.sourceEditLocked':
+    'GitLab does not support changing the source branch after creation.',
+  'mrEditor.targetBranch': 'Target branch',
+  'mrEditor.titleField': 'Title',
+  'mrEditor.descriptionField': 'Description (optional)',
+  'mrEditor.charactersRemaining': '{count} characters remaining',
+  'mrEditor.markdownSupported': 'Markdown supported',
+  'mrEditor.draftAction': 'Draft merge request',
+  'mrEditor.reviewers': 'Reviewers',
+  'mrEditor.assignees': 'Assignees',
+  'mrEditor.reviewersUnavailable':
+    'Reviewer choices are unavailable. Other fields remain editable.',
+  'mrEditor.assigneesUnavailable':
+    'Assignee choices are unavailable. Other fields remain editable.',
+  'mrEditor.noneAvailable': 'No choices are available.',
+  'mrEditor.keyboardHint':
+    'Press Enter in Title or Ctrl+Enter in Description to submit.',
+  'mrEditor.cancel': 'Cancel',
+  'mrEditor.refresh': 'Refresh merge-request context',
+  'mrEditor.createAction': 'Create merge request',
+  'mrEditor.saveAction': 'Save merge request',
+  'mrEditor.creating': 'Creating merge request…',
+  'mrEditor.saving': 'Saving merge request…',
+  'mrEditor.created': 'Merge request created.',
+  'mrEditor.saved': 'Merge request saved.',
+  'mrEditor.canceled': 'The merge-request operation was canceled.',
+  'mrEditor.loading': 'Loading bounded merge-request choices…',
+  'mrEditor.emptyBranches': 'No branches are available for a merge request.',
+  'mrEditor.emptySource': 'No source branches are available.',
+  'mrEditor.emptyTarget': 'No target branches are available.',
+  'mrEditor.emptyDescription':
+    'Refresh after the repository and its GitLab project have branches.',
+  'mrEditor.errorTitle': 'Merge-request choices are unavailable',
+  'mrEditor.errorAuthentication':
+    'The repository-bound GitLab account could not be authenticated.',
+  'mrEditor.errorPermission':
+    'The repository-bound GitLab account cannot read this project.',
+  'mrEditor.errorNetwork':
+    'GitLab could not be reached. Check the network and retry.',
+  'mrEditor.errorUnsupported':
+    'This GitLab server does not expose the required merge-request API.',
+  'mrEditor.errorInvalidResponse':
+    'GitLab returned data that could not be safely validated.',
+  'mrEditor.errorUnknown':
+    'The merge-request context could not be loaded. Refresh and try again.',
+  'mrEditor.staleTitle': 'Repository or account context changed',
+  'mrEditor.staleDescription':
+    'This editor is bound to an older repository, account, endpoint, or request version. Refresh before submitting.',
+  'mrEditor.partialTitle': 'Some optional choices are incomplete',
+  'mrEditor.partialUnavailable':
+    'Unavailable reviewer or assignee fields are disabled; required fields remain usable.',
+  'mrEditor.partialCapped':
+    'One or more choice lists reached a safety limit or contained rejected entries.',
+  'mrEditor.readinessLabel': 'Merge readiness',
+  'mrEditor.readinessChecking': 'GitLab is still checking merge readiness…',
+  'mrEditor.readinessReady': 'Ready to merge',
+  'mrEditor.readinessBlocked': 'Blocked: {reason}',
+  'mrEditor.readinessUnknown': 'Merge readiness is not available yet.',
+  'mrEditor.blockerStatus': 'project policy or merge checks',
+  'mrEditor.blockerCiMustPass': 'the pipeline must pass',
+  'mrEditor.blockerCiRunning': 'the pipeline is still running',
+  'mrEditor.blockerConflict': 'source and target have conflicts',
+  'mrEditor.blockerDiscussions': 'review discussions remain unresolved',
+  'mrEditor.blockerDraft': 'the merge request is still a draft',
+  'mrEditor.blockerExternalChecks': 'external status checks are incomplete',
+  'mrEditor.blockerJira': 'a required Jira association is missing',
+  'mrEditor.blockerRebase': 'the source branch needs a rebase',
+  'mrEditor.blockerApproval': 'required approvals are missing',
+  'mrEditor.blockerNotOpen': 'the merge request is not open',
+  'mrEditor.blockerPolicy': 'a merge policy denied this request',
+  'mrEditor.blockerCommitsStatus': 'one or more commit statuses are blocking',
+  'mrEditor.blockerRequestBlocked':
+    'another merge-request condition is blocking',
+  'mrEditor.blockerMergeTime': 'the scheduled merge time has not arrived',
+  'mrEditor.blockerRequestedChanges': 'a reviewer requested changes',
+  'mrEditor.blockerSecurityPipeline':
+    'the security-policy pipeline check is incomplete',
+  'mrEditor.blockerSecurityViolation': 'a security policy has violations',
+  'mrEditor.blockerStatusChecks': 'required status checks must pass',
+  'mrEditor.blockerLockedPaths': 'one or more changed paths are locked',
+  'mrEditor.blockerLockedLfs': 'one or more changed LFS files are locked',
+  'mrEditor.blockerTitleRegex': 'the title does not match project policy',
+  'mrEditor.validationTitle': 'Fix these merge-request details:',
+  'mrEditor.validationSource': 'Choose a valid source branch.',
+  'mrEditor.validationTarget': 'Choose a valid target branch.',
+  'mrEditor.validationBranchesDiffer':
+    'Source and target branches must be different.',
+  'mrEditor.validationTitleRequired': 'Enter a merge-request title.',
+  'mrEditor.validationTitleLength':
+    'The title exceeds the 255-character safety limit.',
+  'mrEditor.validationTitleInvalid':
+    'Remove surrounding whitespace or unsupported control characters from the title.',
+  'mrEditor.validationBodyLength':
+    'The description exceeds the 128 KiB safety limit.',
+  'mrEditor.validationBodyInvalid':
+    'The description contains an unsupported null character.',
+  'mrEditor.validationReviewerLimit': 'Select at most 20 reviewers.',
+  'mrEditor.validationAssigneeLimit': 'Select at most 20 assignees.',
+  'mrEditor.validationReviewerDuplicate':
+    'Each reviewer may be selected only once.',
+  'mrEditor.validationAssigneeDuplicate':
+    'Each assignee may be selected only once.',
+  'mrEditor.validationReviewerInvalid':
+    'A selected reviewer is not in the current bounded choices.',
+  'mrEditor.validationAssigneeInvalid':
+    'A selected assignee is not in the current bounded choices.',
+  'mrEditor.submitRejected':
+    'GitLab rejected the merge-request update. Refresh and review the current state.',
+  'mrEditor.submitNetwork':
+    'The merge-request update could not reach GitLab. Check the network and retry.',
+  'mrEditor.submitStale':
+    'The repository, account, merge request, or HEAD changed before the update completed.',
+  'mrEditor.submitInvalidResponse':
+    'GitLab returned an update result that could not be safely validated.',
+  'mrEditor.submitUnknown':
+    'The merge-request update did not complete. Refresh before retrying.',
+  'mrLifecycle.title': 'Merge request lifecycle',
+  'mrLifecycle.loading': 'Loading the merge-request lifecycle…',
+  'mrLifecycle.empty': 'No merge request is selected',
+  'mrLifecycle.emptyDescription':
+    'Create or select a merge request to manage its lifecycle.',
+  'mrLifecycle.unavailable': 'Merge-request lifecycle is unavailable',
+  'mrLifecycle.unavailableDescription':
+    'Refresh the repository-bound GitLab context and try again.',
+  'mrLifecycle.stale': 'Merge-request lifecycle context changed',
+  'mrLifecycle.staleDescription':
+    'Repository, account, merge request, or HEAD details changed. Refresh before acting.',
+  'mrLifecycle.partial':
+    'Some lifecycle details are unavailable; available actions remain bounded.',
+  'mrLifecycle.summaryAria': 'Merge request lifecycle summary',
+  'mrLifecycle.state': 'State',
+  'mrLifecycle.stateOpened': 'Open',
+  'mrLifecycle.stateClosed': 'Closed',
+  'mrLifecycle.stateMerged': 'Merged',
+  'mrLifecycle.stateLocked': 'Locked',
+  'mrLifecycle.draft': 'Draft',
+  'mrLifecycle.author': 'Author',
+  'mrLifecycle.reviewers': 'Reviewers',
+  'mrLifecycle.assignees': 'Assignees',
+  'mrLifecycle.none': 'None',
+  'mrLifecycle.approval': 'Approval progress',
+  'mrLifecycle.approvalUnavailable': 'Approval state is unavailable.',
+  'mrLifecycle.approvalComplete': 'Required approvals complete',
+  'mrLifecycle.approvalProgress': '{approved} of {required} required approvals',
+  'mrLifecycle.approvedBy': 'Approved by {names}',
+  'mrLifecycle.pipeline': 'Pipeline',
+  'mrLifecycle.pipelineUnavailable': 'Pipeline state is unavailable.',
+  'mrLifecycle.pipelineNone': 'No pipeline reported',
+  'mrLifecycle.pipelinePending': 'Pending',
+  'mrLifecycle.pipelineRunning': 'Running',
+  'mrLifecycle.pipelinePassed': 'Passed',
+  'mrLifecycle.pipelineFailed': 'Failed',
+  'mrLifecycle.pipelineCanceled': 'Canceled',
+  'mrLifecycle.pipelineSkipped': 'Skipped',
+  'mrLifecycle.pipelineUnknown': 'Unknown',
+  'mrLifecycle.readiness': 'Merge readiness',
+  'mrLifecycle.updated': 'Updated',
+  'mrLifecycle.timeUnavailable': 'Time unavailable',
+  'mrLifecycle.close': 'Close merge request',
+  'mrLifecycle.reopen': 'Reopen merge request',
+  'mrLifecycle.approve': 'Approve current HEAD',
+  'mrLifecycle.unapprove': 'Remove approval',
+  'mrLifecycle.refresh': 'Refresh lifecycle',
+  'mrLifecycle.openCanonical': 'Open on GitLab',
+  'mrLifecycle.operationRunning': '{action}…',
+  'mrLifecycle.operationSuccess': '{action} completed.',
+  'mrLifecycle.operationCanceled': 'The lifecycle operation was canceled.',
+  'mrLifecycle.operationError':
+    'The lifecycle operation did not complete. Refresh before retrying.',
   'forkCheckout.action': 'Checkout from another fork…',
   'forkCheckout.title': 'Checkout a branch from another fork',
   'forkCheckout.description':
@@ -2075,6 +2395,167 @@ export const cantoneseTranslations: Readonly<
   'prCreate.openOnGitHub': '喺 GitHub 開啟',
   'prCreate.partialSuccess': 'Pull request 已建立，不過有以下跟進提示：',
   'prCreate.templateNotice': '範本提示：{notice}',
+  'mrEditor.createTitle': '建立 merge request',
+  'mrEditor.editTitle': '編輯 merge request',
+  'mrEditor.description':
+    '用呢個 repo 已綁定嘅 GitLab 帳戶，準備有安全界線嘅 merge request 資料。',
+  'mrEditor.project': 'Project',
+  'mrEditor.boundAccount': 'Repo 綁定帳戶',
+  'mrEditor.routeAria': '指定 GitLab project 同 repo 綁定帳戶',
+  'mrEditor.formAria': 'Merge request 詳情',
+  'mrEditor.sourceBranch': '來源分支',
+  'mrEditor.sourceEditLocked':
+    'GitLab 建立 merge request 之後唔支援更改來源分支。',
+  'mrEditor.targetBranch': '目標分支',
+  'mrEditor.titleField': '標題',
+  'mrEditor.descriptionField': '描述（可選）',
+  'mrEditor.charactersRemaining': '仲可以輸入 {count} 個字元',
+  'mrEditor.markdownSupported': '支援 Markdown',
+  'mrEditor.draftAction': '草稿 merge request',
+  'mrEditor.reviewers': '覆核者',
+  'mrEditor.assignees': '負責人',
+  'mrEditor.reviewersUnavailable':
+    '暫時攞唔到覆核者選項；其他欄位仍然可以編輯。',
+  'mrEditor.assigneesUnavailable':
+    '暫時攞唔到負責人選項；其他欄位仍然可以編輯。',
+  'mrEditor.noneAvailable': '暫時冇可用選項。',
+  'mrEditor.keyboardHint':
+    '喺「標題」按 Enter，或者喺「描述」按 Ctrl+Enter 就可以提交。',
+  'mrEditor.cancel': '取消',
+  'mrEditor.refresh': '重新整理 merge request 資料',
+  'mrEditor.createAction': '建立 merge request',
+  'mrEditor.saveAction': '儲存 merge request',
+  'mrEditor.creating': '建立緊 merge request…',
+  'mrEditor.saving': '儲存緊 merge request…',
+  'mrEditor.created': 'Merge request 已建立。',
+  'mrEditor.saved': 'Merge request 已儲存。',
+  'mrEditor.canceled': 'Merge request 操作已取消。',
+  'mrEditor.loading': '載入緊有安全上限嘅 merge request 選項…',
+  'mrEditor.emptyBranches': '暫時冇分支可以建立 merge request。',
+  'mrEditor.emptySource': '暫時冇可用來源分支。',
+  'mrEditor.emptyTarget': '暫時冇可用目標分支。',
+  'mrEditor.emptyDescription':
+    '等 repo 同 GitLab project 有分支之後，再重新整理。',
+  'mrEditor.errorTitle': '暫時攞唔到 merge request 選項',
+  'mrEditor.errorAuthentication': '認證唔到呢個 repo 已綁定嘅 GitLab 帳戶。',
+  'mrEditor.errorPermission':
+    '呢個 repo 已綁定嘅 GitLab 帳戶冇權讀取此 project。',
+  'mrEditor.errorNetwork': '連唔到 GitLab；請檢查網絡再試。',
+  'mrEditor.errorUnsupported':
+    '呢部 GitLab 伺服器未提供所需嘅 merge request API。',
+  'mrEditor.errorInvalidResponse':
+    'GitLab 回傳嘅資料未能安全驗證，所以冇使用。',
+  'mrEditor.errorUnknown': '載入唔到 merge request 資料；請重新整理再試。',
+  'mrEditor.staleTitle': 'Repo 或帳戶資料已經轉咗',
+  'mrEditor.staleDescription':
+    '呢個編輯器綁住較舊嘅 repo、帳戶、端點或者請求版本；提交之前請先重新整理。',
+  'mrEditor.partialTitle': '有部分可選資料未齊',
+  'mrEditor.partialUnavailable':
+    '用唔到嘅覆核者或負責人欄位已停用；必填欄位仍然可以使用。',
+  'mrEditor.partialCapped':
+    '一個或以上選項清單已到安全上限，或者有項目未通過驗證。',
+  'mrEditor.readinessLabel': 'Merge 準備狀態',
+  'mrEditor.readinessChecking': 'GitLab 仲檢查緊可唔可以 merge…',
+  'mrEditor.readinessReady': '可以 merge',
+  'mrEditor.readinessBlocked': '暫時未可以 merge：{reason}',
+  'mrEditor.readinessUnknown': '暫時未有 merge 準備狀態。',
+  'mrEditor.blockerStatus': 'project 政策或者 merge 檢查',
+  'mrEditor.blockerCiMustPass': 'pipeline 要先通過',
+  'mrEditor.blockerCiRunning': 'pipeline 仲運行緊',
+  'mrEditor.blockerConflict': '來源同目標分支有衝突',
+  'mrEditor.blockerDiscussions': '仲有覆核討論未解決',
+  'mrEditor.blockerDraft': 'merge request 仲係草稿',
+  'mrEditor.blockerExternalChecks': '外部狀態檢查仲未完成',
+  'mrEditor.blockerJira': '欠缺必要 Jira 關聯',
+  'mrEditor.blockerRebase': '來源分支要先 rebase',
+  'mrEditor.blockerApproval': '仲未有齊必要批准',
+  'mrEditor.blockerNotOpen': 'merge request 唔係開放狀態',
+  'mrEditor.blockerPolicy': 'merge 政策拒絕咗今次請求',
+  'mrEditor.blockerCommitsStatus': '有一個或以上 commit 狀態阻擋緊',
+  'mrEditor.blockerRequestBlocked': '有另一個 merge request 條件阻擋緊',
+  'mrEditor.blockerMergeTime': '未到預定 merge 時間',
+  'mrEditor.blockerRequestedChanges': '覆核者要求咗修改',
+  'mrEditor.blockerSecurityPipeline': '安全政策 pipeline 檢查仲未完成',
+  'mrEditor.blockerSecurityViolation': '有安全政策違規',
+  'mrEditor.blockerStatusChecks': '必要狀態檢查要先通過',
+  'mrEditor.blockerLockedPaths': '有一個或以上已改路徑被鎖定',
+  'mrEditor.blockerLockedLfs': '有一個或以上已改 LFS 檔案被鎖定',
+  'mrEditor.blockerTitleRegex': '標題唔符合 project 政策',
+  'mrEditor.validationTitle': '請修正以下 merge request 資料：',
+  'mrEditor.validationSource': '請揀一條有效來源分支。',
+  'mrEditor.validationTarget': '請揀一條有效目標分支。',
+  'mrEditor.validationBranchesDiffer': '來源同目標分支唔可以一樣。',
+  'mrEditor.validationTitleRequired': '請輸入 merge request 標題。',
+  'mrEditor.validationTitleLength': '標題超過 255 字元安全上限。',
+  'mrEditor.validationTitleInvalid': '請移除標題前後空白或者唔支援嘅控制字元。',
+  'mrEditor.validationBodyLength': '描述超過 128 KiB 安全上限。',
+  'mrEditor.validationBodyInvalid': '描述包含唔支援嘅 null 字元。',
+  'mrEditor.validationReviewerLimit': '最多揀 20 位覆核者。',
+  'mrEditor.validationAssigneeLimit': '最多揀 20 位負責人。',
+  'mrEditor.validationReviewerDuplicate': '每位覆核者只可以揀一次。',
+  'mrEditor.validationAssigneeDuplicate': '每位負責人只可以揀一次。',
+  'mrEditor.validationReviewerInvalid':
+    '有一位已揀覆核者唔喺目前安全選項入面。',
+  'mrEditor.validationAssigneeInvalid':
+    '有一位已揀負責人唔喺目前安全選項入面。',
+  'mrEditor.submitRejected':
+    'GitLab 拒絕咗 merge request 更新；請重新整理並覆核目前狀態。',
+  'mrEditor.submitNetwork': 'Merge request 更新連唔到 GitLab；請檢查網絡再試。',
+  'mrEditor.submitStale':
+    '更新完成之前，repo、帳戶、merge request 或 HEAD 已經轉咗。',
+  'mrEditor.submitInvalidResponse': 'GitLab 回傳嘅更新結果未能安全驗證。',
+  'mrEditor.submitUnknown': 'Merge request 更新未完成；再試之前請先重新整理。',
+  'mrLifecycle.title': 'Merge request 生命週期',
+  'mrLifecycle.loading': '載入緊 merge request 生命週期…',
+  'mrLifecycle.empty': '未揀 merge request',
+  'mrLifecycle.emptyDescription':
+    '建立或者揀一個 merge request，先可以管理佢嘅生命週期。',
+  'mrLifecycle.unavailable': '暫時用唔到 merge request 生命週期',
+  'mrLifecycle.unavailableDescription':
+    '請重新整理 repo 綁定嘅 GitLab 資料再試。',
+  'mrLifecycle.stale': 'Merge request 生命週期資料已經轉咗',
+  'mrLifecycle.staleDescription':
+    'Repo、帳戶、merge request 或 HEAD 資料已經轉咗；操作之前請先重新整理。',
+  'mrLifecycle.partial': '有部分生命週期資料未能提供；可用操作仍然有安全界線。',
+  'mrLifecycle.summaryAria': 'Merge request 生命週期摘要',
+  'mrLifecycle.state': '狀態',
+  'mrLifecycle.stateOpened': '開放',
+  'mrLifecycle.stateClosed': '已關閉',
+  'mrLifecycle.stateMerged': '已 merge',
+  'mrLifecycle.stateLocked': '已鎖定',
+  'mrLifecycle.draft': '草稿',
+  'mrLifecycle.author': '作者',
+  'mrLifecycle.reviewers': '覆核者',
+  'mrLifecycle.assignees': '負責人',
+  'mrLifecycle.none': '冇',
+  'mrLifecycle.approval': '批准進度',
+  'mrLifecycle.approvalUnavailable': '暫時未有批准狀態。',
+  'mrLifecycle.approvalComplete': '已經有齊必要批准',
+  'mrLifecycle.approvalProgress': '必要批准已完成 {approved}/{required}',
+  'mrLifecycle.approvedBy': '由 {names} 批准',
+  'mrLifecycle.pipeline': 'Pipeline',
+  'mrLifecycle.pipelineUnavailable': '暫時未有 pipeline 狀態。',
+  'mrLifecycle.pipelineNone': '未有 pipeline',
+  'mrLifecycle.pipelinePending': '等候中',
+  'mrLifecycle.pipelineRunning': '運行緊',
+  'mrLifecycle.pipelinePassed': '已通過',
+  'mrLifecycle.pipelineFailed': '失敗',
+  'mrLifecycle.pipelineCanceled': '已取消',
+  'mrLifecycle.pipelineSkipped': '已略過',
+  'mrLifecycle.pipelineUnknown': '未知',
+  'mrLifecycle.readiness': 'Merge 準備狀態',
+  'mrLifecycle.updated': '更新時間',
+  'mrLifecycle.timeUnavailable': '暫時未有時間',
+  'mrLifecycle.close': '關閉 merge request',
+  'mrLifecycle.reopen': '重新開啟 merge request',
+  'mrLifecycle.approve': '批准目前 HEAD',
+  'mrLifecycle.unapprove': '移除批准',
+  'mrLifecycle.refresh': '重新整理生命週期',
+  'mrLifecycle.openCanonical': '喺 GitLab 開啟',
+  'mrLifecycle.operationRunning': '{action}…',
+  'mrLifecycle.operationSuccess': '{action}已完成。',
+  'mrLifecycle.operationCanceled': '生命週期操作已取消。',
+  'mrLifecycle.operationError': '生命週期操作未完成；再試之前請先重新整理。',
   'forkCheckout.action': '由另一個 fork checkout…',
   'forkCheckout.title': 'Checkout 另一個 fork 嘅分支',
   'forkCheckout.description':

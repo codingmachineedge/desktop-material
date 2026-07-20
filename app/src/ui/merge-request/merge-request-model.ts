@@ -134,7 +134,9 @@ export type MergeRequestValidationError =
   | 'branches-must-differ'
   | 'title-required'
   | 'title-too-long'
+  | 'title-invalid'
   | 'body-too-long'
+  | 'body-invalid'
   | 'too-many-reviewers'
   | 'too-many-assignees'
   | 'duplicate-reviewers'
@@ -162,8 +164,8 @@ export interface IBoundedMergeRequestContext {
   readonly capped: ReadonlyArray<MergeRequestCappedCollection>
 }
 
-const LegacyDraftPrefix = /^Draft:\s*/i
-const ShaPattern = /^[0-9a-f]{40}$/i
+const LegacyDraftPrefix = /^(?:(?:draft|wip):\s*)+/i
+const ShaPattern = /^[0-9a-f]{40,64}$/i
 
 function hasControlCharacters(value: string): boolean {
   return /[\u0000-\u001f\u007f]/.test(value)
@@ -198,9 +200,16 @@ function boundedUnique<T>(
 
 function validBranch(branch: IMergeRequestBranchOption): boolean {
   return (
-    branch.name.trim() !== '' &&
+    branch.name.trim() === branch.name &&
+    branch.name !== '' &&
     branch.name.length <= MergeRequestBranchMaximumLength &&
-    !hasControlCharacters(branch.name)
+    !branch.name.startsWith('/') &&
+    !branch.name.endsWith('/') &&
+    !branch.name.endsWith('.') &&
+    !branch.name.includes('..') &&
+    !branch.name.includes('//') &&
+    !branch.name.includes('@{') &&
+    !/[\u0000-\u0020\u007f~^:?*\\[]/.test(branch.name)
   )
 }
 
@@ -274,7 +283,7 @@ export function boundMergeRequestEditorContext(
 
 /**
  * Prefer the explicit draft flag. Older GitLab servers are supported by
- * recognizing and removing the legacy `Draft:` title prefix.
+ * recognizing and removing the legacy `Draft:` or `WIP:` title prefix.
  */
 export function normalizeMergeRequestInitialValue(
   input: IMergeRequestEditorInitialValue = {}
@@ -328,9 +337,13 @@ export function validateMergeRequestDraft(
     errors.push('title-required')
   } else if (draft.title.length > MergeRequestTitleMaximumLength) {
     errors.push('title-too-long')
+  } else if (draft.title.trim() !== draft.title || draft.title.includes('\0')) {
+    errors.push('title-invalid')
   }
   if (draft.body.length > MergeRequestBodyMaximumLength) {
     errors.push('body-too-long')
+  } else if (draft.body.includes('\0')) {
+    errors.push('body-invalid')
   }
   if (draft.reviewerIds.length > MergeRequestMaximumReviewers) {
     errors.push('too-many-reviewers')
@@ -360,19 +373,33 @@ export type MergeRequestReadiness =
   | { readonly kind: 'blocked'; readonly status: string }
   | { readonly kind: 'unknown' }
 
+const TransientDetailedMergeStatuses = new Set([
+  'approvals_syncing',
+  'checking',
+  'preparing',
+  'unchecked',
+])
+
 const BlockedDetailedMergeStatuses = new Set([
-  'blocked_status',
   'ci_must_pass',
   'ci_still_running',
+  'commits_status',
   'conflict',
   'discussions_not_resolved',
   'draft_status',
-  'external_status_checks',
   'jira_association_missing',
+  'merge_request_blocked',
+  'merge_time',
   'need_rebase',
   'not_approved',
   'not_open',
-  'policies_denied',
+  'requested_changes',
+  'security_policy_pipeline_check',
+  'security_policy_violations',
+  'status_checks_must_pass',
+  'locked_paths',
+  'locked_lfs_files',
+  'title_regex',
 ])
 
 /** Turn GitLab detailed merge status into a conservative UI state. */
@@ -380,7 +407,7 @@ export function classifyDetailedMergeStatus(
   value: string | undefined
 ): MergeRequestReadiness {
   const status = value?.trim().toLowerCase()
-  if (status === 'checking' || status === 'approvals_syncing') {
+  if (status !== undefined && TransientDetailedMergeStatuses.has(status)) {
     return { kind: 'transient' }
   }
   if (status === 'mergeable') {

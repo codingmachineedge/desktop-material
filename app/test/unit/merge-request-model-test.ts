@@ -77,7 +77,7 @@ describe('merge request structural model', () => {
     assert.deepStrictEqual(bounded.capped, ['sourceBranches', 'reviewers'])
   })
 
-  it('prefers an explicit draft flag and supports the legacy Draft title', () => {
+  it('prefers an explicit draft flag and supports legacy Draft and WIP titles', () => {
     assert.deepStrictEqual(
       normalizeMergeRequestInitialValue({
         title: 'Draft: Ship the safe editor',
@@ -92,6 +92,12 @@ describe('merge request structural model', () => {
         reviewerIds: [],
         assigneeIds: [],
       }
+    )
+    assert.strictEqual(
+      normalizeMergeRequestInitialValue({
+        title: 'WIP: Draft: Ship the compatible editor',
+      }).title,
+      'Ship the compatible editor'
     )
     assert.strictEqual(
       normalizeMergeRequestInitialValue({
@@ -156,22 +162,64 @@ describe('merge request structural model', () => {
     assert.ok(errors.includes('duplicate-assignees'))
     assert.ok(errors.includes('invalid-reviewer'))
     assert.ok(errors.includes('invalid-assignee'))
+
+    assert.deepStrictEqual(
+      validateMergeRequestDraft(
+        {
+          sourceBranch: 'feature',
+          targetBranch: 'main',
+          title: ' Surrounding whitespace ',
+          body: 'unsafe\0body',
+          draft: false,
+          reviewerIds: [],
+          assigneeIds: [],
+        },
+        current
+      ),
+      ['title-invalid', 'body-invalid']
+    )
   })
 
-  it('treats checking and approval syncing as transient readiness', () => {
-    assert.deepStrictEqual(classifyDetailedMergeStatus('checking'), {
-      kind: 'transient',
-    })
-    assert.deepStrictEqual(classifyDetailedMergeStatus('approvals_syncing'), {
-      kind: 'transient',
-    })
+  it('classifies every core detailed merge status conservatively', () => {
+    for (const status of [
+      'checking',
+      'approvals_syncing',
+      'preparing',
+      'unchecked',
+    ]) {
+      assert.deepStrictEqual(classifyDetailedMergeStatus(status), {
+        kind: 'transient',
+      })
+    }
     assert.deepStrictEqual(classifyDetailedMergeStatus('mergeable'), {
       kind: 'ready',
     })
-    assert.deepStrictEqual(classifyDetailedMergeStatus('not_approved'), {
-      kind: 'blocked',
-      status: 'not_approved',
-    })
+    for (const status of [
+      'ci_must_pass',
+      'ci_still_running',
+      'commits_status',
+      'conflict',
+      'discussions_not_resolved',
+      'draft_status',
+      'jira_association_missing',
+      'merge_request_blocked',
+      'merge_time',
+      'need_rebase',
+      'not_approved',
+      'not_open',
+      'requested_changes',
+      'security_policy_pipeline_check',
+      'security_policy_violations',
+      'status_checks_must_pass',
+      'locked_paths',
+      'locked_lfs_files',
+      'title_regex',
+    ]) {
+      assert.deepStrictEqual(classifyDetailedMergeStatus(status), {
+        kind: 'blocked',
+        status,
+      })
+    }
     assert.deepStrictEqual(classifyDetailedMergeStatus('new_server_value'), {
       kind: 'unknown',
     })
@@ -189,6 +237,12 @@ describe('merge request structural model', () => {
       true
     )
     assert.deepStrictEqual(intent, { ...reviewed, approve: true })
+
+    const reviewed64 = { ...reviewed, headSha: 'c'.repeat(64) }
+    assert.deepStrictEqual(
+      createHeadShaGuardedApprovalIntent(reviewed64, reviewed64, false),
+      { ...reviewed64, approve: false }
+    )
 
     assert.strictEqual(
       createHeadShaGuardedApprovalIntent(
