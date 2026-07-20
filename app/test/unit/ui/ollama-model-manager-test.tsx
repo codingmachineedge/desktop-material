@@ -474,6 +474,33 @@ describe('OllamaModelManager', () => {
     assert.strictEqual(screen.queryByText('Installed late-model.'), null)
   })
 
+  it('recovers inventory when pull cancellation races the post-pull refresh', async () => {
+    const client = new TestOllamaClient(['alpha'])
+    renderManager(provider('cancel-refresh', [providerModel('alpha')]), client)
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Select alpha' }))
+    )
+
+    const postPullInventory = deferred<ReadonlyArray<IOllamaModelRecord>>()
+    client.listGate = postPullInventory
+    fireEvent.change(screen.getByLabelText('Model name'), {
+      target: { value: 'beta' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Pull and install' }))
+    await waitFor(() =>
+      assert.strictEqual(client.calls.filter(call => call === 'list').length, 2)
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    postPullInventory.resolve([...client.models])
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Refresh' }))
+    )
+    assert.ok(screen.getByText('Model installation canceled.'))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+  })
+
   it('does not write a late operation result into a newly selected provider', async () => {
     const clientA = new TestOllamaClient(['alpha'])
     const copyGate = deferred<void>()
