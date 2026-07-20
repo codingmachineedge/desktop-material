@@ -41,7 +41,7 @@
 ## Ordered background interactions
 
 1. Reconfirm source root, clean baseline, exact branch/remote SHA, and active GitHub account.
-2. Use the skill-bundled `scripts/lowlevel_mcp_client.py` against `http://127.0.0.1:8765/mcp`. The skill text contains stale `C:\Users\cntow\...` paths; this run must use the actual Administrator checkouts and record that mismatch rather than touching another checkout.
+2. Use the skill-bundled `scripts/lowlevel_mcp_client.py` against `http://127.0.0.1:8765/mcp`. The skill text contains stale `%USERPROFILE%\...` paths; this run must use the actual Administrator checkouts and record that mismatch rather than touching another checkout.
 3. Require MCP `startup_status` `ok: true`. Through MCP `run_command`, inspect the scheduled task executable/arguments and require the actual server checkout `C:\Users\Administrator\Documents\GitHub\lowlevel-computer-use-mcp`, port `8765`, and its exact `git rev-parse HEAD`; require `client_ok: true`, `returncode: 0`, and `timed_out: false` for every preflight command.
 4. Through MCP `run_command`, build exactly `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod` from the source root with a 3,600-second tool timeout and a longer client timeout. Abort rather than downloading any dependency.
 5. Create one unique owned run root beneath `%TEMP%\desktop-material-p0-ui-20260713-c7e68853`. Under it create the disposable Git repositories/remotes, isolated user-data/home/config directories, captures, downloaded artifacts, local fake-provider state, logs, and cleanup ledger. Resolve every path beneath this root before later deletion.

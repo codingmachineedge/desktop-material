@@ -16,7 +16,7 @@
 ## Local result
 
 - MCP preflight passed: `startup_status.ok=true`; the scheduled task runs `uv`
-  from `C:\Users\cntow\Documents\GitHub\lowlevel-computer-use-mcp` on
+  from `%USERPROFILE%\Documents\GitHub\lowlevel-computer-use-mcp` on
   `127.0.0.1:8765`, whose source was
   `beed66ca6ed2503e6170ee1e1158247f1c2f0140`.
 - The required production build ran through that MCP server and refreshed the

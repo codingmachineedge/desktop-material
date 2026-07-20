@@ -637,12 +637,25 @@ clipping controls below the viewport.
 ### Sparse checkout
 
 Open **Repository → Manage sparse checkout…** to keep selected directories in a large worktree.
-The side panel reports whether sparse checkout is enabled, explains cone mode, and accepts one
-repository-relative directory per line. It normalizes slashes and rejects absolute paths,
-traversal, option-like input, control characters, blanks, and duplicates before the review step.
+The side panel reports whether sparse checkout is enabled and guides each change through
+**Select → Review → Apply**:
 
-Choose **Review enable** only after the valid-directory count matches your intent. The verified
-disabled state below leaves all working-tree paths eligible to appear locally.
+1. **Select** one repository-relative directory root per line. Slashes are normalized, while
+   absolute paths, traversal, option-like input, control characters, blanks, duplicates, and
+   over-limit selections are rejected. State-aware guidance says whether the selection is empty,
+   needs correction, or is ready for review.
+2. **Review** the frozen normalized selection before Git changes the worktree. The bounded review
+   shows every selected root. When cone mode is already enabled, it also reports added, removed,
+   and unchanged selection entries; these counts describe directory-root entries rather than
+   predicting individual local files.
+3. **Apply** the reviewed operation and let Desktop Material refresh repository state. Cancellation
+   remains available while Git is changing the worktree. Success, cancellation, or failure stays
+   on the result phase until you edit the selection or request a manual refresh.
+
+Choose **Review enable** only after the valid-directory count and exact normalized review match
+your intent. Reapply and disable have their own review confirmations; disabling restores the full
+tracked working tree without changing commits or history. The verified disabled state below leaves
+all working-tree paths eligible to appear locally.
 
 ![Sparse-checkout directory editor in its disabled state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
 

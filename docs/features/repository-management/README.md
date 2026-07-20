@@ -7,6 +7,9 @@ Material is displaying or how a repository is represented in the application.
 
 - [Selective stashes](selective-stashes.md) — save only an exact reviewed set
   of whole changed files with repository-bound path validation.
+- [Guided sparse checkout](sparse-checkout.md) — select, review every bounded
+  normalized directory root, and apply cone-mode worktree changes through a
+  retained result phase.
 - [Named multi-stash manager](named-stash-manager.md) — create, inspect, apply,
   pop, rename, branch from, and clear exact object-identified stashes.
 - [Advanced history

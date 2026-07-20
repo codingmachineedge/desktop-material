@@ -145,6 +145,12 @@ export const SearchSurfaceRegistry: ReadonlyArray<ISearchSurfaceRegistration> =
       implementation: 'shared-filter-list',
     },
     {
+      id: 'ollama-models',
+      label: 'Ollama models',
+      source: 'copilot/ollama-model-manager.tsx',
+      implementation: 'standalone',
+    },
+    {
       id: 'material-context-menu',
       label: 'Context-menu actions',
       source: 'lib/material-context-menu.tsx',

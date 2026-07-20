@@ -5,7 +5,13 @@ import * as React from 'react'
 import { Repository } from '../../../src/models/repository'
 import { parseSparseCheckoutDirectories } from '../../../src/lib/git/sparse-checkout-parser'
 import { DialogStackContext } from '../../../src/ui/dialog'
-import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '../../helpers/ui/render'
 
 class TestSparseCheckoutError extends Error {}
 
@@ -86,11 +92,52 @@ describe('SparseCheckoutManager', () => {
     const editor = await screen.findByRole('textbox', {
       name: 'Included directories',
     })
+    const workflow = screen.getByRole('list', {
+      name: 'Sparse checkout workflow',
+    })
+    assert.equal(within(workflow).getAllByRole('listitem').length, 3)
+    assert.equal(
+      within(workflow)
+        .getByText('Choose directories')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
+    assert.ok(
+      screen.getByText(
+        'Add at least one repository-relative directory to continue.'
+      )
+    )
+    fireEvent.change(editor, { target: { value: '../outside' } })
+    assert.ok(screen.getByText('Fix 1 validation issue before review.'))
     fireEvent.change(editor, { target: { value: 'src\\ui/' } })
+    assert.ok(screen.getByText('Ready to review 1 directory root.'))
     const review = screen.getByRole('button', { name: 'Review enable' })
     fireEvent.click(review)
 
     assert.ok(screen.getByRole('alertdialog'))
+    assert.equal(
+      within(workflow)
+        .getByText('Review selection')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
+    assert.ok(screen.getByText('1 selected directory root will be applied.'))
+    assert.equal(
+      screen.getByLabelText('Reviewed selection size').textContent,
+      'Selected roots1'
+    )
+    assert.ok(
+      screen.getByText(
+        'Step 2 is locked to the reviewed selection. Go back to edit it.'
+      )
+    )
+    assert.ok(
+      within(
+        screen.getByRole('list', { name: 'Reviewed directory selection' })
+      ).getByText('src/ui')
+    )
     const confirm = screen.getByRole('button', {
       name: 'Apply directory selection',
     })
@@ -123,6 +170,18 @@ describe('SparseCheckoutManager', () => {
       name: 'Cancel operation',
     })
     await waitFor(() => assert.equal(document.activeElement, cancel))
+    assert.ok(
+      screen.getByText(
+        'Step 3 is running. You can cancel while Git is changing the worktree.'
+      )
+    )
+    assert.equal(
+      within(workflow)
+        .getByText('Apply and refresh')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
     assert.deepEqual(inputs, ['src/ui'])
 
     const closeShortcut = __DARWIN__
@@ -135,8 +194,147 @@ describe('SparseCheckoutManager', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => assert.equal(signals[0]?.aborted, true))
     await screen.findByText('Operation cancelled. Repository state refreshed.')
+    assert.equal(
+      within(workflow)
+        .getByText('Apply and refresh')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
+    assert.ok(
+      screen.getByText(
+        'Step 3 finished. Review the result, then edit the selection or refresh to start again.'
+      )
+    )
     assert.equal(refreshes, 1)
     assert.ok(stateLoads >= 2)
+  })
+
+  it('shows exact enabled-cone changes and keeps the result step until editing resumes', async () => {
+    let sparseState = {
+      ...disabledState,
+      enabled: true,
+      coneMode: true,
+      entries: ['src', 'docs', 'test'],
+    }
+    const client = {
+      getState: async () => sparseState,
+      setDirectories: async (
+        _repositoryPath: string,
+        input: string
+      ): Promise<ReadonlyArray<string>> => {
+        const entries = input.split('\n')
+        sparseState = { ...sparseState, entries }
+        return entries
+      },
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+
+    render(
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={async () => {}}
+          onDismissed={() => {}}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    const workflow = screen.getByRole('list', {
+      name: 'Sparse checkout workflow',
+    })
+    fireEvent.change(editor, { target: { value: 'src\npackages' } })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review directory update' })
+    )
+
+    const changes = screen.getByLabelText('Selection entry changes')
+    assert.equal(
+      within(changes).getByText('Added roots').nextElementSibling?.textContent,
+      '1'
+    )
+    assert.equal(
+      within(changes).getByText('Removed roots').nextElementSibling
+        ?.textContent,
+      '2'
+    )
+    assert.equal(
+      within(changes).getByText('Unchanged roots').nextElementSibling
+        ?.textContent,
+      '1'
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply directory selection' })
+    )
+    await screen.findByText('Included directories updated.')
+    assert.equal(
+      within(workflow)
+        .getByText('Apply and refresh')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
+
+    fireEvent.change(editor, { target: { value: 'src' } })
+    assert.equal(
+      within(workflow)
+        .getByText('Adjust directories')
+        .closest('li')
+        ?.getAttribute('aria-current'),
+      'step'
+    )
+    assert.ok(screen.getByText('Ready to review 1 directory root.'))
+  })
+
+  it('shows every bounded normalized entry in the exact review', async () => {
+    const client = {
+      getState: async () => disabledState,
+      setDirectories: async () => [],
+      reapply: async () => {},
+      disable: async () => {},
+    }
+    const repository = new Repository('C:/repo', -1, null, false)
+    const { SparseCheckoutManager } = await import(
+      '../../../src/ui/sparse-checkout/sparse-checkout'
+    )
+    const directories = Array.from(
+      { length: 13 },
+      (_, index) => `packages/package-${index + 1}`
+    )
+
+    render(
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <SparseCheckoutManager
+          repository={repository}
+          client={client}
+          onRefreshRepository={async () => {}}
+          onDismissed={() => {}}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    const editor = await screen.findByRole('textbox', {
+      name: 'Included directories',
+    })
+    fireEvent.change(editor, { target: { value: directories.join('\n') } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review enable' }))
+
+    const reviewed = screen.getByRole('list', {
+      name: 'Reviewed directory selection',
+    })
+    assert.equal(within(reviewed).getAllByRole('listitem').length, 13)
+    assert.ok(within(reviewed).getByText('packages/package-13'))
+    assert.equal(screen.queryByText(/Plus \d+ more reviewed/), null)
   })
 
   it('owns shortcuts only while topmost and focused, and separates review dismissal from closing', async () => {

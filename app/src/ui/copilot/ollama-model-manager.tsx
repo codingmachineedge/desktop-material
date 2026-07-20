@@ -1,5 +1,11 @@
 import * as React from 'react'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { Button } from '../lib/button'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 export interface IOllamaManagerProviderModel {
   readonly id: string
@@ -344,6 +350,8 @@ interface IOllamaModelManagerState {
   readonly detailsLoading: boolean
   readonly detailsUnavailable: boolean
   readonly query: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
   readonly scope: InventoryScope
   readonly pullName: string
   readonly copyName: string
@@ -367,6 +375,7 @@ interface IInventoryRefreshResult {
 const MaximumLicenseCharacters = 1200
 const MaximumMetadataCharacters = 180
 const MaximumCapabilities = 10
+const OllamaModelsSearchSurfaceId = 'ollama-models'
 let managerInstance = 0
 
 function settle<T>(promise: Promise<T>): Promise<ISettledResult<T>> {
@@ -475,7 +484,7 @@ export class OllamaModelManager extends React.Component<
 
   public render() {
     const strings = this.getStrings()
-    const visibleModels = this.getVisibleModels()
+    const visibleModelResult = this.getVisibleModels()
     const initialLoading =
       this.state.inventoryPhase === 'loading' && this.state.models === null
     const busy = this.state.operation !== null
@@ -510,8 +519,8 @@ export class OllamaModelManager extends React.Component<
 
         <div className="ollama-model-manager-workspace">
           <div className="ollama-model-inventory">
-            {this.renderInventoryControls(strings)}
-            {this.renderInventory(strings, visibleModels)}
+            {this.renderInventoryControls(strings, visibleModelResult)}
+            {this.renderInventory(strings, visibleModelResult.models)}
           </div>
           {this.renderDetails(strings)}
         </div>
@@ -531,6 +540,8 @@ export class OllamaModelManager extends React.Component<
       detailsLoading: false,
       detailsUnavailable: false,
       query: '',
+      filterMode: readPersistedFilterMode(OllamaModelsSearchSurfaceId),
+      filterCaseSensitive: false,
       scope: 'all',
       pullName: '',
       copyName: '',
@@ -956,24 +967,64 @@ export class OllamaModelManager extends React.Component<
     )
   }
 
-  private renderInventoryControls(strings: IOllamaModelManagerStrings) {
+  private renderInventoryControls(
+    strings: IOllamaModelManagerStrings,
+    visibleModelResult: {
+      readonly models: ReadonlyArray<INormalizedModel>
+      readonly regexError: string | null
+    }
+  ) {
     const total = this.state.models?.length ?? 0
-    const visible = this.getVisibleModels().length
+    const visible = visibleModelResult.models.length
+    const searchErrorId = `${this.headingId}-search-error`
     return (
       <div className="ollama-inventory-controls">
         <div className="ollama-model-search" role="search">
           <label htmlFor={`${this.headingId}-search`}>
             {strings.searchLabel}
           </label>
-          <input
-            id={`${this.headingId}-search`}
-            data-verification="ollama-filter"
-            type="search"
-            value={this.state.query}
-            onChange={this.onQueryChanged}
-            placeholder={strings.searchPlaceholder}
-            disabled={this.state.models === null}
-          />
+          <div
+            className={`ollama-model-search-field${
+              visibleModelResult.regexError === null ? '' : ' invalid'
+            }`}
+          >
+            <input
+              id={`${this.headingId}-search`}
+              data-search-surface-id="ollama-models"
+              data-verification="ollama-filter"
+              type="search"
+              value={this.state.query}
+              onChange={this.onQueryChanged}
+              placeholder={strings.searchPlaceholder}
+              disabled={this.state.models === null}
+              aria-invalid={visibleModelResult.regexError !== null}
+              aria-describedby={
+                visibleModelResult.regexError === null
+                  ? undefined
+                  : searchErrorId
+              }
+            />
+            <FilterModeControl
+              searchSurfaceId="ollama-models"
+              mode={this.state.filterMode}
+              caseSensitive={this.state.filterCaseSensitive}
+              onModeChange={this.onFilterModeChanged}
+              onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+              regexBuilderTarget={strings.inventoryLabel}
+              getSampleItems={this.getFilterSampleItems}
+              filterText={this.state.query}
+              onRegexPatternApply={this.onFilterPatternApply}
+            />
+          </div>
+          {visibleModelResult.regexError !== null && (
+            <span
+              id={searchErrorId}
+              className="ollama-filter-error"
+              role="alert"
+            >
+              {visibleModelResult.regexError}
+            </span>
+          )}
         </div>
         <label className="ollama-scope-control">
           <span>{strings.scopeLabel}</span>
@@ -1076,33 +1127,57 @@ export class OllamaModelManager extends React.Component<
     )
   }
 
-  private getVisibleModels(): ReadonlyArray<INormalizedModel> {
-    const models = this.state.models ?? []
-    const query = this.state.query.trim().toLocaleLowerCase()
-    return models.filter(model => {
-      if (
-        this.state.scope === 'running' &&
-        this.getRunningModel(model.name) === null
-      ) {
-        return false
-      }
-      if (query === '') {
-        return true
-      }
-      const details = model.details
-      return [
-        model.name,
-        details?.family,
-        details?.format,
-        details?.parameterSize,
-        details?.quantizationLevel,
-        ...(details?.families ?? []),
-        ...(model.capabilities ?? []),
-      ]
-        .filter((value): value is string => value !== undefined)
-        .some(value => value.toLocaleLowerCase().includes(query))
+  private getVisibleModels(): {
+    readonly models: ReadonlyArray<INormalizedModel>
+    readonly regexError: string | null
+  } {
+    const models = (this.state.models ?? []).filter(
+      model =>
+        this.state.scope !== 'running' ||
+        this.getRunningModel(model.name) !== null
+    )
+    const query = this.state.query.trim()
+    if (query === '') {
+      return { models, regexError: null }
+    }
+    const searchKeys =
+      this.state.filterMode === FilterMode.Fuzzy
+        ? this.getFuzzyModelSearchKeys
+        : this.getModelSearchKeys
+    const result = matchWithMode(query, models, searchKeys, {
+      mode: this.state.filterMode,
+      caseSensitive: this.state.filterCaseSensitive,
     })
+    return {
+      models: result.results.map(match => match.item),
+      regexError: result.regexError,
+    }
   }
+
+  private getModelSearchKeys = (
+    model: INormalizedModel
+  ): ReadonlyArray<string> => {
+    const details = model.details
+    return [
+      model.name,
+      details?.family,
+      details?.format,
+      details?.parameterSize,
+      details?.quantizationLevel,
+      ...(details?.families ?? []),
+      ...(model.capabilities ?? []),
+    ].filter((value): value is string => value !== undefined)
+  }
+
+  private getFuzzyModelSearchKeys = (
+    model: INormalizedModel
+  ): ReadonlyArray<string> => {
+    const [, ...metadata] = this.getModelSearchKeys(model)
+    return [model.name, metadata.join(' ')]
+  }
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    (this.state.models ?? []).flatMap(this.getModelSearchKeys)
 
   private getModelSubtitle(model: INormalizedModel): string {
     const parts = [
@@ -1455,6 +1530,19 @@ export class OllamaModelManager extends React.Component<
 
   private onQueryChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ query: event.currentTarget.value })
+  }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(OllamaModelsSearchSurfaceId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) => {
+    this.setState({ filterCaseSensitive })
+  }
+
+  private onFilterPatternApply = (query: string) => {
+    this.setState({ query })
   }
 
   private onScopeChanged = (event: React.ChangeEvent<HTMLSelectElement>) => {

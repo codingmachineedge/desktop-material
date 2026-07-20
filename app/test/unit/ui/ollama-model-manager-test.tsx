@@ -270,6 +270,85 @@ describe('OllamaModelManager', () => {
     ])
   })
 
+  it('uses the shared persisted filter modes and regex builder safely', async () => {
+    const storageKey = 'filter-mode/ollama-models'
+    window.localStorage.removeItem(storageKey)
+    const view = renderManager(
+      provider('search'),
+      new TestOllamaClient(['Alpha', 'beta'])
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    )
+    const search = screen.getByRole('searchbox', {
+      name: 'Search installed models',
+    })
+    assert.strictEqual(
+      search.getAttribute('data-search-surface-id'),
+      'ollama-models'
+    )
+
+    fireEvent.change(search, { target: { value: 'tools' } })
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+
+    fireEvent.change(search, { target: { value: 'Q4_K_M' } })
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+
+    fireEvent.change(search, { target: { value: '' } })
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
+    )
+    assert.strictEqual(window.localStorage.getItem(storageKey), 'substring')
+    fireEvent.change(search, { target: { value: 'ALPHA' } })
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Match case' }))
+    assert.strictEqual(
+      screen.queryByRole('button', { name: 'Select Alpha' }),
+      null
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Substring (click to change)',
+      })
+    )
+    fireEvent.change(search, { target: { value: '(' } })
+    assert.strictEqual(search.getAttribute('aria-invalid'), 'true')
+    assert.ok(screen.getByRole('alert'))
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open regex builder' }))
+    const builder = screen.getByRole('dialog', { name: 'Regex builder' })
+    fireEvent.change(
+      within(builder).getByRole('textbox', {
+        name: 'Regular expression pattern',
+      }),
+      { target: { value: '^beta$' } }
+    )
+    fireEvent.click(
+      within(builder).getByRole('button', {
+        name: 'Apply to Installed Ollama models',
+      })
+    )
+    assert.strictEqual(window.localStorage.getItem(storageKey), 'regex')
+    assert.strictEqual(
+      screen.queryByRole('button', { name: 'Select Alpha' }),
+      null
+    )
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+    assert.strictEqual(view.container.querySelector('[role="dialog"]'), null)
+
+    window.localStorage.removeItem(storageKey)
+  })
+
   it('scrubs private endpoint parts and falls back for malformed values', async () => {
     const privateProvider: IOllamaManagerProvider = {
       ...provider('private', [providerModel('alpha')]),

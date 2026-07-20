@@ -59,18 +59,52 @@ function parseTrustedEndpoint(value: string): URL {
     throw endpointError('The Ollama endpoint is invalid.')
   }
 
+  // Validate the user-provided URL syntax before relying on WHATWG's
+  // canonicalized pathname. URL parsing removes empty query/fragment
+  // delimiters and resolves dot segments (including encoded ones), which would
+  // otherwise let values other than the exact root or `/v1` spellings pass.
+  const schemeSeparator = value.indexOf('://')
+  if (schemeSeparator === -1) {
+    throw endpointError('The Ollama endpoint is invalid.')
+  }
+  const authorityStart = schemeSeparator + 3
+  const pathStart = value.indexOf('/', authorityStart)
+  const authorityEnd = pathStart === -1 ? value.length : pathStart
+  const authority = value.slice(authorityStart, authorityEnd)
+  const rawPath = pathStart === -1 ? '' : value.slice(pathStart)
+
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw endpointError('The Ollama endpoint must use HTTP or HTTPS.')
   }
   if (!isLoopbackHostname(parsed.hostname)) {
     throw endpointError('The Ollama endpoint must use a loopback address.')
   }
-  if (parsed.username.length > 0 || parsed.password.length > 0) {
+  if (
+    authority.includes('@') ||
+    parsed.username.length > 0 ||
+    parsed.password.length > 0
+  ) {
     throw endpointError('The Ollama endpoint must not contain URL credentials.')
   }
-  if (parsed.search.length > 0 || parsed.hash.length > 0) {
+  if (
+    value.includes('?') ||
+    value.includes('#') ||
+    parsed.search.length > 0 ||
+    parsed.hash.length > 0
+  ) {
     throw endpointError(
       'The Ollama endpoint must not contain a query or fragment.'
+    )
+  }
+  if (
+    value.includes('\\') ||
+    (rawPath !== '' &&
+      rawPath !== '/' &&
+      rawPath !== '/v1' &&
+      rawPath !== '/v1/')
+  ) {
+    throw endpointError(
+      'The Ollama endpoint must be an origin or use the /v1 API base.'
     )
   }
 
