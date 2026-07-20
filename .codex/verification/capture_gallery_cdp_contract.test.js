@@ -835,8 +835,6 @@ test('advanced workflow and Cheap-LFS scenes use exact enabled controls', () => 
     'assertOwnedDisposableFixture()',
     'const cheapLfsBaseRef = `refs/heads/${ready.featureBranch}^{commit}`',
     "'rev-parse', '--verify', cheapLfsBaseRef",
-    "'--quiet', '-B', cheapLfsBranch",
-    'cheapLfsBaseRef',
     "'branch', '--show-current'",
     "'status', '--porcelain=v1', '--untracked-files=all'",
     'checkedOutHead !== cheapLfsBaseHead',
@@ -849,6 +847,10 @@ test('advanced workflow and Cheap-LFS scenes use exact enabled controls', () => 
   ]) {
     assert.ok(cheap.includes(contract), `Cheap-LFS misses ${contract}`)
   }
+  assert.match(
+    cheap,
+    /'checkout',\s*'--quiet',\s*'-B',\s*cheapLfsBranch,\s*cheapLfsBaseRef/
+  )
 })
 
 test('advanced workflow seeds and proves the exact owned tag topology', () => {

@@ -4516,9 +4516,7 @@ scene('advanced-workflows', async () => {
 
 scene('cheap-lfs-preparing', async () => {
   if (fixturePath === null || ready === null) {
-    fail(
-      'Cheap-LFS preparation requires a disposable provider-backed fixture.'
-    )
+    fail('Cheap-LFS preparation requires a disposable provider-backed fixture.')
   }
   assertOwnedDisposableFixture()
   const cheapLfsBranch = 'gallery/cheap-lfs-evidence'
