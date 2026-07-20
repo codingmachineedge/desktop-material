@@ -564,6 +564,41 @@ test('both pull-request scenes refresh the non-empty origin/main comparison', ()
   }
 })
 
+test('native pull-request review retries readiness and activation atomically', () => {
+  const helperStart = source.indexOf('async function clickTextWhenEnabled(')
+  const helperEnd = source.indexOf(
+    '\nasync function clickSelector(',
+    helperStart
+  )
+  assert.notEqual(helperStart, -1)
+  assert.notEqual(helperEnd, -1)
+  const helper = source.slice(helperStart, helperEnd)
+  assert.ok(!helper.includes('waitFor('))
+  assert.ok(!helper.includes('catch'))
+  const scene = sceneSource('pull-request-open')
+  for (const contract of [
+    'const clicked = await evaluate(',
+    "candidate.getAttribute('aria-disabled') !== 'true' &&",
+    '!candidate.disabled',
+    'target.click()',
+    'if (clicked) {',
+    'await sleep(300)',
+  ]) {
+    assert.ok(
+      helper.includes(contract),
+      `atomic text action misses ${contract}`
+    )
+  }
+  assert.match(helper, /target\.click\(\)\s+return true/)
+  assert.match(helper, /if \(clicked\) \{\s+return\s+\}/)
+  assert.equal(helper.match(/target\.click\(\)/g)?.length, 1)
+  assert.ok(scene.includes("clickTextWhenEnabled('Review pull request'"))
+  assert.ok(scene.includes("within: '#create-github-pull-request'"))
+  assert.ok(scene.includes('timeout: 30000'))
+  assert.ok(!scene.includes("'enabled pull-request review action'"))
+  assert.ok(!scene.includes("clickText('Review pull request'"))
+})
+
 test('canonical workflow scenes use current reviewed controls and outcomes', () => {
   for (const contract of [
     "clickText('Sync repositories')",
@@ -1045,7 +1080,7 @@ test('capture scenes prove PR, sparse, scale, merge, and distinct artifact state
     "document.querySelector('.sparse-checkout-confirmation')",
     "document.querySelector('.pull-request-files-changed')",
     "document.querySelector('#create-github-pull-request')",
-    "clickText('Review pull request'",
+    "clickTextWhenEnabled('Review pull request'",
     "clickText('Create pull request'",
     'const expectedPullRequestNumber = 73 + before',
     'const expectedPullRequestReceipt =',

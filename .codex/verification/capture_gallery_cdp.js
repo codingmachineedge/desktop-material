@@ -842,6 +842,38 @@ async function clickText(label, options = {}) {
   return clicked
 }
 
+/**
+ * Activate one enabled React-controlled text action at most once. Unlike the
+ * generic waitFor helper, evaluation errors propagate so a lost response after
+ * target.click() cannot retry the activation.
+ */
+async function clickTextWhenEnabled(label, options = {}) {
+  const deadline = Date.now() + (options.timeout ?? 20000)
+  while (Date.now() < deadline) {
+    const clicked = await evaluate(`(() => {
+      const scope = ${
+        options.within
+          ? `document.querySelector(${JSON.stringify(options.within)})`
+          : 'document'
+      }
+      if (!scope) return false
+      const target = [...scope.querySelectorAll('button, [role="button"], a')]
+        .find(candidate => candidate.textContent.trim() === ${JSON.stringify(
+          label
+        )} && candidate.getAttribute('aria-disabled') !== 'true' &&
+          !candidate.disabled)
+      if (!target) return false
+      target.click()
+      return true
+    })()`)
+    if (clicked) {
+      return
+    }
+    await sleep(300)
+  }
+  fail(`Timed out waiting to activate "${label}".`)
+}
+
 async function clickSelector(selector, options = {}) {
   const clicked = await evaluate(`(() => {
     const target = document.querySelector(${JSON.stringify(selector)})
@@ -3395,13 +3427,11 @@ scene('pull-request-open', async () => {
     '#create-github-pull-request textarea[aria-label="Description (optional)"]',
     'Synthetic provider-backed completion proof for the reviewed feature-to-main route.'
   )
-  await waitFor(
-    `[...document.querySelectorAll('#create-github-pull-request button')].some(button => button.textContent.trim() === 'Review pull request' && !button.disabled)`,
-    'enabled pull-request review action',
-    30000
-  )
-  await clickText('Review pull request', {
+  // Button exposes creation-context loading through aria-disabled rather than
+  // the native disabled property, so activate only its settled instance.
+  await clickTextWhenEnabled('Review pull request', {
     within: '#create-github-pull-request',
+    timeout: 30000,
   })
   await waitFor(
     `document.querySelector('.create-github-pull-request-review') !== null && document.querySelector('.create-github-pull-request-context')?.textContent?.includes('feature/material-verification → main') === true`,
