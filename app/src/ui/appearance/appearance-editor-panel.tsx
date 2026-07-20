@@ -5,23 +5,20 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 
 /** Stable keys shared by element-owned editors and their history stores. */
-export const AppearanceEditorElementId = {
-  AppWorkspace: 'app-workspace',
-  UpdateProgress: 'update-progress',
-  CodeDiff: 'code-diff',
-  Toolbar: 'toolbar',
-  RepositoryList: 'repository-list',
-  RepositoryTabs: 'repository-tabs',
-  FeatureHighlighting: 'feature-highlighting',
-  AppIdentity: 'app-identity',
-  DefaultRepositoryLogo: 'default-repository-logo',
-  RepositoryWorkspace: 'repository-workspace',
-  RepositoryToolbar: 'repository-toolbar',
-  RepositoryTabsOverride: 'repository-tabs-override',
-} as const
-
-export type AppearanceEditorElementId =
-  typeof AppearanceEditorElementId[keyof typeof AppearanceEditorElementId]
+export enum AppearanceEditorElementId {
+  AppWorkspace = 'app-workspace',
+  UpdateProgress = 'update-progress',
+  CodeDiff = 'code-diff',
+  Toolbar = 'toolbar',
+  RepositoryList = 'repository-list',
+  RepositoryTabs = 'repository-tabs',
+  FeatureHighlighting = 'feature-highlighting',
+  AppIdentity = 'app-identity',
+  DefaultRepositoryLogo = 'default-repository-logo',
+  RepositoryWorkspace = 'repository-workspace',
+  RepositoryToolbar = 'repository-toolbar',
+  RepositoryTabsOverride = 'repository-tabs-override',
+}
 
 interface IAppearanceEditorPanelProps {
   readonly elementId: AppearanceEditorElementId

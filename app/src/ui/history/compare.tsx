@@ -509,6 +509,7 @@ export class CompareSidebar extends React.Component<
         {this.renderHistoryScopeControl()}
         <div className="history-commit-filter-row">
           <TextBox
+            searchSurfaceId="history-commits"
             className="history-commit-filter-field"
             type="search"
             displayClearButton={true}
@@ -520,6 +521,7 @@ export class CompareSidebar extends React.Component<
             onSearchCleared={this.onCommitFilterCleared}
           />
           <FilterModeControl
+            searchSurfaceId="history-commits"
             mode={this.state.commitFilterMode}
             caseSensitive={this.state.commitFilterCaseSensitive}
             onModeChange={this.onCommitFilterModeChanged}
@@ -671,6 +673,7 @@ export class CompareSidebar extends React.Component<
 
     return (
       <RegexBuilder
+        searchSurfaceId="history-commits"
         targetLabel="Commits"
         initialPattern={this.state.commitFilterText}
         sampleItems={this.getCommitFilterSampleItems()}

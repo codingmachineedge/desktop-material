@@ -3,6 +3,10 @@ import { sanitizedRefName } from '../lib/sanitize-ref-name'
 
 const InvalidPathCharacter = /[\0\r\n]/
 const InvalidSourceCharacter = /[\0\r\n]/
+const InvalidRemoteRepositoryNameCharacter = /[^A-Za-z0-9._-]/
+
+export const MaximumRemoteRepositoryNameLength = 100
+export const MaximumRemoteRepositoryDescriptionLength = 350
 
 /** Normalize a user-facing submodule path to Git's portable slash form. */
 export function normalizeSubmodulePath(value: string): string {
@@ -75,6 +79,43 @@ export function getSubmoduleSourceError(value: string): string | null {
   }
   if (InvalidSourceCharacter.test(source)) {
     return 'The repository URL contains unsupported control characters.'
+  }
+  return null
+}
+
+/**
+ * Validate a GitHub repository name before creating a remote for a submodule.
+ * Keeping this strict avoids creating a repository under a silently rewritten
+ * name and then pinning a different-looking submodule path.
+ */
+export function getSubmoduleRemoteNameError(value: string): string | null {
+  const name = value.trim()
+  if (name.length === 0) {
+    return 'Enter a name for the new remote repository.'
+  }
+  if (name.length > MaximumRemoteRepositoryNameLength) {
+    return `Repository names must be ${MaximumRemoteRepositoryNameLength} characters or fewer.`
+  }
+  if (
+    value !== name ||
+    name === '.' ||
+    name === '..' ||
+    InvalidRemoteRepositoryNameCharacter.test(name)
+  ) {
+    return 'Use only letters, numbers, periods, hyphens, and underscores in the repository name.'
+  }
+  return null
+}
+
+/** Validate the optional description sent to the remote host. */
+export function getSubmoduleRemoteDescriptionError(
+  value: string
+): string | null {
+  if (value.length > MaximumRemoteRepositoryDescriptionLength) {
+    return `Repository descriptions must be ${MaximumRemoteRepositoryDescriptionLength} characters or fewer.`
+  }
+  if (/[\0\r\n]/.test(value)) {
+    return 'The repository description contains unsupported control characters.'
   }
   return null
 }

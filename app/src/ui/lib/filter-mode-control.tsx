@@ -23,6 +23,9 @@ export function nextFilterMode(mode: FilterMode): FilterMode {
 }
 
 interface IFilterModeControlProps {
+  /** Stable audit identity shared with the originating search input. */
+  readonly searchSurfaceId: string
+
   /** The current filter mode. */
   readonly mode: FilterMode
 
@@ -111,6 +114,7 @@ export class FilterModeControl extends React.Component<
 
     return (
       <RegexBuilder
+        searchSurfaceId={this.props.searchSurfaceId}
         targetLabel={this.props.regexBuilderTarget}
         initialPattern={this.props.filterText}
         sampleItems={this.props.getSampleItems()}
@@ -125,7 +129,10 @@ export class FilterModeControl extends React.Component<
     const caseDisabled = mode === FilterMode.Fuzzy
 
     return (
-      <div className="filter-mode-control">
+      <div
+        className="filter-mode-control"
+        data-search-surface-id={this.props.searchSurfaceId}
+      >
         {/*
          * The interactive controls live in their own flex cluster so they can
          * wrap independently (e.g. the regex-builder chip dropping below the

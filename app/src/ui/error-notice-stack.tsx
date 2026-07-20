@@ -15,13 +15,17 @@ interface IErrorNoticeCardProps {
 
 interface IErrorNoticeCardState {
   readonly detailsExpanded: boolean
+  readonly confirmingLockRemoval: boolean
 }
 
 class ErrorNoticeCard extends React.PureComponent<
   IErrorNoticeCardProps,
   IErrorNoticeCardState
 > {
-  public state: IErrorNoticeCardState = { detailsExpanded: false }
+  public state: IErrorNoticeCardState = {
+    detailsExpanded: false,
+    confirmingLockRemoval: false,
+  }
 
   private onDismiss = () => {
     this.props.onDismiss(this.props.notice.id)
@@ -36,11 +40,24 @@ class ErrorNoticeCard extends React.PureComponent<
     this.setState(state => ({ detailsExpanded: !state.detailsExpanded }))
   }
 
-  private onAction = () => {
+  private onRequestAction = () => {
     const { action } = this.props.notice
-    if (action !== undefined) {
-      this.props.onAction?.(this.props.notice, action)
+    if (action?.kind === 'remove-repository-lock') {
+      this.setState({ confirmingLockRemoval: true })
     }
+  }
+
+  private onCancelLockRemoval = () => {
+    this.setState({ confirmingLockRemoval: false })
+  }
+
+  private onConfirmLockRemoval = () => {
+    const { action } = this.props.notice
+    if (action?.kind !== 'remove-repository-lock') {
+      return
+    }
+    this.setState({ confirmingLockRemoval: false })
+    this.props.onAction?.(this.props.notice, action)
   }
 
   public render() {
@@ -68,17 +85,47 @@ class ErrorNoticeCard extends React.PureComponent<
           {this.state.detailsExpanded && notice.details !== null && (
             <pre className="error-notice-diagnostic">{notice.details}</pre>
           )}
+          {this.state.confirmingLockRemoval &&
+            notice.action?.kind === 'remove-repository-lock' && (
+              <div
+                className="error-notice-lock-confirmation"
+                role="group"
+                aria-label="Confirm lock file removal"
+              >
+                <p>
+                  Stop all Git and IDE processes before continuing. Removing a
+                  lock owned by an active process can corrupt repository state.
+                </p>
+                <div className="error-notice-lock-confirmation-actions">
+                  <button
+                    type="button"
+                    className="error-notice-recovery-confirm"
+                    onClick={this.onConfirmLockRemoval}
+                  >
+                    Confirm remove lock file
+                  </button>
+                  <button
+                    type="button"
+                    className="error-notice-recovery-cancel"
+                    onClick={this.onCancelLockRemoval}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
         </div>
         <div className="error-notice-actions">
-          {notice.action?.kind === 'remove-repository-lock' && (
-            <button
-              type="button"
-              className="error-notice-recovery"
-              onClick={this.onAction}
-            >
-              Remove lock file
-            </button>
-          )}
+          {notice.action?.kind === 'remove-repository-lock' &&
+            !this.state.confirmingLockRemoval && (
+              <button
+                type="button"
+                className="error-notice-recovery"
+                onClick={this.onRequestAction}
+              >
+                Remove lock file
+              </button>
+            )}
           {showDetails && (
             <button
               type="button"

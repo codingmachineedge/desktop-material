@@ -139,6 +139,50 @@ describe('ActionsStore workflow-run cancellation', () => {
     }
   })
 
+  it('returns prompt bulk requests after POST while terminal monitoring continues', async () => {
+    const accounts = new TestAccountsStore([account])
+    const store = await createStore(accounts)
+    const terminalState = deferred<IActionsWorkflowRunCancellationState>()
+    const monitorStarted = deferred<void>()
+    const requests = new Array<string>()
+    let reads = 0
+    const fakeAPI = {
+      fetchWorkflowRunCancellationState: async () => {
+        reads++
+        requests.push('GET')
+        if (reads === 1) {
+          return state('in_progress')
+        }
+        monitorStarted.resolve()
+        return terminalState.promise
+      },
+      cancelWorkflowRun: async () => {
+        requests.push('POST:false')
+        return true
+      },
+    }
+    const fromAccount = mock.method(
+      API,
+      'fromAccount',
+      () => fakeAPI as unknown as API
+    )
+
+    try {
+      const result = await store.requestRunCancellation(repository, 42)
+      assert.equal(result.accepted, true)
+      assert.equal(result.alreadyTerminal, false)
+      assert.equal(result.status, 'in_progress')
+      await monitorStarted.promise
+      assert.deepEqual(requests, ['GET', 'POST:false', 'GET'])
+
+      terminalState.resolve(state('completed', 'cancelled'))
+      await Promise.resolve()
+      await Promise.resolve()
+    } finally {
+      fromAccount.mock.restore()
+    }
+  })
+
   it('does not POST for a terminal or non-cancellable revalidated state', async () => {
     const accounts = new TestAccountsStore([account])
     const store = await createStore(accounts)

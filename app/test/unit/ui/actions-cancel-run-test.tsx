@@ -100,6 +100,11 @@ function deferred<T>() {
 class TestActionsStore {
   public readonly cancelCalls = new Array<number>()
   public readonly cancelSignals = new Array<AbortSignal | undefined>()
+  public readonly cancellationRequestCalls = new Array<number>()
+  public readonly cancellationRequestSignals = new Array<
+    AbortSignal | undefined
+  >()
+  public readonly rerunCalls = new Array<number>()
 
   public constructor(
     private readonly states: ReadonlyMap<string, IActionsState>
@@ -116,6 +121,15 @@ class TestActionsStore {
     conclusion: 'cancelled',
   })
 
+  public cancellationRequestImpl: ActionsStore['requestRunCancellation'] =
+    async (_repository, runId) => ({
+      runId,
+      accepted: true,
+      alreadyTerminal: false,
+      status: 'in_progress',
+      conclusion: null,
+    })
+
   public subscribe(
     selected: Repository,
     callback: (state: IActionsState) => void
@@ -129,6 +143,9 @@ class TestActionsStore {
 
   public async loadCacheManager(_repository: Repository) {}
   public async refresh(_repository: Repository) {}
+  public async rerun(_repository: Repository, runId: number) {
+    this.rerunCalls.push(runId)
+  }
 
   public cancelRun: ActionsStore['cancelRun'] = (
     selected,
@@ -139,6 +156,17 @@ class TestActionsStore {
     this.cancelCalls.push(runId)
     this.cancelSignals.push(signal)
     return this.cancelImpl(selected, runId, signal, onProgress)
+  }
+
+  public requestRunCancellation: ActionsStore['requestRunCancellation'] = (
+    selected,
+    runId,
+    signal,
+    onProgress
+  ) => {
+    this.cancellationRequestCalls.push(runId)
+    this.cancellationRequestSignals.push(signal)
+    return this.cancellationRequestImpl(selected, runId, signal, onProgress)
   }
 }
 
@@ -270,6 +298,14 @@ describe('Actions workflow-run cancellation UI', () => {
     assert.deepEqual(store.cancelCalls, [42])
     assert.equal(dialog.getAttribute('aria-busy'), 'true')
     assert.ok(details.getByRole('status').textContent?.includes('Checking'))
+    assert.equal(
+      details
+        .getByRole('button', {
+          name: 'Keep current state',
+        })
+        .getAttribute('aria-disabled'),
+      'true'
+    )
 
     cancellation.resolve({
       runId: 42,
@@ -332,5 +368,378 @@ describe('Actions workflow-run cancellation UI', () => {
     await waitFor(() => assert.equal(store.cancelSignals[0]?.aborted, true))
     assert.equal(screen.queryByRole('alertdialog'), null)
     assert.ok(screen.getByText('Second repo run'))
+  })
+
+  it('reviews and revalidates each selected active run before bulk cancellation', async () => {
+    const selected = repository('bulk-cancel', 13)
+    const first = workflowRun(61, 'queued', 'First selected run')
+    const second = workflowRun(62, 'pending', 'Second selected run')
+    const state = {
+      ...actionsState(first),
+      runs: [first, second],
+      runsTotalCount: 2,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, state]]))
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main']}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible workflow runs'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel active (2)' }))
+    assert.deepEqual(store.cancellationRequestCalls, [])
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel 2 workflow runs?',
+    })
+    assert.ok(within(dialog).getByText('First selected run'))
+    assert.ok(within(dialog).getByText('Second selected run'))
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel reviewed runs' })
+    )
+    await waitFor(() =>
+      assert.deepEqual(store.cancellationRequestCalls, [61, 62])
+    )
+    await waitFor(() => assert.equal(screen.queryByRole('alertdialog'), null))
+    assert.ok(screen.getByText('Cancellation requested for 2 workflow runs.'))
+  })
+
+  it('requests later reviewed cancellations while an earlier provider request is still pending', async () => {
+    const selected = repository('bulk-cancel-concurrent', 15)
+    const first = workflowRun(81, 'queued', 'Slow first cancellation')
+    const second = workflowRun(82, 'pending', 'Prompt second cancellation')
+    const third = workflowRun(83, 'waiting', 'Prompt third cancellation')
+    const state = {
+      ...actionsState(first),
+      runs: [first, second, third],
+      runsTotalCount: 3,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, state]]))
+    const firstRequest = deferred<IActionsRunCancellationResult>()
+    store.cancellationRequestImpl = async (_repository, runId) => {
+      if (runId === first.id) {
+        return firstRequest.promise
+      }
+      return {
+        runId,
+        accepted: true,
+        alreadyTerminal: false,
+        status: 'in_progress',
+        conclusion: null,
+      }
+    }
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main']}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible workflow runs'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel active (3)' }))
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel 3 workflow runs?',
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel reviewed runs' })
+    )
+
+    await waitFor(() =>
+      assert.deepEqual(store.cancellationRequestCalls, [81, 82, 83])
+    )
+    assert.equal(dialog.getAttribute('aria-busy'), 'true')
+    assert.deepEqual(store.cancelCalls, [])
+
+    firstRequest.resolve({
+      runId: first.id,
+      accepted: true,
+      alreadyTerminal: false,
+      status: 'in_progress',
+      conclusion: null,
+    })
+    await waitFor(() => assert.equal(screen.queryByRole('alertdialog'), null))
+    assert.ok(screen.getByText('Cancellation requested for 3 workflow runs.'))
+  })
+
+  it('times out stalled provider requests and continues past the worker pool', async () => {
+    const selected = repository('bulk-cancel-timeout', 17)
+    const runs = [
+      workflowRun(101, 'queued', 'Stalled cancellation one'),
+      workflowRun(102, 'pending', 'Stalled cancellation two'),
+      workflowRun(103, 'waiting', 'Stalled cancellation three'),
+      workflowRun(104, 'in_progress', 'Stalled cancellation four'),
+      workflowRun(105, 'queued', 'Accepted cancellation five'),
+      workflowRun(106, 'pending', 'Accepted cancellation six'),
+    ]
+    const state = {
+      ...actionsState(runs[0]),
+      runs,
+      runsTotalCount: runs.length,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, state]]))
+    const stalledIds = new Set(runs.slice(0, 4).map(run => run.id))
+    store.cancellationRequestImpl = async (_repository, runId, signal) => {
+      if (stalledIds.has(runId)) {
+        return new Promise<IActionsRunCancellationResult>((_resolve, reject) =>
+          signal?.addEventListener(
+            'abort',
+            () => {
+              const error = new Error('The provider request was aborted.')
+              error.name = 'AbortError'
+              reject(error)
+            },
+            { once: true }
+          )
+        )
+      }
+      return {
+        runId,
+        accepted: true,
+        alreadyTerminal: false,
+        status: 'in_progress',
+        conclusion: null,
+      }
+    }
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main']}
+        actionsStore={store as unknown as ActionsStore}
+        bulkRunCancellationRequestTimeoutMs={20}
+      />
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible workflow runs'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel active (6)' }))
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel 6 workflow runs?',
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel reviewed runs' })
+    )
+
+    await waitFor(() =>
+      assert.deepEqual(
+        store.cancellationRequestCalls,
+        runs.map(run => run.id)
+      )
+    )
+    await waitFor(() => assert.equal(screen.queryByRole('alertdialog'), null))
+    assert.deepEqual(
+      store.cancellationRequestSignals
+        .slice(0, 4)
+        .map(signal => signal?.aborted),
+      [true, true, true, true]
+    )
+    assert.ok(
+      screen
+        .getByRole('alert')
+        .textContent?.includes('GitHub may still have received it')
+    )
+    assert.ok(
+      screen.getByText(
+        'Cancellation was requested for 2 workflow runs; the remaining selected runs were unchanged.'
+      )
+    )
+    for (const run of runs.slice(0, 4)) {
+      assert.equal(
+        (
+          screen.getByLabelText(
+            `Select workflow run ${run.run_number}`
+          ) as HTMLInputElement
+        ).checked,
+        true
+      )
+    }
+    for (const run of runs.slice(4)) {
+      assert.equal(
+        (
+          screen.getByLabelText(
+            `Select workflow run ${run.run_number}`
+          ) as HTMLInputElement
+        ).checked,
+        false
+      )
+    }
+  })
+
+  it('lets the user stop a stalled batch without submitting unstarted runs', async () => {
+    const selected = repository('bulk-cancel-user-stop', 18)
+    const runs = [
+      workflowRun(121, 'queued', 'Pending cancellation one'),
+      workflowRun(122, 'pending', 'Pending cancellation two'),
+      workflowRun(123, 'waiting', 'Pending cancellation three'),
+      workflowRun(124, 'in_progress', 'Pending cancellation four'),
+      workflowRun(125, 'queued', 'Unstarted cancellation five'),
+      workflowRun(126, 'pending', 'Unstarted cancellation six'),
+    ]
+    const state = {
+      ...actionsState(runs[0]),
+      runs,
+      runsTotalCount: runs.length,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, state]]))
+    store.cancellationRequestImpl = async () =>
+      new Promise<IActionsRunCancellationResult>(() => undefined)
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main']}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible workflow runs'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel active (6)' }))
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel 6 workflow runs?',
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel reviewed runs' })
+    )
+
+    await waitFor(() =>
+      assert.deepEqual(
+        store.cancellationRequestCalls,
+        runs.slice(0, 4).map(run => run.id)
+      )
+    )
+    const stopButton = within(dialog).getByRole('button', {
+      name: 'Cancel pending requests',
+    })
+    assert.equal(stopButton.getAttribute('aria-disabled'), null)
+    fireEvent.click(stopButton)
+
+    await waitFor(() => assert.equal(screen.queryByRole('alertdialog'), null))
+    assert.deepEqual(
+      store.cancellationRequestCalls,
+      runs.slice(0, 4).map(run => run.id)
+    )
+    assert.deepEqual(
+      store.cancellationRequestSignals.map(signal => signal?.aborted),
+      [true, true, true, true]
+    )
+    assert.ok(
+      screen.getByText(
+        'Pending cancellation requests were stopped. GitHub may still have received an in-flight request; refresh Actions before retrying.'
+      )
+    )
+    for (const run of runs) {
+      assert.equal(
+        (
+          screen.getByLabelText(
+            `Select workflow run ${run.run_number}`
+          ) as HTMLInputElement
+        ).checked,
+        true
+      )
+    }
+  })
+
+  it('retains failed selections and partial-failure evidence after prompt bulk requests', async () => {
+    const selected = repository('bulk-cancel-partial', 16)
+    const first = workflowRun(91, 'queued', 'Accepted first cancellation')
+    const second = workflowRun(92, 'pending', 'Rejected second cancellation')
+    const third = workflowRun(93, 'waiting', 'Accepted third cancellation')
+    const state = {
+      ...actionsState(first),
+      runs: [first, second, third],
+      runsTotalCount: 3,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, state]]))
+    store.cancellationRequestImpl = async (_repository, runId) => {
+      if (runId === second.id) {
+        throw new Error('Provider rejected run 1092 cancellation.')
+      }
+      return {
+        runId,
+        accepted: true,
+        alreadyTerminal: false,
+        status: 'in_progress',
+        conclusion: null,
+      }
+    }
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main']}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible workflow runs'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel active (3)' }))
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancel 3 workflow runs?',
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Cancel reviewed runs' })
+    )
+
+    await waitFor(() => assert.equal(screen.queryByRole('alertdialog'), null))
+    assert.deepEqual(store.cancellationRequestCalls, [91, 92, 93])
+    assert.ok(
+      screen
+        .getByRole('alert')
+        .textContent?.includes('Provider rejected run 1092 cancellation.')
+    )
+    assert.ok(
+      screen
+        .getByText(
+          'Cancellation was requested for 2 workflow runs; the remaining selected runs were unchanged.'
+        )
+        .textContent?.includes('Cancellation was requested for 2 workflow runs')
+    )
+    assert.equal(
+      (screen.getByLabelText('Select workflow run 1091') as HTMLInputElement)
+        .checked,
+      false
+    )
+    assert.equal(
+      (screen.getByLabelText('Select workflow run 1092') as HTMLInputElement)
+        .checked,
+      true
+    )
+    assert.equal(
+      (screen.getByLabelText('Select workflow run 1093') as HTMLInputElement)
+        .checked,
+      false
+    )
+  })
+
+  it('reviews each selected completed run before requesting bulk re-runs', async () => {
+    const selected = repository('bulk-rerun', 14)
+    const first = workflowRun(71, 'completed', 'First completed run')
+    const second = workflowRun(72, 'completed', 'Second completed run')
+    const state = {
+      ...actionsState(first),
+      runs: [first, second],
+      runsTotalCount: 2,
+    }
+    const store = new TestActionsStore(new Map([[selected.hash, state]]))
+
+    render(
+      <ActionsView
+        repository={selected}
+        branchNames={['main']}
+        actionsStore={store as unknown as ActionsStore}
+      />
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible workflow runs'))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Re-run completed (2)' })
+    )
+    assert.deepEqual(store.rerunCalls, [])
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Re-run 2 workflow runs?',
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Re-run reviewed runs' })
+    )
+    await waitFor(() => assert.deepEqual(store.rerunCalls, [71, 72]))
+    assert.ok(screen.getByText('Re-run requested for 2 workflow runs.'))
   })
 })

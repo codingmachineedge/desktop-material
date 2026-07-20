@@ -153,6 +153,7 @@ export class CloseTabsContainingPopover extends React.Component<
           <h3 id="close-tabs-containing-title">Close tabs containing</h3>
           <div className="close-tabs-containing-field">
             <input
+              data-search-surface-id="close-tabs-containing"
               type="text"
               className="close-tabs-containing-input"
               placeholder="Filter by name"
@@ -164,6 +165,7 @@ export class CloseTabsContainingPopover extends React.Component<
               aria-describedby="close-tabs-containing-status"
             />
             <FilterModeControl
+              searchSurfaceId="close-tabs-containing"
               mode={mode}
               caseSensitive={caseSensitive}
               onModeChange={this.onModeChange}

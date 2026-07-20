@@ -23,6 +23,15 @@ import {
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { LocalizedText } from '../lib/localized-text'
+import { FilterMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+  matchGroup,
+} from '../lib/filter-list-mode'
+
+const TagLifecycleFilterListId = 'tag-lifecycle-inventory'
 
 export interface ITagLifecycleDispatcher {
   readonly getTagLifecycleInventory: (
@@ -96,6 +105,8 @@ interface ITagLifecycleManagerState {
   readonly error: ILocalizedMessage | string | null
   readonly status: ILocalizedMessage | null
   readonly filter: string
+  readonly filterMode: FilterMode
+  readonly filterCaseSensitive: boolean
   readonly createName: string
   readonly createTarget: string
   readonly createKind: TagKind
@@ -118,26 +129,28 @@ interface ILocalizedMessage {
 
 class TagOperationRejectedError extends Error {}
 
-const emptyState: Omit<ITagLifecycleManagerState, 'languageMode' | 'loading'> =
-  {
-    inventory: null,
-    busy: false,
-    error: null,
-    status: null,
-    filter: '',
-    createName: '',
-    createTarget: 'HEAD',
-    createKind: 'annotated',
-    createMessage: '',
-    createSigned: false,
-    movingTag: null,
-    moveTarget: 'HEAD',
-    moveKind: 'annotated',
-    moveMessage: '',
-    moveSigned: false,
-    pending: null,
-    confirmationText: '',
-  }
+const emptyState: Omit<
+  ITagLifecycleManagerState,
+  'languageMode' | 'loading' | 'filterMode' | 'filterCaseSensitive'
+> = {
+  inventory: null,
+  busy: false,
+  error: null,
+  status: null,
+  filter: '',
+  createName: '',
+  createTarget: 'HEAD',
+  createKind: 'annotated',
+  createMessage: '',
+  createSigned: false,
+  movingTag: null,
+  moveTarget: 'HEAD',
+  moveKind: 'annotated',
+  moveMessage: '',
+  moveSigned: false,
+  pending: null,
+  confirmationText: '',
+}
 
 function shortObject(oid: string): string {
   return oid.slice(0, 10)
@@ -166,6 +179,8 @@ export class TagLifecycleManager extends React.Component<
     this.state = {
       ...emptyState,
       loading: true,
+      filterMode: readPersistedFilterMode(TagLifecycleFilterListId),
+      filterCaseSensitive: false,
       languageMode: getPersistedLanguageMode(),
     }
   }
@@ -887,21 +902,48 @@ export class TagLifecycleManager extends React.Component<
     )
   }
 
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(TagLifecycleFilterListId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) =>
+    this.setState({ filterCaseSensitive })
+
+  private onFilterPatternApply = (filter: string) => this.setState({ filter })
+
+  private getFilterSamples = () => [
+    ...(this.state.inventory?.local.map(tag => tag.name) ?? []),
+    ...(this.state.inventory?.remote?.map(tag => tag.name) ?? []),
+  ]
+
   public render() {
     const inventory = this.state.inventory
     const remoteByName = new Map(
       (inventory?.remote ?? []).map(tag => [tag.name, tag])
     )
-    const query = this.state.filter.trim().toLocaleLowerCase('en')
-    const local = (inventory?.local ?? []).filter(tag =>
-      tag.name.toLocaleLowerCase('en').includes(query)
+    const localMatches = matchGroup(
+      this.state.filter.trim(),
+      inventory?.local ?? [],
+      tag => [tag.name, tag.target, tag.refObject],
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
     )
+    const local = localMatches.results.map(match => match.item)
     const localNames = new Set((inventory?.local ?? []).map(tag => tag.name))
-    const remoteOnly = (inventory?.remote ?? []).filter(
-      tag =>
-        !localNames.has(tag.name) &&
-        tag.name.toLocaleLowerCase('en').includes(query)
+    const remoteMatches = matchGroup(
+      this.state.filter.trim(),
+      (inventory?.remote ?? []).filter(tag => !localNames.has(tag.name)),
+      tag => [tag.name, tag.target, tag.refObject],
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
     )
+    const remoteOnly = remoteMatches.results.map(match => match.item)
+    const regexError = localMatches.regexError ?? remoteMatches.regexError
     const disabled = this.state.busy || this.props.readOnly
 
     return (
@@ -961,13 +1003,27 @@ export class TagLifecycleManager extends React.Component<
           <div className="tag-lifecycle-inventory-toolbar">
             <label>
               {this.localized('tagLifecycle.filterLabel')}
-              <input
-                type="search"
-                value={this.state.filter}
-                onChange={event =>
-                  this.setState({ filter: event.currentTarget.value })
-                }
-              />
+              <div className="tag-lifecycle-filter-field">
+                <input
+                  data-search-surface-id="tag-lifecycle-inventory"
+                  type="search"
+                  value={this.state.filter}
+                  onChange={event =>
+                    this.setState({ filter: event.currentTarget.value })
+                  }
+                />
+                <FilterModeControl
+                  searchSurfaceId="tag-lifecycle-inventory"
+                  mode={this.state.filterMode}
+                  caseSensitive={this.state.filterCaseSensitive}
+                  onModeChange={this.onFilterModeChanged}
+                  onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+                  regexBuilderTarget="Tags"
+                  getSampleItems={this.getFilterSamples}
+                  filterText={this.state.filter}
+                  onRegexPatternApply={this.onFilterPatternApply}
+                />
+              </div>
             </label>
             <div className="tag-lifecycle-actions">
               <Button
@@ -1039,6 +1095,12 @@ export class TagLifecycleManager extends React.Component<
               </Button>
             </div>
           </div>
+
+          {regexError !== null && (
+            <p className="tag-lifecycle-error" role="alert">
+              Invalid tag search pattern: {regexError}
+            </p>
+          )}
 
           <h3>
             {this.localized('tagLifecycle.localTagsHeading', {

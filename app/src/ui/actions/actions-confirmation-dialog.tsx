@@ -13,6 +13,8 @@ interface IActionsConfirmationDialogProps {
   readonly progressMessage?: string | null
   readonly onConfirm: () => void
   readonly onDismissed: () => void
+  readonly onCancelSubmitting?: () => void
+  readonly cancelSubmittingLabel?: string
   readonly onReturnFocus?: () => void
 }
 
@@ -59,10 +61,21 @@ export class ActionsConfirmationDialog extends React.Component<IActionsConfirmat
   private onKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     event.stopPropagation()
     trapActionsDialogFocus(event, event.currentTarget)
-    if (event.key === 'Escape' && !this.props.submitting) {
+    if (
+      event.key === 'Escape' &&
+      (!this.props.submitting || this.props.onCancelSubmitting !== undefined)
+    ) {
       event.preventDefault()
-      this.props.onDismissed()
+      this.dismiss()
     }
+  }
+
+  private dismiss = () => {
+    if (this.props.submitting) {
+      this.props.onCancelSubmitting?.()
+      return
+    }
+    this.props.onDismissed()
   }
 
   private submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -73,6 +86,8 @@ export class ActionsConfirmationDialog extends React.Component<IActionsConfirmat
   }
 
   public render() {
+    const canCancelSubmission =
+      this.props.submitting && this.props.onCancelSubmitting !== undefined
     const describedBy = [
       this.descriptionId,
       this.props.progressMessage ? this.progressId : null,
@@ -129,10 +144,12 @@ export class ActionsConfirmationDialog extends React.Component<IActionsConfirmat
           <footer>
             <Button
               onButtonRef={this.setDismissButtonRef}
-              onClick={this.props.onDismissed}
-              disabled={this.props.submitting}
+              onClick={this.dismiss}
+              disabled={this.props.submitting && !canCancelSubmission}
             >
-              Keep current state
+              {canCancelSubmission
+                ? this.props.cancelSubmittingLabel ?? 'Cancel request'
+                : 'Keep current state'}
             </Button>
             <Button
               type="submit"

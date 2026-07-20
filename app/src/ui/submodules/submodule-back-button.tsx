@@ -83,7 +83,9 @@ export class SubmoduleBackAppearanceEditor extends React.Component<ISubmoduleBac
           onChange={this.onStyleChanged}
         >
           <option value="tonal">{localize('submodule.backStyleTonal')}</option>
-          <option value="filled">{localize('submodule.backStyleFilled')}</option>
+          <option value="filled">
+            {localize('submodule.backStyleFilled')}
+          </option>
           <option value="outlined">
             {localize('submodule.backStyleOutlined')}
           </option>

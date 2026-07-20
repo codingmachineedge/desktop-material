@@ -848,6 +848,7 @@ export class GitHubIssuesView extends React.Component<
           <label>
             Search title and description
             <input
+              data-search-surface-id="github-issues"
               type="search"
               value={this.state.query.search}
               maxLength={256}
@@ -856,6 +857,7 @@ export class GitHubIssuesView extends React.Component<
             />
           </label>
           <FilterModeControl
+            searchSurfaceId="github-issues"
             mode={this.state.searchMode}
             caseSensitive={this.state.searchCaseSensitive}
             onModeChange={this.onSearchModeChange}

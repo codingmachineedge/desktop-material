@@ -20,6 +20,7 @@ import {
   RepositoryLogoChangedEvent,
 } from '../../../src/lib/appearance-customization'
 import {
+  getAppearanceRepositoryDisplayPath,
   RepositoryListNameAppearanceEditor,
   RepositoryLogoAppearanceEditor,
 } from '../../../src/ui/appearance'
@@ -35,6 +36,7 @@ const ListNameSettingsPath =
 const LogoSettingsPath = 'C:/profile/appearance-elements/repositories/one/logo'
 const ProfileLogoSettingsPath =
   'C:/profile/appearance-elements/profile/default-repository-logo'
+const PrivatePathTitle = 'Private root hidden; copy the exact path'
 
 function logo(primaryColor: string): IRepositoryLogoDesign {
   return {
@@ -256,8 +258,8 @@ describe('repository element appearance editors', () => {
     })
     assert.ok(editor)
     assert.equal(
-      screen.getByTitle(ListNameSettingsPath).textContent,
-      ListNameSettingsPath
+      screen.getByTitle(PrivatePathTitle).textContent,
+      getAppearanceRepositoryDisplayPath(ListNameSettingsPath)
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
@@ -300,8 +302,8 @@ describe('repository element appearance editors', () => {
       })
     )
     assert.equal(
-      screen.getByTitle(LogoSettingsPath).textContent,
-      LogoSettingsPath
+      screen.getByTitle(PrivatePathTitle).textContent,
+      getAppearanceRepositoryDisplayPath(LogoSettingsPath)
     )
     assert.ok(screen.getByText('Profile default'))
 
@@ -355,8 +357,8 @@ describe('repository element appearance editors', () => {
       })
     )
     assert.equal(
-      screen.getByTitle(LogoSettingsPath).textContent,
-      LogoSettingsPath
+      screen.getByTitle(PrivatePathTitle).textContent,
+      getAppearanceRepositoryDisplayPath(LogoSettingsPath)
     )
 
     fireEvent.click(
@@ -368,10 +370,9 @@ describe('repository element appearance editors', () => {
       })
     )
     assert.equal(
-      screen.getByTitle(ProfileLogoSettingsPath).textContent,
-      ProfileLogoSettingsPath
+      screen.getByTitle(PrivatePathTitle).textContent,
+      getAppearanceRepositoryDisplayPath(ProfileLogoSettingsPath)
     )
-    assert.equal(screen.queryByTitle(LogoSettingsPath), null)
 
     fireEvent.change(screen.getByLabelText('Color'), {
       target: { value: '#abcdef' },
@@ -386,10 +387,13 @@ describe('repository element appearance editors', () => {
       })
     )
     await waitFor(() => assert.ok(historyReads.includes('profile')))
+    const profileDisplayPath = getAppearanceRepositoryDisplayPath(
+      ProfileLogoSettingsPath
+    )
     assert.equal(
       screen
-        .getByText(new RegExp(ProfileLogoSettingsPath.replace(/\\/g, '\\\\')))
-        .textContent?.includes(ProfileLogoSettingsPath),
+        .getByText(new RegExp(profileDisplayPath.replace(/\\/g, '\\\\')))
+        .textContent?.includes(profileDisplayPath),
       true
     )
 
@@ -410,8 +414,8 @@ describe('repository element appearance editors', () => {
       })
     )
     assert.equal(
-      screen.getByTitle(LogoSettingsPath).textContent,
-      LogoSettingsPath
+      screen.getByTitle(PrivatePathTitle).textContent,
+      getAppearanceRepositoryDisplayPath(LogoSettingsPath)
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Monogram' }))

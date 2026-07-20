@@ -47,7 +47,10 @@ describe('Pages accessibility contracts', () => {
       markup,
       /Build &amp; Run moves into More\s+first,[\s\S]*?Commit &amp; Push/
     )
-    assert.match(markup, /dedicated setting, local Git path, and mutable history/)
+    assert.match(
+      markup,
+      /dedicated setting, local Git path, and mutable history/
+    )
     assert.match(markup, /no monolithic repository Appearance tab/)
     assert.match(markup, /class="material-icon-sprite"/)
     assert.match(markup, /id="icon-palette"/)
@@ -140,17 +143,23 @@ describe('Pages accessibility contracts', () => {
     const figures = [
       ...gallery.matchAll(/<figure class="shot">([\s\S]*?)<\/figure>/g),
     ]
-    assert.ok(
-      figures.length >= 40,
-      'Pages should expose at least 40 screenshots'
-    )
+    const manifest = read('docs/wiki/Feature-Gallery.md')
+    const expectedSources = [
+      ...manifest.matchAll(/^\| `([^`]+\.png)` \| ([^|]+?) \|$/gm),
+    ]
+      .map(([, file]) => `docs/assets/screenshots/${file}`)
+      .sort()
+    assert.equal(expectedSources.length, 68)
+    assert.equal(figures.length, expectedSources.length)
 
+    const actualSources = new Array<string>()
     for (const [, figure] of figures) {
       const href = figure.match(/<a\s+[\s\S]*?href="([^"]+)"/)?.[1]
       const source = figure.match(/<img\s+[\s\S]*?src="([^"]+)"/)?.[1]
       const alt = figure.match(/<img\s+[\s\S]*?alt="([^"]+)"/)?.[1]
       assert.ok(href, 'Gallery image is missing its full-size link')
       assert.ok(source, 'Gallery image is missing a source')
+      actualSources.push(source)
       assert.equal(href, source, `${source} full-size link does not match`)
       assert.ok(alt?.trim(), `${source} is missing useful alt text`)
       assert.match(figure, /loading="lazy"/)
@@ -158,5 +167,6 @@ describe('Pages accessibility contracts', () => {
       assert.match(figure, /rel="noopener"/)
       assert.ok(existsSync(join(process.cwd(), source)), `${source} is missing`)
     }
+    assert.deepEqual(actualSources.sort(), expectedSources)
   })
 })

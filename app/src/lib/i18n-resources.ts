@@ -93,6 +93,30 @@ export type TranslationKey =
   | 'submodule.addEnterpriseSignInGuidance'
   | 'submodule.addProviderAccountAction'
   | 'submodule.addProviderSignInGuidance'
+  | 'submodule.addCreateRemoteTab'
+  | 'submodule.addCreateAndAddAction'
+  | 'submodule.addCreateRemoteSignInGuidance'
+  | 'submodule.addRemoteCreatedHeading'
+  | 'submodule.addRemoteCreatedRetryHelp'
+  | 'submodule.addRemoteOwnerLabel'
+  | 'submodule.addRemoteNameLabel'
+  | 'submodule.addRemoteDescriptionLabel'
+  | 'submodule.addRemotePrivateLabel'
+  | 'submodule.addRemoteNameHelp'
+  | 'submodule.addRemoteDescriptionHelp'
+  | 'submodule.addRemoteInitializeHelp'
+  | 'submodule.addRemoteAccountRequiredError'
+  | 'submodule.addRemoteOwnerUnavailableError'
+  | 'submodule.addRemoteNameRequiredError'
+  | 'submodule.addRemoteNameLengthError'
+  | 'submodule.addRemoteNameCharactersError'
+  | 'submodule.addRemoteDescriptionLengthError'
+  | 'submodule.addRemoteDescriptionCharactersError'
+  | 'submodule.addCreatingRemoteProgress'
+  | 'submodule.addRemoteCreatedProgress'
+  | 'submodule.addRemoteCreatedButAddFailed'
+  | 'submodule.addRemoteCreateFailed'
+  | 'submodule.addRemoteCreateCancelledUncertain'
   | 'submodule.addOrganizationLoadFailed'
   | 'submodule.addTryAgainAction'
   | 'submodule.addRepositoryListLabel'
@@ -799,6 +823,46 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'submodule.addProviderAccountAction': 'Add provider account',
   'submodule.addProviderSignInGuidance':
     'Add a GitLab or Bitbucket account in Settings to browse its repositories.',
+  'submodule.addCreateRemoteTab': 'Create remote',
+  'submodule.addCreateAndAddAction': 'Create and add submodule',
+  'submodule.addCreateRemoteSignInGuidance':
+    'Sign in to GitHub.com or GitHub Enterprise to create a remote repository for this submodule.',
+  'submodule.addRemoteCreatedHeading': 'Remote repository created',
+  'submodule.addRemoteCreatedRetryHelp':
+    'The remote is ready. Retry to add that existing remote without creating it again.',
+  'submodule.addRemoteOwnerLabel': 'Owner',
+  'submodule.addRemoteNameLabel': 'Repository name',
+  'submodule.addRemoteDescriptionLabel': 'Description (optional)',
+  'submodule.addRemotePrivateLabel': 'Keep this repository private',
+  'submodule.addRemoteNameHelp':
+    'Use the exact name to create on the selected GitHub host.',
+  'submodule.addRemoteDescriptionHelp':
+    'A short description for the new remote repository.',
+  'submodule.addRemoteInitializeHelp':
+    'Desktop initializes the remote with a first commit so Git can track it as a submodule immediately.',
+  'submodule.addRemoteAccountRequiredError':
+    'Choose an authenticated GitHub account before creating the remote repository.',
+  'submodule.addRemoteOwnerUnavailableError':
+    'The selected organization is no longer available for this account. Choose an owner again.',
+  'submodule.addRemoteNameRequiredError':
+    'Enter a name for the new remote repository.',
+  'submodule.addRemoteNameLengthError':
+    'Repository names must be 100 characters or fewer.',
+  'submodule.addRemoteNameCharactersError':
+    'Use only letters, numbers, periods, hyphens, and underscores in the repository name.',
+  'submodule.addRemoteDescriptionLengthError':
+    'Repository descriptions must be 350 characters or fewer.',
+  'submodule.addRemoteDescriptionCharactersError':
+    'The repository description contains unsupported control characters.',
+  'submodule.addCreatingRemoteProgress': 'Creating the remote repositoryâ€¦',
+  'submodule.addRemoteCreatedProgress':
+    'Remote created. Adding it as a submoduleâ€¦',
+  'submodule.addRemoteCreatedButAddFailed':
+    'The remote repository was created at {repository}, but Desktop could not add it as a submodule: {error}. Retry to use the existing remote.',
+  'submodule.addRemoteCreateFailed':
+    'Desktop could not create the remote repository: {error}',
+  'submodule.addRemoteCreateCancelledUncertain':
+    'The creation request ended before Desktop received a result. The remote host may still have created the repository. Check it before retrying to avoid a duplicate.',
   'submodule.addOrganizationLoadFailed':
     "Desktop couldn't load every organization repository.",
   'submodule.addTryAgainAction': 'Try again',

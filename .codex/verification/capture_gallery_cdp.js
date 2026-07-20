@@ -8,12 +8,13 @@
  * Win32 desktop with --remote-debugging-port), seeds the deterministic
  * provider profile, drives surfaces entirely through the renderer (DOM plus
  * ipcRenderer-emitted menu events), fixes the capture viewport with CDP
- * device metrics, and writes canonical PNGs into docs/assets/screenshots.
+ * device metrics, and writes candidate PNGs below a caller-owned Temp run.
+ * Promotion into docs/assets/screenshots is a separate reviewed step.
  *
  * Usage:
  *   node .codex/verification/capture_gallery_cdp.js \
  *     --run-root %TEMP%\desktop-material-p0-ui-... [--port 9337] \
- *     --scenes seed,dump [--out docs/assets/screenshots]
+ *     --scenes seed,dump --out %TEMP%\desktop-material-p0-ui-...\captures\gallery
  *   node ... --fixture-path C:\DesktopMaterialEvidence\fixture \
  *     --scenes seed,repository-tools
  *   node ... --probe "expression"
@@ -21,6 +22,7 @@
  */
 
 const fs = require('fs')
+const { execFileSync } = require('child_process')
 const http = require('http')
 const path = require('path')
 const WebSocket = require('ws')
@@ -46,10 +48,9 @@ function parseArguments(argv) {
 
 const args = parseArguments(process.argv.slice(2))
 const port = Number(args.get('port') ?? '9337')
-const outDir = path.resolve(
-  repoRoot,
-  args.get('out') ?? 'docs/assets/screenshots'
-)
+const requestedOutDir = args.get('out')
+const outDir =
+  requestedOutDir === undefined ? null : path.resolve(repoRoot, requestedOutDir)
 const runRoot = args.get('run-root')
 const ready = runRoot
   ? JSON.parse(
@@ -62,11 +63,157 @@ const fixturePath = args.get('fixture-path')
   ? path.join(runRoot, 'fixture')
   : null
 const fixtureSourcePath = runRoot ? path.join(runRoot, 'git-source') : null
+const providerRequestLog = runRoot
+  ? path.join(runRoot, 'provider', 'requests.jsonl')
+  : null
 
 const DefaultWidth = 1440
 const DefaultHeight = 960
 const CaptureWidth = Number(args.get('width') ?? DefaultWidth)
 const CaptureHeight = Number(args.get('height') ?? DefaultHeight)
+
+const CanonicalGalleryScenes = Object.freeze([
+  'welcome',
+  'complete-welcome',
+  'seed',
+  'workspace-changes',
+  'history',
+  'history-context-actions',
+  'branches-sheet',
+  'repositories-sheet',
+  'settings',
+  'settings-agent-access',
+  'anchored-appearance',
+  'settings-accounts',
+  'settings-automation',
+  'settings-history',
+  'sparse-checkout',
+  'gitignore-manager',
+  'branch-rules',
+  'repository-tools',
+  'repository-tools-scroll',
+  'error-notice',
+  'responsive-overflow',
+  'releases',
+  'issues',
+  'provider-triage',
+  'api-explorer',
+  'api-app-functions',
+  'actions-runs',
+  'actions-load-more',
+  'actions-run-details',
+  'actions-caches',
+  'notification-center',
+  'notification-bulk',
+  'notification-github',
+  'tab-search',
+  'tab-arrange',
+  'tab-style',
+  'app-identity',
+  'multi-window-menu',
+  'toolbar-overflow',
+  'scale-200',
+  'history-power-tools',
+  'remote-manager',
+  'add-submodule',
+  'logo-studio',
+  'repository-folder-detection',
+  'repository-submodule-management',
+  'submodule-context',
+  'stash-manager',
+  'rebase-review',
+  'pull-request-compose',
+  'pull-request-open',
+  'shallow-clone-dialog',
+  'sparse-checkout-safe',
+  'pull-all',
+  'clone-fallback',
+  'regex-builder',
+  'history-deepen',
+  'history-deepening',
+  'actions-artifacts',
+  'actions-artifact-download',
+  'actions-artifact-page-two',
+  'actions-sentinel',
+  'actions-job-log',
+  'actions-cancel',
+  'actions-pending-deployments',
+  'merge-all',
+  'advanced-workflows',
+  'cheap-lfs-preparing',
+])
+
+const CanonicalGalleryOutputs = Object.freeze([
+  'material-welcome',
+  'material-workspace-changes',
+  'material-history',
+  'material-history-context-actions',
+  'material-branches-sheet',
+  'material-repositories-sheet',
+  'material-settings',
+  'material-agent-access',
+  'material-customization',
+  'material-provider-accounts',
+  'material-automation',
+  'settings-history-manager',
+  'material-sparse-checkout',
+  'material-gitignore-manager',
+  'material-effective-branch-rules',
+  'material-repository-tools',
+  'material-repository-tools-scroll',
+  'material-error-notice',
+  'material-responsive-overflow-fixed',
+  'material-github-releases',
+  'material-github-issues',
+  'material-provider-triage',
+  'material-github-api-explorer',
+  'material-api-app-functions',
+  'material-actions-pagination',
+  'material-actions-pagination-headless',
+  'material-actions-jobs-pagination',
+  'material-actions-cache-manager',
+  'material-notification-center',
+  'material-notification-bulk-actions',
+  'material-github-notifications',
+  'material-tab-search',
+  'material-tab-arrange',
+  'material-tab-appearance-word',
+  'material-app-identity-workspace',
+  'material-multi-window-menu',
+  'material-toolbar-overflow',
+  'material-scale-200-autofit',
+  'material-history-power-tools',
+  'material-remote-manager',
+  'add-submodule-dialog',
+  'material-repository-logo-studio',
+  'material-repository-folder-detection',
+  'material-repository-submodule-management',
+  'material-submodule-context',
+  'material-stash-manager',
+  'material-rebase-review',
+  'material-native-pull-request',
+  'material-create-pull-request',
+  'material-shallow-clone',
+  'material-shallow-clone-safe',
+  'material-sparse-checkout-safe',
+  'material-pull-all-account-fallback',
+  'material-clone-account-fallback',
+  'regex-builder',
+  'material-history-deepen',
+  'material-history-deepening',
+  'material-actions-artifacts',
+  'material-actions-artifact-download',
+  'material-actions-artifact-page-two',
+  'material-actions-artifacts-headless',
+  'material-actions-sentinel-headless',
+  'material-actions-job-log',
+  'material-actions-cancel',
+  'material-actions-pending-deployments',
+  'material-branch-merge-all',
+  'advanced-workflows',
+  'material-cheap-lfs-preparing',
+])
+const capturedNames = []
 
 if (
   !Number.isInteger(CaptureWidth) ||
@@ -216,10 +363,29 @@ async function restoreCaptureViewport() {
 }
 
 async function capture(name) {
+  if (outDir === null) {
+    fail('Capture scenes require an explicit disposable --out directory.')
+  }
+  const trackedScreenshots = path.join(
+    repoRoot,
+    'docs',
+    'assets',
+    'screenshots'
+  )
+  const relativeToTracked = path.relative(trackedScreenshots, outDir)
+  if (
+    relativeToTracked === '' ||
+    (!path.isAbsolute(relativeToTracked) &&
+      relativeToTracked !== '..' &&
+      !relativeToTracked.startsWith(`..${path.sep}`))
+  ) {
+    fail('Capture candidates must be reviewed in Temp before promotion.')
+  }
   fs.mkdirSync(outDir, { recursive: true })
   const shot = await client.send('Page.captureScreenshot', { format: 'png' })
   const file = path.join(outDir, `${name}.png`)
-  fs.writeFileSync(file, Buffer.from(shot.data, 'base64'))
+  fs.writeFileSync(file, Buffer.from(shot.data, 'base64'), { flag: 'wx' })
+  capturedNames.push(name)
   const size = fs.statSync(file).size
   process.stdout.write(`CAPTURED ${name}.png ${size}b\n`)
   if (size < 20000) {
@@ -289,6 +455,69 @@ async function clickSelector(selector, options = {}) {
   return clicked
 }
 
+/** Open the editor owned by a concrete element through its pointer contract. */
+async function contextMenuSelector(selector) {
+  const opened = await evaluate(`(() => {
+    const target = document.querySelector(${JSON.stringify(selector)})
+    if (!(target instanceof HTMLElement)) return false
+    const bounds = target.getBoundingClientRect()
+    target.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: bounds.left + Math.min(24, bounds.width / 2),
+      clientY: bounds.top + Math.min(18, bounds.height / 2),
+    }))
+    return true
+  })()`)
+  if (!opened) {
+    fail(`Unable to context-menu ${selector}.`)
+  }
+}
+
+/** Open a focused owner's editor through the accessible keyboard contract. */
+async function shiftF10Selector(selector) {
+  const opened = await evaluate(`(() => {
+    const target = document.querySelector(${JSON.stringify(selector)})
+    if (!(target instanceof HTMLElement)) return false
+    target.focus()
+    target.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'F10',
+      code: 'F10',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    }))
+    return true
+  })()`)
+  if (!opened) {
+    fail(`Unable to send Shift+F10 to ${selector}.`)
+  }
+}
+
+async function waitForPrivacySafeAnchoredEditor(label) {
+  await waitFor(
+    `document.querySelector('.anchored-appearance-editor') !== null`,
+    label
+  )
+  const state = await evaluate(`(() => {
+    const editor = document.querySelector('.anchored-appearance-editor')
+    const repository = editor?.querySelector(
+      '.anchored-appearance-editor-repository code'
+    )
+    return {
+      text: editor?.textContent ?? '',
+      repository: repository?.textContent ?? '',
+    }
+  })()`)
+  if (
+    typeof state?.repository !== 'string' ||
+    !state.repository.startsWith('…\\') ||
+    /C:\\Users|Temp/i.test(`${state.text} ${state.repository}`)
+  ) {
+    fail(`Anchored editor exposed a private path: ${JSON.stringify(state)}`)
+  }
+}
+
 /** Set a React-controlled input's value with native setter + input event. */
 async function setInput(selector, value) {
   const done = await evaluate(`(() => {
@@ -310,26 +539,34 @@ async function setInput(selector, value) {
   }
 }
 
-/** Set a React-controlled select and dispatch the same events as a user edit. */
-async function setSelect(selector, value) {
-  const done = await evaluate(`(() => {
-    const el = document.querySelector(${JSON.stringify(selector)})
-    if (!(el instanceof HTMLSelectElement)) return false
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLSelectElement.prototype,
-      'value'
-    ).set
-    setter.call(el, ${JSON.stringify(value)})
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-    el.dispatchEvent(new Event('change', { bubbles: true }))
-    return el.value === ${JSON.stringify(value)}
-  })()`)
-  if (!done) {
-    fail(`Unable to set select ${selector} to ${value}.`)
+function ensureDirectFixtureProviderRemote() {
+  if (ready === null || fixturePath === null) {
+    return false
   }
+
+  const endpoint = new URL(ready.endpoint)
+  if (!['127.0.0.1', 'localhost', '::1'].includes(endpoint.hostname)) {
+    fail(`Fixture provider is not loopback-only: ${endpoint.hostname}`)
+  }
+  const directURL = `${endpoint.origin}/${ready.owner}/${ready.repository}.git`
+  const currentURL = execFileSync(
+    'git',
+    ['-C', fixturePath, 'remote', 'get-url', 'origin'],
+    { encoding: 'utf8' }
+  ).trim()
+  if (currentURL === directURL) {
+    return false
+  }
+  execFileSync(
+    'git',
+    ['-C', fixturePath, 'remote', 'set-url', 'origin', directURL],
+    { stdio: 'ignore' }
+  )
+  return true
 }
 
 async function seedProfile() {
+  const providerRemoteChanged = ensureDirectFixtureProviderRemote()
   const account =
     ready === null
       ? null
@@ -363,7 +600,7 @@ async function seedProfile() {
         ]
   )
 
-  const changed = await evaluate(`(() => {
+  const profileChanged = await evaluate(`(() => {
     const expected = {
       'has-shown-welcome-flow': '1',
       'theme': 'light',
@@ -395,6 +632,7 @@ async function seedProfile() {
     return changed
   })()`)
 
+  const changed = providerRemoteChanged || profileChanged
   if (changed) {
     await evaluate('window.location.reload(), true')
     await sleep(4500)
@@ -912,46 +1150,17 @@ scene('settings-agent-access', async () => {
   await captureSettingsTab('Agent access', 'material-agent-access')
 })
 
-scene('settings-appearance', async () => {
-  await captureSettingsTab('Appearance', 'material-customization', async () => {
-    const enabled = await evaluate(`(() => {
-        const label = [...document.querySelectorAll('#preferences label')]
-          .find(node => node.textContent.trim() === 'Highlight Desktop Material features')
-        if (!(label instanceof HTMLLabelElement)) return false
-        const input = document.getElementById(label.htmlFor)
-        if (!(input instanceof HTMLInputElement)) return false
-        if (!input.checked) input.click()
-        return input.checked
-      })()`)
-    if (!enabled) {
-      fail('Unable to enable Desktop Material feature highlighting.')
-    }
-    await waitFor(
-      `document.body.hasAttribute('data-dm-highlight-features') && document.querySelectorAll('#preferences [data-dm-feature]').length >= 2`,
-      'enabled Desktop Material feature markers'
-    )
-    await setSelect(
-      '#preferences select[name="submoduleBackButtonStyle"]',
-      'filled'
-    ).catch(async () => {
-      const selectors = await evaluate(`(() =>
-        [...document.querySelectorAll('#preferences .appearance-language-navigation select')]
-          .map(select => ({ value: select.value, options: [...select.options].map(o => o.value) }))
-      )()`)
-      fail(`Unable to select the Back style: ${JSON.stringify(selectors)}`)
-    })
-    await setSelect(
-      '#preferences select[name="submoduleBackButtonLabel"]',
-      'parent-name'
-    )
-    await evaluate(`(() => {
-      const section = document.querySelector('.appearance-language-navigation')
-      if (!(section instanceof HTMLElement)) return false
-      section.scrollIntoView({ block: 'center' })
-      return true
-    })()`)
-    await sleep(500)
-  })
+scene('anchored-appearance', async () => {
+  await ensureRepository()
+  await menuEvent('show-changes')
+  await contextMenuSelector('#desktop-app-toolbar')
+  await waitForPrivacySafeAnchoredEditor(
+    'repository toolbar owner appearance editor'
+  )
+  await sleep(900)
+  await parkPointer()
+  await capture('material-customization')
+  await closeAllDialogs()
 })
 
 scene('settings-accounts', async () => {
@@ -1042,12 +1251,61 @@ scene('repository-tools-scroll', async () => {
 })
 
 scene('error-notice', async () => {
+  if (fixturePath === null) {
+    fail('Lock-file recovery requires a disposable fixture path.')
+  }
   await ensureRepository()
-  await menuEvent('test-app-error')
-  await sleep(1600)
+  await menuEvent('show-changes')
+  await setInput(
+    'input[aria-label="Commit summary"]',
+    'Verify stale lock recovery'
+  )
+
+  const lockPath = path.join(fixturePath, '.git', 'index.lock')
+  fs.writeFileSync(lockPath, 'stale Desktop Material verification lock\n', {
+    flag: 'wx',
+  })
+  const staleTime = new Date(Date.now() - 120_000)
+  fs.utimesSync(lockPath, staleTime, staleTime)
+
+  await clickSelector('.commit-button')
+  await waitFor(
+    `[...document.querySelectorAll('.error-notice button')].some(button => button.textContent.trim() === 'Remove lock file')`,
+    'real stale-lock recovery notice',
+    30000
+  )
+  const noticeText = await evaluate(
+    `document.querySelector('.error-notice')?.textContent ?? ''`
+  )
+  if (!/lock file/i.test(noticeText) || !/Remove lock file/.test(noticeText)) {
+    fail(`Stale-lock notice did not name its recovery: ${noticeText}`)
+  }
+
+  await clickText('Remove lock file', { within: '.error-notice' })
+  await waitFor(
+    `document.querySelector('.error-notice [aria-label="Confirm lock file removal"]') !== null`,
+    'explicit stale-lock removal confirmation'
+  )
+  const confirmationText = await evaluate(
+    `document.querySelector('.error-notice-lock-confirmation')?.textContent ?? ''`
+  )
+  if (!/Stop all Git and IDE processes/.test(confirmationText)) {
+    fail(
+      `Stale-lock confirmation omitted its process warning: ${confirmationText}`
+    )
+  }
+  await sleep(700)
+  await parkPointer()
   await capture('material-error-notice')
-  await sleep(400)
-  await clickText('Dismiss', { optional: true })
+
+  await clickText('Confirm remove lock file', { within: '.error-notice' })
+  const removalDeadline = Date.now() + 15000
+  while (fs.existsSync(lockPath) && Date.now() < removalDeadline) {
+    await sleep(250)
+  }
+  if (fs.existsSync(lockPath)) {
+    fail('Remove lock file did not remove the verified stale index.lock.')
+  }
   await closeAllDialogs()
 })
 
@@ -1244,32 +1502,26 @@ scene('tab-arrange', async () => {
 
 scene('tab-style', async () => {
   await ensureRepository()
-  await clickAria('Customize tab appearance')
-  await sleep(1200)
+  await contextMenuSelector('.repository-tab.active .repository-tab-label')
+  await waitForPrivacySafeAnchoredEditor('tab-title owner appearance editor')
+  await sleep(900)
   await parkPointer()
   await capture('material-tab-appearance-word')
-  await pressEscape(1)
+  await closeAllDialogs()
 })
 
 scene('app-identity', async () => {
   await ensureRepository()
-  await clickSelector(
-    '.app-brand-container button, [data-customization-scope="profile"] button',
-    {
-      optional: true,
-    }
+  await contextMenuSelector('[data-customization-surface="app-identity"]')
+  await waitForPrivacySafeAnchoredEditor('app-identity owner appearance editor')
+  await waitFor(
+    `document.querySelector('.app-identity-section') !== null`,
+    'app identity controls'
   )
-  const opened = await evaluate(
-    `document.querySelector('[class*=app-identity], [class*=identity-editor]') !== null`
-  )
-  if (!opened) {
-    await clickSelector('.app-brand-container', { optional: true })
-    await sleep(1200)
-  }
-  await sleep(1200)
+  await sleep(900)
   await parkPointer()
   await capture('material-app-identity-workspace')
-  await pressEscape(1)
+  await closeAllDialogs()
 })
 
 scene('multi-window-menu', async () => {
@@ -1342,6 +1594,96 @@ async function openRepositorySettingsTab(tabLabel) {
   }
 }
 
+function ensureRepositoryFolderScanFixture() {
+  if (fixturePath === null) {
+    fail('Repository-folder detection requires a disposable fixture path.')
+  }
+  const root = path.join(
+    runRoot ?? path.dirname(fixturePath),
+    'repository-folder-scan'
+  )
+  for (const relativePath of ['design-system', 'tools/release-kit']) {
+    const repositoryPath = path.join(root, relativePath)
+    fs.mkdirSync(repositoryPath, { recursive: true })
+    if (!fs.existsSync(path.join(repositoryPath, '.git'))) {
+      execFileSync('git', ['init', '--quiet', repositoryPath], {
+        windowsHide: true,
+        stdio: 'pipe',
+      })
+    }
+  }
+  return root
+}
+
+async function installSyntheticDirectoryPicker(directoryPath) {
+  const installed = await evaluate(`(() => {
+    const ipc = require('electron').ipcRenderer
+    if (window.__galleryOriginalIpcInvoke !== undefined) return false
+    window.__galleryOriginalIpcInvoke = ipc.invoke
+    ipc.invoke = function(channel, ...args) {
+      if (channel === 'show-open-dialog') {
+        return Promise.resolve(${JSON.stringify(directoryPath)})
+      }
+      return window.__galleryOriginalIpcInvoke.call(this, channel, ...args)
+    }
+    return true
+  })()`)
+  if (!installed) {
+    fail('Unable to install the synthetic directory-picker response.')
+  }
+}
+
+async function restoreSyntheticDirectoryPicker() {
+  await evaluate(`(() => {
+    const ipc = require('electron').ipcRenderer
+    if (window.__galleryOriginalIpcInvoke === undefined) return false
+    ipc.invoke = window.__galleryOriginalIpcInvoke
+    delete window.__galleryOriginalIpcInvoke
+    return true
+  })()`)
+}
+
+scene('repository-folder-detection', async () => {
+  const scanRoot = ensureRepositoryFolderScanFixture()
+  await ensureRepository()
+  await menuEvent('add-local-repository')
+  await waitFor(
+    `document.querySelector('#add-existing-repository') !== null`,
+    'Add local repository dialog'
+  )
+  await installSyntheticDirectoryPicker(scanRoot)
+  try {
+    await clickText('Auto-detect repositories...', {
+      within: '#add-existing-repository',
+    })
+    await waitFor(
+      `document.querySelector('.repository-folder-scan-results')?.textContent?.includes('Found 2 Git repositories') === true`,
+      'two detected synthetic repositories'
+    )
+  } finally {
+    await restoreSyntheticDirectoryPicker()
+  }
+
+  // The scan is real; only replace the private disposable root in the visible
+  // textbox so published pixels stay deterministic and privacy-safe.
+  await evaluate(`(() => {
+    const input = document.querySelector(
+      '#add-existing-repository input[type="text"]'
+    )
+    if (!(input instanceof HTMLInputElement)) return false
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    ).set
+    setter.call(input, 'C:\\Synthetic\\Repository Fleet')
+    return true
+  })()`)
+  await sleep(700)
+  await parkPointer()
+  await capture('material-repository-folder-detection')
+  await closeAllDialogs()
+})
+
 scene('remote-manager', async () => {
   await openRepositorySettingsTab('Remote')
   await sleep(1200)
@@ -1373,50 +1715,224 @@ scene('add-submodule', async () => {
     `document.querySelector('.add-submodule-dialog') !== null`,
     'Add Submodule dialog'
   )
-  await clickText('URL', { within: '.add-submodule-dialog' })
-  await setInput(
-    '.add-submodule-dialog .add-submodule-url-content input',
-    'https://example.invalid/material-widget.git'
+  await clickText('Create remote', { within: '.add-submodule-dialog' })
+  await waitFor(
+    `document.querySelector('.add-submodule-create-remote-content') !== null`,
+    'Create remote submodule source'
   )
-  const fields = await evaluate(`(() =>
-    [...document.querySelectorAll('.add-submodule-dialog .add-submodule-fields input')]
-      .map(input => input.getAttribute('placeholder'))
+  const remoteFields = await evaluate(`(() =>
+    [...document.querySelectorAll('.add-submodule-create-remote-fields input[type="text"]')]
+      .map(input => input.getAttribute('aria-label') ?? input.labels?.[0]?.textContent?.trim() ?? '')
   )()`)
-  if (!Array.isArray(fields) || fields.length < 2) {
+  if (!Array.isArray(remoteFields) || remoteFields.length < 2) {
     fail(
-      `Add Submodule review fields are unavailable: ${JSON.stringify(fields)}`
+      `Create remote fields are unavailable: ${JSON.stringify(remoteFields)}`
     )
+  }
+  await setInput(
+    '.add-submodule-create-remote-fields input[type="text"]:nth-of-type(1)',
+    'material-widget'
+  ).catch(async () => {
+    const set = await evaluate(`(() => {
+      const input = document.querySelectorAll(
+        '.add-submodule-create-remote-fields input[type="text"]'
+      )[0]
+      if (!(input instanceof HTMLInputElement)) return false
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      ).set
+      setter.call(input, 'material-widget')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    if (!set) fail('Unable to enter the new remote repository name.')
+  })
+  const descriptionEntered = await evaluate(`(() => {
+    const input = document.querySelectorAll(
+      '.add-submodule-create-remote-fields input[type="text"]'
+    )[1]
+    if (!(input instanceof HTMLInputElement)) return false
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    ).set
+    setter.call(input, 'Synthetic dependency for the Material workspace')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  if (!descriptionEntered) {
+    fail('Unable to enter the new remote repository description.')
   }
   await setInput(
     '.add-submodule-dialog input[placeholder="vendor/repository"]',
     'vendor/material-widget'
-  )
-  await setInput(
-    '.add-submodule-dialog input[placeholder="Remote default branch"]',
-    'stable'
   )
   await waitFor(
     `!document.querySelector('.add-submodule-dialog')?.textContent?.includes('Checking that the destination is safe and empty')`,
     'Add Submodule path validation'
   )
   await waitFor(
-    `[...document.querySelectorAll('.add-submodule-dialog button')].some(button => button.textContent.trim() === 'Add submodule' && !button.disabled)`,
-    'valid Add Submodule review'
+    `[...document.querySelectorAll('.add-submodule-dialog button')].some(button => button.textContent.trim() === 'Create and add submodule' && !button.disabled)`,
+    'valid Create remote and add review'
   )
+  const providerMutations =
+    providerRequestLog !== null && fs.existsSync(providerRequestLog)
+      ? fs
+          .readFileSync(providerRequestLog, 'utf8')
+          .split(/\r?\n/)
+          .filter(line => /POST .*\/(?:user|orgs\/[^/]+)\/repos/.test(line))
+          .length
+      : 0
   await parkPointer()
   await capture('add-submodule-dialog')
+  if (providerRequestLog !== null && fs.existsSync(providerRequestLog)) {
+    const after = fs
+      .readFileSync(providerRequestLog, 'utf8')
+      .split(/\r?\n/)
+      .filter(line => /POST .*\/(?:user|orgs\/[^/]+)\/repos/.test(line)).length
+    if (after !== providerMutations) {
+      fail('Create remote review mutated the provider before submission.')
+    }
+  }
   await closeAllDialogs()
 })
 
-scene('logo-studio', async () => {
-  await openRepositorySettingsTab('Appearance')
-  await sleep(1000)
-  await evaluate(`(() => {
-    const studio = document.querySelector('.repository-logo-studio')
-    if (studio instanceof HTMLElement) studio.scrollIntoView({ block: 'center' })
+scene('repository-submodule-management', async () => {
+  await openRepositorySettingsTab('Submodules')
+  await waitFor(
+    `document.querySelector('.submodule-appearance-preview .submodule-context-back') !== null`,
+    'Submodule Back appearance owner'
+  )
+  await shiftF10Selector(
+    '.submodule-appearance-preview .submodule-context-back'
+  )
+  await waitForPrivacySafeAnchoredEditor(
+    'Submodule Back owner appearance editor'
+  )
+  await sleep(900)
+  await parkPointer()
+  await capture('material-repository-submodule-management')
+  await closeAllDialogs()
+})
+
+async function getPersistentRepositoryState() {
+  return await evaluate(`(async () => {
+    const repositories = await new Promise((resolve, reject) => {
+      const open = indexedDB.open('Database')
+      open.onerror = () => reject(open.error ?? new Error('database open failed'))
+      open.onsuccess = () => {
+        const database = open.result
+        if (!database.objectStoreNames.contains('repositories')) {
+          database.close()
+          reject(new Error('repositories store is unavailable'))
+          return
+        }
+        const transaction = database.transaction('repositories', 'readonly')
+        const request = transaction.objectStore('repositories').count()
+        request.onerror = () => reject(request.error ?? new Error('count failed'))
+        request.onsuccess = () => {
+          const count = request.result
+          transaction.oncomplete = () => database.close()
+          resolve(count)
+        }
+      }
+    })
+    return {
+      repositories,
+      tabs: document.querySelectorAll('.repository-tab[role="tab"]').length,
+    }
+  })()`)
+}
+
+scene('submodule-context', async () => {
+  await ensureRepository()
+  const before = await getPersistentRepositoryState()
+  await menuEvent('show-repository-tools')
+  await waitFor(
+    `document.querySelector('[data-hub-tool="submodule-manager"]') !== null`,
+    'Submodule Manager tool'
+  )
+  await clickSelector('[data-hub-tool="submodule-manager"]')
+  await clickText('Open submodule manager', {
+    within: 'main.repository-tools',
+  })
+  await waitFor(
+    `document.querySelector('#submodule-manager .submodule-row') !== null`,
+    'Submodule Manager rows',
+    30000
+  )
+  const opened = await evaluate(`(() => {
+    const action = [...document.querySelectorAll(
+      '#submodule-manager .submodule-open-repository'
+    )].find(button =>
+      button.getAttribute('aria-disabled') !== 'true' && !button.disabled
+    )
+    if (!(action instanceof HTMLElement)) return false
+    action.click()
     return true
   })()`)
-  await sleep(600)
+  if (!opened) {
+    fail('No checked-out submodule was available to open temporarily.')
+  }
+  await waitFor(
+    `document.querySelector('.submodule-repository-context') !== null`,
+    'temporary submodule repository context',
+    30000
+  )
+  const openedState = await getPersistentRepositoryState()
+  if (
+    openedState.repositories !== before.repositories ||
+    openedState.tabs !== before.tabs
+  ) {
+    fail(
+      `Temporary submodule polluted persisted state: ${JSON.stringify({
+        before,
+        openedState,
+      })}`
+    )
+  }
+  await waitFor(
+    `document.querySelector('.submodule-context-back')?.getAttribute('aria-label')?.length > 0`,
+    'named Back control'
+  )
+  await sleep(900)
+  await parkPointer()
+  await capture('material-submodule-context')
+
+  await clickSelector('.submodule-context-back')
+  await waitFor(
+    `document.querySelector('.submodule-repository-context') === null`,
+    'return to persisted parent repository',
+    30000
+  )
+  const returnedState = await getPersistentRepositoryState()
+  if (
+    returnedState.repositories !== before.repositories ||
+    returnedState.tabs !== before.tabs
+  ) {
+    fail(
+      `Returning from the temporary submodule changed persisted state: ${JSON.stringify(
+        { before, returnedState }
+      )}`
+    )
+  }
+})
+
+scene('logo-studio', async () => {
+  await ensureRepository()
+  await menuEvent('choose-repository')
+  await waitFor(
+    `document.querySelector('.repository-list-logo-appearance-target') !== null`,
+    'repository logo owner'
+  )
+  await contextMenuSelector('.repository-list-logo-appearance-target')
+  await waitForPrivacySafeAnchoredEditor('repository logo owner editor')
+  await waitFor(
+    `document.querySelector('.repository-logo-studio') !== null`,
+    'repository logo studio'
+  )
+  await sleep(900)
   await parkPointer()
   await capture('material-repository-logo-studio')
   await closeAllDialogs()
@@ -1869,6 +2385,122 @@ scene('merge-all', async () => {
   await pressEscape(1)
 })
 
+scene('advanced-workflows', async () => {
+  await ensureRepository()
+  await menuEvent('show-repository-tools')
+  await waitFor(
+    `document.querySelector('.repository-tools-sidebar') !== null`,
+    'Repository Tools sidebar'
+  )
+  await setInput('.repository-tools-search-input', 'Tag lifecycle')
+  await waitFor(
+    `document.querySelector('[data-hub-tool="tag-lifecycle"]') !== null`,
+    'Tag lifecycle tool'
+  )
+  await clickSelector('[data-hub-tool="tag-lifecycle"]')
+  await waitFor(
+    `document.querySelector('.tag-lifecycle-manager')?.textContent?.includes('Local tags') === true`,
+    'local tag lifecycle inventory',
+    30000
+  )
+  await waitFor(
+    `[...document.querySelectorAll('.tag-lifecycle-manager button')].some(button => button.textContent.trim() === 'Load remote' && !button.disabled)`,
+    'enabled remote tag inventory action',
+    30000
+  )
+  await clickText('Load remote', { within: '.tag-lifecycle-manager' })
+  await waitFor(
+    `document.querySelector('.tag-lifecycle-manager')?.textContent?.includes('Remote-only tags') === true`,
+    'remote-only tag inventory',
+    30000
+  )
+  const receipt = await evaluate(`(() => {
+    const manager = document.querySelector('.tag-lifecycle-manager')
+    const sidebar = document.querySelector('.repository-tools-sidebar')
+    if (!(manager instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
+      return null
+    }
+    const visibleText = document.body.innerText
+    return {
+      language: document.body.getAttribute('data-dm-language-mode'),
+      horizontalOverflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 ||
+        document.body.scrollWidth > document.body.clientWidth + 1 ||
+        manager.scrollWidth > manager.clientWidth + 1 ||
+        sidebar.scrollWidth > sidebar.clientWidth + 1,
+      leakedPath: /C:\\\\Users\\\\[^\\s]+|AppData\\\\Local\\\\Temp/i.test(visibleText),
+    }
+  })()`)
+  if (
+    receipt === null ||
+    receipt.language !== 'english' ||
+    receipt.horizontalOverflow ||
+    receipt.leakedPath
+  ) {
+    fail(
+      `Advanced workflows failed geometry/privacy checks: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  await evaluate(`(() => {
+    const heading = [...document.querySelectorAll('.tag-lifecycle-manager h3')]
+      .find(node => node.textContent?.startsWith('Remote-only tags'))
+    if (heading instanceof HTMLElement) heading.scrollIntoView({ block: 'center' })
+    return true
+  })()`)
+  await sleep(900)
+  await parkPointer()
+  await capture('advanced-workflows')
+})
+
+scene('cheap-lfs-preparing', async () => {
+  if (fixturePath === null) {
+    fail('Cheap-LFS preparation requires a disposable fixture path.')
+  }
+  const largeFileName = 'windows-enterprise-evaluation.iso'
+  const largeFilePath = path.join(fixturePath, largeFileName)
+  const descriptor = fs.openSync(largeFilePath, 'wx')
+  try {
+    fs.writeSync(
+      descriptor,
+      Buffer.from(
+        'Desktop Material synthetic large-file verification fixture\n'
+      )
+    )
+    fs.ftruncateSync(descriptor, 100 * 1024 * 1024 + 4096)
+  } finally {
+    fs.closeSync(descriptor)
+  }
+
+  await ensureRepository()
+  await menuEvent('show-changes')
+  await evaluate(`require('electron').ipcRenderer.emit('focus'), true`)
+  await waitFor(
+    `document.body.textContent?.includes(${JSON.stringify(
+      largeFileName
+    )}) === true`,
+    'synthetic oversized file in Changes',
+    30000
+  )
+  await setInput(
+    'input[aria-label="Commit summary"]',
+    'Route large ISO through cheap LFS'
+  )
+  await waitFor(
+    `document.querySelector('.commit-button') instanceof HTMLButtonElement && !document.querySelector('.commit-button').disabled`,
+    'enabled cheap-LFS commit action'
+  )
+  await clickSelector('.commit-button')
+  await waitFor(
+    `document.body.textContent?.includes('Preparing 1 large file for cheap LFS') === true`,
+    'cheap-LFS preparation phase',
+    30000
+  )
+  await parkPointer()
+  await capture('material-cheap-lfs-preparing')
+})
+
 async function main() {
   if (args.has('list')) {
     for (const name of scenes.keys()) {
@@ -1897,10 +2529,16 @@ async function main() {
       process.stdout.write(`PROBE ${JSON.stringify(value, null, 1)}\n`)
     }
 
-    const names = (args.get('scenes') ?? '')
-      .split(',')
-      .map(value => value.trim())
-      .filter(value => value.length > 0)
+    const canonical = args.get('canonical') === 'true'
+    if (canonical && args.has('scenes')) {
+      fail('Use either --canonical true or --scenes, not both.')
+    }
+    const names = canonical
+      ? [...CanonicalGalleryScenes]
+      : (args.get('scenes') ?? '')
+          .split(',')
+          .map(value => value.trim())
+          .filter(value => value.length > 0)
 
     for (const name of names) {
       const run = scenes.get(name)
@@ -1910,6 +2548,22 @@ async function main() {
       process.stdout.write(`SCENE ${name}\n`)
       await resetSceneState(name)
       await run()
+    }
+
+    if (canonical) {
+      const expected = [...CanonicalGalleryOutputs].sort()
+      const actual = [...capturedNames].sort()
+      if (
+        capturedNames.length !== new Set(capturedNames).size ||
+        JSON.stringify(actual) !== JSON.stringify(expected)
+      ) {
+        fail(
+          `Canonical gallery did not produce the exact 68-output set: ${JSON.stringify(
+            { expected, actual }
+          )}`
+        )
+      }
+      process.stdout.write('CANONICAL 68/68 exact output set\n')
     }
   } finally {
     // This style is capture-only state. Leaving it installed breaks normal

@@ -1,16 +1,22 @@
 import * as React from 'react'
 
-import { Account, getAccountKey } from '../../models/account'
+import { Account, accountEquals, getAccountKey } from '../../models/account'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
 import { Repository } from '../../models/repository'
 import {
   getSubmoduleBranchError,
   getSubmodulePathError,
+  getSubmoduleRemoteDescriptionError,
+  getSubmoduleRemoteNameError,
   getSubmoduleSourceError,
   getSuggestedSubmodulePath,
   normalizeSubmodulePath,
 } from '../../models/submodule-add'
-import { IAPIOrganization, IAPIRepository } from '../../lib/api'
+import {
+  IAPIFullRepository,
+  IAPIOrganization,
+  IAPIRepository,
+} from '../../lib/api'
 import { getPreferredGenericCloneAccountKey } from '../../lib/automation/clone-account-fallback'
 import { findAccountForRemoteURL } from '../../lib/find-account'
 import { validateSubmoduleAddPath } from '../../lib/git'
@@ -24,6 +30,7 @@ import { Button } from '../lib/button'
 import { Loading } from '../lib/loading'
 import { Row } from '../lib/row'
 import { TextBox } from '../lib/text-box'
+import { Select } from '../lib/select'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { TabBar } from '../tab-bar'
@@ -52,6 +59,17 @@ type HostedTab =
   | CloneRepositoryTab.Enterprise
   | CloneRepositoryTab.Providers
 
+const CreateRemoteTab = 4 as const
+type AddSubmoduleTab = CloneRepositoryTab | typeof CreateRemoteTab
+
+function isHostedTab(tab: AddSubmoduleTab): tab is HostedTab {
+  return (
+    tab === CloneRepositoryTab.DotCom ||
+    tab === CloneRepositoryTab.Enterprise ||
+    tab === CloneRepositoryTab.Providers
+  )
+}
+
 interface IHostedTabState {
   readonly filterText: string
   readonly selectedAccount: Account | null
@@ -62,11 +80,17 @@ interface IHostedTabState {
 type AddSubmoduleOperation = 'idle' | 'adding' | 'success'
 
 interface IAddSubmoduleDialogState {
-  readonly selectedTab: CloneRepositoryTab
+  readonly selectedTab: AddSubmoduleTab
   readonly dotCom: IHostedTabState
   readonly enterprise: IHostedTabState
   readonly providers: IHostedTabState
   readonly url: string
+  readonly remoteAccount: Account | null
+  readonly remoteOrganizationLogin: string | null
+  readonly remoteName: string
+  readonly remoteDescription: string
+  readonly remotePrivate: boolean
+  readonly createdRemote: IAPIFullRepository | null
   readonly path: string
   readonly branch: string
   readonly pathTouched: boolean
@@ -115,6 +139,16 @@ const ValidationErrorKeys: Readonly<Record<string, TranslationKey>> = {
   'Choose a repository or enter its URL.': 'submodule.addSourceRequiredError',
   'The repository URL contains unsupported control characters.':
     'submodule.addSourceControlCharacterError',
+  'Enter a name for the new remote repository.':
+    'submodule.addRemoteNameRequiredError',
+  'Repository names must be 100 characters or fewer.':
+    'submodule.addRemoteNameLengthError',
+  'Use only letters, numbers, periods, hyphens, and underscores in the repository name.':
+    'submodule.addRemoteNameCharactersError',
+  'Repository descriptions must be 350 characters or fewer.':
+    'submodule.addRemoteDescriptionLengthError',
+  'The repository description contains unsupported control characters.':
+    'submodule.addRemoteDescriptionCharactersError',
   'Unable to read path on disk. Please check the path and try again.':
     'submodule.addPathUnreadableError',
   'This folder contains files. Git can only clone to empty folders.':
@@ -158,6 +192,12 @@ export class AddSubmoduleDialog extends React.Component<
       enterprise: emptyHostedState(),
       providers: emptyHostedState(),
       url: '',
+      remoteAccount: null,
+      remoteOrganizationLogin: null,
+      remoteName: '',
+      remoteDescription: '',
+      remotePrivate: true,
+      createdRemote: null,
       path: '',
       branch: '',
       pathTouched: false,
@@ -266,9 +306,70 @@ export class AddSubmoduleDialog extends React.Component<
     )
   }
 
+  private getRemoteAccounts(): ReadonlyArray<Account> {
+    return this.props.accounts.filter(
+      account => account.provider === 'github' && account.token.length > 0
+    )
+  }
+
+  private getRemoteAccount(): Account | null {
+    const accounts = this.getRemoteAccounts()
+    const selectedAccount = this.state.remoteAccount
+
+    if (selectedAccount !== null) {
+      return (
+        accounts.find(account => accountEquals(account, selectedAccount)) ??
+        null
+      )
+    }
+
+    return resolveSelectedAccount(accounts, null)
+  }
+
+  private getRemoteOrganizations(): ReadonlyArray<IAPIOrganization> {
+    const account = this.getRemoteAccount()
+    return account === null
+      ? []
+      : this.props.apiRepositories.get(account)?.organizations ?? []
+  }
+
+  private getRemoteOrganization(): IAPIOrganization | null {
+    const login = this.state.remoteOrganizationLogin
+    return login === null
+      ? null
+      : this.getRemoteOrganizations().find(org => org.login === login) ?? null
+  }
+
+  private getRemoteOwner(): string {
+    if (this.state.remoteOrganizationLogin !== null) {
+      return (
+        this.getRemoteOrganization()?.login ??
+        this.state.remoteOrganizationLogin
+      )
+    }
+    return this.getRemoteAccount()?.login ?? ''
+  }
+
+  private getRemoteSourcePreview(): string {
+    if (this.state.createdRemote !== null) {
+      return this.state.createdRemote.clone_url
+    }
+    const owner = this.getRemoteOwner()
+    const name = this.state.remoteName.trim()
+    return owner.length > 0 && name.length > 0
+      ? `${owner}/${name} (new remote)`
+      : ''
+  }
+
   private getSelectedSource(): string {
     if (this.state.selectedTab === CloneRepositoryTab.Generic) {
       return this.state.url.trim()
+    }
+    if (this.state.selectedTab === CreateRemoteTab) {
+      return this.state.createdRemote?.clone_url ?? ''
+    }
+    if (!isHostedTab(this.state.selectedTab)) {
+      return ''
     }
     return (
       this.getHostedState(this.state.selectedTab).selectedItem?.clone_url ?? ''
@@ -278,7 +379,11 @@ export class AddSubmoduleDialog extends React.Component<
   private getSelectedAccountKey = async (
     source: string
   ): Promise<string | undefined> => {
-    if (this.state.selectedTab !== CloneRepositoryTab.Generic) {
+    if (this.state.selectedTab === CreateRemoteTab) {
+      const account = this.getRemoteAccount()
+      return account === null ? undefined : getAccountKey(account)
+    }
+    if (isHostedTab(this.state.selectedTab)) {
       const account = this.getSelectedAccount(this.state.selectedTab)
       return account !== null && account.token.length > 0
         ? getAccountKey(account)
@@ -294,13 +399,39 @@ export class AddSubmoduleDialog extends React.Component<
   }
 
   private getSynchronousErrors() {
-    const source = this.getSelectedSource()
+    const createRemote = this.state.selectedTab === CreateRemoteTab
+    const source = createRemote
+      ? this.state.createdRemote?.clone_url ?? ''
+      : this.getSelectedSource()
     return {
-      source: localizeValidationError(getSubmoduleSourceError(source)),
+      source: createRemote
+        ? this.getRemoteAccount() === null
+          ? ({ key: 'submodule.addRemoteAccountRequiredError' } as const)
+          : this.state.createdRemote === null
+          ? null
+          : localizeValidationError(getSubmoduleSourceError(source))
+        : localizeValidationError(getSubmoduleSourceError(source)),
       path: localizeValidationError(getSubmodulePathError(this.state.path)),
-      branch: localizeValidationError(
-        getSubmoduleBranchError(this.state.branch)
-      ),
+      branch: createRemote
+        ? null
+        : localizeValidationError(getSubmoduleBranchError(this.state.branch)),
+      remoteName: createRemote
+        ? localizeValidationError(
+            getSubmoduleRemoteNameError(this.state.remoteName)
+          )
+        : null,
+      remoteDescription: createRemote
+        ? localizeValidationError(
+            getSubmoduleRemoteDescriptionError(this.state.remoteDescription)
+          )
+        : null,
+      remoteOwner:
+        createRemote &&
+        this.state.createdRemote === null &&
+        this.state.remoteOrganizationLogin !== null &&
+        this.getRemoteOrganization() === null
+          ? ({ key: 'submodule.addRemoteOwnerUnavailableError' } as const)
+          : null,
     }
   }
 
@@ -312,12 +443,24 @@ export class AddSubmoduleDialog extends React.Component<
       this.state.pathValidationError === null &&
       errors.source === null &&
       errors.path === null &&
-      errors.branch === null
+      errors.branch === null &&
+      errors.remoteName === null &&
+      errors.remoteDescription === null &&
+      errors.remoteOwner === null
     )
   }
 
-  private onTabClicked = (selectedTab: CloneRepositoryTab) => {
-    this.setState({ selectedTab, error: null }, this.suggestPathForSource)
+  private onTabClicked = (selectedTab: number) => {
+    if (
+      selectedTab < CloneRepositoryTab.DotCom ||
+      selectedTab > CreateRemoteTab
+    ) {
+      return
+    }
+    this.setState(
+      { selectedTab: selectedTab as AddSubmoduleTab, error: null },
+      this.suggestPathForSource
+    )
   }
 
   private getSelectedTabId() {
@@ -330,11 +473,13 @@ export class AddSubmoduleDialog extends React.Component<
         return 'add-submodule-url-tab'
       case CloneRepositoryTab.Providers:
         return 'add-submodule-providers-tab'
+      case CreateRemoteTab:
+        return 'add-submodule-create-remote-tab'
     }
   }
 
   private onSelectedAccountChanged = (account: Account) => {
-    if (this.state.selectedTab === CloneRepositoryTab.Generic) {
+    if (!isHostedTab(this.state.selectedTab)) {
       return
     }
     this.setHostedState(this.state.selectedTab, {
@@ -347,7 +492,7 @@ export class AddSubmoduleDialog extends React.Component<
   private onSelectedOrganizationChanged = (
     organization: IAPIOrganization | null
   ) => {
-    if (this.state.selectedTab === CloneRepositoryTab.Generic) {
+    if (!isHostedTab(this.state.selectedTab)) {
       return
     }
     const tab = this.state.selectedTab
@@ -365,7 +510,7 @@ export class AddSubmoduleDialog extends React.Component<
   }
 
   private onRefreshOrganization = () => {
-    if (this.state.selectedTab === CloneRepositoryTab.Generic) {
+    if (!isHostedTab(this.state.selectedTab)) {
       return
     }
     const tab = this.state.selectedTab
@@ -386,13 +531,13 @@ export class AddSubmoduleDialog extends React.Component<
   }
 
   private onFilterTextChanged = (filterText: string) => {
-    if (this.state.selectedTab !== CloneRepositoryTab.Generic) {
+    if (isHostedTab(this.state.selectedTab)) {
       this.setHostedState(this.state.selectedTab, { filterText })
     }
   }
 
   private onSelectionChanged = (selectedItem: IAPIRepository | null) => {
-    if (this.state.selectedTab === CloneRepositoryTab.Generic) {
+    if (!isHostedTab(this.state.selectedTab)) {
       return
     }
     this.setHostedState(this.state.selectedTab, { selectedItem })
@@ -416,11 +561,61 @@ export class AddSubmoduleDialog extends React.Component<
     this.setState({ url, error: null }, this.suggestPathForSource)
   }
 
+  private onRemoteAccountChanged = (remoteAccount: Account) => {
+    this.setState(
+      {
+        remoteAccount,
+        remoteOrganizationLogin: null,
+        createdRemote: null,
+        error: null,
+      },
+      this.suggestPathForSource
+    )
+  }
+
+  private onRemoteOrganizationChanged = (
+    event: React.FormEvent<HTMLSelectElement>
+  ) => {
+    const value = event.currentTarget.value
+    this.setState({
+      remoteOrganizationLogin: value.startsWith('org:')
+        ? value.slice('org:'.length)
+        : null,
+      createdRemote: null,
+      error: null,
+    })
+  }
+
+  private onRemoteNameChanged = (remoteName: string) => {
+    this.setState(
+      { remoteName, createdRemote: null, error: null },
+      this.suggestPathForSource
+    )
+  }
+
+  private onRemoteDescriptionChanged = (remoteDescription: string) => {
+    this.setState({ remoteDescription, createdRemote: null, error: null })
+  }
+
+  private onRemotePrivateChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    this.setState({
+      remotePrivate: event.currentTarget.checked,
+      createdRemote: null,
+      error: null,
+    })
+  }
+
   private suggestPathForSource = () => {
     if (this.state.pathTouched) {
       return
     }
-    const path = getSuggestedSubmodulePath(this.getSelectedSource())
+    const source =
+      this.state.selectedTab === CreateRemoteTab
+        ? this.state.createdRemote?.clone_url ?? this.state.remoteName
+        : this.getSelectedSource()
+    const path = getSuggestedSubmodulePath(source)
     this.setState({ path, pathValidationError: null })
   }
 
@@ -486,10 +681,14 @@ export class AddSubmoduleDialog extends React.Component<
 
   private onProgress = (progress: string, progressValue: number) => {
     if (this.mounted) {
+      const bounded = Math.max(0, Math.min(progressValue, 1))
       this.setState({
         progress:
           progress.trim() || ({ key: 'submodule.addAddingProgress' } as const),
-        progressValue: Math.max(0, Math.min(progressValue, 1)),
+        progressValue:
+          this.state.selectedTab === CreateRemoteTab
+            ? 0.25 + bounded * 0.75
+            : bounded,
       })
     }
   }
@@ -508,10 +707,13 @@ export class AddSubmoduleDialog extends React.Component<
       return
     }
 
-    const source = this.getSelectedSource()
+    const createRemote = this.state.selectedTab === CreateRemoteTab
+    let source = this.getSelectedSource()
     const path = normalizeSubmodulePath(this.state.path)
-    const branch = this.state.branch.trim()
+    const branch = createRemote ? '' : this.state.branch.trim()
     const controller = new AbortController()
+    let createdRemote = this.state.createdRemote
+    let gitAdded = false
     this.pathValidationController?.abort()
     this.operationController = controller
     this.setState({
@@ -523,7 +725,47 @@ export class AddSubmoduleDialog extends React.Component<
     })
 
     try {
-      const accountKey = await this.getSelectedAccountKey(source)
+      let accountKey: string | undefined
+      if (createRemote) {
+        const account = this.getRemoteAccount()
+        if (account === null) {
+          throw new Error(this.text('submodule.addRemoteAccountRequiredError'))
+        }
+        accountKey = getAccountKey(account)
+        if (createdRemote === null) {
+          if (this.mounted) {
+            this.setState({
+              progress: { key: 'submodule.addCreatingRemoteProgress' },
+              progressValue: 0.08,
+            })
+          }
+          createdRemote =
+            await this.props.dispatcher.createRemoteRepositoryForSubmodule(
+              account,
+              this.getRemoteOrganization(),
+              this.state.remoteName,
+              this.state.remoteDescription,
+              this.state.remotePrivate,
+              controller.signal
+            )
+          source = createdRemote.clone_url
+          if (this.mounted) {
+            this.setState({
+              createdRemote,
+              progress: { key: 'submodule.addRemoteCreatedProgress' },
+              progressValue: 0.25,
+            })
+          }
+        } else {
+          source = createdRemote.clone_url
+        }
+        if (controller.signal.aborted) {
+          throw new Error(this.text('submodule.addCancelledError'))
+        }
+      } else {
+        accountKey = await this.getSelectedAccountKey(source)
+      }
+
       await this.props.dispatcher.addSubmodule(
         this.props.repository,
         source,
@@ -535,7 +777,13 @@ export class AddSubmoduleDialog extends React.Component<
           onProgress: this.onProgress,
         }
       )
-      await this.props.onAdded()
+      gitAdded = true
+      try {
+        await this.props.onAdded()
+      } catch {
+        // The Git operation already succeeded. A follow-up list refresh must
+        // not turn a real add into a false failure report.
+      }
       if (this.mounted) {
         this.setState({
           operation: 'success',
@@ -545,18 +793,42 @@ export class AddSubmoduleDialog extends React.Component<
       }
     } catch (error) {
       if (this.mounted) {
+        if (gitAdded) {
+          this.setState({
+            operation: 'success',
+            progress: { key: 'submodule.addAddedProgress' },
+            progressValue: 1,
+          })
+          return
+        }
+        const details = error instanceof Error ? error.message : String(error)
         this.setState({
           operation: 'idle',
           progress: null,
           progressValue: 0,
-          error: controller.signal.aborted
-            ? { key: 'submodule.addCancelledError' }
-            : {
-                key: 'submodule.addFailed',
-                variables: {
-                  error: error instanceof Error ? error.message : String(error),
+          createdRemote,
+          error:
+            createRemote && createdRemote !== null
+              ? {
+                  key: 'submodule.addRemoteCreatedButAddFailed',
+                  variables: {
+                    repository: createdRemote.html_url,
+                    error: details,
+                  },
+                }
+              : createRemote && controller.signal.aborted
+              ? { key: 'submodule.addRemoteCreateCancelledUncertain' }
+              : createRemote
+              ? {
+                  key: 'submodule.addRemoteCreateFailed',
+                  variables: { error: details },
+                }
+              : controller.signal.aborted
+              ? { key: 'submodule.addCancelledError' }
+              : {
+                  key: 'submodule.addFailed',
+                  variables: { error: details },
                 },
-              },
         })
       }
     } finally {
@@ -710,7 +982,146 @@ export class AddSubmoduleDialog extends React.Component<
     )
   }
 
+  private renderCreateRemote() {
+    const accounts = this.getRemoteAccounts()
+    const account = this.getRemoteAccount()
+    if (account === null) {
+      return (
+        <DialogContent className="add-submodule-sign-in">
+          <CallToAction
+            actionTitle={this.text('submodule.addSignInAction')}
+            onAction={this.signInDotCom}
+          >
+            <LocalizedText
+              translationKey="submodule.addCreateRemoteSignInGuidance"
+              languageMode={this.state.languageMode}
+            />
+          </CallToAction>
+        </DialogContent>
+      )
+    }
+
+    if (this.state.createdRemote !== null) {
+      return (
+        <DialogContent className="add-submodule-created-remote">
+          <Octicon symbol={octicons.checkCircleFill} />
+          <div>
+            <strong>
+              <LocalizedText
+                translationKey="submodule.addRemoteCreatedHeading"
+                languageMode={this.state.languageMode}
+              />
+            </strong>
+            <span>{this.state.createdRemote.html_url}</span>
+            <p>
+              <LocalizedText
+                translationKey="submodule.addRemoteCreatedRetryHelp"
+                languageMode={this.state.languageMode}
+              />
+            </p>
+          </div>
+        </DialogContent>
+      )
+    }
+
+    const errors = this.getSynchronousErrors()
+    const organizations = this.getRemoteOrganizations()
+    return (
+      <DialogContent className="add-submodule-create-remote-content">
+        <Row>
+          <AccountPicker
+            accounts={accounts}
+            selectedAccount={account}
+            onSelectedAccountChanged={this.onRemoteAccountChanged}
+            openButtonClassName="dialog-preferred-focus"
+          />
+        </Row>
+        <div className="add-submodule-create-remote-fields">
+          <Select
+            label={this.text('submodule.addRemoteOwnerLabel')}
+            value={
+              this.state.remoteOrganizationLogin === null
+                ? 'personal'
+                : `org:${this.state.remoteOrganizationLogin}`
+            }
+            onChange={this.onRemoteOrganizationChanged}
+          >
+            <option value="personal">{account.login}</option>
+            {organizations.map(org => (
+              <option key={org.id} value={`org:${org.login}`}>
+                {org.login}
+              </option>
+            ))}
+          </Select>
+          <TextBox
+            label={
+              <LocalizedText
+                translationKey="submodule.addRemoteNameLabel"
+                languageMode={this.state.languageMode}
+              />
+            }
+            value={this.state.remoteName}
+            onValueChanged={this.onRemoteNameChanged}
+            required={true}
+            spellcheck={false}
+            ariaDescribedBy="add-submodule-remote-name-help"
+          />
+          <TextBox
+            label={
+              <LocalizedText
+                translationKey="submodule.addRemoteDescriptionLabel"
+                languageMode={this.state.languageMode}
+              />
+            }
+            value={this.state.remoteDescription}
+            onValueChanged={this.onRemoteDescriptionChanged}
+            ariaDescribedBy="add-submodule-remote-description-help"
+          />
+          <label className="add-submodule-create-private">
+            <input
+              type="checkbox"
+              checked={this.state.remotePrivate}
+              onChange={this.onRemotePrivateChanged}
+            />
+            <LocalizedText
+              translationKey="submodule.addRemotePrivateLabel"
+              languageMode={this.state.languageMode}
+            />
+          </label>
+        </div>
+        <div className="add-submodule-create-remote-help">
+          <small id="add-submodule-remote-name-help">
+            {this.renderMessage(
+              errors.remoteName ?? { key: 'submodule.addRemoteNameHelp' }
+            )}
+          </small>
+          <small id="add-submodule-remote-description-help">
+            {this.renderMessage(
+              errors.remoteDescription ?? {
+                key: 'submodule.addRemoteDescriptionHelp',
+              }
+            )}
+          </small>
+        </div>
+        {errors.remoteOwner !== null && (
+          <div className="add-submodule-create-owner-error" role="alert">
+            {this.renderMessage(errors.remoteOwner)}
+          </div>
+        )}
+        <p className="add-submodule-help">
+          <LocalizedText
+            translationKey="submodule.addRemoteInitializeHelp"
+            languageMode={this.state.languageMode}
+          />
+        </p>
+      </DialogContent>
+    )
+  }
+
   private renderSource() {
+    if (this.state.selectedTab === CreateRemoteTab) {
+      return this.renderCreateRemote()
+    }
     if (this.state.selectedTab === CloneRepositoryTab.Generic) {
       return (
         <DialogContent className="add-submodule-url-content">
@@ -745,7 +1156,10 @@ export class AddSubmoduleDialog extends React.Component<
   private renderReview() {
     const errors = this.getSynchronousErrors()
     const pathError = errors.path ?? this.state.pathValidationError
-    const source = this.getSelectedSource()
+    const createRemote = this.state.selectedTab === CreateRemoteTab
+    const source = createRemote
+      ? this.getRemoteSourcePreview()
+      : this.getSelectedSource()
 
     return (
       <DialogContent className="add-submodule-review">
@@ -765,21 +1179,23 @@ export class AddSubmoduleDialog extends React.Component<
             required={true}
             ariaDescribedBy="add-submodule-path-help"
           />
-          <TextBox
-            label={
-              <LocalizedText
-                translationKey="submodule.addBranchLabel"
-                languageMode={this.state.languageMode}
-              />
-            }
-            placeholder={this.text(
-              'submodule.addRemoteDefaultBranchPlaceholder'
-            )}
-            value={this.state.branch}
-            onValueChanged={this.onBranchChanged}
-            spellcheck={false}
-            ariaDescribedBy="add-submodule-branch-help"
-          />
+          {!createRemote && (
+            <TextBox
+              label={
+                <LocalizedText
+                  translationKey="submodule.addBranchLabel"
+                  languageMode={this.state.languageMode}
+                />
+              }
+              placeholder={this.text(
+                'submodule.addRemoteDefaultBranchPlaceholder'
+              )}
+              value={this.state.branch}
+              onValueChanged={this.onBranchChanged}
+              spellcheck={false}
+              ariaDescribedBy="add-submodule-branch-help"
+            />
+          )}
         </div>
         <div className="add-submodule-field-help">
           <small id="add-submodule-path-help">
@@ -789,11 +1205,13 @@ export class AddSubmoduleDialog extends React.Component<
                   pathError ?? { key: 'submodule.addPathHelp' }
                 )}
           </small>
-          <small id="add-submodule-branch-help">
-            {this.renderMessage(
-              errors.branch ?? { key: 'submodule.addBranchHelp' }
-            )}
-          </small>
+          {!createRemote && (
+            <small id="add-submodule-branch-help">
+              {this.renderMessage(
+                errors.branch ?? { key: 'submodule.addBranchHelp' }
+              )}
+            </small>
+          )}
         </div>
         <section
           className="add-submodule-summary"
@@ -849,10 +1267,11 @@ export class AddSubmoduleDialog extends React.Component<
                 />
               </dt>
               <dd>
-                {this.state.branch.trim() ||
-                  this.renderMessage({
-                    key: 'submodule.addReviewRemoteDefault',
-                  })}
+                {!createRemote && this.state.branch.trim()
+                  ? this.state.branch.trim()
+                  : this.renderMessage({
+                      key: 'submodule.addReviewRemoteDefault',
+                    })}
               </dd>
             </div>
           </dl>
@@ -972,6 +1391,12 @@ export class AddSubmoduleDialog extends React.Component<
           <span id="add-submodule-enterprise-tab">GitHub Enterprise</span>
           <span id="add-submodule-url-tab">URL</span>
           <span id="add-submodule-providers-tab">GitLab &amp; Bitbucket</span>
+          <span id="add-submodule-create-remote-tab">
+            <LocalizedText
+              translationKey="submodule.addCreateRemoteTab"
+              languageMode={this.state.languageMode}
+            />
+          </span>
         </TabBar>
         {this.state.error !== null && (
           <DialogError>{this.renderMessage(this.state.error)}</DialogError>
@@ -993,10 +1418,18 @@ export class AddSubmoduleDialog extends React.Component<
             <Button
               type="submit"
               disabled={!this.canSubmit()}
-              ariaLabel={this.accessibleText('submodule.addSubmitAction')}
+              ariaLabel={this.accessibleText(
+                this.state.selectedTab === CreateRemoteTab
+                  ? 'submodule.addCreateAndAddAction'
+                  : 'submodule.addSubmitAction'
+              )}
             >
               <LocalizedText
-                translationKey="submodule.addSubmitAction"
+                translationKey={
+                  this.state.selectedTab === CreateRemoteTab
+                    ? 'submodule.addCreateAndAddAction'
+                    : 'submodule.addSubmitAction'
+                }
                 languageMode={this.state.languageMode}
               />
             </Button>

@@ -1,9 +1,10 @@
 # Desktop Material roadmap
 
-Updated: **July 19, 2026**
+Updated: **July 20, 2026**
 
 Desktop Material's feature roadmap is complete through the **M21 advanced
-workflow wave** below. This file is the compact public source of truth;
+workflow wave** below, with the **M22 owner-scoped management and publication
+wave** now in active acceptance. This file is the compact public source of truth;
 implementation details and historical test receipts stay in
 [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 
@@ -14,6 +15,29 @@ x64/arm64 builds, the Windows x64 full-unit and packaged-E2E lanes, and the
 Windows x64 installer/release workflow. macOS and Linux application runtimes
 and packages are outside the roadmap; non-Windows runners may still host
 platform-neutral repository automation.
+
+## M22 — Owner-scoped management and complete visual refresh (July 19–20, 2026) — **Implementation complete; visual refresh paused**
+
+- Every custom visual is edited from its actual owner with an anchored editor;
+  each owner keeps a strict setting, independent local Git repository, and
+  mutable undo/redo/restore history. General Appearance retains only ordinary
+  preferences.
+- Files over 100 MiB route through release-backed cheap LFS before every commit
+  entry point. New uploads skip compression, remain raw, and split into verified
+  ordered parts below GitHub's release-asset limit.
+- Add Local Repository performs bounded parent-folder discovery. Repository
+  Settings is wider and includes temporary submodule navigation, a full subtree
+  manager, and a create-remote-repository-and-add-as-submodule workflow.
+- Saved SSH hosts are available to the paired site through a redacted command
+  contract for credential-vault-backed remote cloning.
+- Collection managers are being audited for reviewed bulk actions, beginning
+  with Releases and Actions and extending to every safe batchable list. Every
+  actual search field is being audited against the shared regex-builder and
+  invalid-pattern contract.
+- All 68 published app screenshots used by README, Pages, and the wiki will be
+  recaptured from a synthetic production build on an off-screen Win32 desktop.
+  The new anchored-editor proof must display a privacy-safe collapsed local-repo
+  path while its Copy action retains the exact path.
 
 ## M21 — Advanced workflow completeness (July 19, 2026) — **Complete**
 
@@ -90,6 +114,7 @@ shipped.
 | **M19** | **Complete** | Guided Git/GitHub/provider parity: PR lifecycle, Releases, Issues, rules, patch series, commit rewrite, signing, LFS, worktrees, remotes, hooks, bisect, and triage. |
 | **M20** | **Complete** | Secure LAN agent access, provider inbox and Releases depth, submodule workflows, Material context menus, compact-surface fixes, and refreshed gallery evidence. |
 | **M21** | **Complete** | Thirty demand-backed identity, PR, stash/tag, navigation, diff, integration, and Projects workflow closures with bounded safety contracts. |
+| **M22** | **Implementation complete; visual refresh paused** | Owner-scoped anchored appearance/history, raw split cheap LFS, repository discovery and submodule/subtree expansion, safe cross-manager bulk/regex coverage, verified by build/tests; 68-image publication refresh remains pending. |
 
 The completed milestone waves remain shipped. The temporary-submodule
 navigation and CI/release hardening items below completed local acceptance and
@@ -103,9 +128,10 @@ in `HANDOFF.md` and the canonical wiki.
 
 | Work | State | Required proof |
 |---|---|---|
+| M22 integrated owner-scoped management wave | **Implementation merged locally; final acceptance in progress** | Cheap-LFS/SSH/discovery checkpoint `cdedb4afb8` is already on `origin/main`. The combined owner-scoped appearance/repository-management commit is rebased locally as `04581544cf`; TypeScript and 166 focused tests pass. Remote-repository submodule creation is implemented and focused-tested. Remaining proof is the expanded bulk/regex audit, final exact MCP build, full 68-image privacy-safe headless refresh, full unit/lint/format gates, push, remote CI/CodeQL/Pages/wiki verification, and topology cleanup. |
 | Temporary submodule repository navigation and explicit language modes | **Complete; release verified** | Run `20260718-232824-ci-10-pass-submodule-navigation` opened only initialized submodules; kept temporary children out of the repository list, Recent, tabs, and persisted last selection; returned nested navigation to the persisted root; rejected stale, invalid-Git, traversal, sibling-prefix, and symlink/junction escape targets; covered all Back styles/labels and exact English, playful Hong Kong Cantonese, and bilingual modes; and passed restart, keyboard, compact, dark, 200%-requested auto-fit, ten accepted screenshot passes, and a post-build 1440×960 child/read-only/Back regression. A later fresh-bundle race regression synchronously exercised duplicate Open and Back activation: it preserved one persisted repository and tab, restored the root once, and showed no error. Initial remote CI exposed a macOS arm64 symlink-error ordering issue; correction `98d93ccc` passed all seven CI jobs and published `v3.6.3-beta3-b0000000165`. |
 | CI updater port and release gating | **Complete; release verified** | Local contracts verify a per-job exact loopback updater URL at build and runtime, successful exact-SHA CI gating before installer publication, immutable-tag and `origin/main` checks both before packaging and immediately before publication, required non-empty assets, least-privilege release-PR read access, and one publication action. The original failed CI correctly skipped its downstream installer run. The correction passed remote Windows packaged E2E, all remaining matrix jobs, CodeQL, and [Build Installers 29697597981](https://github.com/codingmachineedge/desktop-material/actions/runs/29697597981), which published the five required assets in `v3.6.3-beta3-b0000000165`. |
-| Profile, repository, and tab appearance customization | **Complete** | Verified all 17 active-profile defaults, including explicit language and temporary-submodule Back controls plus default-off Desktop Material feature highlighting with an explicit fork-only allowlist, profile local-Git history, all six repository-local overrides and inheritance, Word-style per-tab typography plus independent text/background palettes, restart persistence, light/dark/compact layouts, and inspected appearance evidence. |
+| Profile, repository, feature, and tab appearance customization | **Owner-scoped implementation complete locally; publication pending** | Each actual visual owner now opens its own anchored editor and owns an independent strict setting, local Git repository, and mutable history. Repository owners inherit matching profile owners without sharing commits; individual tab titles and feature IDs stay isolated. Language is an ordinary preference, and the monolithic custom-visual Appearance surfaces are retired. Focused behavior, race, recovery, focus, and history tests pass; final 68-image and remote acceptance remains part of M22. |
 | App identity and portable tab workspace | **Complete** | Verified profile-backed app logo/name typography and effects, favorites, folder-drop tab opening, current-tab session import/export, appropriate right-click customization/history context, unknown-key migration safety, restart persistence, 38 named identity controls, compact no-overflow geometry, and inspected headless evidence. |
 | Measured app-bar overflow | **Complete** | Verified live label measurement, Icons only/compact footprints, Build & Run then Commit & Push overflow order, mounted-state and focus continuity, deterministic widening restore, and `material-toolbar-overflow.png`. |
 | Material Welcome and landing page | **Complete** | Verified the first-run task card and compact fallback, the Material landing structure and keyboard path, and inspected `material-welcome.png`. |
@@ -117,7 +143,7 @@ in `HANDOFF.md` and the canonical wiki.
 | Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on `main`. |
 | Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment. |
 | Repository-wide feature revalidation | **Complete** | The historical revalidation verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and its then-current 52-image documentation gallery. |
-| Documentation gallery expansion | **Complete; delivery verified** | Current adaptive-customization, submodule, and app-identity captures are shared by README, wiki, Pages, and tutorial; the guided gallery now contains 64 distinct tracked images. The six refreshed assets were served byte-identically by Pages; exact hashes and final wiki delivery are recorded in `HANDOFF.md`. |
+| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages now declare 68 app screenshots. All 68 must be recaptured from the final production build with synthetic data; stale monolithic appearance scenes are being replaced by actual-owner anchored scenes, and specialized large-file, repository-discovery, and submodule-management frames are being added. Final completion requires original-resolution privacy inspection and byte-identical Pages/wiki delivery. |
 | Complete notifications and Releases dashboard | **Complete** | Verified every GitHub notification page, confirmed local/remote Clear all with partial-failure retention, release status metrics and loaded-result search/filtering, rich asset metadata, scoped retries, responsive layout, and inspected headless evidence. |
 
 ## Acceptance gates

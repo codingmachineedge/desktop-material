@@ -346,6 +346,7 @@ export class ActionsCacheManager extends React.PureComponent<
           >
             <Octicon symbol={octicons.search} />
             <input
+              data-search-surface-id="actions-caches"
               value={this.state.filterText}
               onChange={this.onFilterChanged}
               placeholder="Filter caches by key, ref, or version…"
@@ -353,6 +354,7 @@ export class ActionsCacheManager extends React.PureComponent<
               aria-label="Filter caches"
             />
             <FilterModeControl
+              searchSurfaceId="actions-caches"
               mode={this.state.filterMode}
               caseSensitive={this.state.filterCaseSensitive}
               onModeChange={this.onFilterModeChanged}

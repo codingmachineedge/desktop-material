@@ -560,6 +560,12 @@ interface IActionsRunCancellationContext {
   readonly runId: number
 }
 
+interface IActionsRunCancellationRequestResult {
+  readonly accepted: boolean
+  readonly alreadyTerminal: boolean
+  readonly state: IActionsWorkflowRunCancellationState
+}
+
 /** Compare the API fields used by the run list before notifying subscribers. */
 export function workflowRunsEqual(
   left: ReadonlyArray<IAPIWorkflowRun>,
@@ -733,6 +739,10 @@ export class ActionsStore {
   private readonly runPageInFlight = new Map<string, Promise<void>>()
   private readonly runPageControllers = new Map<string, AbortController>()
   private readonly runCancellationInFlight = new Map<
+    string,
+    Promise<IActionsRunCancellationResult>
+  >()
+  private readonly runCancellationRequestInFlight = new Map<
     string,
     Promise<IActionsRunCancellationResult>
   >()
@@ -1396,6 +1406,161 @@ export class ActionsStore {
     this.updateRunCancellationState(repository, state)
   }
 
+  private async requestRunCancellationFromProvider(
+    repository: Repository,
+    context: IActionsRunCancellationContext,
+    api: API,
+    accountSignal: AbortSignal,
+    onProgress: ActionsRunCancellationProgressCallback | undefined
+  ): Promise<IActionsRunCancellationRequestResult> {
+    this.assertRunCancellationContext(repository, context, accountSignal)
+    this.reportRunCancellationProgress(
+      onProgress,
+      'revalidating',
+      `Checking workflow run #${context.runId} before cancellation…`
+    )
+    const state = await api.fetchWorkflowRunCancellationState(
+      context.owner,
+      context.name,
+      context.runId,
+      accountSignal
+    )
+    this.updateRunCancellationState(repository, state)
+
+    if (isWorkflowRunTerminalStatus(state.status)) {
+      this.reportRunCancellationProgress(
+        onProgress,
+        'terminal',
+        `Workflow run #${context.runId} has already finished.`
+      )
+      await this.refreshAfterRunCancellation(repository, state)
+      return { accepted: false, alreadyTerminal: true, state }
+    }
+    if (!isWorkflowRunCancellableStatus(state.status)) {
+      throw new Error(
+        'This workflow run is no longer queued, running, waiting, or pending. Refresh Actions before trying again.'
+      )
+    }
+
+    // This check is intentionally adjacent to the POST. It prevents a stale
+    // repository or selected account from crossing the destructive boundary.
+    this.assertRunCancellationContext(repository, context, accountSignal)
+    this.reportRunCancellationProgress(
+      onProgress,
+      'requesting',
+      `Requesting normal cancellation for workflow run #${context.runId}…`
+    )
+
+    let accepted: boolean
+    try {
+      accepted = await api.cancelWorkflowRun(
+        context.owner,
+        context.name,
+        context.runId,
+        false,
+        accountSignal
+      )
+    } catch (error) {
+      if (
+        error instanceof APIError &&
+        (error.responseStatus === 409 || error.responseStatus === 422)
+      ) {
+        try {
+          const racedState = await api.fetchWorkflowRunCancellationState(
+            context.owner,
+            context.name,
+            context.runId,
+            accountSignal
+          )
+          this.updateRunCancellationState(repository, racedState)
+          if (isWorkflowRunTerminalStatus(racedState.status)) {
+            await this.refreshAfterRunCancellation(repository, racedState)
+            return {
+              accepted: false,
+              alreadyTerminal: true,
+              state: racedState,
+            }
+          }
+        } catch (revalidationError) {
+          if ((revalidationError as Error)?.name === 'AbortError') {
+            throw revalidationError
+          }
+        }
+      }
+      throw error
+    }
+
+    this.reportRunCancellationProgress(
+      onProgress,
+      'accepted',
+      accepted
+        ? `GitHub accepted cancellation for workflow run #${context.runId}.`
+        : `Cancellation was sent for workflow run #${context.runId}.`
+    )
+    return { accepted, alreadyTerminal: false, state }
+  }
+
+  private async monitorRunCancellation(
+    repository: Repository,
+    context: IActionsRunCancellationContext,
+    api: API,
+    accountSignal: AbortSignal,
+    request: IActionsRunCancellationRequestResult,
+    onProgress: ActionsRunCancellationProgressCallback | undefined
+  ): Promise<IActionsRunCancellationResult> {
+    let delay = ActionsRunCancellationInitialPollDelay
+    for (
+      let attempt = 0;
+      attempt < ActionsRunCancellationMaximumPollAttempts;
+      attempt++
+    ) {
+      this.reportRunCancellationProgress(
+        onProgress,
+        'waiting',
+        `Waiting for workflow run #${context.runId} to stop…`
+      )
+      await this.waitForRunCancellationPoll(delay, accountSignal)
+      this.assertRunCancellationContext(repository, context, accountSignal)
+      const state = await api.fetchWorkflowRunCancellationState(
+        context.owner,
+        context.name,
+        context.runId,
+        accountSignal
+      )
+      this.updateRunCancellationState(repository, state)
+      if (isWorkflowRunTerminalStatus(state.status)) {
+        this.reportRunCancellationProgress(
+          onProgress,
+          'terminal',
+          state.conclusion === 'cancelled'
+            ? `Workflow run #${context.runId} was canceled.`
+            : `Workflow run #${context.runId} finished before cancellation completed.`
+        )
+        await this.refreshAfterRunCancellation(repository, state)
+        return {
+          runId: context.runId,
+          accepted: request.accepted,
+          alreadyTerminal: false,
+          status: state.status,
+          conclusion: state.conclusion,
+        }
+      }
+      delay = Math.min(
+        Math.ceil(delay * 1.5),
+        ActionsRunCancellationMaximumPollDelay
+      )
+    }
+
+    window.setTimeout(() => {
+      this.refresh(repository, true).catch(error =>
+        log.error('Failed following up accepted workflow cancellation', error)
+      )
+    }, ActionsRunCancellationMaximumPollDelay)
+    throw new Error(
+      'GitHub accepted the cancellation request, but the run is still stopping. Actions will keep refreshing its status.'
+    )
+  }
+
   private async performCancelRun(
     repository: Repository,
     context: IActionsRunCancellationContext,
@@ -1405,149 +1570,29 @@ export class ActionsStore {
   ): Promise<IActionsRunCancellationResult> {
     const api = API.fromAccount(account)
     return this.runAccountBound(signal, async accountSignal => {
-      this.assertRunCancellationContext(repository, context, accountSignal)
-      this.reportRunCancellationProgress(
-        onProgress,
-        'revalidating',
-        `Checking workflow run #${context.runId} before cancellation…`
+      const request = await this.requestRunCancellationFromProvider(
+        repository,
+        context,
+        api,
+        accountSignal,
+        onProgress
       )
-      let state = await api.fetchWorkflowRunCancellationState(
-        context.owner,
-        context.name,
-        context.runId,
-        accountSignal
-      )
-      this.updateRunCancellationState(repository, state)
-
-      if (isWorkflowRunTerminalStatus(state.status)) {
-        this.reportRunCancellationProgress(
-          onProgress,
-          'terminal',
-          `Workflow run #${context.runId} has already finished.`
-        )
-        await this.refreshAfterRunCancellation(repository, state)
+      if (request.alreadyTerminal) {
         return {
           runId: context.runId,
-          accepted: false,
+          accepted: request.accepted,
           alreadyTerminal: true,
-          status: state.status,
-          conclusion: state.conclusion,
+          status: request.state.status,
+          conclusion: request.state.conclusion,
         }
       }
-      if (!isWorkflowRunCancellableStatus(state.status)) {
-        throw new Error(
-          'This workflow run is no longer queued, running, waiting, or pending. Refresh Actions before trying again.'
-        )
-      }
-
-      // This check is intentionally adjacent to the POST. It prevents a stale
-      // repository or selected account from crossing the destructive boundary.
-      this.assertRunCancellationContext(repository, context, accountSignal)
-      this.reportRunCancellationProgress(
-        onProgress,
-        'requesting',
-        `Requesting normal cancellation for workflow run #${context.runId}…`
-      )
-
-      let accepted: boolean
-      try {
-        accepted = await api.cancelWorkflowRun(
-          context.owner,
-          context.name,
-          context.runId,
-          false,
-          accountSignal
-        )
-      } catch (error) {
-        if (
-          error instanceof APIError &&
-          (error.responseStatus === 409 || error.responseStatus === 422)
-        ) {
-          try {
-            const racedState = await api.fetchWorkflowRunCancellationState(
-              context.owner,
-              context.name,
-              context.runId,
-              accountSignal
-            )
-            this.updateRunCancellationState(repository, racedState)
-            if (isWorkflowRunTerminalStatus(racedState.status)) {
-              await this.refreshAfterRunCancellation(repository, racedState)
-              return {
-                runId: context.runId,
-                accepted: false,
-                alreadyTerminal: true,
-                status: racedState.status,
-                conclusion: racedState.conclusion,
-              }
-            }
-          } catch (revalidationError) {
-            if ((revalidationError as Error)?.name === 'AbortError') {
-              throw revalidationError
-            }
-          }
-        }
-        throw error
-      }
-
-      this.reportRunCancellationProgress(
-        onProgress,
-        'accepted',
-        accepted
-          ? `GitHub accepted cancellation for workflow run #${context.runId}.`
-          : `Cancellation was sent for workflow run #${context.runId}.`
-      )
-
-      let delay = ActionsRunCancellationInitialPollDelay
-      for (
-        let attempt = 0;
-        attempt < ActionsRunCancellationMaximumPollAttempts;
-        attempt++
-      ) {
-        this.reportRunCancellationProgress(
-          onProgress,
-          'waiting',
-          `Waiting for workflow run #${context.runId} to stop…`
-        )
-        await this.waitForRunCancellationPoll(delay, accountSignal)
-        this.assertRunCancellationContext(repository, context, accountSignal)
-        state = await api.fetchWorkflowRunCancellationState(
-          context.owner,
-          context.name,
-          context.runId,
-          accountSignal
-        )
-        this.updateRunCancellationState(repository, state)
-        if (isWorkflowRunTerminalStatus(state.status)) {
-          this.reportRunCancellationProgress(
-            onProgress,
-            'terminal',
-            state.conclusion === 'cancelled'
-              ? `Workflow run #${context.runId} was canceled.`
-              : `Workflow run #${context.runId} finished before cancellation completed.`
-          )
-          await this.refreshAfterRunCancellation(repository, state)
-          return {
-            runId: context.runId,
-            accepted,
-            alreadyTerminal: false,
-            status: state.status,
-            conclusion: state.conclusion,
-          }
-        }
-        delay = Math.min(
-          Math.ceil(delay * 1.5),
-          ActionsRunCancellationMaximumPollDelay
-        )
-      }
-
-      window.setTimeout(() => {
-        this.refresh(repository, true).catch(error =>
-          log.error('Failed following up accepted workflow cancellation', error)
-        )
-      }, ActionsRunCancellationMaximumPollDelay)
-      throw new Error(
-        'GitHub accepted the cancellation request, but the run is still stopping. Actions will keep refreshing its status.'
+      return this.monitorRunCancellation(
+        repository,
+        context,
+        api,
+        accountSignal,
+        request,
+        onProgress
       )
     })
   }
@@ -1593,6 +1638,87 @@ export class ActionsStore {
       })
     this.runCancellationInFlight.set(key, request)
     return request
+  }
+
+  /**
+   * Revalidate and submit one cancellation without waiting for the provider to
+   * report a terminal run. Bulk callers use this prompt boundary so an earlier
+   * accepted run cannot serialize later cancellation POSTs for several minutes.
+   * The ordinary cancelRun method keeps its terminal-polling behavior.
+   */
+  public async requestRunCancellation(
+    repository: Repository,
+    runId: number,
+    signal?: AbortSignal,
+    onProgress?: ActionsRunCancellationProgressCallback
+  ): Promise<IActionsRunCancellationResult> {
+    await this.accountsReady
+    const safeRunId = validateActionsJobIdentifier(runId, 'workflow run id')
+    const gitHubRepository = this.gitHubFor(repository)
+    const account = this.accountFor(repository)
+    const context: IActionsRunCancellationContext = {
+      repositoryHash: repository.hash,
+      repositoryKey: getActionsRepositoryKey(repository),
+      accountKey: getAccountKey(account),
+      accountsGeneration: this.accountsGeneration,
+      owner: gitHubRepository.owner.login,
+      name: gitHubRepository.name,
+      runId: safeRunId,
+    }
+    const key = `${context.repositoryHash}#${context.repositoryKey}#${context.accountKey}#run:${safeRunId}`
+    const pending = this.runCancellationRequestInFlight.get(key)
+    if (pending !== undefined) {
+      return pending
+    }
+
+    const api = API.fromAccount(account)
+    const promptRequest = this.runAccountBound(signal, accountSignal =>
+      this.requestRunCancellationFromProvider(
+        repository,
+        context,
+        api,
+        accountSignal,
+        onProgress
+      )
+    )
+      .then(request => {
+        if (!request.alreadyTerminal) {
+          void this.runAccountBound(signal, accountSignal =>
+            this.monitorRunCancellation(
+              repository,
+              context,
+              api,
+              accountSignal,
+              request,
+              undefined
+            )
+          ).catch(error => {
+            if ((error as Error)?.name !== 'AbortError') {
+              log.error(
+                `Failed following up workflow run #${context.runId} after an accepted bulk cancellation`,
+                error
+              )
+            }
+          })
+        }
+        return {
+          runId: context.runId,
+          accepted: request.accepted,
+          alreadyTerminal: request.alreadyTerminal,
+          status: request.state.status,
+          conclusion: request.state.conclusion,
+        }
+      })
+      .catch(error => {
+        throw actionsMutationError(error, 'cancel-run')
+      })
+      .finally(() => {
+        if (this.runCancellationRequestInFlight.get(key) === promptRequest) {
+          this.runCancellationRequestInFlight.delete(key)
+        }
+      })
+    this.runCancellationRequestInFlight.set(key, promptRequest)
+    return promptRequest
   }
 
   public async setWorkflowEnabled(

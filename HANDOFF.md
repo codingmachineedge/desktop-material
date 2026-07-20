@@ -23,6 +23,75 @@ not Prettier-clean. Pages `29710664112` passed and installer run `29710722904`
 skipped. The correction formats that generator without changing any generated
 SVG content; the repository-wide Prettier gate and a fresh generator run pass.
 
+## 2026-07-20 M22 handoff — implementation pushed; visual refresh paused
+
+This section is the live handoff for the current user-directed wave. Do not
+interpret the historical completion receipts below as proof that this wave is
+finished.
+
+- A tested fast-forward checkpoint is already on remote `main` at
+  `cdedb4afb86588553a72222a729bfe4fc1e232e3`. It adds raw, release-backed
+  cheap-LFS assets with verified multipart splitting, bounded parent-folder
+  repository discovery, and redacted saved-host SSH clone commands. The
+  checkpoint passed TypeScript and 89 focused tests against its then-current
+  remote parent.
+- All upstream M21/wiki/Windows-only commits were reconciled without choosing
+  either side wholesale. The remaining owner-scoped appearance, commit routing,
+  wider Repository Settings, temporary submodule navigation, subtree manager,
+  documentation, and tests are rebased locally as `04581544cf`. The integrated
+  tree passes TypeScript and 166 focused tests, including concurrent owner-store
+  initialization, strict corruption recovery, repository UUID races, junction
+  escape refusal, actual-element editor focus/history, auto-discovery, TGA plus
+  oversized-file diff handling, temporary submodules, subtrees, and tab history.
+- Every appearance owner now has one strict `setting.json`, one independent
+  local Git repository, and append-only history mutations for undo, redo, and
+  restore. Editors open by right-click or `Shift+F10` beside the actual profile,
+  feature, repository, tab, logo, name, or Back owner. Language remains an
+  ordinary preference and neither general nor repository settings contains a
+  monolithic custom-visual studio.
+- The Add Submodule dialog now also has a **Create remote** flow. It uses the
+  selected authenticated GitHub/GHE account and loaded organization owner,
+  validates repository metadata and relative path, creates an initialized
+  public/private remote, and then adds its exact clone URL. A remote-create
+  failure never invokes Git; if Git fails after creation, retry reuses the
+  already-created remote instead of creating a duplicate. Focused UI/service/
+  model/i18n tests pass.
+- The active follow-up audits collection managers for reviewed, recoverable bulk
+  actions, starting with Releases and Actions and extending to every safe
+  batchable manager. It also inventories every real search input and requires
+  the shared regex builder, plain-text modes, and safe invalid-regex behavior.
+- Publication scope is now the complete 68-image screenshot set referenced by
+  README, Pages, and the canonical wiki. All images must be freshly captured
+  from synthetic fixtures through the exact low-level MCP server and an
+  off-screen Win32 desktop, inspected at original resolution, checked for stale
+  UI and private data, promoted, and verified byte-for-byte after publication.
+  The central capture driver currently covers 63 images; five specialized
+  scenes and three retired appearance scenes require reconciliation.
+- The anchored editor currently prints its full absolute local repository path.
+  Before capture, its visible label must collapse the user profile/Temp prefix
+  to a privacy-safe Desktop Material data label while Copy continues to use the
+  exact path. No frame containing `C:\Users\`, a real email, token, credential,
+  or user repository content may be published.
+- Exact MCP build invocation is
+  `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`.
+  The first integrated run completed and produced fresh `out/main.js` and
+  `out/renderer.js`; the client timed out before returning its receipt because
+  the client timeout was shorter than the build. The final post-follow-up run
+  must use an MCP client timeout longer than the 3600-second tool timeout and
+  record the returned exit-0 receipt. Focused UI/service tests passed (83/83),
+  the fake provider passed 14/14, TypeScript and full lint passed, and the
+  capture/Page contract tests passed (9/9 and 4/4).
+- The 68-image capture was intentionally stopped at the user's request. No
+  incomplete gallery output was promoted; existing published screenshots remain
+  unchanged. Resume later with the exact MCP capture workflow and complete the
+  privacy/dimension audit before claiming a full visual refresh.
+- Current topology has only local/remote `main`, no stash, and one primary
+  worktree after the tested checkpoint worktree was removed following remote
+  proof. Final acceptance still requires committing and pushing every intended
+  change, proving every completed source tip is an ancestor of remote `main`,
+  deleting only proven-merged temporary branches/worktrees, and ending at clean
+  `main` with zero divergence.
+
 ## Outcome
 
 The July 19 documentation pass adds a repo-wide visual-learning layer: eight

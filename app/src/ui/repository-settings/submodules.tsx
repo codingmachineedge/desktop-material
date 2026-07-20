@@ -468,6 +468,7 @@ export class Submodules extends React.Component<
       <div className="submodules-filter-row">
         <div className="submodules-filter-search">
           <TextBox
+            searchSurfaceId="submodules"
             className="submodules-filter-text"
             placeholder={t('submodule.searchPlaceholder')}
             ariaLabel={translateForAccessibleName('submodule.searchAriaLabel')}
@@ -475,6 +476,7 @@ export class Submodules extends React.Component<
             onValueChanged={this.onFilterTextChanged}
           />
           <FilterModeControl
+            searchSurfaceId="submodules"
             mode={this.state.filterMode}
             caseSensitive={this.state.filterCaseSensitive}
             onModeChange={this.onFilterModeChanged}

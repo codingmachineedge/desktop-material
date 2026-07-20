@@ -16,8 +16,11 @@ import { getWorkflowFileName } from './workflow-templates'
 interface IRunListProps {
   readonly runs: ReadonlyArray<IAPIWorkflowRun>
   readonly selectedRunId: number | null
+  readonly selectedRunIds?: ReadonlySet<number>
   readonly busyRunId: number | null
+  readonly bulkBusy?: boolean
   readonly onSelect: (run: IAPIWorkflowRun) => void
+  readonly onToggleSelection?: (run: IAPIWorkflowRun, selected: boolean) => void
   readonly onRerun: (run: IAPIWorkflowRun) => void
   readonly onRerunFailed: (run: IAPIWorkflowRun) => void
   readonly onRequestCancel: (
@@ -95,6 +98,8 @@ class RunListItem extends React.PureComponent<
 > {
   private selectButton: HTMLButtonElement | null = null
   private select = () => this.props.onSelect(this.props.run)
+  private toggleSelection = (event: React.ChangeEvent<HTMLInputElement>) =>
+    this.props.onToggleSelection?.(this.props.run, event.currentTarget.checked)
   private setSelectButtonRef = (button: HTMLButtonElement | null) => {
     this.selectButton = button
   }
@@ -116,7 +121,13 @@ class RunListItem extends React.PureComponent<
   }
 
   public render() {
-    const { run, selectedRunId, busyRunId } = this.props
+    const {
+      run,
+      selectedRunId,
+      selectedRunIds = new Set<number>(),
+      busyRunId,
+      bulkBusy = false,
+    } = this.props
     const status = getRunTone(run)
     const glyph = getRunStatusGlyph(run)
     const failed = run.conclusion === APICheckConclusion.Failure
@@ -133,6 +144,17 @@ class RunListItem extends React.PureComponent<
             selected: selectedRunId === run.id,
           })}
         >
+          {this.props.onToggleSelection !== undefined && (
+            <label className="actions-run-checkbox">
+              <input
+                type="checkbox"
+                checked={selectedRunIds.has(run.id)}
+                disabled={bulkBusy || busyRunId !== null}
+                onChange={this.toggleSelection}
+                aria-label={`Select workflow run ${run.run_number ?? run.id}`}
+              />
+            </label>
+          )}
           <button
             type="button"
             className="actions-run-select"
@@ -171,7 +193,7 @@ class RunListItem extends React.PureComponent<
               <Button
                 size="small"
                 className="actions-run-icon-button"
-                disabled={busyRunId === run.id}
+                disabled={bulkBusy || busyRunId === run.id}
                 onClick={this.requestCancel}
                 ariaLabel={`Cancel workflow run ${run.run_number ?? run.id}`}
                 ariaHaspopup="dialog"
@@ -184,7 +206,7 @@ class RunListItem extends React.PureComponent<
                   <Button
                     size="small"
                     className="actions-run-icon-button"
-                    disabled={busyRunId === run.id}
+                    disabled={bulkBusy || busyRunId === run.id}
                     onClick={this.rerunFailed}
                     ariaLabel="Re-run failed"
                   >
@@ -194,7 +216,7 @@ class RunListItem extends React.PureComponent<
                 <Button
                   size="small"
                   className="actions-run-icon-button"
-                  disabled={busyRunId === run.id}
+                  disabled={bulkBusy || busyRunId === run.id}
                   onClick={this.rerun}
                   ariaLabel="Re-run"
                 >

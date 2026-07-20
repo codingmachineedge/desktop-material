@@ -165,6 +165,9 @@ import { SubmoduleConfigDialog } from './submodules/submodule-config-dialog'
 import { SubmoduleBackButton } from './submodules/submodule-back-button'
 import {
   AnchoredAppearanceEditor,
+  IAnchoredAppearanceEditorControls,
+  IFeatureHighlightingAppearance,
+  IRepositoryTabsAppearance,
   AppIdentityAppearanceEditor,
   AppWorkspaceAppearanceEditor,
   CodeDiffAppearanceEditor,
@@ -1573,10 +1576,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     const repositoryMatch = this.findRepositoryAppearanceOwner(event.target)
     const repository = this.getRepository()
-    if (
-      repositoryMatch !== null &&
-      repository instanceof Repository
-    ) {
+    if (repositoryMatch !== null && repository instanceof Repository) {
       event.preventDefault()
       event.stopPropagation()
       this.prepareAppearanceAnchor(repositoryMatch.anchor)
@@ -4728,7 +4728,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     if (action.kind === 'remove-repository-lock') {
       void this.props.dispatcher.removeRepositoryLock(
         action.repositoryId,
-        notice.id
+        notice.id,
+        true
       )
     }
   }
@@ -4740,6 +4741,71 @@ export class App extends React.Component<IAppProps, IAppState> {
     void this.props.dispatcher
       .setProfileAppearanceElement(id, value)
       .catch(error => this.props.dispatcher.postError(asError(error)))
+  }
+
+  private onAppWorkspaceAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.AppWorkspace]
+  ) => {
+    this.setProfileAppearanceElement(
+      ProfileAppearanceElementId.AppWorkspace,
+      value
+    )
+  }
+
+  private onUpdateProgressAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.UpdateProgress]
+  ) => {
+    this.setProfileAppearanceElement(
+      ProfileAppearanceElementId.UpdateProgress,
+      value
+    )
+  }
+
+  private onToolbarAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.Toolbar]
+  ) => {
+    this.setProfileAppearanceElement(ProfileAppearanceElementId.Toolbar, value)
+  }
+
+  private onRepositoryListAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.RepositoryList]
+  ) => {
+    this.setProfileAppearanceElement(
+      ProfileAppearanceElementId.RepositoryList,
+      value
+    )
+  }
+
+  private onRepositoryTabsAppearanceChanged = (
+    value: IRepositoryTabsAppearance
+  ) => {
+    const id = ProfileAppearanceElementId.RepositoryTabs
+    const current = this.props.dispatcher.getProfileAppearanceElement(id)
+    this.setProfileAppearanceElement(id, { ...current, ...value })
+  }
+
+  private onCodeDiffAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.CodeDiff]
+  ) => {
+    this.setProfileAppearanceElement(ProfileAppearanceElementId.CodeDiff, value)
+  }
+
+  private onAppIdentityAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.AppIdentity]
+  ) => {
+    this.setProfileAppearanceElement(
+      ProfileAppearanceElementId.AppIdentity,
+      value
+    )
+  }
+
+  private onDefaultRepositoryLogoAppearanceChanged = (
+    value: IProfileAppearanceElementSettings[typeof ProfileAppearanceElementId.DefaultRepositoryLogo]
+  ) => {
+    this.setProfileAppearanceElement(
+      ProfileAppearanceElementId.DefaultRepositoryLogo,
+      value
+    )
   }
 
   private profileAppearanceTitle(id: ProfileAppearanceElementId): string {
@@ -4772,74 +4838,86 @@ export class App extends React.Component<IAppProps, IAppState> {
     showHistory: () => void
   ): JSX.Element | null {
     switch (id) {
-      case ProfileAppearanceElementId.AppWorkspace:
+      case ProfileAppearanceElementId.AppWorkspace: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <AppWorkspaceAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onAppWorkspaceAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
-      case ProfileAppearanceElementId.UpdateProgress:
+      }
+      case ProfileAppearanceElementId.UpdateProgress: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <UpdateProgressAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onUpdateProgressAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
-      case ProfileAppearanceElementId.Toolbar:
+      }
+      case ProfileAppearanceElementId.Toolbar: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <ToolbarAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onToolbarAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
-      case ProfileAppearanceElementId.RepositoryList:
+      }
+      case ProfileAppearanceElementId.RepositoryList: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <RepositoryListAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onRepositoryListAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
+      }
       case ProfileAppearanceElementId.RepositoryTabs: {
         const current = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <RepositoryTabsAppearanceEditor
             value={current}
-            onChange={value =>
-              this.setProfileAppearanceElement(id, { ...current, ...value })
-            }
+            onChange={this.onRepositoryTabsAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
       }
-      case ProfileAppearanceElementId.CodeDiff:
+      case ProfileAppearanceElementId.CodeDiff: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <CodeDiffAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onCodeDiffAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
-      case ProfileAppearanceElementId.AppIdentity:
+      }
+      case ProfileAppearanceElementId.AppIdentity: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <AppIdentityAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onAppIdentityAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
-      case ProfileAppearanceElementId.DefaultRepositoryLogo:
+      }
+      case ProfileAppearanceElementId.DefaultRepositoryLogo: {
+        const value = this.props.dispatcher.getProfileAppearanceElement(id)
         return (
           <DefaultRepositoryLogoAppearanceEditor
-            value={this.props.dispatcher.getProfileAppearanceElement(id)}
-            onChange={value => this.setProfileAppearanceElement(id, value)}
+            value={value}
+            onChange={this.onDefaultRepositoryLogoAppearanceChanged}
             onShowHistory={showHistory}
           />
         )
+      }
       case ProfileAppearanceElementId.SubmoduleBackButton:
         return null
       default:
@@ -4960,77 +5038,185 @@ export class App extends React.Component<IAppProps, IAppState> {
     this.forceUpdate()
   }
 
+  private getActiveRepositoryAppearanceTarget(
+    elementId: RepositoryAppearanceEditorTarget['elementId']
+  ): RepositoryAppearanceEditorTarget | null {
+    const target = this.appearanceEditorTarget
+    return target?.kind === 'repository' && target.elementId === elementId
+      ? target
+      : null
+  }
+
+  private onRepositoryWorkspaceAppearanceChanged = (
+    value: IRepositoryAppearanceElementSettings[typeof RepositoryAppearanceElementId.Workspace]
+  ) => {
+    const target = this.getActiveRepositoryAppearanceTarget(
+      RepositoryAppearanceElementId.Workspace
+    )
+    if (target !== null) {
+      this.setRepositoryAppearanceElement(
+        target,
+        RepositoryAppearanceElementId.Workspace,
+        value
+      )
+    }
+  }
+
+  private onRepositoryToolbarAppearanceChanged = (
+    value: IRepositoryAppearanceElementSettings[typeof RepositoryAppearanceElementId.Toolbar]
+  ) => {
+    const target = this.getActiveRepositoryAppearanceTarget(
+      RepositoryAppearanceElementId.Toolbar
+    )
+    if (target !== null) {
+      this.setRepositoryAppearanceElement(
+        target,
+        RepositoryAppearanceElementId.Toolbar,
+        value
+      )
+    }
+  }
+
+  private onRepositoryTabsOverrideAppearanceChanged = (
+    value: IRepositoryAppearanceElementSettings[typeof RepositoryAppearanceElementId.Tabs]
+  ) => {
+    const target = this.getActiveRepositoryAppearanceTarget(
+      RepositoryAppearanceElementId.Tabs
+    )
+    if (target !== null) {
+      this.setRepositoryAppearanceElement(
+        target,
+        RepositoryAppearanceElementId.Tabs,
+        value
+      )
+    }
+  }
+
+  private onEditRepositoryProfileDefault = () => {
+    const target = this.appearanceEditorTarget
+    if (target?.kind === 'repository') {
+      this.editProfileDefaultForRepositoryTarget(target)
+    }
+  }
+
   private renderRepositoryAppearanceEditor(
     target: RepositoryAppearanceEditorTarget,
     showHistory: () => void
   ): JSX.Element {
     switch (target.elementId) {
-      case RepositoryAppearanceElementId.Workspace:
+      case RepositoryAppearanceElementId.Workspace: {
+        const inherited = this.props.dispatcher.getProfileAppearanceElement(
+          ProfileAppearanceElementId.AppWorkspace
+        )
         return (
           <RepositoryWorkspaceAppearanceEditor
             value={target.values[RepositoryAppearanceElementId.Workspace]}
-            inherited={this.props.dispatcher.getProfileAppearanceElement(
-              ProfileAppearanceElementId.AppWorkspace
-            )}
-            onChange={value =>
-              this.setRepositoryAppearanceElement(
-                target,
-                RepositoryAppearanceElementId.Workspace,
-                value
-              )
-            }
-            onEditProfileDefault={() =>
-              this.editProfileDefaultForRepositoryTarget(target)
-            }
+            inherited={inherited}
+            onChange={this.onRepositoryWorkspaceAppearanceChanged}
+            onEditProfileDefault={this.onEditRepositoryProfileDefault}
             onShowHistory={showHistory}
           />
         )
-      case RepositoryAppearanceElementId.Toolbar:
+      }
+      case RepositoryAppearanceElementId.Toolbar: {
+        const inherited = this.props.dispatcher.getProfileAppearanceElement(
+          ProfileAppearanceElementId.Toolbar
+        )
         return (
           <RepositoryToolbarAppearanceEditor
             value={target.values[RepositoryAppearanceElementId.Toolbar]}
-            inherited={this.props.dispatcher.getProfileAppearanceElement(
-              ProfileAppearanceElementId.Toolbar
-            )}
-            onChange={value =>
-              this.setRepositoryAppearanceElement(
-                target,
-                RepositoryAppearanceElementId.Toolbar,
-                value
-              )
-            }
-            onEditProfileDefault={() =>
-              this.editProfileDefaultForRepositoryTarget(target)
-            }
+            inherited={inherited}
+            onChange={this.onRepositoryToolbarAppearanceChanged}
+            onEditProfileDefault={this.onEditRepositoryProfileDefault}
             onShowHistory={showHistory}
           />
         )
-      case RepositoryAppearanceElementId.Tabs:
+      }
+      case RepositoryAppearanceElementId.Tabs: {
+        const inherited = this.props.dispatcher.getProfileAppearanceElement(
+          ProfileAppearanceElementId.RepositoryTabs
+        )
         return (
           <RepositoryTabsOverrideAppearanceEditor
             value={target.values[RepositoryAppearanceElementId.Tabs]}
-            inherited={this.props.dispatcher.getProfileAppearanceElement(
-              ProfileAppearanceElementId.RepositoryTabs
-            )}
-            onChange={value =>
-              this.setRepositoryAppearanceElement(
-                target,
-                RepositoryAppearanceElementId.Tabs,
-                value
-              )
-            }
-            onEditProfileDefault={() =>
-              this.editProfileDefaultForRepositoryTarget(target)
-            }
+            inherited={inherited}
+            onChange={this.onRepositoryTabsOverrideAppearanceChanged}
+            onEditProfileDefault={this.onEditRepositoryProfileDefault}
             onShowHistory={showHistory}
           />
         )
+      }
       default:
         return assertNever(
           target.elementId,
           `Unknown repository appearance element: ${target.elementId}`
         )
     }
+  }
+
+  private onFeatureHighlightingAppearanceChanged = (
+    value: IFeatureHighlightingAppearance
+  ) => {
+    const target = this.appearanceEditorTarget
+    if (target?.kind !== 'feature') {
+      return
+    }
+
+    this.applyFeatureAppearance(
+      target.featureId,
+      value.highlightDesktopMaterialFeatures
+    )
+    this.appearanceEditorTarget = {
+      ...target,
+      highlighted: value.highlightDesktopMaterialFeatures,
+    }
+    this.forceUpdate()
+    void this.props.dispatcher
+      .setFeatureAppearanceElement(
+        target.featureId,
+        value.highlightDesktopMaterialFeatures
+      )
+      .catch(error => this.props.dispatcher.postError(asError(error)))
+  }
+
+  private renderFeatureAppearanceEditorContents = (
+    controls: IAnchoredAppearanceEditorControls
+  ): React.ReactNode => {
+    const target = this.appearanceEditorTarget
+    if (target?.kind !== 'feature') {
+      return null
+    }
+
+    return (
+      <FeatureHighlightingAppearanceEditor
+        value={{
+          highlightDesktopMaterialFeatures: target.highlighted,
+        }}
+        onChange={this.onFeatureHighlightingAppearanceChanged}
+        onShowHistory={controls.showHistory}
+      />
+    )
+  }
+
+  private renderRepositoryAppearanceEditorContents = (
+    controls: IAnchoredAppearanceEditorControls
+  ): React.ReactNode => {
+    const target = this.appearanceEditorTarget
+    return target?.kind === 'repository'
+      ? this.renderRepositoryAppearanceEditor(target, controls.showHistory)
+      : null
+  }
+
+  private renderProfileAppearanceEditorWithControls = (
+    controls: IAnchoredAppearanceEditorControls
+  ): React.ReactNode => {
+    const target = this.appearanceEditorTarget
+    return target?.kind === 'profile'
+      ? this.renderProfileAppearanceEditorContents(
+          target.elementId,
+          controls.showHistory
+        )
+      : null
   }
 
   private renderAppearanceEditor(): JSX.Element | null {
@@ -5056,47 +5242,25 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     if (target.kind === 'feature') {
+      const historySource =
+        this.props.dispatcher.getFeatureAppearanceHistorySource(
+          target.featureId
+        )
+      const repositoryPath =
+        this.props.dispatcher.getFeatureAppearanceRepositoryPath(
+          target.featureId
+        )
       return (
         <AnchoredAppearanceEditor
           title={`${target.label} appearance`}
           anchor={target.anchor}
-          historySource={this.props.dispatcher.getFeatureAppearanceHistorySource(
-            target.featureId
-          )}
-          repositoryPath={this.props.dispatcher.getFeatureAppearanceRepositoryPath(
-            target.featureId
-          )}
+          historySource={historySource}
+          repositoryPath={repositoryPath}
           onClose={this.closeAppearanceEditor}
           onMutation={this.refreshFeatureAppearanceTarget}
           contentOwnsHeader={true}
         >
-          {controls => (
-            <FeatureHighlightingAppearanceEditor
-              value={{
-                highlightDesktopMaterialFeatures: target.highlighted,
-              }}
-              onChange={value => {
-                this.applyFeatureAppearance(
-                  target.featureId,
-                  value.highlightDesktopMaterialFeatures
-                )
-                this.appearanceEditorTarget = {
-                  ...target,
-                  highlighted: value.highlightDesktopMaterialFeatures,
-                }
-                this.forceUpdate()
-                void this.props.dispatcher
-                  .setFeatureAppearanceElement(
-                    target.featureId,
-                    value.highlightDesktopMaterialFeatures
-                  )
-                  .catch(error =>
-                    this.props.dispatcher.postError(asError(error))
-                  )
-              }}
-              onShowHistory={controls.showHistory}
-            />
-          )}
+          {this.renderFeatureAppearanceEditorContents}
         </AnchoredAppearanceEditor>
       )
     }
@@ -5118,12 +5282,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           onMutation={this.refreshRepositoryAppearanceTarget}
           contentOwnsHeader={true}
         >
-          {controls =>
-            this.renderRepositoryAppearanceEditor(
-              target,
-              controls.showHistory
-            )
-          }
+          {this.renderRepositoryAppearanceEditorContents}
         </AnchoredAppearanceEditor>
       )
     }
@@ -5136,25 +5295,20 @@ export class App extends React.Component<IAppProps, IAppState> {
     ) {
       return null
     }
+    const historySource =
+      this.props.dispatcher.getProfileAppearanceHistorySource(target.elementId)
+    const repositoryPath =
+      this.props.dispatcher.getProfileAppearanceRepositoryPath(target.elementId)
     return (
       <AnchoredAppearanceEditor
         title={this.profileAppearanceTitle(target.elementId)}
         anchor={target.anchor}
-        historySource={this.props.dispatcher.getProfileAppearanceHistorySource(
-          target.elementId
-        )}
-        repositoryPath={this.props.dispatcher.getProfileAppearanceRepositoryPath(
-          target.elementId
-        )}
+        historySource={historySource}
+        repositoryPath={repositoryPath}
         onClose={this.closeAppearanceEditor}
         contentOwnsHeader={true}
       >
-        {controls =>
-          this.renderProfileAppearanceEditorContents(
-            target.elementId,
-            controls.showHistory
-          )
-        }
+        {this.renderProfileAppearanceEditorWithControls}
       </AnchoredAppearanceEditor>
     )
   }

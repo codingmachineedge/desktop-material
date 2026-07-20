@@ -502,6 +502,32 @@
   min-height: 0;
 }
 
+.actions-run-bulk-toolbar {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-low);
+
+  > label {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  > span {
+    margin-right: auto;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+  }
+}
+
 .actions-run-list {
   flex: 1 1 auto;
   min-width: 0;
@@ -574,6 +600,31 @@
   &.selected {
     background: var(--md-sys-color-secondary-container);
   }
+}
+
+.actions-run-checkbox {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+
+  &:focus-within {
+    outline: 2px solid var(--md-sys-color-primary);
+  }
+}
+
+.actions-bulk-run-review-list {
+  display: grid;
+  gap: 6px;
+  max-height: 190px;
+  margin: 0;
+  padding: 8px 8px 8px 28px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-low);
+  font-size: 11px;
 }
 
 .actions-run-select {

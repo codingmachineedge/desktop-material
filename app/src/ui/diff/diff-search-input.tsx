@@ -62,6 +62,7 @@ export class DiffSearchInput extends React.Component<
       // rendered inside it) doesn't dismiss the search.
       <div className="diff-search" onBlur={this.onBlur}>
         <TextBox
+          searchSurfaceId="diff"
           ref={this.textBoxRef}
           placeholder="Search…"
           ariaLabel="Search within diff"
@@ -72,6 +73,7 @@ export class DiffSearchInput extends React.Component<
           value={this.state.value}
         />
         <FilterModeControl
+          searchSurfaceId="diff"
           mode={this.state.mode}
           caseSensitive={this.state.caseSensitive}
           onModeChange={this.onModeChange}

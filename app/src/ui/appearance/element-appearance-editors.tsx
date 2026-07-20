@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-no-bind -- controlled editor callbacks capture the current owner value */
 import * as React from 'react'
 
 import { IAppIdentityCustomization } from '../../models/app-identity'
@@ -452,9 +453,7 @@ export function RepositoryWorkspaceAppearanceEditor(
       description="Override this repository's workspace colors, or inherit either profile value."
       onShowHistory={props.onShowHistory}
     >
-      <ProfileDefaultAction
-        onEditProfileDefault={props.onEditProfileDefault}
-      />
+      <ProfileDefaultAction onEditProfileDefault={props.onEditProfileDefault} />
       <div className="element-appearance-editor-grid">
         <Select
           label="Repository accent color"
@@ -517,9 +516,7 @@ export function RepositoryToolbarAppearanceEditor(
       description="Override toolbar labels and spacing only while this repository is active."
       onShowHistory={props.onShowHistory}
     >
-      <ProfileDefaultAction
-        onEditProfileDefault={props.onEditProfileDefault}
-      />
+      <ProfileDefaultAction onEditProfileDefault={props.onEditProfileDefault} />
       <div className="element-appearance-editor-grid">
         <Select
           label="Repository toolbar labels"
@@ -580,9 +577,7 @@ export function RepositoryTabsOverrideAppearanceEditor(
       description="Override tab spacing and width while this repository is active."
       onShowHistory={props.onShowHistory}
     >
-      <ProfileDefaultAction
-        onEditProfileDefault={props.onEditProfileDefault}
-      />
+      <ProfileDefaultAction onEditProfileDefault={props.onEditProfileDefault} />
       <div className="element-appearance-editor-grid">
         <Select
           label="Repository tab density"
@@ -597,9 +592,7 @@ export function RepositoryTabsOverrideAppearanceEditor(
             })
           }
         >
-          <option value="inherit">
-            Inherit {props.inherited.tabDensity}
-          </option>
+          <option value="inherit">Inherit {props.inherited.tabDensity}</option>
           <option value="comfortable">Comfortable</option>
           <option value="compact">Compact</option>
         </Select>

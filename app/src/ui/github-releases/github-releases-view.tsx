@@ -46,6 +46,8 @@ type BusyOperation =
   | 'upload'
   | 'download'
   | 'delete-asset'
+  | 'bulk-publish'
+  | 'bulk-delete'
 
 const BusyOperationLabels: Record<BusyOperation, string> = {
   releases: 'Loading releases…',
@@ -57,6 +59,8 @@ const BusyOperationLabels: Record<BusyOperation, string> = {
   upload: 'Uploading release asset…',
   download: 'Downloading release asset…',
   'delete-asset': 'Deleting release asset…',
+  'bulk-publish': 'Publishing selected release drafts…',
+  'bulk-delete': 'Deleting selected releases…',
 }
 
 interface IReleaseEditorState extends IGitHubReleaseDraft {
@@ -92,6 +96,11 @@ type ReleaseConfirmation =
       readonly asset: IGitHubReleaseAsset
       readonly review: IGitHubReleaseMutationReview
     }
+  | {
+      readonly kind: 'bulk-publish' | 'bulk-delete'
+      readonly releases: ReadonlyArray<IGitHubRelease>
+      readonly reviews: ReadonlyArray<IGitHubReleaseMutationReview>
+    }
 
 interface ICompletedDownload {
   readonly path: string
@@ -119,6 +128,7 @@ interface IGitHubReleasesViewState {
   readonly nextReleasePage: number | null
   readonly releasesCapped: boolean
   readonly selectedReleaseId: number | null
+  readonly selectedReleaseIds: ReadonlySet<number>
   readonly search: string
   readonly searchMode: FilterMode
   readonly searchCaseSensitive: boolean
@@ -161,6 +171,7 @@ function initialState(
     nextReleasePage: null,
     releasesCapped: false,
     selectedReleaseId: null,
+    selectedReleaseIds: new Set(),
     search: '',
     searchMode: readPersistedFilterMode(ReleasesSearchFilterId),
     searchCaseSensitive: false,
@@ -355,6 +366,12 @@ export class GitHubReleasesView extends React.Component<
         releases.some(release => release.id === this.state.selectedReleaseId)
           ? this.state.selectedReleaseId
           : releases[0]?.id ?? null
+      const loadedReleaseIds = new Set(releases.map(release => release.id))
+      const selectedReleaseIds = new Set(
+        [...this.state.selectedReleaseIds].filter(id =>
+          loadedReleaseIds.has(id)
+        )
+      )
       this.finishOperation(operation.controller)
       this.setState(
         {
@@ -363,6 +380,7 @@ export class GitHubReleasesView extends React.Component<
           nextReleasePage: result.nextPage,
           releasesCapped: result.capped,
           selectedReleaseId,
+          selectedReleaseIds,
           busy: null,
           failedOperation: null,
           error: null,
@@ -522,6 +540,89 @@ export class GitHubReleasesView extends React.Component<
 
   private clearReleaseFilters = () =>
     this.setState({ search: '', statusFilter: 'all' })
+
+  private toggleReleaseSelection = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const releaseId = Number(event.currentTarget.value)
+    if (!Number.isSafeInteger(releaseId) || releaseId <= 0) {
+      return
+    }
+    const checked = event.currentTarget.checked
+    this.setState(state => {
+      const selectedReleaseIds = new Set(state.selectedReleaseIds)
+      if (checked) {
+        selectedReleaseIds.add(releaseId)
+      } else {
+        selectedReleaseIds.delete(releaseId)
+      }
+      return { selectedReleaseIds, confirmation: null }
+    })
+  }
+
+  private toggleAllVisibleReleases = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const visibleIds = this.getVisibleReleases().releases.map(
+      release => release.id
+    )
+    const checked = event.currentTarget.checked
+    this.setState(state => {
+      const selectedReleaseIds = new Set(state.selectedReleaseIds)
+      for (const id of visibleIds) {
+        if (checked) {
+          selectedReleaseIds.add(id)
+        } else {
+          selectedReleaseIds.delete(id)
+        }
+      }
+      return { selectedReleaseIds, confirmation: null }
+    })
+  }
+
+  private clearReleaseSelection = () =>
+    this.setState({ selectedReleaseIds: new Set(), confirmation: null })
+
+  private selectedReleases(): ReadonlyArray<IGitHubRelease> {
+    return this.state.releases.filter(release =>
+      this.state.selectedReleaseIds.has(release.id)
+    )
+  }
+
+  private confirmBulkPublish = () =>
+    this.confirmBulkReleaseMutation(
+      'bulk-publish',
+      this.selectedReleases().filter(release => release.draft)
+    )
+
+  private confirmBulkDelete = () =>
+    this.confirmBulkReleaseMutation('bulk-delete', this.selectedReleases())
+
+  private confirmBulkReleaseMutation(
+    kind: 'bulk-publish' | 'bulk-delete',
+    releases: ReadonlyArray<IGitHubRelease>
+  ) {
+    if (releases.length === 0 || this.state.busy !== null) {
+      return
+    }
+    try {
+      const reviews = releases.map(release =>
+        this.props.releasesStore.createMutationReview(
+          this.props.repository,
+          release
+        )
+      )
+      this.setState({
+        confirmation: { kind, releases, reviews },
+        editor: null,
+        upload: null,
+        error: null,
+        message: null,
+      })
+    } catch (error) {
+      this.setState({ error: errorMessage(error) })
+    }
+  }
 
   private getSearchSampleItems = () =>
     this.state.releases.map(
@@ -894,11 +995,14 @@ export class GitHubReleasesView extends React.Component<
         ? 'publish'
         : confirmation.kind === 'delete-release'
         ? 'delete'
-        : 'delete-asset'
+        : confirmation.kind === 'delete-asset'
+        ? 'delete-asset'
+        : confirmation.kind
     const operation = this.startOperation(operationName)
     if (operation === null) {
       return
     }
+    const completedIds = new Set<number>()
     try {
       if (confirmation.kind === 'publish') {
         await this.props.releasesStore.publish(
@@ -912,12 +1016,36 @@ export class GitHubReleasesView extends React.Component<
           confirmation.review,
           operation.controller.signal
         )
-      } else {
+      } else if (confirmation.kind === 'delete-asset') {
         await this.props.releasesStore.deleteAsset(
           this.props.repository,
           confirmation.review,
           operation.controller.signal
         )
+      } else {
+        for (let index = 0; index < confirmation.reviews.length; index++) {
+          const review = confirmation.reviews[index]
+          const release = confirmation.releases[index]
+          if (review === undefined || release === undefined) {
+            throw new Error(
+              'The reviewed release selection changed. Review the bulk action again.'
+            )
+          }
+          if (confirmation.kind === 'bulk-publish') {
+            await this.props.releasesStore.publish(
+              this.props.repository,
+              review,
+              operation.controller.signal
+            )
+          } else {
+            await this.props.releasesStore.delete(
+              this.props.repository,
+              review,
+              operation.controller.signal
+            )
+          }
+          completedIds.add(release.id)
+        }
       }
       if (!this.isCurrent(operation.generation, operation.controller)) {
         return
@@ -927,20 +1055,65 @@ export class GitHubReleasesView extends React.Component<
           ? `Published ${confirmation.release.tagName}.`
           : confirmation.kind === 'delete-release'
           ? `Deleted release ${confirmation.release.tagName}. The Git tag was not deleted.`
-          : `Deleted asset ${confirmation.asset.name}.`
+          : confirmation.kind === 'delete-asset'
+          ? `Deleted asset ${confirmation.asset.name}.`
+          : confirmation.kind === 'bulk-publish'
+          ? `Published ${confirmation.releases.length} selected release ${
+              confirmation.releases.length === 1 ? 'draft' : 'drafts'
+            }.`
+          : `Deleted ${confirmation.releases.length} selected ${
+              confirmation.releases.length === 1 ? 'release' : 'releases'
+            }. Git tags were not deleted.`
       this.finishOperation(operation.controller)
       this.setState(
-        { busy: null, confirmation: null },
+        {
+          busy: null,
+          confirmation: null,
+          selectedReleaseIds:
+            completedIds.size === 0
+              ? this.state.selectedReleaseIds
+              : new Set(
+                  [...this.state.selectedReleaseIds].filter(
+                    id => !completedIds.has(id)
+                  )
+                ),
+        },
         () => void this.loadReleases(true, message)
       )
     } catch (error) {
       if (this.isCurrent(operation.generation, operation.controller)) {
         const canceled = (error as Error)?.name === 'AbortError'
-        this.setState({
-          busy: null,
-          error: canceled ? null : errorMessage(error),
-          message: canceled ? 'Release operation canceled.' : null,
-        })
+        const batch =
+          confirmation.kind === 'bulk-publish' ||
+          confirmation.kind === 'bulk-delete'
+        const selectedReleaseIds = new Set(
+          [...this.state.selectedReleaseIds].filter(id => !completedIds.has(id))
+        )
+        this.finishOperation(operation.controller)
+        this.setState(
+          {
+            busy: null,
+            confirmation: batch ? null : confirmation,
+            selectedReleaseIds,
+            error:
+              canceled || completedIds.size > 0 ? null : errorMessage(error),
+            message:
+              completedIds.size > 0
+                ? `${completedIds.size} selected ${
+                    completedIds.size === 1 ? 'release was' : 'releases were'
+                  } changed before the bulk operation stopped. ${errorMessage(
+                    error
+                  )}`
+                : canceled
+                ? 'Release operation canceled.'
+                : null,
+          },
+          () => {
+            if (completedIds.size > 0) {
+              void this.loadReleases(true, this.state.message ?? undefined)
+            }
+          }
+        )
       }
     } finally {
       this.finishOperation(operation.controller)
@@ -1354,6 +1527,16 @@ export class GitHubReleasesView extends React.Component<
 
   private renderReleaseList() {
     const { releases: visibleReleases, regexError } = this.getVisibleReleases()
+    const visibleSelectedCount = visibleReleases.filter(release =>
+      this.state.selectedReleaseIds.has(release.id)
+    ).length
+    const allVisibleSelected =
+      visibleReleases.length > 0 &&
+      visibleSelectedCount === visibleReleases.length
+    const selectedReleases = this.selectedReleases()
+    const selectedDraftCount = selectedReleases.filter(
+      release => release.draft
+    ).length
     const latestStableId = this.latestStableRelease()?.id ?? null
     const hasFilters =
       this.state.search.trim().length > 0 || this.state.statusFilter !== 'all'
@@ -1387,6 +1570,7 @@ export class GitHubReleasesView extends React.Component<
                 </label>
                 <div className="github-releases-search-field">
                   <input
+                    data-search-surface-id="github-releases-search"
                     id="github-releases-search"
                     type="search"
                     value={this.state.search}
@@ -1395,6 +1579,7 @@ export class GitHubReleasesView extends React.Component<
                     onChange={this.updateSearch}
                   />
                   <FilterModeControl
+                    searchSurfaceId="github-releases-search"
                     mode={this.state.searchMode}
                     caseSensitive={this.state.searchCaseSensitive}
                     onModeChange={this.onSearchModeChange}
@@ -1437,6 +1622,49 @@ export class GitHubReleasesView extends React.Component<
             )}
           </div>
         )}
+        {this.state.releases.length > 0 && (
+          <div
+            className="github-releases-bulk-toolbar"
+            role="group"
+            aria-label="Bulk release actions"
+          >
+            <label>
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                disabled={
+                  visibleReleases.length === 0 || this.state.busy !== null
+                }
+                onChange={this.toggleAllVisibleReleases}
+                aria-label="Select all visible releases"
+              />
+              Select all visible
+            </label>
+            <span aria-live="polite">{selectedReleases.length} selected</span>
+            <Button
+              disabled={selectedDraftCount === 0 || this.state.busy !== null}
+              onClick={this.confirmBulkPublish}
+            >
+              Publish drafts ({selectedDraftCount})
+            </Button>
+            <Button
+              disabled={
+                selectedReleases.length === 0 || this.state.busy !== null
+              }
+              onClick={this.confirmBulkDelete}
+            >
+              Delete selected ({selectedReleases.length})
+            </Button>
+            <Button
+              disabled={
+                selectedReleases.length === 0 || this.state.busy !== null
+              }
+              onClick={this.clearReleaseSelection}
+            >
+              Clear selection
+            </Button>
+          </div>
+        )}
         {initiallyLoading ? (
           <div className="github-releases-loading" role="status">
             <span
@@ -1474,37 +1702,49 @@ export class GitHubReleasesView extends React.Component<
               const status = releaseStatus(release)
               const date = release.publishedAt ?? release.createdAt
               return (
-                <button
-                  type="button"
-                  value={release.id}
-                  className={`github-release-row status-${status}${
-                    selected ? ' selected' : ''
-                  }`}
-                  aria-current={selected ? 'true' : undefined}
-                  disabled={this.state.busy !== null}
-                  onClick={this.selectReleaseFromButton}
-                  key={release.id}
-                >
-                  <span className="github-release-row-title">
-                    {release.name || release.tagName}
-                  </span>
-                  <span className="github-release-row-badges">
-                    {release.id === latestStableId && (
-                      <span className="github-release-latest-badge">
-                        Latest stable
-                      </span>
-                    )}
-                    <span className="github-release-row-state">
-                      {releaseStatusLabel(release)}
+                <div className="github-release-row-shell" key={release.id}>
+                  <label className="github-release-row-checkbox">
+                    <input
+                      type="checkbox"
+                      value={release.id}
+                      checked={this.state.selectedReleaseIds.has(release.id)}
+                      disabled={this.state.busy !== null}
+                      onChange={this.toggleReleaseSelection}
+                      aria-label={`Select release ${release.tagName}`}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    value={release.id}
+                    className={`github-release-row status-${status}${
+                      selected ? ' selected' : ''
+                    }`}
+                    aria-current={selected ? 'true' : undefined}
+                    disabled={this.state.busy !== null}
+                    onClick={this.selectReleaseFromButton}
+                  >
+                    <span className="github-release-row-title">
+                      {release.name || release.tagName}
                     </span>
-                  </span>
-                  <span className="github-release-row-tag">
-                    {release.tagName}
-                  </span>
-                  <span className="github-release-row-date">
-                    {release.draft ? 'Created' : 'Published'} {formatDate(date)}
-                  </span>
-                </button>
+                    <span className="github-release-row-badges">
+                      {release.id === latestStableId && (
+                        <span className="github-release-latest-badge">
+                          Latest stable
+                        </span>
+                      )}
+                      <span className="github-release-row-state">
+                        {releaseStatusLabel(release)}
+                      </span>
+                    </span>
+                    <span className="github-release-row-tag">
+                      {release.tagName}
+                    </span>
+                    <span className="github-release-row-date">
+                      {release.draft ? 'Created' : 'Published'}{' '}
+                      {formatDate(date)}
+                    </span>
+                  </button>
+                </div>
               )
             })}
           </div>
@@ -1678,13 +1918,25 @@ export class GitHubReleasesView extends React.Component<
     if (confirmation === null) {
       return null
     }
-    const isPublish = confirmation.kind === 'publish'
+    const isBulk =
+      confirmation.kind === 'bulk-publish' ||
+      confirmation.kind === 'bulk-delete'
+    const isPublish =
+      confirmation.kind === 'publish' || confirmation.kind === 'bulk-publish'
     const isAsset = confirmation.kind === 'delete-asset'
-    const title = isPublish
+    const title = isBulk
+      ? `${isPublish ? 'Publish' : 'Delete'} ${
+          confirmation.releases.length
+        } selected ${
+          confirmation.releases.length === 1 ? 'release' : 'releases'
+        }?`
+      : confirmation.kind === 'publish'
       ? `Publish ${confirmation.release.tagName}?`
       : isAsset
       ? `Delete ${confirmation.asset.name}?`
-      : `Delete release ${confirmation.release.tagName}?`
+      : confirmation.kind === 'delete-release'
+      ? `Delete release ${confirmation.release.tagName}?`
+      : 'Review selected releases?'
     return (
       <section
         className={`github-release-confirmation${
@@ -1696,19 +1948,39 @@ export class GitHubReleasesView extends React.Component<
       >
         <h2 id="github-release-confirmation-title">{title}</h2>
         <p id="github-release-confirmation-description">
-          {isPublish
+          {confirmation.kind === 'bulk-publish'
+            ? 'Each exact reviewed draft will be revalidated immediately before it is published. Processing stops on the first stale or failed item.'
+            : confirmation.kind === 'bulk-delete'
+            ? 'Each exact reviewed release will be revalidated immediately before permanent deletion. Git tags are not deleted. Processing stops on the first stale or failed item.'
+            : isPublish
             ? 'This makes the reviewed draft visible to repository readers. Its tag, target, notes, pre-release state, and assets will be published as currently shown.'
             : isAsset
             ? 'This permanently removes the selected asset from this release. Local files are not changed.'
             : 'This permanently removes the GitHub release and its uploaded assets. The Git tag is not deleted.'}
         </p>
+        {isBulk && (
+          <ul className="github-release-bulk-review-list">
+            {confirmation.releases.map(release => (
+              <li key={release.id}>
+                <strong>{release.name || release.tagName}</strong>{' '}
+                <code>{release.tagName}</code> · {releaseStatusLabel(release)}
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="github-releases-controls">
           <Button
             className={isPublish ? undefined : 'destructive'}
             disabled={this.state.busy !== null}
             onClick={this.executeConfirmation}
           >
-            {isPublish ? 'Publish reviewed release' : 'Delete permanently'}
+            {isPublish
+              ? isBulk
+                ? 'Publish reviewed drafts'
+                : 'Publish reviewed release'
+              : isBulk
+              ? 'Delete reviewed releases'
+              : 'Delete permanently'}
           </Button>
           <Button
             disabled={this.state.busy !== null}

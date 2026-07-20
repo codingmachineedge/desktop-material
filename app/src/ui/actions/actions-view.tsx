@@ -44,6 +44,10 @@ const ActionsViewTabOrder: ReadonlyArray<'runs' | 'workflows' | 'caches'> = [
 
 /** localStorage key used to persist the runs filter mode. */
 const ActionsRunsFilterListId = 'actions-runs'
+/** Keep destructive provider traffic bounded while avoiding serial poll waits. */
+const BulkRunCancellationConcurrency = 4
+/** Do not let one uncertain provider response permanently occupy a worker. */
+const BulkRunCancellationRequestTimeoutMs = 30_000
 import { WorkflowDispatchDialog } from './workflow-dispatch-dialog'
 import { JobLogViewer } from './job-log-viewer'
 import { ActionsConfirmationDialog } from './actions-confirmation-dialog'
@@ -65,12 +69,19 @@ type ActionsConfirmation =
       readonly workflow: IAPIWorkflow
       readonly enabled: boolean
     }
+  | {
+      readonly kind: 'bulk-rerun' | 'bulk-cancel'
+      readonly runs: ReadonlyArray<IAPIWorkflowRun>
+      readonly repositoryKey: string
+    }
 
 interface IActionsViewProps {
   readonly repository: Repository
   readonly currentBranch?: string | null
   readonly branchNames: ReadonlyArray<string>
   readonly actionsStore: ActionsStore
+  /** Overrides the provider-response deadline for deterministic tests. */
+  readonly bulkRunCancellationRequestTimeoutMs?: number
 }
 
 interface IActionsJobRequestContext {
@@ -96,12 +107,14 @@ interface IActionsViewState {
   readonly activeTab: 'runs' | 'workflows' | 'caches'
   readonly catalogOpen: boolean
   readonly selectedRun: IAPIWorkflowRun | null
+  readonly selectedRunIds: ReadonlySet<number>
   readonly selectedAttempt: number | null
   readonly jobList: IActionsJobList | null
   readonly jobsLoading: boolean
   readonly jobsLoadingMore: boolean
   readonly jobsError: Error | null
   readonly busyRunId: number | null
+  readonly bulkRunBusy: boolean
   readonly busyJobId: number | null
   readonly busyWorkflowId: number | null
   readonly actionMessage: string | null
@@ -151,12 +164,14 @@ const initialActionsViewState = (repositoryKey: string): IActionsViewState => ({
   activeTab: 'runs',
   catalogOpen: false,
   selectedRun: null,
+  selectedRunIds: new Set(),
   selectedAttempt: null,
   jobList: null,
   jobsLoading: false,
   jobsLoadingMore: false,
   jobsError: null,
   busyRunId: null,
+  bulkRunBusy: false,
   busyJobId: null,
   busyWorkflowId: null,
   actionMessage: null,
@@ -311,12 +326,14 @@ export class ActionsView extends React.Component<
         runQuery: '',
         catalogOpen: false,
         selectedRun: null,
+        selectedRunIds: new Set(),
         selectedAttempt: null,
         jobList: null,
         jobsLoading: false,
         jobsLoadingMore: false,
         jobsError: null,
         busyRunId: null,
+        bulkRunBusy: false,
         busyJobId: null,
         busyWorkflowId: null,
         actionMessage: null,
@@ -409,7 +426,11 @@ export class ActionsView extends React.Component<
       }
     }
 
-    this.setState({ actions, selectedRun })
+    const loadedRunIds = new Set(actions.runs.map(run => run.id))
+    const selectedRunIds = new Set(
+      [...this.state.selectedRunIds].filter(id => loadedRunIds.has(id))
+    )
+    this.setState({ actions, selectedRun, selectedRunIds })
   }
 
   private ensureCacheManagerLoaded(actions: IActionsState) {
@@ -966,12 +987,391 @@ export class ActionsView extends React.Component<
   private rerunFailed = (run: IAPIWorkflowRun) =>
     this.performRunAction(run, true)
 
+  private toggleRunSelection = (run: IAPIWorkflowRun, selected: boolean) => {
+    this.setState(state => {
+      const selectedRunIds = new Set(state.selectedRunIds)
+      if (selected) {
+        selectedRunIds.add(run.id)
+      } else {
+        selectedRunIds.delete(run.id)
+      }
+      return { selectedRunIds, confirmation: null }
+    })
+  }
+
+  private toggleAllVisibleRuns = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const checked = event.currentTarget.checked
+    const visibleRuns = this.getFilteredRuns()
+    this.setState(state => {
+      const selectedRunIds = new Set(state.selectedRunIds)
+      for (const run of visibleRuns) {
+        if (checked) {
+          selectedRunIds.add(run.id)
+        } else {
+          selectedRunIds.delete(run.id)
+        }
+      }
+      return { selectedRunIds, confirmation: null }
+    })
+  }
+
+  private clearRunSelection = () =>
+    this.setState({ selectedRunIds: new Set(), confirmation: null })
+
+  private selectedRuns(): ReadonlyArray<IAPIWorkflowRun> {
+    return this.state.actions.runs.filter(run =>
+      this.state.selectedRunIds.has(run.id)
+    )
+  }
+
+  private requestBulkRerun = () =>
+    this.requestBulkRunAction(
+      'bulk-rerun',
+      this.selectedRuns().filter(run => run.status === APICheckStatus.Completed)
+    )
+
+  private requestBulkCancel = () =>
+    this.requestBulkRunAction(
+      'bulk-cancel',
+      this.selectedRuns().filter(run =>
+        isWorkflowRunCancellableStatus(run.status)
+      )
+    )
+
+  private requestBulkRunAction(
+    kind: 'bulk-rerun' | 'bulk-cancel',
+    runs: ReadonlyArray<IAPIWorkflowRun>
+  ) {
+    if (
+      runs.length === 0 ||
+      this.state.busyRunId !== null ||
+      this.state.bulkRunBusy
+    ) {
+      return
+    }
+    this.setState({
+      confirmation: {
+        kind,
+        runs: [...runs],
+        repositoryKey: getActionsViewRepositoryKey(this.props.repository),
+      },
+      confirmationError: null,
+      confirmationProgress: null,
+      actionError: null,
+      actionMessage: null,
+    })
+  }
+
+  private requestRunCancellationWithDeadline = async (
+    repository: Repository,
+    run: IAPIWorkflowRun,
+    batchController: AbortController
+  ): Promise<void> => {
+    if (batchController.signal.aborted) {
+      const error = new Error(
+        'Pending bulk cancellation requests were stopped.'
+      )
+      error.name = 'AbortError'
+      throw error
+    }
+
+    const requestController = new AbortController()
+    let requestIsActive = true
+    let timeoutId: number | null = null
+    let abortRequest: (() => void) | null = null
+    const boundary = new Promise<never>((_resolve, reject) => {
+      abortRequest = () => {
+        requestController.abort()
+        const error = new Error(
+          'Pending bulk cancellation requests were stopped.'
+        )
+        error.name = 'AbortError'
+        reject(error)
+      }
+      batchController.signal.addEventListener('abort', abortRequest, {
+        once: true,
+      })
+      timeoutId = window.setTimeout(() => {
+        const error = new Error(
+          `Cancellation request for workflow run #${
+            run.run_number ?? run.id
+          } timed out before GitHub's response could be confirmed. GitHub may still have received it; refresh Actions before retrying.`
+        )
+        // Establish the uncertain-timeout result before aborting fetch. Otherwise
+        // the fetch AbortError could win the race and incorrectly stop the batch.
+        reject(error)
+        requestController.abort()
+      }, this.props.bulkRunCancellationRequestTimeoutMs ?? BulkRunCancellationRequestTimeoutMs)
+    })
+
+    try {
+      const request = this.props.actionsStore.requestRunCancellation(
+        repository,
+        run.id,
+        requestController.signal,
+        progress => {
+          if (
+            requestIsActive &&
+            this.cancellationController === batchController
+          ) {
+            this.setState({ confirmationProgress: progress.message })
+          }
+        }
+      )
+      void request.catch(() => undefined)
+      await Promise.race([request, boundary])
+    } finally {
+      requestIsActive = false
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+      if (abortRequest !== null) {
+        batchController.signal.removeEventListener('abort', abortRequest)
+      }
+    }
+  }
+
+  private cancelPendingBulkRunCancellations = () => {
+    if (
+      this.state.confirmation?.kind !== 'bulk-cancel' ||
+      !this.state.bulkRunBusy
+    ) {
+      return
+    }
+    this.cancellationController?.abort()
+    this.setState({
+      confirmationProgress: 'Stopping pending cancellation requests…',
+    })
+  }
+
+  private confirmBulkRunAction = async () => {
+    const confirmation = this.state.confirmation
+    const repository = this.props.repository
+    const repositoryGeneration = this.repositoryGeneration
+    const operationGeneration = this.operationGeneration
+    if (
+      (confirmation?.kind !== 'bulk-rerun' &&
+        confirmation?.kind !== 'bulk-cancel') ||
+      repository.gitHubRepository === null ||
+      confirmation.repositoryKey !== getActionsViewRepositoryKey(repository) ||
+      this.state.busyRunId !== null ||
+      this.state.bulkRunBusy
+    ) {
+      return
+    }
+    const controller = new AbortController()
+    this.cancellationController = controller
+    const completedIds = new Set<number>()
+    this.setState({
+      bulkRunBusy: true,
+      confirmationError: null,
+      confirmationProgress: `Reviewing ${confirmation.runs.length} selected workflow runs…`,
+    })
+    try {
+      if (confirmation.kind === 'bulk-rerun') {
+        for (let index = 0; index < confirmation.runs.length; index++) {
+          if (
+            !this.isCurrentOperation(
+              repository,
+              repositoryGeneration,
+              operationGeneration
+            ) ||
+            controller.signal.aborted
+          ) {
+            const error = new Error(
+              'The repository changed during the bulk action.'
+            )
+            error.name = 'AbortError'
+            throw error
+          }
+          const reviewedRun = confirmation.runs[index]
+          const currentRun = this.state.actions.runs.find(
+            run => run.id === reviewedRun.id
+          )
+          if (
+            currentRun === undefined ||
+            currentRun.status !== APICheckStatus.Completed
+          ) {
+            throw new Error(
+              `Workflow run #${
+                reviewedRun.run_number ?? reviewedRun.id
+              } changed after review. Refresh Actions and review the selection again.`
+            )
+          }
+          this.setState({
+            confirmationProgress: `Requesting re-run ${index + 1} of ${
+              confirmation.runs.length
+            }: #${currentRun.run_number ?? currentRun.id}…`,
+          })
+          await this.props.actionsStore.rerun(repository, currentRun.id)
+          completedIds.add(currentRun.id)
+        }
+      } else {
+        let nextIndex = 0
+        const failures = new Array<Error>()
+        const cancelNext = async () => {
+          while (nextIndex < confirmation.runs.length) {
+            const index = nextIndex++
+            if (
+              !this.isCurrentOperation(
+                repository,
+                repositoryGeneration,
+                operationGeneration
+              ) ||
+              controller.signal.aborted
+            ) {
+              const error = new Error(
+                'The repository changed during the bulk action.'
+              )
+              error.name = 'AbortError'
+              throw error
+            }
+            const reviewedRun = confirmation.runs[index]
+            const currentRun = this.state.actions.runs.find(
+              run => run.id === reviewedRun.id
+            )
+            if (
+              currentRun === undefined ||
+              !isWorkflowRunCancellableStatus(currentRun.status)
+            ) {
+              failures.push(
+                new Error(
+                  `Workflow run #${
+                    reviewedRun.run_number ?? reviewedRun.id
+                  } changed after review. Refresh Actions and review the selection again.`
+                )
+              )
+              continue
+            }
+            this.setState({
+              confirmationProgress: `Requesting cancellation ${index + 1} of ${
+                confirmation.runs.length
+              }: #${currentRun.run_number ?? currentRun.id}…`,
+            })
+            try {
+              await this.requestRunCancellationWithDeadline(
+                repository,
+                currentRun,
+                controller
+              )
+              completedIds.add(currentRun.id)
+            } catch (error) {
+              const failure =
+                error instanceof Error ? error : new Error(String(error))
+              if (failure.name === 'AbortError') {
+                throw failure
+              }
+              failures.push(failure)
+            }
+          }
+        }
+        const workerResults = await Promise.allSettled(
+          Array.from(
+            {
+              length: Math.min(
+                BulkRunCancellationConcurrency,
+                confirmation.runs.length
+              ),
+            },
+            cancelNext
+          )
+        )
+        for (const result of workerResults) {
+          if (result.status === 'rejected') {
+            throw result.reason
+          }
+        }
+        if (failures.length > 0) {
+          throw new Error(
+            `${failures.length} reviewed workflow ${
+              failures.length === 1 ? 'run was' : 'runs were'
+            } not confirmed as canceled. ${failures[0].message}`
+          )
+        }
+      }
+      if (
+        this.cancellationController === controller &&
+        this.isCurrentOperation(
+          repository,
+          repositoryGeneration,
+          operationGeneration
+        )
+      ) {
+        this.setState(state => ({
+          bulkRunBusy: false,
+          confirmation: null,
+          confirmationError: null,
+          confirmationProgress: null,
+          selectedRunIds: new Set(
+            [...state.selectedRunIds].filter(id => !completedIds.has(id))
+          ),
+          actionMessage: `${
+            confirmation.kind === 'bulk-rerun'
+              ? 'Re-run requested for'
+              : 'Cancellation requested for'
+          } ${completedIds.size} workflow ${
+            completedIds.size === 1 ? 'run' : 'runs'
+          }.`,
+        }))
+      }
+    } catch (error) {
+      if (
+        this.isCurrentOperation(
+          repository,
+          repositoryGeneration,
+          operationGeneration
+        )
+      ) {
+        const failure =
+          error instanceof Error ? error : new Error(String(error))
+        this.setState(state => ({
+          bulkRunBusy: false,
+          confirmation: null,
+          confirmationError: null,
+          confirmationProgress: null,
+          selectedRunIds: new Set(
+            [...state.selectedRunIds].filter(id => !completedIds.has(id))
+          ),
+          actionError: failure.name === 'AbortError' ? null : failure,
+          actionMessage:
+            completedIds.size === 0
+              ? failure.name === 'AbortError'
+                ? confirmation.kind === 'bulk-cancel'
+                  ? 'Pending cancellation requests were stopped. GitHub may still have received an in-flight request; refresh Actions before retrying.'
+                  : 'Bulk workflow action canceled.'
+                : null
+              : confirmation.kind === 'bulk-cancel'
+              ? failure.name === 'AbortError'
+                ? `Cancellation was requested for ${
+                    completedIds.size
+                  } workflow ${
+                    completedIds.size === 1 ? 'run' : 'runs'
+                  }. Pending requests were stopped; GitHub may still complete an in-flight request. Refresh Actions before retrying.`
+                : `Cancellation was requested for ${
+                    completedIds.size
+                  } workflow ${
+                    completedIds.size === 1 ? 'run' : 'runs'
+                  }; the remaining selected runs were unchanged.`
+              : `${completedIds.size} workflow ${
+                  completedIds.size === 1 ? 'run was' : 'runs were'
+                } changed before the bulk action stopped.`,
+        }))
+      }
+    } finally {
+      if (this.cancellationController === controller) {
+        this.cancellationController = null
+      }
+    }
+  }
+
   private requestCancelRun = (
     run: IAPIWorkflowRun,
     returnFocus: HTMLButtonElement,
     fallbackFocus: HTMLButtonElement | null
   ) => {
-    if (!isWorkflowRunCancellableStatus(run.status)) {
+    if (!isWorkflowRunCancellableStatus(run.status) || this.state.bulkRunBusy) {
       return
     }
     this.logController?.abort()
@@ -1013,7 +1413,11 @@ export class ActionsView extends React.Component<
   }
 
   private closeConfirmation = () => {
-    if (this.state.busyRunId !== null || this.state.busyWorkflowId !== null) {
+    if (
+      this.state.busyRunId !== null ||
+      this.state.busyWorkflowId !== null ||
+      this.state.bulkRunBusy
+    ) {
       return
     }
     this.setState({
@@ -1258,7 +1662,7 @@ export class ActionsView extends React.Component<
     const repository = this.props.repository
     const repositoryGeneration = this.repositoryGeneration
     const operationGeneration = this.operationGeneration
-    if (repository.gitHubRepository === null) {
+    if (repository.gitHubRepository === null || this.state.bulkRunBusy) {
       return
     }
     this.setState({ busyRunId: run.id, actionError: null, actionMessage: null })
@@ -1425,7 +1829,24 @@ export class ActionsView extends React.Component<
       this.state.confirmation?.kind === 'cancel-run'
         ? this.state.confirmation
         : null
+    const bulkRunConfirmation =
+      this.state.confirmation?.kind === 'bulk-rerun' ||
+      this.state.confirmation?.kind === 'bulk-cancel'
+        ? this.state.confirmation
+        : null
     const filteredRuns = this.getFilteredRuns()
+    const selectedRuns = this.selectedRuns()
+    const visibleSelectedCount = filteredRuns.filter(run =>
+      this.state.selectedRunIds.has(run.id)
+    ).length
+    const allVisibleSelected =
+      filteredRuns.length > 0 && visibleSelectedCount === filteredRuns.length
+    const selectedCompletedCount = selectedRuns.filter(
+      run => run.status === APICheckStatus.Completed
+    ).length
+    const selectedActiveCount = selectedRuns.filter(run =>
+      isWorkflowRunCancellableStatus(run.status)
+    ).length
     const events = [
       ...new Set([
         ...(this.state.event === 'all' ? [] : [this.state.event]),
@@ -1534,6 +1955,7 @@ export class ActionsView extends React.Component<
               >
                 <Octicon symbol={octicons.search} />
                 <input
+                  data-search-surface-id="actions-runs"
                   value={this.state.runQuery}
                   onChange={this.onRunQueryChange}
                   placeholder="Filter runs — try a branch, event, or actor…"
@@ -1541,6 +1963,7 @@ export class ActionsView extends React.Component<
                   aria-label="Filter workflow runs"
                 />
                 <FilterModeControl
+                  searchSurfaceId="actions-runs"
                   mode={this.state.runQueryMode}
                   caseSensitive={this.state.runQueryCaseSensitive}
                   onModeChange={this.onRunQueryModeChange}
@@ -1623,6 +2046,56 @@ export class ActionsView extends React.Component<
                 <option value="failure">Failure</option>
               </Select>
             </section>
+            <div
+              className="actions-run-bulk-toolbar"
+              role="group"
+              aria-label="Bulk workflow run actions"
+            >
+              <label>
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  disabled={
+                    filteredRuns.length === 0 ||
+                    this.state.bulkRunBusy ||
+                    this.state.busyRunId !== null
+                  }
+                  onChange={this.toggleAllVisibleRuns}
+                  aria-label="Select all visible workflow runs"
+                />
+                Select all visible
+              </label>
+              <span aria-live="polite">{selectedRuns.length} selected</span>
+              <Button
+                size="small"
+                disabled={
+                  selectedCompletedCount === 0 ||
+                  this.state.bulkRunBusy ||
+                  this.state.busyRunId !== null
+                }
+                onClick={this.requestBulkRerun}
+              >
+                Re-run completed ({selectedCompletedCount})
+              </Button>
+              <Button
+                size="small"
+                disabled={
+                  selectedActiveCount === 0 ||
+                  this.state.bulkRunBusy ||
+                  this.state.busyRunId !== null
+                }
+                onClick={this.requestBulkCancel}
+              >
+                Cancel active ({selectedActiveCount})
+              </Button>
+              <Button
+                size="small"
+                disabled={selectedRuns.length === 0 || this.state.bulkRunBusy}
+                onClick={this.clearRunSelection}
+              >
+                Clear selection
+              </Button>
+            </div>
             {actions.loading && actions.runs.length === 0 && (
               <div className="actions-loading">Loading workflows…</div>
             )}
@@ -1631,8 +2104,11 @@ export class ActionsView extends React.Component<
                 <RunList
                   runs={filteredRuns}
                   selectedRunId={selectedRun?.id ?? null}
+                  selectedRunIds={this.state.selectedRunIds}
                   busyRunId={this.state.busyRunId}
+                  bulkBusy={this.state.bulkRunBusy}
                   onSelect={this.selectRun}
+                  onToggleSelection={this.toggleRunSelection}
                   onRerun={this.rerun}
                   onRerunFailed={this.rerunFailed}
                   onRequestCancel={this.requestCancelRun}
@@ -1806,6 +2282,57 @@ export class ActionsView extends React.Component<
               onConfirm={this.confirmCancelRun}
               onDismissed={this.closeConfirmation}
               onReturnFocus={cancelConfirmation.returnFocus}
+            />
+          )}
+        {bulkRunConfirmation !== null &&
+          this.props.repository.gitHubRepository !== null && (
+            <ActionsConfirmationDialog
+              eyebrow="Reviewed bulk action"
+              title={
+                (bulkRunConfirmation.kind === 'bulk-rerun'
+                  ? 'Re-run '
+                  : 'Cancel ') +
+                bulkRunConfirmation.runs.length +
+                (bulkRunConfirmation.runs.length === 1
+                  ? ' workflow run?'
+                  : ' workflow runs?')
+              }
+              description={
+                <>
+                  <p>
+                    The exact selected run identifiers and current states will
+                    be checked again before each request.{' '}
+                    {bulkRunConfirmation.kind === 'bulk-cancel'
+                      ? 'Cancellation failures and uncertain timeouts stay selected while the rest of the reviewed batch continues.'
+                      : 'Re-run processing stops on the first changed or failed run.'}
+                  </p>
+                  <ul className="actions-bulk-run-review-list">
+                    {bulkRunConfirmation.runs.map(run => (
+                      <li key={run.id}>
+                        <strong>{run.display_title || run.name}</strong>{' '}
+                        <span>#{run.run_number ?? run.id}</span>{' '}
+                        <code>{run.head_branch ?? 'detached'}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              }
+              confirmLabel={
+                bulkRunConfirmation.kind === 'bulk-rerun'
+                  ? 'Re-run reviewed runs'
+                  : 'Cancel reviewed runs'
+              }
+              submitting={this.state.bulkRunBusy}
+              error={this.state.confirmationError}
+              progressMessage={this.state.confirmationProgress}
+              onConfirm={this.confirmBulkRunAction}
+              onDismissed={this.closeConfirmation}
+              onCancelSubmitting={
+                bulkRunConfirmation.kind === 'bulk-cancel'
+                  ? this.cancelPendingBulkRunCancellations
+                  : undefined
+              }
+              cancelSubmittingLabel="Cancel pending requests"
             />
           )}
         {this.state.confirmation?.kind === 'workflow-state' && (

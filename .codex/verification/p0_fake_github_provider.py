@@ -1797,6 +1797,11 @@ def main(argv: list[str]) -> int:
     )
     host, port = server.server_address[:2]
     endpoint = f"http://localhost:{port}/api/v3"
+    # Runtime API payloads must describe the same loopback host as the account
+    # endpoint. The invalid public-looking URL remains in the readiness receipt
+    # and stored Git fixture, while repository metadata is internally coherent
+    # enough for Desktop's exact remote/account routing checks.
+    state.html_url = f"http://localhost:{port}"
     ready = {
         "pid": os.getpid(),
         "bind": host,

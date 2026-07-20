@@ -493,6 +493,7 @@ export class NotificationAutomationsDialog extends React.Component<
           <label className="notification-automations-search">
             <span>Search</span>
             <input
+              data-search-surface-id="notification-automations"
               type="search"
               value={this.state.query}
               aria-label="Search automations by name"
@@ -501,6 +502,7 @@ export class NotificationAutomationsDialog extends React.Component<
             />
           </label>
           <FilterModeControl
+            searchSurfaceId="notification-automations"
             mode={this.state.queryMode}
             caseSensitive={this.state.queryCaseSensitive}
             onModeChange={this.onQueryModeChange}

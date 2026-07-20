@@ -5642,8 +5642,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Remove a verified stale index lock for one idle repository. */
   public async _removeRepositoryLock(
     repositoryId: number,
-    noticeId: string
+    noticeId: string,
+    confirmed: boolean = false
   ): Promise<void> {
+    if (!confirmed) {
+      this.emitError(
+        new Error(
+          'Confirm that all Git and IDE processes are stopped before removing the repository lock.'
+        )
+      )
+      return
+    }
     if (this.repositoryLockRemovalInFlight.has(repositoryId)) {
       return
     }

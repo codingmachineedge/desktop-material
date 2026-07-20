@@ -381,6 +381,7 @@ export class WorkflowCatalogDialog extends React.Component<
             >
               <Octicon symbol={octicons.search} />
               <input
+                data-search-surface-id="actions-workflow-catalog"
                 value={query}
                 onChange={this.onQueryChange}
                 placeholder="Search templates — try node, docker, pages…"
@@ -388,6 +389,7 @@ export class WorkflowCatalogDialog extends React.Component<
                 aria-label="Search workflow templates"
               />
               <FilterModeControl
+                searchSurfaceId="actions-workflow-catalog"
                 mode={this.state.queryMode}
                 caseSensitive={this.state.queryCaseSensitive}
                 onModeChange={this.onQueryModeChange}

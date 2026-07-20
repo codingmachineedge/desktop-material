@@ -189,6 +189,7 @@ export class TabSearchPopover extends React.Component<
 
           <div className="tab-search-filter-row">
             <input
+              data-search-surface-id="tab-search"
               className="tab-search-input"
               type="search"
               role="combobox"
@@ -203,6 +204,7 @@ export class TabSearchPopover extends React.Component<
               onKeyDown={this.onKeyDown}
             />
             <FilterModeControl
+              searchSurfaceId="tab-search"
               mode={this.state.filterMode}
               caseSensitive={this.state.filterCaseSensitive}
               onModeChange={this.onFilterModeChange}

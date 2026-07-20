@@ -371,6 +371,7 @@ export class TabStyleEditor extends React.Component<
               <div className="tab-style-font-search">
                 <Octicon symbol={octicons.search} />
                 <input
+                  data-search-surface-id="tab-style-font"
                   type="text"
                   placeholder="Search fonts"
                   value={this.state.fontQuery}
@@ -379,6 +380,7 @@ export class TabStyleEditor extends React.Component<
                   aria-label="Search fonts"
                 />
                 <FilterModeControl
+                  searchSurfaceId="tab-style-font"
                   mode={this.state.fontFilterMode}
                   caseSensitive={this.state.fontFilterCaseSensitive}
                   onModeChange={this.onFontFilterModeChange}

@@ -96,7 +96,7 @@ describe('ErrorNoticeStack', () => {
     )
   })
 
-  it('offers the scoped stale-lock recovery action', () => {
+  it('requires an explicit process-safety confirmation for stale-lock recovery', () => {
     const actions: Array<{ noticeId: string; repositoryId: number }> = []
     render(
       <ErrorNoticeStack
@@ -116,7 +116,41 @@ describe('ErrorNoticeStack', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove lock file' }))
+    assert.deepEqual(actions, [])
+    assert.ok(
+      screen.getByText(/Stop all Git and IDE processes before continuing/)
+    )
+    assert.ok(screen.getByRole('group', { name: 'Confirm lock file removal' }))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm remove lock file' })
+    )
     assert.deepEqual(actions, [{ noticeId: 'lock', repositoryId: 42 }])
+  })
+
+  it('cancels stale-lock recovery confirmation without dispatching', () => {
+    let actions = 0
+    render(
+      <ErrorNoticeStack
+        notices={[
+          notice('lock', {
+            action: { kind: 'remove-repository-lock', repositoryId: 42 },
+          }),
+        ]}
+        onDismiss={() => undefined}
+        onAction={() => actions++}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove lock file' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    assert.equal(actions, 0)
+    assert.ok(screen.getByRole('button', { name: 'Remove lock file' }))
+    assert.equal(
+      screen.queryByRole('group', { name: 'Confirm lock file removal' }),
+      null
+    )
   })
 
   it('renders no landmark when there are no errors', () => {

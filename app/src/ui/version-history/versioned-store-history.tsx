@@ -498,6 +498,7 @@ export class VersionedStoreHistory extends React.Component<
       <div className="versioned-store-history-filter">
         <div className="versioned-store-history-filter-row">
           <TextBox
+            searchSurfaceId="version-history"
             className="versioned-store-history-filter-input"
             type="search"
             ariaLabel="Search version history"
@@ -508,6 +509,7 @@ export class VersionedStoreHistory extends React.Component<
             onValueChanged={this.onFilterTextChanged}
           />
           <FilterModeControl
+            searchSurfaceId="version-history"
             mode={filterMode}
             caseSensitive={filterCaseSensitive}
             onModeChange={this.onFilterModeChanged}

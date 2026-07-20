@@ -101,6 +101,21 @@
     white-space: pre-wrap;
   }
 
+  .error-notice-lock-confirmation {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: var(--md-sys-shape-corner-small);
+    background: color-mix(in srgb, var(--md-sys-color-on-error) 10%, transparent);
+  }
+
+  .error-notice-lock-confirmation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 9px;
+  }
+
   .error-notice-actions {
     display: flex;
     align-items: center;
@@ -112,6 +127,8 @@
 
   .error-notice-details,
   .error-notice-recovery,
+  .error-notice-recovery-confirm,
+  .error-notice-recovery-cancel,
   .error-notice-dismiss {
     min-height: 36px;
     border: 0;
@@ -141,6 +158,23 @@
     padding: 0 10px;
     border: 1px solid currentColor;
     border-radius: 999px;
+  }
+
+  .error-notice-recovery-confirm,
+  .error-notice-recovery-cancel {
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+  }
+
+  .error-notice-recovery-confirm {
+    background: var(--md-sys-color-on-error);
+    color: var(--md-sys-color-error);
+
+    &:hover {
+      background: color-mix(in srgb, var(--md-sys-color-on-error) 86%, transparent);
+    }
   }
 
   .error-notice-dismiss {

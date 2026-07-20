@@ -1912,7 +1912,9 @@ export class API {
     org: IAPIOrganization | null,
     name: string,
     description: string,
-    private_: boolean
+    private_: boolean,
+    autoInitialize: boolean = false,
+    signal?: AbortSignal
   ): Promise<IAPIFullRepository> {
     try {
       const apiPath = org ? `orgs/${org.login}/repos` : 'user/repos'
@@ -1921,11 +1923,18 @@ export class API {
           name,
           description,
           private: private_,
+          ...(autoInitialize ? { auto_init: true } : {}),
         },
+        signal,
       })
 
       return await parsedResponse<IAPIFullRepository>(response)
     } catch (e) {
+      if (signal?.aborted || (e as Error)?.name === 'AbortError') {
+        throw new Error(
+          'The creation request ended before Desktop received a result. The remote host may still have created the repository; check it before retrying to avoid a duplicate.'
+        )
+      }
       if (e instanceof APIError) {
         if (org !== null) {
           throw new Error(

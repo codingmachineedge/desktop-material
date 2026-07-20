@@ -380,6 +380,7 @@ class MaterialContextMenu extends React.Component<
           <div className="context-menu-filter">
             <Octicon symbol={octicons.filter} />
             <input
+              data-search-surface-id="material-context-menu"
               ref={this.filterRef}
               type="text"
               placeholder="Filter actions"
@@ -389,6 +390,7 @@ class MaterialContextMenu extends React.Component<
               spellCheck={false}
             />
             <FilterModeControl
+              searchSurfaceId="material-context-menu"
               mode={this.state.filterMode}
               caseSensitive={this.state.filterCaseSensitive}
               onModeChange={this.onFilterModeChanged}

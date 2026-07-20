@@ -21,6 +21,16 @@ import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { Repository } from '../../models/repository'
 import { Dispatcher } from '../dispatcher'
 import { Button } from '../lib/button'
+import { FilterMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+  matchGroup,
+} from '../lib/filter-list-mode'
+
+const ForkNetworkFilterListId = 'fork-network-repositories'
+const ForkBranchFilterListId = 'fork-network-branches'
 
 interface IForkBranchCheckoutProps {
   readonly repository: Repository
@@ -44,6 +54,10 @@ interface IForkBranchCheckoutState {
   readonly selectedBranchID: string
   readonly forkFilter: string
   readonly branchFilter: string
+  readonly forkFilterMode: FilterMode
+  readonly branchFilterMode: FilterMode
+  readonly forkFilterCaseSensitive: boolean
+  readonly branchFilterCaseSensitive: boolean
   readonly localBranchName: string
   readonly plan: IForkBranchCheckoutPlan | null
   readonly result: IForkBranchCheckoutResult | null
@@ -99,6 +113,10 @@ export class ForkBranchCheckout extends React.Component<
     this.state = {
       open: false,
       ...initialWorkflowState,
+      forkFilterMode: readPersistedFilterMode(ForkNetworkFilterListId),
+      branchFilterMode: readPersistedFilterMode(ForkBranchFilterListId),
+      forkFilterCaseSensitive: false,
+      branchFilterCaseSensitive: false,
       languageMode: getPersistedLanguageMode(),
     }
   }
@@ -284,6 +302,36 @@ export class ForkBranchCheckout extends React.Component<
     this.setState({ branchFilter: event.currentTarget.value })
   }
 
+  private onForkFilterModeChanged = (forkFilterMode: FilterMode) => {
+    persistFilterMode(ForkNetworkFilterListId, forkFilterMode)
+    this.setState({ forkFilterMode })
+  }
+
+  private onBranchFilterModeChanged = (branchFilterMode: FilterMode) => {
+    persistFilterMode(ForkBranchFilterListId, branchFilterMode)
+    this.setState({ branchFilterMode })
+  }
+
+  private onForkFilterCaseSensitiveChanged = (
+    forkFilterCaseSensitive: boolean
+  ) => this.setState({ forkFilterCaseSensitive })
+
+  private onBranchFilterCaseSensitiveChanged = (
+    branchFilterCaseSensitive: boolean
+  ) => this.setState({ branchFilterCaseSensitive })
+
+  private onForkFilterPatternApply = (forkFilter: string) =>
+    this.setState({ forkFilter })
+
+  private onBranchFilterPatternApply = (branchFilter: string) =>
+    this.setState({ branchFilter })
+
+  private getForkFilterSamples = () =>
+    this.state.catalog?.forks.map(fork => `${fork.owner}/${fork.name}`) ?? []
+
+  private getBranchFilterSamples = () =>
+    this.state.branchCatalog?.branches.map(branch => branch.name) ?? []
+
   private selectedBranch(): IForkNetworkBranch | undefined {
     return this.state.branchCatalog?.branches.find(
       branch => branch.id === this.state.selectedBranchID
@@ -425,16 +473,26 @@ export class ForkBranchCheckout extends React.Component<
 
   public render() {
     const { catalog, branchCatalog, activity } = this.state
-    const forkFilter = this.state.forkFilter.trim().toLowerCase()
-    const branchFilter = this.state.branchFilter.trim().toLowerCase()
-    const forks =
-      catalog?.forks.filter(fork =>
-        `${fork.owner}/${fork.name}`.toLowerCase().includes(forkFilter)
-      ) ?? []
-    const branches =
-      branchCatalog?.branches.filter(branch =>
-        branch.name.toLowerCase().includes(branchFilter)
-      ) ?? []
+    const forkMatches = matchGroup(
+      this.state.forkFilter.trim(),
+      catalog?.forks ?? [],
+      fork => [`${fork.owner}/${fork.name}`],
+      {
+        mode: this.state.forkFilterMode,
+        caseSensitive: this.state.forkFilterCaseSensitive,
+      }
+    )
+    const branchMatches = matchGroup(
+      this.state.branchFilter.trim(),
+      branchCatalog?.branches ?? [],
+      branch => [branch.name, branch.headSha],
+      {
+        mode: this.state.branchFilterMode,
+        caseSensitive: this.state.branchFilterCaseSensitive,
+      }
+    )
+    const forks = forkMatches.results.map(match => match.item)
+    const branches = branchMatches.results.map(match => match.item)
     const selectedBranch = this.selectedBranch()
 
     return (
@@ -458,13 +516,34 @@ export class ForkBranchCheckout extends React.Component<
               <>
                 <label>
                   <span>{this.localize('forkCheckout.filterForks')}</span>
-                  <input
-                    type="search"
-                    value={this.state.forkFilter}
-                    onChange={this.onForkFilterChanged}
-                    placeholder={this.localize('forkCheckout.filterForks')}
-                  />
+                  <div className="fork-branch-checkout-filter-field">
+                    <input
+                      data-search-surface-id="fork-network-repositories"
+                      type="search"
+                      value={this.state.forkFilter}
+                      onChange={this.onForkFilterChanged}
+                      placeholder={this.localize('forkCheckout.filterForks')}
+                    />
+                    <FilterModeControl
+                      searchSurfaceId="fork-network-repositories"
+                      mode={this.state.forkFilterMode}
+                      caseSensitive={this.state.forkFilterCaseSensitive}
+                      onModeChange={this.onForkFilterModeChanged}
+                      onCaseSensitiveChange={
+                        this.onForkFilterCaseSensitiveChanged
+                      }
+                      regexBuilderTarget="Fork repositories"
+                      getSampleItems={this.getForkFilterSamples}
+                      filterText={this.state.forkFilter}
+                      onRegexPatternApply={this.onForkFilterPatternApply}
+                    />
+                  </div>
                 </label>
+                {forkMatches.regexError !== null && (
+                  <p className="fork-branch-checkout-error" role="alert">
+                    Invalid fork search pattern: {forkMatches.regexError}
+                  </p>
+                )}
                 <label>
                   <span>{this.localize('forkCheckout.forkLabel')}</span>
                   <select
@@ -498,13 +577,34 @@ export class ForkBranchCheckout extends React.Component<
               <>
                 <label>
                   <span>{this.localize('forkCheckout.filterBranches')}</span>
-                  <input
-                    type="search"
-                    value={this.state.branchFilter}
-                    onChange={this.onBranchFilterChanged}
-                    placeholder={this.localize('forkCheckout.filterBranches')}
-                  />
+                  <div className="fork-branch-checkout-filter-field">
+                    <input
+                      data-search-surface-id="fork-network-branches"
+                      type="search"
+                      value={this.state.branchFilter}
+                      onChange={this.onBranchFilterChanged}
+                      placeholder={this.localize('forkCheckout.filterBranches')}
+                    />
+                    <FilterModeControl
+                      searchSurfaceId="fork-network-branches"
+                      mode={this.state.branchFilterMode}
+                      caseSensitive={this.state.branchFilterCaseSensitive}
+                      onModeChange={this.onBranchFilterModeChanged}
+                      onCaseSensitiveChange={
+                        this.onBranchFilterCaseSensitiveChanged
+                      }
+                      regexBuilderTarget="Fork branches"
+                      getSampleItems={this.getBranchFilterSamples}
+                      filterText={this.state.branchFilter}
+                      onRegexPatternApply={this.onBranchFilterPatternApply}
+                    />
+                  </div>
                 </label>
+                {branchMatches.regexError !== null && (
+                  <p className="fork-branch-checkout-error" role="alert">
+                    Invalid branch search pattern: {branchMatches.regexError}
+                  </p>
+                )}
                 <label>
                   <span>{this.localize('forkCheckout.branchLabel')}</span>
                   <select

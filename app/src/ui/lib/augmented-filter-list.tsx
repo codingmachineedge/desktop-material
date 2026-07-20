@@ -378,6 +378,7 @@ export class AugmentedSectionFilterList<
   public renderTextBox() {
     return (
       <TextBox
+        searchSurfaceId={this.props.filterListId}
         ref={this.onTextBoxRef}
         displayClearButton={true}
         prefixedIcon={octicons.search}
@@ -463,6 +464,7 @@ export class AugmentedSectionFilterList<
 
     return (
       <FilterModeControl
+        searchSurfaceId={this.props.filterListId}
         mode={this.state.filterMode}
         caseSensitive={this.state.caseSensitive}
         onModeChange={this.setFilterMode}

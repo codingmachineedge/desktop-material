@@ -213,6 +213,26 @@
   flex: 1 1 220px;
 }
 
+.tag-lifecycle-filter-field {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+
+  > input {
+    min-width: 80px;
+    flex: 1 1 auto;
+  }
+
+  .filter-mode-control {
+    flex: 0 1 auto;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
+  }
+}
+
 .tag-lifecycle-row {
   align-items: center;
   background: var(--md-sys-color-surface-container-high);

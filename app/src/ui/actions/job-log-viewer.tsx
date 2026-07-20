@@ -339,6 +339,7 @@ export class JobLogViewer extends React.Component<
           </header>
           <div className="actions-log-search">
             <input
+              data-search-surface-id="actions-job-log"
               type="search"
               value={this.state.search}
               onChange={this.onSearch}
@@ -346,6 +347,7 @@ export class JobLogViewer extends React.Component<
               aria-label="Search logs"
             />
             <FilterModeControl
+              searchSurfaceId="actions-job-log"
               mode={this.state.searchMode}
               caseSensitive={this.state.searchCaseSensitive}
               onModeChange={this.onSearchModeChange}

@@ -5,6 +5,8 @@ import {
   getSubmoduleBranchError,
   getSubmodulePathError,
   getSubmoduleSourceError,
+  getSubmoduleRemoteDescriptionError,
+  getSubmoduleRemoteNameError,
   getSuggestedSubmodulePath,
   normalizeSubmodulePath,
 } from '../../src/models/submodule-add'
@@ -45,6 +47,28 @@ describe('Add Submodule input model', () => {
     assert.equal(getSubmoduleSourceError('git@example.com:shared.git'), null)
     assert.equal(getSubmoduleSourceError('../shared.git'), null)
     assert.match(getSubmoduleSourceError('bad\nsource') ?? '', /control/)
+  })
+
+  it('validates new remote repository metadata without rewriting it', () => {
+    assert.equal(getSubmoduleRemoteNameError('shared-ui'), null)
+    assert.equal(getSubmoduleRemoteNameError('shared.ui_2026'), null)
+    assert.match(getSubmoduleRemoteNameError('') ?? '', /Enter a name/)
+    assert.match(getSubmoduleRemoteNameError('shared ui') ?? '', /only letters/)
+    assert.match(
+      getSubmoduleRemoteNameError(' shared-ui') ?? '',
+      /only letters/
+    )
+    assert.match(getSubmoduleRemoteNameError('.'.repeat(101)) ?? '', /100/)
+
+    assert.equal(getSubmoduleRemoteDescriptionError('Shared UI controls'), null)
+    assert.match(
+      getSubmoduleRemoteDescriptionError('x'.repeat(351)) ?? '',
+      /350/
+    )
+    assert.match(
+      getSubmoduleRemoteDescriptionError('line one\nline two') ?? '',
+      /control/
+    )
   })
 
   it('suggests a conventional path from common remote forms', () => {

@@ -35,6 +35,7 @@ export type {
 export {
   AnchoredAppearanceEditor,
   AppearanceElementHistoryDialog,
+  getAppearanceRepositoryDisplayPath,
   isAppearanceEditorContextMenuKey,
   openAppearanceEditorFromContextMenu,
   openAppearanceEditorFromKeyDown,

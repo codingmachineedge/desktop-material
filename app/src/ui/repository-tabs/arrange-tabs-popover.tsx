@@ -366,6 +366,7 @@ export class ArrangeTabsPopover extends React.Component<
             <label htmlFor="arrange-tabs-filter-input">Filter tabs</label>
             <div className="arrange-tabs-filter-field">
               <input
+                data-search-surface-id="arrange-tabs"
                 id="arrange-tabs-filter-input"
                 className="arrange-tabs-filter-input"
                 type="search"
@@ -375,6 +376,7 @@ export class ArrangeTabsPopover extends React.Component<
                 placeholder="Name, alias, path, or URL"
               />
               <FilterModeControl
+                searchSurfaceId="arrange-tabs"
                 mode={this.state.filterMode}
                 caseSensitive={this.state.filterCaseSensitive}
                 onModeChange={this.onFilterModeChange}

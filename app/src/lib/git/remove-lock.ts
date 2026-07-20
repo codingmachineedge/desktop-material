@@ -4,6 +4,7 @@ import { link, lstat, rename, unlink } from 'fs/promises'
 import { isAbsolute, join, normalize, resolve } from 'path'
 import { Repository } from '../../models/repository'
 import { coerceToString } from './coerce-to-string'
+import { execFile } from '../exec-file'
 
 /** A fresh lock may still belong to a process that has not updated it yet. */
 export const MinimumStaleRepositoryLockAgeMs = 30_000
@@ -20,6 +21,189 @@ const defaultFileSystem: IRepositoryLockFileSystem = {
   rename,
   unlink,
   link,
+}
+
+export type RepositoryLockOwnershipProbe = (path: string) => Promise<void>
+
+type RestartManagerProbeRunner = (path: string) => Promise<string>
+
+const RestartManagerProbeScript = String.raw`
+$ErrorActionPreference = 'Stop'
+$encodedPath = [Environment]::GetEnvironmentVariable('DESKTOP_MATERIAL_LOCK_PATH_BASE64')
+if ([String]::IsNullOrWhiteSpace($encodedPath)) { throw 'Missing lock path.' }
+$lockPath = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($encodedPath))
+if ([String]::IsNullOrWhiteSpace($lockPath)) { throw 'Invalid lock path.' }
+
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class DesktopMaterialRestartManager
+{
+    private const int ErrorMoreData = 234;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct UniqueProcess
+    {
+        public int ProcessId;
+        public System.Runtime.InteropServices.ComTypes.FILETIME ProcessStartTime;
+    }
+
+    public enum ApplicationType
+    {
+        Unknown = 0,
+        MainWindow = 1,
+        OtherWindow = 2,
+        Service = 3,
+        Explorer = 4,
+        Console = 5,
+        Critical = 1000
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct ProcessInfo
+    {
+        public UniqueProcess Process;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string ApplicationName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string ServiceShortName;
+        public ApplicationType Type;
+        public uint Status;
+        public uint TerminalSessionId;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool Restartable;
+    }
+
+    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
+    private static extern int RmStartSession(out uint session, int flags, string key);
+
+    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
+    private static extern int RmRegisterResources(
+        uint session,
+        uint fileCount,
+        string[] fileNames,
+        uint applicationCount,
+        UniqueProcess[] applications,
+        uint serviceCount,
+        string[] serviceNames);
+
+    [DllImport("rstrtmgr.dll")]
+    private static extern int RmGetList(
+        uint session,
+        out uint needed,
+        ref uint count,
+        [In, Out] ProcessInfo[] processes,
+        ref uint rebootReasons);
+
+    [DllImport("rstrtmgr.dll")]
+    private static extern int RmEndSession(uint session);
+
+    public static int CountProcessesUsing(string path)
+    {
+        uint session;
+        int result = RmStartSession(out session, 0, Guid.NewGuid().ToString("N"));
+        if (result != 0) { throw new InvalidOperationException("RmStartSession failed: " + result); }
+
+        try
+        {
+            result = RmRegisterResources(session, 1, new[] { path }, 0, null, 0, null);
+            if (result != 0) { throw new InvalidOperationException("RmRegisterResources failed: " + result); }
+
+            uint needed = 0;
+            uint count = 0;
+            uint rebootReasons = 0;
+            result = RmGetList(session, out needed, ref count, null, ref rebootReasons);
+            if (result == 0) { return 0; }
+            if (result != ErrorMoreData || needed == 0)
+            {
+                throw new InvalidOperationException("RmGetList failed: " + result);
+            }
+
+            ProcessInfo[] processes = new ProcessInfo[needed];
+            count = needed;
+            result = RmGetList(session, out needed, ref count, processes, ref rebootReasons);
+            if (result != 0) { throw new InvalidOperationException("RmGetList failed: " + result); }
+            return checked((int)count);
+        }
+        finally
+        {
+            RmEndSession(session);
+        }
+    }
+}
+'@
+
+$count = [DesktopMaterialRestartManager]::CountProcessesUsing($lockPath)
+if ($count -eq 0) { 'CLEAR' } else { 'ACTIVE:' + $count }
+`
+
+async function runRestartManagerProbe(path: string): Promise<string> {
+  const encodedCommand = Buffer.from(
+    RestartManagerProbeScript,
+    'utf16le'
+  ).toString('base64')
+  const encodedPath = Buffer.from(path, 'utf16le').toString('base64')
+  const { stdout } = await execFile(
+    'powershell.exe',
+    [
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-EncodedCommand',
+      encodedCommand,
+    ],
+    {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15_000,
+      maxBuffer: 64 * 1024,
+      env: {
+        ...process.env,
+        DESKTOP_MATERIAL_LOCK_PATH_BASE64: encodedPath,
+      },
+    }
+  )
+  return stdout
+}
+
+/**
+ * Fail closed unless Windows Restart Manager proves no process currently uses
+ * the lock. The path is base64-encoded in a child environment variable and the
+ * fixed probe is passed to PowerShell without a shell-interpreted command.
+ */
+export async function assertRepositoryLockHasNoActiveWindowsHandles(
+  path: string,
+  run: RestartManagerProbeRunner = runRestartManagerProbe
+): Promise<void> {
+  if (!__WIN32__) {
+    throw new Error(
+      'Desktop could not verify repository lock ownership on this platform. Stop all Git and IDE processes, then retry.'
+    )
+  }
+
+  let result: string
+  try {
+    result = (await run(path)).trim()
+  } catch {
+    throw new Error(
+      'Desktop could not verify which process owns the repository lock. Stop all Git and IDE processes, then retry.'
+    )
+  }
+
+  if (result === 'CLEAR') {
+    return
+  }
+  if (/^ACTIVE:[1-9]\d{0,5}$/.test(result)) {
+    throw new Error(
+      'The repository lock is still in use by an active process. Stop all Git and IDE processes, then retry.'
+    )
+  }
+  throw new Error(
+    'Desktop received an uncertain repository lock ownership result. Stop all Git and IDE processes, then retry.'
+  )
 }
 
 function isNotFound(error: unknown): boolean {
@@ -114,7 +298,8 @@ export function gitErrorReferencesRepositoryIndexLock(
 export async function removeStaleRepositoryLock(
   repository: Repository,
   now: number = Date.now(),
-  fs: IRepositoryLockFileSystem = defaultFileSystem
+  fs: IRepositoryLockFileSystem = defaultFileSystem,
+  ownershipProbe: RepositoryLockOwnershipProbe = assertRepositoryLockHasNoActiveWindowsHandles
 ): Promise<string | null> {
   const lockPath = join(repository.resolvedGitDir, 'index.lock')
   let lock: Stats
@@ -130,6 +315,7 @@ export async function removeStaleRepositoryLock(
   if (rejection !== null) {
     throw new Error(rejection)
   }
+  await ownershipProbe(lockPath)
 
   const quarantinePath = `${lockPath}.desktop-material-${randomBytes(
     8
@@ -160,6 +346,13 @@ export async function removeStaleRepositoryLock(
       quarantineRejection ??
         'The repository lock changed while it was being checked, so it was restored.'
     )
+  }
+
+  try {
+    await ownershipProbe(quarantinePath)
+  } catch (error) {
+    await restoreWithoutOverwrite(quarantinePath, lockPath, fs)
+    throw error
   }
 
   try {

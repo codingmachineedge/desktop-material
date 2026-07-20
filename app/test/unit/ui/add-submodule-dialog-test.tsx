@@ -2,7 +2,11 @@ import assert from 'node:assert'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import * as React from 'react'
 
-import { IAPIRepository } from '../../../src/lib/api'
+import {
+  IAPIFullRepository,
+  IAPIOrganization,
+  IAPIRepository,
+} from '../../../src/lib/api'
 import { IAddSubmoduleOptions } from '../../../src/lib/git'
 import { IAccountRepositories } from '../../../src/lib/stores/api-repositories-store'
 import { Account, getAccountKey } from '../../../src/models/account'
@@ -59,6 +63,7 @@ class DialogResizeObserver implements ResizeObserver {
 }
 
 beforeEach(async () => {
+  localStorage.removeItem('language-mode-v1')
   const electron = await import('electron')
   const previousSend = electron.ipcRenderer.send
   electron.ipcRenderer.send = () => undefined
@@ -95,6 +100,7 @@ afterEach(() => {
   restoreDialogShow?.()
   restoreWindowResizeObserver?.()
   localStorage.removeItem('appearance-customization-v1')
+  localStorage.removeItem('language-mode-v1')
 })
 
 const repository = new Repository('C:/fixtures/superproject', 1, null, false)
@@ -144,14 +150,37 @@ const apiRepository: IAPIRepository = {
   archived: false,
 }
 
+const organization: IAPIOrganization = {
+  id: 19,
+  login: 'material-org',
+  avatar_url: 'https://example.invalid/org.png',
+  url: 'https://api.github.com/orgs/material-org',
+}
+
+const createdRemote: IAPIFullRepository = {
+  ...apiRepository,
+  clone_url: 'https://github.com/material-org/new-component.git',
+  ssh_url: 'git@github.com:material-org/new-component.git',
+  html_url: 'https://github.com/material-org/new-component',
+  name: 'new-component',
+  owner: {
+    ...apiRepository.owner,
+    id: organization.id,
+    login: organization.login,
+    type: 'Organization',
+  },
+  parent: undefined,
+}
+
 function accountRepositories(
-  repositories: ReadonlyArray<IAPIRepository>
+  repositories: ReadonlyArray<IAPIRepository>,
+  organizations: ReadonlyArray<IAPIOrganization> = []
 ): IAccountRepositories {
   return {
     repositories,
     loading: false,
     error: null,
-    organizations: [],
+    organizations,
     organizationsLoading: false,
     organizationRepositories: new Map(),
   }
@@ -348,5 +377,349 @@ describe('Clone-style Add Submodule dialog', () => {
     assert.equal(calls[0].url, apiRepository.clone_url)
     assert.equal(calls[0].path, 'vendor/shared-ui')
     assert.equal(calls[0].options?.accountKey, getAccountKey(account))
+  })
+
+  it('creates an initialized organization remote before adding its clone URL', async () => {
+    const account = dotComAccount()
+    const sequence = new Array<string>()
+    const createCalls = new Array<{
+      readonly account: Account
+      readonly org: IAPIOrganization | null
+      readonly name: string
+      readonly description: string
+      readonly private_: boolean
+    }>()
+    const addCalls = new Array<IAddCall>()
+    const dispatcher = {
+      createRemoteRepositoryForSubmodule: async (
+        selectedAccount: Account,
+        org: IAPIOrganization | null,
+        name: string,
+        description: string,
+        private_: boolean
+      ) => {
+        sequence.push('create')
+        createCalls.push({
+          account: selectedAccount,
+          org,
+          name,
+          description,
+          private_,
+        })
+        return createdRemote
+      },
+      addSubmodule: async (
+        _repository: Repository,
+        url: string,
+        path: string,
+        branch?: string | null,
+        options?: IAddSubmoduleOptions
+      ) => {
+        sequence.push('add')
+        addCalls.push({ url, path, branch, options })
+      },
+    } as unknown as Dispatcher
+
+    renderDialog(
+      dispatcher,
+      [account],
+      new Map([[account, accountRepositories([], [organization])]])
+    )
+    fireEvent.click(screen.getByText('Create remote'))
+    fireEvent.change(screen.getByLabelText('Owner'), {
+      target: { value: 'org:material-org' },
+    })
+    fireEvent.change(screen.getByLabelText('Repository name'), {
+      target: { value: 'new-component' },
+    })
+    fireEvent.change(screen.getByLabelText('Description (optional)'), {
+      target: { value: 'Shared material component' },
+    })
+
+    await waitFor(() =>
+      assert.equal(
+        (screen.getByLabelText('Path inside repository') as HTMLInputElement)
+          .value,
+        'vendor/new-component'
+      )
+    )
+    assert.equal(
+      (
+        screen.getByLabelText(
+          'Keep this repository private'
+        ) as HTMLInputElement
+      ).checked,
+      true
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create and add submodule' })
+    )
+
+    await screen.findByText('Submodule added')
+    assert.deepEqual(sequence, ['create', 'add'])
+    assert.equal(createCalls.length, 1)
+    assert.equal(createCalls[0].account, account)
+    assert.equal(createCalls[0].org, organization)
+    assert.equal(createCalls[0].name, 'new-component')
+    assert.equal(createCalls[0].description, 'Shared material component')
+    assert.equal(createCalls[0].private_, true)
+    assert.equal(addCalls.length, 1)
+    assert.equal(addCalls[0].url, createdRemote.clone_url)
+    assert.equal(addCalls[0].path, 'vendor/new-component')
+    assert.equal(addCalls[0].branch, null)
+    assert.equal(addCalls[0].options?.accountKey, getAccountKey(account))
+  })
+
+  it('does not run Git or report success when remote creation fails', async () => {
+    const account = dotComAccount()
+    let addCalls = 0
+    const dispatcher = {
+      createRemoteRepositoryForSubmodule: async () => {
+        throw new Error('name already exists')
+      },
+      addSubmodule: async () => {
+        addCalls++
+      },
+    } as unknown as Dispatcher
+
+    renderDialog(
+      dispatcher,
+      [account],
+      new Map([[account, accountRepositories([])]])
+    )
+    fireEvent.click(screen.getByText('Create remote'))
+    fireEvent.change(screen.getByLabelText('Repository name'), {
+      target: { value: 'new-component' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create and add submodule' })
+    )
+
+    assert.ok(
+      await screen.findByText(
+        /could not create the remote repository: name already exists/i
+      )
+    )
+    assert.equal(addCalls, 0)
+    assert.equal(screen.queryByText('Submodule added'), null)
+  })
+
+  it('aborts pending remote creation and never proceeds to Git', async () => {
+    const account = dotComAccount()
+    let creationSignal: AbortSignal | undefined
+    let addCalls = 0
+    const dispatcher = {
+      createRemoteRepositoryForSubmodule: async (
+        _account: Account,
+        _org: IAPIOrganization | null,
+        _name: string,
+        _description: string,
+        _private: boolean,
+        signal?: AbortSignal
+      ) => {
+        creationSignal = signal
+        return await new Promise<IAPIFullRepository>((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('transport stopped', 'AbortError')),
+            { once: true }
+          )
+        })
+      },
+      addSubmodule: async () => {
+        addCalls++
+      },
+    } as unknown as Dispatcher
+
+    renderDialog(
+      dispatcher,
+      [account],
+      new Map([[account, accountRepositories([])]])
+    )
+    fireEvent.click(screen.getByText('Create remote'))
+    fireEvent.change(screen.getByLabelText('Repository name'), {
+      target: { value: 'new-component' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create and add submodule' })
+    )
+
+    const cancel = await screen.findByRole('button', {
+      name: 'Cancel operation',
+    })
+    assert.equal(creationSignal?.aborted, false)
+    fireEvent.click(cancel)
+
+    await waitFor(() => assert.equal(creationSignal?.aborted, true))
+    assert.ok(
+      await screen.findByText(
+        /remote host may still have created the repository/i
+      )
+    )
+    assert.equal(addCalls, 0)
+    assert.equal(screen.queryByText('Submodule added'), null)
+  })
+
+  it('fails closed when the selected organization disappears before submit', async () => {
+    const account = dotComAccount()
+    let createCalls = 0
+    const dispatcher = {
+      createRemoteRepositoryForSubmodule: async () => {
+        createCalls++
+        return createdRemote
+      },
+    } as unknown as Dispatcher
+    const props = {
+      repository,
+      dispatcher,
+      accounts: [account],
+      apiRepositories: new Map([
+        [account, accountRepositories([], [organization])],
+      ]),
+      onRefreshRepositories: () => undefined,
+      onAdded: () => undefined,
+      onDismissed: () => undefined,
+    }
+    const view = render(<AddSubmoduleDialog {...props} />)
+    fireEvent.click(screen.getByText('Create remote'))
+    fireEvent.change(screen.getByLabelText('Owner'), {
+      target: { value: 'org:material-org' },
+    })
+    fireEvent.change(screen.getByLabelText('Repository name'), {
+      target: { value: 'new-component' },
+    })
+
+    view.rerender(
+      <AddSubmoduleDialog
+        {...props}
+        apiRepositories={new Map([[account, accountRepositories([])]])}
+      />
+    )
+
+    assert.ok(screen.getByText(/selected organization is no longer available/i))
+    const submit = screen.getByRole('button', {
+      name: 'Create and add submodule',
+    })
+    assert.equal(submit.getAttribute('aria-disabled'), 'true')
+    fireEvent.click(submit)
+    assert.equal(createCalls, 0)
+  })
+
+  it('fails closed when the selected remote account disappears before submit', async () => {
+    const accountA = dotComAccount()
+    const accountB = new Account(
+      'backup-tester',
+      'https://api.github.com',
+      'backup-token',
+      [],
+      'Backup Tester',
+      8,
+      'Backup Tester',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'github'
+    )
+    const createAccounts = new Array<Account>()
+    let addCalls = 0
+    const dispatcher = {
+      createRemoteRepositoryForSubmodule: async (account: Account) => {
+        createAccounts.push(account)
+        return createdRemote
+      },
+      addSubmodule: async () => {
+        addCalls++
+      },
+    } as unknown as Dispatcher
+    const props = {
+      repository,
+      dispatcher,
+      accounts: [accountB, accountA],
+      apiRepositories: new Map([
+        [accountA, accountRepositories([])],
+        [accountB, accountRepositories([])],
+      ]),
+      onRefreshRepositories: () => undefined,
+      onAdded: () => undefined,
+      onDismissed: () => undefined,
+    }
+    const view = render(<AddSubmoduleDialog {...props} />)
+    fireEvent.click(screen.getByText('Create remote'))
+    fireEvent.click(screen.getByLabelText('Account'))
+    const accountFilter = screen.getByLabelText('Filter Accounts')
+    fireEvent.change(accountFilter, { target: { value: 'material-tester' } })
+    fireEvent.keyDown(accountFilter, { key: 'Enter', code: 'Enter' })
+    assert.match(
+      screen.getByLabelText('Account').textContent ?? '',
+      /@material-tester/
+    )
+    fireEvent.change(screen.getByLabelText('Repository name'), {
+      target: { value: 'new-component' },
+    })
+
+    view.rerender(
+      <AddSubmoduleDialog
+        {...props}
+        accounts={[accountB]}
+        apiRepositories={new Map([[accountB, accountRepositories([])]])}
+      />
+    )
+
+    const submit = screen.getByRole('button', {
+      name: 'Create and add submodule',
+    })
+    assert.equal(submit.getAttribute('aria-disabled'), 'true')
+    fireEvent.click(submit)
+    assert.deepEqual(createAccounts, [])
+    assert.equal(addCalls, 0)
+  })
+
+  it('retries an already-created remote without creating a duplicate', async () => {
+    const account = dotComAccount()
+    let createCalls = 0
+    let addCalls = 0
+    const dispatcher = {
+      createRemoteRepositoryForSubmodule: async () => {
+        createCalls++
+        return createdRemote
+      },
+      addSubmodule: async () => {
+        addCalls++
+        if (addCalls === 1) {
+          throw new Error('checkout path is temporarily locked')
+        }
+      },
+    } as unknown as Dispatcher
+
+    renderDialog(
+      dispatcher,
+      [account],
+      new Map([[account, accountRepositories([])]])
+    )
+    fireEvent.click(screen.getByText('Create remote'))
+    fireEvent.change(screen.getByLabelText('Repository name'), {
+      target: { value: 'new-component' },
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create and add submodule' })
+    )
+
+    assert.ok(
+      await screen.findByText(
+        /remote repository was created at .*new-component/i
+      )
+    )
+    assert.ok(screen.getByText('Remote repository created'))
+    assert.equal(createCalls, 1)
+    assert.equal(addCalls, 1)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create and add submodule' })
+    )
+    await screen.findByText('Submodule added')
+    assert.equal(createCalls, 1)
+    assert.equal(addCalls, 2)
   })
 })

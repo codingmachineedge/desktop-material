@@ -1069,6 +1069,7 @@ export class NotificationCentrePanel extends React.Component<
           <label className="notification-centre-search">
             <span>Search</span>
             <input
+              data-search-surface-id="notifications"
               type="search"
               value={this.state.query}
               disabled={this.state.bulkBusy}
@@ -1078,6 +1079,7 @@ export class NotificationCentrePanel extends React.Component<
             />
           </label>
           <FilterModeControl
+            searchSurfaceId="notifications"
             mode={this.state.queryMode}
             caseSensitive={this.state.queryCaseSensitive}
             onModeChange={this.onQueryModeChange}

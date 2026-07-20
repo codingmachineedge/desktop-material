@@ -12,6 +12,9 @@ import { clampDialogOffset } from '../../dialog/dialog-geometry'
 const MaxSampleItems = 50
 
 interface IRegexBuilderProps {
+  /** Stable audit identity of the search surface that opened this builder. */
+  readonly searchSurfaceId?: string
+
   /**
    * A human readable label for the search surface this builder applies to
    * (e.g. "Changes", "Branches"). Used in the subtitle and Apply button.
@@ -399,7 +402,10 @@ export class RegexBuilder extends React.Component<
     const transform = `translate(${this.state.dragOffset.x}px, ${this.state.dragOffset.y}px)`
 
     return (
-      <div className="regex-builder-overlay">
+      <div
+        className="regex-builder-overlay"
+        data-search-surface-id={this.props.searchSurfaceId}
+      >
         <div
           className="regex-builder-dialog"
           style={{ transform }}

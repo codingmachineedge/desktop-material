@@ -67,32 +67,26 @@ export function isElementAppearanceDocument(
 }
 
 /** Stable profile-level owners. Every value is stored in its own Git repo. */
-export const ProfileAppearanceElementId = {
-  AppWorkspace: 'app-workspace',
-  UpdateProgress: 'update-progress',
-  Toolbar: 'toolbar',
-  RepositoryList: 'repository-list',
-  RepositoryTabs: 'repository-tabs',
-  CodeDiff: 'code-diff',
-  SubmoduleBackButton: 'submodule-back-button',
-  AppIdentity: 'app-identity',
-  DefaultRepositoryLogo: 'default-repository-logo',
-} as const
-
-export type ProfileAppearanceElementId =
-  typeof ProfileAppearanceElementId[keyof typeof ProfileAppearanceElementId]
+export enum ProfileAppearanceElementId {
+  AppWorkspace = 'app-workspace',
+  UpdateProgress = 'update-progress',
+  Toolbar = 'toolbar',
+  RepositoryList = 'repository-list',
+  RepositoryTabs = 'repository-tabs',
+  CodeDiff = 'code-diff',
+  SubmoduleBackButton = 'submodule-back-button',
+  AppIdentity = 'app-identity',
+  DefaultRepositoryLogo = 'default-repository-logo',
+}
 
 /** Stable repository-level owners. Instances are keyed by appearance UUID. */
-export const RepositoryAppearanceElementId = {
-  Workspace: 'workspace',
-  Toolbar: 'toolbar',
-  Tabs: 'tabs',
-  ListName: 'list-name',
-  Logo: 'logo',
-} as const
-
-export type RepositoryAppearanceElementId =
-  typeof RepositoryAppearanceElementId[keyof typeof RepositoryAppearanceElementId]
+export enum RepositoryAppearanceElementId {
+  Workspace = 'workspace',
+  Toolbar = 'toolbar',
+  Tabs = 'tabs',
+  ListName = 'list-name',
+  Logo = 'logo',
+}
 
 export interface IAppWorkspaceAppearance {
   readonly accentPalette: AccentPalette

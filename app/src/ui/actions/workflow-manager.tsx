@@ -182,6 +182,7 @@ export class WorkflowManager extends React.PureComponent<
             >
               <Octicon symbol={octicons.search} />
               <input
+                data-search-surface-id="actions-workflows"
                 value={this.state.filterText}
                 onChange={this.onFilterChanged}
                 placeholder="Filter workflows by name or file…"
@@ -189,6 +190,7 @@ export class WorkflowManager extends React.PureComponent<
                 aria-label="Filter workflows"
               />
               <FilterModeControl
+                searchSurfaceId="actions-workflows"
                 mode={this.state.filterMode}
                 caseSensitive={this.state.filterCaseSensitive}
                 onModeChange={this.onFilterModeChanged}

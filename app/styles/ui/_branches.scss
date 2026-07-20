@@ -116,6 +116,25 @@
   gap: 8px;
 }
 
+.fork-branch-checkout-filter-field {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+
+  > input {
+    flex: 1 1 auto;
+  }
+
+  .filter-mode-control {
+    flex: 0 1 auto;
+  }
+
+  .filter-regex-builder-label {
+    display: none;
+  }
+}
+
 .fork-branch-checkout-local > .button-component,
 .fork-branch-checkout-review > .button-component,
 .fork-branch-checkout-error > .button-component {

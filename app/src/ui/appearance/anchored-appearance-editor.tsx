@@ -60,6 +60,41 @@ export interface IAppearanceElementHistoryDialogProps {
   readonly onMutation?: () => Promise<void> | void
 }
 
+const AppearanceRepositoryRootSegment = 'appearance-elements'
+
+/**
+ * Produce the only repository path that is safe to render in screenshots.
+ *
+ * Appearance repositories live below a private user-data root. The useful
+ * part is their logical owner path below `appearance-elements`; drive letters,
+ * user names, AppData, and temporary run roots are implementation details. For
+ * an unexpected layout, expose only a sanitized leaf instead of guessing how
+ * much of an absolute path is private.
+ */
+export function getAppearanceRepositoryDisplayPath(
+  repositoryPath: string
+): string {
+  const segments = repositoryPath
+    .replaceAll('/', '\\')
+    .split('\\')
+    .map(segment => segment.trim())
+    .filter(segment => segment.length > 0)
+  const rootIndex = segments.findIndex(
+    segment => segment.toLowerCase() === AppearanceRepositoryRootSegment
+  )
+  const candidate =
+    rootIndex === -1
+      ? segments.slice(-1)
+      : segments.slice(rootIndex, rootIndex + 5)
+  const safe = candidate.filter(
+    segment =>
+      !/^[a-z]:$/i.test(segment) &&
+      !/(?:^users?$|^appdata$|^documents?$|temp|^tmp$)/i.test(segment)
+  )
+
+  return `…\\${safe.length === 0 ? 'element-settings' : safe.join('\\')}`
+}
+
 /**
  * Whether a keyboard event is the platform-neutral command for an element's
  * context menu. Callers can use this for any focusable customization surface.
@@ -102,15 +137,15 @@ export function openAppearanceEditorFromKeyDown<T extends HTMLElement>(
 export function AppearanceElementHistoryDialog(
   props: IAppearanceElementHistoryDialogProps
 ): JSX.Element {
+  const displayPath = getAppearanceRepositoryDisplayPath(props.repositoryPath)
+
   return (
     <DialogStackContext.Provider value={{ isTopMost: true }}>
       <VersionedStoreHistory
         className="appearance-element-history-dialog"
         title={`${props.title} history`}
         timelineLabel="Element-local Git history"
-        description={`Every ${props.title.toLocaleLowerCase()} change is committed in its own local Git repository at ${
-          props.repositoryPath
-        }. Undo, redo, and restore always create another commit.`}
+        description={`Every ${props.title.toLocaleLowerCase()} change is committed in its own local Git repository at ${displayPath}. Undo, redo, and restore always create another commit.`}
         source={props.source}
         onStoreMutated={props.onMutation}
         onDismissed={props.onDismissed}
@@ -321,6 +356,10 @@ export class AnchoredAppearanceEditor extends React.Component<
   }
 
   private renderRepositoryFooter(): JSX.Element {
+    const displayPath = getAppearanceRepositoryDisplayPath(
+      this.props.repositoryPath
+    )
+
     return (
       <footer
         className="anchored-appearance-editor-repository"
@@ -329,8 +368,8 @@ export class AnchoredAppearanceEditor extends React.Component<
         <Octicon symbol={octicons.repo} />
         <span>
           <strong>Local Git repository</strong>
-          <code title={this.props.repositoryPath}>
-            {this.props.repositoryPath}
+          <code title="Private root hidden; copy the exact path">
+            {displayPath}
           </code>
         </span>
         <Button

@@ -860,6 +860,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
         <div className="cheap-lfs-search">
           <Octicon symbol={octicons.search} />
           <input
+            data-search-surface-id="cheap-lfs"
             type="search"
             className="cheap-lfs-search-input"
             placeholder="Search pinned files"
@@ -868,6 +869,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
             onChange={this.onFilterChanged}
           />
           <FilterModeControl
+            searchSurfaceId="cheap-lfs"
             mode={this.state.filterMode}
             caseSensitive={this.state.caseSensitive}
             onModeChange={this.onFilterModeChanged}

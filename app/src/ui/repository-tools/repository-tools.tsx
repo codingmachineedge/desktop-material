@@ -2206,6 +2206,7 @@ export class RepositoryTools extends React.Component<
         <div className="repository-tools-search">
           <Octicon symbol={octicons.search} />
           <input
+            data-search-surface-id="repository-tools"
             type="search"
             className="repository-tools-search-input"
             placeholder="Search tools"
@@ -2215,6 +2216,7 @@ export class RepositoryTools extends React.Component<
             ref={this.setHubSearchInput}
           />
           <FilterModeControl
+            searchSurfaceId="repository-tools"
             mode={this.state.toolFilterMode}
             caseSensitive={this.state.toolFilterCaseSensitive}
             onModeChange={this.onHubFilterModeChanged}

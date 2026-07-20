@@ -7,6 +7,9 @@ import * as octicons from '../octicons/octicons.generated'
 import { AriaLiveContainer } from '../accessibility/aria-live-container'
 
 export interface ITextBoxProps {
+  /** Stable audit identity when this text box is a collection search input. */
+  readonly searchSurfaceId?: string
+
   /** The label for the input field. */
   readonly label?: string | JSX.Element
 
@@ -310,6 +313,7 @@ export class TextBox extends React.Component<ITextBoxProps, ITextBoxState> {
           <Octicon className="prefixed-icon" symbol={prefixedIcon} />
         )}
         <input
+          data-search-surface-id={this.props.searchSurfaceId}
           id={inputId}
           ref={this.onInputRef}
           onFocus={this.onFocus}

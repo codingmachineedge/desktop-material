@@ -18,32 +18,52 @@ const {
   validateCapturePath,
   waitFor,
 } = require('./verify_actions_pagination_cdp.js')
+const fs = require('fs')
+const path = require('path')
 
-const milestoneImageDimensions = Object.freeze({
-  'material-actions-jobs-pagination.png': Object.freeze({
-    width: 960,
-    height: 660,
-  }),
-  'material-actions-pending-deployments.png': Object.freeze({
-    width: 944,
-    height: 808,
-  }),
-  'material-repository-tools.png': Object.freeze({
-    width: 1440,
-    height: 960,
-  }),
+const galleryManifest = fs.readFileSync(
+  path.resolve(__dirname, '../../docs/wiki/Feature-Gallery.md'),
+  'utf8'
+)
+const acceptedImageNames = Object.freeze(
+  [...galleryManifest.matchAll(/^\| `([^`]+\.png)` \| ([^|]+?) \|$/gm)].map(
+    ([, file]) => file
+  )
+)
+if (
+  acceptedImageNames.length !== 68 ||
+  new Set(acceptedImageNames).size !== acceptedImageNames.length
+) {
+  fail('The guided gallery manifest must contain exactly 68 unique PNGs.')
+}
+
+const responsiveImageDimensions = Object.freeze({
   'material-repository-tools-scroll.png': Object.freeze({
     width: 960,
     height: 420,
   }),
-  'material-effective-branch-rules.png': Object.freeze({
-    width: 1440,
-    height: 960,
+  'material-responsive-overflow-fixed.png': Object.freeze({
+    width: 640,
+    height: 480,
   }),
-  'add-submodule-dialog.png': Object.freeze({ width: 1440, height: 960 }),
-  'material-customization.png': Object.freeze({ width: 1440, height: 960 }),
-  'material-submodule-context.png': Object.freeze({ width: 1440, height: 960 }),
+  'material-toolbar-overflow.png': Object.freeze({
+    width: 720,
+    height: 687,
+  }),
+  'material-scale-200-autofit.png': Object.freeze({
+    width: 640,
+    height: 480,
+  }),
 })
+const acceptedImageDimensions = Object.freeze(
+  Object.fromEntries(
+    acceptedImageNames.map(file => [
+      file,
+      responsiveImageDimensions[file] ??
+        Object.freeze({ width: 1440, height: 960 }),
+    ])
+  )
+)
 
 function parseArguments(argv) {
   const values = new Map()
@@ -114,13 +134,17 @@ const geometryExpression = `(() => {
       }
     })
     .filter(rect => rect.left < -1 || rect.right > clientWidth + 1)
-  const images = [...document.images].map(image => ({
+  const describeImage = image => ({
     src: image.getAttribute('src'),
+    file: new URL(image.src).pathname.split('/').pop(),
     complete: image.complete,
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
-  }))
+  })
+  const images = [...document.images].map(describeImage)
   const galleryFigures = [...document.querySelectorAll('figure.shot')]
+  const galleryImages = [...document.querySelectorAll('figure.shot img')]
+    .map(describeImage)
   const invalidGalleryCards = galleryFigures
     .map((figure, index) => ({
       index,
@@ -136,15 +160,14 @@ const geometryExpression = `(() => {
     bodyScrollWidth: document.body.scrollWidth,
     imageCount: images.length,
     figureCount: galleryFigures.length,
-    galleryImageCount: document.querySelectorAll('figure.shot img').length,
+    galleryImageCount: galleryImages.length,
+    galleryAssetNames: galleryImages.map(image => image.file),
     invalidGalleryCards,
     brokenImages: images.filter(image =>
       !image.complete || image.naturalWidth === 0 || image.naturalHeight === 0
     ),
-    milestoneImages: images.filter(image =>
-      ${JSON.stringify(Object.keys(milestoneImageDimensions))}.some(file =>
-        image.src?.includes(file)
-      )
+    acceptedImages: galleryImages.filter(image =>
+      ${JSON.stringify(acceptedImageNames)}.includes(image.file)
     ),
     overflow,
     outsideControls,
@@ -152,10 +175,10 @@ const geometryExpression = `(() => {
 })()`
 
 function assertReceipt(receipt, label) {
-  const exactMilestoneImages = Object.entries(milestoneImageDimensions).every(
+  const exactAcceptedImages = Object.entries(acceptedImageDimensions).every(
     ([file, dimensions]) => {
-      const matches = receipt.milestoneImages.filter(image =>
-        image.src?.includes(file)
+      const matches = receipt.acceptedImages.filter(
+        image => image.file === file
       )
       return (
         matches.length === 1 &&
@@ -175,11 +198,13 @@ function assertReceipt(receipt, label) {
   // The gallery grows over time, so verify its structure instead of a fixed size.
   if (
     receipt.imageCount < 1 ||
-    receipt.figureCount < 1 ||
+    receipt.figureCount !== acceptedImageNames.length ||
     receipt.galleryImageCount !== receipt.figureCount ||
+    JSON.stringify([...receipt.galleryAssetNames].sort()) !==
+      JSON.stringify([...acceptedImageNames].sort()) ||
     receipt.invalidGalleryCards.length > 0 ||
     receipt.brokenImages.length > 0 ||
-    !exactMilestoneImages ||
+    !exactAcceptedImages ||
     receipt.overflow.length > 0 ||
     receipt.outsideControls.length > 0
   ) {
@@ -297,8 +322,10 @@ if (require.main === module) {
 }
 
 module.exports = {
+  acceptedImageDimensions,
+  acceptedImageNames,
   assertReceipt,
   geometryExpression,
-  milestoneImageDimensions,
   parseArguments,
+  responsiveImageDimensions,
 }

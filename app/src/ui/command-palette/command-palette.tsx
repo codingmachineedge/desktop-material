@@ -167,6 +167,7 @@ export class CommandPalette extends React.Component<
           <div className="command-palette-search">
             <Octicon symbol={octicons.search} />
             <input
+              data-search-surface-id="command-palette"
               ref={this.inputRef}
               type="text"
               value={this.state.query}
@@ -178,6 +179,7 @@ export class CommandPalette extends React.Component<
             />
             <div className="command-palette-filter-modes">
               <FilterModeControl
+                searchSurfaceId="command-palette"
                 mode={this.state.filterMode}
                 caseSensitive={this.state.filterCaseSensitive}
                 onModeChange={this.onFilterModeChanged}

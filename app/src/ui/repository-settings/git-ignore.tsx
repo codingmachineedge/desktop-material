@@ -398,6 +398,7 @@ export class GitIgnore extends React.Component<
                   symbol={octicons.search}
                 />
                 <input
+                  data-search-surface-id="git-ignore-templates"
                   type="text"
                   className="gitignore-search-input"
                   placeholder="Search templates"
@@ -407,6 +408,7 @@ export class GitIgnore extends React.Component<
                 />
               </div>
               <FilterModeControl
+                searchSurfaceId="git-ignore-templates"
                 mode={this.state.filterMode}
                 caseSensitive={this.state.filterCaseSensitive}
                 onModeChange={this.onFilterModeChanged}

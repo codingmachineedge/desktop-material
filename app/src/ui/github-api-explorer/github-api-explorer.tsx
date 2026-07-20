@@ -1273,6 +1273,7 @@ export class GitHubAPIExplorer extends React.Component<
             <label>
               Search operations
               <input
+                data-search-surface-id="github-api-rest"
                 type="search"
                 value={this.state.catalogQuery}
                 disabled={this.state.loading}
@@ -1281,6 +1282,7 @@ export class GitHubAPIExplorer extends React.Component<
               />
             </label>
             <FilterModeControl
+              searchSurfaceId="github-api-rest"
               mode={this.state.catalogQueryMode}
               caseSensitive={this.state.catalogQueryCaseSensitive}
               onModeChange={this.onCatalogQueryModeChange}
@@ -1486,6 +1488,7 @@ export class GitHubAPIExplorer extends React.Component<
             <label>
               Search GraphQL roots
               <input
+                data-search-surface-id="github-api-graphql"
                 type="search"
                 value={this.state.graphQLCatalogQuery}
                 disabled={this.state.loading}
@@ -1494,6 +1497,7 @@ export class GitHubAPIExplorer extends React.Component<
               />
             </label>
             <FilterModeControl
+              searchSurfaceId="github-api-graphql"
               mode={this.state.graphQLCatalogQueryMode}
               caseSensitive={this.state.graphQLCatalogQueryCaseSensitive}
               onModeChange={this.onGraphQLCatalogQueryModeChange}

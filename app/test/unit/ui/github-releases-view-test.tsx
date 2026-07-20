@@ -534,6 +534,79 @@ describe('GitHub Releases view', () => {
     await waitFor(() => assert.equal(deletes, 1))
   })
 
+  it('reviews exact bulk selections before publishing drafts or deleting releases', async () => {
+    const stable = {
+      ...draft,
+      id: 8,
+      tagName: 'v0.9.0',
+      name: 'Stable Material',
+      draft: false,
+    }
+    const published = new Array<number>()
+    const deleted = new Array<number>()
+    const store = fakeStore({
+      list: async () => ({
+        releases: [draft, stable],
+        page: 1,
+        nextPage: null,
+        capped: false,
+      }),
+      publish: async (
+        _repository: Repository,
+        review: IGitHubReleaseMutationReview
+      ) => {
+        published.push(review.releaseId)
+        return { ...draft, draft: false }
+      },
+      delete: async (
+        _repository: Repository,
+        review: IGitHubReleaseMutationReview
+      ) => {
+        deleted.push(review.releaseId)
+      },
+    })
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByLabelText('Select all visible releases'))
+    )
+    fireEvent.click(screen.getByLabelText('Select all visible releases'))
+    fireEvent.click(screen.getByRole('button', { name: 'Publish drafts (1)' }))
+    assert.deepEqual(published, [])
+    const publishDialog = screen.getByRole('alertdialog', {
+      name: 'Publish 1 selected release?',
+    })
+    assert.ok(within(publishDialog).getByText('v1.0.0'))
+    assert.equal(within(publishDialog).queryByText('v0.9.0'), null)
+    fireEvent.click(
+      within(publishDialog).getByRole('button', {
+        name: 'Publish reviewed drafts',
+      })
+    )
+    await waitFor(() => assert.deepEqual(published, [draft.id]))
+
+    fireEvent.click(screen.getByLabelText('Select all visible releases'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected (2)' }))
+    assert.deepEqual(deleted, [])
+    const deleteDialog = screen.getByRole('alertdialog', {
+      name: 'Delete 2 selected releases?',
+    })
+    assert.ok(within(deleteDialog).getByText('v1.0.0'))
+    assert.ok(within(deleteDialog).getByText('v0.9.0'))
+    fireEvent.click(
+      within(deleteDialog).getByRole('button', {
+        name: 'Delete reviewed releases',
+      })
+    )
+    await waitFor(() => assert.deepEqual(deleted, [draft.id, stable.id]))
+  })
+
   it('deletes an individual asset only after its destructive review', async () => {
     const deletedAssetIds = new Array<number>()
     const store = fakeStore({

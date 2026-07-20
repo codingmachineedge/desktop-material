@@ -141,6 +141,11 @@ import type {
   IRepositoryAppearanceElementSettings,
 } from '../../models/element-appearance'
 import { CloneRepositoryTab } from '../../models/clone-repository-tab'
+import {
+  getSubmoduleRemoteDescriptionError,
+  getSubmoduleRemoteNameError,
+  getSubmoduleSourceError,
+} from '../../models/submodule-add'
 import type { CloneOptions } from '../../models/clone-options'
 import { BatchCloneMode, IBatchCloneItem } from '../../models/batch-clone'
 import { CloningRepository } from '../../models/cloning-repository'
@@ -813,9 +818,14 @@ export class Dispatcher {
   /** Remove one verified stale `.git/index.lock` and refresh its repository. */
   public removeRepositoryLock(
     repositoryId: number,
-    noticeId: string
+    noticeId: string,
+    confirmed: boolean = false
   ): Promise<void> {
-    return this.appStore._removeRepositoryLock(repositoryId, noticeId)
+    return this.appStore._removeRepositoryLock(
+      repositoryId,
+      noticeId,
+      confirmed
+    )
   }
 
   /** Load a newest-first page of notification-history commits. */
@@ -1878,6 +1888,60 @@ export class Dispatcher {
       account,
       org
     )
+  }
+
+  /**
+   * Create an initialized GitHub repository which can immediately be pinned as
+   * a submodule. Unlike publishing, this does not mutate or push the currently
+   * open repository; the caller adds the returned clone URL explicitly.
+   */
+  public async createRemoteRepositoryForSubmodule(
+    account: Account,
+    org: IAPIOrganization | null,
+    name: string,
+    description: string,
+    private_: boolean,
+    signal?: AbortSignal
+  ): Promise<IAPIFullRepository> {
+    if (account.provider !== 'github' || account.token.length === 0) {
+      throw new Error(
+        'Choose an authenticated GitHub account before creating the remote repository.'
+      )
+    }
+
+    const nameError = getSubmoduleRemoteNameError(name)
+    if (nameError !== null) {
+      throw new Error(nameError)
+    }
+    const normalizedName = name.trim()
+
+    const descriptionError = getSubmoduleRemoteDescriptionError(description)
+    if (descriptionError !== null) {
+      throw new Error(descriptionError)
+    }
+
+    if (
+      org !== null &&
+      (org.login.trim().length === 0 || /[\0\r\n/\\]/.test(org.login))
+    ) {
+      throw new Error('Choose a valid remote repository owner.')
+    }
+
+    const created = await API.fromAccount(account).createRepository(
+      org,
+      normalizedName,
+      description.trim(),
+      private_,
+      true,
+      signal
+    )
+    const sourceError = getSubmoduleSourceError(created.clone_url)
+    if (sourceError !== null) {
+      throw new Error(
+        `The remote host created the repository but returned an unusable clone URL: ${sourceError}`
+      )
+    }
+    return created
   }
 
   /**

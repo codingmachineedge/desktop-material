@@ -560,6 +560,7 @@ export class RepositoryProviderTriage extends React.Component<
               <label>
                 <span>Search work items</span>
                 <input
+                  data-search-surface-id="provider-triage"
                   type="search"
                   value={filters.query}
                   onChange={this.onQueryChange}
@@ -568,6 +569,7 @@ export class RepositoryProviderTriage extends React.Component<
                 />
               </label>
               <FilterModeControl
+                searchSurfaceId="provider-triage"
                 mode={this.state.filterMode}
                 caseSensitive={this.state.filterCaseSensitive}
                 onModeChange={this.onFilterModeChange}

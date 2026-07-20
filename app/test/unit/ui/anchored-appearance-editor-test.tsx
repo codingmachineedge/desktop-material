@@ -4,6 +4,7 @@ import * as React from 'react'
 
 import {
   AnchoredAppearanceEditor,
+  getAppearanceRepositoryDisplayPath,
   openAppearanceEditorFromContextMenu,
   openAppearanceEditorFromKeyDown,
 } from '../../../src/ui/appearance'
@@ -15,7 +16,9 @@ import { captureClipboardWrites } from '../../helpers/ui/electron'
 import { fireEvent, render, screen, waitFor } from '../../helpers/ui/render'
 
 const RepositoryPath =
-  'C:\\Users\\example\\appearance-elements\\toolbar\\setting'
+  'C:\\Users\\example\\AppData\\Local\\Temp\\appearance-elements\\profile\\toolbar\\setting'
+const DisplayRepositoryPath =
+  '…\\appearance-elements\\profile\\toolbar\\setting'
 
 function historyEntry(): IVersionHistoryEntry {
   return {
@@ -120,9 +123,11 @@ describe('anchored appearance editor', () => {
       assert.ok(screen.getByRole('tab', { name: 'Customize' }))
       assert.ok(screen.getByRole('tab', { name: 'History' }))
       assert.equal(
-        screen.getByTitle(RepositoryPath).textContent,
-        RepositoryPath
+        screen.getByTitle('Private root hidden; copy the exact path')
+          .textContent,
+        DisplayRepositoryPath
       )
+      assert.doesNotMatch(document.body.textContent ?? '', /C:\\Users|Temp/i)
 
       fireEvent.click(
         screen.getByRole('button', {
@@ -141,6 +146,32 @@ describe('anchored appearance editor', () => {
       })
     } finally {
       clipboard.restore()
+    }
+  })
+
+  it('collapses known owners and fails private unknown layouts closed', () => {
+    assert.equal(
+      getAppearanceRepositoryDisplayPath(RepositoryPath),
+      DisplayRepositoryPath
+    )
+    assert.equal(
+      getAppearanceRepositoryDisplayPath(
+        'C:\\Users\\private-name\\AppData\\Local\\Temp\\temporary-owner'
+      ),
+      '…\\element-settings'
+    )
+    assert.equal(
+      getAppearanceRepositoryDisplayPath('D:/safe/custom-owner'),
+      '…\\custom-owner'
+    )
+
+    for (const displayed of [
+      getAppearanceRepositoryDisplayPath(RepositoryPath),
+      getAppearanceRepositoryDisplayPath(
+        'C:\\Users\\private-name\\AppData\\Local\\Temp\\temporary-owner'
+      ),
+    ]) {
+      assert.doesNotMatch(displayed, /C:\\Users|Temp/i)
     }
   })
 
@@ -182,6 +213,8 @@ describe('anchored appearance editor', () => {
     })
     assert.ok(history)
     assert.ok(screen.getByText(/own local Git repository/))
+    assert.ok(screen.getByText(text => text.includes(DisplayRepositoryPath)))
+    assert.doesNotMatch(history.textContent ?? '', /C:\\Users|Temp/i)
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     await waitFor(() => {

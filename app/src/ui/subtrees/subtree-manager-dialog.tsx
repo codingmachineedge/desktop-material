@@ -567,6 +567,7 @@ export class SubtreeManager extends React.Component<
       <div className="subtrees-filter-row">
         <div className="subtrees-filter-search">
           <TextBox
+            searchSurfaceId="subtrees"
             className="subtrees-filter-text"
             placeholder="Search subtrees by prefix"
             ariaLabel="Search subtrees"
@@ -574,6 +575,7 @@ export class SubtreeManager extends React.Component<
             onValueChanged={this.onFilterTextChanged}
           />
           <FilterModeControl
+            searchSurfaceId="subtrees"
             mode={this.state.filterMode}
             caseSensitive={this.state.filterCaseSensitive}
             onModeChange={this.onFilterModeChanged}

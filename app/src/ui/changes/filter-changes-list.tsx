@@ -1513,6 +1513,7 @@ export class FilterChangesList extends React.Component<
     return (
       <div className="filter-box-container">
         <TextBox
+          searchSurfaceId="changes"
           ref={this.onTextBoxRef}
           displayClearButton={true}
           placeholder={'Filter'}
@@ -1522,6 +1523,7 @@ export class FilterChangesList extends React.Component<
           value={this.props.fileListFilter.filterText}
         />
         <FilterModeControl
+          searchSurfaceId="changes"
           mode={this.state.filterMode}
           caseSensitive={this.state.caseSensitive}
           onModeChange={this.onFilterModeChange}
@@ -1568,6 +1570,7 @@ export class FilterChangesList extends React.Component<
 
     return (
       <RegexBuilder
+        searchSurfaceId="changes"
         targetLabel="Changes"
         initialPattern={this.props.fileListFilter.filterText}
         sampleItems={this.getFilterSampleItems()}

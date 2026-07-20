@@ -31,6 +31,8 @@ dialog.clone-repository.add-submodule-dialog {
 
   .add-submodule-hosted-content,
   .add-submodule-url-content,
+  .add-submodule-create-remote-content,
+  .add-submodule-created-remote,
   .add-submodule-sign-in,
   .add-submodule-review {
     flex: none;
@@ -79,6 +81,72 @@ dialog.clone-repository.add-submodule-dialog {
     margin: var(--spacing) 0 0;
     color: var(--md-sys-color-on-surface-variant);
     font-size: var(--font-size-sm);
+  }
+
+  .add-submodule-create-remote-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing);
+    padding: var(--spacing-double) 20px;
+
+    > .row-component {
+      margin: 0;
+    }
+  }
+
+  .add-submodule-create-remote-fields,
+  .add-submodule-create-remote-help {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+  }
+
+  .add-submodule-create-remote-help small {
+    color: var(--md-sys-color-on-surface-variant);
+    overflow-wrap: anywhere;
+  }
+
+  .add-submodule-create-owner-error {
+    color: var(--md-sys-color-error);
+    font-size: var(--font-size-sm);
+  }
+
+  .add-submodule-create-private {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-half);
+    align-self: end;
+    min-height: 32px;
+  }
+
+  .add-submodule-created-remote {
+    display: flex;
+    min-height: 180px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing);
+
+    > .octicon {
+      color: var(--dm-green);
+    }
+
+    > div {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: var(--spacing-half);
+    }
+
+    span {
+      font-family: var(--font-family-monospace);
+      overflow-wrap: anywhere;
+    }
+
+    p {
+      margin: 0;
+      color: var(--md-sys-color-on-surface-variant);
+    }
   }
 
   .add-submodule-review {
@@ -229,6 +297,11 @@ dialog.clone-repository.add-submodule-dialog {
     .add-submodule-summary dl > div {
       grid-template-columns: minmax(0, 1fr);
       gap: 1px;
+    }
+
+    .add-submodule-create-remote-fields,
+    .add-submodule-create-remote-help {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
