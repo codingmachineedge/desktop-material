@@ -154,6 +154,13 @@ test('app identity capture proves a reload-restored closed workspace', () => {
     'dispatcher.setAppearanceCustomization({',
     'repositoryTabsStore.setTabFavorite(activeTab.id, true)',
     "'live customized app identity and favorite repository tab'",
+    "crypto.randomBytes(12).toString('hex')",
+    "crypto.randomBytes(32).toString('hex')",
+    '`desktop-material:gallery:app-identity:${reloadProofId}`',
+    '`__desktopMaterialGalleryReload_${reloadProofId}`',
+    'sessionStorage.setItem(storageKey, nonce)',
+    'Object.defineProperty(window, sentinelKey, {',
+    'sentinelPresent:',
     "await evaluate('window.location.reload(), true')",
     "resetSceneState('restored app-identity workspace')",
     "'stable restored app-identity workspace'",
@@ -164,10 +171,19 @@ test('app identity capture proves a reload-restored closed workspace', () => {
     "document.querySelector('.app-identity-section') === null",
     "document.querySelector('.anchored-appearance-editor') === null",
     "document.querySelector('#preferences') === null",
-    "restored?.navigationType !== 'reload'",
+    'sessionNonceMatches:',
+    'sessionStorage.getItem(',
+    'globalSentinelAbsent: !Object.prototype.hasOwnProperty.call(',
+    'restored?.sessionNonceMatches !== true',
+    'restored?.globalSentinelAbsent !== true',
+    'restored?.timeOrigin > beforeReloadTimeOrigin',
     "assertNoSceneLeaks('restored app-identity workspace')",
     'APP_IDENTITY_RELOAD',
+    'sessionNonceSurvived:',
+    'navigationType: restored.navigationType',
     'appIdentity: originalIdentity',
+    'sessionStorage.removeItem(',
+    'reloadProofRemoved:',
     'identityRestored:',
     'tabFound:',
     'favoriteRestored:',
@@ -180,13 +196,22 @@ test('app identity capture proves a reload-restored closed workspace', () => {
 
   assert.ok(!identity.includes('contextMenuSelector('))
   assert.ok(!identity.includes('waitForPrivacySafeAnchoredEditor('))
+  assert.ok(!identity.includes("restored?.navigationType !== 'reload'"))
+  const armProof = identity.indexOf('sessionStorage.setItem(storageKey, nonce)')
+  const reload = identity.indexOf(
+    "await evaluate('window.location.reload(), true')"
+  )
   const persistenceGate = identity.indexOf(
     'Restored app identity workspace failed its persistence/geometry gate'
   )
   const capture = identity.indexOf("capture('material-app-identity-workspace')")
   const cleanup = identity.indexOf('appIdentity: originalIdentity')
+  const removeProof = identity.indexOf('sessionStorage.removeItem(', capture)
+  assert.ok(armProof >= 0 && armProof < reload)
+  assert.ok(reload < persistenceGate)
   assert.ok(persistenceGate >= 0 && persistenceGate < capture)
   assert.ok(capture < cleanup)
+  assert.ok(cleanup < removeProof)
 })
 
 test('settings captures select distinct settled Preferences tabs', () => {

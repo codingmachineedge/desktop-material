@@ -2873,7 +2873,42 @@ scene('app-identity', async () => {
     'live customized app identity and favorite repository tab'
   )
 
-  const beforeReloadTimeOrigin = await evaluate('performance.timeOrigin')
+  const reloadProofId = crypto.randomBytes(12).toString('hex')
+  const reloadProof = Object.freeze({
+    storageKey: `desktop-material:gallery:app-identity:${reloadProofId}`,
+    nonce: crypto.randomBytes(32).toString('hex'),
+    sentinelKey: `__desktopMaterialGalleryReload_${reloadProofId}`,
+  })
+  const armedReloadProof = await evaluate(`(() => {
+    const storageKey = ${JSON.stringify(reloadProof.storageKey)}
+    const nonce = ${JSON.stringify(reloadProof.nonce)}
+    const sentinelKey = ${JSON.stringify(reloadProof.sentinelKey)}
+    sessionStorage.setItem(storageKey, nonce)
+    Object.defineProperty(window, sentinelKey, {
+      configurable: true,
+      enumerable: false,
+      value: nonce,
+    })
+    return {
+      nonceStored: sessionStorage.getItem(storageKey) === nonce,
+      sentinelPresent:
+        Object.prototype.hasOwnProperty.call(window, sentinelKey) &&
+        window[sentinelKey] === nonce,
+      timeOrigin: performance.timeOrigin,
+    }
+  })()`)
+  if (
+    armedReloadProof?.nonceStored !== true ||
+    armedReloadProof?.sentinelPresent !== true ||
+    typeof armedReloadProof?.timeOrigin !== 'number'
+  ) {
+    fail(
+      `Unable to arm the app identity renderer-reload proof: ${JSON.stringify(
+        armedReloadProof
+      )}`
+    )
+  }
+  const beforeReloadTimeOrigin = armedReloadProof.timeOrigin
   await evaluate('window.location.reload(), true')
   await sleep(2500)
   await client.send('Runtime.enable')
@@ -2974,6 +3009,14 @@ scene('app-identity', async () => {
         document.querySelector('.app-identity-section') === null &&
         document.querySelector('.anchored-appearance-editor') === null &&
         document.querySelector('#preferences') === null,
+      sessionNonceMatches:
+        sessionStorage.getItem(${JSON.stringify(
+          reloadProof.storageKey
+        )}) === ${JSON.stringify(reloadProof.nonce)},
+      globalSentinelAbsent: !Object.prototype.hasOwnProperty.call(
+        window,
+        ${JSON.stringify(reloadProof.sentinelKey)}
+      ),
       navigationType:
         performance.getEntriesByType('navigation')[0]?.type ?? null,
       timeOrigin: performance.timeOrigin,
@@ -2993,7 +3036,8 @@ scene('app-identity', async () => {
     restored?.favoritePressed !== true ||
     restored?.changesSelected !== true ||
     restored?.editorClosed !== true ||
-    restored?.navigationType !== 'reload' ||
+    restored?.sessionNonceMatches !== true ||
+    restored?.globalSentinelAbsent !== true ||
     !(restored?.timeOrigin > beforeReloadTimeOrigin)
   ) {
     fail(
@@ -3008,6 +3052,8 @@ scene('app-identity', async () => {
       displayName: restored.displayName,
       logo: restored.logo,
       favorite: restored.favoriteRestored,
+      sessionNonceSurvived: restored.sessionNonceMatches,
+      globalSentinelAbsent: restored.globalSentinelAbsent,
       navigationType: restored.navigationType,
       beforeReloadTimeOrigin,
       restoredTimeOrigin: restored.timeOrigin,
@@ -3061,6 +3107,7 @@ scene('app-identity', async () => {
     const restoredTab = repositoryTabsStore.getState().tabs.find(
       tab => tab.id === ${JSON.stringify(original.activeTabId)}
     )
+    sessionStorage.removeItem(${JSON.stringify(reloadProof.storageKey)})
     return {
       appFound: true,
       identityRestored:
@@ -3070,13 +3117,18 @@ scene('app-identity', async () => {
         (restoredTab?.isFavorite === true) === ${JSON.stringify(
           original.originalFavorite
         )},
+      reloadProofRemoved:
+        sessionStorage.getItem(${JSON.stringify(
+          reloadProof.storageKey
+        )}) === null,
     }
   })()`)
   if (
     cleanup?.appFound !== true ||
     cleanup?.identityRestored !== true ||
     cleanup?.tabFound !== true ||
-    cleanup?.favoriteRestored !== true
+    cleanup?.favoriteRestored !== true ||
+    cleanup?.reloadProofRemoved !== true
   ) {
     fail(`App identity scene cleanup failed: ${JSON.stringify(cleanup)}`)
   }
