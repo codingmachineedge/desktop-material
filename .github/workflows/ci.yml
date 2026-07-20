@@ -36,11 +36,6 @@ on:
       AZURE_CODE_SIGNING_CLIENT_ID:
       DESKTOP_OAUTH_CLIENT_ID:
       DESKTOP_OAUTH_CLIENT_SECRET:
-      APPLE_ID:
-      APPLE_ID_PASSWORD:
-      APPLE_TEAM_ID:
-      APPLE_APPLICATION_CERT:
-      APPLE_APPLICATION_CERT_PASSWORD:
 
 env:
   NODE_VERSION: 24.15.0
@@ -81,11 +76,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-2022]
+        os: [windows-2022]
         arch: [x64, arm64]
         include:
-          - os: macos-14
-            friendlyName: macOS
           - os: windows-2022
             friendlyName: Windows
     timeout-minutes: 60
@@ -102,9 +95,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           arch: ${{ matrix.arch }}
-      - name: Validate macOS version
-        if: runner.os == 'macOS'
-        run: yarn validate-macos-version
       - name: Run desktop-trampoline tests
         run: |
           cd vendor/desktop-trampoline
@@ -116,11 +106,6 @@ jobs:
           DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET:
             ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
-          KEY_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
           npm_config_arch: ${{ matrix.arch }}
           TARGET_ARCH: ${{ matrix.arch }}
       - name: Prepare testing environment
@@ -128,13 +113,11 @@ jobs:
         env:
           npm_config_arch: ${{ matrix.arch }}
       - name: Run unit tests
-        if: |
-          (runner.os == 'Windows' && matrix.arch == 'x64') || (runner.os == 'macOS' && matrix.arch == 'arm64')
+        if: matrix.arch == 'x64'
         run: yarn test:unit
       - name: Run script tests
         run: yarn test:script
-      - if: runner.os == 'Windows'
-        uses: ./.github/actions/setup-windows-signing
+      - uses: ./.github/actions/setup-windows-signing
         with:
           enabled: ${{ inputs.sign }}
           azure-client-id: ${{ secrets.AZURE_CODE_SIGNING_CLIENT_ID }}
@@ -168,9 +151,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            friendlyName: macOS
-            arch: arm64
           - os: windows-2022
             friendlyName: Windows
             arch: x64
@@ -197,19 +177,13 @@ jobs:
           DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET:
             ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
-          KEY_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
           npm_config_arch: ${{ matrix.arch }}
           TARGET_ARCH: ${{ matrix.arch }}
       - name: Prepare testing environment
         run: yarn test:setup
         env:
           npm_config_arch: ${{ matrix.arch }}
-      - if: runner.os == 'Windows'
-        uses: ./.github/actions/setup-windows-signing
+      - uses: ./.github/actions/setup-windows-signing
         with:
           enabled: ${{ inputs.sign }}
           azure-client-id: ${{ secrets.AZURE_CODE_SIGNING_CLIENT_ID }}
@@ -220,14 +194,7 @@ jobs:
           npm_config_arch: ${{ matrix.arch }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_CODE_SIGNING_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CODE_SIGNING_CLIENT_ID }}
-      - name: Install app on macOS
-        if: runner.os == 'macOS'
-        run: |
-          rm -rf "/Applications/GitHub Desktop.app"
-          ditto "dist/GitHub Desktop-darwin-arm64/GitHub Desktop.app" "/Applications/GitHub Desktop.app"
-          echo "DESKTOP_E2E_APP_PATH=/Applications/GitHub Desktop.app/Contents/MacOS/GitHub Desktop" >> "$GITHUB_ENV"
       - name: Install app on Windows
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           function Write-SquirrelLogs {

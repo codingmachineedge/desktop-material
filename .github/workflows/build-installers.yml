@@ -10,7 +10,7 @@ name: Build Installers
 # - Code signing is disabled (no certificates configured), so installers are
 #   unsigned. Provide AZURE_* secrets and flip the signing input to produce
 #   signed builds.
-# - macOS builds are intentionally not produced.
+# - Desktop Material is Windows-only; non-Windows installers are not produced.
 
 on:
   workflow_run:

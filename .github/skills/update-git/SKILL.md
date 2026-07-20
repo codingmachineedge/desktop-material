@@ -97,7 +97,7 @@ The version tag should follow Git's versioning scheme:
 
 Tell the user to:
 
-1. Wait for the build to complete across all platforms
+1. Wait for every supported Windows build lane to complete
 2. Review the draft release notes — remove infrastructure-only changes
 3. Click **Publish** on the GitHub release page
 

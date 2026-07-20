@@ -3,6 +3,7 @@
 - Run date: 2026-07-19 (America/Toronto)
 - Mode: `publish`
 - Milestone: implement and verify every distinct workflow feature explicitly named in the user-supplied `Desktop more stuff.md` backlog, including identity/workspace scale, pull requests, stash/tag completeness, review/diff ergonomics, environment/integration tools, and project/offline workflow surfaces; preserve already-complete behavior and expose each addition through the existing Desktop Material architecture
+- Support decision: Desktop Material is Windows-only. The final remote gate retains Windows x64/arm64 builds, Windows x64 full-unit and packaged-E2E coverage, and the Windows x64 installer/release; macOS/Linux app targets are intentionally outside acceptance. Non-Windows runners may host platform-neutral repository automation, not application build/runtime/package/E2E targets.
 - Requested feature inventory: multiple accounts and per-repository identity; full pull-request review; selective stash; richer pull-request context/actions; complete tag lifecycle; pull-request creation; pull-request notifications; multiple/named stash management; external-stash recognition; history search/filtering; remote-commit visibility; repository sidebar/pinning; repository-picker filters; branch-switcher improvements; cross-fork branch checkout; pull/fetch across repositories; changed-file tree view; always-expanded/richer diff context; one-click and broader editor support; CSV diff; richer image/binary previews including TGA; WSL-aware paths; custom Git commands/extensibility; global-ignore management; patch import; bulk branch deletion; network-drive support; project/offline views; and Copilot commit-message controls where the backlog cites them as a proven demand surface
 - Expected UI state: every inventory item is reachable from an appropriate repository, branch, history, changes, stash, account, pull-request, project, settings, or command surface; advanced features remain progressively disclosed; English, playful Hong Kong Cantonese, and compact bilingual modes remain functional at desktop and narrow widths
 - Ordered background interactions: preflight the fixed low-level MCP HTTP server and scheduled-task configuration; inventory existing implementation/tests/docs; implement only verified gaps; run focused and repository-wide checks; build through the fixed MCP; create an owned deterministic Git/provider fixture and isolated Electron user-data directory; create one uniquely named off-screen Win32 desktop; launch the freshly built app with only the fixture; resolve its HWND dynamically; capture a stable frame; exercise representative account, pull-request, stash/tag, history/navigation, diff, integration, and project workflows using only allowed HWND-targeted input; recapture after meaningful actions; inspect a final original-resolution feature overview; close the revalidated HWND (saved PID fallback only), close the desktop, and remove only owned resources
@@ -31,6 +32,12 @@
   Markdownlint, and diff whitespace checks. The only full-sweep regression was
   a stale test expecting **Pull all** after the reviewed action became **Sync
   repositories**; the corrected focused test passes 2/2.
+- After the explicit Windows-only support decision and concurrent visual-doc
+  integration, a fresh exact-tree Windows sweep passed all 592 unit files:
+  4,162 tests, 4,161 passes, zero failures, and one intentional skip in 386.4
+  seconds. The Windows CI-policy contract passes 8/8, script tests 16/16,
+  wiki/catalog checks 13/13, plus root/script TypeScript, ESLint, Prettier,
+  feature Markdownlint, YAML parsing, and diff checks.
 - Fixed MCP preflight returned `startup_status.ok=true`; task
   `LowLevelComputerUseMCP` is running the fixed venv Python and loopback HTTP
   arguments from checkout

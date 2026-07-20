@@ -105,7 +105,7 @@ After the build succeeds:
    - A summary stating the Electron version being upgraded (from OLD_VERSION to NEW_VERSION)
    - The corresponding Node.js version update if applicable
    - **Breaking changes** between the previous Electron version and the new one
-   - **⚠️ OS Compatibility Changes**: Explicitly highlight any macOS or Windows versions that are no longer supported in the new Electron version (Linux changes can be omitted)
+   - **⚠️ Windows Compatibility Changes**: Explicitly highlight any Windows versions that are no longer supported in the new Electron version
 
    **Example PR Description**:
    ```markdown
@@ -118,11 +118,10 @@ After the build succeeds:
 
    [List breaking changes from Electron release notes]
 
-   ## ⚠️ OS Compatibility Changes
+   ## ⚠️ Windows Compatibility Changes
 
    The following operating system versions are **no longer supported** in Electron vNEW_VERSION:
 
-   - **macOS**: [List any dropped macOS versions, e.g., "macOS 10.15 (Catalina) is no longer supported"]
    - **Windows**: [List any dropped Windows versions, e.g., "Windows 8.1 is no longer supported"]
 
    ## References

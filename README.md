@@ -2,6 +2,11 @@
 
 Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [GitHub Desktop](https://github.com/desktop/desktop). It rebuilds the entire application shell around Material Design 3 while keeping GitHub Desktop's full Git workflow and the same underlying stack: [TypeScript](https://www.typescriptlang.org), [React](https://react.dev), [Electron](https://www.electronjs.org), and [Sass](https://sass-lang.com). This project is in active development.
 
+> **Platform support:** Desktop Material is a Windows-only application. Windows
+> x64 is the published installer target; Windows x64/arm64 builds and Windows
+> packaged E2E are the supported CI gates. macOS and Linux application packages
+> are not produced or supported.
+
 <img
   width="1072"
   src="docs/assets/screenshots/material-app-identity-workspace.png"

@@ -1,3 +1,7 @@
+> **Inherited upstream checklist:** Desktop Material is Windows-only. macOS
+> cases below are retained as GitHub Desktop history and are not supported
+> Desktop Material acceptance targets.
+
 ### Download Desktop
   - [ ] [User can download latest (Mac & Windows) Desktop](https://desktop.github.com/) 
     - [ ] [Mac](https://central.github.com/deployments/desktop/desktop/latest/darwin)

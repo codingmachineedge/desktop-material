@@ -7,6 +7,14 @@ workflow wave** below. This file is the compact public source of truth;
 implementation details and historical test receipts stay in
 [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
 
+## Platform support
+
+Desktop Material is Windows-only. The supported product gates are Windows
+x64/arm64 builds, the Windows x64 full-unit and packaged-E2E lanes, and the
+Windows x64 installer/release workflow. macOS and Linux application runtimes
+and packages are outside the roadmap; non-Windows runners may still host
+platform-neutral repository automation.
+
 ## M21 — Advanced workflow completeness (July 19, 2026) — **Complete**
 
 - Exact account/repository identity, scalable repository and branch switching,

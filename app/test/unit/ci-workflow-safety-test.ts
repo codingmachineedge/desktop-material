@@ -87,6 +87,14 @@ describe('CI workflow safety', () => {
     assert.doesNotMatch(pushTrigger?.[1] ?? '', /^\s*(?:paths|paths-ignore):/m)
   })
 
+  it('builds, packages, and exercises the Windows application only', () => {
+    assert.match(ciWorkflow, /os: \[windows-2022\]/)
+    assert.match(ciWorkflow, /arch: \[x64, arm64\]/)
+    assert.match(ciWorkflow, /friendlyName: Windows/)
+    assert.match(ciWorkflow, /Install app on Windows/)
+    assert.doesNotMatch(ciWorkflow, /macos|APPLE_/i)
+  })
+
   it('scans the real default branch and supports manual dispatch', () => {
     assert.match(codeQLWorkflow, /push:\s*\n\s*branches: \['main'\]/)
     assert.match(codeQLWorkflow, /pull_request:\s*\n\s*branches: \['main'\]/)

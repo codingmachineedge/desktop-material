@@ -4,6 +4,10 @@ This document explains the end-to-end smoke test harness added for GitHub
 Desktop, what it covers, how it runs locally and in CI, and which repository
 files make up the implementation.
 
+Desktop Material is Windows-only. The supported packaged smoke lane installs
+and exercises Windows x64; inherited non-Windows fixture branches are not
+product or release targets.
+
 ## Overview
 
 The smoke suite uses Playwright's Electron support to launch the real Desktop
@@ -14,7 +18,7 @@ boundaries:
 - app startup and first-run flow
 - opening an existing repository
 - committing and switching branches
-- updater state transitions and platform-specific update behavior
+- Windows updater state transitions
 
 The suite is deliberately small and runs serially in one Electron session. That
 keeps it practical for CI and useful for iterative development.
@@ -45,8 +49,7 @@ The main files added or changed for the E2E harness are:
   - Playwright/Electron fixtures, launch mode selection, tracing, video output,
     and Windows updater cleanup
 - `app/test/e2e/mock-update-server.ts`
-  - an in-process HTTP server used to simulate updater responses for macOS and
-    Windows
+  - an in-process HTTP server used to simulate Windows updater responses
 - `app/test/e2e/test-helpers.ts`
   - helpers for creating and validating the smoke test repository
 - `app/test/e2e/playwright.config.ts`
@@ -162,16 +165,6 @@ root once, and showed no error. This headless gate complements the installed
 Windows x64 packaged-E2E job, which passed in correction CI `29696805239` using
 the same per-job loopback updater URL.
 
-### macOS behavior
-
-For macOS, the mock server serves a Squirrel.Mac-style JSON response.
-
-- `no-update` returns HTTP 204
-- `update-available` returns a JSON payload with a fake zip URL
-
-The fake download stays open rather than completing, which keeps the app in the
-"Downloading update…" state without requiring a valid signed update archive.
-
 ### Windows behavior
 
 For Windows, the mock server serves Squirrel.Windows-style responses.
@@ -179,8 +172,9 @@ For Windows, the mock server serves Squirrel.Windows-style responses.
 - requests for `RELEASES` receive a text manifest
 - requests for `.nupkg` receive a fake long-lived binary response
 
-This is necessary because Windows updater behavior does not use the macOS JSON
-contract.
+The fake package download stays open rather than completing, which keeps the
+app in the "Downloading update…" state without requiring a valid signed update
+package.
 
 ### Mock server control plane
 
@@ -207,7 +201,7 @@ It currently:
   server
 - uses the shared Windows signing action when needed
 - packages the app
-- installs the app on macOS and Windows
+- installs the app on Windows x64
 - exports `DESKTOP_E2E_APP_PATH`
 - runs `yarn test:e2e:run:packaged`
 - uploads `playwright-videos` as artifacts so traces and videos are retained

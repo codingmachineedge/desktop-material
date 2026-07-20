@@ -2,15 +2,17 @@
 
 ## Setup
 
-Refer to the specific instructions for each platform:
+Desktop Material development and product acceptance are supported on Windows
+only:
 
- - [macOS](./setup-macos.md)
- - [Windows](./setup-windows.md)
- - [Linux](./setup-linux.md)
+- [Windows](./setup-windows.md)
 
-Experimental support for building Desktop is also available for these platforms:
+Windows ARM64 build details are available here:
 
- - [ARM64](./building-arm64.md)
+- [ARM64](./building-arm64.md)
+
+Inherited macOS and Linux setup files remain upstream reference material, not
+supported Desktop Material development or release targets.
 
 ## Verification
 
@@ -40,17 +42,8 @@ The typical workflow to get up running is as follows:
 * Run `yarn` to get all required dependencies on your machine.
 * Run `yarn build:dev` to create a development build of the app.
 * Run `yarn start` to launch the application. Changes will be compiled in the
-  background. The app can then be reloaded to see the changes (<kbd>Ctrl/Command+Alt+R</kbd>).
-
-**Optional Tip**: On macOS and Linux, you can use `screen` to avoid filling your terminal with logging output:
-
-```shellsession
-$ screen -S "desktop" yarn start # -S sets the name of the session; you can pick anything
-$ # Your screen clears and shows logs. Press Ctrl+A then D to exit.
-[detached]
-$ screen -R "desktop" # to reopen the session, read the logs, and exit (Ctrl+C)
-[screen is terminating]
-```
+  background. The app can then be reloaded to see the changes
+  (<kbd>Ctrl+Alt+R</kbd>).
 
 If you've made changes in the `main-process` folder you need to run `yarn
 build:dev` to rebuild the package, and then `yarn start` for these changes to be

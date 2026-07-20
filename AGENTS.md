@@ -1,5 +1,17 @@
 # Repository agent instructions
 
+## Windows-only product boundary
+
+- Desktop Material is a Windows-only application. Support, build, packaging,
+  runtime, and end-to-end acceptance work targets Windows only.
+- Keep Windows x64/arm64 CI, Windows x64 packaged E2E, and the Windows x64
+  installer/release path healthy. Do not add or require macOS/Linux app jobs,
+  packages, compatibility work, or release blockers unless the user explicitly
+  changes the product boundary.
+- Non-Windows runners may host platform-neutral repository automation such as
+  lint, Pages, static analysis, release metadata, or issue triage; that does
+  not make those operating systems supported application targets.
+
 ## Shared repository completion memory
 
 - Every task that changes this repository must end with all intended task work committed and pushed.

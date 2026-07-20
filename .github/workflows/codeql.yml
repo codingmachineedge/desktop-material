@@ -11,7 +11,8 @@ on:
 
 jobs:
   CodeQL-Build:
-    # CodeQL runs on ubuntu-latest, windows-latest, and macos-latest
+    # The Linux runner is scanning infrastructure, not a supported app target.
+    # Desktop Material's runtime, package, and release support is Windows-only.
     runs-on: ubuntu-latest
 
     permissions:

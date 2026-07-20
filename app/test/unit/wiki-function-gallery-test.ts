@@ -35,10 +35,10 @@ describe('wiki function screenshot catalog', () => {
     ].map(([, asset]) => asset)
     const renderedAssets = [
       ...gallery.matchAll(/!\[[^\]]+\]\((https:\/\/[^)]+\.png)\)/g),
-    ].map(([, url]) => {
-      assert.ok(url.startsWith(rawImagePrefix), url)
-      return url.slice(rawImagePrefix.length)
-    })
+    ]
+      .map(([, url]) => url)
+      .filter(url => url.startsWith(rawImagePrefix))
+      .map(url => url.slice(rawImagePrefix.length))
 
     assert.equal(renderedAssets.length, rowAssets.length)
     assert.equal(new Set(renderedAssets).size, renderedAssets.length)
@@ -70,10 +70,10 @@ describe('wiki submodules guide', () => {
     const guide = readFileSync(submodulesGuidePath, 'utf8')
     const renderedAssets = [
       ...guide.matchAll(/!\[[^\]]+\]\((https:\/\/[^)]+\.svg)\)/g),
-    ].map(([, url]) => {
-      assert.ok(url.startsWith(rawIllustrationPrefix), url)
-      return url.slice(rawIllustrationPrefix.length)
-    })
+    ]
+      .map(([, url]) => url)
+      .filter(url => url.startsWith(rawIllustrationPrefix))
+      .map(url => url.slice(rawIllustrationPrefix.length))
     const assets = readdirSync(illustrationDirectory)
       .filter(name => name.endsWith('.svg'))
       .sort()

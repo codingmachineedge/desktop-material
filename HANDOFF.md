@@ -1,5 +1,22 @@
 # Desktop Material — Active parity handoff
 
+## Platform support decision
+
+Desktop Material is a Windows-only application. Windows x64 is the published
+installer target; Windows x64/arm64 builds, the Windows x64 full-unit lane, and
+Windows x64 packaged E2E are the supported product gates. macOS and Linux app
+runtimes, packages, and E2E lanes are intentionally unsupported. Non-Windows
+runners may still host platform-neutral repository automation such as lint,
+Pages, static analysis, release metadata, or issue triage; those jobs are not
+application targets. Preserve this boundary in future CI, release, roadmap,
+and feature work unless the user explicitly changes it.
+
+The policy change has a tracked CI contract and a fresh combined-tree Windows
+gate: 592 unit files ran in three batches, with 4,161 passes, zero failures,
+and one intentional skip across 4,162 tests in 386.4 seconds. The 8/8 CI-policy
+checks, 16/16 script tests, root/script TypeScript, formatting, ESLint, feature
+Markdownlint, YAML parsing, and 13/13 wiki/catalog checks also pass.
+
 ## Outcome
 
 The July 19 documentation pass adds a repo-wide visual-learning layer: eight

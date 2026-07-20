@@ -5,6 +5,10 @@ Desktop Material keeps the upstream
 while adding product, Material Design, acceptance, and publishing guidance for
 this fork.
 
+Desktop Material itself is supported and released on Windows only. Inherited
+non-Windows source and historical upstream documentation do not define a
+supported runtime; see [Windows-only platform support](features/integrations/windows-only-platform-support.md).
+
 ## Product and Material design
 
 - **[Project overview](../README.md)** - shipped workflows and the compact
@@ -119,6 +123,6 @@ and how things work:
   the ability to OAuth on behalf of a user. A developer OAuth app is bundled
   to reduce the friction of getting started.
 - **[Building and Packaging Desktop](technical/packaging.md)** - outlines how
-  Desktop is currently packaged for all platforms
+  Desktop is built and packaged for Windows
 - **[Automatic Git Proxy support](technical/proxies.md)** - a pre-launch
   overview and troubleshooting guide for Git automatic proxy support

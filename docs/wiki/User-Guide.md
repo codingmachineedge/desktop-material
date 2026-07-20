@@ -10,6 +10,10 @@ A task-oriented tour of Desktop Material's features. It assumes you already know
 Desktop workflow (clone, commit, push, branch, pull request) — that all still works. This guide
 focuses on what Desktop Material adds on top.
 
+> Desktop Material is supported on Windows only. Use the published Windows x64
+> installer; macOS and Linux application packages are not produced or
+> supported.
+
 **Feature guide**
 
 The complete M0–M21 roadmap is published on `main`. This guide also covers the verified adaptive

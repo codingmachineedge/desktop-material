@@ -121,7 +121,7 @@ Notes: [Type] Brief user-facing description, or "no-notes" for internal-only cha
 Classify every change by the highest-risk area it touches.
 
 ### Critical — Auto-update & Installation
-Changes here can **trap users on a broken version** with no way to update. Require extensive manual QA on both macOS and Windows.
+Changes here can **trap users on a broken version** with no way to update. Require extensive Windows manual QA.
 
 | File | What It Does |
 |------|-------------|

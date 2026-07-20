@@ -551,7 +551,7 @@ DESKTOP_E2E_APP_MODE=unpackaged npx playwright test \
 > `DESKTOP_SKIP_PACKAGE=1`. This bundles `renderer.js` directly into `out/`
 > so the app is self-contained.
 
-### Handling the welcome flow and macOS dialogs
+### Handling the welcome flow on Windows
 
 If your test launches from a fresh state, you will encounter the welcome flow.
 Handle it like the smoke test does:
@@ -574,9 +574,6 @@ if ((await emailInput.inputValue()) === '') {
 }
 await page.locator('button:has-text("Finish")').click()
 await page.waitForSelector('#welcome', { state: 'hidden', timeout: 15000 })
-
-// Dismiss macOS "Move to Applications" dialog if it appears
-await dismissMoveToApplicationsDialog(page)
 ```
 
 ### Attaching artifacts to Pull Requests
