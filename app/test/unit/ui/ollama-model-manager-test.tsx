@@ -289,6 +289,16 @@ describe('OllamaModelManager', () => {
       'ollama-models'
     )
 
+    fireEvent.change(search, { target: { value: 'tools' } })
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+
+    fireEvent.change(search, { target: { value: 'Q4_K_M' } })
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+
+    fireEvent.change(search, { target: { value: '' } })
+
     fireEvent.click(
       screen.getByRole('button', {
         name: 'Filter mode: Fuzzy (click to change)',

@@ -1140,7 +1140,11 @@ export class OllamaModelManager extends React.Component<
     if (query === '') {
       return { models, regexError: null }
     }
-    const result = matchWithMode(query, models, this.getModelSearchKeys, {
+    const searchKeys =
+      this.state.filterMode === FilterMode.Fuzzy
+        ? this.getFuzzyModelSearchKeys
+        : this.getModelSearchKeys
+    const result = matchWithMode(query, models, searchKeys, {
       mode: this.state.filterMode,
       caseSensitive: this.state.filterCaseSensitive,
     })
@@ -1163,6 +1167,13 @@ export class OllamaModelManager extends React.Component<
       ...(details?.families ?? []),
       ...(model.capabilities ?? []),
     ].filter((value): value is string => value !== undefined)
+  }
+
+  private getFuzzyModelSearchKeys = (
+    model: INormalizedModel
+  ): ReadonlyArray<string> => {
+    const [, ...metadata] = this.getModelSearchKeys(model)
+    return [model.name, metadata.join(' ')]
   }
 
   private getFilterSampleItems = (): ReadonlyArray<string> =>
