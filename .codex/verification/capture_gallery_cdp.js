@@ -1018,6 +1018,31 @@ async function waitFor(expression, label, timeout = 20000) {
   fail(`Timed out waiting for ${label}.`)
 }
 
+async function waitForElementAppearanceCoordinatorReady(context) {
+  await waitFor(
+    `(() => {
+      const root = document.querySelector('#desktop-app-container')
+      const node = root?.querySelector('*')
+      const fiberKey = node && Object.keys(node).find(key =>
+        key.startsWith('__reactFiber$') ||
+        key.startsWith('__reactInternalInstance$')
+      )
+      let fiber = fiberKey ? node[fiberKey] : null
+      for (let depth = 0; fiber && depth < 120; depth++, fiber = fiber.return) {
+        const dispatcher = fiber.stateNode?.props?.dispatcher
+        if (
+          typeof dispatcher?.isElementAppearanceCoordinatorReady === 'function'
+        ) {
+          return dispatcher.isElementAppearanceCoordinatorReady() === true
+        }
+      }
+      return false
+    })()`,
+    `${context} element appearance coordinator`,
+    60000
+  )
+}
+
 function expectedDocumentLanguage(languageMode) {
   return languageMode === 'cantonese' ? 'zh-HK' : 'en'
 }
@@ -1117,6 +1142,9 @@ async function applyRequestedPresentationState(context) {
     return changed
   })()`)
   if (changed) {
+    await waitForElementAppearanceCoordinatorReady(
+      `${context} before renderer reload`
+    )
     const beforeReloadTimeOrigin = await evaluate('performance.timeOrigin')
     await client.send('Page.reload', { ignoreCache: true })
     await sleep(4500)
@@ -1125,6 +1153,9 @@ async function applyRequestedPresentationState(context) {
       `performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}`,
       `${context} renderer reload`,
       25000
+    )
+    await waitForElementAppearanceCoordinatorReady(
+      `${context} after renderer reload`
     )
   }
   await waitFor(
@@ -2056,6 +2087,9 @@ async function seedProfile() {
 
   const changed = providerRemoteChanged || profileChanged
   if (changed) {
+    await waitForElementAppearanceCoordinatorReady(
+      'seedProfile before renderer reload'
+    )
     const beforeSeedReloadTimeOrigin = await evaluate('performance.timeOrigin')
     await client.send('Page.reload', { ignoreCache: true })
     await sleep(4500)
@@ -2064,6 +2098,9 @@ async function seedProfile() {
       `performance.timeOrigin > ${JSON.stringify(beforeSeedReloadTimeOrigin)}`,
       'seeded profile renderer reload',
       25000
+    )
+    await waitForElementAppearanceCoordinatorReady(
+      'seedProfile after renderer reload'
     )
   }
   if (
@@ -2803,6 +2840,9 @@ scene('settings-agent-access', async () => {
 scene('anchored-appearance', async () => {
   await ensureRepository()
   await menuEvent('show-changes')
+  await waitForElementAppearanceCoordinatorReady(
+    'anchored-appearance before repository toolbar context menu'
+  )
   await contextMenuSelector('#desktop-app-toolbar')
   await waitForPrivacySafeAnchoredEditor(
     'repository toolbar owner appearance editor'
@@ -4320,9 +4360,20 @@ scene('app-identity', async () => {
     )
   }
   const beforeReloadTimeOrigin = armedReloadProof.timeOrigin
+  await waitForElementAppearanceCoordinatorReady(
+    'app-identity before renderer reload'
+  )
   await evaluate('window.location.reload(), true')
   await sleep(2500)
   await client.send('Runtime.enable')
+  await waitFor(
+    `performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}`,
+    'app-identity renderer reload',
+    25000
+  )
+  await waitForElementAppearanceCoordinatorReady(
+    'app-identity after renderer reload'
+  )
   await waitFor(
     `document.querySelector('nav.repository-rail') !== null &&
       document.querySelector('#desktop-app-title-bar .app-brand') !== null`,

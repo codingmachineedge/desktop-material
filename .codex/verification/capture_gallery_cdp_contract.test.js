@@ -193,6 +193,109 @@ test('canonical Appearance verification waits for the welcome transition', () =>
   assert.ok(!validation.includes('await pressEscape()'))
 })
 
+test('every renderer reload is fenced by the appearance coordinator', () => {
+  const pageReloads =
+    source.match(
+      /await client\.send\('Page\.reload', \{ ignoreCache: true \}\)/g
+    ) ?? []
+  const locationReloads =
+    source.match(/await evaluate\('window\.location\.reload\(\), true'\)/g) ??
+    []
+  assert.equal(pageReloads.length, 2)
+  assert.equal(locationReloads.length, 1)
+  assert.equal(pageReloads.length + locationReloads.length, 3)
+
+  const helperStart = source.indexOf(
+    'async function waitForElementAppearanceCoordinatorReady(context)'
+  )
+  const helperEnd = source.indexOf(
+    'function expectedDocumentLanguage(',
+    helperStart
+  )
+  assert.ok(helperStart >= 0 && helperEnd > helperStart)
+  const helper = source.slice(helperStart, helperEnd)
+  for (const contract of [
+    "key.startsWith('__reactFiber$')",
+    "key.startsWith('__reactInternalInstance$')",
+    'fiber.stateNode?.props?.dispatcher',
+    "typeof dispatcher?.isElementAppearanceCoordinatorReady === 'function'",
+    'dispatcher.isElementAppearanceCoordinatorReady() === true',
+  ]) {
+    assert.ok(helper.includes(contract), `readiness helper misses ${contract}`)
+  }
+  assert.ok(!helper.includes('document.body.textContent'))
+  assert.ok(!helper.includes('sleep('))
+
+  const applyStart = source.indexOf(
+    'async function applyRequestedPresentationState(context)'
+  )
+  const applyEnd = source.indexOf(
+    'async function validateAppearanceLanguageSurface()',
+    applyStart
+  )
+  const apply = source.slice(applyStart, applyEnd)
+  const applyPre = apply.indexOf('`${context} before renderer reload`')
+  const applyReload = apply.indexOf(
+    "await client.send('Page.reload', { ignoreCache: true })"
+  )
+  const applyTimeOrigin = apply.indexOf(
+    'performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}',
+    applyReload
+  )
+  const applyPost = apply.indexOf('`${context} after renderer reload`')
+  assert.ok(
+    applyPre >= 0 &&
+      applyPre < applyReload &&
+      applyReload < applyTimeOrigin &&
+      applyTimeOrigin < applyPost
+  )
+
+  const seedStart = source.indexOf('async function seedProfile()')
+  const seedEnd = source.indexOf('async function ensureRepository(', seedStart)
+  const seed = source.slice(seedStart, seedEnd)
+  const seedPre = seed.indexOf("'seedProfile before renderer reload'")
+  const seedReload = seed.indexOf(
+    "await client.send('Page.reload', { ignoreCache: true })"
+  )
+  const seedTimeOrigin = seed.indexOf(
+    'performance.timeOrigin > ${JSON.stringify(beforeSeedReloadTimeOrigin)}',
+    seedReload
+  )
+  const seedPost = seed.indexOf("'seedProfile after renderer reload'")
+  assert.ok(
+    seedPre >= 0 &&
+      seedPre < seedReload &&
+      seedReload < seedTimeOrigin &&
+      seedTimeOrigin < seedPost
+  )
+
+  const identity = sceneSource('app-identity')
+  const identityPre = identity.indexOf("'app-identity before renderer reload'")
+  const identityReload = identity.indexOf(
+    "await evaluate('window.location.reload(), true')"
+  )
+  const identityTimeOrigin = identity.indexOf(
+    'performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}',
+    identityReload
+  )
+  const identityPost = identity.indexOf("'app-identity after renderer reload'")
+  assert.ok(
+    identityPre >= 0 &&
+      identityPre < identityReload &&
+      identityReload < identityTimeOrigin &&
+      identityTimeOrigin < identityPost
+  )
+
+  const anchored = sceneSource('anchored-appearance')
+  const anchoredPre = anchored.indexOf(
+    "'anchored-appearance before repository toolbar context menu'"
+  )
+  const anchoredAction = anchored.indexOf(
+    "contextMenuSelector('#desktop-app-toolbar')"
+  )
+  assert.ok(anchoredPre >= 0 && anchoredPre < anchoredAction)
+})
+
 test('every requested scene resets before its runner executes', () => {
   const loopStart = source.indexOf('for (const name of names)')
   const loopEnd = source.indexOf('client.close()', loopStart)
