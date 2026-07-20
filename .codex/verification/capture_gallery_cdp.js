@@ -1096,7 +1096,7 @@ async function dismissSceneSurfaces(context) {
           '.side-sheet-close, .close-button, [data-dialog-dismiss]'
         ) ??
         controls.find(button =>
-          ['Cancel', 'Close', 'Done', 'Not now'].includes(
+          ['Cancel', 'Close', 'Done', 'Hide', 'Not now', 'Skip for now'].includes(
             (button.textContent ?? '').trim()
           )
         )

@@ -46,6 +46,8 @@ test('reset covers every transient surface that contaminated captures', () => {
     "'.material-context-menu-backdrop'",
     "'.error-notice-stack .error-notice'",
     "'.error-notice-dismiss'",
+    "'Hide'",
+    "'Skip for now'",
     '\'.tooltip, [role="tooltip"]\'',
     "'Input.dispatchMouseEvent'",
     "await menuEvent('zoom-reset')",

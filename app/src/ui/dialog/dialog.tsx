@@ -439,6 +439,7 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
   }
 
   private onDismissGraceTimer = () => {
+    this.dismissGraceTimeoutId = undefined
     this.setState({ isAppearing: false })
 
     this.dialogElement?.dispatchEvent(
@@ -501,6 +502,14 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
     // open when this dialog becomes the top most one.
     if (!this.dialogElement.open) {
       this.openDialog()
+    }
+
+    // A dialog can be pushed behind a newer non-modal dialog before its
+    // dismissal grace period expires. Backgrounding clears that timer, so
+    // restart it when the dialog returns to the front; otherwise
+    // `isAppearing` stays true forever and every close action is ignored.
+    if (this.state.isAppearing && this.dismissGraceTimeoutId === undefined) {
+      this.scheduleDismissGraceTimeout()
     }
 
     // Only steal focus if it has fallen out of this dialog (e.g. after a DOM
