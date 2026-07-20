@@ -17,6 +17,12 @@ and one intentional skip across 4,162 tests in 386.4 seconds. The 8/8 CI-policy
 checks, 16/16 script tests, root/script TypeScript, formatting, ESLint, feature
 Markdownlint, YAML parsing, and 13/13 wiki/catalog checks also pass.
 
+The first Windows-only remote run, CI `29710664098`, correctly withheld a
+release because the concurrently added `script/generate-wiki-diagrams.js` was
+not Prettier-clean. Pages `29710664112` passed and installer run `29710722904`
+skipped. The correction formats that generator without changing any generated
+SVG content; the repository-wide Prettier gate and a fresh generator run pass.
+
 ## Outcome
 
 The July 19 documentation pass adds a repo-wide visual-learning layer: eight

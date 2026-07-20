@@ -38,6 +38,11 @@
   seconds. The Windows CI-policy contract passes 8/8, script tests 16/16,
   wiki/catalog checks 13/13, plus root/script TypeScript, ESLint, Prettier,
   feature Markdownlint, YAML parsing, and diff checks.
+- Windows-only CI `29710664098` withheld a release when repository-wide
+  Prettier found the concurrent visual-learning generator unformatted. Pages
+  `29710664112` passed and installer run `29710722904` skipped. Formatting the
+  generator changes no generated SVG blobs; a fresh generator run and the full
+  repository Prettier check pass before the corrective push.
 - Fixed MCP preflight returned `startup_status.ok=true`; task
   `LowLevelComputerUseMCP` is running the fixed venv Python and loopback HTTP
   arguments from checkout
