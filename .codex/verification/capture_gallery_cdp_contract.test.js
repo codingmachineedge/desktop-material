@@ -212,6 +212,25 @@ test('every screenshot passes the universal private-path gate', () => {
   }
 })
 
+test('settings history masks only the owned run path before capture', () => {
+  const helperStart = source.indexOf(
+    'async function maskSettingsHistoryPrivatePaths()'
+  )
+  const helperEnd = source.indexOf(
+    'function countProviderRequests(',
+    helperStart
+  )
+  const helper = source.slice(helperStart, helperEnd)
+  const settingsHistory = sceneSource('settings-history')
+  assert.ok(helper.includes("const syntheticRoot = 'C:\\\\Synthetic"))
+  assert.ok(helper.includes('fs.realpathSync.native(path.resolve(runRoot))'))
+  assert.ok(helper.includes("privateRoot.replaceAll('\\\\', '\\\\\\\\')"))
+  assert.ok(
+    settingsHistory.indexOf('await maskSettingsHistoryPrivatePaths()') <
+      settingsHistory.indexOf("await capture('settings-history-manager')")
+  )
+})
+
 test('fixture mutation is restricted to the named owned Temp run', () => {
   const ownership = source.indexOf('function assertOwnedDisposableFixture()')
   const assertion = source.indexOf(

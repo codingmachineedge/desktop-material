@@ -736,6 +736,40 @@ async function maskRepositoryToolsIntroduction() {
   }
 }
 
+async function maskSettingsHistoryPrivatePaths() {
+  if (runRoot === undefined) {
+    fail('Settings history masking requires the owned Temp run root.')
+  }
+  const privateRoot = fs.realpathSync.native(path.resolve(runRoot))
+  const syntheticRoot = 'C:\\Synthetic\\desktop-material-run'
+  const replacements = [
+    [privateRoot, syntheticRoot],
+    [
+      privateRoot.replaceAll('\\', '\\\\'),
+      syntheticRoot.replaceAll('\\', '\\\\'),
+    ],
+  ].sort((left, right) => right[0].length - left[0].length)
+  const masked = await evaluate(`(() => {
+    const diff = document.querySelector('.versioned-store-history-diff')
+    if (!(diff instanceof HTMLElement)) return false
+    const replacements = ${JSON.stringify(replacements)}
+    for (const line of diff.querySelectorAll('span')) {
+      let text = line.textContent ?? ''
+      for (const [privateValue, publicValue] of replacements) {
+        text = text.split(privateValue).join(publicValue)
+      }
+      line.textContent = text
+    }
+    const rendered = diff.textContent ?? ''
+    return replacements.every(([privateValue]) =>
+      !rendered.includes(privateValue)
+    )
+  })()`)
+  if (!masked) {
+    fail('Unable to mask owned paths in the Settings history diff.')
+  }
+}
+
 function countProviderRequests(method, pathPattern) {
   if (providerRequestLog === null || !fs.existsSync(providerRequestLog)) {
     return 0
@@ -1448,7 +1482,11 @@ scene('settings-automation', async () => {
 scene('settings-history', async () => {
   await ensureRepository()
   await menuEvent('show-settings-history')
-  await sleep(1500)
+  await waitFor(
+    `document.querySelector('.versioned-store-history-diff') !== null`,
+    'loaded Settings history diff'
+  )
+  await maskSettingsHistoryPrivatePaths()
   await parkPointer()
   await capture('settings-history-manager')
   await closeAllDialogs()
