@@ -5,8 +5,9 @@
 Milestones **M0 through M21 are shipped on `main`**. M22 owner-scoped management
 remains in its separately tracked visual-publication acceptance, while the M23
 Ollama model manager has completed local acceptance and awaits final exact-SHA
-remote publication. The concise public status and current maintenance gates
-live in
+remote publication. M24's guided sparse-checkout implementation and local
+acceptance are complete. The concise public status and current maintenance
+gates live in
 [`ROADMAP.md`](ROADMAP.md); this document keeps the detailed implementation
 ledger, architecture contracts, and historical acceptance evidence. Build,
 screenshot, CI, Pages, wiki, privacy, and cleanup receipts remain in
@@ -73,6 +74,29 @@ its geometry receipt reports zero overlaps and no horizontal overflow. Owned
 runtime resources were cleaned. Final exact-`main` Windows CI, Pages, and wiki
 publication checks remain pending.
 
+M24 turns the existing bounded cone-mode sparse-checkout operation into a
+persistent **Choose/Adjust/Restore → Review selection → Apply and refresh**
+workflow. The guide remains in a fixed region above the scrolling editor/review
+body, stacks at compact widths, and
+distinguishes empty, invalid, ready, locked-review, running, and settled-result
+states. Review freezes the editor, lists the complete bounded normalized
+selection, and reports either selected roots or added/removed/unchanged roots.
+The Apply/result phase persists through success, cancellation, or failure until
+an edit or manual refresh starts a new pass.
+
+Exact application source
+`255ad0c2283dd3a86328808a373a5438526bdaec` passed 23 focused parser,
+Git-safety, guided-behavior, and layout checks, TypeScript, targeted
+ESLint/Prettier, the 41-test gallery-driver contract, and the required
+low-level-MCP production build in 254.90 seconds. The accepted Choose and Review
+captures are 1452×1001, 112,506 and 125,413 bytes, with SHA-256 values
+`8ee7149da7eb045bcda347067dcf2d88c32a626829402c97a52df2d60b2a3576`
+and
+`d536c936e1888c5ea7712bb746ec6eac302ae204edd170ab55379455aeda6a5d`.
+Both passed original-resolution privacy/layout review and byte-for-byte
+promotion; the app, hidden desktop, provider, credentials, ports, and owned
+Temp root were removed.
+
 ## Product milestone ledger
 
 | Milestone | Status | Delivered capability | Important implementation paths |
@@ -101,6 +125,7 @@ publication checks remain pending.
 | **M21 — Advanced workflow completeness** | **COMPLETE** | All 30 demand-backed identity/workspace, PR, stash/tag, history/navigation, diff, editor/integration, network, and live/offline Projects requests, with reviewed mutation boundaries and exact-context guards. | `app/src/lib/github-pull-request*`, `app/src/lib/git/`, `app/src/ui/github-pull-request-lifecycle/`, `app/src/ui/repository-tools/`, `app/src/ui/github-projects/`, `app/src/ui/stashing/`, `app/src/ui/tag/`, `docs/features/` |
 | **M22 — Owner-scoped management and complete visual refresh** | **IMPLEMENTATION COMPLETE; VISUAL REFRESH PAUSED** | Owner-scoped anchored appearance/history, raw split cheap LFS, repository discovery and submodule/subtree expansion, and safe cross-manager bulk/regex coverage. Its original 68-image visual-refresh acceptance remains tracked separately. | `app/src/ui/appearance/`, `app/src/lib/cheap-lfs/`, `app/src/ui/submodules/`, `app/src/ui/subtrees/`, `ROADMAP.md`, `.codex/run-manifests/` |
 | **M23 — Full Ollama model manager** | **LOCAL ACCEPTANCE COMPLETE; REMOTE PUBLICATION PENDING** | Local health/version, installed/running inventory, search/filter/details, cancellable pull progress, copy/rename, load/unload, confirmed delete, provider-model synchronization, guarded endpoints, localized accessible states, and an accepted privacy-safe off-screen capture. | `app/src/lib/ollama/`, `app/src/ui/copilot/ollama-model-manager.tsx`, `app/styles/ui/_ollama-model-manager.scss`, `docs/features/integrations/ollama-model-manager.md` |
+| **M24 — Guided sparse checkout** | **LOCAL ACCEPTANCE COMPLETE; PUBLICATION VERIFICATION PENDING** | Persistent Choose/Adjust/Restore → Review selection → Apply and refresh guidance, exact bounded normalized review and cone-mode diff, retained result state, responsive non-overlapping layout, production-build proof, and inspected Choose/Review captures. | `app/src/ui/sparse-checkout/sparse-checkout.tsx`, `app/styles/ui/_sparse-checkout.scss`, `docs/features/repository-management/sparse-checkout.md` |
 
 ## M19 guided parity implementation ledger
 
@@ -445,6 +470,11 @@ unchanged in final documentation/image union `a890ab579c…`.
 | `material-github-releases.png` | `5e80e678…` | 1452×1001 | 135,021 | `ab6d46d4fe749dd63b34095411562cae82f4ddfc48991474f927e4be9ae5d739` |
 | `material-github-issues.png` | `5e80e678…` | 1452×1001 | 123,243 | `423d201a90346548ca9b36cdc472b11e144cf3aff1f79179939e44fb50e606bc` |
 | `material-native-pull-request.png` | `5e80e678…` | 1452×1001 | 152,440 | `9fd4c407f74639b58607c1c2c3158c2278f71ac3fe4088bb66bc5e3cf24434cb` |
+
+The table preserves the historical M19 receipt. M24 later replaced the tracked
+`material-sparse-checkout-safe.png` with the 125,413-byte guided Review capture
+from `255ad0c228`, SHA-256
+`d536c936e1888c5ea7712bb746ec6eac302ae204edd170ab55379455aeda6a5d`.
 
 This app-source proof is intentionally distinct from the later publication
 identities. The application, loopback listener, synthetic credential entries,

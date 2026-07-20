@@ -75,7 +75,7 @@ active profile's style, label, and explicit language mode.
 | `add-submodule-dialog.png` | Clone-style Add Submodule review with source, checkout path, and branch |
 | `material-submodule-context.png` | Initialized submodule opened temporarily with context and Back to the persisted root |
 | `material-pull-all-account-fallback.png` | Pull all with per-repository results and exact-origin account retry |
-| `material-sparse-checkout-safe.png` | Validated cone-mode sparse-checkout review |
+| `material-sparse-checkout-safe.png` | Persistent guided review with the locked editor and exact normalized selection |
 | `material-history-deepen.png` | Deepen-history result without exposing the account used |
 | `material-remote-manager.png` | Reviewed named-remote administration |
 | `material-native-pull-request.png` | Native pull-request creation with bounded metadata |
@@ -125,7 +125,7 @@ active profile's style, label, and explicit language mode.
 | `material-actions-pending-deployments.png` | Deployment environment review and history |
 | `material-history-deepening.png` | Full-history state after a verified deepen |
 | `material-shallow-clone.png` | Shallow-clone commit-depth controls |
-| `material-sparse-checkout.png` | Sparse-checkout directory editor |
+| `material-sparse-checkout.png` | Persistent three-step sparse-checkout guide in its disabled Choose state |
 
 ## App identity and portable tabs
 
@@ -148,7 +148,7 @@ customization/history context use the same profile/repository ownership model.
 
 ![Pull all showing a neutral exact-origin signed-in account fallback result](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
 
-![Validated cone-mode sparse-checkout review](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
+![Persistent guided sparse-checkout review with the editor locked and exact normalized selection](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
 
 ![Deepen-history result without displaying the account used](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepen.png)
 
@@ -379,4 +379,4 @@ authentication choice, or remediation remain decision dialogs.
 
 ![Shallow-clone commit-depth controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-shallow-clone.png)
 
-![Sparse-checkout directory editor](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
+![Persistent three-step sparse-checkout guide in its disabled Choose state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)

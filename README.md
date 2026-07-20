@@ -18,12 +18,14 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
 ## Product scope
 
 The complete M0–M21 roadmap is shipped on `main`. M22 owner-scoped management
-keeps its separately tracked visual-publication acceptance, and M23 adds the
-full Ollama model manager described below. M23 has completed its production
-build, deterministic lifecycle, privacy, layout, and cleanup acceptance; final
-exact-`main` CI, Pages, and wiki publication checks remain pending. The compact
-status summary is below; the implementation ledger is in [`PLAN.md`](PLAN.md),
-and detailed acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
+keeps its separately tracked visual-publication acceptance, M23 adds the full
+Ollama model manager described below, and M24 makes sparse-checkout changes a
+persistent guided Choose/Adjust/Restore → Review selection → Apply and refresh
+workflow. M24 implementation,
+production-build, off-screen interaction, privacy, and cleanup acceptance are
+complete; its publication checks are tracked separately. The compact status
+summary is below; the implementation ledger is in [`PLAN.md`](PLAN.md), and
+detailed acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
 
 The M20 platform wave and earlier post-M19 adaptive customization maintenance
 release described below are shipped on `main`. Their exact production build,
@@ -196,7 +198,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 - Choose **File → Add local repository → Auto-detect repositories…** to scan a parent folder with bounded, link-safe traversal, review the discovered Git repositories, and add them together
 
 **Guided Git and provider administration**
-- Manage cone-mode sparse checkout through a three-step **Select → Review → Apply** guide. State-aware guidance distinguishes empty, invalid, ready, running, and completed states; review freezes and shows every bounded normalized selection entry before Git updates and refreshes the worktree
+- Manage cone-mode sparse checkout through a three-step **Choose/Adjust/Restore → Review selection → Apply and refresh** guide that remains visible above the scrolling editor and review content. State-aware guidance distinguishes empty, invalid, ready, running, and completed states; review freezes and shows every bounded normalized selection entry before Git updates and refreshes the worktree
 - Exchange reviewed patch series, rewrite local commits from an explicit plan, configure commit/tag signing, administer Git LFS, and run bounded guided bisect sessions from named Repository Tools panels. Release-backed cheap LFS labels its preparation/upload phase separately from the final branch commit, uploads raw bytes without a compression delay, keeps a file in one asset when it fits the release cap, splits larger files into ordered ranged assets, and transparently verifies/reassembles the original bytes
 - Rebase the current branch onto a searched target through a reviewed current→target summary with ahead/behind context and a bounded commit preview. Fresh preflight state blocks dirty or conflicted repositories and ongoing operations, exact refs are revalidated before Git starts, conflicts remain in the existing continue/abort flow, and Desktop Material never force-pushes automatically
 - Manage every named remote with guarded add/rename/update/default/remove operations, and inspect or create exact known client hooks through the effective `core.hooksPath` without displaying hook contents or absolute paths. Remote rows stack before their name, URL, and controls collapse below a readable width, and the Repository Tools workspace keeps its diagnostics and results vertically reachable at compact heights
@@ -285,7 +287,7 @@ automation, and account isolation. The diagrams are reproducible with
 | --- | --- | --- |
 | <img src="docs/assets/screenshots/material-clone-account-fallback.png" alt="Exact-origin account fallback clone" width="360"><br><sub>Account-aware clone</sub> | <img src="docs/assets/screenshots/add-submodule-dialog.png" alt="Clone-style Add Submodule dialog reviewing a synthetic URL, checkout path, and tracked branch" width="360"><br><sub>Clone-style submodules</sub> | <img src="docs/assets/screenshots/material-remote-manager.png" alt="Named remote manager" width="360"><br><sub>Remote manager</sub> |
 | <img src="docs/assets/screenshots/material-shallow-clone-safe.png" alt="Reviewed shallow clone" width="360"><br><sub>Shallow clone</sub> | <img src="docs/assets/screenshots/material-gitignore-manager.png" alt="Gitignore template manager" width="360"><br><sub>Gitignore manager</sub> | <img src="docs/assets/screenshots/material-automation.png" alt="Automation settings" width="360"><br><sub>Automation</sub> |
-| <img src="docs/assets/screenshots/material-sparse-checkout-safe.png" alt="Reviewed sparse checkout" width="360"><br><sub>Sparse checkout</sub> | <img src="docs/assets/screenshots/material-history-deepening.png" alt="Full history after deepening" width="360"><br><sub>History deepening</sub> | <img src="docs/assets/screenshots/material-agent-access.png" alt="Local agent access settings" width="360"><br><sub>Agent access</sub> |
+| <img src="docs/assets/screenshots/material-sparse-checkout-safe.png" alt="Guided sparse checkout with Review active, a locked editor, and the exact normalized selection" width="360"><br><sub>Guided sparse-checkout review</sub> | <img src="docs/assets/screenshots/material-history-deepening.png" alt="Full history after deepening" width="360"><br><sub>History deepening</sub> | <img src="docs/assets/screenshots/material-agent-access.png" alt="Local agent access settings" width="360"><br><sub>Agent access</sub> |
 | <img src="docs/assets/screenshots/material-branches-sheet.png" alt="Branches side sheet" width="360"><br><sub>Branches</sub> | <img src="docs/assets/screenshots/material-repositories-sheet.png" alt="Repositories side sheet" width="360"><br><sub>Repositories</sub> | <img src="docs/assets/screenshots/material-multi-window-menu.png" alt="Open repository in a new window" width="360"><br><sub>Multi-window</sub> |
 | <img src="docs/assets/screenshots/material-history-power-tools.png" alt="History search and graph" width="360"><br><sub>History search</sub> | <img src="docs/assets/screenshots/material-branch-merge-all.png" alt="Merge all progress" width="360"><br><sub>Merge All</sub> | <img src="docs/assets/screenshots/material-notification-bulk-actions.png" alt="Filtered Local notification centre with visible selection and bulk actions" width="360"><br><sub>Bulk notification triage</sub> |
 | <img src="docs/assets/screenshots/regex-builder.png" alt="Block-based regular expression builder" width="360"><br><sub>Regex builder</sub> | <img src="docs/assets/screenshots/settings-history-manager.png" alt="Settings history side sheet" width="360"><br><sub>Settings history</sub> | <img src="docs/assets/screenshots/material-error-notice.png" alt="Bottom-right Git lock error notice with a Remove lock file recovery action" width="360"><br><sub>Stale-lock recovery</sub> |

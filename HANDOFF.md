@@ -23,6 +23,59 @@ not Prettier-clean. Pages `29710664112` passed and installer run `29710722904`
 skipped. The correction formats that generator without changing any generated
 SVG content; the repository-wide Prettier gate and a fresh generator run pass.
 
+## 2026-07-20 M24 — guided sparse checkout accepted locally
+
+This is the implementation and local-acceptance receipt for the user-directed
+guided sparse-checkout dialog. Final pushed-SHA CI, Pages, release, wiki, and
+topology checks are delivery receipts and are not claimed by this
+pre-publication section.
+
+- Commits `83dbe4c628`, `55a94bb468`, `9ebae109ba`, `083e4a378d`, and
+  `255ad0c228` develop the sheet into a persistent **Choose/Adjust/Restore →
+  Review selection → Apply and refresh** workflow. Its state-aware copy
+  distinguishes empty, invalid, ready, locked-review, running, and
+  settled-result states. Review freezes the editor and lists every bounded
+  normalized root; enabled cone mode also separates added, removed, and
+  unchanged roots. Success, cancellation, and failure stay in the Apply/result
+  phase until an edit or manual refresh begins another pass.
+- The guide now occupies a dedicated region above the scrollable editor/review
+  body, remains visible without covering content, and stacks within compact
+  layouts. The 23 focused parser, Git-safety, UI-behavior, and static-layout
+  checks pass, as do TypeScript, targeted ESLint/Prettier, and the 41-test
+  gallery-driver contract.
+- Exact application source
+  `255ad0c2283dd3a86328808a373a5438526bdaec` completed the required production
+  build through the exact low-level MCP server in 254.90 seconds with
+  `client_ok: true`, exit code 0, and no timeout. The repository-pinned Yarn
+  runtime was invoked through an owned Temp PATH shim because global Yarn was
+  absent; no dependency was downloaded.
+- The deterministic loopback provider probe passed API, CORS, Git, pagination,
+  artifact, branch-rule, and blocked-push contracts. Two pre-input HWND frames
+  were byte-identical, rendered, and nonblank before the app-native driver
+  opened the production sheet and exercised Choose plus frozen Review.
+
+| M24 promoted screenshot | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-sparse-checkout.png` | 1452×1001 | 112,506 | `8ee7149da7eb045bcda347067dcf2d88c32a626829402c97a52df2d60b2a3576` |
+| `docs/assets/screenshots/material-sparse-checkout-safe.png` | 1452×1001 | 125,413 | `d536c936e1888c5ea7712bb746ec6eac302ae204edd170ab55379455aeda6a5d` |
+
+- Both light-theme captures were inspected at original resolution and promoted
+  byte-for-byte. They contain only the neutral fixture, show no private path,
+  identity, credential, token, clipping, overlap, or blank region, and never
+  exposed or focused the visible desktop.
+- Cleanup is complete for every M24-owned resource: the exact app PID/HWND,
+  hidden desktop, provider processes, CDP/provider ports, synthetic production
+  and development credential namespaces, and containment-checked Temp root are
+  absent. Port 8765 and the headless build/capture window were explicitly
+  released to the separate UI audit afterward.
+- The 845 deleted PNGs in the nested `gemoji` checkout belong to separate audit
+  activity. M24 did not stage, commit, discard, or otherwise claim that state;
+  it remains exactly preserved and is excluded from this milestone's diff.
+- README, the categorized feature guide/index, wiki guide/gallery, Pages source,
+  roadmap, plan, handoff, screenshots, and the publish run manifest carry the
+  guided-workflow evidence. The manifest contains the complete resource and
+  cleanup ledger.
+
 ## 2026-07-20 M23 — local acceptance complete; remote publication pending
 
 This is the live handoff for the user-directed **full Ollama model manager**
@@ -1705,7 +1758,7 @@ endpoints.
 | Screenshot | Dimensions | Bytes | SHA-256 |
 | --- | ---: | ---: | --- |
 | `docs/assets/screenshots/material-github-notifications.png` | 1000×687 | 81,465 | `53f40a94a6ead19b73c6c3302d0eb60b0effd050c7b018b43dd76d4b2072a354` |
-| `docs/assets/screenshots/material-sparse-checkout.png` | 1000×687 | 60,070 | `49a7182f5fd9eb7e0a86d6c20a1ed5b5f388b9063c87d033bfef63d42b7b37e7` |
+| `docs/assets/screenshots/material-sparse-checkout.png` (historical M19 version) | 1000×687 | 60,070 | `49a7182f5fd9eb7e0a86d6c20a1ed5b5f388b9063c87d033bfef63d42b7b37e7` |
 | `docs/assets/screenshots/material-shallow-clone.png` | 1000×687 | 67,271 | `337e7a967b538de22bdd560ff9393ff35619fd1ea76e6ff8aea7827793befd59` |
 
 Each promoted PNG was reopened at original resolution and matched the source
@@ -1713,6 +1766,11 @@ capture's SHA-256. No bundle-import or issue-creation screenshot is included in
 this evidence set. Task forms follow a no-page-level-sideways-scroll policy:
 labels wrap and action groups stack when practical, while horizontal scrolling
 is reserved for spatial code, diff, or log content.
+
+The M19 table is a historical receipt. M24 later replaced the tracked
+`material-sparse-checkout.png` with the 1452×1001, 112,506-byte guided Choose
+capture whose SHA-256 is
+`8ee7149da7eb045bcda347067dcf2d88c32a626829402c97a52df2d60b2a3576`.
 
 ## Headless verification environment
 

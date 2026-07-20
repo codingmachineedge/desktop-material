@@ -644,26 +644,31 @@ clipping controls below the viewport.
 
 Open **Repository → Manage sparse checkout…** to keep selected directories in a large worktree.
 The side panel reports whether sparse checkout is enabled and guides each change through
-**Select → Review → Apply**:
+**Choose/Adjust/Restore → Review selection → Apply and refresh**:
 
-1. **Select** one repository-relative directory root per line. Slashes are normalized, while
+1. **Choose/Adjust/Restore** one repository-relative directory root per line. Slashes are normalized, while
    absolute paths, traversal, option-like input, control characters, blanks, duplicates, and
    over-limit selections are rejected. State-aware guidance says whether the selection is empty,
    needs correction, or is ready for review.
-2. **Review** the frozen normalized selection before Git changes the worktree. The bounded review
+2. **Review selection** freezes the normalized input before Git changes the worktree. The bounded review
    shows every selected root. When cone mode is already enabled, it also reports added, removed,
    and unchanged selection entries; these counts describe directory-root entries rather than
    predicting individual local files.
-3. **Apply** the reviewed operation and let Desktop Material refresh repository state. Cancellation
+3. **Apply and refresh** the reviewed operation. Cancellation
    remains available while Git is changing the worktree. Success, cancellation, or failure stays
    on the result phase until you edit the selection or request a manual refresh.
+
+The three-step guide remains visible above the scrolling editor and review body. On a compact
+window, its steps stack inside the sheet instead of covering content or forcing sideways scrolling.
 
 Choose **Review enable** only after the valid-directory count and exact normalized review match
 your intent. Reapply and disable have their own review confirmations; disabling restores the full
 tracked working tree without changing commits or history. The verified disabled state below leaves
 all working-tree paths eligible to appear locally.
 
-![Sparse-checkout directory editor in its disabled state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
+![Guided sparse-checkout sheet in its disabled Choose state with the persistent three-step guide and directory editor](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
+
+![Guided sparse-checkout sheet with Review active, the editor locked, and the exact normalized docs selection](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
 
 These forms wrap labels and stack actions as space narrows. Page-level sideways scrolling is not
 part of the workflow; only inherently spatial content such as code, diffs, and logs may scroll
