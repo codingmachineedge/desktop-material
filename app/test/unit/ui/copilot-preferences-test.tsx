@@ -500,7 +500,39 @@ describe('CopilotPreferences', () => {
     assert.strictEqual(screen.queryByRole('combobox'), null)
     assert.strictEqual(
       view.container.querySelectorAll('[role="tab"]').length,
-      0
+      2
+    )
+  })
+
+  it('keeps BYOK providers accessible when Copilot account access is unavailable', () => {
+    const view = render(
+      <CopilotPreferences
+        {...defaults()}
+        copilotModels={null}
+        accounts={[
+          makeAccount({
+            endpoint: 'http://localhost:58439/api/v3',
+            id: 2,
+            login: 'material-verifier-p0',
+            isCopilotDesktopEnabled: undefined,
+            copilotLicenseType: undefined,
+          }),
+        ]}
+        byokProviders={[ollamaProvider]}
+        showBYOKSettings={true}
+      />
+    )
+
+    assert.ok(
+      screen.getByText(
+        'Sign in to an account with a Copilot license to configure Copilot settings.'
+      )
+    )
+    fireEvent.click(
+      within(view.container).getByRole('tab', { name: 'Providers' })
+    )
+    assert.ok(
+      within(view.container).getByRole('button', { name: 'Manage models' })
     )
   })
 

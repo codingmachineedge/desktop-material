@@ -214,26 +214,17 @@ export class CopilotPreferences extends React.Component<
 
   public render() {
     const accessState = this.getCopilotAccessState()
-
-    if (accessState !== 'enabled') {
-      return (
-        <DialogContent className="copilot-tab">
-          <div className="copilot-tab-content">
-            <div className="copilot-section">
-              {this.renderAccessState(accessState)}
-            </div>
-          </div>
-        </DialogContent>
-      )
-    }
-
     const showBYOK = this.props.showBYOKSettings
 
     if (!showBYOK) {
       return (
         <DialogContent className="copilot-tab">
           <div className="copilot-tab-content">
-            <div className="copilot-section">{this.renderModelPicker()}</div>
+            <div className="copilot-section">
+              {accessState === 'enabled'
+                ? this.renderModelPicker()
+                : this.renderAccessState(accessState)}
+            </div>
           </div>
         </DialogContent>
       )
@@ -249,17 +240,21 @@ export class CopilotPreferences extends React.Component<
           <span>Providers</span>
         </TabBar>
         <div className="copilot-tab-content">
-          <div className="copilot-section">{this.renderCurrentTab()}</div>
+          <div className="copilot-section">
+            {this.renderCurrentTab(accessState)}
+          </div>
         </div>
       </DialogContent>
     )
   }
 
-  private renderCurrentTab() {
+  private renderCurrentTab(accessState: CopilotAccessState) {
     if (this.state.selectedTabIndex === 1) {
       return this.renderBYOKProviders()
     }
-    return this.renderModelPicker()
+    return accessState === 'enabled'
+      ? this.renderModelPicker()
+      : this.renderAccessState(accessState)
   }
 
   private getCopilotAccessState(): CopilotAccessState {
