@@ -1163,8 +1163,14 @@ export class Preferences extends React.Component<
     })
   }
 
-  private onUpdateBYOKProvider = (provider: IBYOKProvider) => {
-    return this.props.dispatcher.updateCopilotBYOKProvider(provider, undefined)
+  private onUpdateBYOKProvider = async (provider: IBYOKProvider) => {
+    const updated = await this.props.dispatcher.updateCopilotBYOKProvider(
+      provider,
+      undefined
+    )
+    if (!updated) {
+      throw new Error('The Ollama provider model list could not be saved.')
+    }
   }
 
   private onSelectedTabSizeChanged = (tabSize: number) => {

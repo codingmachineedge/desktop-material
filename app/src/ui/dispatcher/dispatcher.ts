@@ -6795,12 +6795,14 @@ export class Dispatcher {
   public async updateCopilotBYOKProvider(
     provider: IBYOKProvider,
     secret: string | null | undefined
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await this.appStore._updateCopilotBYOKProvider(provider, secret)
+      return true
     } catch (e) {
       log.error(`Error updating BYOK Copilot provider '${provider.name}'`, e)
-      this.postError(e)
+      await this.postError(e)
+      return false
     }
   }
 
