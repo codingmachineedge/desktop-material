@@ -41,6 +41,17 @@ describe('Ollama model manager style contracts', () => {
     )
   })
 
+  it('uses the full settings workspace and compacts details on desktop', () => {
+    assert.match(
+      styles,
+      /dialog#preferences:has\(\.ollama-model-manager\)[\s\S]*width: min\(1320px, calc\(100vw - 60px\)\);[\s\S]*height: min\(900px, calc\(100vh - 60px\)\);[\s\S]*\.copilot-tab-content[\s\S]*max-height: none;/
+    )
+    assert.match(
+      styles,
+      /@container ollama-model-manager \(min-width: 900px\)[\s\S]*\.ollama-model-details[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);[\s\S]*\.ollama-model-metadata[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/
+    )
+  })
+
   it('keeps focus indicators visible and disables indeterminate motion when requested', () => {
     assert.match(styles, /&:focus-visible\s*\{[\s\S]*box-shadow:/)
     assert.match(

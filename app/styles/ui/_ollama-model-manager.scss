@@ -666,6 +666,39 @@
     }
   }
 
+  @container ollama-model-manager (min-width: 900px) {
+    .ollama-model-details {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+    }
+
+    .ollama-model-details > header,
+    .ollama-details-state,
+    .ollama-model-metadata,
+    .ollama-model-editors {
+      grid-column: 1 / -1;
+    }
+
+    .ollama-model-metadata {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .ollama-runtime-section dl {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .ollama-license-section p {
+      max-height: 4.35em;
+      -webkit-line-clamp: 3;
+    }
+
+    .ollama-model-editors form {
+      padding: 7px;
+    }
+  }
+
   @container ollama-model-manager (max-width: 700px) {
     .ollama-endpoint-summary,
     .ollama-pull-card,
@@ -750,6 +783,24 @@
         width: 100%;
         justify-content: center;
       }
+    }
+  }
+}
+
+dialog#preferences:has(.ollama-model-manager) {
+  width: min(1320px, calc(100vw - 60px));
+  height: min(900px, calc(100vh - 60px));
+
+  .dialog-content.copilot-tab {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+
+    .copilot-tab-content {
+      min-height: 0;
+      max-height: none;
+      flex: 1;
+      overflow: visible;
     }
   }
 }
