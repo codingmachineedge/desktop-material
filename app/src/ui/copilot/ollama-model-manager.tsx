@@ -1608,14 +1608,17 @@ export class OllamaModelManager extends React.Component<
     ++this.operationRequestId
     this.operationController?.abort()
     this.operationController = null
-    this.setState({
-      operation: null,
-      pullProgress: null,
-      notice: {
-        kind: 'cancelled',
-        message: this.getStrings().pullCancelled,
+    this.setState(
+      {
+        operation: null,
+        pullProgress: null,
+        notice: {
+          kind: 'cancelled',
+          message: this.getStrings().pullCancelled,
+        },
       },
-    })
+      () => void this.refreshInventory(true)
+    )
   }
 
   private beginOperation(
