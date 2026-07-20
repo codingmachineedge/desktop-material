@@ -102,11 +102,14 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
         self.assertEqual([user["id"] for user in created["assignees"]], [104])
         self.assertTrue(created["remove_source_branch"])
         self.assertTrue(created["squash"])
+        self.assertGreater(created["updated_at"], fixture.FIXED_TIME)
 
         updated = self.state.update_merge_request(
             42,
             {
                 "title": "Add native GitLab review",
+                "description": "Updated review workflow",
+                "target_branch": "release/next",
                 "reviewer_ids": [103],
                 "assignee_ids": [0],
                 "state_event": "close",
@@ -116,13 +119,19 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
         self.assertEqual([user["id"] for user in updated["reviewers"]], [103])
         self.assertEqual(updated["assignees"], [])
         self.assertEqual(updated["state"], "closed")
+        self.assertEqual(updated["description"], "Updated review workflow")
+        self.assertEqual(updated["target_branch"], "release/next")
+        self.assertGreater(updated["updated_at"], created["updated_at"])
         reopened = self.state.update_merge_request(42, {"state_event": "reopen"})
         self.assertEqual(reopened["state"], "opened")
+        self.assertGreater(reopened["updated_at"], updated["updated_at"])
 
-        operations = [
-            event.get("operation") for event in self.state.audit_log.snapshot()
-        ]
+        events = self.state.audit_log.snapshot()
+        operations = [event.get("operation") for event in events]
         self.assertEqual(operations, ["create", "update", "update"])
+        self.assertEqual(events[0]["targetBranch"], "main")
+        self.assertEqual(events[1]["targetBranch"], "release/next")
+        self.assertEqual(events[1]["updatedAt"], updated["updated_at"])
 
     def test_sha_guarded_approve_and_unapprove_preserve_state_on_mismatch(self) -> None:
         head_sha = self.state.get_merge_request(41)["sha"]
@@ -137,6 +146,9 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
         self.assertEqual(approved["approvals_left"], 0)
         self.assertEqual(approved["approved_by"][0]["user"]["id"], 101)
         self.assertEqual(approved["detailed_merge_status"], "mergeable")
+        approval_event = self.state.audit_log.snapshot()[0]
+        self.assertTrue(approval_event["headSHAProvided"])
+        self.assertTrue(approval_event["headMatched"])
         state = self.state.approval_state(41)
         self.assertTrue(state["rules"][0]["approved"])
         aggregate = self.state.approvals(41)
@@ -158,6 +170,10 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
                 }
             ),
             lambda: self.state.update_merge_request(41, {"unknown": True}),
+            lambda: self.state.update_merge_request(41, {"target_branch": "bad branch"}),
+            lambda: self.state.update_merge_request(
+                41, {"reviewer_ids": [104], "assignee_ids": [999]}
+            ),
             lambda: self.state.list_merge_requests({"per_page": ["101"]}),
             lambda: self.state.list_merge_requests(
                 {"page": ["1000"], "per_page": ["100"]}
@@ -169,6 +185,18 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
                 with self.assertRaises(fixture.FixtureAPIError) as failure:
                     operation()
                 self.assertEqual(failure.exception.status, 400)
+        snapshot = self.state.snapshot()
+        self.assertEqual(snapshot["mutationRevision"], 0)
+        self.assertEqual(snapshot["readinessRemaining"], {"41": 2})
+        self.assertEqual(self.state.audit_log.snapshot(), [])
+        self.assertEqual(
+            self.state.get_merge_request(41)["updated_at"], fixture.FIXED_TIME
+        )
+        values, _, _, _ = self.state.list_merge_requests({"state": ["all"]})
+        unchanged = next(value for value in values if value["iid"] == 41)
+        self.assertEqual(
+            [reviewer["id"] for reviewer in unchanged["reviewers"]], [101, 103]
+        )
 
     def test_concurrent_creates_have_unique_iids_and_contiguous_audit_sequences(self) -> None:
         def create(index: int) -> int:
@@ -498,12 +526,17 @@ class GitLabMRFixtureHTTPTests(unittest.TestCase):
             f"{self.project_api}/merge_requests/{iid}",
             {
                 "title": "Native GitLab review",
+                "description": "Edited by the fixture lifecycle",
+                "target_branch": "release/next",
                 "reviewer_ids": [103],
                 "assignee_ids": [101, 104],
             },
         )
         self.assertEqual(status, 200)
         self.assertFalse(updated["draft"])
+        self.assertEqual(updated["description"], "Edited by the fixture lifecycle")
+        self.assertEqual(updated["target_branch"], "release/next")
+        self.assertGreater(updated["updated_at"], created["updated_at"])
         self.assertEqual([user["id"] for user in updated["reviewers"]], [103])
         self.assertEqual(
             [user["id"] for user in updated["assignees"]], [101, 104]

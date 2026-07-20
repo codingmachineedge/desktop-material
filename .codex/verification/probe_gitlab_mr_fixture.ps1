@@ -213,11 +213,13 @@ $created = Invoke-GitLabMRJson -Method Post -Path "$projectApi/merge_requests" -
   assignee_ids = @(104)
 }
 $createdIid = [int]$created.iid
+$createdUpdatedAt = ([DateTime]$created.updated_at).ToUniversalTime()
 if (
   $createdIid -ne 42 -or
   [bool]$created.draft -ne $true -or
   @($created.reviewers).Count -ne 2 -or
-  @($created.assignees).Count -ne 1
+  @($created.assignees).Count -ne 1 -or
+  $createdUpdatedAt -le [DateTime]'2026-07-20T16:00:00.000Z'
 ) {
   throw 'GitLab merge-request create contract failed.'
 }
@@ -230,13 +232,19 @@ $createdUrls = @(
 Assert-GitLabMRSameOriginUrls -Label 'created merge request' -Urls $createdUrls
 $updated = Invoke-GitLabMRJson -Method Put -Path "$projectApi/merge_requests/$createdIid" -Body @{
   title = 'Probe native GitLab review'
+  description = 'Edited by the raw fixture lifecycle.'
+  target_branch = 'release/next'
   reviewer_ids = @(103)
   assignee_ids = @(101, 104)
   state_event = 'close'
 }
+$updatedAt = ([DateTime]$updated.updated_at).ToUniversalTime()
 if (
   [bool]$updated.draft -ne $false -or
   [string]$updated.state -ne 'closed' -or
+  [string]$updated.description -ne 'Edited by the raw fixture lifecycle.' -or
+  [string]$updated.target_branch -ne 'release/next' -or
+  $updatedAt -le $createdUpdatedAt -or
   @($updated.reviewers).Count -ne 1 -or
   @($updated.assignees).Count -ne 2
 ) {
@@ -249,8 +257,14 @@ $updatedUrls = @(
   @($updated.assignees) | ForEach-Object { $_.web_url }
 )
 Assert-GitLabMRSameOriginUrls -Label 'updated merge request' -Urls $updatedUrls
-$null = Invoke-GitLabMRJson -Method Put -Path "$projectApi/merge_requests/$createdIid" -Body @{
+$reopened = Invoke-GitLabMRJson -Method Put -Path "$projectApi/merge_requests/$createdIid" -Body @{
   state_event = 'reopen'
+}
+if (
+  [string]$reopened.state -ne 'opened' -or
+  ([DateTime]$reopened.updated_at).ToUniversalTime() -le $updatedAt
+) {
+  throw 'GitLab merge-request reopen timestamp contract failed.'
 }
 
 $membersResult = Invoke-GitLabMRJson -Method Get -Path "$projectApi/members/all?per_page=100&page=1"

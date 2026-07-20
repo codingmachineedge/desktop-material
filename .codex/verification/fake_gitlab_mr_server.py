@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -37,6 +38,7 @@ PROJECT_PATH = "material-labs/platform/desktop-material"
 ENCODED_PROJECT_PATH = quote(PROJECT_PATH, safe="")
 DEFAULT_STATE_ORIGIN = "https://gitlab.example.test"
 FIXED_TIME = "2026-07-20T16:00:00.000Z"
+FIXED_TIME_ORIGIN = datetime(2026, 7, 20, 16, 0, 0, tzinfo=timezone.utc)
 MAX_REQUEST_BODY_BYTES = 64 * 1024
 MAX_PAGE = 1_000
 MAX_PER_PAGE = 100
@@ -330,7 +332,15 @@ class GitLabMRFixtureState:
         self._readiness_remaining = {iid: 0 for iid in self._merge_requests}
         self._readiness_remaining[41] = 2
         self._next_iid = 42
+        self._mutation_revision = 0
         self._fault_mode = "none"
+
+    def _next_updated_at(self) -> str:
+        """Return a stable, strictly increasing provider timestamp."""
+
+        self._mutation_revision += 1
+        value = FIXED_TIME_ORIGIN + timedelta(milliseconds=self._mutation_revision)
+        return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
     @property
     def fault_mode(self) -> str:
@@ -360,6 +370,7 @@ class GitLabMRFixtureState:
                 "faultMode": self._fault_mode,
                 "mergeRequestIids": sorted(self._merge_requests, reverse=True),
                 "nextIid": self._next_iid,
+                "mutationRevision": self._mutation_revision,
                 "approvedIids": sorted(
                     iid for iid, users in self._approvals.items() if users
                 ),
@@ -476,6 +487,12 @@ class GitLabMRFixtureState:
             "state": merge_request.state,
             "created_at": merge_request.created_at,
             "updated_at": merge_request.updated_at,
+            "merged_at": (
+                merge_request.updated_at if merge_request.state == "merged" else None
+            ),
+            "closed_at": (
+                merge_request.updated_at if merge_request.state == "closed" else None
+            ),
             "source_branch": merge_request.source_branch,
             "target_branch": merge_request.target_branch,
             "source_project_id": PROJECT_ID,
@@ -494,6 +511,7 @@ class GitLabMRFixtureState:
                 "can_be_merged" if status == "mergeable" else "checking"
             ),
             "has_conflicts": False,
+            "blocking_discussions_resolved": True,
             "labels": ["provider:gitlab", "review"],
             "references": {
                 "short": f"!{merge_request.iid}",
@@ -633,6 +651,7 @@ class GitLabMRFixtureState:
         with self._lock:
             iid = self._next_iid
             self._next_iid += 1
+            mutation_time = self._next_updated_at()
             merge_request = MergeRequest(
                 iid=iid,
                 title=title,
@@ -644,6 +663,8 @@ class GitLabMRFixtureState:
                 author_id=CURRENT_USER_ID,
                 reviewer_ids=reviewer_ids,
                 assignee_ids=assignee_ids,
+                created_at=mutation_time,
+                updated_at=mutation_time,
                 remove_source_branch=remove_source_branch,
                 squash=squash,
             )
@@ -657,6 +678,8 @@ class GitLabMRFixtureState:
                 draft=merge_request.draft,
                 reviewerIds=list(reviewer_ids),
                 assigneeIds=list(assignee_ids),
+                targetBranch=target_branch,
+                updatedAt=mutation_time,
             )
             return self._render(merge_request, advance=False, origin=origin)
 
@@ -670,6 +693,7 @@ class GitLabMRFixtureState:
         allowed = {
             "title",
             "description",
+            "target_branch",
             "reviewer_ids",
             "assignee_ids",
             "state_event",
@@ -683,6 +707,7 @@ class GitLabMRFixtureState:
             existing = self._merge_requests.get(iid)
             if existing is None:
                 raise FixtureAPIError(HTTPStatus.NOT_FOUND, "404 Not found")
+            readiness_remaining = self._readiness_remaining.get(iid, 0)
             values = {
                 "iid": existing.iid,
                 "title": existing.title,
@@ -695,7 +720,7 @@ class GitLabMRFixtureState:
                 "reviewer_ids": existing.reviewer_ids,
                 "assignee_ids": existing.assignee_ids,
                 "created_at": existing.created_at,
-                "updated_at": FIXED_TIME,
+                "updated_at": existing.updated_at,
                 "remove_source_branch": existing.remove_source_branch,
                 "squash": existing.squash,
             }
@@ -707,9 +732,11 @@ class GitLabMRFixtureState:
                 values["description"] = _request_text(
                     request, "description", required=False, maximum=32_768
                 )
+            if "target_branch" in request:
+                values["target_branch"] = _request_branch(request, "target_branch")
             if "reviewer_ids" in request:
                 values["reviewer_ids"] = _request_user_ids(request, "reviewer_ids")
-                self._readiness_remaining[iid] = 1
+                readiness_remaining = 1
             if "assignee_ids" in request:
                 values["assignee_ids"] = _request_user_ids(request, "assignee_ids")
             if "remove_source_branch" in request:
@@ -726,8 +753,10 @@ class GitLabMRFixtureState:
                     values["state"] = "closed"
                 else:
                     values["state"] = "opened"
+            values["updated_at"] = self._next_updated_at()
             updated = MergeRequest(**values)
             self._merge_requests[iid] = updated
+            self._readiness_remaining[iid] = readiness_remaining
             self.audit_log.record(
                 "mutation",
                 operation="update",
@@ -737,6 +766,8 @@ class GitLabMRFixtureState:
                 reviewerIds=list(updated.reviewer_ids),
                 assigneeIds=list(updated.assignee_ids),
                 state=updated.state,
+                targetBranch=updated.target_branch,
+                updatedAt=updated.updated_at,
             )
             return self._render(updated, advance=False, origin=origin)
 
@@ -814,7 +845,12 @@ class GitLabMRFixtureState:
             self._approvals[iid].add(CURRENT_USER_ID)
             self._readiness_remaining[iid] = 0
             self.audit_log.record(
-                "mutation", operation="approve", iid=iid, changed=changed
+                "mutation",
+                operation="approve",
+                iid=iid,
+                changed=changed,
+                headSHAProvided=supplied_sha is not None,
+                headMatched=supplied_sha is None or supplied_sha == merge_request.sha,
             )
             return self._approval_summary(iid, origin=origin)
 
