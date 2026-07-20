@@ -112,9 +112,8 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
         with self.assertRaises(fixture.FixtureAPIError) as mismatch:
             self.state.approve(41, {"sha": "f" * 40})
         self.assertEqual(mismatch.exception.status, 409)
-        self.assertEqual(
-            self.state.approval_state(41)["rules"][0]["approved_by"], []
-        )
+        self.assertFalse(self.state.approvals(41)["approved"])
+        self.assertEqual(self.state.approvals(41)["approved_by"], [])
         self.assertEqual(self.state.audit_log.snapshot(), [])
 
         approved = self.state.approve(41, {"sha": head_sha})
@@ -123,6 +122,9 @@ class GitLabMRFixtureStateTests(unittest.TestCase):
         self.assertEqual(approved["detailed_merge_status"], "mergeable")
         state = self.state.approval_state(41)
         self.assertTrue(state["rules"][0]["approved"])
+        aggregate = self.state.approvals(41)
+        self.assertTrue(aggregate["approved"])
+        self.assertEqual(aggregate["approvals_left"], 0)
 
         unapproved = self.state.unapprove(41)
         self.assertEqual(unapproved["approvals_left"], 1)
@@ -414,11 +416,19 @@ class GitLabMRFixtureHTTPTests(unittest.TestCase):
         )
         self.assertEqual(status, 201)
         self.assertEqual(approved["approvals_left"], 0)
-        status, _, approval_state = self.json_request(
+        status, _, approvals = self.json_request(
+            "GET", f"{single}/approvals"
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(approvals["approved"])
+        self.assertEqual(approvals["approvals_required"], 1)
+        self.assertEqual(approvals["approvals_left"], 0)
+        self.assertEqual(approvals["approved_by"][0]["user"]["id"], 101)
+        status, _, rule_details = self.json_request(
             "GET", f"{single}/approval_state"
         )
         self.assertEqual(status, 200)
-        self.assertTrue(approval_state["rules"][0]["approved"])
+        self.assertTrue(rule_details["rules"][0]["approved"])
         status, _, unapproved = self.json_request(
             "POST", f"{single}/unapprove", {}
         )
@@ -453,7 +463,7 @@ class GitLabMRFixtureHTTPTests(unittest.TestCase):
         )
         self.assertEqual(status, 503)
         status, _, _ = self.json_request(
-            "GET", f"{self.project_api}/merge_requests/41/approval_state"
+            "GET", f"{self.project_api}/merge_requests/41/approvals"
         )
         self.assertEqual(status, 503)
 

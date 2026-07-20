@@ -727,6 +727,12 @@ class GitLabMRFixtureState:
                 ],
             }
 
+    def approvals(self, iid: int) -> dict[str, Any]:
+        with self._lock:
+            if iid not in self._merge_requests:
+                raise FixtureAPIError(HTTPStatus.NOT_FOUND, "404 Not found")
+            return self._approval_summary(iid)
+
     def approve(self, iid: int, request: Mapping[str, Any]) -> dict[str, Any]:
         _reject_unknown_fields(request, {"sha"})
         with self._lock:
@@ -788,6 +794,7 @@ class GitLabMRFixtureState:
             "detailed_merge_status": self._derived_status(merge_request),
             "approvals_required": 1,
             "approvals_left": 0 if approved_by else 1,
+            "approved": bool(approved_by),
             "approved_by": approved_by,
         }
 
@@ -1217,7 +1224,7 @@ class GitLabMRFixtureHandler(BaseHTTPRequestHandler):
             return self._method_not_allowed("GET, POST"), "merge-request-list"
 
         match = re.fullmatch(
-            r"merge_requests/([1-9][0-9]*)(?:/(approval_state|approve|unapprove))?",
+            r"merge_requests/([1-9][0-9]*)(?:/(approvals|approval_state|approve|unapprove))?",
             project_suffix,
         )
         if match is None:
@@ -1226,6 +1233,17 @@ class GitLabMRFixtureHandler(BaseHTTPRequestHandler):
             ), "project-not-found"
         iid = int(match.group(1))
         operation = match.group(2)
+        if operation == "approvals":
+            if method != "GET":
+                return self._method_not_allowed("GET"), "approvals"
+            if self.server.state.fault_mode == "partial":
+                return error_response(
+                    FixtureAPIError(
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                        "approvals are temporarily unavailable",
+                    )
+                ), "approvals"
+            return json_response(self.server.state.approvals(iid)), "approvals"
         if operation == "approval_state":
             if method != "GET":
                 return self._method_not_allowed("GET"), "approval-state"
@@ -1428,7 +1446,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "tokenRequired": True,
         "runId": paths.run_id,
         "runRootName": paths.run_root.name,
-        "mutationLog": str(paths.mutation_log),
+        "mutationLog": f"{OWNED_DIRECTORY_NAME}/{MUTATION_LOG_FILE_NAME}",
         "faultMode": arguments.fault_mode,
         "responseDelayMs": arguments.response_delay_ms,
     }
