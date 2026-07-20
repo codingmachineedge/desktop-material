@@ -670,11 +670,13 @@ test('fixture account hydration returns only privacy-safe receipts', () => {
   )
   for (const contract of [
     'accountsStore.reloadFromStore()',
+    'accountsStore.refresh()',
     'accountsStore.getAll()',
     'repositoryWithRefreshedGitHubRepository(repository)',
     'accountCount: accounts.length',
     'fixtureAccountMatched: fixtureAccount !== undefined',
     'fixtureTokenPresent:',
+    'fixtureCopilotEnabled:',
     'repositoryMatched: Boolean(freshRepository?.gitHubRepository)',
     'selectedRepositoryMatched: Boolean(',
   ]) {
@@ -710,6 +712,88 @@ test('fixture account hydration removes only its exact temporary Git proxy', () 
       remote.indexOf("'--unset-all'"),
     'the proxy must be validated before it is removed'
   )
+})
+
+test('Ollama evidence uses an owned loopback fixture and a full reversible UI exercise', () => {
+  const fixtureStart = source.indexOf('function readOwnedOllamaFixture(')
+  const fixtureEnd = source.indexOf(
+    'function assertOwnedDisposableFixture()',
+    fixtureStart
+  )
+  assert.ok(fixtureStart >= 0 && fixtureEnd > fixtureStart)
+  const fixture = source.slice(fixtureStart, fixtureEnd)
+  for (const contract of [
+    "args.get('ollama-run-root')",
+    'fs.realpathSync.native(os.tmpdir())',
+    '/^desktop-material-ollama-',
+    "receipt.fixture !== 'desktop-material-ollama'",
+    'receipt.protocolVersion !== 1',
+    "receipt.bind !== '127.0.0.1'",
+    "endpoint.protocol !== 'http:'",
+    "endpoint.hostname !== '127.0.0.1'",
+    "receipt.mutationLog !== 'ollama/mutations.jsonl'",
+    'ready?.copilotEnabled !== true',
+    "integration: 'ollama'",
+    "authKind: 'none'",
+    "wireApi: 'completions'",
+  ]) {
+    assert.ok(fixture.includes(contract), `Ollama fixture misses ${contract}`)
+  }
+  assert.ok(!fixture.includes('TokenStore'))
+
+  const seedStart = source.indexOf('async function seedProfile()')
+  const seedEnd = source.indexOf('async function ensureRepository(', seedStart)
+  const seed = source.slice(seedStart, seedEnd)
+  assert.ok(seed.includes("'language-mode-v1': 'english'"))
+  assert.ok(seed.includes("localStorage.getItem('copilot-byok-providers')"))
+  assert.ok(seed.includes("localStorage.setItem('copilot-byok-providers'"))
+  assert.ok(!seed.includes('TokenStore'))
+
+  const manager = sceneSource('ollama-manager')
+  for (const contract of [
+    'await setViewport(1452, 1001)',
+    "clickEnabledSelector('#theme-toggle button')",
+    'await captureSettingsTab(',
+    "'Copilot'",
+    "clickText('Providers'",
+    "clickText('Manage models'",
+    'material-ollama-model-manager',
+    'ollama-endpoint-status',
+    'ollama-pull-progress',
+    'ollama-pull-cancel',
+    'material-code:1.5b',
+    'material-gallery-copy:latest',
+    'ollama-copy',
+    'ollama-load',
+    'ollama-unload',
+    'ollama-delete-dialog',
+    'ollama-delete-confirm',
+    "'pull-cancelled'",
+    "'/__fixture__/reset'",
+    'assertBaseOllamaFixtureState(finalReset',
+    "document.body.classList.contains('theme-dark')",
+    "localStorage.getItem('theme') === 'dark'",
+    'window.innerWidth === 1452 && window.innerHeight === 1001',
+    'document.querySelector(\'[data-verification="ollama-notice"]\') === null',
+    'finally {',
+    "localStorage.getItem('theme') === 'system'",
+    'await restoreCaptureViewport()',
+  ]) {
+    assert.ok(manager.includes(contract), `Ollama scene misses ${contract}`)
+  }
+  for (const model of [
+    'material-chat:7b',
+    'material-embed:latest',
+    'material-vision:3b',
+  ]) {
+    assert.ok(manager.includes(model), `Ollama scene misses ${model}`)
+  }
+  assert.ok(!manager.includes('TokenStore'))
+
+  const viewport = manager.indexOf('await setViewport(1452, 1001)')
+  const capture = manager.indexOf('material-ollama-model-manager')
+  const restoration = manager.lastIndexOf('await restoreCaptureViewport()')
+  assert.ok(viewport >= 0 && viewport < capture && capture < restoration)
 })
 
 test('both pull-request scenes refresh the non-empty origin/main comparison', () => {
