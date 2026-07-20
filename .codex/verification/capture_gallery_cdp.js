@@ -2786,6 +2786,70 @@ scene('logo-studio', async () => {
     `document.querySelector('.repository-logo-studio') !== null`,
     'repository logo studio'
   )
+  await waitFor(
+    `(() => {
+      const editor = document.querySelector('.repository-logo-anchored-editor')
+      const content = editor?.querySelector('.anchored-appearance-editor-content')
+      const studio = editor?.querySelector('.repository-logo-studio')
+      const mount = editor?.closest('.anchored-appearance-editor-mount')
+      const popover = editor?.closest('.popover-component')
+      const foldoutContainer = document.querySelector('#foldout-container')
+      const foldout = foldoutContainer?.querySelector('.foldout')
+      const heading = studio?.querySelector('#repository-logo-studio-heading')
+      const preview = studio?.querySelector('[aria-label^="Live logo preview for "]')
+      const presets = studio?.querySelector('[aria-label="Logo presets"]')
+      if (!(editor instanceof HTMLElement) || !(content instanceof HTMLElement) ||
+          !(studio instanceof HTMLElement) || !(mount instanceof HTMLElement) ||
+          !(popover instanceof HTMLElement) || !(foldoutContainer instanceof HTMLElement) ||
+          !(foldout instanceof HTMLElement) || !(heading instanceof HTMLElement) ||
+          !(preview instanceof HTMLElement) || !(presets instanceof HTMLElement)) return false
+      const popoverBounds = popover.getBoundingClientRect()
+      const foldoutBounds = foldout.getBoundingClientRect()
+      const studioBounds = studio.getBoundingClientRect()
+      const namedControls = [heading, preview, presets].map(element =>
+        element.getBoundingClientRect()
+      )
+      return editor.closest('.foldout') === null &&
+        mount.parentElement === foldoutContainer &&
+        popoverBounds.width > foldoutBounds.width &&
+        popoverBounds.height > 0 &&
+        popoverBounds.left >= 0 && popoverBounds.top >= 0 &&
+        popoverBounds.right <= window.innerWidth && popoverBounds.bottom <= window.innerHeight &&
+        content.clientHeight >= Math.min(320, window.innerHeight - 200) &&
+        getComputedStyle(content).overflowY === 'auto' &&
+        studioBounds.width > 0 && studioBounds.height > 0 &&
+        studioBounds.left >= popoverBounds.left && studioBounds.right <= popoverBounds.right &&
+        namedControls.every(bounds => bounds.width > 0 && bounds.height > 0)
+    })()`,
+    'unclipped repository logo studio portal'
+  )
+  const scrollReceipt = await evaluate(`(() => {
+    const content = document.querySelector(
+      '.repository-logo-anchored-editor .anchored-appearance-editor-content'
+    )
+    if (!(content instanceof HTMLElement)) return null
+    const maximum = content.scrollHeight - content.clientHeight
+    content.scrollTop = content.scrollHeight
+    const reachedBottom = maximum > 0 && content.scrollTop >= maximum - 1
+    const reached = content.scrollTop
+    content.scrollTop = 0
+    return { maximum, reached, reachedBottom, restored: content.scrollTop === 0 }
+  })()`)
+  if (
+    scrollReceipt === null ||
+    scrollReceipt.reachedBottom !== true ||
+    scrollReceipt.restored !== true
+  ) {
+    fail(
+      `Repository logo studio scroll range is unreachable: ${JSON.stringify(
+        scrollReceipt
+      )}`
+    )
+  }
+  await waitFor(
+    `document.querySelector('.repository-logo-anchored-editor .anchored-appearance-editor-content')?.scrollTop === 0`,
+    'restored repository logo studio scroll position'
+  )
   await sleep(900)
   await parkPointer()
   await capture('material-repository-logo-studio')

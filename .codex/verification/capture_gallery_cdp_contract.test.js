@@ -123,6 +123,36 @@ test('appearance captures require a visible in-viewport owner editor', () => {
   )
 })
 
+test('repository logo capture proves its foldout portal and scroll range', () => {
+  const logo = sceneSource('logo-studio')
+  for (const contract of [
+    "document.querySelector('.repository-logo-anchored-editor')",
+    "editor.closest('.foldout') === null",
+    'mount.parentElement === foldoutContainer',
+    'popoverBounds.width > foldoutBounds.width',
+    'content.clientHeight >= Math.min(320, window.innerHeight - 200)',
+    "getComputedStyle(content).overflowY === 'auto'",
+    "studio?.querySelector('#repository-logo-studio-heading')",
+    'studio?.querySelector(\'[aria-label^="Live logo preview for "]\')',
+    'studio?.querySelector(\'[aria-label="Logo presets"]\')',
+    'content.scrollHeight - content.clientHeight',
+    'content.scrollTop = content.scrollHeight',
+    'reachedBottom',
+    'content.scrollTop = 0',
+    'restored repository logo studio scroll position',
+  ]) {
+    assert.ok(
+      logo.includes(contract),
+      `repository logo gate misses ${contract}`
+    )
+  }
+  assert.ok(
+    logo.indexOf('restored repository logo studio scroll position') <
+      logo.indexOf("capture('material-repository-logo-studio')"),
+    'the portal and scroll gates must run before capture'
+  )
+})
+
 test('provider triage capture waits for the exact settled surface', () => {
   const triage = sceneSource('provider-triage')
   for (const contract of [
