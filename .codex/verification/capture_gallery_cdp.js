@@ -118,11 +118,45 @@ const AdvancedWorkflowRemoteTagNames = Object.freeze([
 const AdvancedWorkflowGitTimeoutMs = 30_000
 const AdvancedWorkflowGitMaxBufferBytes = 1024 * 1024
 const AdvancedWorkflowGitNullDevice = 'NUL'
+const AdvancedWorkflowGitRedirectEnvironmentNames = Object.freeze([
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_CEILING_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_DIR',
+  'GIT_DISCOVERY_ACROSS_FILESYSTEM',
+  'GIT_EXEC_PATH',
+  'GIT_GLOB_PATHSPECS',
+  'GIT_GRAFT_FILE',
+  'GIT_ICASE_PATHSPECS',
+  'GIT_IMPLICIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_INTERNAL_SUPER_PREFIX',
+  'GIT_LITERAL_PATHSPECS',
+  'GIT_NAMESPACE',
+  'GIT_NOGLOB_PATHSPECS',
+  'GIT_NO_REPLACE_OBJECTS',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_PREFIX',
+  'GIT_QUARANTINE_PATH',
+  'GIT_REDIRECT_STDERR',
+  'GIT_REDIRECT_STDIN',
+  'GIT_REDIRECT_STDOUT',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+  'GIT_SUPER_PREFIX',
+  'GIT_TEMPLATE_DIR',
+  'GIT_WORK_TREE',
+])
 
 function getAdvancedWorkflowGitEnvironment(overrides = {}) {
   const environment = { ...process.env, ...overrides }
   for (const key of Object.keys(environment)) {
-    if (/^GIT_CONFIG(?:_|$)/i.test(key)) {
+    const normalizedKey = key.toUpperCase()
+    if (
+      /^GIT_CONFIG(?:_|$)/.test(normalizedKey) ||
+      /^GIT_TRACE(?:2)?(?:_|$)/.test(normalizedKey) ||
+      AdvancedWorkflowGitRedirectEnvironmentNames.includes(normalizedKey)
+    ) {
       delete environment[key]
     }
   }

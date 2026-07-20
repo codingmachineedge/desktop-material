@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const test = require('node:test')
+const vm = require('node:vm')
 
 const driverPath = path.join(__dirname, 'capture_gallery_cdp.js')
 const source = fs.readFileSync(driverPath, 'utf8')
@@ -811,6 +812,45 @@ test('advanced workflow seeds and proves the exact owned tag topology', () => {
 })
 
 test('advanced workflow Git subprocesses are bounded and hermetic', () => {
+  const redirectEnvironmentNames = frozenStringArray(
+    'AdvancedWorkflowGitRedirectEnvironmentNames'
+  )
+  const requiredRedirectEnvironmentNames = [
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_CEILING_DIRECTORIES',
+    'GIT_COMMON_DIR',
+    'GIT_DIR',
+    'GIT_DISCOVERY_ACROSS_FILESYSTEM',
+    'GIT_EXEC_PATH',
+    'GIT_GLOB_PATHSPECS',
+    'GIT_GRAFT_FILE',
+    'GIT_ICASE_PATHSPECS',
+    'GIT_IMPLICIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_INTERNAL_SUPER_PREFIX',
+    'GIT_LITERAL_PATHSPECS',
+    'GIT_NAMESPACE',
+    'GIT_NOGLOB_PATHSPECS',
+    'GIT_NO_REPLACE_OBJECTS',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_PREFIX',
+    'GIT_QUARANTINE_PATH',
+    'GIT_REDIRECT_STDERR',
+    'GIT_REDIRECT_STDIN',
+    'GIT_REDIRECT_STDOUT',
+    'GIT_REPLACE_REF_BASE',
+    'GIT_SHALLOW_FILE',
+    'GIT_SUPER_PREFIX',
+    'GIT_TEMPLATE_DIR',
+    'GIT_WORK_TREE',
+  ]
+  assert.deepEqual(redirectEnvironmentNames, requiredRedirectEnvironmentNames)
+  assert.equal(
+    new Set(redirectEnvironmentNames).size,
+    redirectEnvironmentNames.length,
+    'Git redirection environment names must remain unique'
+  )
+
   const helperStart = source.indexOf(
     'const AdvancedWorkflowGitTimeoutMs = 30_000'
   )
@@ -826,7 +866,10 @@ test('advanced workflow Git subprocesses are bounded and hermetic', () => {
     'const AdvancedWorkflowGitMaxBufferBytes = 1024 * 1024',
     "const AdvancedWorkflowGitNullDevice = 'NUL'",
     'const environment = { ...process.env, ...overrides }',
-    '/^GIT_CONFIG(?:_|$)/i.test(key)',
+    'const normalizedKey = key.toUpperCase()',
+    '/^GIT_CONFIG(?:_|$)/.test(normalizedKey)',
+    '/^GIT_TRACE(?:2)?(?:_|$)/.test(normalizedKey)',
+    'AdvancedWorkflowGitRedirectEnvironmentNames.includes(normalizedKey)',
     'delete environment[key]',
     'GIT_CONFIG_GLOBAL: AdvancedWorkflowGitNullDevice',
     'GIT_CONFIG_SYSTEM: AdvancedWorkflowGitNullDevice',
@@ -847,6 +890,79 @@ test('advanced workflow Git subprocesses are bounded and hermetic', () => {
   )
   assert.ok(callerOptions >= 0 && callerOptions < timeout)
   assert.ok(callerOptions < maxBuffer)
+
+  const inheritedEnvironment = Object.fromEntries(
+    redirectEnvironmentNames.map((name, index) => [
+      index % 2 === 0 ? name : name.toLowerCase(),
+      `inherited-${index}`,
+    ])
+  )
+  inheritedEnvironment.GIT_CONFIG_COUNT = '1'
+  inheritedEnvironment.GIT_CONFIG_KEY_0 = 'core.hooksPath'
+  inheritedEnvironment.GIT_CONFIG_VALUE_0 = 'inherited-hook-path'
+  inheritedEnvironment.Git_Trace = 'inherited-trace-path'
+  inheritedEnvironment.git_trace2_event = 'inherited-trace2-path'
+  inheritedEnvironment.GIT_COMMITTER_NAME = 'Inherited identity'
+  inheritedEnvironment.SAFE_CAPTURE_SENTINEL = 'inherited-safe-value'
+  const getEnvironment = vm.runInNewContext(
+    `(() => { ${helper}; return getAdvancedWorkflowGitEnvironment })()`,
+    { process: { env: inheritedEnvironment } }
+  )
+  const sanitizedEnvironment = getEnvironment({
+    git_dir: 'override-repository',
+    git_config_global: 'override-config',
+    GIT_COMMITTER_NAME: 'Material Fixture',
+    GIT_COMMITTER_EMAIL: 'material-fixture@example.invalid',
+    GIT_COMMITTER_DATE: '2026-07-13T10:24:00Z',
+    SAFE_OVERRIDE_SENTINEL: 'override-safe-value',
+  })
+  for (const name of redirectEnvironmentNames) {
+    assert.equal(
+      Object.keys(sanitizedEnvironment).some(key => key.toUpperCase() === name),
+      false,
+      `${name} escaped Git environment isolation`
+    )
+  }
+  assert.equal(
+    Object.keys(sanitizedEnvironment).some(key =>
+      /^GIT_TRACE(?:2)?(?:_|$)/.test(key.toUpperCase())
+    ),
+    false,
+    'Git trace output escaped environment isolation'
+  )
+  assert.equal(
+    Object.keys(sanitizedEnvironment).some(key =>
+      /^GIT_CONFIG(?:_|$)/.test(key.toUpperCase())
+    ),
+    true,
+    'only the fixed Git configuration variables should survive isolation'
+  )
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(sanitizedEnvironment).filter(([key]) =>
+        /^GIT_CONFIG(?:_|$)/.test(key.toUpperCase())
+      )
+    ),
+    {
+      GIT_CONFIG_GLOBAL: 'NUL',
+      GIT_CONFIG_SYSTEM: 'NUL',
+      GIT_CONFIG_NOSYSTEM: '1',
+    }
+  )
+  assert.equal(sanitizedEnvironment.GIT_COMMITTER_NAME, 'Material Fixture')
+  assert.equal(
+    sanitizedEnvironment.GIT_COMMITTER_EMAIL,
+    'material-fixture@example.invalid'
+  )
+  assert.equal(sanitizedEnvironment.GIT_COMMITTER_DATE, '2026-07-13T10:24:00Z')
+  assert.equal(
+    sanitizedEnvironment.SAFE_CAPTURE_SENTINEL,
+    'inherited-safe-value'
+  )
+  assert.equal(
+    sanitizedEnvironment.SAFE_OVERRIDE_SENTINEL,
+    'override-safe-value'
+  )
 
   const fixtureStart = source.indexOf(
     'function prepareAdvancedWorkflowTagFixture()'
