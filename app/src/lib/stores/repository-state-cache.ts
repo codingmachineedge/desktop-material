@@ -30,35 +30,45 @@ import { WorktreeEntry } from '../../models/worktree'
 
 export class RepositoryStateCache {
   private readonly repositoryState = new Map<string, IRepositoryState>()
+  private readonly repositoryStateAliases = new Map<string, string>()
 
   public constructor(private readonly statsStore: IStatsStore) {}
 
   /** Drop all in-memory state for a repository that is leaving the session. */
   public remove(repository: Repository): void {
-    this.repositoryState.delete(repository.hash)
+    const stateHash = this.resolveStateHash(repository.hash)
+    this.repositoryState.delete(stateHash)
+
+    for (const [alias, target] of this.repositoryStateAliases) {
+      if (alias === repository.hash || target === stateHash) {
+        this.repositoryStateAliases.delete(alias)
+      }
+    }
   }
 
   /** Get the state for the repository. */
   public get(repository: Repository): IRepositoryState {
-    const existing = this.repositoryState.get(repository.hash)
+    const stateHash = this.resolveStateHash(repository.hash)
+    const existing = this.repositoryState.get(stateHash)
     if (existing != null) {
       return existing
     }
 
     const newItem = getInitialRepositoryState()
-    this.repositoryState.set(repository.hash, newItem)
+    this.repositoryState.set(stateHash, newItem)
     return newItem
   }
 
   /** Get existing state without recreating an entry that was already removed. */
   public getIfPresent(repository: Repository): IRepositoryState | undefined {
-    return this.repositoryState.get(repository.hash)
+    return this.repositoryState.get(this.resolveStateHash(repository.hash))
   }
 
   public update<K extends keyof IRepositoryState>(
     repository: Repository,
     fn: (state: IRepositoryState) => Pick<IRepositoryState, K>
   ) {
+    const stateHash = this.resolveStateHash(repository.hash)
     const currentState = this.get(repository)
     const newValues = fn(currentState)
     const newState = merge(currentState, newValues)
@@ -76,7 +86,7 @@ export class RepositoryStateCache {
       newTip.branch.tip.sha === newState.commitToAmend.sha &&
       newState.changesState.conflictState === null
 
-    this.repositoryState.set(repository.hash, {
+    this.repositoryState.set(stateHash, {
       ...newState,
       commitToAmend: isAmending ? newState.commitToAmend : null,
     })
@@ -268,14 +278,14 @@ export class RepositoryStateCache {
     source: Repository,
     worktree: WorktreeEntry
   ) {
-    const sourceState = this.repositoryState.get(source.hash)
+    const sourceState = this.getIfPresent(source)
     if (sourceState === undefined) {
       return
     }
 
     const targetState = this.get(target)
 
-    this.repositoryState.set(target.hash, {
+    this.repositoryState.set(this.resolveStateHash(target.hash), {
       ...targetState,
       branchesState: {
         ...targetState.branchesState,
@@ -297,27 +307,47 @@ export class RepositoryStateCache {
   }
 
   /**
-   * Preserve durable view state when account binding changes a repository hash.
+   * Rekey cached state when account binding changes a repository hash.
    *
-   * Async operations started before the binding change still complete against
-   * the source identity, so the target must not inherit their in-flight state.
-   * Keep the source entry intact and initialize a distinct target entry with
-   * only the view state that must survive the account change.
+   * The rebound identity becomes canonical and keeps the complete state,
+   * including live operation locks. Historical account identities become
+   * direct aliases so async work started before the rekey continues updating
+   * that same state. Rebinding to a previous alias flattens the whole group
+   * onto the new canonical hash instead of introducing alias chains or cycles.
    */
-  public preserveAccountBindingState(source: Repository, target: Repository) {
+  public rekeyStateForAccountBinding(source: Repository, target: Repository) {
     if (source.hash === target.hash) {
       return
     }
 
-    const sourceState = this.repositoryState.get(source.hash)
+    const sourceStateHash = this.resolveStateHash(source.hash)
+    const targetStateHash = this.resolveStateHash(target.hash)
+    const sourceState = this.repositoryState.get(sourceStateHash)
     if (sourceState === undefined) {
       return
     }
 
-    this.repositoryState.set(target.hash, {
-      ...getInitialRepositoryState(),
-      selectedSection: sourceState.selectedSection,
-    })
+    const stateHashes = new Set([sourceStateHash, targetStateHash])
+    const relatedHashes = new Set([source.hash, target.hash, ...stateHashes])
+    for (const [alias, canonical] of this.repositoryStateAliases) {
+      if (stateHashes.has(canonical)) {
+        relatedHashes.add(alias)
+      }
+    }
+
+    for (const hash of relatedHashes) {
+      this.repositoryStateAliases.delete(hash)
+      if (hash !== target.hash) {
+        this.repositoryState.delete(hash)
+      }
+    }
+
+    this.repositoryState.set(target.hash, sourceState)
+    for (const hash of relatedHashes) {
+      if (hash !== target.hash) {
+        this.repositoryStateAliases.set(hash, target.hash)
+      }
+    }
   }
 
   /**
@@ -334,13 +364,28 @@ export class RepositoryStateCache {
       return
     }
 
-    const sourceState = this.repositoryState.get(source.hash)
+    const sourceStateHash = this.resolveStateHash(source.hash)
+    if (sourceStateHash === target.hash) {
+      return
+    }
+
+    const sourceState = this.repositoryState.get(sourceStateHash)
     if (sourceState === undefined) {
       return
     }
 
+    for (const [alias, canonical] of this.repositoryStateAliases) {
+      if (canonical === sourceStateHash || alias === target.hash) {
+        this.repositoryStateAliases.delete(alias)
+      }
+    }
+
     this.repositoryState.set(target.hash, sourceState)
-    this.repositoryState.delete(source.hash)
+    this.repositoryState.delete(sourceStateHash)
+  }
+
+  private resolveStateHash(hash: string): string {
+    return this.repositoryStateAliases.get(hash) ?? hash
   }
 
   private sendPullRequestStateNotExistsException() {

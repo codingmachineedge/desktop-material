@@ -12377,10 +12377,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
         accountKey
       )
 
-    // Account binding participates in Repository.hash. Preserve the current
-    // repository surface without carrying live operation state into the new
-    // identity while older operations still complete against the source.
-    this.repositoryStateCache.preserveAccountBindingState(
+    // Account binding participates in Repository.hash. Rekey the shared state
+    // so the rebound identity keeps the current surface and operation locks,
+    // while older operations can still settle through their original identity.
+    this.repositoryStateCache.rekeyStateForAccountBinding(
       repository,
       updatedRepository
     )
