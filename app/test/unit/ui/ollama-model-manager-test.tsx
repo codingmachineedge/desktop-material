@@ -494,6 +494,48 @@ describe('OllamaModelManager', () => {
     ])
   })
 
+  it('does not bubble editor submissions to the parent dialog form', async () => {
+    const client = new TestOllamaClient(['alpha'])
+    let parentSubmissions = 0
+    render(
+      <div
+        onSubmit={event => {
+          event.preventDefault()
+          parentSubmissions++
+        }}
+      >
+        <OllamaModelManager
+          provider={provider('nested', [providerModel('alpha')])}
+          client={client}
+          onProviderModelsChanged={() => {}}
+        />
+      </div>
+    )
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Select alpha' }))
+    )
+
+    fireEvent.change(screen.getByLabelText('Model name'), {
+      target: { value: 'beta' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Pull and install' }))
+    await waitFor(() => assert.ok(screen.getByText('Installed beta.')))
+
+    fireEvent.change(screen.getByLabelText('Copy destination'), {
+      target: { value: 'gamma' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    await waitFor(() => assert.ok(screen.getByText('Copied alpha to gamma.')))
+
+    fireEvent.change(screen.getByLabelText('New model name'), {
+      target: { value: 'delta' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+    await waitFor(() => assert.ok(screen.getByText('Renamed alpha to delta.')))
+
+    assert.strictEqual(parentSubmissions, 0)
+  })
+
   it('cancels a pull without accepting its late completion or persisting phantom models', async () => {
     const client = new TestOllamaClient(['alpha'])
     const gate = deferred<void>()
