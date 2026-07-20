@@ -252,6 +252,7 @@ const CanonicalGalleryOutputs = Object.freeze([
   'material-cheap-lfs-preparing',
 ])
 const capturedNames = []
+const capturedHashes = new Map()
 
 if (
   !Number.isInteger(CaptureWidth) ||
@@ -475,6 +476,12 @@ async function capture(name) {
   const shot = await client.send('Page.captureScreenshot', { format: 'png' })
   const file = path.join(outDir, `${name}.png`)
   fs.writeFileSync(file, Buffer.from(shot.data, 'base64'), { flag: 'wx' })
+  const digest = sha256File(file)
+  const duplicate = capturedHashes.get(digest)
+  if (duplicate !== undefined) {
+    fail(`Capture ${name}.png duplicates ${duplicate}.png byte-for-byte.`)
+  }
+  capturedHashes.set(digest, name)
   capturedNames.push(name)
   const size = fs.statSync(file).size
   process.stdout.write(`CAPTURED ${name}.png ${size}b\n`)
@@ -1726,10 +1733,70 @@ scene('api-explorer', async () => {
 
 scene('api-app-functions', async () => {
   await captureSection('API', null, 2000)
+  const filterModeSelector =
+    '.filter-mode-control[data-search-surface-id="github-api-rest"] .filter-mode-button'
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const mode = await evaluate(
+      `document.querySelector(${JSON.stringify(
+        filterModeSelector
+      )})?.getAttribute('aria-label') ?? ''`
+    )
+    if (mode.startsWith('Filter mode: Substring')) {
+      break
+    }
+    await clickSelector(filterModeSelector)
+    await sleep(150)
+  }
+  await waitFor(
+    `document.querySelector(${JSON.stringify(
+      filterModeSelector
+    )})?.getAttribute('aria-label')?.startsWith('Filter mode: Substring') === true`,
+    'substring API operation filter mode'
+  )
+  await setInput(
+    '[data-search-surface-id="github-api-rest"]',
+    'repos/get'
+  )
+  await waitFor(
+    `document.querySelector('.github-api-explorer-operation-create[data-operation-id="repos/get"]') !== null`,
+    'repository function source operation'
+  )
+  await clickSelector(
+    '.github-api-explorer-operation-create[data-operation-id="repos/get"]'
+  )
+  await waitFor(
+    `document.querySelector('#github-api-explorer-rest-panel select')?.value === 'GET' && [...document.querySelectorAll('#github-api-explorer-rest-panel label')].find(label => label.firstChild?.textContent?.trim() === 'REST API path')?.querySelector('input')?.value === 'repos/material-fixture-owner/material-fixture'`,
+    'repository request template'
+  )
+  await setInput(
+    '.github-api-function-editor input[pattern]',
+    'get_repository'
+  )
+  await setInput(
+    '.github-api-function-editor input[maxlength="500"]',
+    'Inspect the bound repository metadata without changing it.'
+  )
+  await clickText('Add current request as function', {
+    within: '.github-api-functions',
+  })
+  await waitFor(
+    `(() => {
+      const functions = document.querySelector('.github-api-functions')
+      const card = [...(functions?.querySelectorAll('[aria-label="Named API functions"] > li') ?? [])]
+        .find(node => node.querySelector('strong')?.textContent?.trim() === 'get_repository')
+      return functions?.querySelector(':scope > header > span')?.textContent?.trim() === '1 for this repository' &&
+        card?.querySelector('code')?.textContent?.trim() === 'repos/get' &&
+        card?.querySelector('header > span.read')?.textContent?.trim() === 'read' &&
+        !functions?.querySelector('[role="alert"]')?.textContent?.trim()
+    })()`,
+    'saved repository API function'
+  )
   await evaluate(`(() => {
-    const panel = document.querySelector('.github-api-functions')
-    if (panel instanceof HTMLElement) {
-      panel.scrollIntoView({ block: 'start' })
+    const functions = document.querySelector(
+      '.github-api-functions [aria-label="Named API functions"]'
+    )
+    if (functions instanceof HTMLElement) {
+      functions.scrollIntoView({ block: 'center' })
       return true
     }
     const explorer = document.querySelector('.github-api-explorer')

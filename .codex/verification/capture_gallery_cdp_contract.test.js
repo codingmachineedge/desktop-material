@@ -183,7 +183,51 @@ test('capture candidates cannot overwrite tracked screenshots directly', () => {
     )
   )
   assert.ok(source.includes("{ flag: 'wx' }"))
+  assert.ok(source.includes('const capturedHashes = new Map()'))
+  assert.ok(source.includes('duplicates ${duplicate}.png byte-for-byte'))
   assert.ok(!source.includes("args.get('out') ?? 'docs/assets/screenshots'"))
+})
+
+test('API app-function capture saves and shows a repository-bound function', () => {
+  const apiFunctions = sceneSource('api-app-functions')
+  for (const contract of [
+    'Filter mode: Substring',
+    'repos/get',
+    "select')?.value === 'GET'",
+    'repos/material-fixture-owner/material-fixture',
+    'repository request template',
+    'get_repository',
+    'Add current request as function',
+    '1 for this repository',
+    'Named API functions',
+    "querySelector('code')?.textContent?.trim()",
+    "querySelector('header > span.read')?.textContent?.trim() === 'read'",
+    "querySelector('[role=\"alert\"]')?.textContent?.trim()",
+    "functions.scrollIntoView({ block: 'center' })",
+    "capture('material-api-app-functions')",
+  ]) {
+    assert.ok(
+      apiFunctions.includes(contract),
+      `API app-functions scene misses ${contract}`
+    )
+  }
+  for (const forbidden of [
+    "clickText('Run function'",
+    "clickText('Run request'",
+    "clickText('Run reviewed request'",
+  ]) {
+    assert.ok(
+      !apiFunctions.includes(forbidden),
+      `API app-functions scene must not invoke ${forbidden}`
+    )
+  }
+  const selection = apiFunctions.indexOf(
+    '.github-api-explorer-operation-create[data-operation-id='
+  )
+  const save = apiFunctions.indexOf('Add current request as function')
+  const capture = apiFunctions.indexOf("capture('material-api-app-functions')")
+  assert.ok(selection >= 0 && selection < save)
+  assert.ok(save < capture)
 })
 
 test('every screenshot passes the universal private-path gate', () => {
