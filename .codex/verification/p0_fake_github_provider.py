@@ -1444,7 +1444,11 @@ class ProviderState:
                     "body": request["body"],
                     "state": "open",
                     "draft": request["draft"],
-                    "head": {"ref": head_ref, "label": head_label},
+                    "head": {
+                        "ref": head_ref,
+                        "label": head_label,
+                        "repo": {"full_name": f"{OWNER}/{REPOSITORY}"},
+                    },
                     "base": {"ref": request["base"]},
                     "html_url": f"{self.repository_html_url}/pull/{number}",
                 }

@@ -25,6 +25,7 @@ const fs = require('fs')
 const crypto = require('crypto')
 const { execFileSync } = require('child_process')
 const http = require('http')
+const os = require('os')
 const path = require('path')
 const WebSocket = require('ws')
 
@@ -67,6 +68,42 @@ const fixtureSourcePath = runRoot ? path.join(runRoot, 'git-source') : null
 const providerRequestLog = runRoot
   ? path.join(runRoot, 'provider', 'requests.jsonl')
   : null
+
+function assertOwnedDisposableFixture() {
+  if (runRoot === undefined || fixturePath === null) {
+    fail('Fixture mutation requires a named disposable Temp run root.')
+  }
+
+  let tempRoot
+  let ownedRunRoot
+  let ownedFixture
+  try {
+    tempRoot = fs.realpathSync.native(os.tmpdir())
+    ownedRunRoot = fs.realpathSync.native(path.resolve(runRoot))
+    ownedFixture = fs.realpathSync.native(fixturePath)
+  } catch {
+    fail('Disposable fixture ownership could not be verified.')
+  }
+
+  const relativeRunRoot = path.relative(tempRoot, ownedRunRoot)
+  const namedRunRoot = path
+    .basename(ownedRunRoot)
+    .toLowerCase()
+    .startsWith('desktop-material-p0-ui-')
+  const runRootInsideTemp =
+    relativeRunRoot !== '' &&
+    relativeRunRoot !== '..' &&
+    !relativeRunRoot.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relativeRunRoot)
+  const relativeFixture = path.relative(ownedRunRoot, ownedFixture)
+  if (
+    !namedRunRoot ||
+    !runRootInsideTemp ||
+    relativeFixture.toLowerCase() !== 'fixture'
+  ) {
+    fail('Fixture mutation is outside the owned disposable Temp run root.')
+  }
+}
 
 const DefaultWidth = 1440
 const DefaultHeight = 960
@@ -375,6 +412,8 @@ async function assertCapturePrivacy(name) {
     const values = [...document.querySelectorAll('input, textarea')]
       .filter(visible)
       .map(element => element.value)
+    const bundledAsset = value =>
+      /^file:\/\/\/[a-z]:\/(?:[^?#]*\/)?out\/static\/[a-z0-9._-]+\.(?:gif|ico|png|svg|webp)(?:[?#].*)?$/i.test(value)
     const attributes = [...document.querySelectorAll('[title], a[href], img[src]')]
       .filter(visible)
       .flatMap(element => [
@@ -382,6 +421,7 @@ async function assertCapturePrivacy(name) {
         element.getAttribute('href') ?? '',
         element.getAttribute('src') ?? '',
       ])
+      .filter(value => !bundledAsset(value))
     return {
       text: document.body.innerText,
       values,
@@ -504,6 +544,22 @@ async function clickSelector(selector, options = {}) {
     fail(`Unable to click ${selector}.`)
   }
   return clicked
+}
+
+async function clickEnabledSelector(selector) {
+  const clicked = await evaluate(`(() => {
+    const target = document.querySelector(${JSON.stringify(selector)})
+    if (!(target instanceof HTMLElement)) return false
+    if (target.matches(':disabled') || target.getAttribute('aria-disabled') === 'true') {
+      return false
+    }
+    target.scrollIntoView({ block: 'nearest' })
+    target.click()
+    return true
+  })()`)
+  if (!clicked) {
+    fail(`Unable to click enabled control ${selector}.`)
+  }
 }
 
 /** Exercise list rows whose selection contract is owned by mouse down/up. */
@@ -828,6 +884,10 @@ async function seedProfile() {
       // cross-window contract, then match the already-open repository.
       await appStore.accountsStore.reloadFromStore()
       const accounts = await appStore.accountsStore.getAll()
+      const fixtureAccount = accounts.find(value =>
+        value.login === ${JSON.stringify(account.login)} &&
+        value.endpoint === ${JSON.stringify(account.endpoint)}
+      )
       const repository = appStore.selectedRepository
       const freshRepository = repository
         ? await appStore.repositoryWithRefreshedGitHubRepository(repository)
@@ -835,11 +895,11 @@ async function seedProfile() {
       await new Promise(resolve => setTimeout(resolve, 500))
       return {
         appStore: true,
-        accounts: accounts.map(value => ({
-          login: value.login,
-          endpoint: value.endpoint,
-          tokenPresent: typeof value.token === 'string' && value.token.length > 0,
-        })),
+        accountCount: accounts.length,
+        fixtureAccountMatched: fixtureAccount !== undefined,
+        fixtureTokenPresent:
+          typeof fixtureAccount?.token === 'string' &&
+          fixtureAccount.token.length > 0,
         repositoryMatched: Boolean(freshRepository?.gitHubRepository),
         selectedRepositoryMatched: Boolean(
           appStore.selectedRepository?.gitHubRepository
@@ -848,10 +908,9 @@ async function seedProfile() {
     })()`)
     if (
       hydrated?.appStore !== true ||
-      hydrated?.accounts?.length !== 1 ||
-      hydrated.accounts[0]?.login !== account.login ||
-      hydrated.accounts[0]?.endpoint !== account.endpoint ||
-      hydrated.accounts[0]?.tokenPresent !== true ||
+      hydrated?.accountCount !== 1 ||
+      hydrated?.fixtureAccountMatched !== true ||
+      hydrated?.fixtureTokenPresent !== true ||
       hydrated?.repositoryMatched !== true ||
       hydrated?.selectedRepositoryMatched !== true
     ) {
@@ -1638,11 +1697,16 @@ async function openInspectorRun() {
   requireInspectorFixture()
   await captureSection('Actions', null, 2500)
   await waitFor(
-    `document.querySelector('.actions-run-pagination')?.textContent?.includes('50 loaded of ${ready.workflowRunCount} workflow runs') === true`,
-    'first 50 Actions runs',
+    `document.querySelector('.actions-run-pagination')?.textContent?.includes('50 loaded of ${ready.workflowRunCount} workflow runs') === true || document.querySelector('.actions-run-pagination')?.textContent?.includes('${ready.workflowRunCount} loaded of ${ready.workflowRunCount} workflow runs') === true`,
+    'bounded or complete Actions run inventory',
     30000
   )
-  await clickText('Load more runs', { within: '.actions-view' })
+  const runInventoryComplete = await evaluate(
+    `document.querySelector('.actions-run-pagination')?.textContent?.includes('${ready.workflowRunCount} loaded of ${ready.workflowRunCount} workflow runs') === true`
+  )
+  if (!runInventoryComplete) {
+    await clickText('Load more runs', { within: '.actions-view' })
+  }
   await waitFor(
     `document.querySelector('.actions-run-pagination')?.textContent?.includes('${ready.workflowRunCount} loaded of ${ready.workflowRunCount} workflow runs') === true`,
     'complete Actions run inventory',
@@ -1663,9 +1727,11 @@ async function openInspectorRun() {
   await waitFor(
     `document.querySelector('.actions-run-details')?.textContent?.includes(${JSON.stringify(
       InspectorRunTitle
-    )}) === true && document.querySelector('.actions-job-pagination')?.textContent?.includes('50 loaded of ${
+    )}) === true && (document.querySelector('.actions-job-pagination')?.textContent?.includes('50 loaded of ${
       ready.inspectorJobCount
-    } jobs for attempt 2') === true`,
+    } jobs for attempt 2') === true || document.querySelector('.actions-job-pagination')?.textContent?.includes('${
+      ready.inspectorJobCount
+    } loaded of ${ready.inspectorJobCount} jobs for attempt 2') === true)`,
     'Actions inspector attempt-two jobs',
     30000
   )
@@ -3067,12 +3133,20 @@ scene('advanced-workflows', async () => {
     'local tag lifecycle inventory',
     30000
   )
+  const loadRemoteSelector =
+    '.tag-lifecycle-manager > header .tag-lifecycle-actions button:nth-of-type(2)'
   await waitFor(
-    `[...document.querySelectorAll('.tag-lifecycle-manager button')].some(button => button.textContent.trim() === 'Load remote' && !button.disabled)`,
+    `document.querySelector(${JSON.stringify(
+      loadRemoteSelector
+    )})?.textContent?.trim() === 'Load remote' && !document.querySelector(${JSON.stringify(
+      loadRemoteSelector
+    )}).disabled && document.querySelector(${JSON.stringify(
+      loadRemoteSelector
+    )}).getAttribute('aria-disabled') !== 'true'`,
     'enabled remote tag inventory action',
     30000
   )
-  await clickText('Load remote', { within: '.tag-lifecycle-manager' })
+  await clickEnabledSelector(loadRemoteSelector)
   await waitFor(
     `document.querySelector('.tag-lifecycle-manager')?.textContent?.includes('Remote-only tags') === true`,
     'remote-only tag inventory',
@@ -3122,6 +3196,12 @@ scene('cheap-lfs-preparing', async () => {
   if (fixturePath === null) {
     fail('Cheap-LFS preparation requires a disposable fixture path.')
   }
+  const cheapLfsBranch = 'gallery/cheap-lfs-evidence'
+  execFileSync(
+    'git',
+    ['-C', fixturePath, 'checkout', '--quiet', '-B', cheapLfsBranch],
+    { windowsHide: true, stdio: 'ignore' }
+  )
   const largeFileName = 'windows-enterprise-evaluation.iso'
   const largeFilePath = path.join(fixturePath, largeFileName)
   const descriptor = fs.openSync(largeFilePath, 'wx')
@@ -3141,21 +3221,23 @@ scene('cheap-lfs-preparing', async () => {
   await menuEvent('show-changes')
   await evaluate(`require('electron').ipcRenderer.emit('focus'), true`)
   await waitFor(
+    `document.querySelector('.commit-button')?.textContent?.includes('Commit 1 file to ${cheapLfsBranch}') === true`,
+    'isolated Cheap-LFS evidence branch',
+    30000
+  )
+  await waitFor(
     `document.body.textContent?.includes(${JSON.stringify(
       largeFileName
     )}) === true`,
     'synthetic oversized file in Changes',
     30000
   )
-  await setInput(
-    'input[aria-label="Commit summary"]',
-    'Route large ISO through cheap LFS'
-  )
+  await setInput('.summary-field input', 'Route large ISO through cheap LFS')
   await waitFor(
-    `document.querySelector('.commit-button') instanceof HTMLButtonElement && !document.querySelector('.commit-button').disabled`,
+    `document.querySelector('.commit-button') instanceof HTMLButtonElement && !document.querySelector('.commit-button').disabled && document.querySelector('.commit-button').getAttribute('aria-disabled') !== 'true'`,
     'enabled cheap-LFS commit action'
   )
-  await clickSelector('.commit-button')
+  await clickEnabledSelector('.commit-button')
   await waitFor(
     `document.body.textContent?.includes('Preparing 1 large file for cheap LFS') === true`,
     'cheap-LFS preparation phase',
@@ -3203,6 +3285,10 @@ async function main() {
           .split(',')
           .map(value => value.trim())
           .filter(value => value.length > 0)
+
+    if (names.length > 0 && fixturePath !== null) {
+      assertOwnedDisposableFixture()
+    }
 
     for (const name of names) {
       const run = scenes.get(name)

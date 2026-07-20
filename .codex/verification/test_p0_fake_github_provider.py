@@ -494,6 +494,10 @@ class ProviderStateTests(unittest.TestCase):
             created["head"]["label"],
             f"{provider.OWNER}:{provider.FEATURE_BRANCH}",
         )
+        self.assertEqual(
+            created["head"]["repo"]["full_name"],
+            f"{provider.OWNER}/{provider.REPOSITORY}",
+        )
         self.assertEqual(len(self.state.pull_requests), 1)
 
         wrong_ref = dict(request, base="release")

@@ -16,6 +16,13 @@ function frozenStringArray(name) {
   return [...match[1].matchAll(/'([^']+)'/g)].map(([, value]) => value)
 }
 
+function sceneSource(name) {
+  const start = source.indexOf(`scene('${name}'`)
+  assert.notEqual(start, -1, `${name} scene is missing`)
+  const next = source.indexOf("\nscene('", start + 1)
+  return source.slice(start, next === -1 ? source.length : next)
+}
+
 test('every requested scene resets before its runner executes', () => {
   const loopStart = source.indexOf('for (const name of names)')
   const loopEnd = source.indexOf('client.close()', loopStart)
@@ -184,6 +191,10 @@ test('every screenshot passes the universal private-path gate', () => {
   assert.notEqual(screenshot, -1)
   assert.ok(privacy < screenshot)
   assert.ok(source.includes('await assertCapturePrivacy(name)'))
+  assert.ok(source.includes('.filter(value => !bundledAsset(value))'))
+  assert.ok(
+    source.includes('out\\/static\\/[a-z0-9._-]+\\.(?:gif|ico|png|svg|webp)')
+  )
   for (const marker of [
     'C:\\\\Users\\\\',
     'C:\\/Users\\/',
@@ -196,6 +207,73 @@ test('every screenshot passes the universal private-path gate', () => {
     'C:\\\\Synthetic\\\\material-fixture',
   ]) {
     assert.ok(source.includes(marker), `missing privacy contract: ${marker}`)
+  }
+})
+
+test('fixture mutation is restricted to the named owned Temp run', () => {
+  const ownership = source.indexOf('function assertOwnedDisposableFixture()')
+  const assertion = source.indexOf(
+    'assertOwnedDisposableFixture()',
+    ownership + 1
+  )
+  const loop = source.indexOf('for (const name of names)', assertion)
+  assert.notEqual(ownership, -1)
+  assert.notEqual(assertion, -1)
+  assert.notEqual(loop, -1)
+  assert.ok(ownership < assertion && assertion < loop)
+  for (const contract of [
+    'fs.realpathSync.native(os.tmpdir())',
+    "startsWith('desktop-material-p0-ui-')",
+    "relativeFixture.toLowerCase() !== 'fixture'",
+  ]) {
+    assert.ok(
+      source.includes(contract),
+      `missing ownership contract: ${contract}`
+    )
+  }
+})
+
+test('fixture account hydration returns only privacy-safe receipts', () => {
+  const start = source.indexOf('async function seedProfile()')
+  const end = source.indexOf('async function ensureRepository(', start)
+  const seed = source.slice(start, end)
+  for (const contract of [
+    'accountsStore.reloadFromStore()',
+    'accountsStore.getAll()',
+    'repositoryWithRefreshedGitHubRepository(repository)',
+    'accountCount: accounts.length',
+    'fixtureAccountMatched: fixtureAccount !== undefined',
+    'fixtureTokenPresent:',
+    'repositoryMatched: Boolean(freshRepository?.gitHubRepository)',
+    'selectedRepositoryMatched: Boolean(',
+  ]) {
+    assert.ok(
+      seed.includes(contract),
+      `missing hydration contract: ${contract}`
+    )
+  }
+  for (const leak of [
+    'login: value.login',
+    'endpoint: value.endpoint',
+    'token: fixtureAccount',
+  ]) {
+    assert.ok(!seed.includes(leak), `hydration receipt leaks: ${leak}`)
+  }
+})
+
+test('both pull-request scenes refresh the non-empty origin/main comparison', () => {
+  for (const name of ['pull-request-compose', 'pull-request-open']) {
+    const scene = sceneSource(name)
+    for (const contract of [
+      'ensurePullRequestMergeBase()',
+      "clickSelector('.open-pull-request .popover-dropdown-component > button')",
+      'clickPointerSelector(',
+      '[role="option"][aria-label^="origin/main"]',
+      'base:origin[/]main',
+      "document.querySelector('.pull-request-files-changed')",
+    ]) {
+      assert.ok(scene.includes(contract), `${name} misses ${contract}`)
+    }
   }
 })
 
@@ -254,7 +332,47 @@ test('Actions captures prove inspector pagination, logs, reviews, and cancellati
     source,
     /50 loaded of \$\{\s*ready\.inspectorJobCount\s*\} jobs for attempt 2/
   )
+  for (const retainedState of [
+    'const runInventoryComplete',
+    'if (!runInventoryComplete)',
+    '${ready.workflowRunCount} loaded of ${ready.workflowRunCount} workflow runs',
+    '${ready.inspectorJobCount} loaded of ${ready.inspectorJobCount} jobs for attempt 2',
+  ]) {
+    assert.ok(
+      source.includes(retainedState),
+      `missing retained state: ${retainedState}`
+    )
+  }
   assert.ok(!source.includes('WARN no cancellable run found'))
+})
+
+test('advanced workflow and Cheap-LFS scenes use exact enabled controls', () => {
+  const advanced = sceneSource('advanced-workflows')
+  const advancedSelector =
+    '.tag-lifecycle-manager > header .tag-lifecycle-actions button:nth-of-type(2)'
+  assert.ok(advanced.includes(advancedSelector))
+  assert.ok(advanced.includes("?.textContent?.trim() === 'Load remote'"))
+  assert.ok(advanced.includes("getAttribute('aria-disabled') !== 'true'"))
+  assert.ok(advanced.includes('clickEnabledSelector(loadRemoteSelector)'))
+  assert.ok(!advanced.includes("clickText('Load remote'"))
+
+  const cheap = sceneSource('cheap-lfs-preparing')
+  const checkout = cheap.indexOf("['-C', fixturePath, 'checkout'")
+  const create = cheap.indexOf("fs.openSync(largeFilePath, 'wx')")
+  assert.notEqual(checkout, -1)
+  assert.notEqual(create, -1)
+  assert.ok(checkout < create)
+  for (const contract of [
+    "const cheapLfsBranch = 'gallery/cheap-lfs-evidence'",
+    "'--quiet', '-B', cheapLfsBranch",
+    'isolated Cheap-LFS evidence branch',
+    "setInput('.summary-field input'",
+    "getAttribute('aria-disabled') !== 'true'",
+    "clickEnabledSelector('.commit-button')",
+    'Preparing 1 large file for cheap LFS',
+  ]) {
+    assert.ok(cheap.includes(contract), `Cheap-LFS misses ${contract}`)
+  }
 })
 
 test('capture scenes prove PR, sparse, scale, merge, and distinct artifact states', () => {
