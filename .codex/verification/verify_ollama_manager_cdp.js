@@ -118,7 +118,10 @@ function assertRealItem(candidate, kind, label) {
   } catch {
     fail(`${label} could not be resolved.`)
   }
-  if (resolved.toLowerCase() !== path.resolve(candidate).toLowerCase()) {
+  // Windows may expand an ordinary DOS 8.3 segment while resolving a path.
+  // lstat above rejects reparse points, and every ownership comparison below
+  // uses this canonical result, so that lexical change is safe and expected.
+  if (process.platform !== 'win32' && resolved !== path.resolve(candidate)) {
     fail(`${label} changed during real-path resolution.`)
   }
   return resolved
@@ -914,7 +917,9 @@ async function exerciseSuccessfulPull(client, options) {
       )
       return manager?.getAttribute('aria-busy') === 'false' &&
         row instanceof HTMLButtonElement &&
-        notice?.textContent?.includes(${JSON.stringify(`Installed ${PulledModel}.`)}) === true &&
+        notice?.textContent?.includes(${JSON.stringify(
+          `Installed ${PulledModel}.`
+        )}) === true &&
         document.querySelector('[data-verification="ollama-pull-progress"]') === null
     })()`,
     'successful model pull',
@@ -941,7 +946,9 @@ async function selectModel(client, name, label) {
   await clickSelector(client, selector, label)
   await waitForExpression(
     client,
-    `document.querySelector(${JSON.stringify(selector)})?.getAttribute('aria-pressed') === 'true' &&
+    `document.querySelector(${JSON.stringify(
+      selector
+    )})?.getAttribute('aria-pressed') === 'true' &&
       document.querySelector('[data-verification="ollama-details"]')
         ?.textContent?.includes(${JSON.stringify(name)}) === true &&
       document.querySelector('.ollama-details-state') === null`,
@@ -1371,8 +1378,8 @@ function paeth(left, above, upperLeft) {
   return leftDistance <= aboveDistance && leftDistance <= upperLeftDistance
     ? left
     : aboveDistance <= upperLeftDistance
-      ? above
-      : upperLeft
+    ? above
+    : upperLeft
 }
 
 function inspectPngBytes(bytes, expectedWidth, expectedHeight) {
