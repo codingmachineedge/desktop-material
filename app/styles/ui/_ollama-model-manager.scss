@@ -336,6 +336,37 @@
     gap: 3px;
   }
 
+  .ollama-model-search-field {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+
+    > input {
+      min-width: 120px;
+      flex: 1 1 150px;
+    }
+
+    &.invalid > input {
+      border-color: var(--md-sys-color-error);
+    }
+
+    .filter-mode-control {
+      flex: 1 1 auto;
+    }
+
+    .filter-regex-builder-label {
+      display: none;
+    }
+  }
+
+  .ollama-filter-error {
+    color: var(--md-sys-color-error);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+  }
+
   .ollama-inventory-count {
     grid-column: 1 / -1;
     color: var(--md-sys-color-on-surface-variant);

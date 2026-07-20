@@ -270,6 +270,75 @@ describe('OllamaModelManager', () => {
     ])
   })
 
+  it('uses the shared persisted filter modes and regex builder safely', async () => {
+    const storageKey = 'filter-mode/ollama-models'
+    window.localStorage.removeItem(storageKey)
+    const view = renderManager(
+      provider('search'),
+      new TestOllamaClient(['Alpha', 'beta'])
+    )
+
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    )
+    const search = screen.getByRole('searchbox', {
+      name: 'Search installed models',
+    })
+    assert.strictEqual(
+      search.getAttribute('data-search-surface-id'),
+      'ollama-models'
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Fuzzy (click to change)',
+      })
+    )
+    assert.strictEqual(window.localStorage.getItem(storageKey), 'substring')
+    fireEvent.change(search, { target: { value: 'ALPHA' } })
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Match case' }))
+    assert.strictEqual(
+      screen.queryByRole('button', { name: 'Select Alpha' }),
+      null
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Filter mode: Substring (click to change)',
+      })
+    )
+    fireEvent.change(search, { target: { value: '(' } })
+    assert.strictEqual(search.getAttribute('aria-invalid'), 'true')
+    assert.ok(screen.getByRole('alert'))
+    assert.ok(screen.getByRole('button', { name: 'Select Alpha' }))
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open regex builder' }))
+    const builder = screen.getByRole('dialog', { name: 'Regex builder' })
+    fireEvent.change(
+      within(builder).getByRole('textbox', {
+        name: 'Regular expression pattern',
+      }),
+      { target: { value: '^beta$' } }
+    )
+    fireEvent.click(
+      within(builder).getByRole('button', {
+        name: 'Apply to Installed Ollama models',
+      })
+    )
+    assert.strictEqual(window.localStorage.getItem(storageKey), 'regex')
+    assert.strictEqual(
+      screen.queryByRole('button', { name: 'Select Alpha' }),
+      null
+    )
+    assert.ok(screen.getByRole('button', { name: 'Select beta' }))
+    assert.strictEqual(view.container.querySelector('[role="dialog"]'), null)
+
+    window.localStorage.removeItem(storageKey)
+  })
+
   it('scrubs private endpoint parts and falls back for malformed values', async () => {
     const privateProvider: IOllamaManagerProvider = {
       ...provider('private', [providerModel('alpha')]),
@@ -492,6 +561,48 @@ describe('OllamaModelManager', () => {
       'gamma',
       'delta',
     ])
+  })
+
+  it('does not bubble editor submissions to the parent dialog form', async () => {
+    const client = new TestOllamaClient(['alpha'])
+    let parentSubmissions = 0
+    render(
+      <div
+        onSubmit={event => {
+          event.preventDefault()
+          parentSubmissions++
+        }}
+      >
+        <OllamaModelManager
+          provider={provider('nested', [providerModel('alpha')])}
+          client={client}
+          onProviderModelsChanged={() => {}}
+        />
+      </div>
+    )
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Select alpha' }))
+    )
+
+    fireEvent.change(screen.getByLabelText('Model name'), {
+      target: { value: 'beta' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Pull and install' }))
+    await waitFor(() => assert.ok(screen.getByText('Installed beta.')))
+
+    fireEvent.change(screen.getByLabelText('Copy destination'), {
+      target: { value: 'gamma' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    await waitFor(() => assert.ok(screen.getByText('Copied alpha to gamma.')))
+
+    fireEvent.change(screen.getByLabelText('New model name'), {
+      target: { value: 'delta' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+    await waitFor(() => assert.ok(screen.getByText('Renamed alpha to delta.')))
+
+    assert.strictEqual(parentSubmissions, 0)
   })
 
   it('cancels a pull without accepting its late completion or persisting phantom models', async () => {

@@ -2510,20 +2510,53 @@ scene('ollama-manager', async () => {
           'visible cancellable Ollama pull progress'
         )
         await clickEnabledSelector('[data-verification="ollama-pull-cancel"]')
-        await waitFor(
-          `(() => {
+        const cancellationState = `(() => {
             const manager = document.querySelector('[data-verification="ollama-manager"]')
             const notice = document.querySelector('[data-verification="ollama-notice"]')
             const refresh = document.querySelector('[data-verification="ollama-refresh"]')
-            return manager?.getAttribute('aria-busy') === 'false' &&
+            const rows = document.querySelectorAll(
+              '[data-verification="ollama-model-row"]'
+            )
+            const state = {
+              busy: manager?.getAttribute('aria-busy') ?? null,
+              refreshDisabled:
+                refresh instanceof HTMLButtonElement ? refresh.disabled : null,
+              refreshText: refresh?.textContent?.trim() ?? null,
+              notice: notice?.textContent?.trim() ?? null,
+              progressVisible:
+                document.querySelector(
+                  '[data-verification="ollama-pull-progress"]'
+                ) !== null,
+              rowCount: rows.length,
+            }
+            return {
+              ...state,
+              settled: state.busy === 'false' &&
               refresh instanceof HTMLButtonElement && !refresh.disabled &&
-              refresh.textContent.trim() === 'Refresh' &&
-              notice?.textContent?.includes('canceled') === true &&
-              document.querySelector('[data-verification="ollama-pull-progress"]') === null &&
-              document.querySelectorAll('[data-verification="ollama-model-row"]').length === 3
-          })()`,
-          'completed Ollama pull cancellation'
-        )
+                state.refreshText === 'Refresh' &&
+                state.notice?.includes('canceled') === true &&
+                !state.progressVisible && state.rowCount === 3
+            }
+          })()`
+        try {
+          await waitFor(
+            `(${cancellationState}).settled`,
+            'completed Ollama pull cancellation'
+          )
+        } catch {
+          const diagnostic = await evaluate(`({
+            state: ${cancellationState},
+            preferencesPresent:
+              document.querySelector('#preferences') !== null,
+          })`).catch(error => ({
+            diagnosticError: error?.message ?? String(error),
+          }))
+          fail(
+            `Timed out waiting for completed Ollama pull cancellation: ${JSON.stringify(
+              diagnostic
+            )}`
+          )
+        }
         const afterCancellation = await waitForOllamaFixture(
           state =>
             JSON.stringify(state?.activePulls) === JSON.stringify([]) &&

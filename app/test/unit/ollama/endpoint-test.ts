@@ -54,8 +54,12 @@ describe('Ollama endpoint trust', () => {
   it('rejects URL credentials, query strings, fragments, and whitespace', () => {
     for (const endpoint of [
       'http://alice:secret@localhost:11434/v1',
+      'http://@localhost:11434/v1',
       'http://localhost:11434/v1?token=secret',
+      'http://localhost:11434/v1?',
       'http://localhost:11434/v1#secret',
+      'http://localhost:11434/v1#',
+      'http:localhost:11434/v1',
       ' http://localhost:11434/v1',
       'http://localhost:11434/v1 ',
       'http://localhost.:11434/v1',
@@ -70,6 +74,10 @@ describe('Ollama endpoint trust', () => {
       'http://localhost:11434/ollama',
       'http://localhost:11434/ollama/v1',
       'http://localhost:11434/v1/models',
+      'http://localhost:11434/ollama/../v1',
+      'http://localhost:11434/%2e/v1',
+      'http://localhost:11434/v1/.',
+      'http://localhost:11434\\v1',
     ]) {
       assert.equal(isTrustedOllamaEndpoint(endpoint), false, endpoint)
     }
