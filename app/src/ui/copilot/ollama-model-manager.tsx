@@ -1498,6 +1498,7 @@ export class OllamaModelManager extends React.Component<
 
   private onPullSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    event.stopPropagation()
     const name = this.state.pullName.trim()
     if (name === '') {
       this.setState({
@@ -1510,6 +1511,7 @@ export class OllamaModelManager extends React.Component<
 
   private onCopySubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    event.stopPropagation()
     const source = this.state.selectedModel
     const destination = this.state.copyName.trim()
     if (source === null || !this.validateDestination(destination, source)) {
@@ -1520,6 +1522,7 @@ export class OllamaModelManager extends React.Component<
 
   private onRenameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    event.stopPropagation()
     const source = this.state.selectedModel
     const destination = this.state.renameName.trim()
     if (source === null || !this.validateDestination(destination, source)) {
