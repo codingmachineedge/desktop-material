@@ -1,3 +1,37 @@
+#ollama-model-manager {
+  width: min(
+    1040px,
+    max(
+      1px,
+      calc(
+        100vw - 24px - var(--non-modal-sheet-cascade-offset, 0px)
+      )
+    )
+  );
+  min-width: min(
+    720px,
+    max(
+      1px,
+      calc(
+        100vw - 24px - var(--non-modal-sheet-cascade-offset, 0px)
+      )
+    )
+  );
+  max-width: max(
+    1px,
+    calc(100vw - 24px - var(--non-modal-sheet-cascade-offset, 0px))
+  );
+  max-height: max(
+    1px,
+    calc(100vh - 24px - var(--non-modal-sheet-cascade-offset, 0px))
+  );
+
+  .ollama-model-manager-dialog-content {
+    min-width: 0;
+    overflow: auto;
+  }
+}
+
 .ollama-model-manager {
   container: ollama-model-manager / inline-size;
   display: flex;
@@ -579,7 +613,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 
-    form {
+    .ollama-model-editor {
       display: flex;
       min-width: 0;
       flex-direction: column;

@@ -163,6 +163,7 @@ export enum PopupType {
   EditCopilotBYOKProvider = 'EditCopilotBYOKProvider',
   EditCopilotBYOKModel = 'EditCopilotBYOKModel',
   ConfirmDeleteCopilotBYOKProvider = 'ConfirmDeleteCopilotBYOKProvider',
+  OllamaModelManager = 'OllamaModelManager',
   CopilotConflictResolutionAlwaysNudge = 'CopilotConflictResolutionAlwaysNudge',
   DeleteWorktreeFailed = 'DeleteWorktreeFailed',
   BatchCloneProgress = 'BatchCloneProgress',
@@ -270,6 +271,10 @@ export type PopupDetail =
     }
   | {
       type: PopupType.ConfirmDeleteCopilotBYOKProvider
+      provider: IBYOKProvider
+    }
+  | {
+      type: PopupType.OllamaModelManager
       provider: IBYOKProvider
     }
   | {

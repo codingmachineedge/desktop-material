@@ -1,10 +1,16 @@
 import * as React from 'react'
 import {
   encodeModelKey,
+  isOllamaBYOKProvider,
   isLocalBaseUrl,
   parseModelKey,
   type IBYOKProvider,
 } from '../../lib/copilot/byok'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+} from '../../lib/i18n'
 import { enableCopilotConflictResolution } from '../../lib/feature-flag'
 import { isGHES } from '../../lib/endpoint-capabilities'
 import {
@@ -13,6 +19,7 @@ import {
   type CopilotModelSelections,
 } from '../../lib/stores/copilot-store'
 import type { Account } from '../../models/account'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { DialogContent, DialogPreferredFocusClassName } from '../dialog'
 import { Button } from '../lib/button'
 import { CallToAction } from '../lib/call-to-action'
@@ -50,10 +57,12 @@ interface ICopilotPreferencesProps {
   readonly onAddBYOKProvider: () => void
   readonly onEditBYOKProvider: (provider: IBYOKProvider) => void
   readonly onDeleteBYOKProvider: (provider: IBYOKProvider) => void
+  readonly onManageOllamaProvider: (provider: IBYOKProvider) => void
 }
 
 interface ICopilotPreferencesState {
   readonly selectedTabIndex: number
+  readonly languageMode: LanguageMode
 }
 
 type CopilotAccessState =
@@ -70,7 +79,24 @@ export class CopilotPreferences extends React.Component<
 > {
   public constructor(props: ICopilotPreferencesProps) {
     super(props)
-    this.state = { selectedTabIndex: 0 }
+    this.state = {
+      selectedTabIndex: 0,
+      languageMode: getPersistedLanguageMode(),
+    }
+  }
+
+  public componentDidMount(): void {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount(): void {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
   }
 
   private onTabClicked = (index: number) => {
@@ -100,6 +126,9 @@ export class CopilotPreferences extends React.Component<
 
   private onDeleteBYOKProviderClick = (provider: IBYOKProvider) => () =>
     this.props.onDeleteBYOKProvider(provider)
+
+  private onManageOllamaProviderClick = (provider: IBYOKProvider) => () =>
+    this.props.onManageOllamaProvider(provider)
 
   public render() {
     const accessState = this.getCopilotAccessState()
@@ -458,6 +487,19 @@ export class CopilotPreferences extends React.Component<
           </span>
         </div>
         <div className="copilot-byok-entry-actions">
+          {isOllamaBYOKProvider(provider) && (
+            <Button
+              size="small"
+              className="copilot-byok-manage-button"
+              dataVerification="ollama-manager-entry"
+              onClick={this.onManageOllamaProviderClick(provider)}
+            >
+              {translate(
+                'ollama.manager.openAction',
+                this.state.languageMode
+              )}
+            </Button>
+          )}
           <Button
             onClick={this.onEditBYOKProviderClick(provider)}
             ariaLabel={`Edit ${provider.name}`}
@@ -484,5 +526,13 @@ export class CopilotPreferences extends React.Component<
       case 'anthropic':
         return 'Anthropic'
     }
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
   }
 }

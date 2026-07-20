@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from '../../helpers/ui/render'
+import { LanguageModeChangedEvent } from '../../../src/lib/i18n'
 import {
   OllamaModelManager,
   formatSafeOllamaEndpoint,
@@ -230,6 +231,7 @@ describe('OllamaModelManager', () => {
     const manager = view.container.querySelector('.ollama-model-manager')
     assert.ok(manager instanceof HTMLElement)
     assert.strictEqual(manager.getAttribute('aria-busy'), 'true')
+    assert.strictEqual(manager.querySelector('form'), null)
     assert.ok(screen.getByText('Loading models…'))
 
     await waitFor(() => assert.ok(screen.getByText('Connected')))
@@ -268,6 +270,31 @@ describe('OllamaModelManager', () => {
     assert.deepStrictEqual(changes, [
       { providerId: 'one', models: [providerModel('alpha')] },
     ])
+  })
+
+  it('reacts to live language mode changes', async () => {
+    const view = renderManager(
+      provider('localized'),
+      new TestOllamaClient(['alpha'])
+    )
+
+    await waitFor(() => assert.ok(screen.getByText('Connected')))
+    document.dispatchEvent(
+      new CustomEvent(LanguageModeChangedEvent, { detail: 'cantonese' })
+    )
+    await waitFor(() => {
+      assert.ok(screen.getByRole('heading', { name: 'Ollama 模型管理員' }))
+      assert.ok(screen.getByRole('button', { name: '重新整理' }))
+      assert.ok(screen.getByRole('button', { name: '揀選 alpha' }))
+    })
+
+    document.dispatchEvent(
+      new CustomEvent(LanguageModeChangedEvent, { detail: 'english' })
+    )
+    await waitFor(() =>
+      assert.ok(screen.getByRole('heading', { name: 'Ollama model manager' }))
+    )
+    view.unmount()
   })
 
   it('scrubs private endpoint parts and falls back for malformed values', async () => {
@@ -435,13 +462,15 @@ describe('OllamaModelManager', () => {
     fireEvent.change(screen.getByLabelText('Model name'), {
       target: { value: 'beta' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Pull and install' }))
+    fireEvent.keyDown(screen.getByLabelText('Model name'), { key: 'Enter' })
     await waitFor(() => assert.ok(screen.getByText('Installed beta.')))
 
     fireEvent.change(screen.getByLabelText('Copy destination'), {
       target: { value: 'gamma' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    fireEvent.keyDown(screen.getByLabelText('Copy destination'), {
+      key: 'Enter',
+    })
     await waitFor(() => assert.ok(screen.getByText('Copied alpha to gamma.')))
 
     fireEvent.change(screen.getByLabelText('New model name'), {

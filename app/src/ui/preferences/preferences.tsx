@@ -681,6 +681,7 @@ export class Preferences extends React.Component<
             onAddBYOKProvider={this.onAddBYOKProvider}
             onEditBYOKProvider={this.onEditBYOKProvider}
             onDeleteBYOKProvider={this.onDeleteBYOKProvider}
+            onManageOllamaProvider={this.onManageOllamaProvider}
           />
         )
         break
@@ -1158,6 +1159,13 @@ export class Preferences extends React.Component<
   private onDeleteBYOKProvider = (provider: IBYOKProvider) => {
     this.props.dispatcher.showPopup({
       type: PopupType.ConfirmDeleteCopilotBYOKProvider,
+      provider,
+    })
+  }
+
+  private onManageOllamaProvider = (provider: IBYOKProvider) => {
+    this.props.dispatcher.showPopup({
+      type: PopupType.OllamaModelManager,
       provider,
     })
   }

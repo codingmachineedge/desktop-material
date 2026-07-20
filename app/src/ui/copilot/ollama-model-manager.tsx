@@ -1,4 +1,13 @@
 import * as React from 'react'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  t,
+  translate,
+  type TranslationKey,
+  type TranslationVariables,
+} from '../../lib/i18n'
 import { Button } from '../lib/button'
 
 export interface IOllamaManagerProviderModel {
@@ -196,98 +205,117 @@ export interface IOllamaModelManagerStrings {
   readonly confirmDelete: (name: string) => string
 }
 
-/** Default English catalog; callers may inject any subset through `strings`. */
-export const DefaultOllamaModelManagerStrings: IOllamaModelManagerStrings = {
-  title: 'Ollama model manager',
-  subtitle: 'Install, inspect, and control models on this Ollama provider.',
-  endpoint: 'Endpoint',
-  configuredEndpoint: 'Configured endpoint',
-  connected: 'Connected',
-  unavailable: 'Unavailable',
-  checking: 'Checking…',
-  partial: 'Some model information could not be loaded.',
-  version: 'Version',
-  installed: 'Installed',
-  running: 'Running',
-  refresh: 'Refresh',
-  refreshing: 'Refreshing…',
-  searchLabel: 'Search installed models',
-  searchPlaceholder: 'Search by name, family, or capability…',
-  scopeLabel: 'Model inventory filter',
-  allModels: 'All models',
-  runningModels: 'Running only',
-  inventoryLabel: 'Installed Ollama models',
-  loadingInventory: 'Loading models…',
-  unavailableInventory: 'The model inventory is unavailable.',
-  emptyInventory: 'No models are installed on this endpoint.',
-  emptyFilter: 'No models match the current filters.',
-  modelDetails: 'Model details',
-  selectModel: 'Select an installed model to inspect and manage it.',
-  loadingDetails: 'Loading model details…',
-  runningBadge: 'Running',
-  size: 'Size',
-  modified: 'Modified',
-  digest: 'Digest',
-  family: 'Family',
-  format: 'Format',
-  parameters: 'Parameters',
-  quantization: 'Quantization',
-  capabilities: 'Capabilities',
-  license: 'License summary',
-  noneReported: 'Not reported',
-  runtime: 'Runtime',
-  vram: 'VRAM',
-  context: 'Context length',
-  expires: 'Expires',
-  notRunning: 'This model is not currently loaded.',
-  pullTitle: 'Install a model',
-  pullHint:
-    'Enter an Ollama model name. The configured endpoint is used as-is.',
-  modelName: 'Model name',
-  pullPlaceholder: 'llama3.2:latest',
-  pull: 'Pull and install',
-  pulling: 'Installing…',
-  cancel: 'Cancel',
-  receiving: 'Receiving model data…',
-  copyTitle: 'Copy model',
-  copyHint: 'Create another local model name from the selected model.',
-  copyDestination: 'Copy destination',
-  copy: 'Copy',
-  renameTitle: 'Rename model',
-  renameHint: 'Copy to the new name, then remove the original.',
-  renameDestination: 'New model name',
-  rename: 'Rename',
-  load: 'Load / start',
-  unload: 'Unload / stop',
-  delete: 'Delete',
-  deleteTitle: 'Delete model?',
-  deleteConfirm: 'Delete model',
-  invalidName: 'Enter a model name.',
-  duplicateName: 'Choose a different model name.',
-  operationError: 'The model operation could not be completed.',
-  refreshError: 'Ollama could not be reached at this provider endpoint.',
-  detailsError: 'Extended details could not be loaded for this model.',
-  configurationPartial:
-    'The Ollama operation succeeded, but the configured model list could not be updated.',
-  renamePartial:
-    'The copy succeeded, but the original model could not be removed.',
-  pullCancelled: 'Model installation canceled.',
-  unknown: 'Unknown',
-  never: 'Never',
-  showing: (visible, total) => `Showing ${visible} of ${total} models`,
-  selectedModel: name => `Select ${name}`,
-  moreCapabilities: count => `+${count} more`,
-  pullProgress: percent => `${percent}% complete`,
-  pullSucceeded: name => `Installed ${name}.`,
-  copySucceeded: (source, destination) => `Copied ${source} to ${destination}.`,
-  renameSucceeded: (source, destination) =>
-    `Renamed ${source} to ${destination}.`,
-  loadSucceeded: name => `Loaded ${name}.`,
-  unloadSucceeded: name => `Unloaded ${name}.`,
-  deleteSucceeded: name => `Deleted ${name}.`,
-  confirmDelete: name =>
-    `Delete ${name} from this Ollama endpoint? This cannot be undone.`,
+type OllamaLocalizer = (
+  key: TranslationKey,
+  variables?: TranslationVariables
+) => string
+
+/** Build the complete manager surface from the typed two-locale catalog. */
+export function buildOllamaModelManagerStrings(
+  localize: OllamaLocalizer = t
+): IOllamaModelManagerStrings {
+  return {
+    title: localize('ollama.manager.title'),
+    subtitle: localize('ollama.manager.subtitle'),
+    endpoint: localize('ollama.manager.endpoint'),
+    configuredEndpoint: localize('ollama.manager.configuredEndpoint'),
+    connected: localize('ollama.manager.connected'),
+    unavailable: localize('ollama.manager.unavailable'),
+    checking: localize('ollama.manager.checking'),
+    partial: localize('ollama.manager.partial'),
+    version: localize('ollama.manager.version'),
+    installed: localize('ollama.manager.installed'),
+    running: localize('ollama.manager.running'),
+    refresh: localize('ollama.manager.refresh'),
+    refreshing: localize('ollama.manager.refreshing'),
+    searchLabel: localize('ollama.manager.searchLabel'),
+    searchPlaceholder: localize('ollama.manager.searchPlaceholder'),
+    scopeLabel: localize('ollama.manager.scopeLabel'),
+    allModels: localize('ollama.manager.allModels'),
+    runningModels: localize('ollama.manager.runningModels'),
+    inventoryLabel: localize('ollama.manager.inventoryLabel'),
+    loadingInventory: localize('ollama.manager.loadingInventory'),
+    unavailableInventory: localize('ollama.manager.unavailableInventory'),
+    emptyInventory: localize('ollama.manager.emptyInventory'),
+    emptyFilter: localize('ollama.manager.emptyFilter'),
+    modelDetails: localize('ollama.manager.modelDetails'),
+    selectModel: localize('ollama.manager.selectModel'),
+    loadingDetails: localize('ollama.manager.loadingDetails'),
+    runningBadge: localize('ollama.manager.runningBadge'),
+    size: localize('ollama.manager.size'),
+    modified: localize('ollama.manager.modified'),
+    digest: localize('ollama.manager.digest'),
+    family: localize('ollama.manager.family'),
+    format: localize('ollama.manager.format'),
+    parameters: localize('ollama.manager.parameters'),
+    quantization: localize('ollama.manager.quantization'),
+    capabilities: localize('ollama.manager.capabilities'),
+    license: localize('ollama.manager.license'),
+    noneReported: localize('ollama.manager.noneReported'),
+    runtime: localize('ollama.manager.runtime'),
+    vram: localize('ollama.manager.vram'),
+    context: localize('ollama.manager.context'),
+    expires: localize('ollama.manager.expires'),
+    notRunning: localize('ollama.manager.notRunning'),
+    pullTitle: localize('ollama.manager.pullTitle'),
+    pullHint: localize('ollama.manager.pullHint'),
+    modelName: localize('ollama.manager.modelName'),
+    pullPlaceholder: localize('ollama.manager.pullPlaceholder'),
+    pull: localize('ollama.manager.pull'),
+    pulling: localize('ollama.manager.pulling'),
+    cancel: localize('ollama.manager.cancel'),
+    receiving: localize('ollama.manager.receiving'),
+    copyTitle: localize('ollama.manager.copyTitle'),
+    copyHint: localize('ollama.manager.copyHint'),
+    copyDestination: localize('ollama.manager.copyDestination'),
+    copy: localize('ollama.manager.copy'),
+    renameTitle: localize('ollama.manager.renameTitle'),
+    renameHint: localize('ollama.manager.renameHint'),
+    renameDestination: localize('ollama.manager.renameDestination'),
+    rename: localize('ollama.manager.rename'),
+    load: localize('ollama.manager.load'),
+    unload: localize('ollama.manager.unload'),
+    delete: localize('ollama.manager.delete'),
+    deleteTitle: localize('ollama.manager.deleteTitle'),
+    deleteConfirm: localize('ollama.manager.deleteConfirm'),
+    invalidName: localize('ollama.manager.invalidName'),
+    duplicateName: localize('ollama.manager.duplicateName'),
+    operationError: localize('ollama.manager.operationError'),
+    refreshError: localize('ollama.manager.refreshError'),
+    detailsError: localize('ollama.manager.detailsError'),
+    configurationPartial: localize('ollama.manager.configurationPartial'),
+    renamePartial: localize('ollama.manager.renamePartial'),
+    pullCancelled: localize('ollama.manager.pullCancelled'),
+    unknown: localize('ollama.manager.unknown'),
+    never: localize('ollama.manager.never'),
+    showing: (visible, total) =>
+      localize('ollama.manager.showing', {
+        visible: String(visible),
+        total: String(total),
+      }),
+    selectedModel: name => localize('ollama.manager.selectedModel', { name }),
+    moreCapabilities: count =>
+      localize('ollama.manager.moreCapabilities', { count: String(count) }),
+    pullProgress: percent =>
+      localize('ollama.manager.pullProgress', { percent: String(percent) }),
+    pullSucceeded: name => localize('ollama.manager.pullSucceeded', { name }),
+    copySucceeded: (source, destination) =>
+      localize('ollama.manager.copySucceeded', { source, destination }),
+    renameSucceeded: (source, destination) =>
+      localize('ollama.manager.renameSucceeded', { source, destination }),
+    loadSucceeded: name => localize('ollama.manager.loadSucceeded', { name }),
+    unloadSucceeded: name =>
+      localize('ollama.manager.unloadSucceeded', { name }),
+    deleteSucceeded: name =>
+      localize('ollama.manager.deleteSucceeded', { name }),
+    confirmDelete: name => localize('ollama.manager.confirmDelete', { name }),
+  }
 }
+
+/** English fallback retained for callers that inject only a partial override. */
+export const DefaultOllamaModelManagerStrings = buildOllamaModelManagerStrings(
+  (key, variables) => translate(key, 'english', variables)
+)
 
 export interface IOllamaModelManagerProps {
   readonly provider: IOllamaManagerProvider
@@ -334,6 +362,7 @@ interface INotice {
 }
 
 interface IOllamaModelManagerState {
+  readonly languageMode: LanguageMode
   readonly endpointVersion: string | null
   readonly endpointAvailable: boolean | null
   readonly inventoryPhase: InventoryPhase
@@ -453,6 +482,10 @@ export class OllamaModelManager extends React.Component<
   }
 
   public componentDidMount() {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     void this.refreshInventory(false)
   }
 
@@ -470,6 +503,10 @@ export class OllamaModelManager extends React.Component<
   }
 
   public componentWillUnmount() {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     this.invalidateRequests()
   }
 
@@ -521,6 +558,7 @@ export class OllamaModelManager extends React.Component<
 
   private getInitialState(): IOllamaModelManagerState {
     return {
+      languageMode: getPersistedLanguageMode(),
       endpointVersion: null,
       endpointAvailable: null,
       inventoryPhase: 'loading',
@@ -543,7 +581,20 @@ export class OllamaModelManager extends React.Component<
   }
 
   private getStrings(): IOllamaModelManagerStrings {
-    return { ...DefaultOllamaModelManagerStrings, ...this.props.strings }
+    return {
+      ...buildOllamaModelManagerStrings((key, variables) =>
+        translate(key, this.state.languageMode, variables)
+      ),
+      ...this.props.strings,
+    }
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
   }
 
   private resolveClient(
@@ -898,7 +949,7 @@ export class OllamaModelManager extends React.Component<
         : null
 
     return (
-      <form className="ollama-pull-card" onSubmit={this.onPullSubmit}>
+      <div className="ollama-pull-card">
         <div className="ollama-pull-copy">
           <h4>{strings.pullTitle}</h4>
           <p id={this.pullHintId}>{strings.pullHint}</p>
@@ -912,12 +963,18 @@ export class OllamaModelManager extends React.Component<
             data-verification="ollama-pull-name"
             value={this.state.pullName}
             onChange={this.onPullNameChanged}
+            onKeyDown={this.onPullNameKeyDown}
             placeholder={strings.pullPlaceholder}
             aria-describedby={this.pullHintId}
             spellCheck={false}
             disabled={busy}
           />
-          <Button type="submit" dataVerification="ollama-pull" disabled={busy}>
+          <Button
+            type="button"
+            dataVerification="ollama-pull"
+            onClick={this.onPull}
+            disabled={busy}
+          >
             {pulling ? strings.pulling : strings.pull}
           </Button>
         </div>
@@ -952,7 +1009,7 @@ export class OllamaModelManager extends React.Component<
             </Button>
           </div>
         )}
-      </form>
+      </div>
     )
   }
 
@@ -1312,7 +1369,7 @@ export class OllamaModelManager extends React.Component<
   ) {
     return (
       <div className="ollama-model-editors">
-        <form onSubmit={this.onCopySubmit}>
+        <div className="ollama-model-editor">
           <div>
             <h5>{strings.copyTitle}</h5>
             <p id={this.copyHintId}>{strings.copyHint}</p>
@@ -1326,20 +1383,22 @@ export class OllamaModelManager extends React.Component<
               data-verification="ollama-copy-name"
               value={this.state.copyName}
               onChange={this.onCopyNameChanged}
+              onKeyDown={this.onCopyNameKeyDown}
               aria-describedby={this.copyHintId}
               spellCheck={false}
               disabled={busy}
             />
             <Button
-              type="submit"
+              type="button"
               dataVerification="ollama-copy"
+              onClick={this.onCopy}
               disabled={busy}
             >
               {strings.copy}
             </Button>
           </div>
-        </form>
-        <form onSubmit={this.onRenameSubmit}>
+        </div>
+        <div className="ollama-model-editor">
           <div>
             <h5>{strings.renameTitle}</h5>
             <p id={this.renameHintId}>{strings.renameHint}</p>
@@ -1353,19 +1412,21 @@ export class OllamaModelManager extends React.Component<
               data-verification="ollama-rename-name"
               value={this.state.renameName}
               onChange={this.onRenameNameChanged}
+              onKeyDown={this.onRenameNameKeyDown}
               aria-describedby={this.renameHintId}
               spellCheck={false}
               disabled={busy}
             />
             <Button
-              type="submit"
+              type="button"
               dataVerification="ollama-rename"
+              onClick={this.onRename}
               disabled={busy}
             >
               {strings.rename}
             </Button>
           </div>
-        </form>
+        </div>
       </div>
     )
   }
@@ -1496,8 +1557,7 @@ export class OllamaModelManager extends React.Component<
     )
   }
 
-  private onPullSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  private onPull = () => {
     const name = this.state.pullName.trim()
     if (name === '') {
       this.setState({
@@ -1508,8 +1568,7 @@ export class OllamaModelManager extends React.Component<
     void this.performOperation('pull', name)
   }
 
-  private onCopySubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  private onCopy = () => {
     const source = this.state.selectedModel
     const destination = this.state.copyName.trim()
     if (source === null || !this.validateDestination(destination, source)) {
@@ -1518,14 +1577,40 @@ export class OllamaModelManager extends React.Component<
     void this.performOperation('copy', source, destination)
   }
 
-  private onRenameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  private onRename = () => {
     const source = this.state.selectedModel
     const destination = this.state.renameName.trim()
     if (source === null || !this.validateDestination(destination, source)) {
       return
     }
     void this.performOperation('rename', source, destination)
+  }
+
+  private onPullNameKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      this.onPull()
+    }
+  }
+
+  private onCopyNameKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      this.onCopy()
+    }
+  }
+
+  private onRenameNameKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      this.onRename()
+    }
   }
 
   private validateDestination(destination: string, source: string | null) {
