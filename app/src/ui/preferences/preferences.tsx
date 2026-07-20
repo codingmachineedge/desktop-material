@@ -681,6 +681,7 @@ export class Preferences extends React.Component<
             onAddBYOKProvider={this.onAddBYOKProvider}
             onEditBYOKProvider={this.onEditBYOKProvider}
             onDeleteBYOKProvider={this.onDeleteBYOKProvider}
+            onUpdateBYOKProvider={this.onUpdateBYOKProvider}
           />
         )
         break
@@ -1160,6 +1161,10 @@ export class Preferences extends React.Component<
       type: PopupType.ConfirmDeleteCopilotBYOKProvider,
       provider,
     })
+  }
+
+  private onUpdateBYOKProvider = (provider: IBYOKProvider) => {
+    return this.props.dispatcher.updateCopilotBYOKProvider(provider, undefined)
   }
 
   private onSelectedTabSizeChanged = (tabSize: number) => {
