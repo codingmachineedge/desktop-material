@@ -1459,6 +1459,52 @@ scene('repositories-sheet', async () => {
   await ensureRepository()
   await menuEvent('choose-repository')
   await sleep(1200)
+  const actionLayout = await evaluate(`(() => {
+    const sheet = document.querySelector('#foldout-container .foldout')
+    const actions = document.querySelector('.repository-list-actions')
+    if (!(sheet instanceof HTMLElement) || !(actions instanceof HTMLElement)) {
+      return null
+    }
+    const sheetBounds = sheet.getBoundingClientRect()
+    const buttons = [...actions.querySelectorAll('button')].map(button => {
+      const bounds = button.getBoundingClientRect()
+      return {
+        label: button.textContent.trim(),
+        left: bounds.left,
+        right: bounds.right,
+        top: bounds.top,
+        bottom: bounds.bottom,
+      }
+    })
+    return {
+      sheet: {
+        left: sheetBounds.left,
+        right: sheetBounds.right,
+        top: sheetBounds.top,
+        bottom: sheetBounds.bottom,
+      },
+      buttons,
+    }
+  })()`)
+  const expectedActions = ['Sync repositories', 'Commit & push all', 'Add']
+  const clippedActions =
+    actionLayout === null
+      ? expectedActions
+      : expectedActions.filter(label => {
+          const button = actionLayout.buttons.find(item => item.label === label)
+          return (
+            button === undefined ||
+            button.left < actionLayout.sheet.left - 0.5 ||
+            button.right > actionLayout.sheet.right + 0.5 ||
+            button.top < actionLayout.sheet.top - 0.5 ||
+            button.bottom > actionLayout.sheet.bottom + 0.5
+          )
+        })
+  if (clippedActions.length > 0) {
+    fail(
+      `Repository sheet clips or omits actions: ${clippedActions.join(', ')}.`
+    )
+  }
   await capture('material-repositories-sheet')
   await closeAllDialogs()
 })
@@ -1784,10 +1830,7 @@ scene('api-app-functions', async () => {
     )})?.getAttribute('aria-label')?.startsWith('Filter mode: Substring') === true`,
     'substring API operation filter mode'
   )
-  await setInput(
-    '[data-search-surface-id="github-api-rest"]',
-    'repos/get'
-  )
+  await setInput('[data-search-surface-id="github-api-rest"]', 'repos/get')
   await waitFor(
     `document.querySelector('.github-api-explorer-operation-create[data-operation-id="repos/get"]') !== null`,
     'repository function source operation'
@@ -1799,10 +1842,7 @@ scene('api-app-functions', async () => {
     `document.querySelector('#github-api-explorer-rest-panel select')?.value === 'GET' && [...document.querySelectorAll('#github-api-explorer-rest-panel label')].find(label => label.firstChild?.textContent?.trim() === 'REST API path')?.querySelector('input')?.value === 'repos/material-fixture-owner/material-fixture'`,
     'repository request template'
   )
-  await setInput(
-    '.github-api-function-editor input[pattern]',
-    'get_repository'
-  )
+  await setInput('.github-api-function-editor input[pattern]', 'get_repository')
   await setInput(
     '.github-api-function-editor input[maxlength="500"]',
     'Inspect the bound repository metadata without changing it.'

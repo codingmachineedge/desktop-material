@@ -141,8 +141,15 @@
 
   .repository-list-actions {
     display: flex;
-    flex-shrink: 0;
+    // This action group lives in the 400px repository sheet. Keep the group
+    // bounded by the filter row and let whole buttons wrap when their readable
+    // labels cannot share one line. Without this, the trailing Add button is
+    // painted beyond the sheet edge and becomes only partially actionable.
+    flex: 1 1 100%;
+    flex-wrap: wrap;
     gap: var(--spacing-half);
+    min-width: 0;
+    width: 100%;
 
     .pull-all-repositories-button .octicon,
     .commit-push-all-repositories-button .octicon {

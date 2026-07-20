@@ -49,4 +49,11 @@ describe('repository list scope filter styles', () => {
       /\.repository-hidden-pill\s*\{[\s\S]*?border-radius: 999px;[\s\S]*?flex: 0 0 auto;/
     )
   })
+
+  it('keeps every repository-sheet action inside the narrow sheet', () => {
+    assert.match(
+      style,
+      /\.repository-list-actions\s*\{[\s\S]*?flex: 1 1 100%;[\s\S]*?flex-wrap: wrap;[\s\S]*?min-width: 0;[\s\S]*?width: 100%;/
+    )
+  })
 })

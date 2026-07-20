@@ -202,7 +202,7 @@ test('API app-function capture saves and shows a repository-bound function', () 
     'Named API functions',
     "querySelector('code')?.textContent?.trim()",
     "querySelector('header > span.read')?.textContent?.trim() === 'read'",
-    "querySelector('[role=\"alert\"]')?.textContent?.trim()",
+    'querySelector(\'[role="alert"]\')?.textContent?.trim()',
     "functions.scrollIntoView({ block: 'center' })",
     "capture('material-api-app-functions')",
   ]) {
@@ -409,6 +409,24 @@ test('canonical workflow scenes use current reviewed controls and outcomes', () 
   }
 })
 
+test('repository sheet capture rejects clipped batch actions', () => {
+  const scene = sceneSource('repositories-sheet')
+  for (const contract of [
+    "document.querySelector('#foldout-container .foldout')",
+    "document.querySelector('.repository-list-actions')",
+    "['Sync repositories', 'Commit & push all', 'Add']",
+    'button.right > actionLayout.sheet.right + 0.5',
+    'Repository sheet clips or omits actions',
+  ]) {
+    assert.ok(scene.includes(contract), `repository sheet misses ${contract}`)
+  }
+  assert.ok(
+    scene.indexOf('Repository sheet clips or omits actions') <
+      scene.indexOf("capture('material-repositories-sheet')"),
+    'the layout gate must run before capture'
+  )
+})
+
 test('Actions captures prove inspector pagination, logs, reviews, and cancellation', () => {
   for (const contract of [
     'async function openInspectorRun()',
@@ -497,7 +515,6 @@ test('capture scenes prove PR, sparse, scale, merge, and distinct artifact state
     "clickText('Create pull request'",
     'const expectedPullRequestNumber = 73 + before',
     'const expectedPullRequestReceipt =',
-    'JSON.stringify(\n      expectedPullRequestReceipt',
     "countProviderRequests('POST', pullRequestPath)",
     "document.querySelector('#merge-all .merge-all-summary')",
     "document.querySelectorAll('#merge-all .merge-all-results tbody tr')",
@@ -508,6 +525,11 @@ test('capture scenes prove PR, sparse, scale, merge, and distinct artifact state
       `missing outcome contract: ${contract}`
     )
   }
+  assert.match(
+    source,
+    /JSON\.stringify\(\r?\n\s+expectedPullRequestReceipt/,
+    'the native pull-request receipt must be evaluated exactly'
+  )
   assert.match(
     source,
     /scene\('scale-200',[\s\S]*?for \(let index = 0; index < 5; index\+\+\)/
