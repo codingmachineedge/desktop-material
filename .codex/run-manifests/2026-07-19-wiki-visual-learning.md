@@ -12,3 +12,23 @@
 - Remote: `origin` (`codingmachineedge/desktop-material`)
 - Expected branch: `main`
 - Publication: push `origin/main` without force, mirror canonical wiki pages to `desktop-material.wiki.git`, then verify remote SHAs, CI/release/Pages state, and public raw image URLs
+
+## Local result
+
+- MCP preflight passed: `startup_status.ok=true`; the scheduled task runs `uv`
+  from `C:\Users\cntow\Documents\GitHub\lowlevel-computer-use-mcp` on
+  `127.0.0.1:8765`, whose source was
+  `beed66ca6ed2503e6170ee1e1158247f1c2f0140`.
+- The required production build ran through that MCP server and refreshed the
+  renderer/static outputs. The client transport recursively remained alive
+  after the build process ended; after verifying their exact command lines,
+  only the three owned client wrapper PIDs were terminated.
+- All eight SVG assets XML-parse, all seven PNG assets decode at 1672×941, and
+  every new raw-main wiki reference resolves to a tracked asset. A headless Edge
+  rasterization of the automation SVG was visually inspected at 1536×512 and
+  showed crisp, unclipped labels and arrows.
+- `node --check script/generate-wiki-diagrams.js`, deterministic regeneration,
+  wiki asset-reference validation, and `git diff --check` pass. Repository-wide
+  Markdown lint still reports the existing historical line-length, heading,
+  and unlabeled-fence backlog, so it is recorded rather than misreported as a
+  clean gate.
