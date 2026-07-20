@@ -294,11 +294,11 @@ try {
 $cancelDeadline = [DateTime]::UtcNow.AddSeconds(5)
 do {
   $events = Read-GitLabMRAuditEvents
-  $cancelled = @(
+  $canceled = @(
     $events |
-      Where-Object { $_.kind -eq 'request' -and $_.outcome -eq 'cancelled' }
+      Where-Object { $_.kind -eq 'request' -and $_.outcome -eq 'canceled' }
   )
-  if ($cancelled.Count -eq 1) {
+  if ($canceled.Count -eq 1) {
     break
   }
   if ([DateTime]::UtcNow -ge $cancelDeadline) {

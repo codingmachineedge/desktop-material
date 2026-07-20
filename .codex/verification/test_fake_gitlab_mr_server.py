@@ -508,7 +508,7 @@ class GitLabMRFixtureHTTPTests(unittest.TestCase):
         connection.close()
         self.assertEqual(self.state.snapshot(), initial)
 
-    def test_delayed_disconnect_is_logged_as_cancelled_without_stderr_noise(self) -> None:
+    def test_delayed_disconnect_is_logged_as_canceled_without_stderr_noise(self) -> None:
         self.set_fault("delayed")
         path = f"{self.project_api}/merge_requests/41"
         request = (
@@ -534,21 +534,21 @@ class GitLabMRFixtureHTTPTests(unittest.TestCase):
             self.assertEqual(self.state.snapshot()["activeDelayedRequests"], 1)
             client.close()
             deadline = time.monotonic() + 3
-            cancelled: list[dict[str, Any]] = []
+            canceled: list[dict[str, Any]] = []
             while time.monotonic() < deadline:
-                cancelled = [
+                canceled = [
                     event
                     for event in self.state.audit_log.snapshot()
                     if event.get("kind") == "request"
-                    and event.get("outcome") == "cancelled"
+                    and event.get("outcome") == "canceled"
                 ]
-                if cancelled:
+                if canceled:
                     break
                 time.sleep(0.02)
         self.assertEqual(stderr.getvalue(), "")
-        self.assertEqual(len(cancelled), 1)
-        self.assertIn(cancelled[0]["route"], ("api-delayed", "merge-request-single"))
-        self.assertNotIn("status", cancelled[0])
+        self.assertEqual(len(canceled), 1)
+        self.assertIn(canceled[0]["route"], ("api-delayed", "merge-request-single"))
+        self.assertNotIn("status", canceled[0])
 
 
 class GitLabMROwnershipTests(unittest.TestCase):

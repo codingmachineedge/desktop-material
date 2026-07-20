@@ -1062,16 +1062,16 @@ class GitLabMRFixtureHandler(BaseHTTPRequestHandler):
             response = error_response(error)
             route = getattr(error, "route", route)
         except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError):
-            self.server.state.record_request(method, route, "cancelled", None)
+            self.server.state.record_request(method, route, "canceled", None)
             self.close_connection = True
             return
 
         if response is None:
-            self.server.state.record_request(method, route, "cancelled", None)
+            self.server.state.record_request(method, route, "canceled", None)
             self.close_connection = True
             return
         if self._client_disconnected():
-            self.server.state.record_request(method, route, "cancelled", None)
+            self.server.state.record_request(method, route, "canceled", None)
             self.close_connection = True
             return
         if self._write_response(response):
@@ -1079,7 +1079,7 @@ class GitLabMRFixtureHandler(BaseHTTPRequestHandler):
                 method, route, "completed", int(response.status)
             )
         else:
-            self.server.state.record_request(method, route, "cancelled", None)
+            self.server.state.record_request(method, route, "canceled", None)
             self.close_connection = True
 
     def _route(self, method: str) -> tuple[FixtureResponse | None, str]:
