@@ -105,6 +105,228 @@ function assertOwnedDisposableFixture() {
   }
 }
 
+const AdvancedWorkflowLocalTagNames = Object.freeze([
+  'preview-local',
+  'v1.0.0',
+  'v1.1.0',
+])
+const AdvancedWorkflowRemoteTagNames = Object.freeze([
+  'archive-remote',
+  'v1.0.0',
+  'v1.1.0',
+])
+
+function runAdvancedWorkflowGit(repositoryPath, gitArguments, options = {}) {
+  return execFileSync('git', ['-C', repositoryPath, ...gitArguments], {
+    encoding: 'utf8',
+    windowsHide: true,
+    stdio: 'pipe',
+    ...options,
+  }).trim()
+}
+
+function readAdvancedWorkflowTagRefs(repositoryPath) {
+  const output = runAdvancedWorkflowGit(repositoryPath, [
+    'for-each-ref',
+    '--format=%(refname:strip=2)%00%(objectname)',
+    'refs/tags',
+  ])
+  return new Map(
+    output
+      .split(/\r?\n/)
+      .filter(line => line.length > 0)
+      .map(line => {
+        const [name, object] = line.split('\0')
+        if (name === undefined || object === undefined) {
+          fail('The advanced-workflow tag fixture returned a malformed ref.')
+        }
+        return [name, object.toLowerCase()]
+      })
+  )
+}
+
+/** Seed only the exact owned tag refs used by the advanced-workflows scene. */
+function prepareAdvancedWorkflowTagFixture() {
+  assertOwnedDisposableFixture()
+  if (
+    runRoot === undefined ||
+    fixturePath === null ||
+    ready === null ||
+    typeof ready.owner !== 'string' ||
+    typeof ready.repository !== 'string' ||
+    typeof ready.defaultBranch !== 'string' ||
+    typeof ready.featureBranch !== 'string' ||
+    !/^[a-z0-9][a-z0-9._-]*$/i.test(ready.owner) ||
+    !/^[a-z0-9][a-z0-9._-]*$/i.test(ready.repository)
+  ) {
+    fail('The advanced-workflow tag fixture lacks reviewed provider identity.')
+  }
+
+  let ownedRunRoot
+  let ownedFixture
+  let ownedBare
+  try {
+    ownedRunRoot = fs.realpathSync.native(path.resolve(runRoot))
+    ownedFixture = fs.realpathSync.native(fixturePath)
+    ownedBare = fs.realpathSync.native(
+      path.join(
+        ownedRunRoot,
+        'git-http',
+        ready.owner,
+        `${ready.repository}.git`
+      )
+    )
+  } catch {
+    fail('The advanced-workflow local or bare fixture could not be resolved.')
+  }
+
+  const relativeFixture = path.relative(ownedRunRoot, ownedFixture)
+  const relativeBare = path.relative(ownedRunRoot, ownedBare)
+  const expectedBare = path.join(
+    'git-http',
+    ready.owner,
+    `${ready.repository}.git`
+  )
+  const bareInsideRunRoot =
+    relativeBare !== '' &&
+    relativeBare !== '..' &&
+    !relativeBare.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relativeBare)
+  if (
+    relativeFixture.toLowerCase() !== 'fixture' ||
+    !bareInsideRunRoot ||
+    relativeBare.toLowerCase() !== expectedBare.toLowerCase()
+  ) {
+    fail('The advanced-workflow tag fixture escaped its owned run root.')
+  }
+  if (
+    runAdvancedWorkflowGit(ownedFixture, [
+      'rev-parse',
+      '--is-inside-work-tree',
+    ]) !== 'true' ||
+    runAdvancedWorkflowGit(ownedBare, ['rev-parse', '--is-bare-repository']) !==
+      'true'
+  ) {
+    fail('The advanced-workflow tag fixture has an invalid Git repository.')
+  }
+
+  const defaultTarget = runAdvancedWorkflowGit(ownedFixture, [
+    'rev-parse',
+    '--verify',
+    `refs/remotes/origin/${ready.defaultBranch}^{commit}`,
+  ]).toLowerCase()
+  const featureTarget = runAdvancedWorkflowGit(ownedFixture, [
+    'rev-parse',
+    '--verify',
+    `refs/remotes/origin/${ready.featureBranch}^{commit}`,
+  ]).toLowerCase()
+  for (const object of [defaultTarget, featureTarget]) {
+    if (!/^[0-9a-f]{40,64}$/.test(object)) {
+      fail('The advanced-workflow tag target is not a reviewed Git object.')
+    }
+  }
+
+  const allNames = [
+    ...new Set([
+      ...AdvancedWorkflowLocalTagNames,
+      ...AdvancedWorkflowRemoteTagNames,
+    ]),
+  ]
+  for (const name of allNames) {
+    const tagRef = `refs/tags/${name}`
+    runAdvancedWorkflowGit(ownedFixture, ['update-ref', '-d', tagRef])
+    runAdvancedWorkflowGit(ownedBare, ['update-ref', '-d', tagRef])
+  }
+
+  const createAnnotatedTag = (name, target, message, taggerDate) => {
+    runAdvancedWorkflowGit(
+      ownedFixture,
+      ['tag', '--annotate', '--force', '--message', message, name, target],
+      {
+        env: {
+          ...process.env,
+          GIT_COMMITTER_NAME: 'Material Fixture',
+          GIT_COMMITTER_EMAIL: 'material-fixture@example.invalid',
+          GIT_COMMITTER_DATE: taggerDate,
+        },
+      }
+    )
+  }
+  createAnnotatedTag(
+    'v1.0.0',
+    defaultTarget,
+    'Synthetic baseline',
+    '2026-07-13T10:13:00Z'
+  )
+  createAnnotatedTag(
+    'v1.1.0',
+    featureTarget,
+    'Synthetic reviewed release',
+    '2026-07-13T10:23:00Z'
+  )
+  createAnnotatedTag(
+    'preview-local',
+    featureTarget,
+    'Synthetic local-only preview',
+    '2026-07-13T10:24:00Z'
+  )
+  runAdvancedWorkflowGit(ownedFixture, [
+    'update-ref',
+    'refs/tags/archive-remote',
+    featureTarget,
+  ])
+  runAdvancedWorkflowGit(ownedFixture, [
+    'push',
+    '--force',
+    ownedBare,
+    'refs/tags/v1.0.0:refs/tags/v1.0.0',
+    'refs/tags/v1.1.0:refs/tags/v1.1.0',
+    'refs/tags/archive-remote:refs/tags/archive-remote',
+  ])
+  runAdvancedWorkflowGit(ownedFixture, [
+    'update-ref',
+    '-d',
+    'refs/tags/archive-remote',
+  ])
+
+  const local = readAdvancedWorkflowTagRefs(ownedFixture)
+  const remote = readAdvancedWorkflowTagRefs(ownedBare)
+  const localNames = [...local.keys()].sort()
+  const remoteNames = [...remote.keys()].sort()
+  const pushed = localNames.filter(
+    name =>
+      remote.get(name) !== undefined && remote.get(name) === local.get(name)
+  )
+  const localOnly = localNames.filter(name => !remote.has(name))
+  const remoteOnly = remoteNames.filter(name => !local.has(name))
+  const receipt = {
+    fixture: relativeFixture,
+    bare: relativeBare,
+    local: localNames,
+    remote: remoteNames,
+    pushed,
+    localOnly,
+    remoteOnly,
+  }
+  if (
+    JSON.stringify(localNames) !==
+      JSON.stringify([...AdvancedWorkflowLocalTagNames].sort()) ||
+    JSON.stringify(remoteNames) !==
+      JSON.stringify([...AdvancedWorkflowRemoteTagNames].sort()) ||
+    JSON.stringify(pushed) !== JSON.stringify(['v1.0.0', 'v1.1.0']) ||
+    JSON.stringify(localOnly) !== JSON.stringify(['preview-local']) ||
+    JSON.stringify(remoteOnly) !== JSON.stringify(['archive-remote'])
+  ) {
+    fail(
+      `The advanced-workflow tag fixture has an invalid topology: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  process.stdout.write(`ADVANCED_TAG_FIXTURE ${JSON.stringify(receipt)}\n`)
+  return receipt
+}
+
 const DefaultWidth = 1440
 const DefaultHeight = 960
 const CaptureWidth = Number(args.get('width') ?? DefaultWidth)
@@ -3884,6 +4106,7 @@ scene('merge-all', async () => {
 })
 
 scene('advanced-workflows', async () => {
+  prepareAdvancedWorkflowTagFixture()
   await ensureRepository()
   await menuEvent('show-repository-tools')
   await waitFor(
@@ -3898,8 +4121,18 @@ scene('advanced-workflows', async () => {
   )
   await clickSelector('[data-hub-tool="tag-lifecycle"]')
   await waitFor(
-    `document.querySelector('.tag-lifecycle-manager')?.textContent?.includes('Local tags') === true`,
-    'local tag lifecycle inventory',
+    `(() => {
+      const manager = document.querySelector('.tag-lifecycle-manager')
+      if (!(manager instanceof HTMLElement)) return false
+      const localHeading = [...manager.querySelectorAll('.tag-lifecycle-inventory > h3')]
+        .find(node => node.textContent?.trim() === 'Local tags (3)')
+      const localNames = [...manager.querySelectorAll('.tag-lifecycle-row:not(.remote) strong')]
+        .map(node => node.textContent?.trim() ?? '')
+        .sort()
+      return localHeading !== undefined &&
+        JSON.stringify(localNames) === '["preview-local","v1.0.0","v1.1.0"]'
+    })()`,
+    'exact three-tag local lifecycle inventory',
     30000
   )
   const loadRemoteSelector =
@@ -3917,46 +4150,198 @@ scene('advanced-workflows', async () => {
   )
   await clickEnabledSelector(loadRemoteSelector)
   await waitFor(
-    `document.querySelector('.tag-lifecycle-manager')?.textContent?.includes('Remote-only tags') === true`,
-    'remote-only tag inventory',
+    `(() => {
+      const manager = document.querySelector('.tag-lifecycle-manager')
+      if (!(manager instanceof HTMLElement)) return false
+      const headings = [...manager.querySelectorAll('.tag-lifecycle-inventory > h3')]
+        .map(node => node.textContent?.trim() ?? '')
+      const rows = [...manager.querySelectorAll('.tag-lifecycle-row')]
+      const textByName = new Map(rows.map(row => [
+        row.querySelector('strong')?.textContent?.trim() ?? '',
+        (row.textContent ?? '').replace(/\\s+/g, ' ').trim(),
+      ]))
+      const localNames = rows
+        .filter(row => !row.classList.contains('remote'))
+        .map(row => row.querySelector('strong')?.textContent?.trim() ?? '')
+        .sort()
+      const remoteNames = rows
+        .filter(row => row.classList.contains('remote'))
+        .map(row => row.querySelector('strong')?.textContent?.trim() ?? '')
+        .sort()
+      return headings.includes('Local tags (3)') &&
+        headings.includes('Remote-only tags (1) on origin') &&
+        JSON.stringify(localNames) === '["preview-local","v1.0.0","v1.1.0"]' &&
+        JSON.stringify(remoteNames) === '["archive-remote"]' &&
+        textByName.get('preview-local')?.includes('Local only') === true &&
+        textByName.get('v1.0.0')?.includes('Pushed') === true &&
+        textByName.get('v1.1.0')?.includes('Pushed') === true &&
+        textByName.get('archive-remote')?.includes('remote only') === true
+    })()`,
+    'exact local-only, pushed, and remote-only tag inventory',
     30000
   )
+  await evaluate(`(() => {
+    const heading = [...document.querySelectorAll('.tag-lifecycle-manager h3')]
+      .find(node => node.textContent?.trim() === 'Remote-only tags (1) on origin')
+    if (heading instanceof HTMLElement) heading.scrollIntoView({ block: 'center' })
+    return heading instanceof HTMLElement
+  })()`)
+  await sleep(900)
   const receipt = await evaluate(`(() => {
     const manager = document.querySelector('.tag-lifecycle-manager')
     const sidebar = document.querySelector('.repository-tools-sidebar')
-    if (!(manager instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
+    const resultsColumn = document.querySelector('.repository-tools-results-column')
+    const inventory = document.querySelector('.tag-lifecycle-inventory')
+    if (
+      !(manager instanceof HTMLElement) ||
+      !(sidebar instanceof HTMLElement) ||
+      !(resultsColumn instanceof HTMLElement) ||
+      !(inventory instanceof HTMLElement)
+    ) {
       return null
     }
+    const visible = element => {
+      if (!(element instanceof HTMLElement)) return false
+      const style = getComputedStyle(element)
+      const bounds = element.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' &&
+        Number(style.opacity || 1) !== 0 && bounds.width > 0 && bounds.height > 0
+    }
+    const rectangle = element => {
+      const bounds = element.getBoundingClientRect()
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        top: bounds.top,
+        bottom: bounds.bottom,
+        width: bounds.width,
+        height: bounds.height,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }
+    }
+    const within = (child, parent) =>
+      child.left >= parent.left - 0.5 &&
+      child.right <= parent.right + 0.5 &&
+      child.top >= parent.top - 0.5 &&
+      child.bottom <= parent.bottom + 0.5
+    const intersects = (first, second) =>
+      first.left < second.right - 0.5 &&
+      first.right > second.left + 0.5 &&
+      first.top < second.bottom - 0.5 &&
+      first.bottom > second.top + 0.5
+    const viewport = {
+      left: 0,
+      right: window.innerWidth,
+      top: 0,
+      bottom: window.innerHeight,
+    }
+    const managerRect = rectangle(manager)
+    const resultsColumnRect = rectangle(resultsColumn)
+    const inventoryRect = rectangle(inventory)
+    const rows = [...manager.querySelectorAll('.tag-lifecycle-row')].map(row => {
+      const rowRect = rectangle(row)
+      const buttons = [...row.querySelectorAll('button')].map(button => ({
+        label: button.textContent?.trim() ?? '',
+        ...rectangle(button),
+      }))
+      const text = (row.textContent ?? '').replace(/\\s+/g, ' ').trim()
+      const remote = row.classList.contains('remote')
+      return {
+        name: row.querySelector('strong')?.textContent?.trim() ?? '',
+        remote,
+        state: remote
+          ? text.includes('remote only')
+            ? 'remote-only'
+            : 'unknown'
+          : text.includes('Local only')
+          ? 'local-only'
+          : text.includes('Pushed')
+          ? 'pushed'
+          : 'unknown',
+        text,
+        visible: visible(row),
+        bounds: rowRect,
+        withinViewport: within(rowRect, viewport),
+        withinResultsColumn: within(rowRect, resultsColumnRect),
+        withinInventoryHorizontally:
+          rowRect.left >= inventoryRect.left - 0.5 &&
+          rowRect.right <= inventoryRect.right + 0.5,
+        horizontalOverflow: row.scrollWidth > row.clientWidth + 1,
+        buttons,
+        buttonsWithinRow: buttons.every(button => within(button, rowRect)),
+        buttonsOverlap: buttons.some((first, index) =>
+          buttons.slice(index + 1).some(second => intersects(first, second))
+        ),
+      }
+    })
+    const headings = [...manager.querySelectorAll('.tag-lifecycle-inventory > h3')]
+      .map(node => node.textContent?.trim() ?? '')
+    const visibleErrors = [...manager.querySelectorAll('[role="alert"], .tag-lifecycle-error')]
+      .filter(visible)
+      .map(node => node.textContent?.trim() ?? '')
     const visibleText = document.body.innerText
     return {
       language: document.body.getAttribute('data-dm-language-mode'),
+      headings,
+      localNames: rows.filter(row => !row.remote).map(row => row.name).sort(),
+      remoteNames: rows.filter(row => row.remote).map(row => row.name).sort(),
+      rows,
+      visibleErrors,
+      manager: managerRect,
+      resultsColumn: resultsColumnRect,
+      inventory: inventoryRect,
       horizontalOverflow:
         document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 ||
         document.body.scrollWidth > document.body.clientWidth + 1 ||
         manager.scrollWidth > manager.clientWidth + 1 ||
-        sidebar.scrollWidth > sidebar.clientWidth + 1,
+        sidebar.scrollWidth > sidebar.clientWidth + 1 ||
+        resultsColumn.scrollWidth > resultsColumn.clientWidth + 1 ||
+        inventory.scrollWidth > inventory.clientWidth + 1,
       leakedPath: /C:\\\\Users\\\\[^\\s]+|AppData\\\\Local\\\\Temp/i.test(visibleText),
     }
   })()`)
+  const expectedStates = [
+    'archive-remote:remote-only',
+    'preview-local:local-only',
+    'v1.0.0:pushed',
+    'v1.1.0:pushed',
+  ]
+  const actualStates =
+    receipt?.rows.map(row => `${row.name}:${row.state}`).sort() ?? []
+  const rowsHaveValidGeometry =
+    receipt?.rows.length === 4 &&
+    receipt.rows.every(
+      row =>
+        row.visible &&
+        row.withinViewport &&
+        row.withinResultsColumn &&
+        row.withinInventoryHorizontally &&
+        !row.horizontalOverflow &&
+        row.buttonsWithinRow &&
+        !row.buttonsOverlap
+    )
   if (
     receipt === null ||
     receipt.language !== 'english' ||
+    JSON.stringify(receipt.headings) !==
+      JSON.stringify(['Local tags (3)', 'Remote-only tags (1) on origin']) ||
+    JSON.stringify(receipt.localNames) !==
+      JSON.stringify(['preview-local', 'v1.0.0', 'v1.1.0']) ||
+    JSON.stringify(receipt.remoteNames) !==
+      JSON.stringify(['archive-remote']) ||
+    JSON.stringify(actualStates) !== JSON.stringify(expectedStates) ||
+    receipt.visibleErrors.length !== 0 ||
+    !rowsHaveValidGeometry ||
     receipt.horizontalOverflow ||
     receipt.leakedPath
   ) {
     fail(
-      `Advanced workflows failed geometry/privacy checks: ${JSON.stringify(
+      `Advanced workflows failed semantic/geometry/privacy checks: ${JSON.stringify(
         receipt
       )}`
     )
   }
-  await evaluate(`(() => {
-    const heading = [...document.querySelectorAll('.tag-lifecycle-manager h3')]
-      .find(node => node.textContent?.startsWith('Remote-only tags'))
-    if (heading instanceof HTMLElement) heading.scrollIntoView({ block: 'center' })
-    return true
-  })()`)
-  await sleep(900)
   await parkPointer()
   await capture('advanced-workflows')
 })

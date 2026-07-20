@@ -713,6 +713,77 @@ test('advanced workflow and Cheap-LFS scenes use exact enabled controls', () => 
   }
 })
 
+test('advanced workflow seeds and proves the exact owned tag topology', () => {
+  const helperStart = source.indexOf(
+    'function prepareAdvancedWorkflowTagFixture()'
+  )
+  const helperEnd = source.indexOf('const DefaultWidth', helperStart)
+  assert.notEqual(helperStart, -1)
+  assert.notEqual(helperEnd, -1)
+  const helper = source.slice(helperStart, helperEnd)
+  for (const contract of [
+    'assertOwnedDisposableFixture()',
+    'fs.realpathSync.native(path.resolve(runRoot))',
+    'ownedBare = fs.realpathSync.native(',
+    "'git-http'",
+    'const bareInsideRunRoot =',
+    "relativeFixture.toLowerCase() !== 'fixture'",
+    'relativeBare.toLowerCase() !== expectedBare.toLowerCase()',
+    "'--is-inside-work-tree'",
+    "'--is-bare-repository'",
+    '`refs/remotes/origin/${ready.defaultBranch}^{commit}`',
+    '`refs/remotes/origin/${ready.featureBranch}^{commit}`',
+    "runAdvancedWorkflowGit(ownedBare, ['update-ref', '-d', tagRef])",
+    'GIT_COMMITTER_DATE: taggerDate',
+    "'preview-local'",
+    "'v1.0.0'",
+    "'v1.1.0'",
+    "'archive-remote'",
+    "'refs/tags/v1.0.0:refs/tags/v1.0.0'",
+    "'refs/tags/v1.1.0:refs/tags/v1.1.0'",
+    "'refs/tags/archive-remote:refs/tags/archive-remote'",
+    "JSON.stringify(pushed) !== JSON.stringify(['v1.0.0', 'v1.1.0'])",
+    "JSON.stringify(localOnly) !== JSON.stringify(['preview-local'])",
+    "JSON.stringify(remoteOnly) !== JSON.stringify(['archive-remote'])",
+    'ADVANCED_TAG_FIXTURE',
+  ]) {
+    assert.ok(
+      helper.includes(contract),
+      `tag fixture helper misses ${contract}`
+    )
+  }
+
+  const advanced = sceneSource('advanced-workflows')
+  const seed = advanced.indexOf('prepareAdvancedWorkflowTagFixture()')
+  const repository = advanced.indexOf('await ensureRepository()')
+  const capture = advanced.indexOf("capture('advanced-workflows')")
+  assert.ok(seed >= 0 && seed < repository)
+  for (const contract of [
+    'Local tags (3)',
+    'Remote-only tags (1) on origin',
+    '["preview-local","v1.0.0","v1.1.0"]',
+    '["archive-remote"]',
+    "textByName.get('preview-local')?.includes('Local only') === true",
+    "textByName.get('v1.0.0')?.includes('Pushed') === true",
+    "textByName.get('v1.1.0')?.includes('Pushed') === true",
+    "textByName.get('archive-remote')?.includes('remote only') === true",
+    'row.withinViewport',
+    'row.withinResultsColumn',
+    'row.withinInventoryHorizontally',
+    '!row.horizontalOverflow',
+    'row.buttonsWithinRow',
+    '!row.buttonsOverlap',
+    'receipt.visibleErrors.length !== 0',
+    'Advanced workflows failed semantic/geometry/privacy checks',
+  ]) {
+    assert.ok(advanced.includes(contract), `advanced gate misses ${contract}`)
+  }
+  assert.ok(
+    advanced.indexOf('const rowsHaveValidGeometry =') < capture,
+    'the semantic and geometry receipt must run before capture'
+  )
+})
+
 test('requested 200% scale proves the base and a lower auto-fit factor', () => {
   const scale = sceneSource('scale-200')
   for (const contract of [
