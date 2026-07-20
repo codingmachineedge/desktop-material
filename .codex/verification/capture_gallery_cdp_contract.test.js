@@ -662,7 +662,7 @@ test('capture-only tooltip suppression is removed before disconnect', () => {
   assert.ok(cleanup < close)
 })
 
-test('canonical mode owns the exact 68-image wiki catalog', () => {
+test('canonical mode owns exactly 68 of the 69-image wiki catalog', () => {
   const scenes = frozenStringArray('CanonicalGalleryScenes')
   const outputs = frozenStringArray('CanonicalGalleryOutputs')
   const gallery = fs.readFileSync(
@@ -673,9 +673,15 @@ test('canonical mode owns the exact 68-image wiki catalog', () => {
     ...gallery.matchAll(/^\| `([^`]+)\.png` \| [^|]+ \|$/gm),
   ].map(([, name]) => name)
 
+  const independentlyVerifiedOutputs = ['material-ollama-model-manager']
+  const expectedCatalog = [...outputs, ...independentlyVerifiedOutputs]
+
   assert.equal(outputs.length, 68)
   assert.equal(new Set(outputs).size, 68)
-  assert.deepEqual([...outputs].sort(), [...catalog].sort())
+  assert.equal(catalog.length, 69)
+  assert.equal(new Set(catalog).size, 69)
+  assert.deepEqual([...expectedCatalog].sort(), [...catalog].sort())
+  assert.ok(!outputs.includes('material-ollama-model-manager'))
   for (const sceneName of scenes) {
     assert.ok(source.includes(`scene('${sceneName}'`), sceneName)
   }
