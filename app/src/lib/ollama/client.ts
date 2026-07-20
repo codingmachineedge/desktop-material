@@ -29,6 +29,7 @@ import {
 } from './validation'
 
 export const DefaultOllamaRequestTimeoutMs = 30_000
+export const DefaultOllamaLoadTimeoutMs = 10 * 60 * 1_000
 export const DefaultOllamaPullInactivityTimeoutMs = 120_000
 export const DefaultOllamaPullTotalTimeoutMs = 6 * 60 * 60 * 1_000
 export const MaxOllamaJsonBodyBytes = 2 * 1_024 * 1_024
@@ -453,6 +454,7 @@ export class OllamaClient implements IOllamaClient {
 
   private readonly fetcher: OllamaFetch
   private readonly requestTimeoutMs: number
+  private readonly loadTimeoutMs: number
   private readonly pullInactivityTimeoutMs: number
   private readonly pullTotalTimeoutMs: number
 
@@ -462,6 +464,10 @@ export class OllamaClient implements IOllamaClient {
     this.requestTimeoutMs = resolveTimeout(
       options.requestTimeoutMs,
       DefaultOllamaRequestTimeoutMs
+    )
+    this.loadTimeoutMs = resolveTimeout(
+      options.loadTimeoutMs,
+      DefaultOllamaLoadTimeoutMs
     )
     this.pullInactivityTimeoutMs = resolveTimeout(
       options.pullInactivityTimeoutMs,
@@ -559,7 +565,10 @@ export class OllamaClient implements IOllamaClient {
     model: string,
     options: IOllamaRequestOptions = {}
   ): Promise<void> {
-    return this.generateKeepAlive(model, -1, options)
+    return this.generateKeepAlive(model, -1, {
+      ...options,
+      timeoutMs: options.timeoutMs ?? this.loadTimeoutMs,
+    })
   }
 
   public unload(

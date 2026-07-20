@@ -99,6 +99,8 @@ export type OllamaFetch = (
 export interface IOllamaClientOptions {
   readonly fetcher?: OllamaFetch
   readonly requestTimeoutMs?: number
+  /** Total deadline for the potentially slow first model load. */
+  readonly loadTimeoutMs?: number
   readonly pullInactivityTimeoutMs?: number
   readonly pullTotalTimeoutMs?: number
 }
