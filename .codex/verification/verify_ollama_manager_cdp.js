@@ -1173,6 +1173,7 @@ function assertAudit(events, startSequence) {
 const FinalSurfaceExpression = String.raw`(() => {
   const manager = document.querySelector('[data-verification="ollama-manager"]')
   const preferences = document.querySelector('#preferences')
+  const footer = preferences?.querySelector('.dialog-footer')
   const details = document.querySelector('[data-verification="ollama-details"]')
   const refresh = document.querySelector('[data-verification="ollama-refresh"]')
   const rows = [...document.querySelectorAll('[data-verification="ollama-model-row"]')]
@@ -1202,6 +1203,9 @@ const FinalSurfaceExpression = String.raw`(() => {
   const contained = bounds => bounds !== null && bounds.width > 0 &&
     bounds.height > 0 && bounds.left >= -0.5 && bounds.top >= -0.5 &&
     bounds.right <= innerWidth + 0.5 && bounds.bottom <= innerHeight + 0.5
+  const footerBounds = rectangle(footer)
+  const aboveFooter = bounds => bounds !== null && footerBounds !== null &&
+    bounds.bottom <= footerBounds.top + 0.5
   const controls = [...(manager?.querySelectorAll('button, input, select') ?? [])]
     .filter(visible)
     .map(element => ({
@@ -1273,8 +1277,10 @@ const FinalSurfaceExpression = String.raw`(() => {
     detailsText: details?.textContent?.replace(/\s+/g, ' ').trim() ?? null,
     manager: rectangle(manager),
     preferences: rectangle(preferences),
+    footer: footerBounds,
     managerContained: contained(rectangle(manager)),
     preferencesContained: contained(rectangle(preferences)),
+    managerAboveFooter: aboveFooter(rectangle(manager)),
     documentOverflow: document.documentElement.scrollWidth >
       document.documentElement.clientWidth + 1,
     bodyOverflow: document.body.scrollWidth > document.body.clientWidth + 1,
@@ -1282,6 +1288,7 @@ const FinalSurfaceExpression = String.raw`(() => {
       manager.scrollWidth > manager.clientWidth + 1,
     controls,
     controlsContained: controls.every(control => contained(control.bounds)),
+    controlsAboveFooter: controls.every(control => aboveFooter(control.bounds)),
     controlsNamed: controls.every(control => control.name.length > 0),
     overlaps,
     managerLabelled: manager?.getAttribute('aria-labelledby') !== null &&
@@ -1351,10 +1358,12 @@ function assertFinalSurface(receipt) {
     !receipt.detailsText?.includes('Q4_K_M') ||
     receipt.managerContained !== true ||
     receipt.preferencesContained !== true ||
+    receipt.managerAboveFooter !== true ||
     receipt.documentOverflow !== false ||
     receipt.bodyOverflow !== false ||
     receipt.managerOverflow !== false ||
     receipt.controlsContained !== true ||
+    receipt.controlsAboveFooter !== true ||
     receipt.controlsNamed !== true ||
     receipt.overlaps.length !== 0 ||
     receipt.managerLabelled !== true ||
@@ -1717,7 +1726,9 @@ async function runVerification(client, options) {
       geometry: {
         managerContained: capture.surface.managerContained,
         preferencesContained: capture.surface.preferencesContained,
+        managerAboveFooter: capture.surface.managerAboveFooter,
         controlsContained: capture.surface.controlsContained,
+        controlsAboveFooter: capture.surface.controlsAboveFooter,
         overlaps: capture.surface.overlaps.length,
         horizontalOverflow:
           capture.surface.documentOverflow ||

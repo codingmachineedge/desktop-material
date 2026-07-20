@@ -44,7 +44,7 @@ describe('Ollama model manager style contracts', () => {
   it('uses the full settings workspace and compacts details on desktop', () => {
     assert.match(
       styles,
-      /dialog#preferences:has\(\.ollama-model-manager\)[\s\S]*width: min\(1320px, calc\(100vw - 60px\)\);[\s\S]*height: min\(900px, calc\(100vh - 60px\)\);[\s\S]*\.copilot-tab-content[\s\S]*max-height: none;/
+      /dialog#preferences:has\(\.ollama-model-manager\)[\s\S]*width: min\(1320px, calc\(100vw - 60px\)\);[\s\S]*height: min\(940px, calc\(100vh - 40px\)\);[\s\S]*\.copilot-tab-content[\s\S]*max-height: none;/
     )
     assert.match(
       styles,
