@@ -581,7 +581,7 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                 "material-fixture@example.invalid",
                 cwd=source,
             )
-            for index in range(6):
+            for index in range(48):
                 run(
                     "commit",
                     "--allow-empty",
@@ -590,7 +590,7 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                     cwd=source,
                 )
             run("checkout", "-b", provider.FEATURE_BRANCH, cwd=source)
-            for index in range(2):
+            for index in range(4):
                 run(
                     "commit",
                     "--allow-empty",
@@ -670,7 +670,7 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                     f"http.proxy={proxy}",
                     "clone",
                     "--depth",
-                    "1",
+                    "32",
                     "--no-single-branch",
                     "--branch",
                     provider.FEATURE_BRANCH,
@@ -726,6 +726,16 @@ class ProviderHTTPIntegrationTests(unittest.TestCase):
                     )
                     for entry in logged
                 )
+            )
+            self.assertTrue(
+                any(
+                    entry["kind"] == "git"
+                    and entry["method"] == "POST"
+                    and entry.get("content_encoding") == "gzip"
+                    and entry["returncode"] == 0
+                    for entry in logged
+                ),
+                "The unshallow integration did not exercise a successful gzip upload-pack request.",
             )
             self.assertTrue(
                 any(
