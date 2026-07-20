@@ -697,7 +697,7 @@ async function openManager(client) {
     `(() => {
       const electron = require('electron')
       if (!electron?.ipcRenderer) return false
-      electron.ipcRenderer.emit('show-preferences')
+      electron.ipcRenderer.emit('menu-event', {}, 'show-preferences')
       return true
     })()`
   )

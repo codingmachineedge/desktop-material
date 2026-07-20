@@ -341,6 +341,11 @@ describe('Ollama manager attach-only verifier contract', () => {
     assert.doesNotMatch(source, /require\(['"]child_process['"]\)/)
     assert.doesNotMatch(source, /show_headless_desktop|create_headless_desktop/)
     assert.doesNotMatch(source, /electron\.exe|taskkill|Stop-Process/)
+    assert.match(
+      source,
+      /ipcRenderer\.emit\('menu-event', \{\}, 'show-preferences'\)/
+    )
+    assert.doesNotMatch(source, /ipcRenderer\.emit\('show-preferences'\)/)
     assert.doesNotThrow(
       () => new Function(`return (${FinalSurfaceExpression})`)
     )
