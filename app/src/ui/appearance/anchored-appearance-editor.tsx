@@ -134,6 +134,18 @@ export function openAppearanceEditorFromKeyDown<T extends HTMLElement>(
   return true
 }
 
+/**
+ * React events keep bubbling through their component ancestry after a portal
+ * changes the DOM ancestry. Keep interactive editor events from reaching an
+ * owning repository ListRow while leaving Popover's native outside-click
+ * handling intact.
+ */
+function stopAppearanceEditorEventPropagation(
+  event: React.SyntheticEvent<HTMLElement>
+): void {
+  event.stopPropagation()
+}
+
 /** Full element-local timeline with non-destructive undo, redo, and restore. */
 export function AppearanceElementHistoryDialog(
   props: IAppearanceElementHistoryDialogProps
@@ -393,7 +405,19 @@ export class AnchoredAppearanceEditor extends React.Component<
     }
 
     const editor = (
-      <span className="anchored-appearance-editor-mount">
+      <span
+        className="anchored-appearance-editor-mount"
+        role="presentation"
+        onPointerDown={stopAppearanceEditorEventPropagation}
+        onPointerUp={stopAppearanceEditorEventPropagation}
+        onMouseDown={stopAppearanceEditorEventPropagation}
+        onMouseUp={stopAppearanceEditorEventPropagation}
+        onClick={stopAppearanceEditorEventPropagation}
+        onDoubleClick={stopAppearanceEditorEventPropagation}
+        onContextMenu={stopAppearanceEditorEventPropagation}
+        onKeyDown={stopAppearanceEditorEventPropagation}
+        onKeyUp={stopAppearanceEditorEventPropagation}
+      >
         <Popover
           anchor={anchor}
           anchorPosition={

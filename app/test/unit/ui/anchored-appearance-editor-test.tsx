@@ -67,6 +67,7 @@ interface IHarnessProps {
   readonly onMutation?: () => void
   readonly contentOwnsHeader?: boolean
   readonly insideFoldout?: boolean
+  readonly onOwnerClick?: () => void
 }
 
 function Harness(props: IHarnessProps) {
@@ -75,7 +76,13 @@ function Harness(props: IHarnessProps) {
   const open = (element: HTMLButtonElement) => setAnchor(element)
 
   const editor = (
-    <div>
+    <div
+      role="option"
+      aria-selected={false}
+      tabIndex={-1}
+      onClick={props.onOwnerClick}
+      onKeyDown={props.onOwnerClick}
+    >
       <button
         type="button"
         onContextMenu={event =>
@@ -247,6 +254,27 @@ describe('anchored appearance editor', () => {
       assert.equal(document.activeElement, anchor)
       assert.ok(document.getElementById('foldout-container'))
     })
+  })
+
+  it('contains portaled editor interactions instead of selecting its owner row', () => {
+    let ownerClicks = 0
+    render(
+      <Harness
+        insideFoldout={true}
+        onOwnerClick={() => {
+          ownerClicks++
+        }}
+      />
+    )
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Toolbar' }))
+
+    const customize = screen.getByRole('tab', { name: 'Customize' })
+    fireEvent.mouseDown(customize)
+    fireEvent.mouseUp(customize)
+    fireEvent.click(customize)
+
+    assert.equal(ownerClicks, 0)
+    assert.ok(screen.getByRole('dialog', { name: 'Toolbar appearance' }))
   })
 
   it('renders the element history with full undo, redo, and restore mutations', async () => {
