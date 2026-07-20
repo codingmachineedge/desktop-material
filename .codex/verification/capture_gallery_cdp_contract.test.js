@@ -239,6 +239,13 @@ test('fixture account hydration returns only privacy-safe receipts', () => {
   const start = source.indexOf('async function seedProfile()')
   const end = source.indexOf('async function ensureRepository(', start)
   const seed = source.slice(start, end)
+  const repositoryOpen = seed.indexOf('await ensureRepository(fixturePath)')
+  const hydration = seed.indexOf('const hydrated = await evaluate')
+  assert.ok(repositoryOpen >= 0, 'seedProfile must open the owned fixture')
+  assert.ok(
+    repositoryOpen < hydration,
+    'seedProfile must open the owned fixture before provider hydration'
+  )
   for (const contract of [
     'accountsStore.reloadFromStore()',
     'accountsStore.getAll()',

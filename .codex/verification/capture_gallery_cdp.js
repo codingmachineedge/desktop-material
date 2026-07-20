@@ -862,6 +862,10 @@ async function seedProfile() {
     await sleep(1800)
   }
   if (account !== null) {
+    // A pristine profile can complete the welcome flow before the startup
+    // --cli-open request is eligible to persist the fixture. Establish the
+    // owned repository explicitly before requiring provider hydration.
+    await ensureRepository(fixturePath)
     const hydrated = await evaluate(`(async () => {
       const root = document.querySelector('#desktop-app-container')
       const node = root?.querySelector('*')
