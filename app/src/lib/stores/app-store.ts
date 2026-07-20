@@ -12371,10 +12371,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
     repository: Repository,
     accountKey: string | null
   ): Promise<Repository> {
-    return this.repositoriesStore.updateRepositoryAccount(
-      repository,
-      accountKey
-    )
+    const updatedRepository =
+      await this.repositoriesStore.updateRepositoryAccount(
+        repository,
+        accountKey
+      )
+
+    // Account binding participates in Repository.hash. Preserve the current
+    // repository surface and all other in-memory state across that identity
+    // change instead of resetting the view to Changes.
+    this.repositoryStateCache.transferState(repository, updatedRepository)
+
+    return updatedRepository
   }
 
   /**

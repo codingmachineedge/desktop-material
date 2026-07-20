@@ -123,6 +123,26 @@ test('appearance captures require a visible in-viewport owner editor', () => {
   )
 })
 
+test('provider triage capture waits for the exact settled surface', () => {
+  const triage = sceneSource('provider-triage')
+  for (const contract of [
+    "document.querySelector('#triage-tab')",
+    'closest(\'button[role="tab"]\')',
+    "getAttribute('aria-selected') === 'true'",
+    "document.querySelector('main.provider-triage-view')",
+    "querySelectorAll('.provider-triage-channel.ready')",
+    '/^\\\\d+ of \\\\d+ work items$/',
+    'settled exact provider triage surface',
+  ]) {
+    assert.ok(triage.includes(contract), `provider triage misses ${contract}`)
+  }
+  assert.ok(
+    triage.indexOf('settled exact provider triage surface') <
+      triage.indexOf("capture('material-provider-triage')"),
+    'the settled triage gate must run before capture'
+  )
+})
+
 test('new prerequisite scenes use deterministic synthetic owner flows', () => {
   const expected = new Map([
     ['anchored-appearance', 'material-customization'],

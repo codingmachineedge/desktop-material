@@ -1903,7 +1903,38 @@ scene('issues', async () => {
 })
 
 scene('provider-triage', async () => {
-  await captureSection('Triage', 'material-provider-triage', 3000)
+  await ensureRepository()
+  const clicked = await evaluate(`(() => {
+    const item = document.querySelector('#triage-tab')
+    const tab = item?.closest('button[role="tab"]')
+    if (!(tab instanceof HTMLButtonElement) || tab.disabled) return false
+    tab.click()
+    return true
+  })()`)
+  if (!clicked) {
+    fail('The exact Triage repository tab was unavailable.')
+  }
+  await waitFor(
+    `(() => {
+      const item = document.querySelector('#triage-tab')
+      const tab = item?.closest('button[role="tab"]')
+      const view = document.querySelector('main.provider-triage-view')
+      const channels = view?.querySelectorAll('.provider-triage-channel.ready')
+      const heading = view?.querySelector('.provider-triage-results-heading strong')
+      const bounds = view?.getBoundingClientRect()
+      return tab?.getAttribute('aria-selected') === 'true' &&
+        view instanceof HTMLElement &&
+        channels?.length === 2 &&
+        /^\\d+ of \\d+ work items$/.test(heading?.textContent?.trim() ?? '') &&
+        bounds !== undefined && bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= 0 && bounds.top >= 0 &&
+        bounds.right <= window.innerWidth && bounds.bottom <= window.innerHeight
+    })()`,
+    'settled exact provider triage surface',
+    30000
+  )
+  await parkPointer()
+  await capture('material-provider-triage')
 })
 
 scene('api-explorer', async () => {

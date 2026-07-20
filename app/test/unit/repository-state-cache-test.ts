@@ -10,7 +10,11 @@ import {
   AppFileStatusKind,
 } from '../../src/models/status'
 import { DiffSelection, DiffSelectionType } from '../../src/models/diff'
-import { HistoryTabMode, IDisplayHistory } from '../../src/lib/app-state'
+import {
+  HistoryTabMode,
+  IDisplayHistory,
+  RepositorySectionTab,
+} from '../../src/lib/app-state'
 import { gitHubRepoFixture } from '../helpers/github-repo-builder'
 import { TestStatsStore } from '../helpers/test-stats-store'
 
@@ -113,5 +117,33 @@ describe('RepositoryStateCache', () => {
     assert.equal(compareState.formState.kind, HistoryTabMode.History)
     assert.equal(compareState.filterText, filterText)
     assert.equal(compareState.commitSHAs.length, 1)
+  })
+
+  it('preserves the selected section when a repository identity changes', () => {
+    const repository = new Repository('/something/path', 1, null, false)
+    const reboundRepository = new Repository(
+      repository.path,
+      repository.id,
+      repository.gitHubRepository,
+      repository.missing,
+      repository.alias,
+      repository.workflowPreferences,
+      repository.isTutorialRepository,
+      repository.gitDir,
+      'https://api.github.com#42'
+    )
+    const cache = new RepositoryStateCache(new TestStatsStore())
+
+    cache.update(repository, () => ({
+      selectedSection: RepositorySectionTab.Triage,
+    }))
+    cache.transferState(repository, reboundRepository)
+
+    assert.notEqual(repository.hash, reboundRepository.hash)
+    assert.equal(cache.getIfPresent(repository), undefined)
+    assert.equal(
+      cache.get(reboundRepository).selectedSection,
+      RepositorySectionTab.Triage
+    )
   })
 })
