@@ -27,6 +27,7 @@ import {
   visibleTabLabel,
 } from '../../../src/ui/repository-tabs/tab-action-helpers'
 import { Dispatcher } from '../../../src/ui/dispatcher'
+import { getAppearanceRepositoryDisplayPath } from '../../../src/ui/appearance/anchored-appearance-editor'
 import {
   fireEvent,
   render,
@@ -646,7 +647,11 @@ describe('RepositoryTab title appearance', () => {
 
     assert.ok(screen.getByText('Tab appearance'))
     assert.ok(
-      screen.getByText('C:\\appearance-elements\\alpha-tab\\title-style')
+      screen.getByText(
+        getAppearanceRepositoryDisplayPath(
+          'C:\\appearance-elements\\alpha-tab\\title-style'
+        )
+      )
     )
     fireEvent.click(
       screen.getByRole('button', { name: 'Open tab appearance history' })
