@@ -2509,89 +2509,6 @@ scene('ollama-manager', async () => {
            document.querySelector('[data-verification="ollama-pull-cancel"]') instanceof HTMLButtonElement`,
           'visible cancellable Ollama pull progress'
         )
-        await evaluate(`(() => {
-          const button = document.querySelector(
-            '[data-verification="ollama-pull-cancel"]'
-          )
-          const preferences = document.querySelector('#preferences')
-          const diagnostic = {
-            control: {
-              type:
-                button instanceof HTMLButtonElement ? button.type : null,
-              formClass: button?.closest('form')?.className ?? null,
-              insidePreferences:
-                preferences instanceof HTMLElement &&
-                button instanceof HTMLElement &&
-                preferences.contains(button),
-            },
-            events: [],
-            closeCalls: [],
-            popupBefore: null,
-            popupAfterRemoval: null,
-          }
-          window.__ollamaCancelDiagnostic = diagnostic
-          const root = document.querySelector('#desktop-app-container')
-          const node = root?.querySelector('*')
-          const fiberKey = node && Object.keys(node).find(key =>
-            key.startsWith('__reactFiber$') ||
-            key.startsWith('__reactInternalInstance$')
-          )
-          let fiber = fiberKey ? node[fiberKey] : null
-          let appStore = null
-          for (
-            let depth = 0;
-            fiber && depth < 120;
-            depth++, fiber = fiber.return
-          ) {
-            if (fiber.stateNode?.props?.appStore) {
-              appStore = fiber.stateNode.props.appStore
-              break
-            }
-          }
-          if (appStore) {
-            diagnostic.popupBefore =
-              appStore.popupManager?.currentPopup?.type ?? null
-            for (const method of ['_closePopup', '_closePopupById']) {
-              const original = appStore[method]?.bind(appStore)
-              if (!original) continue
-              appStore[method] = (...methodArguments) => {
-                diagnostic.closeCalls.push({
-                  method,
-                  arguments: methodArguments.map(value => String(value)),
-                  stack: new Error().stack,
-                })
-                return original(...methodArguments)
-              }
-            }
-            new MutationObserver(() => {
-              if (document.querySelector('#preferences') === null) {
-                diagnostic.popupAfterRemoval =
-                  appStore.popupManager?.currentPopup?.type ?? null
-              }
-            }).observe(document.body, { childList: true, subtree: true })
-          }
-          for (const type of ['click', 'submit', 'cancel', 'close']) {
-            document.addEventListener(
-              type,
-              event => {
-                if (diagnostic.events.length >= 20) return
-                const target = event.target
-                diagnostic.events.push({
-                  type,
-                  target:
-                    target instanceof HTMLElement
-                      ? target.getAttribute('data-verification') ??
-                        target.id ??
-                        target.tagName
-                      : null,
-                  defaultPrevented: event.defaultPrevented,
-                })
-              },
-              true
-            )
-          }
-          return true
-        })()`)
         await clickEnabledSelector('[data-verification="ollama-pull-cancel"]')
         const cancellationState = `(() => {
             const manager = document.querySelector('[data-verification="ollama-manager"]')
@@ -2629,7 +2546,6 @@ scene('ollama-manager', async () => {
         } catch {
           const diagnostic = await evaluate(`({
             state: ${cancellationState},
-            events: window.__ollamaCancelDiagnostic ?? null,
             preferencesPresent:
               document.querySelector('#preferences') !== null,
           })`).catch(error => ({
