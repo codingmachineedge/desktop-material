@@ -279,12 +279,11 @@ identifiers are retained. A successful Ollama request followed by a failed
 provider-settings update is reported as a split outcome rather than a complete
 success.
 
-Plain HTTP is accepted only for loopback endpoints (`localhost`, `127.0.0.1`,
-or `[::1]`); a deliberately configured remote endpoint must use HTTPS. The
-saved provider path must end in terminal `/v1`, with an optional reverse-proxy
-prefix. The manager strips that one suffix and appends only fixed native
-`/api/*` routes; a saved `/api` base, embedded credentials, query strings, and
-URL fragments are rejected. Stale requests are aborted when the provider
+Only HTTP or HTTPS loopback endpoints (`localhost`, `127.0.0.1`, or `[::1]`)
+are accepted. The saved provider path must be exactly `/v1`; the manager derives
+that loopback origin and appends only fixed native `/api/*` routes. Every remote
+host, arbitrary prefix, saved `/api` base, embedded credential, query string,
+and URL fragment is rejected. Stale requests are aborted when the provider
 changes, response text stays bounded, and credentials are never added to
 management URLs or logs.
 

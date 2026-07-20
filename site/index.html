@@ -392,9 +392,9 @@
             now closes all 30 demand-backed advanced workflow requests across
             identity, pull requests, stashes and tags, navigation, diffs,
             integrations, and Projects. M23 adds a full local Ollama model
-            lifecycle workspace with guarded endpoints, synchronized Copilot
-            provider models, and English, Hong Kong Cantonese, or bilingual
-            presentation.
+            lifecycle workspace with an exact loopback-only provider endpoint,
+            synchronized Copilot provider models, and English, Hong Kong
+            Cantonese, or bilingual presentation.
           </p>
           <div class="feature-grid">
             <article class="card">
@@ -811,7 +811,8 @@
                 running models, review bounded details, pull with cancellable
                 progress, copy or rename, load or unload, and confirm deletion.
                 The installed inventory stays synchronized with that Ollama
-                provider's selectable Copilot models.
+                provider's selectable Copilot models, while management accepts
+                only its exact loopback <code>/v1</code> base.
               </p>
             </article>
 

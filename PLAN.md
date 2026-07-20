@@ -52,9 +52,9 @@ and selected-model details; supports search/filter, streamed pull with
 cancellation, copy and guarded rename, load/unload, and confirmed delete; and
 synchronizes the authoritative installed inventory back to the provider's
 selectable Copilot model list. Endpoint validation requires one terminal `/v1`,
-permits loopback HTTP or deliberate remote HTTPS with reverse-proxy prefixes,
-and derives fixed native manager routes while rejecting credential-bearing or
-ambiguous URLs.
+permits only an exact loopback base, and derives fixed native `/api/*` routes
+from that origin while rejecting remote hosts, arbitrary prefixes,
+credential-bearing URLs, queries, and fragments.
 
 All visible and accessible strings follow English, playful Hong Kong Cantonese,
 or bilingual mode. The complete workflow, failure, privacy, and API contracts

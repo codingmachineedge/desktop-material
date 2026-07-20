@@ -7,10 +7,10 @@ that provider to open the lifecycle workspace.
 
 The provider's configured URL serves two related purposes. Copilot requests use
 Ollama's OpenAI-compatible endpoint, while the manager derives its fixed native
-routes from the same trusted origin. The saved provider URL must end in one
-terminal `/v1`; optional reverse-proxy prefixes are retained, but a saved
-`/api` base is rejected. The manager strips that one `/v1` suffix and appends
-only its fixed native `/api/*` routes. The default preset is
+routes from the same trusted origin. The saved provider URL must be an exact
+loopback `/v1` base; remote hosts, arbitrary path prefixes, and a saved `/api`
+base are rejected. The manager derives the loopback origin and appends only its
+fixed native `/api/*` routes. The default preset is
 `http://127.0.0.1:11434/v1`; no API key is required.
 
 ## Inventory and inspection
@@ -54,14 +54,13 @@ claiming a complete operation.
 
 ## Endpoint, privacy, and recovery boundaries
 
-Plain HTTP is accepted only for loopback endpoints such as `localhost`,
-`127.0.0.1`, and `[::1]`. A deliberately configured remote endpoint must use
-HTTPS. Reverse-proxy prefixes are supported when the saved provider path ends
-in terminal `/v1`; embedded credentials, query strings, fragments, or a saved
-`/api` base are rejected. The manager strips exactly that suffix and appends
-only fixed native `/api/*` routes, and operation errors are bounded before
-display. Provider tokens are not required for Ollama and are never added to
-management URLs, process arguments, logs, or repository files.
+Only HTTP or HTTPS loopback URLs such as `localhost`, `127.0.0.1`, and `[::1]`
+are accepted. The saved path must be exactly `/v1`; every remote host,
+arbitrary prefix, embedded credential, query string, fragment, or saved `/api`
+base is rejected. The manager derives only that loopback origin and appends
+fixed native `/api/*` routes, and operation errors are bounded before display.
+Provider tokens are not required for Ollama and are never added to management
+URLs, process arguments, logs, or repository files.
 
 Loading, empty, unavailable, partial, cancellation, validation, and operation
 failure states remain distinct. Refreshing or changing providers aborts stale

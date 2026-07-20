@@ -266,10 +266,10 @@ load/unload, and exact-name confirmed deletion keep partial and failure states
 visible. Successful inventory changes synchronize installed names back to the
 provider's selectable Copilot models.
 
-Plain HTTP is loopback-only and deliberate remote endpoints require HTTPS. A
-terminal `/v1` provider path may retain a reverse-proxy prefix; the manager
-strips only that suffix and appends fixed native `/api/*` routes. A saved `/api`
-base and credential-bearing or ambiguous URLs fail validation. The complete
+Management accepts only an exact loopback `/v1` provider base. The manager
+derives that loopback origin and appends fixed native `/api/*` routes; every
+remote HTTP or HTTPS host, arbitrary prefix, saved `/api` base,
+credential-bearing URL, query, and fragment fails validation. The complete
 surface follows English, playful Hong Kong Cantonese, and bilingual language
 modes, with keyboard access and live status announcements.
 

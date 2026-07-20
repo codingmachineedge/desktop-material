@@ -80,10 +80,11 @@ The detailed Pages, wiki, asset, and cleanup receipts are maintained in
 - Pull with streamed progress and cancellation; copy or guarded-rename a model;
   load or unload it; and delete only after confirming the exact model name
 - Synchronize Ollama's installed inventory back to that provider's selectable
-  Copilot models. A terminal `/v1` base keeps plain HTTP loopback-only, supports
-  deliberate remote HTTPS and reverse-proxy prefixes, and derives only fixed
-  native routes. The complete workspace follows English, playful Hong Kong
-  Cantonese, or bilingual mode. See the
+  Copilot models. Management requires an exact loopback `/v1` base and derives
+  only fixed native `/api/*` routes; remote HTTP/HTTPS hosts, arbitrary
+  prefixes, credentials, queries, and fragments are rejected. The complete
+  workspace follows English, playful Hong Kong Cantonese, or bilingual mode.
+  See the
   [feature guide](docs/features/integrations/ollama-model-manager.md)
 
 **Material Design 3 Expressive shell**

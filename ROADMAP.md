@@ -30,11 +30,11 @@ platform-neutral repository automation.
 - Successful inventory changes synchronize Ollama's installed models back to
   the provider's selectable Copilot models while retaining matching model
   settings and reporting any persistence split outcome.
-- Plain HTTP is loopback-only; deliberate remote endpoints require HTTPS. The
-  saved provider ends in terminal `/v1`, optional reverse-proxy prefixes are
-  retained, native `/api/*` routes are fixed, and embedded credentials, query
-  strings, fragments, oversized responses, and stale requests fail closed or
-  remain bounded.
+- Management accepts only an exact loopback `/v1` provider base. Native
+  `/api/*` routes are fixed from that origin, and every remote HTTP or HTTPS
+  host, arbitrary prefix, saved `/api` base, embedded credential, query,
+  fragment, oversized response, and stale request fails closed or remains
+  bounded.
 - The complete workspace follows English, playful Hong Kong Cantonese, and
   bilingual language modes plus keyboard, status-announcement, compact-window,
   and reduced-motion contracts. See the
