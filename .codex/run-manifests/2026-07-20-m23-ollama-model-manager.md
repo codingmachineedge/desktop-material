@@ -67,3 +67,38 @@ The implementation run must append its unique run id, owned Temp root, fixture
 paths and ports, headless desktop name, create state, Electron PID, and resolved
 HWND before launching the app. Every created resource must be verified absent
 before this manifest can be marked complete.
+
+## Execution ledger (in progress)
+
+- Run id: `m23-49bcbf-a7e3`.
+- Exact MCP endpoint: `http://127.0.0.1:8765/mcp`; scheduled task and checkout
+  were revalidated at `547a102a49169d41da876de217856229ab7c03a1`.
+- Exact application build: source `70bc3afec3bf726159839b390092209a2a524ff4`;
+  the required unpackaged production command returned `client_ok: true`, exit
+  code 0, and no timeout after 207.39 seconds. All later commits through
+  `49bcbfe2f4f719a0aea8fcda723acc800f46d568` change only verification or
+  merge history; the `app/src`, `app/styles`, and package trees remain equal to
+  the built source.
+- Owned P0 root: `%TEMP%\desktop-material-p0-ui-m23-49bcbf-a7e3`;
+  isolated profile, fixture clone, capture directory, and provider state are
+  contained beneath it. Synthetic provider PID `20484`, loopback port `58441`,
+  Copilot feature enabled, disposable credential login `material-verifier-p0`.
+- Owned Ollama root: `%TEMP%\desktop-material-ollama-m23-49bcbf-a7e3`;
+  synthetic fixture PID `37392`, loopback port `55326`, version `0.12.6`, and
+  4.2-second minimum pull duration. The retained probe passed live cancellation
+  and all five deterministic failure modes before resetting the fixture.
+- Owned CDP port: `60586` (confirmed unused when reserved; recheck immediately
+  before launch).
+- Headless desktop: `DesktopMaterialOllamaM23-49bcbf-a7e3`, created exactly
+  once as `WinSta0\DesktopMaterialOllamaM23-49bcbf-a7e3` with owned handle
+  `932`; never shown or switched to the visible desktop.
+- The first Ollama-start wrapper retained an output pipe after the child became
+  ready. Only the wedged MCP scheduled task was restarted; both owned fixture
+  PIDs survived, and the full MCP preflight plus Ollama probe passed afterward.
+- Electron launch PID: pending first launch.
+- Dynamically resolved Desktop Material HWND: pending first launch.
+- Candidate capture and receipt: pending beneath the owned P0 `captures`
+  directory; neither tracked screenshot nor documentation has been changed.
+- Cleanup state: pending. Required order is exact HWND/PID, disposable
+  credential, P0 provider, Ollama fixture, desktop, then containment-checked
+  owned roots and CDP listener verification.
