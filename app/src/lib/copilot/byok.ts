@@ -1,6 +1,7 @@
 import { isIPv4 } from 'net'
 import { TokenStore } from '../stores/token-store'
 import type { ReasoningEffort } from '../stores/copilot-store'
+import { getOllamaManagementEndpoint } from '../ollama/endpoint'
 
 /** Provider type understood by the Copilot SDK BYOK config. */
 export type BYOKProviderType = 'openai' | 'azure' | 'anthropic'
@@ -258,9 +259,33 @@ export function isValidBYOKBaseUrl(value: string): boolean {
   }
 }
 
-/** Whether this provider explicitly opts into the native Ollama manager. */
+/**
+ * Derive the native management origin for a valid Ollama BYOK provider.
+ * Provider URLs remain OpenAI-compatible `/v1` URLs while management calls
+ * are made only against the canonical local origin.
+ */
+export function getOllamaManagementEndpointForProvider(
+  provider: IBYOKProvider
+): string {
+  if (
+    provider.integration !== 'ollama' ||
+    provider.type !== 'openai' ||
+    provider.authKind !== 'none' ||
+    provider.azureApiVersion !== undefined
+  ) {
+    throw new Error('The Ollama provider configuration is invalid.')
+  }
+  return getOllamaManagementEndpoint(provider.baseUrl)
+}
+
+/** Whether this provider safely opts into the native Ollama manager. */
 export function isOllamaBYOKProvider(provider: IBYOKProvider): boolean {
-  return provider.integration === 'ollama'
+  try {
+    getOllamaManagementEndpointForProvider(provider)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function isBYOKModel(value: unknown): value is IBYOKModel {
@@ -332,6 +357,13 @@ function isBYOKProvider(value: unknown): value is IBYOKProvider {
       p.requestTimeoutSeconds <= 0)
   ) {
     return false
+  }
+  if (p.integration === 'ollama') {
+    try {
+      getOllamaManagementEndpointForProvider(p as unknown as IBYOKProvider)
+    } catch {
+      return false
+    }
   }
   return true
 }

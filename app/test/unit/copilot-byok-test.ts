@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { afterEach, describe, it } from 'node:test'
 import {
   encodeModelKey,
+  getOllamaManagementEndpointForProvider,
   isLocalBaseUrl,
   isOllamaBYOKProvider,
   isValidBYOKBaseUrl,
@@ -73,7 +74,54 @@ describe('byok storage', () => {
 
     assert.deepStrictEqual(loadBYOKProviders(), [provider])
     assert.strictEqual(isOllamaBYOKProvider(provider), true)
+    assert.strictEqual(
+      getOllamaManagementEndpointForProvider(provider),
+      'http://127.0.0.1:11434'
+    )
     assert.strictEqual(isOllamaBYOKProvider(sampleProvider), false)
+  })
+
+  it('rejects unsafe Ollama integration configurations without changing generic BYOK', () => {
+    const ollama: IBYOKProvider = {
+      ...sampleProvider,
+      id: 'ollama',
+      name: 'Ollama',
+      baseUrl: 'http://localhost:11434/v1',
+      authKind: 'none',
+      integration: 'ollama',
+    }
+    const invalid: ReadonlyArray<IBYOKProvider> = [
+      { ...ollama, id: 'remote', baseUrl: 'https://models.example.com/v1' },
+      {
+        ...ollama,
+        id: 'credentials',
+        baseUrl: 'http://alice:secret@localhost:11434/v1',
+      },
+      {
+        ...ollama,
+        id: 'query',
+        baseUrl: 'http://localhost:11434/v1?token=secret',
+      },
+      {
+        ...ollama,
+        id: 'path',
+        baseUrl: 'http://localhost:11434/ollama/v1',
+      },
+      { ...ollama, id: 'auth', authKind: 'apiKey' as const },
+      { ...ollama, id: 'type', type: 'anthropic' as const },
+    ]
+
+    localStorage.setItem(
+      StorageKey,
+      JSON.stringify([sampleProvider, ollama, ...invalid])
+    )
+
+    assert.deepStrictEqual(
+      loadBYOKProviders().map(provider => provider.id),
+      ['p1', 'ollama']
+    )
+    assert.strictEqual(isOllamaBYOKProvider(invalid[0]), false)
+    assert.strictEqual(isValidBYOKBaseUrl(sampleProvider.baseUrl), true)
   })
 
   it('rejects unknown provider integration markers', () => {

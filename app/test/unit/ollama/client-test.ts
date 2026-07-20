@@ -1,9 +1,9 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import {
-  MaxOllamaErrorBodyBytes,
   MaxOllamaJsonBodyBytes,
   MaxOllamaNdjsonLineBytes,
+  MaxOllamaPullBytes,
   MaxOllamaPullEvents,
   OllamaClient,
 } from '../../../src/lib/ollama/client'
@@ -13,8 +13,11 @@ import {
   OllamaFetch,
 } from '../../../src/lib/ollama/types'
 import {
+  MaxOllamaLargeTextLength,
   MaxOllamaMetadataEntries,
+  MaxOllamaModelNameLength,
   MaxOllamaModels,
+  MaxOllamaObjectProperties,
 } from '../../../src/lib/ollama/validation'
 
 interface ICapturedRequest {
@@ -185,7 +188,7 @@ describe('Ollama client discovery', () => {
   })
 
   it('rejects oversized success bodies before parsing them', async () => {
-    const client = new OllamaClient('https://models.example.com/v1', {
+    const client = new OllamaClient('http://localhost:11434/v1', {
       fetcher: async () =>
         new Response('{"version":"safe"}', {
           headers: {
@@ -224,6 +227,37 @@ describe('Ollama client discovery', () => {
     for (const operation of [
       () => client.list(),
       () => client.show('llama3.2'),
+    ]) {
+      await assert.rejects(operation, (error: unknown) => {
+        assert.ok(error instanceof OllamaClientError)
+        assert.equal(error.kind, 'response')
+        return true
+      })
+    }
+  })
+
+  it('bounds strings, object properties, and numeric fields', async () => {
+    const overfullObject = Object.fromEntries(
+      new Array(MaxOllamaObjectProperties + 1)
+        .fill(undefined)
+        .map((_value, index) => [`field${index}`, index])
+    )
+    const responses = [
+      { models: [{ model: 'x'.repeat(MaxOllamaModelNameLength + 1) }] },
+      { models: [{ model: 'llama3.2', size: Number.MAX_SAFE_INTEGER + 1 }] },
+      { modelfile: 'x'.repeat(MaxOllamaLargeTextLength + 1) },
+      { version: '0.9.1', ...overfullObject },
+    ]
+    let index = 0
+    const client = new OllamaClient('http://localhost:11434', {
+      fetcher: async () => jsonResponse(responses[index++]),
+    })
+
+    for (const operation of [
+      () => client.list(),
+      () => client.list(),
+      () => client.show('llama3.2'),
+      () => client.health(),
     ]) {
       await assert.rejects(operation, (error: unknown) => {
         assert.ok(error instanceof OllamaClientError)
@@ -281,10 +315,10 @@ describe('Ollama client lifecycle operations', () => {
     }
   })
 
-  it('returns bounded sanitized HTTP errors without endpoint credentials or bodies', async () => {
+  it('returns status-only HTTP errors without provider response details', async () => {
     const secretError =
       'open https://alice:super-secret@example.com then use Bearer abc123 and token=hidden'
-    const client = new OllamaClient('https://models.example.com/v1', {
+    const client = new OllamaClient('http://localhost:11434/v1', {
       fetcher: async () => jsonResponse({ error: secretError }, 502),
     })
 
@@ -292,29 +326,12 @@ describe('Ollama client lifecycle operations', () => {
       assert.ok(error instanceof OllamaClientError)
       assert.equal(error.kind, 'http')
       assert.equal(error.status, 502)
-      assert.match(error.message, /HTTP 502/)
+      assert.equal(error.message, 'Ollama request failed with HTTP 502.')
       assert.equal(error.message.includes('alice'), false)
       assert.equal(error.message.includes('super-secret'), false)
       assert.equal(error.message.includes('abc123'), false)
       assert.equal(error.message.includes('hidden'), false)
-      assert.match(error.message, /\[redacted\]/)
-      return true
-    })
-
-    const oversized = new OllamaClient('https://models.example.com/v1', {
-      fetcher: async () =>
-        new Response(
-          JSON.stringify({
-            error: `${'x'.repeat(MaxOllamaErrorBodyBytes)}never-echo-this`,
-          }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
-        ),
-    })
-    await assert.rejects(oversized.health(), (error: unknown) => {
-      assert.ok(error instanceof OllamaClientError)
-      assert.equal(error.kind, 'http')
-      assert.equal(error.message, 'Ollama request failed with HTTP 500.')
-      assert.equal(error.message.includes('never-echo-this'), false)
+      assert.equal(error.message.includes('[redacted]'), false)
       return true
     })
   })
@@ -328,7 +345,7 @@ describe('Ollama client lifecycle operations', () => {
           { once: true }
         )
       })
-    const client = new OllamaClient('https://models.example.com/v1', {
+    const client = new OllamaClient('http://localhost:11434/v1', {
       fetcher,
     })
 
@@ -486,6 +503,54 @@ describe('Ollama pull streaming', () => {
     assert.equal(streamCancelled, true)
   })
 
+  it('enforces pull inactivity and explicitly cancels the reader', async () => {
+    let streamCancelled = false
+    const client = new OllamaClient('http://localhost:11434', {
+      pullInactivityTimeoutMs: 20,
+      pullTotalTimeoutMs: 1_000,
+      fetcher: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            cancel() {
+              streamCancelled = true
+            },
+          })
+        ),
+    })
+
+    await assert.rejects(client.pull('llama3.2'), (error: unknown) => {
+      assert.ok(error instanceof OllamaClientError)
+      assert.equal(error.kind, 'timeout')
+      return true
+    })
+    assert.equal(streamCancelled, true)
+  })
+
+  it('caps aggregate pull bytes independently of line and event caps', async () => {
+    let streamCancelled = false
+    const client = new OllamaClient('http://localhost:11434', {
+      fetcher: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array(MaxOllamaPullBytes + 1))
+            },
+            cancel() {
+              streamCancelled = true
+            },
+          })
+        ),
+    })
+
+    await assert.rejects(client.pull('llama3.2'), (error: unknown) => {
+      assert.ok(error instanceof OllamaClientError)
+      assert.equal(error.kind, 'response')
+      assert.equal(error.message.includes('allowed size'), true)
+      return true
+    })
+    assert.equal(streamCancelled, true)
+  })
+
   it('rejects malformed and oversized NDJSON progress lines', async () => {
     const bodies = [
       '{"status":\n',
@@ -511,7 +576,7 @@ describe('Ollama pull streaming', () => {
     }
   })
 
-  it('treats a successful HTTP stream error object as a sanitized server failure', async () => {
+  it('treats a successful stream error object as a generic server failure', async () => {
     const client = new OllamaClient('http://localhost:11434', {
       fetcher: async () =>
         new Response(
@@ -522,6 +587,7 @@ describe('Ollama pull streaming', () => {
     await assert.rejects(client.pull('private/model'), (error: unknown) => {
       assert.ok(error instanceof OllamaClientError)
       assert.equal(error.kind, 'server')
+      assert.equal(error.message, 'Ollama rejected the request.')
       assert.equal(error.message.includes('alice'), false)
       assert.equal(error.message.includes('secret'), false)
       return true

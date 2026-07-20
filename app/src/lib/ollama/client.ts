@@ -38,7 +38,6 @@ export const MaxOllamaPullBytes = 8 * 1_024 * 1_024
 export const MaxOllamaPullEvents = 4_096
 
 const MaxTimerDelayMs = 2_147_483_647
-const MaxErrorDetailLength = 512
 
 type OllamaMethod = 'GET' | 'POST' | 'DELETE'
 type TimeoutKind = 'request' | 'pull-total' | 'pull-inactivity'
@@ -296,71 +295,15 @@ function decodeJson(bytes: Uint8Array): unknown {
   }
 }
 
-function sanitizeErrorDetail(value: string): string {
-  let detail = value
-    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  detail = detail.replace(
-    /\b([a-z][a-z\d+.-]*:\/\/)[^/\s:@]+:[^@/\s]+@/gi,
-    '$1[redacted]@'
-  )
-  detail = detail.replace(/\b(Bearer|Basic)\s+[^\s,;]+/gi, '$1 [redacted]')
-  detail = detail.replace(
-    /\b(api[_-]?key|token|password)\s*([:=])\s*[^\s,;]+/gi,
-    '$1$2[redacted]'
-  )
-  if (detail.length > MaxErrorDetailLength) {
-    return `${detail.slice(0, MaxErrorDetailLength - 3)}...`
-  }
-  return detail
+function serverError(): OllamaClientError {
+  return new OllamaClientError('server', 'Ollama rejected the request.')
 }
 
-function providerErrorDetail(value: unknown): string | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return undefined
-  }
-  const record = value as Record<string, unknown>
-  const candidate =
-    typeof record.error === 'string'
-      ? record.error
-      : typeof record.message === 'string'
-      ? record.message
-      : undefined
-  return candidate === undefined ? undefined : sanitizeErrorDetail(candidate)
-}
-
-function serverError(value: unknown): OllamaClientError {
-  const detail = providerErrorDetail(value)
-  return new OllamaClientError(
-    'server',
-    detail !== undefined && detail.length > 0
-      ? `Ollama rejected the request: ${detail}`
-      : 'Ollama rejected the request.'
-  )
-}
-
-async function httpError(
-  response: Response,
-  context: IRequestContext
-): Promise<OllamaClientError> {
-  let detail: string | undefined
-  try {
-    const value = decodeJson(
-      await readBoundedBody(response, MaxOllamaErrorBodyBytes, context)
-    )
-    detail = providerErrorDetail(value)
-  } catch (error) {
-    if (context.signal.aborted) {
-      throw error
-    }
-    // Oversized, empty, or non-JSON error bodies remain status-only.
-  }
+async function httpError(response: Response): Promise<OllamaClientError> {
+  await cancelResponseBody(response)
   return new OllamaClientError(
     'http',
-    `Ollama request failed with HTTP ${response.status}.${
-      detail !== undefined && detail.length > 0 ? ` ${detail}` : ''
-    }`,
+    `Ollama request failed with HTTP ${response.status}.`,
     response.status
   )
 }
@@ -444,7 +387,7 @@ async function readPullProgress(
       )
     }
     if (hasServerError(value)) {
-      throw serverError(value)
+      throw serverError()
     }
     const progress = parsePullProgress(value)
     lastProgress = progress
@@ -681,7 +624,7 @@ export class OllamaClient implements IOllamaClient {
           await readBoundedBody(response, MaxOllamaJsonBodyBytes, context)
         )
         if (hasServerError(value)) {
-          throw serverError(value)
+          throw serverError()
         }
         return parse(value)
       }
@@ -727,7 +670,7 @@ export class OllamaClient implements IOllamaClient {
       throwIfAborted(context.signal)
       context.touch()
       if (!response.ok) {
-        throw await httpError(response, context)
+        throw await httpError(response)
       }
       const result = await handle(response, context)
       throwIfAborted(context.signal)

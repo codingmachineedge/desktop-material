@@ -171,6 +171,27 @@ describe('native Ollama renderer transport', () => {
           headers: { Authorization: 'Bearer secret' },
         })
       )
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/prefix/api/version`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/api/version?token=secret`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
+      await assert.rejects(
+        nodeOllamaFetch(`${fixture.endpoint}/api/delete`, {
+          method: 'GET',
+          redirect: 'error',
+          credentials: 'omit',
+        })
+      )
       assert.equal(requests, 0)
     } finally {
       await close(fixture.server)
