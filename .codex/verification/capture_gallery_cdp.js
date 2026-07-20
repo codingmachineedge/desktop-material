@@ -1549,6 +1549,11 @@ async function seedProfile() {
   )
 
   const profileChanged = await evaluate(`(() => {
+    let changed = false
+    if (localStorage.getItem('autoSwitchTheme') !== null) {
+      localStorage.removeItem('autoSwitchTheme')
+      changed = true
+    }
     const expected = {
       'has-shown-welcome-flow': '1',
       'theme': 'light',
@@ -1557,7 +1562,6 @@ async function seedProfile() {
       'stats-opt-out': '1',
       'has-sent-stats-opt-in-ping': '1'
     }
-    let changed = false
     for (const [key, value] of Object.entries(expected)) {
       if (localStorage.getItem(key) !== value) {
         localStorage.setItem(key, value)
@@ -2365,7 +2369,9 @@ scene('ollama-manager', async () => {
   )
 
   await setViewport(1452, 1001)
-  await clickEnabledSelector('#theme-toggle button')
+  await clickEnabledSelector(
+    'button.theme-toggle-button[aria-label="Toggle theme"]'
+  )
   await waitFor(
     `document.body.classList.contains('theme-dark') && localStorage.getItem('theme') === 'dark'`,
     'dark Ollama evidence theme'
@@ -2706,12 +2712,16 @@ scene('ollama-manager', async () => {
       `document.body.classList.contains('theme-dark')`
     ).catch(() => false)
     if (dark) {
-      await clickEnabledSelector('#theme-toggle button')
+      await clickEnabledSelector(
+        'button.theme-toggle-button[aria-label="Toggle theme"]'
+      )
       await waitFor(
         `localStorage.getItem('theme') === 'system'`,
         'intermediate system theme'
       )
-      await clickEnabledSelector('#theme-toggle button')
+      await clickEnabledSelector(
+        'button.theme-toggle-button[aria-label="Toggle theme"]'
+      )
       await waitFor(
         `document.body.classList.contains('theme-light') && localStorage.getItem('theme') === 'light'`,
         'restored light theme'

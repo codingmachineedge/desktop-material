@@ -687,7 +687,7 @@ test('fixture account hydration returns only privacy-safe receipts', () => {
     'fixtureAccountMatched: fixtureAccount !== undefined',
     'fixtureTokenPresent:',
     'fixtureCopilotFeatureEnabled:',
-    "fixtureAccount?.features?.includes(",
+    'fixtureAccount?.features?.includes(',
     "'desktop_enable_copilot_sdk_commit_message_generation'",
     'repositoryMatched: Boolean(freshRepository?.gitHubRepository)',
     'selectedRepositoryMatched: Boolean(',
@@ -759,6 +759,7 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
   const seedEnd = source.indexOf('async function ensureRepository(', seedStart)
   const seed = source.slice(seedStart, seedEnd)
   assert.ok(seed.includes("'language-mode-v1': 'english'"))
+  assert.ok(seed.includes("localStorage.removeItem('autoSwitchTheme')"))
   assert.ok(seed.includes("localStorage.getItem('copilot-byok-providers')"))
   assert.ok(seed.includes("localStorage.setItem('copilot-byok-providers'"))
   assert.ok(!seed.includes('TokenStore'))
@@ -766,7 +767,7 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
   const manager = sceneSource('ollama-manager')
   for (const contract of [
     'await setViewport(1452, 1001)',
-    "clickEnabledSelector('#theme-toggle button')",
+    '\'button.theme-toggle-button[aria-label="Toggle theme"]\'',
     'await captureSettingsTab(',
     "'Copilot'",
     "clickText('Providers'",
