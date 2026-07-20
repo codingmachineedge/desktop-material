@@ -800,20 +800,51 @@ function ensureDirectFixtureProviderRemote() {
     fail(`Fixture provider is not loopback-only: ${endpoint.hostname}`)
   }
   const directURL = `${endpoint.origin}/${ready.owner}/${ready.repository}.git`
+  const expectedProxy = `http://127.0.0.1:${endpoint.port}`
+  let proxyValues = []
+  try {
+    proxyValues = execFileSync(
+      'git',
+      ['-C', fixturePath, 'config', '--get-all', 'http.proxy'],
+      { encoding: 'utf8' }
+    )
+      .split(/\r?\n/)
+      .map(value => value.trim())
+      .filter(value => value.length > 0)
+  } catch (error) {
+    if (error?.status !== 1) {
+      throw error
+    }
+  }
+  if (
+    proxyValues.length > 1 ||
+    (proxyValues.length === 1 && proxyValues[0] !== expectedProxy)
+  ) {
+    fail(`Fixture proxy is not the owned provider: ${proxyValues.join(', ')}`)
+  }
   const currentURL = execFileSync(
     'git',
     ['-C', fixturePath, 'remote', 'get-url', 'origin'],
     { encoding: 'utf8' }
   ).trim()
-  if (currentURL === directURL) {
-    return false
+  let changed = false
+  if (currentURL !== directURL) {
+    execFileSync(
+      'git',
+      ['-C', fixturePath, 'remote', 'set-url', 'origin', directURL],
+      { stdio: 'ignore' }
+    )
+    changed = true
   }
-  execFileSync(
-    'git',
-    ['-C', fixturePath, 'remote', 'set-url', 'origin', directURL],
-    { stdio: 'ignore' }
-  )
-  return true
+  if (proxyValues.length === 1) {
+    execFileSync(
+      'git',
+      ['-C', fixturePath, 'config', '--unset-all', 'http.proxy'],
+      { stdio: 'ignore' }
+    )
+    changed = true
+  }
+  return changed
 }
 
 async function seedProfile() {

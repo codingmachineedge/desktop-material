@@ -333,6 +333,26 @@ test('fixture account hydration returns only privacy-safe receipts', () => {
   }
 })
 
+test('fixture account hydration removes only its exact temporary Git proxy', () => {
+  const start = source.indexOf('function ensureDirectFixtureProviderRemote()')
+  const end = source.indexOf('async function seedProfile()', start)
+  const remote = source.slice(start, end)
+  for (const contract of [
+    "['-C', fixturePath, 'config', '--get-all', 'http.proxy']",
+    '`http://127.0.0.1:${endpoint.port}`',
+    'Fixture proxy is not the owned provider',
+    "['-C', fixturePath, 'remote', 'set-url', 'origin', directURL]",
+    "['-C', fixturePath, 'config', '--unset-all', 'http.proxy']",
+  ]) {
+    assert.ok(remote.includes(contract), `missing proxy contract: ${contract}`)
+  }
+  assert.ok(
+    remote.indexOf('proxyValues[0] !== expectedProxy') <
+      remote.indexOf("'--unset-all'"),
+    'the proxy must be validated before it is removed'
+  )
+})
+
 test('both pull-request scenes refresh the non-empty origin/main comparison', () => {
   for (const name of ['pull-request-compose', 'pull-request-open']) {
     const scene = sceneSource(name)
