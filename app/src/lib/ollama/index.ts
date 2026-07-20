@@ -2,6 +2,7 @@ export {
   DefaultOllamaPullInactivityTimeoutMs,
   DefaultOllamaPullTotalTimeoutMs,
   DefaultOllamaRequestTimeoutMs,
+  MaxOllamaErrorBodyBytes,
   MaxOllamaJsonBodyBytes,
   MaxOllamaNdjsonLineBytes,
   OllamaClient,

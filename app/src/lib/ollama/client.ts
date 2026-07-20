@@ -32,6 +32,7 @@ export const DefaultOllamaRequestTimeoutMs = 30_000
 export const DefaultOllamaPullInactivityTimeoutMs = 120_000
 export const DefaultOllamaPullTotalTimeoutMs = 6 * 60 * 60 * 1_000
 export const MaxOllamaJsonBodyBytes = 2 * 1_024 * 1_024
+export const MaxOllamaErrorBodyBytes = 16 * 1_024
 export const MaxOllamaNdjsonLineBytes = 64 * 1_024
 export const MaxOllamaPullBytes = 8 * 1_024 * 1_024
 export const MaxOllamaPullEvents = 4_096

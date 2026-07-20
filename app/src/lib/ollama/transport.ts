@@ -39,19 +39,6 @@ function abortError(): Error {
   return error
 }
 
-function nativeApiMethod(url: URL): 'GET' | 'POST' | 'DELETE' | undefined {
-  for (const [route, method] of Object.entries(NativeApiMethods)) {
-    if (!url.pathname.endsWith(route)) {
-      continue
-    }
-    const basePath = url.pathname.slice(0, -route.length)
-    if (isTrustedOllamaEndpoint(`${url.origin}${basePath}`)) {
-      return method
-    }
-  }
-  return undefined
-}
-
 function requestUrl(input: RequestInfo | URL): URL {
   const value =
     typeof input === 'string'
@@ -71,7 +58,8 @@ function requestUrl(input: RequestInfo | URL): URL {
     url.password.length > 0 ||
     url.hash.length > 0 ||
     url.search.length > 0 ||
-    nativeApiMethod(url) === undefined
+    NativeApiMethods[url.pathname] === undefined ||
+    !isTrustedOllamaEndpoint(url.origin)
   ) {
     throw transportError()
   }
@@ -137,7 +125,7 @@ export const nodeOllamaFetch: OllamaFetch = async (input, init = {}) => {
   const method = (init.method ?? 'GET').toUpperCase()
   const body = requestBody(init.body)
   if (
-    nativeApiMethod(url) !== method ||
+    NativeApiMethods[url.pathname] !== method ||
     (init.redirect !== undefined && init.redirect !== 'error') ||
     (init.credentials !== undefined && init.credentials !== 'omit')
   ) {
