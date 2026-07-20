@@ -374,7 +374,12 @@ export class RepositoryStateCache {
       return
     }
 
+    const sourceAliases = new Set<string>()
     for (const [alias, canonical] of this.repositoryStateAliases) {
+      if (canonical === sourceStateHash) {
+        sourceAliases.add(alias)
+      }
+
       if (canonical === sourceStateHash || alias === target.hash) {
         this.repositoryStateAliases.delete(alias)
       }
@@ -382,6 +387,19 @@ export class RepositoryStateCache {
 
     this.repositoryState.set(target.hash, sourceState)
     this.repositoryState.delete(sourceStateHash)
+
+    // Account rekeys preserve historical identities for in-flight operation
+    // completions. If that canonical state later moves with its worktree, move
+    // the complete alias group too. A standalone worktree rename has no such
+    // aliases, so its retired source identity remains absent as before.
+    if (sourceAliases.size > 0) {
+      sourceAliases.add(sourceStateHash)
+      for (const alias of sourceAliases) {
+        if (alias !== target.hash) {
+          this.repositoryStateAliases.set(alias, target.hash)
+        }
+      }
+    }
   }
 
   private resolveStateHash(hash: string): string {

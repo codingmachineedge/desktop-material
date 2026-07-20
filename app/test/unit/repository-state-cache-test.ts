@@ -199,6 +199,54 @@ describe('RepositoryStateCache', () => {
     assert.equal(cache.getIfPresent(accountC), undefined)
   })
 
+  it('retargets account aliases when rebound worktree state is transferred', () => {
+    const accountA = new Repository('/old/worktree/path', 1, null, false)
+    const accountB = withAccountKey(accountA, 'https://api.github.com#42')
+    const movedRepository = new Repository(
+      '/new/worktree/path',
+      accountB.id,
+      accountB.gitHubRepository,
+      accountB.missing,
+      accountB.alias,
+      accountB.workflowPreferences,
+      accountB.isTutorialRepository,
+      accountB.gitDir,
+      accountB.accountKey
+    )
+    const cache = new RepositoryStateCache(new TestStatsStore())
+
+    cache.update(accountA, () => ({
+      selectedSection: RepositorySectionTab.Triage,
+      isPushPullFetchInProgress: true,
+      isCommitting: true,
+    }))
+
+    cache.rekeyStateForAccountBinding(accountA, accountB)
+    cache.transferState(accountB, movedRepository)
+
+    const movedState = cache.get(movedRepository)
+    assert.strictEqual(cache.getIfPresent(accountA), movedState)
+    assert.strictEqual(cache.getIfPresent(accountB), movedState)
+    assert.equal(movedState.selectedSection, RepositorySectionTab.Triage)
+    assert.equal(movedState.isPushPullFetchInProgress, true)
+    assert.equal(movedState.isCommitting, true)
+
+    cache.update(accountA, () => ({ isPushPullFetchInProgress: false }))
+    cache.update(accountB, () => ({ isCommitting: false }))
+
+    const settledState = cache.get(movedRepository)
+    assert.strictEqual(cache.get(accountA), settledState)
+    assert.strictEqual(cache.get(accountB), settledState)
+    assert.equal(settledState.isPushPullFetchInProgress, false)
+    assert.equal(settledState.isCommitting, false)
+
+    cache.remove(movedRepository)
+
+    assert.equal(cache.getIfPresent(accountA), undefined)
+    assert.equal(cache.getIfPresent(accountB), undefined)
+    assert.equal(cache.getIfPresent(movedRepository), undefined)
+  })
+
   it('moves the entire cached state when a worktree path is renamed', () => {
     const repository = new Repository('/old/worktree/path', 1, null, false)
     const renamedRepository = new Repository(
