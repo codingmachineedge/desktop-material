@@ -12378,9 +12378,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
       )
 
     // Account binding participates in Repository.hash. Preserve the current
-    // repository surface and all other in-memory state across that identity
-    // change instead of resetting the view to Changes.
-    this.repositoryStateCache.transferState(repository, updatedRepository)
+    // repository surface without carrying live operation state into the new
+    // identity while older operations still complete against the source.
+    this.repositoryStateCache.preserveAccountBindingState(
+      repository,
+      updatedRepository
+    )
 
     return updatedRepository
   }

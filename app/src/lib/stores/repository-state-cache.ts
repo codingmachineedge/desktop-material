@@ -297,6 +297,30 @@ export class RepositoryStateCache {
   }
 
   /**
+   * Preserve durable view state when account binding changes a repository hash.
+   *
+   * Async operations started before the binding change still complete against
+   * the source identity, so the target must not inherit their in-flight state.
+   * Keep the source entry intact and initialize a distinct target entry with
+   * only the view state that must survive the account change.
+   */
+  public preserveAccountBindingState(source: Repository, target: Repository) {
+    if (source.hash === target.hash) {
+      return
+    }
+
+    const sourceState = this.repositoryState.get(source.hash)
+    if (sourceState === undefined) {
+      return
+    }
+
+    this.repositoryState.set(target.hash, {
+      ...getInitialRepositoryState(),
+      selectedSection: sourceState.selectedSection,
+    })
+  }
+
+  /**
    * Move the entire cached state for a repository from one identity to another.
    *
    * This is used when a worktree is renamed: the repository's path (and

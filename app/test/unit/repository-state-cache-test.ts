@@ -119,7 +119,7 @@ describe('RepositoryStateCache', () => {
     assert.equal(compareState.commitSHAs.length, 1)
   })
 
-  it('preserves the selected section when a repository identity changes', () => {
+  it('preserves only durable view state when account binding changes identity', () => {
     const repository = new Repository('/something/path', 1, null, false)
     const reboundRepository = new Repository(
       repository.path,
@@ -136,14 +136,52 @@ describe('RepositoryStateCache', () => {
 
     cache.update(repository, () => ({
       selectedSection: RepositorySectionTab.Triage,
+      isPushPullFetchInProgress: true,
     }))
-    cache.transferState(repository, reboundRepository)
+    const sourceState = cache.get(repository)
+
+    cache.preserveAccountBindingState(repository, reboundRepository)
+
+    const reboundState = cache.get(reboundRepository)
 
     assert.notEqual(repository.hash, reboundRepository.hash)
-    assert.equal(cache.getIfPresent(repository), undefined)
-    assert.equal(
-      cache.get(reboundRepository).selectedSection,
-      RepositorySectionTab.Triage
+    assert.strictEqual(cache.getIfPresent(repository), sourceState)
+    assert.notStrictEqual(reboundState, sourceState)
+    assert.equal(reboundState.selectedSection, RepositorySectionTab.Triage)
+    assert.equal(reboundState.isPushPullFetchInProgress, false)
+    assert.equal(sourceState.isPushPullFetchInProgress, true)
+  })
+
+  it('moves the entire cached state when a worktree path is renamed', () => {
+    const repository = new Repository('/old/worktree/path', 1, null, false)
+    const renamedRepository = new Repository(
+      '/new/worktree/path',
+      repository.id,
+      repository.gitHubRepository,
+      repository.missing,
+      repository.alias,
+      repository.workflowPreferences,
+      repository.isTutorialRepository,
+      repository.gitDir,
+      repository.accountKey
     )
+    const cache = new RepositoryStateCache(new TestStatsStore())
+
+    cache.update(repository, () => ({
+      selectedSection: RepositorySectionTab.History,
+      isPushPullFetchInProgress: true,
+    }))
+    const sourceState = cache.get(repository)
+
+    cache.transferState(repository, renamedRepository)
+
+    assert.notEqual(repository.hash, renamedRepository.hash)
+    assert.equal(cache.getIfPresent(repository), undefined)
+    assert.strictEqual(cache.get(renamedRepository), sourceState)
+    assert.equal(
+      cache.get(renamedRepository).selectedSection,
+      RepositorySectionTab.History
+    )
+    assert.equal(cache.get(renamedRepository).isPushPullFetchInProgress, true)
   })
 })

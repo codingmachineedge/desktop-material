@@ -9,7 +9,7 @@ const appStoreSource = readFileSync(
 )
 
 describe('repository account state preservation source contract', () => {
-  it('transfers cached state to the account-bound identity before returning it', () => {
+  it('preserves account-binding view state before returning the new identity', () => {
     const start = appStoreSource.indexOf(
       'public async _updateRepositoryAccount('
     )
@@ -19,15 +19,16 @@ describe('repository account state preservation source contract', () => {
     const updateIndex = updateRepositoryAccount.indexOf(
       'await this.repositoriesStore.updateRepositoryAccount('
     )
-    const transferIndex = updateRepositoryAccount.indexOf(
-      'this.repositoryStateCache.transferState(repository, updatedRepository)'
+    const preserveIndex = updateRepositoryAccount.indexOf(
+      'this.repositoryStateCache.preserveAccountBindingState('
     )
     const returnIndex = updateRepositoryAccount.indexOf(
       'return updatedRepository'
     )
 
     assert.notEqual(updateIndex, -1)
-    assert.ok(updateIndex < transferIndex)
-    assert.ok(transferIndex < returnIndex)
+    assert.ok(updateIndex < preserveIndex)
+    assert.ok(preserveIndex < returnIndex)
+    assert.equal(updateRepositoryAccount.includes('transferState('), false)
   })
 })
