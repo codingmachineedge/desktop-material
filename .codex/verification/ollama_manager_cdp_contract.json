@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "contractId": "desktop-material-ollama-manager-cdp",
+  "uiSelectorSourceCommit": "378bb171bd30fde137ddd77706de840fccfe0c7b",
+  "fixture": {
+    "id": "desktop-material-ollama",
+    "protocolVersion": 1,
+    "loopbackHost": "127.0.0.1",
+    "runRootPattern": "^desktop-material-ollama-[a-z0-9][a-z0-9._-]{5,120}$",
+    "readyRelativePath": "ollama/ready.json",
+    "auditRelativePath": "ollama/mutations.jsonl"
+  },
+  "renderer": {
+    "urlIncludes": "/out/index.html",
+    "attachOnly": true,
+    "nativeWindowMutationAllowed": false,
+    "managerPrecondition": "The manager is visible, or its integration exposes data-verification=ollama-manager-entry in the current renderer.",
+    "pendingIntegrationSelector": "[data-verification=\"ollama-manager-entry\"]"
+  },
+  "selectors": {
+    "manager": "[data-verification=\"ollama-manager\"]",
+    "entry": "[data-verification=\"ollama-manager-entry\"]",
+    "refresh": "[data-verification=\"ollama-refresh\"]",
+    "endpointStatus": "[data-verification=\"ollama-endpoint-status\"]",
+    "pullName": "[data-verification=\"ollama-pull-name\"]",
+    "pull": "[data-verification=\"ollama-pull\"]",
+    "pullCancel": "[data-verification=\"ollama-pull-cancel\"]",
+    "pullProgress": "[data-verification=\"ollama-pull-progress\"]",
+    "filter": "[data-verification=\"ollama-filter\"]",
+    "scope": "[data-verification=\"ollama-scope\"]",
+    "inventory": "[data-verification=\"ollama-inventory\"]",
+    "modelRow": "[data-verification=\"ollama-model-row\"]",
+    "modelAttribute": "data-model",
+    "details": "[data-verification=\"ollama-details\"]",
+    "load": "[data-verification=\"ollama-load\"]",
+    "unload": "[data-verification=\"ollama-unload\"]",
+    "delete": "[data-verification=\"ollama-delete\"]",
+    "copyName": "[data-verification=\"ollama-copy-name\"]",
+    "copy": "[data-verification=\"ollama-copy\"]",
+    "renameName": "[data-verification=\"ollama-rename-name\"]",
+    "rename": "[data-verification=\"ollama-rename\"]",
+    "deleteDialog": "[data-verification=\"ollama-delete-dialog\"]",
+    "deleteConfirm": "[data-verification=\"ollama-delete-confirm\"]",
+    "deleteCancel": "[data-verification=\"ollama-delete-cancel\"]",
+    "notice": "[data-verification=\"ollama-notice\"]"
+  },
+  "models": {
+    "seed": [
+      "material-chat:7b",
+      "material-embed:latest",
+      "material-vision:3b"
+    ],
+    "initiallyRunning": "material-chat:7b",
+    "pullable": "material-code:1.5b",
+    "copyDestination": "material-verifier-copy:3b",
+    "renameDestination": "material-verifier-rename:3b"
+  },
+  "actions": [
+    "gate",
+    "filter",
+    "pull-cancel",
+    "lifecycle",
+    "unavailable",
+    "partial",
+    "stream-failure"
+  ],
+  "timeoutsMs": {
+    "connect": 20000,
+    "renderer": 20000,
+    "manager": 10000,
+    "settle": 10000,
+    "operation": 20000,
+    "pullProgress": 10000
+  },
+  "receipt": {
+    "schemaVersion": 1,
+    "successStatus": "passed",
+    "failureStatus": "failed"
+  }
+}
