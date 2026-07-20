@@ -1,5 +1,9 @@
 # Guided Feature Gallery
 
+![A four-step guide for finding and safely completing a feature workflow](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/feature-gallery-map.svg)
+
+Treat every gallery entry as part of a workflow: find the capability, open its named surface, review the exact scope, and keep the resulting evidence.
+
 This page maps 65 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
@@ -147,6 +151,8 @@ customization/history context use the same profile/repository ownership model.
 ![Deepen-history result without displaying the account used](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepen.png)
 
 ## Repository administration
+
+![Unfinished file tiles stored temporarily and restored intact](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/stash-recovery.png)
 
 The current Remote Manager layout preserves readable semantic columns and
 stacks a row before its name, fetch/push URLs, or controls collapse. Repository

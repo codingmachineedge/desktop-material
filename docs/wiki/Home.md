@@ -1,5 +1,9 @@
 # Desktop Material
 
+![A four-step map from the wiki home to the right guide](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/wiki-map.svg)
+
+Use this map to choose a starting point: learn the daily workflow in the User Guide, browse shipped surfaces in the Feature Gallery, or open a specialist guide for deeper details.
+
 **Desktop Material** is an independent Material Design 3 (M3 Expressive) remake of GitHub Desktop.
 It is a fork of [desktop/desktop](https://github.com/desktop/desktop) (MIT) with the entire
 application shell rebuilt around Material Design 3 — animated light/dark theming, dynamic type and

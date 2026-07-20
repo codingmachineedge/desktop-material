@@ -203,6 +203,12 @@ The compact selection below keeps this README scannable. The
 [task-oriented tutorial](docs/wiki/User-Guide.md) contain the full annotated
 set.
 
+The wiki now also includes a visual-learning layer: eight labeled workflow
+diagrams—one on every wiki page—and seven conceptual illustrations covering the
+safe Git loop, short-lived branches, conflict resolution, rebase, stash recovery,
+automation, and account isolation. The diagrams are reproducible with
+`node script/generate-wiki-diagrams.js`.
+
 | Custom app identity | Material Welcome | Appearance customization | Dynamic toolbar overflow |
 | --- | --- | --- | --- |
 | <img src="docs/assets/screenshots/material-app-identity-workspace.png" alt="Workspace with a customized in-app logo and name plus a favorite repository tab" width="320"><br><sub>Profile app identity</sub> | <img src="docs/assets/screenshots/material-welcome.png" alt="Pure Material first-run Welcome task card and tonal workspace preview" width="320"><br><sub>Material Welcome</sub> | <img src="docs/assets/screenshots/material-customization.png" alt="Appearance preferences with explicit language mode and temporary-submodule Back button style and label controls" width="320"><br><sub>Language and navigation</sub> | <img src="docs/assets/screenshots/material-toolbar-overflow.png" alt="Narrow app bar with lower-priority actions moved into the More surface before clipping" width="320"><br><sub>Measured More behavior</sub> |

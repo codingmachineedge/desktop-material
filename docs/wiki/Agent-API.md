@@ -1,5 +1,7 @@
 # Agent API
 
+![The local agent request path through authentication, validation, exact repository resolution, and app safeguards](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/agent-request-path.svg)
+
 Desktop Material ships a built-in **agent control surface** so an AI agent can drive the app
 programmatically. It is exposed as an **MCP server** with a **local HTTP + CLI fallback** for
 environments where an MCP transport isn't convenient.

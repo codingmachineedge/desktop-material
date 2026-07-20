@@ -1,5 +1,11 @@
 # User Guide
 
+![The everyday repository loop from inspecting changes through safe synchronization](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/workspace-loop.svg)
+
+The safest rhythm is simple: inspect, stage, commit, then synchronize. The tools below add power without changing that basic loop.
+
+![A conceptual safe Git workflow from working files to reviewed cloud synchronization](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/safe-git-workflow.png)
+
 A task-oriented tour of Desktop Material's features. It assumes you already know the basic GitHub
 Desktop workflow (clone, commit, push, branch, pull request) — that all still works. This guide
 focuses on what Desktop Material adds on top.
@@ -625,6 +631,8 @@ horizontally when preserving columns is necessary.
 
 ### Rebase the current branch
 
+![Commit checkpoints moving in order onto a newer main-line history](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/safe-rebase.png)
+
 Open **Branch → Rebase current branch…**, then search for and select the target/base branch. The
 review shows the current→target relationship, ahead/behind context, and a bounded preview of commits
 that would be replayed.
@@ -671,6 +679,8 @@ instead of guessed.
 ---
 
 ## One-click commit & push
+
+![A short-lived feature branch passing review and merging into the stable line](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/short-lived-branch.png)
 
 For quick, low-ceremony commits, use **one-click commit & push**:
 
@@ -860,6 +870,8 @@ elements.
 ---
 
 ## Automation and merge-all
+
+![Two conflicting file streams reconciled into one verified result](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/conflict-resolution.png)
 
 Open **Settings → Automation** to configure the two background schedules:
 

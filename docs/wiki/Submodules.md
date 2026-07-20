@@ -1,5 +1,7 @@
 # Submodules — little projects inside your project
 
+![The four known submodule states from declaration through an updated pinned checkout](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/submodule-state-path.svg)
+
 This is the simplest page in the wiki. On purpose.
 
 Some repositories keep other repositories inside them. Git calls the inside ones
