@@ -1206,6 +1206,57 @@ async function clickEnabledSelector(selector) {
   }
 }
 
+const ThemeToggleSelector =
+  'button.theme-toggle-button[aria-label="Toggle theme"]'
+
+async function setThemeThroughToggle(theme) {
+  if (!['light', 'dark', 'system'].includes(theme)) {
+    fail(`Unsupported capture theme: ${theme}`)
+  }
+  const expectedLabel = `${theme[0].toUpperCase()}${theme.slice(1)} theme`
+  const expectedBodyClass =
+    theme === 'dark' ? 'theme-dark' : theme === 'light' ? 'theme-light' : null
+
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    const selected = await evaluate(`(() => {
+      const button = document.querySelector(${JSON.stringify(
+        ThemeToggleSelector
+      )})
+      return button instanceof HTMLButtonElement &&
+        button.textContent.trim() === ${JSON.stringify(expectedLabel)} &&
+        localStorage.getItem('theme') === ${JSON.stringify(theme)}
+    })()`)
+    if (selected) {
+      if (expectedBodyClass !== null) {
+        await waitFor(
+          `document.body.classList.contains(${JSON.stringify(
+            expectedBodyClass
+          )})`,
+          `applied ${theme} capture theme`
+        )
+      }
+      return
+    }
+    if (attempt === 3) {
+      break
+    }
+
+    const previousLabel = await evaluate(
+      `document.querySelector(${JSON.stringify(
+        ThemeToggleSelector
+      )})?.textContent?.trim() ?? null`
+    )
+    await clickEnabledSelector(ThemeToggleSelector)
+    await waitFor(
+      `document.querySelector(${JSON.stringify(
+        ThemeToggleSelector
+      )})?.textContent?.trim() !== ${JSON.stringify(previousLabel)}`,
+      `theme toggle transition toward ${theme}`
+    )
+  }
+  fail(`Unable to settle the capture theme at ${theme}.`)
+}
+
 /** Exercise list rows whose selection contract is owned by mouse down/up. */
 async function clickPointerSelector(selector) {
   const clicked = await evaluate(`(() => {
@@ -1601,9 +1652,15 @@ async function seedProfile() {
 
   const changed = providerRemoteChanged || profileChanged
   if (changed) {
-    await evaluate('window.location.reload(), true')
+    const beforeSeedReloadTimeOrigin = await evaluate('performance.timeOrigin')
+    await client.send('Page.reload', { ignoreCache: true })
     await sleep(4500)
     await client.send('Runtime.enable')
+    await waitFor(
+      `performance.timeOrigin > ${JSON.stringify(beforeSeedReloadTimeOrigin)}`,
+      'seeded profile renderer reload',
+      25000
+    )
   }
   if (
     await clickText('Continue without signing in', {
@@ -2369,13 +2426,7 @@ scene('ollama-manager', async () => {
   )
 
   await setViewport(1452, 1001)
-  await clickEnabledSelector(
-    'button.theme-toggle-button[aria-label="Toggle theme"]'
-  )
-  await waitFor(
-    `document.body.classList.contains('theme-dark') && localStorage.getItem('theme') === 'dark'`,
-    'dark Ollama evidence theme'
-  )
+  await setThemeThroughToggle('dark')
 
   try {
     await captureSettingsTab(
@@ -2712,20 +2763,8 @@ scene('ollama-manager', async () => {
       `document.body.classList.contains('theme-dark')`
     ).catch(() => false)
     if (dark) {
-      await clickEnabledSelector(
-        'button.theme-toggle-button[aria-label="Toggle theme"]'
-      )
-      await waitFor(
-        `localStorage.getItem('theme') === 'system'`,
-        'intermediate system theme'
-      )
-      await clickEnabledSelector(
-        'button.theme-toggle-button[aria-label="Toggle theme"]'
-      )
-      await waitFor(
-        `document.body.classList.contains('theme-light') && localStorage.getItem('theme') === 'light'`,
-        'restored light theme'
-      )
+      await setThemeThroughToggle('system')
+      await setThemeThroughToggle('light')
     }
     await restoreCaptureViewport()
   }

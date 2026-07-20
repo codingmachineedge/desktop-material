@@ -697,6 +697,8 @@ test('fixture account hydration returns only privacy-safe receipts', () => {
       `missing hydration contract: ${contract}`
     )
   }
+  assert.ok(seed.includes("client.send('Page.reload', { ignoreCache: true })"))
+  assert.ok(seed.includes('beforeSeedReloadTimeOrigin'))
   assert.ok(!seed.includes('fixtureAccount?.isCopilotDesktopEnabled'))
   assert.ok(!seed.includes('fixtureAccount?.copilotLicenseType'))
   for (const leak of [
@@ -767,7 +769,7 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
   const manager = sceneSource('ollama-manager')
   for (const contract of [
     'await setViewport(1452, 1001)',
-    '\'button.theme-toggle-button[aria-label="Toggle theme"]\'',
+    "setThemeThroughToggle('dark')",
     'await captureSettingsTab(',
     "'Copilot'",
     "clickText('Providers'",
@@ -793,12 +795,16 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
     'window.innerWidth === 1452 && window.innerHeight === 1001',
     'document.querySelector(\'[data-verification="ollama-notice"]\') === null',
     'finally {',
-    "localStorage.getItem('theme') === 'system'",
+    "setThemeThroughToggle('system')",
+    "setThemeThroughToggle('light')",
     'await restoreCaptureViewport()',
     'post-scroll stable Ollama capture surface',
   ]) {
     assert.ok(manager.includes(contract), `Ollama scene misses ${contract}`)
   }
+  assert.ok(
+    source.includes('\'button.theme-toggle-button[aria-label="Toggle theme"]\'')
+  )
   for (const model of [
     'material-chat:7b',
     'material-embed:latest',
