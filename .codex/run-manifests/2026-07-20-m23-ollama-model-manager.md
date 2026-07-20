@@ -1,9 +1,9 @@
-# Ollama Model Manager — M22 Run Manifest
+# Ollama Model Manager — M23 Run Manifest
 
 ## Mode and scope
 
 - Mode: `publish`
-- Milestone: M22 — full Ollama model manager
+- Milestone: M23 — full Ollama model manager
 - Product boundary: Windows x64/arm64 application only
 - Requested scope: add the Ollama model manager only; do not implement the
   worktree-manager or close-tabs regex-builder requests in this run
