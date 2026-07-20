@@ -483,6 +483,7 @@ export class OllamaModelManager extends React.Component<
     return (
       <section
         className="ollama-model-manager"
+        data-verification="ollama-manager"
         aria-labelledby={this.headingId}
         aria-busy={initialLoading || busy}
       >
@@ -493,6 +494,7 @@ export class OllamaModelManager extends React.Component<
           </div>
           <Button
             size="small"
+            dataVerification="ollama-refresh"
             onClick={this.onRefresh}
             disabled={initialLoading || busy}
           >
@@ -643,10 +645,10 @@ export class OllamaModelManager extends React.Component<
 
     const models = inventory.succeeded
       ? normalizeModels(inventory.value ?? [])
-      : this.state.models
+      : null
     const runningModels = running.succeeded
       ? normalizeRunningModels(running.value ?? [])
-      : this.state.runningModels
+      : []
     const failures = [health, inventory, running].filter(
       result => !result.succeeded
     ).length
@@ -825,7 +827,9 @@ export class OllamaModelManager extends React.Component<
           />
           <div>
             <span className="ollama-summary-label">{strings.endpoint}</span>
-            <strong>{endpointStatus}</strong>
+            <strong data-verification="ollama-endpoint-status">
+              {endpointStatus}
+            </strong>
             <span className="ollama-endpoint-name">
               {boundedText(this.props.provider.name, MaximumMetadataCharacters)}
               {' · '}
@@ -871,6 +875,7 @@ export class OllamaModelManager extends React.Component<
     return (
       <div
         className={`ollama-manager-notice is-${notice.kind}`}
+        data-verification="ollama-notice"
         role={notice.kind === 'error' ? 'alert' : 'status'}
         aria-live={notice.kind === 'error' ? 'assertive' : 'polite'}
       >
@@ -904,6 +909,7 @@ export class OllamaModelManager extends React.Component<
           </label>
           <input
             id={`${this.headingId}-pull-name`}
+            data-verification="ollama-pull-name"
             value={this.state.pullName}
             onChange={this.onPullNameChanged}
             placeholder={strings.pullPlaceholder}
@@ -911,13 +917,14 @@ export class OllamaModelManager extends React.Component<
             spellCheck={false}
             disabled={busy}
           />
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" dataVerification="ollama-pull" disabled={busy}>
             {pulling ? strings.pulling : strings.pull}
           </Button>
         </div>
         {pulling && (
           <div
             className="ollama-pull-progress"
+            data-verification="ollama-pull-progress"
             role="status"
             aria-live="polite"
           >
@@ -936,7 +943,11 @@ export class OllamaModelManager extends React.Component<
             ) : (
               <progress aria-label={strings.receiving} />
             )}
-            <Button size="small" onClick={this.onCancelPull}>
+            <Button
+              size="small"
+              dataVerification="ollama-pull-cancel"
+              onClick={this.onCancelPull}
+            >
               {strings.cancel}
             </Button>
           </div>
@@ -956,6 +967,7 @@ export class OllamaModelManager extends React.Component<
           </label>
           <input
             id={`${this.headingId}-search`}
+            data-verification="ollama-filter"
             type="search"
             value={this.state.query}
             onChange={this.onQueryChanged}
@@ -965,7 +977,11 @@ export class OllamaModelManager extends React.Component<
         </div>
         <label className="ollama-scope-control">
           <span>{strings.scopeLabel}</span>
-          <select value={this.state.scope} onChange={this.onScopeChanged}>
+          <select
+            data-verification="ollama-scope"
+            value={this.state.scope}
+            onChange={this.onScopeChanged}
+          >
             <option value="all">{strings.allModels}</option>
             <option value="running">{strings.runningModels}</option>
           </select>
@@ -983,7 +999,11 @@ export class OllamaModelManager extends React.Component<
   ) {
     if (this.state.models === null) {
       return (
-        <div className="ollama-inventory-state" role="status">
+        <div
+          className="ollama-inventory-state"
+          data-verification="ollama-inventory"
+          role="status"
+        >
           {this.state.inventoryPhase === 'loading'
             ? strings.loadingInventory
             : strings.unavailableInventory}
@@ -992,21 +1012,33 @@ export class OllamaModelManager extends React.Component<
     }
     if (this.state.models.length === 0) {
       return (
-        <div className="ollama-inventory-state" role="status">
+        <div
+          className="ollama-inventory-state"
+          data-verification="ollama-inventory"
+          role="status"
+        >
           {strings.emptyInventory}
         </div>
       )
     }
     if (models.length === 0) {
       return (
-        <div className="ollama-inventory-state" role="status">
+        <div
+          className="ollama-inventory-state"
+          data-verification="ollama-inventory"
+          role="status"
+        >
           {strings.emptyFilter}
         </div>
       )
     }
 
     return (
-      <ul className="ollama-model-list" aria-label={strings.inventoryLabel}>
+      <ul
+        className="ollama-model-list"
+        data-verification="ollama-inventory"
+        aria-label={strings.inventoryLabel}
+      >
         {models.map(this.renderModelRow)}
       </ul>
     )
@@ -1021,6 +1053,7 @@ export class OllamaModelManager extends React.Component<
         <button
           type="button"
           className="ollama-model-row"
+          data-verification="ollama-model-row"
           data-model={model.name}
           onClick={this.onSelectModel}
           aria-pressed={selected}
@@ -1095,6 +1128,7 @@ export class OllamaModelManager extends React.Component<
       return (
         <section
           className="ollama-model-details is-empty"
+          data-verification="ollama-details"
           aria-labelledby={this.detailsHeadingId}
         >
           <h4 id={this.detailsHeadingId}>{strings.modelDetails}</h4>
@@ -1120,6 +1154,7 @@ export class OllamaModelManager extends React.Component<
     return (
       <section
         className="ollama-model-details"
+        data-verification="ollama-details"
         aria-labelledby={this.detailsHeadingId}
       >
         <header>
@@ -1130,6 +1165,7 @@ export class OllamaModelManager extends React.Component<
           <div className="ollama-model-primary-actions">
             <Button
               size="small"
+              dataVerification="ollama-load"
               onClick={this.onLoadModel}
               disabled={busy || running !== null}
             >
@@ -1137,6 +1173,7 @@ export class OllamaModelManager extends React.Component<
             </Button>
             <Button
               size="small"
+              dataVerification="ollama-unload"
               onClick={this.onUnloadModel}
               disabled={busy || running === null}
             >
@@ -1145,6 +1182,7 @@ export class OllamaModelManager extends React.Component<
             <Button
               size="small"
               className="destructive"
+              dataVerification="ollama-delete"
               onClick={this.onRequestDelete}
               onButtonRef={this.onDeleteButtonRef}
               disabled={busy}
@@ -1285,13 +1323,18 @@ export class OllamaModelManager extends React.Component<
           <div className="ollama-inline-field">
             <input
               id={`${this.headingId}-copy-name`}
+              data-verification="ollama-copy-name"
               value={this.state.copyName}
               onChange={this.onCopyNameChanged}
               aria-describedby={this.copyHintId}
               spellCheck={false}
               disabled={busy}
             />
-            <Button type="submit" disabled={busy}>
+            <Button
+              type="submit"
+              dataVerification="ollama-copy"
+              disabled={busy}
+            >
               {strings.copy}
             </Button>
           </div>
@@ -1307,13 +1350,18 @@ export class OllamaModelManager extends React.Component<
           <div className="ollama-inline-field">
             <input
               id={`${this.headingId}-rename-name`}
+              data-verification="ollama-rename-name"
               value={this.state.renameName}
               onChange={this.onRenameNameChanged}
               aria-describedby={this.renameHintId}
               spellCheck={false}
               disabled={busy}
             />
-            <Button type="submit" disabled={busy}>
+            <Button
+              type="submit"
+              dataVerification="ollama-rename"
+              disabled={busy}
+            >
               {strings.rename}
             </Button>
           </div>
@@ -1332,6 +1380,7 @@ export class OllamaModelManager extends React.Component<
     return (
       <div
         className="ollama-delete-confirmation"
+        data-verification="ollama-delete-dialog"
         role="alertdialog"
         tabIndex={-1}
         aria-labelledby={`${this.detailsHeadingId}-delete-title`}
@@ -1348,6 +1397,7 @@ export class OllamaModelManager extends React.Component<
         <div>
           <Button
             size="small"
+            dataVerification="ollama-delete-cancel"
             onClick={this.onCancelDelete}
             onKeyDown={this.onDeleteConfirmationKeyDown}
           >
@@ -1356,6 +1406,7 @@ export class OllamaModelManager extends React.Component<
           <Button
             size="small"
             className="destructive"
+            dataVerification="ollama-delete-confirm"
             onClick={this.onConfirmDelete}
             onKeyDown={this.onDeleteConfirmationKeyDown}
             onButtonRef={this.onConfirmDeleteButtonRef}

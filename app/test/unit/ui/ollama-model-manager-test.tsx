@@ -179,6 +179,13 @@ function renderManager(
   )
 }
 
+function verification(
+  container: HTMLElement,
+  value: string
+): HTMLElement | null {
+  return container.querySelector(`[data-verification="${value}"]`)
+}
+
 function InlineFactoryHarness(props: {
   readonly client: IOllamaModelManagerClient
 }) {
@@ -235,6 +242,29 @@ describe('OllamaModelManager', () => {
     assert.ok(screen.getByText('0.9.6'))
     assert.ok(screen.getByRole('button', { name: 'Select alpha' }))
     assert.ok(screen.getAllByText('Running').length >= 2)
+    for (const hook of [
+      'ollama-manager',
+      'ollama-refresh',
+      'ollama-endpoint-status',
+      'ollama-pull-name',
+      'ollama-pull',
+      'ollama-filter',
+      'ollama-scope',
+      'ollama-inventory',
+      'ollama-model-row',
+      'ollama-details',
+      'ollama-load',
+      'ollama-unload',
+      'ollama-delete',
+      'ollama-copy-name',
+      'ollama-copy',
+    ]) {
+      assert.ok(verification(view.container, hook), `missing ${hook}`)
+    }
+    assert.strictEqual(
+      verification(view.container, 'ollama-model-row')?.dataset.model,
+      'alpha'
+    )
     assert.deepStrictEqual(changes, [
       { providerId: 'one', models: [providerModel('alpha')] },
     ])
@@ -332,6 +362,34 @@ describe('OllamaModelManager', () => {
     assert.deepStrictEqual(changes, [])
   })
 
+  it('removes stale actions when a later inventory refresh fails', async () => {
+    const client = new TestOllamaClient(['alpha'])
+    const changes: string[] = []
+    renderManager(
+      provider('refresh-failure', [providerModel('alpha')]),
+      client,
+      p => {
+        changes.push(p.id)
+      }
+    )
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Select alpha' }))
+    )
+
+    client.inventoryFails = true
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() =>
+      assert.ok(screen.getByText('The model inventory is unavailable.'))
+    )
+
+    assert.strictEqual(
+      screen.queryByRole('button', { name: 'Select alpha' }),
+      null
+    )
+    assert.strictEqual(screen.queryByRole('button', { name: 'Delete' }), null)
+    assert.deepStrictEqual(changes, [])
+  })
+
   it('aborts and drops an inventory response from a replaced client', async () => {
     const staleClient = new TestOllamaClient(['stale-model'])
     const staleInventory = deferred<ReadonlyArray<IOllamaModelRecord>>()
@@ -363,7 +421,7 @@ describe('OllamaModelManager', () => {
   it('runs pull, copy, rename, load, unload, and confirmed delete through refreshed inventory', async () => {
     const client = new TestOllamaClient(['alpha'])
     const synchronized: Array<ReadonlyArray<string>> = []
-    renderManager(
+    const view = renderManager(
       provider('lifecycle', [providerModel('alpha')]),
       client,
       (_p, models) => {
@@ -399,6 +457,9 @@ describe('OllamaModelManager', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     let confirmation = screen.getByRole('alertdialog')
+    assert.ok(verification(view.container, 'ollama-delete-dialog'))
+    assert.ok(verification(view.container, 'ollama-delete-confirm'))
+    assert.ok(verification(view.container, 'ollama-delete-cancel'))
     const confirmButton = within(confirmation).getByRole('button', {
       name: 'Delete model',
     })
@@ -438,9 +499,13 @@ describe('OllamaModelManager', () => {
     const gate = deferred<void>()
     client.pullGate = gate
     const changes: string[] = []
-    renderManager(provider('cancel', [providerModel('alpha')]), client, p => {
-      changes.push(p.id)
-    })
+    const view = renderManager(
+      provider('cancel', [providerModel('alpha')]),
+      client,
+      p => {
+        changes.push(p.id)
+      }
+    )
     await waitFor(() =>
       assert.ok(screen.getByRole('button', { name: 'Select alpha' }))
     )
@@ -454,6 +519,8 @@ describe('OllamaModelManager', () => {
     })) as HTMLProgressElement
     assert.strictEqual(progress.value, 40)
     assert.strictEqual(progress.max, 100)
+    assert.ok(verification(view.container, 'ollama-pull-progress'))
+    assert.ok(verification(view.container, 'ollama-pull-cancel'))
     assert.strictEqual(
       screen
         .getByRole('heading', { name: 'Ollama model manager' })
@@ -519,7 +586,7 @@ describe('OllamaModelManager', () => {
 
   it('reports a persistence failure without converting it into operation failure', async () => {
     const client = new TestOllamaClient(['authoritative'])
-    renderManager(provider('persistence'), client, async () => {
+    const view = renderManager(provider('persistence'), client, async () => {
       throw new Error('write failed')
     })
 
@@ -530,6 +597,7 @@ describe('OllamaModelManager', () => {
         )
       )
     )
+    assert.ok(verification(view.container, 'ollama-notice'))
     assert.ok(screen.getByRole('button', { name: 'Select authoritative' }))
   })
 })
