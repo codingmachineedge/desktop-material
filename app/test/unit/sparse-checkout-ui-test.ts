@@ -82,6 +82,14 @@ describe('Sparse checkout native UI contracts', () => {
       styles,
       /\.sparse-checkout-guide[\s\S]*grid-template-columns: repeat\(3/
     )
+    assert.match(
+      styles,
+      /\.sparse-checkout-guide\s*\{[\s\S]*?position: sticky;[\s\S]*?top: 0;/
+    )
+    assert.match(
+      styles,
+      /@container sparse-checkout-panel \(max-width: 460px\)[\s\S]*?\.sparse-checkout-guide\s*\{[\s\S]*?position: static;/
+    )
     assert.match(styles, /\.sparse-checkout-review[\s\S]*max-height: 150px/)
   })
 })

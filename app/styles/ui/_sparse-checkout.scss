@@ -10,6 +10,9 @@
 }
 
 .sparse-checkout-guide {
+  position: sticky;
+  z-index: 1;
+  top: 0;
   margin-bottom: 14px;
   padding: 10px;
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -515,8 +518,12 @@
     flex-direction: column;
   }
 
-  .sparse-checkout-guide ol {
-    grid-template-columns: minmax(0, 1fr);
+  .sparse-checkout-guide {
+    position: static;
+
+    ol {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .sparse-checkout-controls .button-component,
