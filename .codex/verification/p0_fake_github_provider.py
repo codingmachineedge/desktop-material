@@ -1115,7 +1115,15 @@ class ProviderState:
         if method == "GET" and resource in {"/user/orgs", "/organizations", "/notifications"}:
             return json_response([])
         if method == "GET" and resource == "/desktop_internal/features":
-            return json_response({"features": []})
+            return json_response(
+                {
+                    "features": (
+                        ["desktop_enable_copilot_sdk_commit_message_generation"]
+                        if self.copilot_enabled
+                        else []
+                    )
+                }
+            )
         if method == "POST" and resource == "/graphql":
             copilot_enabled = self.copilot_enabled
             return json_response(

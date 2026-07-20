@@ -712,6 +712,92 @@ export type TranslationKey =
   | 'ollama.authenticationDescription'
   | 'ollama.modelsSyncDescription'
   | 'ollama.modelsEmpty'
+  | 'ollama.manager.openAction'
+  | 'ollama.manager.backAction'
+  | 'ollama.manager.title'
+  | 'ollama.manager.subtitle'
+  | 'ollama.manager.endpoint'
+  | 'ollama.manager.configuredEndpoint'
+  | 'ollama.manager.connected'
+  | 'ollama.manager.unavailable'
+  | 'ollama.manager.checking'
+  | 'ollama.manager.partial'
+  | 'ollama.manager.version'
+  | 'ollama.manager.installed'
+  | 'ollama.manager.running'
+  | 'ollama.manager.refresh'
+  | 'ollama.manager.refreshing'
+  | 'ollama.manager.searchLabel'
+  | 'ollama.manager.searchPlaceholder'
+  | 'ollama.manager.scopeLabel'
+  | 'ollama.manager.allModels'
+  | 'ollama.manager.runningModels'
+  | 'ollama.manager.inventoryLabel'
+  | 'ollama.manager.loadingInventory'
+  | 'ollama.manager.unavailableInventory'
+  | 'ollama.manager.emptyInventory'
+  | 'ollama.manager.emptyFilter'
+  | 'ollama.manager.modelDetails'
+  | 'ollama.manager.selectModel'
+  | 'ollama.manager.loadingDetails'
+  | 'ollama.manager.runningBadge'
+  | 'ollama.manager.size'
+  | 'ollama.manager.modified'
+  | 'ollama.manager.digest'
+  | 'ollama.manager.family'
+  | 'ollama.manager.format'
+  | 'ollama.manager.parameters'
+  | 'ollama.manager.quantization'
+  | 'ollama.manager.capabilities'
+  | 'ollama.manager.license'
+  | 'ollama.manager.noneReported'
+  | 'ollama.manager.runtime'
+  | 'ollama.manager.vram'
+  | 'ollama.manager.context'
+  | 'ollama.manager.expires'
+  | 'ollama.manager.notRunning'
+  | 'ollama.manager.pullTitle'
+  | 'ollama.manager.pullHint'
+  | 'ollama.manager.modelName'
+  | 'ollama.manager.pullPlaceholder'
+  | 'ollama.manager.pull'
+  | 'ollama.manager.pulling'
+  | 'ollama.manager.cancel'
+  | 'ollama.manager.receiving'
+  | 'ollama.manager.copyTitle'
+  | 'ollama.manager.copyHint'
+  | 'ollama.manager.copyDestination'
+  | 'ollama.manager.copy'
+  | 'ollama.manager.renameTitle'
+  | 'ollama.manager.renameHint'
+  | 'ollama.manager.renameDestination'
+  | 'ollama.manager.rename'
+  | 'ollama.manager.load'
+  | 'ollama.manager.unload'
+  | 'ollama.manager.delete'
+  | 'ollama.manager.deleteTitle'
+  | 'ollama.manager.deleteConfirm'
+  | 'ollama.manager.invalidName'
+  | 'ollama.manager.duplicateName'
+  | 'ollama.manager.operationError'
+  | 'ollama.manager.refreshError'
+  | 'ollama.manager.detailsError'
+  | 'ollama.manager.configurationPartial'
+  | 'ollama.manager.renamePartial'
+  | 'ollama.manager.pullCancelled'
+  | 'ollama.manager.unknown'
+  | 'ollama.manager.never'
+  | 'ollama.manager.showing'
+  | 'ollama.manager.selectedModel'
+  | 'ollama.manager.moreCapabilities'
+  | 'ollama.manager.pullProgress'
+  | 'ollama.manager.pullSucceeded'
+  | 'ollama.manager.copySucceeded'
+  | 'ollama.manager.renameSucceeded'
+  | 'ollama.manager.loadSucceeded'
+  | 'ollama.manager.unloadSucceeded'
+  | 'ollama.manager.deleteSucceeded'
+  | 'ollama.manager.confirmDelete'
   | 'subtree.title'
   | 'color.blue'
   | 'color.violet'
@@ -1605,6 +1691,103 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'Installed Ollama models will be synchronized from the model manager after you add this provider.',
   'ollama.modelsEmpty':
     'No models synchronized yet. Add this provider, then open its model manager.',
+  'ollama.manager.openAction': 'Manage models',
+  'ollama.manager.backAction': 'Back to providers',
+  'ollama.manager.title': 'Ollama model manager',
+  'ollama.manager.subtitle':
+    'Install, inspect, and control models on this Ollama provider.',
+  'ollama.manager.endpoint': 'Endpoint',
+  'ollama.manager.configuredEndpoint': 'Configured endpoint',
+  'ollama.manager.connected': 'Connected',
+  'ollama.manager.unavailable': 'Unavailable',
+  'ollama.manager.checking': 'Checking…',
+  'ollama.manager.partial': 'Some model information could not be loaded.',
+  'ollama.manager.version': 'Version',
+  'ollama.manager.installed': 'Installed',
+  'ollama.manager.running': 'Running',
+  'ollama.manager.refresh': 'Refresh',
+  'ollama.manager.refreshing': 'Refreshing…',
+  'ollama.manager.searchLabel': 'Search installed models',
+  'ollama.manager.searchPlaceholder': 'Search by name, family, or capability…',
+  'ollama.manager.scopeLabel': 'Model inventory filter',
+  'ollama.manager.allModels': 'All models',
+  'ollama.manager.runningModels': 'Running only',
+  'ollama.manager.inventoryLabel': 'Installed Ollama models',
+  'ollama.manager.loadingInventory': 'Loading models…',
+  'ollama.manager.unavailableInventory': 'The model inventory is unavailable.',
+  'ollama.manager.emptyInventory': 'No models are installed on this endpoint.',
+  'ollama.manager.emptyFilter': 'No models match the current filters.',
+  'ollama.manager.modelDetails': 'Model details',
+  'ollama.manager.selectModel':
+    'Select an installed model to inspect and manage it.',
+  'ollama.manager.loadingDetails': 'Loading model details…',
+  'ollama.manager.runningBadge': 'Running',
+  'ollama.manager.size': 'Size',
+  'ollama.manager.modified': 'Modified',
+  'ollama.manager.digest': 'Digest',
+  'ollama.manager.family': 'Family',
+  'ollama.manager.format': 'Format',
+  'ollama.manager.parameters': 'Parameters',
+  'ollama.manager.quantization': 'Quantization',
+  'ollama.manager.capabilities': 'Capabilities',
+  'ollama.manager.license': 'License summary',
+  'ollama.manager.noneReported': 'Not reported',
+  'ollama.manager.runtime': 'Runtime',
+  'ollama.manager.vram': 'VRAM',
+  'ollama.manager.context': 'Context length',
+  'ollama.manager.expires': 'Expires',
+  'ollama.manager.notRunning': 'This model is not currently loaded.',
+  'ollama.manager.pullTitle': 'Install a model',
+  'ollama.manager.pullHint':
+    'Enter an Ollama model name. The configured endpoint is used as-is.',
+  'ollama.manager.modelName': 'Model name',
+  'ollama.manager.pullPlaceholder': 'llama3.2:latest',
+  'ollama.manager.pull': 'Pull and install',
+  'ollama.manager.pulling': 'Installing…',
+  'ollama.manager.cancel': 'Cancel',
+  'ollama.manager.receiving': 'Receiving model data…',
+  'ollama.manager.copyTitle': 'Copy model',
+  'ollama.manager.copyHint':
+    'Create another local model name from the selected model.',
+  'ollama.manager.copyDestination': 'Copy destination',
+  'ollama.manager.copy': 'Copy',
+  'ollama.manager.renameTitle': 'Rename model',
+  'ollama.manager.renameHint':
+    'Copy to the new name, then remove the original.',
+  'ollama.manager.renameDestination': 'New model name',
+  'ollama.manager.rename': 'Rename',
+  'ollama.manager.load': 'Load / start',
+  'ollama.manager.unload': 'Unload / stop',
+  'ollama.manager.delete': 'Delete',
+  'ollama.manager.deleteTitle': 'Delete model?',
+  'ollama.manager.deleteConfirm': 'Delete model',
+  'ollama.manager.invalidName': 'Enter a model name.',
+  'ollama.manager.duplicateName': 'Choose a different model name.',
+  'ollama.manager.operationError':
+    'The model operation could not be completed.',
+  'ollama.manager.refreshError':
+    'Ollama could not be reached at this provider endpoint.',
+  'ollama.manager.detailsError':
+    'Extended details could not be loaded for this model.',
+  'ollama.manager.configurationPartial':
+    'The Ollama operation succeeded, but the configured model list could not be updated.',
+  'ollama.manager.renamePartial':
+    'The copy succeeded, but the original model could not be removed.',
+  'ollama.manager.pullCancelled': 'Model installation canceled.',
+  'ollama.manager.unknown': 'Unknown',
+  'ollama.manager.never': 'Never',
+  'ollama.manager.showing': 'Showing {visible} of {total} models',
+  'ollama.manager.selectedModel': 'Select {name}',
+  'ollama.manager.moreCapabilities': '+{count} more',
+  'ollama.manager.pullProgress': '{percent}% complete',
+  'ollama.manager.pullSucceeded': 'Installed {name}.',
+  'ollama.manager.copySucceeded': 'Copied {source} to {destination}.',
+  'ollama.manager.renameSucceeded': 'Renamed {source} to {destination}.',
+  'ollama.manager.loadSucceeded': 'Loaded {name}.',
+  'ollama.manager.unloadSucceeded': 'Unloaded {name}.',
+  'ollama.manager.deleteSucceeded': 'Deleted {name}.',
+  'ollama.manager.confirmDelete':
+    'Delete {name} from this Ollama endpoint? This cannot be undone.',
   'subtree.title': 'Subtrees',
   'color.blue': 'Blue',
   'color.violet': 'Violet',
@@ -2405,6 +2588,95 @@ export const cantoneseTranslations: Readonly<
     '加咗呢個供應商之後，模型管理員會同步已安裝嘅 Ollama 模型。',
   'ollama.modelsEmpty':
     '未同步任何模型。加咗呢個供應商之後，再開啟佢嘅模型管理員。',
+  'ollama.manager.openAction': '管理模型',
+  'ollama.manager.backAction': '返去供應商',
+  'ollama.manager.title': 'Ollama 模型管理員',
+  'ollama.manager.subtitle':
+    '安裝、睇資料，同控制呢個 Ollama 供應商上面嘅模型。',
+  'ollama.manager.endpoint': '端點',
+  'ollama.manager.configuredEndpoint': '已設定嘅端點',
+  'ollama.manager.connected': '已連線',
+  'ollama.manager.unavailable': '暫時用唔到',
+  'ollama.manager.checking': '檢查緊…',
+  'ollama.manager.partial': '有部分模型資料載入唔到。',
+  'ollama.manager.version': '版本',
+  'ollama.manager.installed': '已安裝',
+  'ollama.manager.running': '運行緊',
+  'ollama.manager.refresh': '重新整理',
+  'ollama.manager.refreshing': '重新整理緊…',
+  'ollama.manager.searchLabel': '搜尋已安裝模型',
+  'ollama.manager.searchPlaceholder': '用名稱、系列或者能力搜尋…',
+  'ollama.manager.scopeLabel': '模型清單篩選',
+  'ollama.manager.allModels': '全部模型',
+  'ollama.manager.runningModels': '只睇運行緊',
+  'ollama.manager.inventoryLabel': '已安裝嘅 Ollama 模型',
+  'ollama.manager.loadingInventory': '載入緊模型…',
+  'ollama.manager.unavailableInventory': '暫時攞唔到模型清單。',
+  'ollama.manager.emptyInventory': '呢個端點未安裝任何模型。',
+  'ollama.manager.emptyFilter': '而家嘅篩選搵唔到模型。',
+  'ollama.manager.modelDetails': '模型詳情',
+  'ollama.manager.selectModel': '揀一個已安裝模型嚟睇資料同管理。',
+  'ollama.manager.loadingDetails': '載入緊模型詳情…',
+  'ollama.manager.runningBadge': '運行緊',
+  'ollama.manager.size': '大小',
+  'ollama.manager.modified': '修改時間',
+  'ollama.manager.digest': '雜湊摘要',
+  'ollama.manager.family': '系列',
+  'ollama.manager.format': '格式',
+  'ollama.manager.parameters': '參數',
+  'ollama.manager.quantization': '量化',
+  'ollama.manager.capabilities': '能力',
+  'ollama.manager.license': '授權摘要',
+  'ollama.manager.noneReported': '未有資料',
+  'ollama.manager.runtime': '運行狀態',
+  'ollama.manager.vram': 'VRAM',
+  'ollama.manager.context': 'Context 長度',
+  'ollama.manager.expires': '到期時間',
+  'ollama.manager.notRunning': '呢個模型而家未載入。',
+  'ollama.manager.pullTitle': '安裝模型',
+  'ollama.manager.pullHint': '輸入 Ollama 模型名稱；會原樣使用已設定嘅端點。',
+  'ollama.manager.modelName': '模型名稱',
+  'ollama.manager.pullPlaceholder': 'llama3.2:latest',
+  'ollama.manager.pull': 'Pull 並安裝',
+  'ollama.manager.pulling': '安裝緊…',
+  'ollama.manager.cancel': '取消',
+  'ollama.manager.receiving': '接收緊模型資料…',
+  'ollama.manager.copyTitle': '複製模型',
+  'ollama.manager.copyHint': '用所選模型建立另一個本機模型名稱。',
+  'ollama.manager.copyDestination': '複製目的地',
+  'ollama.manager.copy': '複製',
+  'ollama.manager.renameTitle': '重新命名模型',
+  'ollama.manager.renameHint': '先複製做新名稱，再移除原本嗰個。',
+  'ollama.manager.renameDestination': '新模型名稱',
+  'ollama.manager.rename': '重新命名',
+  'ollama.manager.load': '載入 / 啟動',
+  'ollama.manager.unload': '卸載 / 停止',
+  'ollama.manager.delete': '刪除',
+  'ollama.manager.deleteTitle': '刪除模型？',
+  'ollama.manager.deleteConfirm': '刪除模型',
+  'ollama.manager.invalidName': '請輸入模型名稱。',
+  'ollama.manager.duplicateName': '請揀另一個模型名稱。',
+  'ollama.manager.operationError': '未能完成模型操作。',
+  'ollama.manager.refreshError': '呢個供應商端點暫時連唔到 Ollama。',
+  'ollama.manager.detailsError': '未能載入呢個模型嘅延伸詳情。',
+  'ollama.manager.configurationPartial':
+    'Ollama 操作成功咗，不過未能更新已設定嘅模型清單。',
+  'ollama.manager.renamePartial': '複製成功咗，不過未能移除原本模型。',
+  'ollama.manager.pullCancelled': '已取消安裝模型。',
+  'ollama.manager.unknown': '未知',
+  'ollama.manager.never': '永不',
+  'ollama.manager.showing': '顯示緊 {visible}/{total} 個模型',
+  'ollama.manager.selectedModel': '揀選 {name}',
+  'ollama.manager.moreCapabilities': '仲有 {count} 項',
+  'ollama.manager.pullProgress': '已完成 {percent}%',
+  'ollama.manager.pullSucceeded': '已安裝 {name}。',
+  'ollama.manager.copySucceeded': '已由 {source} 複製去 {destination}。',
+  'ollama.manager.renameSucceeded': '已由 {source} 改名做 {destination}。',
+  'ollama.manager.loadSucceeded': '已載入 {name}。',
+  'ollama.manager.unloadSucceeded': '已卸載 {name}。',
+  'ollama.manager.deleteSucceeded': '已刪除 {name}。',
+  'ollama.manager.confirmDelete':
+    '要由呢個 Ollama 端點刪除 {name} 嗎？刪咗冇得返轉頭。',
   'subtree.title': '子樹',
   'color.blue': '藍色',
   'color.violet': '紫色',

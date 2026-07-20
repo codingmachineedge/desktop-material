@@ -193,7 +193,27 @@ class PullPlan:
 
 
 def _same_path(left: Path, right: Path) -> bool:
-    return os.path.normcase(str(left)) == os.path.normcase(str(right))
+    """Compare filesystem paths after expanding Windows 8.3 aliases."""
+
+    return os.path.normcase(str(left.resolve(strict=False))) == os.path.normcase(
+        str(right.resolve(strict=False))
+    )
+
+
+def _path_has_link_or_junction(path: Path) -> bool:
+    """Reject link traversal without mistaking a DOS short-name alias for one."""
+
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink() or (
+            hasattr(current, "is_junction") and current.is_junction()
+        ):
+            return True
+        if not current.exists():
+            break
+    return False
 
 
 def resolve_owned_paths(
@@ -206,13 +226,18 @@ def resolve_owned_paths(
         raise ValueError("TEMP must identify the owned fixture parent directory")
     temp_requested = Path(os.path.abspath(temp_value))
     temp_root = temp_requested.resolve(strict=True)
-    if not temp_root.is_dir() or not _same_path(temp_requested, temp_root):
+    if (
+        not temp_root.is_dir()
+        or _path_has_link_or_junction(temp_requested)
+        or not _same_path(temp_requested, temp_root)
+    ):
         raise ValueError("TEMP must be a real directory, not a symlink or junction")
 
     requested_root = Path(os.path.abspath(run_root))
     resolved_root = requested_root.resolve(strict=True)
     if (
         not resolved_root.is_dir()
+        or _path_has_link_or_junction(requested_root)
         or not _same_path(requested_root, resolved_root)
         or resolved_root.parent != temp_root
         or RUN_ROOT_PATTERN.fullmatch(resolved_root.name) is None
@@ -227,6 +252,7 @@ def resolve_owned_paths(
         resolved_owned_directory = owned_directory.resolve(strict=True)
         if (
             not resolved_owned_directory.is_dir()
+            or _path_has_link_or_junction(owned_directory)
             or not _same_path(owned_directory, resolved_owned_directory)
         ):
             raise ValueError("the owned Ollama directory may not be a link")

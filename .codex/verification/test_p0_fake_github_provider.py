@@ -71,6 +71,21 @@ class ProviderStateTests(unittest.TestCase):
             enabled_viewer["copilotLicenseType"], "COPILOT_INDIVIDUAL"
         )
         self.assertEqual(enabled_viewer["copilotEndpoints"], {"api": ""})
+        default_features = self.state.dispatch(
+            "GET", "/api/v3/desktop_internal/features", self.headers
+        )
+        enabled_features = enabled_state.dispatch(
+            "GET", "/api/v3/desktop_internal/features", self.headers
+        )
+        self.assertEqual(self.json(default_features), {"features": []})
+        self.assertEqual(
+            self.json(enabled_features),
+            {
+                "features": [
+                    "desktop_enable_copilot_sdk_commit_message_generation"
+                ]
+            },
+        )
 
     def test_repository_and_branch_rules_are_purpose_built(self) -> None:
         repository = self.state.dispatch("GET", self.repo_path, self.headers)
