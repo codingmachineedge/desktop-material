@@ -656,6 +656,14 @@ test('Actions captures prove inspector pagination, logs, reviews, and cancellati
 test('artifact page-two capture targets its exact card inside the details pane', () => {
   const artifactPageTwo = sceneSource('actions-artifact-page-two')
   for (const contract of [
+    'exact page-one artifact inventory and enabled pagination action',
+    'const pageOneArtifactCount = ready.artifactCount - 1',
+    'const pageOneArtifactStatus = `Showing ${pageOneArtifactCount} loaded of ${ready.artifactCount} artifacts.`',
+    'const status = pagination?.querySelector(\'[role="status"]\')',
+    "candidate.textContent?.trim() === 'Load more artifacts'",
+    'button instanceof HTMLButtonElement',
+    '!button.disabled',
+    "button.getAttribute('aria-disabled') !== 'true'",
     "within: '.actions-run-details .actions-artifacts'",
     "'#actions-artifact-${",
     'ready.artifactSentinelId',
@@ -677,6 +685,24 @@ test('artifact page-two capture targets its exact card inside the details pane',
       `artifact page-two gate misses ${contract}`
     )
   }
+  assert.match(
+    artifactPageTwo,
+    /status\?\.textContent\?\.trim\(\) === \$\{JSON\.stringify\(\s*pageOneArtifactStatus\s*\)\}/
+  )
+  assert.match(
+    artifactPageTwo,
+    /querySelectorAll\('#actions-artifact-grid \.actions-artifact-card'\)\.length ===\s*\$\{pageOneArtifactCount\}/
+  )
+  assert.match(
+    artifactPageTwo,
+    /querySelector\('#actions-artifact-\$\{\s*ready\.artifactSentinelId\s*\}'\) === null/
+  )
+  const open = artifactPageTwo.indexOf('await openFirstRun()')
+  const pageOne = artifactPageTwo.indexOf(
+    'exact page-one artifact inventory and enabled pagination action'
+  )
+  const loadMore = artifactPageTwo.indexOf("clickText('Load more artifacts'")
+  assert.ok(open >= 0 && open < pageOne && pageOne < loadMore)
   assert.ok(
     artifactPageTwo.indexOf('visible exact artifact page-two sentinel') <
       artifactPageTwo.indexOf("capture('material-actions-artifact-page-two')"),

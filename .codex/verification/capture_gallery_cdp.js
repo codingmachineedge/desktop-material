@@ -3614,6 +3614,30 @@ scene('actions-artifact-download', async () => {
 
 scene('actions-artifact-page-two', async () => {
   await openFirstRun()
+  const pageOneArtifactCount = ready.artifactCount - 1
+  const pageOneArtifactStatus = `Showing ${pageOneArtifactCount} loaded of ${ready.artifactCount} artifacts.`
+  await waitFor(
+    `(() => {
+      const artifacts = document.querySelector('.actions-run-details .actions-artifacts')
+      const pagination = artifacts?.querySelector('.actions-artifact-pagination')
+      const status = pagination?.querySelector('[role="status"]')
+      const button = [...(pagination?.querySelectorAll('button') ?? [])]
+        .find(candidate => candidate.textContent?.trim() === 'Load more artifacts')
+      return status?.textContent?.trim() === ${JSON.stringify(
+        pageOneArtifactStatus
+      )} &&
+        artifacts?.querySelectorAll('#actions-artifact-grid .actions-artifact-card').length ===
+          ${pageOneArtifactCount} &&
+        artifacts?.querySelector('#actions-artifact-${
+          ready.artifactSentinelId
+        }') === null &&
+        button instanceof HTMLButtonElement &&
+        !button.disabled &&
+        button.getAttribute('aria-disabled') !== 'true'
+    })()`,
+    'exact page-one artifact inventory and enabled pagination action',
+    30000
+  )
   for (let round = 0; round < 3; round++) {
     const more = await clickText('Load more artifacts', {
       within: '.actions-run-details .actions-artifacts',
