@@ -162,6 +162,65 @@ function renderResponsiveToolbar(onBuild = () => {}) {
 }
 
 describe('responsive toolbar overflow', () => {
+  it('shows the full action name for an overflowed item without custom overflow rendering', async () => {
+    const width = 200
+    render(
+      <Toolbar id="labeled-toolbar" ariaLabel="Repository controls">
+        <ToolbarItem id="wide" preferredWidth={180}>
+          <div className="toolbar-button">
+            <button type="button">
+              <span className="text">
+                <span
+                  className="title"
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Wide anchor
+                </span>
+              </span>
+            </button>
+          </div>
+        </ToolbarItem>
+        <ToolbarItem
+          id="branch"
+          preferredWidth={150}
+          overflowPriority={1}
+          overflowLabel="Current branch"
+          overflowSymbol="alt_route"
+        >
+          <button type="button">Branch original</button>
+        </ToolbarItem>
+      </Toolbar>
+    )
+    const toolbar = screen.getByRole('toolbar', {
+      name: 'Repository controls',
+    }) as HTMLDivElement
+    toolbar.style.gap = '10px'
+    toolbar.style.padding = '0'
+    Object.defineProperty(toolbar, 'clientWidth', {
+      configurable: true,
+      get: () => width,
+    })
+    for (const observer of ControlledResizeObserver.instances) {
+      observer.trigger()
+    }
+
+    const more = await screen.findByRole('button', {
+      name: /More toolbar actions/,
+    })
+    fireEvent.click(more)
+    await screen.findByRole('dialog', { name: 'More toolbar actions' })
+
+    // The overflowed item renders its full action name rather than a blank row.
+    assert.ok(
+      screen.getByText('Current branch'),
+      'overflowed item should show its full action name'
+    )
+  })
+
   it('moves an optional action when a live label starts clipping', async () => {
     const view = renderResponsiveToolbar()
     const repositoryItem = view.container.querySelector<HTMLDivElement>(

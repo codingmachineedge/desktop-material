@@ -6117,16 +6117,35 @@ export class App extends React.Component<IAppProps, IAppState> {
           canGrow={true}
           className="sidebar-section"
           style={{ width }}
+          overflowLabel="Current repository"
+          overflowSymbol="book_2"
         >
           {this.renderRepositoryToolbarButton()}
         </ToolbarItem>
-        <ToolbarItem id="worktree" preferredWidth={220} canGrow={true}>
+        <ToolbarItem
+          id="worktree"
+          preferredWidth={220}
+          canGrow={true}
+          overflowLabel="Worktrees"
+          overflowSymbol="account_tree"
+        >
           {this.renderWorktreeToolbarButton()}
         </ToolbarItem>
-        <ToolbarItem id="branch" preferredWidth={190} canGrow={true}>
+        <ToolbarItem
+          id="branch"
+          preferredWidth={190}
+          canGrow={true}
+          overflowLabel="Current branch"
+          overflowSymbol="alt_route"
+        >
           {this.renderBranchToolbarButton()}
         </ToolbarItem>
-        <ToolbarItem id="sync" preferredWidth={210}>
+        <ToolbarItem
+          id="sync"
+          preferredWidth={210}
+          overflowLabel="Push, pull, and fetch"
+          overflowSymbol="sync"
+        >
           {this.renderPushPullToolbarButton()}
         </ToolbarItem>
         <ToolbarItem
@@ -6151,6 +6170,8 @@ export class App extends React.Component<IAppProps, IAppState> {
           id="theme-toggle"
           preferredWidth={54}
           desktopMaterialFeature={true}
+          overflowLabel="Toggle light and dark theme"
+          overflowSymbol="light_mode"
         >
           <ThemeToggleButton
             dispatcher={this.props.dispatcher}

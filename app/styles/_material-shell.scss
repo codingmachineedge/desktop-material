@@ -534,6 +534,33 @@ body {
       display: flex;
     }
   }
+
+  // Default menu row for an overflowed action that supplies no custom overflow
+  // rendering: its full name beside its glyph, never clipped.
+  .toolbar-overflow-default-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: var(--md-sys-color-on-surface);
+
+    .material-symbol {
+      flex: none;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  .toolbar-overflow-default-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    font-weight: var(--font-weight-medium);
+  }
 }
 
 body[data-dm-toolbar-density='compact'] #desktop-app-toolbar {

@@ -8,7 +8,7 @@ import {
   PopoverDecoration,
 } from '../lib/popover'
 import { createUniqueId, releaseUniqueId } from '../lib/id-pool'
-import { MaterialSymbol } from '../lib/material-symbol'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 import { ToolbarButton } from './button'
 import {
   calculateToolbarOverflow,
@@ -44,6 +44,14 @@ export interface IToolbarItemProps {
    * remains mounted off-layout so subscriptions and in-flight state survive.
    */
   readonly renderOverflow?: () => JSX.Element | null
+  /**
+   * Full action name shown for this item in the overflow surface when it does
+   * not supply a custom `renderOverflow`. Without it an overflowed item would
+   * render as a blank row on a narrow toolbar.
+   */
+  readonly overflowLabel?: string
+  /** Optional Material Symbol shown beside `overflowLabel` in the overflow. */
+  readonly overflowSymbol?: MaterialSymbolName
 }
 /* eslint-enable react/no-unused-prop-types */
 
@@ -512,6 +520,37 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
     )
   }
 
+  /**
+   * Content shown for one overflowed item inside the overflow surface. Items
+   * that supply a custom `renderOverflow` keep it; every other item falls back
+   * to a menu row showing its full action name (`overflowLabel`) beside its
+   * optional Material Symbol, so a narrow toolbar never collapses an action
+   * into a blank overflow row.
+   */
+  private renderOverflowItemContent(
+    item: IResolvedToolbarItem
+  ): JSX.Element | null {
+    const props = item.element.props
+    if (props.renderOverflow !== undefined) {
+      return props.renderOverflow()
+    }
+
+    if (props.overflowLabel === undefined) {
+      return null
+    }
+
+    return (
+      <span className="toolbar-overflow-default-item">
+        {props.overflowSymbol !== undefined && (
+          <MaterialSymbol name={props.overflowSymbol} size={18} />
+        )}
+        <span className="toolbar-overflow-default-label">
+          {props.overflowLabel}
+        </span>
+      </span>
+    )
+  }
+
   private renderOverflowPopover() {
     if (!this.state.overflowOpen || this.overflowButtonElement === null) {
       return null
@@ -562,7 +601,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
                 }
                 onClick={this.onOverflowItemClick}
               >
-                {item.element.props.renderOverflow?.() ?? null}
+                {this.renderOverflowItemContent(item)}
               </div>
             ))}
           </div>
