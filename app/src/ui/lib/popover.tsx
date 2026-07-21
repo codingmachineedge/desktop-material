@@ -88,6 +88,12 @@ interface IPopoverProps {
   readonly ariaLabelledby?: string
   readonly ariaDescribedBy?: string
   readonly trapFocus?: boolean // Default: true
+  /**
+   * Whether pressing Escape deactivates the focus trap (and therefore invokes
+   * the deactivate/dismiss handler). Default: true. Set false when the caller
+   * owns Escape handling itself and needs to defer to nested overlays.
+   */
+  readonly escapeDeactivates?: boolean // Default: true
   readonly decoration?: PopoverDecoration // Default: none
 
   /** Maximum height decided by clients of Popover */
@@ -113,7 +119,7 @@ export class Popover extends React.Component<IPopoverProps, IPopoverState> {
 
     this.focusTrapOptions = {
       allowOutsideClick: true,
-      escapeDeactivates: true,
+      escapeDeactivates: this.props.escapeDeactivates ?? true,
       onDeactivate: this.props.onMousedownOutside ?? this.props.onClickOutside,
     }
 

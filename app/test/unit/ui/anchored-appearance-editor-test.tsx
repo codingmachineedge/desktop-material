@@ -213,6 +213,47 @@ describe('anchored appearance editor', () => {
     assert.ok(screen.getByRole('dialog', { name: 'Toolbar appearance' }))
   })
 
+  it('lets a nested overlay handle Escape instead of tearing down the whole editor', async () => {
+    render(<Harness />)
+    const anchor = screen.getByRole('button', { name: 'Toolbar' })
+    anchor.focus()
+
+    fireEvent.keyDown(anchor, { key: 'ContextMenu' })
+    const editor = screen.getByRole('dialog', { name: 'Toolbar appearance' })
+
+    // Simulate a nested overlay (regex builder / menu / dropdown) rendered
+    // inside the editor content, which manages its own Escape-to-dismiss.
+    const content = editor.querySelector<HTMLElement>(
+      '.anchored-appearance-editor-content'
+    )
+    assert.ok(content)
+    const overlay = document.createElement('div')
+    overlay.setAttribute('role', 'dialog')
+    const overlayInput = document.createElement('input')
+    overlay.appendChild(overlayInput)
+    content.appendChild(overlay)
+    overlayInput.focus()
+
+    // Escape from within the nested overlay must NOT close the editor.
+    fireEvent.keyDown(overlayInput, { key: 'Escape' })
+    assert.ok(
+      screen.getByRole('dialog', { name: 'Toolbar appearance' }),
+      'editor should remain open while a nested overlay handles Escape'
+    )
+
+    content.removeChild(overlay)
+
+    // A plain Escape (no nested overlay involved) still closes the editor.
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => {
+      assert.equal(
+        screen.queryByRole('dialog', { name: 'Toolbar appearance' }),
+        null
+      )
+      assert.equal(document.activeElement, anchor)
+    })
+  })
+
   it('portals a foldout editor outside the clipping ancestor without changing dismissal or focus behavior', async () => {
     render(<Harness insideFoldout={true} />)
     const anchor = screen.getByRole('button', { name: 'Toolbar' })

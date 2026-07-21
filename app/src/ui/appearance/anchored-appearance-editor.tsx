@@ -260,6 +260,26 @@ export class AnchoredAppearanceEditor extends React.Component<
       return
     }
 
+    // A nested overlay opened inside the editor content — the regex builder
+    // (role="dialog"), a context menu (role="menu"), or a dropdown listbox
+    // (role="listbox") — manages its own Escape-to-dismiss. Because this is a
+    // capture-phase listener it would otherwise steal Escape and tear down the
+    // whole editor before the overlay's own handler ever runs. Defer to the
+    // overlay so Escape closes the innermost layer first. The editor's own
+    // dialog shell (the Popover) wraps the content rather than living inside
+    // it, so only an overlay strictly contained by the content is a nested
+    // layer; the editor's own dialog is not matched.
+    const target = event.target
+    if (target instanceof Element) {
+      const overlay = target.closest(
+        '[role="dialog"], [role="menu"], [role="listbox"]'
+      )
+      const content = document.getElementById(this.contentId)
+      if (overlay !== null && content !== null && content.contains(overlay)) {
+        return
+      }
+    }
+
     event.preventDefault()
     event.stopPropagation()
     this.requestClose()
@@ -426,6 +446,10 @@ export class AnchoredAppearanceEditor extends React.Component<
           decoration={PopoverDecoration.Balloon}
           ariaLabelledby={this.titleId}
           onClickOutside={this.onPopoverDismissed}
+          // The editor owns Escape handling in onWindowKeyDown so it can defer
+          // to nested overlays (regex builder, menus, dropdowns); don't let the
+          // focus trap independently close the editor on Escape.
+          escapeDeactivates={false}
         >
           <section
             className={classNames(
