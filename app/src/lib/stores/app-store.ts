@@ -25,6 +25,11 @@ import {
   GitHubReleasesStore,
 } from './github-releases-store'
 import {
+  GitLabMergeRequestAvailability,
+  GitLabMergeRequestStore,
+  IGitLabMergeRequestMutationReview,
+} from './gitlab-merge-request-store'
+import {
   autoPinLargeFilesForCommit,
   defaultCheapLfsFileSystem,
   ICheapLfsAutoPinnedFile,
@@ -125,6 +130,24 @@ import {
   getGitHubPullRequestContextVersion,
   resolveRefreshedGitHubPullRequestBranch,
 } from '../github-pull-request'
+import {
+  buildGitLabMergeRequestBranchContext,
+  buildGitLabMergeRequestManageBranchContext,
+  getGitLabMergeRequestManageVersion,
+  getGitLabMergeRequestWorkspaceRoute,
+  getGitLabMergeRequestWorkspaceVersion,
+  getPullRequestBrowserURL,
+  getPullRequestCreationBrowserURL,
+  getPullRequestInteractionRoute,
+  IGitLabMergeRequestWorkspaceRoute,
+} from '../gitlab-merge-request-workspace'
+import {
+  IGitLabMergeRequest,
+  IGitLabMergeRequestApprovalState,
+  IGitLabMergeRequestDraft,
+  IGitLabMergeRequestMemberList,
+  IGitLabMergeRequestUpdate,
+} from '../gitlab-merge-request'
 import {
   CommittedFileChange,
   WorkingDirectoryFileChange,
@@ -1051,6 +1074,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /** Account-bound Releases coordinator backing the cheap-LFS delegations. */
   private readonly githubReleasesStore: GitHubReleasesStore
 
+  /** Exact-account GitLab merge-request coordinator. */
+  private readonly gitLabMergeRequestStore: GitLabMergeRequestStore
+
   /** Accounts already audited for missing OAuth scopes this session. */
   private readonly scopeAuditedAccounts = new Set<string>()
 
@@ -1088,6 +1114,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
       new FileBatchCloneStagingManager()
     )
     this.githubReleasesStore = new GitHubReleasesStore(this.accountsStore)
+    this.gitLabMergeRequestStore = new GitLabMergeRequestStore(
+      this.accountsStore
+    )
     this.autoCloneStore = new AutoCloneStore({
       getAccounts: () => this.accounts,
       getApiRepositories: () => this.apiRepositoriesStore.getState(),
@@ -12894,8 +12923,100 @@ export class AppStore extends TypedBaseStore<IAppState> {
         baseBranch,
       })
     } else {
-      this._showCreateGitHubPullRequest(repository, compareBranch, baseBranch)
+      await this._continueCreatePullRequest(
+        repository,
+        compareBranch,
+        baseBranch
+      )
     }
+  }
+
+  /** Continue the publish/push prerequisite flow on the exact host provider. */
+  public async _continueCreatePullRequest(
+    repository: Repository,
+    requestedBranch: Branch,
+    initialBaseBranch?: Branch
+  ): Promise<void> {
+    const route = getPullRequestInteractionRoute(repository, this.accounts)
+    if (route === 'github-native') {
+      this._showCreateGitHubPullRequest(
+        repository,
+        requestedBranch,
+        initialBaseBranch
+      )
+      return
+    }
+    if (route === 'gitlab-native') {
+      this._showCreateGitLabMergeRequest(
+        repository,
+        requestedBranch,
+        initialBaseBranch
+      )
+      return
+    }
+    if (route === 'provider-browser') {
+      await this._openCreateProviderPullRequestInBrowser(repository)
+    }
+  }
+
+  /** Open the provider-native browser composer when no native workspace exists. */
+  private async _openCreateProviderPullRequestInBrowser(
+    repository: Repository
+  ): Promise<void> {
+    const url = getPullRequestCreationBrowserURL(repository, this.accounts)
+    if (url !== null) {
+      await this._openInBrowser(url)
+    }
+  }
+
+  /** Open a native GitLab composer for an already published non-fork branch. */
+  public _showCreateGitLabMergeRequest(
+    repository: Repository,
+    requestedBranch: Branch,
+    initialBaseBranch?: Branch
+  ): void {
+    if (
+      !isRepositoryWithGitHubRepository(repository) ||
+      repository.gitHubRepository.parent !== null ||
+      this.popupManager.areTherePopupsOfType(PopupType.GitLabMergeRequest)
+    ) {
+      return
+    }
+    const route = getGitLabMergeRequestWorkspaceRoute(repository, this.accounts)
+    if (route === null) {
+      return
+    }
+    const repositoryState = this.repositoryStateCache.get(repository)
+    const { branchesState, remote } = repositoryState
+    const refreshedBranch = resolveRefreshedGitHubPullRequestBranch(
+      requestedBranch,
+      branchesState.tip.kind === TipState.Valid
+        ? branchesState.tip.branch
+        : null
+    )
+    if (refreshedBranch === null) {
+      return
+    }
+    const branchContext = buildGitLabMergeRequestBranchContext(
+      refreshedBranch,
+      branchesState.allBranches,
+      branchesState.defaultBranch,
+      remote?.name ?? null,
+      initialBaseBranch
+    )
+    this._showPopup({
+      type: PopupType.GitLabMergeRequest,
+      repository,
+      route,
+      branchContext,
+      contextVersion: getGitLabMergeRequestWorkspaceVersion(
+        repository,
+        refreshedBranch,
+        remote,
+        route
+      ),
+      intent: { kind: 'create' },
+    })
   }
 
   /**
@@ -12993,6 +13114,60 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
   }
 
+  /** Reject stale GitLab workspaces after repository, account, or tip changes. */
+  public _isGitLabMergeRequestContextCurrent(
+    repository: Repository,
+    route: IGitLabMergeRequestWorkspaceRoute,
+    contextVersion: string,
+    intent:
+      | { readonly kind: 'create' }
+      | { readonly kind: 'manage'; readonly mergeRequestIID: number }
+  ): boolean {
+    const selected = this.selectedRepository
+    if (
+      !(selected instanceof Repository) ||
+      !isRepositoryWithGitHubRepository(selected) ||
+      selected.id !== repository.id ||
+      selected.path !== repository.path ||
+      selected.gitHubRepository.parent !== null
+    ) {
+      return false
+    }
+    const currentRoute = getGitLabMergeRequestWorkspaceRoute(
+      selected,
+      this.accounts
+    )
+    if (
+      currentRoute === null ||
+      currentRoute.repositoryId !== route.repositoryId ||
+      currentRoute.accountKey !== route.accountKey ||
+      currentRoute.accountUserId !== route.accountUserId ||
+      currentRoute.providerHTMLURL !== route.providerHTMLURL ||
+      currentRoute.projectPath !== route.projectPath
+    ) {
+      return false
+    }
+    if (intent.kind === 'manage') {
+      return (
+        getGitLabMergeRequestManageVersion(
+          selected,
+          currentRoute,
+          intent.mergeRequestIID
+        ) === contextVersion
+      )
+    }
+    const { branchesState, remote } = this.repositoryStateCache.get(selected)
+    return (
+      branchesState.tip.kind === TipState.Valid &&
+      getGitLabMergeRequestWorkspaceVersion(
+        selected,
+        branchesState.tip.branch,
+        remote,
+        currentRoute
+      ) === contextVersion
+    )
+  }
+
   public _showGitHubPullRequestLifecycle(
     repository: Repository,
     pullRequest: PullRequest
@@ -13034,6 +13209,60 @@ export class AppStore extends TypedBaseStore<IAppState> {
     })
   }
 
+  private _showGitLabMergeRequestLifecycle(
+    repository: Repository,
+    pullRequest: PullRequest
+  ): void {
+    if (
+      !isRepositoryWithGitHubRepository(repository) ||
+      repository.gitHubRepository.parent !== null ||
+      !Number.isSafeInteger(pullRequest.pullRequestNumber) ||
+      pullRequest.pullRequestNumber < 1 ||
+      this.popupManager.areTherePopupsOfType(PopupType.GitLabMergeRequest) ||
+      getPullRequestBrowserURL(repository, this.accounts, pullRequest) === null
+    ) {
+      return
+    }
+    const route = getGitLabMergeRequestWorkspaceRoute(repository, this.accounts)
+    if (route === null) {
+      return
+    }
+    const { branchesState, remote } = this.repositoryStateCache.get(repository)
+    const branchContext = buildGitLabMergeRequestManageBranchContext(
+      branchesState.allBranches,
+      branchesState.defaultBranch,
+      remote?.name ?? null
+    )
+    const mergeRequestIID = pullRequest.pullRequestNumber
+    this._showPopup({
+      type: PopupType.GitLabMergeRequest,
+      repository,
+      route,
+      branchContext,
+      contextVersion: getGitLabMergeRequestManageVersion(
+        repository,
+        route,
+        mergeRequestIID
+      ),
+      intent: { kind: 'manage', mergeRequestIID },
+    })
+  }
+
+  /** Route lifecycle management through the exact repository provider. */
+  public async _showPullRequestLifecycle(
+    repository: Repository,
+    pullRequest: PullRequest
+  ): Promise<void> {
+    const route = getPullRequestInteractionRoute(repository, this.accounts)
+    if (route === 'github-native') {
+      this._showGitHubPullRequestLifecycle(repository, pullRequest)
+    } else if (route === 'gitlab-native') {
+      this._showGitLabMergeRequestLifecycle(repository, pullRequest)
+    } else if (route === 'provider-browser') {
+      await this._showPullRequestByPR(repository, pullRequest)
+    }
+  }
+
   public async _showPullRequest(repository: Repository): Promise<void> {
     // no pull requests from non github repos
     if (repository.gitHubRepository === null) {
@@ -13047,19 +13276,100 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return
     }
 
-    return this._showPullRequestByPR(currentPullRequest)
+    return this._showPullRequestByPR(repository, currentPullRequest)
   }
 
-  public async _showPullRequestByPR(pr: PullRequest): Promise<void> {
-    const { htmlURL: baseRepoUrl } = pr.base.gitHubRepository
-
-    if (baseRepoUrl === null) {
-      return
+  public async _showPullRequestByPR(
+    repository: Repository,
+    pr: PullRequest
+  ): Promise<void> {
+    const url = getPullRequestBrowserURL(repository, this.accounts, pr)
+    if (url !== null) {
+      await this._openInBrowser(url)
     }
+  }
 
-    const showPrUrl = `${baseRepoUrl}/pull/${pr.pullRequestNumber}`
+  public _getGitLabMergeRequestAvailability(
+    repository: Repository
+  ): GitLabMergeRequestAvailability {
+    return this.gitLabMergeRequestStore.availability(repository)
+  }
 
-    await this._openInBrowser(showPrUrl)
+  public _listGitLabMergeRequestMembers(
+    repository: Repository,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequestMemberList> {
+    return this.gitLabMergeRequestStore.listMembers(repository, signal)
+  }
+
+  public _getGitLabMergeRequest(
+    repository: Repository,
+    mergeRequestIID: number,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.gitLabMergeRequestStore.get(repository, mergeRequestIID, signal)
+  }
+
+  public _createGitLabMergeRequest(
+    repository: Repository,
+    draft: IGitLabMergeRequestDraft,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.gitLabMergeRequestStore.create(repository, draft, signal)
+  }
+
+  public _createGitLabMergeRequestMutationReview(
+    repository: Repository,
+    mergeRequest: IGitLabMergeRequest
+  ): IGitLabMergeRequestMutationReview {
+    return this.gitLabMergeRequestStore.createMutationReview(
+      repository,
+      mergeRequest
+    )
+  }
+
+  public _updateGitLabMergeRequest(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    update: IGitLabMergeRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.gitLabMergeRequestStore.update(
+      repository,
+      review,
+      update,
+      signal
+    )
+  }
+
+  public _setGitLabMergeRequestState(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    state: 'close' | 'reopen',
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.gitLabMergeRequestStore.setState(
+      repository,
+      review,
+      state,
+      signal
+    )
+  }
+
+  public _approveGitLabMergeRequest(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequestApprovalState> {
+    return this.gitLabMergeRequestStore.approve(repository, review, signal)
+  }
+
+  public _unapproveGitLabMergeRequest(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequestApprovalState> {
+    return this.gitLabMergeRequestStore.unapprove(repository, review, signal)
   }
 
   public async _refreshPullRequests(repository: Repository): Promise<void> {

@@ -15,7 +15,7 @@ interface IPushBranchCommitsProps {
     repository: Repository,
     branch: Branch,
     baseBranch?: Branch
-  ) => void
+  ) => Promise<void>
   readonly onDismissed: () => void
 
   /**
@@ -159,16 +159,24 @@ export class PushBranchCommits extends React.Component<
     )
   }
 
-  private onCreateWithoutPushButtonClick = (
+  private onCreateWithoutPushButtonClick = async (
     e: React.MouseEvent<HTMLButtonElement>
   ) => {
     e.preventDefault()
-    this.props.onConfirm(
-      this.props.repository,
-      this.props.branch,
-      this.props.baseBranch
-    )
-    this.props.onDismissed()
+    this.setState({ isPushingOrPublishing: true })
+    try {
+      await this.props.onConfirm(
+        this.props.repository,
+        this.props.branch,
+        this.props.baseBranch
+      )
+      this.props.onDismissed()
+    } catch (error) {
+      await this.props.dispatcher.postError(
+        error instanceof Error ? error : new Error(String(error))
+      )
+      this.setState({ isPushingOrPublishing: false })
+    }
   }
 
   private onSubmit = async () => {
@@ -178,11 +186,13 @@ export class PushBranchCommits extends React.Component<
 
     try {
       await this.props.dispatcher.push(repository)
-    } finally {
+      await this.props.onConfirm(repository, branch, this.props.baseBranch)
+      this.props.onDismissed()
+    } catch (error) {
+      await this.props.dispatcher.postError(
+        error instanceof Error ? error : new Error(String(error))
+      )
       this.setState({ isPushingOrPublishing: false })
     }
-
-    this.props.onConfirm(repository, branch, this.props.baseBranch)
-    this.props.onDismissed()
   }
 }

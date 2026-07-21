@@ -5,6 +5,9 @@ import { createObservableRef } from './observable-ref'
 import { AriaHasPopupType } from './aria-types'
 
 export interface IButtonProps {
+  /** Stable, non-user-visible hook for deterministic UI verification. */
+  readonly dataVerification?: string
+
   /**
    * A callback which is invoked when the button is clicked
    * using a pointer device or keyboard. The source event is
@@ -254,6 +257,7 @@ export class Button extends React.Component<IButtonProps, {}> {
     return (
       <button
         id={this.props.id}
+        data-verification={this.props.dataVerification}
         className={className}
         data-verification={this.props.dataVerification}
         onClick={disabled ? preventDefault : this.onClick}

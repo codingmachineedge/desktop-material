@@ -96,6 +96,18 @@ import type { IBYOKProvider } from '../../lib/copilot/byok'
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { PullRequestLifecycleStore } from '../../lib/stores/pull-request-lifecycle-store'
 import { PullRequestCreationStore } from '../../lib/stores/pull-request-creation-store'
+import {
+  GitLabMergeRequestAvailability,
+  IGitLabMergeRequestMutationReview,
+} from '../../lib/stores/gitlab-merge-request-store'
+import {
+  IGitLabMergeRequest,
+  IGitLabMergeRequestApprovalState,
+  IGitLabMergeRequestDraft,
+  IGitLabMergeRequestMemberList,
+  IGitLabMergeRequestUpdate,
+} from '../../lib/gitlab-merge-request'
+import { IGitLabMergeRequestWorkspaceRoute } from '../../lib/gitlab-merge-request-workspace'
 import { getTipSha } from '../../lib/tip'
 import type {
   IAutomationSettingsOverrides,
@@ -4451,12 +4463,38 @@ export class Dispatcher {
     this.appStore._showCreateGitHubPullRequest(repository, branch, baseBranch)
   }
 
+  /** Continue create after publish/push using the exact repository provider. */
+  public continueCreatePullRequest(
+    repository: Repository,
+    branch: Branch,
+    baseBranch?: Branch
+  ): Promise<void> {
+    return this.appStore._continueCreatePullRequest(
+      repository,
+      branch,
+      baseBranch
+    )
+  }
+
   /** Open the native inspect/update/review/merge workbench. */
   public showGitHubPullRequestLifecycle(
     repository: Repository,
     pullRequest: PullRequest
   ): void {
     this.appStore._showGitHubPullRequestLifecycle(repository, pullRequest)
+  }
+
+  public showPullRequestLifecycle(
+    repository: Repository,
+    pullRequest: PullRequest
+  ): Promise<void> {
+    return this.appStore
+      ._showPullRequestLifecycle(repository, pullRequest)
+      .catch(error =>
+        this.postError(
+          error instanceof Error ? error : new Error(String(error))
+        )
+      )
   }
 
   /**
@@ -4469,8 +4507,124 @@ export class Dispatcher {
   /**
    * Open a browser and navigate to the provided pull request
    */
-  public async showPullRequestByPR(pr: PullRequest): Promise<void> {
-    return this.appStore._showPullRequestByPR(pr)
+  public async showPullRequestByPR(
+    repository: Repository,
+    pr: PullRequest
+  ): Promise<void> {
+    return this.appStore
+      ._showPullRequestByPR(repository, pr)
+      .catch(error =>
+        this.postError(
+          error instanceof Error ? error : new Error(String(error))
+        )
+      )
+  }
+
+  public getGitLabMergeRequestAvailability(
+    repository: Repository
+  ): GitLabMergeRequestAvailability {
+    return this.appStore._getGitLabMergeRequestAvailability(repository)
+  }
+
+  public isGitLabMergeRequestContextCurrent(
+    repository: Repository,
+    route: IGitLabMergeRequestWorkspaceRoute,
+    contextVersion: string,
+    intent:
+      | { readonly kind: 'create' }
+      | { readonly kind: 'manage'; readonly mergeRequestIID: number }
+  ): boolean {
+    return this.appStore._isGitLabMergeRequestContextCurrent(
+      repository,
+      route,
+      contextVersion,
+      intent
+    )
+  }
+
+  public listGitLabMergeRequestMembers(
+    repository: Repository,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequestMemberList> {
+    return this.appStore._listGitLabMergeRequestMembers(repository, signal)
+  }
+
+  public getGitLabMergeRequest(
+    repository: Repository,
+    mergeRequestIID: number,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.appStore._getGitLabMergeRequest(
+      repository,
+      mergeRequestIID,
+      signal
+    )
+  }
+
+  public createGitLabMergeRequest(
+    repository: Repository,
+    draft: IGitLabMergeRequestDraft,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.appStore._createGitLabMergeRequest(repository, draft, signal)
+  }
+
+  public createGitLabMergeRequestMutationReview(
+    repository: Repository,
+    mergeRequest: IGitLabMergeRequest
+  ): IGitLabMergeRequestMutationReview {
+    return this.appStore._createGitLabMergeRequestMutationReview(
+      repository,
+      mergeRequest
+    )
+  }
+
+  public updateGitLabMergeRequest(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    update: IGitLabMergeRequestUpdate,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.appStore._updateGitLabMergeRequest(
+      repository,
+      review,
+      update,
+      signal
+    )
+  }
+
+  public setGitLabMergeRequestState(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    state: 'close' | 'reopen',
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequest> {
+    return this.appStore._setGitLabMergeRequestState(
+      repository,
+      review,
+      state,
+      signal
+    )
+  }
+
+  public approveGitLabMergeRequest(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequestApprovalState> {
+    return this.appStore._approveGitLabMergeRequest(repository, review, signal)
+  }
+
+  public unapproveGitLabMergeRequest(
+    repository: Repository,
+    review: IGitLabMergeRequestMutationReview,
+    signal?: AbortSignal
+  ): Promise<IGitLabMergeRequestApprovalState> {
+    return this.appStore._unapproveGitLabMergeRequest(
+      repository,
+      review,
+      signal
+    )
   }
 
   /**

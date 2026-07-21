@@ -1,9 +1,12 @@
 import { IMenuItem } from '../../lib/menu-item'
+import { getPersistedLanguageMode, translate } from '../../lib/i18n'
+import { LanguageMode } from '../../models/language-mode'
 
 interface IPullRequestContextMenuConfig {
   onManagePullRequest?: () => void
   onViewPullRequestOnGitHub?: () => void
   onCheckoutInNewWorktree?: () => void
+  languageMode?: LanguageMode
 }
 
 export function generatePullRequestContextMenuItems(
@@ -14,18 +17,19 @@ export function generatePullRequestContextMenuItems(
     onViewPullRequestOnGitHub,
     onCheckoutInNewWorktree,
   } = config
+  const languageMode = config.languageMode ?? getPersistedLanguageMode()
   const items = new Array<IMenuItem>()
 
   if (onManagePullRequest !== undefined) {
     items.push({
-      label: 'Manage Pull Request…',
+      label: translate('reviewRequest.manage', languageMode),
       action: () => onManagePullRequest(),
     })
   }
 
   if (onViewPullRequestOnGitHub !== undefined) {
     items.push({
-      label: 'View Pull Request on GitHub',
+      label: translate('reviewRequest.openInBrowser', languageMode),
       action: () => onViewPullRequestOnGitHub(),
     })
   }

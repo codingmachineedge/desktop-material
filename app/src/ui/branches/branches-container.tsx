@@ -188,6 +188,7 @@ export class BranchesContainer extends React.Component<
       <PullRequestQuickView
         dispatcher={this.props.dispatcher}
         emoji={this.props.emoji}
+        repository={this.props.repository}
         pullRequest={pr}
         pullRequestItemTop={prListItemTop}
         onMouseEnter={this.onMouseEnterPullRequestQuickView}

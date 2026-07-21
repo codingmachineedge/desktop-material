@@ -225,13 +225,16 @@ export class PullRequestList extends React.Component<
 
     const items = generatePullRequestContextMenuItems({
       onManagePullRequest: () => {
-        this.props.dispatcher.showGitHubPullRequestLifecycle(
+        this.props.dispatcher.showPullRequestLifecycle(
           this.props.repository,
           pullRequest
         )
       },
       onViewPullRequestOnGitHub: () => {
-        this.props.dispatcher.showPullRequestByPR(pullRequest)
+        this.props.dispatcher.showPullRequestByPR(
+          this.props.repository,
+          pullRequest
+        )
       },
       onCheckoutInNewWorktree:
         onCheckoutInNewWorktree !== undefined
