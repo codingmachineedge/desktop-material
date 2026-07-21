@@ -158,11 +158,11 @@ export class RepositorySettings extends React.Component<
       initialCommitterName: null,
       initialCommitterEmail: null,
       isLoadingGitConfig: true,
-      accountKey:
-        props.repository.accountKey ??
-        (props.repositoryAccount !== null
-          ? getAccountKey(props.repositoryAccount)
-          : null),
+      // Keep a legacy repository unbound until the user actually chooses an
+      // identity. Display may still show the effective endpoint fallback, but
+      // saving an unrelated setting must not silently persist the first account
+      // on a shared GitHub host.
+      accountKey: props.repository.accountKey,
       buildRunPreferences:
         props.repository.buildRunPreferences ?? defaultBuildRunPreferences,
       buildRunPreferencesHaveChanged: false,

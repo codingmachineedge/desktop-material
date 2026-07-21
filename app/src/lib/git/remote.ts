@@ -120,12 +120,15 @@ export async function getRemotePushURL(
 export async function updateRemoteHEAD(
   repository: Repository,
   remote: IRemote,
-  isBackgroundTask: boolean
+  isBackgroundTask: boolean,
+  /** Stable account identity to force for this remote lookup. Never a token. */
+  accountKey?: string
 ): Promise<void> {
   const options = {
     successExitCodes: new Set([0, 1, 128]),
     env: await envForRemoteOperation(remote.url),
     isBackgroundTask,
+    credentialAccountKey: accountKey,
   }
 
   await git(

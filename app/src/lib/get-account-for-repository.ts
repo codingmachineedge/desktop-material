@@ -29,6 +29,27 @@ export function getAccountForRepository(
 }
 
 /**
+ * Get the stable account identity Git must use for a repository network
+ * operation.
+ *
+ * An explicit repository binding is returned even when that account is no
+ * longer signed in. The credential helper can then reject the unavailable
+ * identity instead of silently falling back to another user on the same host.
+ * Legacy, unbound repositories retain the endpoint-based account fallback.
+ */
+export function getRepositoryCredentialAccountKey(
+  accounts: ReadonlyArray<Account>,
+  repository: Repository
+): string | undefined {
+  if (repository.accountKey !== null) {
+    return repository.accountKey
+  }
+
+  const account = getAccountForRepository(accounts, repository)
+  return account === null ? undefined : getAccountKey(account)
+}
+
+/**
  * Determine which signed-in account, if any, should be promoted to the active
  * identity (positional `accounts[0]`) when the given repository becomes the
  * selected repository.
