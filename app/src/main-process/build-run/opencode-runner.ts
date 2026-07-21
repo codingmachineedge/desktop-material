@@ -10,6 +10,7 @@ import {
   IOpencodeStatus,
   buildOpencodeFixPrompt,
   buildOpencodeRunArgs,
+  buildOpencodeUserPrompt,
   ensureOpencodeRepoConfig,
 } from '../../lib/build-run/opencode'
 import {
@@ -398,6 +399,32 @@ export function registerOpencodeIpc(): void {
       tailText: request.tailText,
       cwd: request.cwd,
     })
+    try {
+      return await opencodeRunner.runFix(
+        {
+          repoPath: request.repoPath,
+          cwd: request.cwd,
+          autoApprove: request.autoApprove,
+          prompt,
+          model: request.model,
+        },
+        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        controller.signal
+      )
+    } finally {
+      controllers.delete(request.operationId)
+    }
+  })
+
+  ipcMain.handle('opencode-run-prompt', async (event, request) => {
+    // A blank prompt never spawns opencode. Reject before allocating an
+    // operation/controller so the renderer sees a clean no-op result.
+    const prompt = buildOpencodeUserPrompt(request.prompt)
+    if (prompt === null) {
+      return { ok: false }
+    }
+    const controller = new AbortController()
+    controllers.set(request.operationId, controller)
     try {
       return await opencodeRunner.runFix(
         {

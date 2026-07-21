@@ -27,6 +27,7 @@ import {
   IOpencodeInstallResult,
   IOpencodeLogEvent,
   IOpencodeRunFixRequest,
+  IOpencodeRunPromptRequest,
   IOpencodeRunResult,
   IOpencodeStatus,
 } from './build-run/opencode'
@@ -233,6 +234,7 @@ export type RequestResponseChannels = {
   'get-exec-path': () => Promise<string>
   'is-running-under-arm64-translation': () => Promise<boolean>
   'move-to-trash': (path: string) => Promise<void>
+  'force-delete-directory': (path: string) => Promise<void>
   'show-item-in-folder': (path: string) => Promise<void>
   'show-contextual-menu': (
     items: ReadonlyArray<ISerializableMenuItem>,
@@ -281,6 +283,9 @@ export type RequestResponseChannels = {
   ) => Promise<IOpencodeInstallResult>
   'opencode-run-fix': (
     request: IOpencodeRunFixRequest
+  ) => Promise<IOpencodeRunResult>
+  'opencode-run-prompt': (
+    request: IOpencodeRunPromptRequest
   ) => Promise<IOpencodeRunResult>
   'opencode-cancel': (operationId: string) => Promise<void>
   'get-cli-workbench-runtime': () => Promise<ICLIWorkbenchRuntime>

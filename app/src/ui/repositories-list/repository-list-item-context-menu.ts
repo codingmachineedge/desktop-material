@@ -37,6 +37,10 @@ interface IRepositoryListItemContextMenuConfig {
   isHidden?: boolean
   onHideRepository?: (repository: Repository) => void
   onUnhideRepository?: (repository: Repository) => void
+  /** Opens the anchored editor for the repository's list-name appearance. */
+  onCustomizeNameAppearance?: (repository: Repositoryish) => void
+  /** Opens the anchored editor for the repository's logo appearance. */
+  onCustomizeLogoAppearance?: (repository: Repositoryish) => void
   languageMode?: LanguageMode
 }
 
@@ -96,6 +100,28 @@ export const generateRepositoryListContextMenu = (
       (config.onHideRepository !== undefined &&
         config.onUnhideRepository !== undefined))
       ? [{ type: 'separator' as const }]
+      : []),
+    ...(repository instanceof Repository &&
+    !missing &&
+    config.onCustomizeNameAppearance !== undefined &&
+    config.onCustomizeLogoAppearance !== undefined
+      ? [
+          {
+            label: translate(
+              'repositoryPicker.customizeNameMenu',
+              config.languageMode ?? getPersistedLanguageMode()
+            ),
+            action: () => config.onCustomizeNameAppearance?.(repository),
+          },
+          {
+            label: translate(
+              'repositoryPicker.customizeLogoMenu',
+              config.languageMode ?? getPersistedLanguageMode()
+            ),
+            action: () => config.onCustomizeLogoAppearance?.(repository),
+          },
+          { type: 'separator' as const },
+        ]
       : []),
     ...buildAliasMenuItems(config),
     ...buildGroupNameMenuItems(config),

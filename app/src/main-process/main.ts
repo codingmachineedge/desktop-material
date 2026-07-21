@@ -26,6 +26,7 @@ import { fatalError } from '../lib/fatal-error'
 
 import { log as writeLog, setLogLevel } from './log'
 import { UNSAFE_openDirectory } from './shell'
+import { safeForceDeleteDirectory } from './force-delete-directory'
 import { reportError } from './exception-reporting'
 import {
   enableSourceMaps,
@@ -1084,6 +1085,9 @@ app.on('ready', () => {
   })
 
   ipcMain.handle('move-to-trash', (_, path) => shell.trashItem(path))
+  ipcMain.handle('force-delete-directory', (_, path) =>
+    safeForceDeleteDirectory(path)
+  )
   ipcMain.handle('show-item-in-folder', async (_, path) =>
     shell.showItemInFolder(path)
   )

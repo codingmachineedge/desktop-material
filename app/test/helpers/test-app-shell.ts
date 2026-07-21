@@ -11,6 +11,9 @@ export const shell: IAppShell = {
   moveItemToTrash: (path: string): Promise<void> => {
     return unlink(path)
   },
+  forceDeleteDirectory: (path: string): Promise<void> => {
+    return unlink(path)
+  },
   beep: () => {},
   showItemInFolder: (path: string) => {},
   showFolderContents: (path: string) => {},

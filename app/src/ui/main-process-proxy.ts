@@ -155,6 +155,13 @@ export async function showFolderContents(path: string) {
 export const openExternal = invokeProxy('open-external', 1)
 export const moveItemToTrash = invokeProxy('move-to-trash', 1)
 
+/**
+ * Permanently, recursively delete a directory in the main process. Used as the
+ * last-resort fallback when moving a repository to the Recycle Bin/Trash fails.
+ * The main-process handler validates and contains the path before deleting.
+ */
+export const forceDeleteDirectory = invokeProxy('force-delete-directory', 1)
+
 /** Tell the main process to obtain the current window state */
 export const getCurrentWindowState = invokeProxy('get-current-window-state', 0)
 
@@ -472,6 +479,9 @@ export const installOpencode = invokeProxy('opencode-install', 1)
 
 /** Launch `opencode run` to fix a failed build; output streams on `opencode-log`. */
 export const runOpencodeFix = invokeProxy('opencode-run-fix', 1)
+
+/** Launch `opencode run` with a user-authored prompt; streams on `opencode-log`. */
+export const runOpencodePrompt = invokeProxy('opencode-run-prompt', 1)
 
 /** Request cancellation of the opencode operation with this id. */
 export const cancelOpencode = invokeProxy('opencode-cancel', 1)

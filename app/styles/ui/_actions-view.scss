@@ -1840,6 +1840,166 @@
   }
 }
 
+.workflow-dispatch-search {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 42px;
+  padding: 0 6px 0 12px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container-high);
+  transition: background-color 300ms var(--emph), border-color 240ms var(--emph);
+
+  &:focus-within {
+    border-color: var(--md-sys-color-primary);
+  }
+
+  &.invalid {
+    border-color: var(--md-sys-color-error);
+  }
+
+  > .octicon {
+    flex: 0 0 auto;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .workflow-dispatch-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      color: inherit;
+      font-size: 13px;
+      background: transparent;
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+}
+
+.workflow-dispatch-listbox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-height: 200px;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background: var(--md-sys-color-surface);
+  overscroll-behavior: contain;
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+}
+
+.workflow-dispatch-list-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.workflow-dispatch-option {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 200ms var(--emph), color 200ms var(--emph);
+
+  .workflow-dispatch-option-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .workflow-dispatch-option-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .workflow-dispatch-option-name {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .workflow-dispatch-option-file {
+    min-width: 0;
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--font-family-monospace);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .workflow-dispatch-option-state {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: var(--md-sys-color-on-secondary-container);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: var(--md-sys-color-secondary-container);
+
+    &.disabled {
+      color: var(--md-sys-color-on-surface-variant);
+      background: var(--md-sys-color-surface-container-highest);
+    }
+  }
+
+  &:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  &.selected {
+    color: var(--md-sys-color-on-primary-container);
+    background: var(--md-sys-color-primary-container);
+
+    .workflow-dispatch-option-icon,
+    .workflow-dispatch-option-file {
+      color: var(--md-sys-color-on-primary-container);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: -2px;
+  }
+}
+
 .workflow-dispatch-run-button {
   display: inline-flex;
   flex: 0 0 auto;

@@ -4,8 +4,10 @@ import { Dialog, DialogContent } from '../dialog'
 import {
   CommandPaletteCatalog,
   IPaletteCommand,
+  IPaletteCommandContext,
   filterPaletteCommands,
 } from '../../lib/command-palette-catalog'
+import { t } from '../../lib/i18n'
 import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { isDesktopMaterialFeatureEntryPoint } from '../../lib/desktop-material-features'
 import { FilterModeControl } from '../lib/filter-mode-control'
@@ -20,21 +22,38 @@ import * as octicons from '../octicons/octicons.generated'
 const PaletteFilterListId = 'command-palette'
 
 /**
- * The keys a query is matched against: the title first (fuzzy scoring's
- * primary key), then group/keywords/event folded into one secondary key.
+ * The visible title in the active language mode: a localized title when the
+ * command declares an i18n key, otherwise its English fallback title.
+ */
+function resolvePaletteTitle(command: IPaletteCommand): string {
+  return command.titleKey !== undefined ? t(command.titleKey) : command.title
+}
+
+/**
+ * The keys a query is matched against: the (localized) title first (fuzzy
+ * scoring's primary key), then group/keywords/event plus the English title
+ * folded into one secondary key so search keeps working in every language.
  */
 function getPaletteCommandKeys(
   command: IPaletteCommand
 ): ReadonlyArray<string> {
   return [
-    command.title,
-    `${command.group} ${command.keywords ?? ''} ${command.event}`,
+    resolvePaletteTitle(command),
+    `${command.title} ${command.group} ${command.keywords ?? ''} ${
+      command.event
+    }`,
   ]
 }
 
 interface ICommandPaletteProps {
   /** Executes the chosen command's menu event or palette action id. */
   readonly onExecute: (event: string) => void
+
+  /**
+   * The current selection snapshot used to hide commands that cannot run
+   * right now. When omitted, every platform-eligible command is offered.
+   */
+  readonly availabilityContext?: IPaletteCommandContext
 
   readonly onDismissed: () => void
 }
@@ -74,7 +93,8 @@ export class CommandPalette extends React.Component<
     const eligible = filterPaletteCommands(
       CommandPaletteCatalog,
       '',
-      process.platform
+      process.platform,
+      this.props.availabilityContext
     )
 
     if (this.state.query.trim().length === 0) {
@@ -117,7 +137,7 @@ export class CommandPalette extends React.Component<
   }
 
   private getFilterSampleItems = (): ReadonlyArray<string> =>
-    this.getMatches().map(command => command.title)
+    this.getMatches().map(resolvePaletteTitle)
 
   private onKeyDown = (event: React.KeyboardEvent) => {
     const matches = this.getMatches()
@@ -223,7 +243,9 @@ export class CommandPalette extends React.Component<
                   onClick={this.onRowClick}
                 >
                   <span className="command-palette-group">{command.group}</span>
-                  <span className="command-palette-title">{command.title}</span>
+                  <span className="command-palette-title">
+                    {resolvePaletteTitle(command)}
+                  </span>
                 </button>
               ))
             )}

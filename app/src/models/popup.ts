@@ -58,6 +58,22 @@ export interface IOpencodeFixFailure {
   readonly cwd: string
 }
 
+/**
+ * The context handed to the "Send to opencode" composer. Built by the Build &
+ * Run panel; the dialog forwards the user's typed prompt to
+ * `Dispatcher.runOpencodePrompt` scoped to the `cwd`.
+ */
+export interface IOpencodeSendContext {
+  /** The working directory opencode runs in (the agent's `--dir`). */
+  readonly cwd: string
+  /**
+   * An optional pre-filled prompt (for example the current chat message). The
+   * composer seeds its textarea with this; the core flow is still a free-form
+   * box the user can edit or clear.
+   */
+  readonly initialPrompt?: string
+}
+
 export enum PopupType {
   RenameBranch = 'RenameBranch',
   DeleteBranch = 'DeleteBranch',
@@ -179,6 +195,7 @@ export enum PopupType {
   PullAllRepositories = 'PullAllRepositories',
   CommitAndPushAll = 'CommitAndPushAll',
   OpencodeFix = 'OpencodeFix',
+  OpencodeSend = 'OpencodeSend',
 }
 
 interface IBasePopup {
@@ -740,6 +757,11 @@ export type PopupDetail =
       type: PopupType.OpencodeFix
       repository: Repository
       failure: IOpencodeFixFailure
+    }
+  | {
+      type: PopupType.OpencodeSend
+      repository: Repository
+      context: IOpencodeSendContext
     }
 export type Popup = IBasePopup & PopupDetail
 

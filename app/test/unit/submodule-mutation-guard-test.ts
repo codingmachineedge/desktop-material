@@ -295,7 +295,11 @@ describe('temporary submodule mutation guard contract', () => {
       )
     }
 
-    for (const method of ['startBuildRun', 'runOpencodeFix']) {
+    for (const method of [
+      'startBuildRun',
+      'runOpencodeFix',
+      'runOpencodePrompt',
+    ]) {
       assert.match(
         getMethodBody(dispatcher, method),
         /SubmoduleRepository/,

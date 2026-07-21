@@ -88,6 +88,36 @@ export function buildOpencodeFixPrompt({
   ].join('\n')
 }
 
+/** Longest user-authored "Send to opencode" prompt fed over stdin, in chars. */
+export const USER_PROMPT_CAP = 8000
+
+/**
+ * Compose the instruction handed to opencode over stdin for a free-form "Send to
+ * opencode" request. The user's own text drives the run; a compact repository
+ * guard rail is appended so the agent stays scoped even though the prompt is
+ * user-authored (the repo-scoped opencode.json already denies `external_directory`
+ * and `question`, but the reminder keeps the agent from wandering or stalling).
+ *
+ * Returns `null` when the prompt is blank — a blank prompt must never spawn
+ * opencode. The bounded text (capped at {@link USER_PROMPT_CAP}) travels via
+ * stdin exactly like the fix prompt: it is NEVER an argv element.
+ */
+export function buildOpencodeUserPrompt(rawPrompt: string): string | null {
+  const trimmed = rawPrompt.trim()
+  if (trimmed.length === 0) {
+    return null
+  }
+  const bounded = trimmed.slice(0, USER_PROMPT_CAP)
+  return [
+    bounded,
+    '',
+    'Work only within this repository — do not run destructive commands or ' +
+      'touch files outside it. This is an unattended request, so do not ask ' +
+      'questions; when details are ambiguous, make the safest minimal ' +
+      'reasonable choice and explain it in your output.',
+  ].join('\n')
+}
+
 /**
  * The canonical opencode.json permission block. Scopes auto-approve to the
  * repository: edits and shell commands are allowed, but the agent is denied any
@@ -248,6 +278,26 @@ export interface IOpencodeRunFixRequest {
   readonly stageKind: BuildStageKind
   readonly exitCode: number
   readonly tailText: string
+  readonly model?: string
+}
+
+/**
+ * A free-form "Send to opencode" request as it crosses the IPC boundary. Unlike
+ * {@link IOpencodeRunFixRequest} the prompt is user-authored; the main process
+ * bounds it and appends the repository guard rail (via
+ * {@link buildOpencodeUserPrompt}) before feeding it to the child over stdin.
+ */
+export interface IOpencodeRunPromptRequest {
+  /** Correlates streamed log lines and cancellation with this run. */
+  readonly operationId: string
+  /** Git repository root — where opencode.json is ensured. */
+  readonly repoPath: string
+  /** Working directory the agent runs in (the agent's `--dir`). */
+  readonly cwd: string
+  /** Whether to launch in `--auto` (yolo) mode; scoped to the repo. */
+  readonly autoApprove: boolean
+  /** The user's free-form request, fed to the child over stdin (never argv). */
+  readonly prompt: string
   readonly model?: string
 }
 

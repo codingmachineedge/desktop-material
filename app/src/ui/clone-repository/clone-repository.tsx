@@ -932,9 +932,14 @@ export class CloneRepository extends React.Component<
               organizations={accountState?.organizations ?? []}
               organizationsLoading={accountState?.organizationsLoading ?? false}
               organizationsError={accountState?.organizationsError ?? null}
+              organizationsLoaded={accountState?.organizationsLoaded ?? false}
+              organizationsScopeMissing={
+                accountState?.organizationsScopeMissing ?? false
+              }
               selectedOrganization={tabState.selectedOrganization}
               organizationError={organizationState?.error ?? null}
               onSelectedOrganizationChanged={this.onSelectedOrganizationChanged}
+              onReconnectAccount={this.onReconnectAccount}
               visibilityFilter={tabState.visibilityFilter}
               onVisibilityFilterChanged={this.onVisibilityFilterChanged}
               languageFilter={tabState.languageFilter}
@@ -1139,6 +1144,26 @@ export class CloneRepository extends React.Component<
         organization
       )
     }
+  }
+
+  /**
+   * Re-run the sign-in/OAuth flow for the selected tab's account. Reuses the
+   * existing browser-based sign-in path (which requests the full
+   * `GitHubOAuthScopes`, including `read:org`) rather than inventing a new OAuth
+   * route, so an account whose token predates `read:org` can be reconnected to
+   * reveal its concealed organization memberships. The endpoint routes the flow
+   * to GitHub.com or the matching GitHub Enterprise host automatically.
+   */
+  private onReconnectAccount = () => {
+    const tab = this.props.selectedTab
+    if (tab === CloneRepositoryTab.Generic) {
+      return
+    }
+    const account = this.getAccountForTab(tab)
+    if (account === null) {
+      return
+    }
+    this.props.dispatcher.beginBrowserBasedSignIn(account.endpoint)
   }
 
   private onRefreshOrganization = () => {

@@ -38,6 +38,22 @@ export interface IOllamaPullOptions extends IOllamaRequestOptions {
   readonly onProgress?: (progress: IOllamaPullProgress) => void
 }
 
+export type OllamaChatRole = 'system' | 'user' | 'assistant'
+
+export interface IOllamaChatMessage {
+  readonly role: OllamaChatRole
+  readonly content: string
+}
+
+export interface IOllamaChatDelta {
+  readonly content: string
+  readonly done: boolean
+}
+
+export interface IOllamaChatOptions extends IOllamaRequestOptions {
+  readonly onChunk?: (delta: IOllamaChatDelta) => void
+}
+
 export interface IOllamaVersion {
   readonly version: string
 }
@@ -113,6 +129,15 @@ export interface IOllamaModelManagerClient {
     model: string,
     options?: IOllamaRequestOptions
   ) => Promise<void>
+  /**
+   * Stream a chat completion. Optional so existing structural clients remain
+   * valid; the panel disables sending when a provider client omits it.
+   */
+  readonly chat?: (
+    model: string,
+    messages: ReadonlyArray<IOllamaChatMessage>,
+    options?: IOllamaChatOptions
+  ) => Promise<string>
 }
 
 export interface IOllamaModelManagerStrings {
@@ -187,6 +212,21 @@ export interface IOllamaModelManagerStrings {
   readonly configurationPartial: string
   readonly renamePartial: string
   readonly pullCancelled: string
+  readonly chatTitle: string
+  readonly chatHint: string
+  readonly chatModelLabel: string
+  readonly chatPlaceholder: string
+  readonly chatSend: string
+  readonly chatStop: string
+  readonly chatClear: string
+  readonly chatStreaming: string
+  readonly chatEmpty: string
+  readonly chatNoModel: string
+  readonly chatUnsupported: string
+  readonly chatError: string
+  readonly chatYou: string
+  readonly chatAssistant: string
+  readonly chatMessageLabel: string
   readonly unknown: string
   readonly never: string
   readonly showing: (visible: number, total: number) => string
@@ -278,6 +318,21 @@ export const DefaultOllamaModelManagerStrings: IOllamaModelManagerStrings = {
   renamePartial:
     'The copy succeeded, but the original model could not be removed.',
   pullCancelled: 'Model installation canceled.',
+  chatTitle: 'Chat',
+  chatHint: 'Send a prompt to a model on this endpoint and stream the reply.',
+  chatModelLabel: 'Chat model',
+  chatPlaceholder: 'Send a message…',
+  chatSend: 'Send',
+  chatStop: 'Stop',
+  chatClear: 'Clear chat',
+  chatStreaming: 'Generating a reply…',
+  chatEmpty: 'Start a conversation with the selected model.',
+  chatNoModel: 'Install a model to start chatting.',
+  chatUnsupported: 'Chat is unavailable for this provider.',
+  chatError: 'The chat request could not be completed.',
+  chatYou: 'You',
+  chatAssistant: 'Assistant',
+  chatMessageLabel: 'Message',
   unknown: 'Unknown',
   never: 'Never',
   showing: (visible, total) => `Showing ${visible} of ${total} models`,
@@ -339,6 +394,11 @@ interface INotice {
   readonly message: string
 }
 
+interface IChatTranscriptMessage {
+  readonly role: 'user' | 'assistant'
+  readonly content: string
+}
+
 interface IOllamaModelManagerState {
   readonly endpointVersion: string | null
   readonly endpointAvailable: boolean | null
@@ -360,6 +420,12 @@ interface IOllamaModelManagerState {
   readonly pullProgress: IPullState | null
   readonly deleteConfirmation: string | null
   readonly notice: INotice | null
+  readonly chatExpanded: boolean
+  readonly chatModel: string | null
+  readonly chatMessages: ReadonlyArray<IChatTranscriptMessage>
+  readonly chatInput: string
+  readonly chatStreaming: boolean
+  readonly chatError: string | null
 }
 
 interface ISettledResult<T> {
@@ -375,6 +441,9 @@ interface IInventoryRefreshResult {
 const MaximumLicenseCharacters = 1200
 const MaximumMetadataCharacters = 180
 const MaximumCapabilities = 10
+const MaximumChatMessages = 60
+const MaximumChatInputCharacters = 8000
+const MaximumChatMessageCharacters = 16000
 const OllamaModelsSearchSurfaceId = 'ollama-models'
 let managerInstance = 0
 
@@ -453,8 +522,11 @@ export class OllamaModelManager extends React.Component<
   private refreshController: AbortController | null = null
   private detailController: AbortController | null = null
   private operationController: AbortController | null = null
+  private chatController: AbortController | null = null
+  private chatRequestId = 0
   private deleteButton: HTMLButtonElement | null = null
   private confirmDeleteButton: HTMLButtonElement | null = null
+  private chatTranscript: HTMLDivElement | null = null
 
   public constructor(props: IOllamaModelManagerProps) {
     super(props)
@@ -465,7 +537,10 @@ export class OllamaModelManager extends React.Component<
     void this.refreshInventory(false)
   }
 
-  public componentDidUpdate(prevProps: IOllamaModelManagerProps) {
+  public componentDidUpdate(
+    prevProps: IOllamaModelManagerProps,
+    prevState: IOllamaModelManagerState
+  ) {
     if (
       prevProps.provider.id !== this.props.provider.id ||
       prevProps.provider.baseUrl !== this.props.provider.baseUrl ||
@@ -475,6 +550,14 @@ export class OllamaModelManager extends React.Component<
       this.setState(this.getInitialState(), () => {
         void this.refreshInventory(false)
       })
+      return
+    }
+
+    if (
+      this.chatTranscript !== null &&
+      prevState.chatMessages !== this.state.chatMessages
+    ) {
+      this.chatTranscript.scrollTop = this.chatTranscript.scrollHeight
     }
   }
 
@@ -524,6 +607,8 @@ export class OllamaModelManager extends React.Component<
           </div>
           {this.renderDetails(strings)}
         </div>
+
+        {this.renderChat(strings)}
       </section>
     )
   }
@@ -550,6 +635,12 @@ export class OllamaModelManager extends React.Component<
       pullProgress: null,
       deleteConfirmation: null,
       notice: null,
+      chatExpanded: false,
+      chatModel: null,
+      chatMessages: [],
+      chatInput: '',
+      chatStreaming: false,
+      chatError: null,
     }
   }
 
@@ -578,12 +669,15 @@ export class OllamaModelManager extends React.Component<
     ++this.refreshRequestId
     ++this.detailRequestId
     ++this.operationRequestId
+    ++this.chatRequestId
     this.refreshController?.abort()
     this.detailController?.abort()
     this.operationController?.abort()
+    this.chatController?.abort()
     this.refreshController = null
     this.detailController = null
     this.operationController = null
+    this.chatController = null
   }
 
   private refreshInventory = async (
@@ -1491,6 +1585,398 @@ export class OllamaModelManager extends React.Component<
         </div>
       </div>
     )
+  }
+
+  private getChatModelOptions(): ReadonlyArray<string> {
+    return (this.state.models ?? []).map(model => model.name)
+  }
+
+  private getEffectiveChatModel(): string | null {
+    const options = this.getChatModelOptions()
+    if (options.length === 0) {
+      return null
+    }
+    if (
+      this.state.chatModel !== null &&
+      options.includes(this.state.chatModel)
+    ) {
+      return this.state.chatModel
+    }
+    if (
+      this.state.selectedModel !== null &&
+      options.includes(this.state.selectedModel)
+    ) {
+      return this.state.selectedModel
+    }
+    const running = this.state.runningModels.find(model =>
+      options.includes(model.name)
+    )
+    return running?.name ?? options[0]
+  }
+
+  private boundedTranscript(
+    messages: ReadonlyArray<IChatTranscriptMessage>
+  ): ReadonlyArray<IChatTranscriptMessage> {
+    const bounded = messages.map(message => ({
+      role: message.role,
+      content: message.content.slice(0, MaximumChatMessageCharacters),
+    }))
+    return bounded.length > MaximumChatMessages
+      ? bounded.slice(bounded.length - MaximumChatMessages)
+      : bounded
+  }
+
+  private dropTrailingEmptyAssistant(
+    messages: ReadonlyArray<IChatTranscriptMessage>
+  ): ReadonlyArray<IChatTranscriptMessage> {
+    const last = messages[messages.length - 1]
+    return last !== undefined &&
+      last.role === 'assistant' &&
+      last.content === ''
+      ? messages.slice(0, -1)
+      : messages
+  }
+
+  private renderChat(strings: IOllamaModelManagerStrings) {
+    const provider = this.props.provider
+    const client = this.resolveClient(provider)
+    const chatSupported = client !== null && client.chat !== undefined
+    const options = this.getChatModelOptions()
+    const effectiveModel = this.getEffectiveChatModel()
+    const expanded = this.state.chatExpanded
+    const streaming = this.state.chatStreaming
+    const canSend =
+      chatSupported &&
+      effectiveModel !== null &&
+      !streaming &&
+      this.state.chatInput.trim() !== ''
+    const panelId = `${this.headingId}-chat-panel`
+    const headingId = `${this.headingId}-chat-heading`
+
+    return (
+      <section
+        className="ollama-chat"
+        data-verification="ollama-chat"
+        aria-labelledby={headingId}
+      >
+        <button
+          type="button"
+          className="ollama-chat-toggle"
+          data-verification="ollama-chat-toggle"
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          aria-label={strings.chatTitle}
+          onClick={this.onToggleChat}
+        >
+          <span id={headingId} className="ollama-chat-title">
+            {strings.chatTitle}
+          </span>
+          <span className="ollama-chat-toggle-hint">{strings.chatHint}</span>
+        </button>
+
+        {expanded && (
+          <div id={panelId} className="ollama-chat-panel">
+            {!chatSupported ? (
+              <p className="ollama-chat-empty" role="status">
+                {strings.chatUnsupported}
+              </p>
+            ) : options.length === 0 || effectiveModel === null ? (
+              <p className="ollama-chat-empty" role="status">
+                {strings.chatNoModel}
+              </p>
+            ) : (
+              <>
+                <div className="ollama-chat-controls">
+                  <label htmlFor={`${this.headingId}-chat-model`}>
+                    {strings.chatModelLabel}
+                  </label>
+                  <select
+                    id={`${this.headingId}-chat-model`}
+                    data-verification="ollama-chat-model"
+                    value={effectiveModel}
+                    onChange={this.onChatModelChanged}
+                    disabled={streaming}
+                  >
+                    {options.map(name => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="small"
+                    dataVerification="ollama-chat-reset"
+                    onClick={this.onResetChat}
+                    disabled={
+                      this.state.chatMessages.length === 0 && !streaming
+                    }
+                  >
+                    {strings.chatClear}
+                  </Button>
+                </div>
+
+                <div
+                  className="ollama-chat-transcript"
+                  data-verification="ollama-chat-transcript"
+                  role="log"
+                  aria-label={strings.chatTitle}
+                  aria-live="polite"
+                  ref={this.onChatTranscriptRef}
+                >
+                  {this.state.chatMessages.length === 0 ? (
+                    <p className="ollama-chat-empty">{strings.chatEmpty}</p>
+                  ) : (
+                    this.state.chatMessages.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`ollama-chat-message is-${message.role}`}
+                        data-verification={`ollama-chat-${message.role}`}
+                      >
+                        <span className="ollama-chat-role">
+                          {message.role === 'user'
+                            ? strings.chatYou
+                            : strings.chatAssistant}
+                        </span>
+                        <p>{message.content}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {streaming && (
+                  <p
+                    className="ollama-chat-streaming"
+                    data-verification="ollama-chat-streaming"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {strings.chatStreaming}
+                  </p>
+                )}
+                {this.state.chatError !== null && (
+                  <p
+                    className="ollama-chat-error"
+                    data-verification="ollama-chat-error"
+                    role="alert"
+                  >
+                    {this.state.chatError}
+                  </p>
+                )}
+
+                <form
+                  className="ollama-chat-composer"
+                  onSubmit={this.onChatSubmit}
+                >
+                  <label
+                    className="ollama-chat-visually-hidden"
+                    htmlFor={`${this.headingId}-chat-input`}
+                  >
+                    {strings.chatMessageLabel}
+                  </label>
+                  <textarea
+                    id={`${this.headingId}-chat-input`}
+                    data-verification="ollama-chat-input"
+                    value={this.state.chatInput}
+                    onChange={this.onChatInputChanged}
+                    onKeyDown={this.onChatInputKeyDown}
+                    placeholder={strings.chatPlaceholder}
+                    rows={2}
+                    maxLength={MaximumChatInputCharacters}
+                    spellCheck={true}
+                  />
+                  <div className="ollama-chat-composer-actions">
+                    {streaming ? (
+                      <Button
+                        size="small"
+                        dataVerification="ollama-chat-stop"
+                        onClick={this.onStopChat}
+                      >
+                        {strings.chatStop}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        size="small"
+                        dataVerification="ollama-chat-send"
+                        disabled={!canSend}
+                      >
+                        {strings.chatSend}
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  private onToggleChat = () => {
+    this.setState(state => ({ chatExpanded: !state.chatExpanded }))
+  }
+
+  private onChatTranscriptRef = (element: HTMLDivElement | null) => {
+    this.chatTranscript = element
+  }
+
+  private onChatModelChanged = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const model = event.currentTarget.value
+    ++this.chatRequestId
+    this.chatController?.abort()
+    this.chatController = null
+    this.setState({
+      chatModel: model,
+      chatMessages: [],
+      chatInput: '',
+      chatStreaming: false,
+      chatError: null,
+    })
+  }
+
+  private onChatInputChanged = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    this.setState({
+      chatInput: event.currentTarget.value.slice(0, MaximumChatInputCharacters),
+    })
+  }
+
+  private onChatInputKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      void this.sendChat()
+    }
+  }
+
+  private onChatSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    void this.sendChat()
+  }
+
+  private onResetChat = () => {
+    ++this.chatRequestId
+    this.chatController?.abort()
+    this.chatController = null
+    this.setState({
+      chatMessages: [],
+      chatInput: '',
+      chatStreaming: false,
+      chatError: null,
+    })
+  }
+
+  private onStopChat = () => {
+    if (!this.state.chatStreaming) {
+      return
+    }
+    ++this.chatRequestId
+    this.chatController?.abort()
+    this.chatController = null
+    this.setState(state => ({
+      chatStreaming: false,
+      chatMessages: this.dropTrailingEmptyAssistant(state.chatMessages),
+    }))
+  }
+
+  private onChatDelta = (requestId: number, delta: IOllamaChatDelta) => {
+    if (
+      requestId !== this.chatRequestId ||
+      this.chatController?.signal.aborted === true ||
+      delta.content.length === 0
+    ) {
+      return
+    }
+    this.setState(state => {
+      const messages = state.chatMessages.slice()
+      const lastIndex = messages.length - 1
+      if (lastIndex < 0 || messages[lastIndex].role !== 'assistant') {
+        return null
+      }
+      const combined = (messages[lastIndex].content + delta.content).slice(
+        0,
+        MaximumChatMessageCharacters
+      )
+      messages[lastIndex] = { role: 'assistant', content: combined }
+      return { chatMessages: messages }
+    })
+  }
+
+  private sendChat = async () => {
+    const strings = this.getStrings()
+    const provider = this.props.provider
+    const client = this.resolveClient(provider)
+    const model = this.getEffectiveChatModel()
+    const input = this.state.chatInput.trim()
+    if (
+      model === null ||
+      input === '' ||
+      this.state.chatStreaming ||
+      client === null ||
+      client.chat === undefined
+    ) {
+      return
+    }
+
+    const history = this.state.chatMessages
+    const apiMessages: ReadonlyArray<IOllamaChatMessage> = [
+      ...history
+        .filter(message => message.content.trim() !== '')
+        .map(message => ({ role: message.role, content: message.content })),
+      { role: 'user' as const, content: input },
+    ]
+    const nextMessages = this.boundedTranscript([
+      ...history,
+      { role: 'user' as const, content: input },
+      { role: 'assistant' as const, content: '' },
+    ])
+
+    const requestId = ++this.chatRequestId
+    this.chatController?.abort()
+    const controller = new AbortController()
+    this.chatController = controller
+    this.setState({
+      chatMessages: nextMessages,
+      chatInput: '',
+      chatStreaming: true,
+      chatError: null,
+    })
+
+    const isCurrent = () =>
+      requestId === this.chatRequestId &&
+      !controller.signal.aborted &&
+      this.isCurrentProvider(provider)
+
+    try {
+      await client.chat(model, apiMessages, {
+        signal: controller.signal,
+        onChunk: delta => this.onChatDelta(requestId, delta),
+      })
+      if (!isCurrent()) {
+        return
+      }
+      this.chatController = null
+      this.setState(state => ({
+        chatStreaming: false,
+        chatMessages: this.dropTrailingEmptyAssistant(state.chatMessages),
+      }))
+    } catch {
+      if (!isCurrent()) {
+        return
+      }
+      this.chatController = null
+      this.setState(state => ({
+        chatStreaming: false,
+        chatError: strings.chatError,
+        chatMessages: this.dropTrailingEmptyAssistant(state.chatMessages),
+      }))
+    }
   }
 
   private formatBytes(value: number | undefined): string {

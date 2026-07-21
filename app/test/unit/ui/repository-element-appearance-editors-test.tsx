@@ -262,9 +262,17 @@ describe('repository element appearance editors', () => {
       name: 'Customize desktop-material list-name appearance',
     })
     name.focus()
+
+    // Right-clicking the name no longer opens the editor directly (that was too
+    // easy to trigger by accident). The contextmenu event is not cancelled and
+    // bubbles to the row so the repository context menu can handle it.
     const contextMenuNotCancelled = fireEvent.contextMenu(name)
-    assert.equal(contextMenuNotCancelled, false)
-    assert.equal(backgroundMenus, 0)
+    assert.equal(contextMenuNotCancelled, true)
+    assert.equal(screen.queryByRole('dialog'), null)
+    assert.equal(backgroundMenus, 1)
+
+    // The keyboard path (Shift+F10) still opens the anchored editor directly.
+    fireEvent.keyDown(name, { key: 'F10', shiftKey: true })
 
     const editor = await screen.findByRole('dialog', {
       name: 'desktop-material list-name appearance',
@@ -291,10 +299,12 @@ describe('repository element appearance editors', () => {
       })
     )
 
+    // While the anchored editor is open, right-clicking the row still reaches
+    // the row's context-menu owner (the editor is portaled out of the row).
     fireEvent.contextMenu(
       view.container.querySelector('.repository-list-item')!
     )
-    assert.equal(backgroundMenus, 1)
+    assert.equal(backgroundMenus, 2)
   })
 
   it('opens the actual logo with Shift+F10, writes a separate logo owner, inherits, and restores focus on Escape', async () => {
@@ -362,7 +372,7 @@ describe('repository element appearance editors', () => {
       name: 'Customize desktop-material repository logo',
     })
     logoTarget.focus()
-    fireEvent.contextMenu(logoTarget)
+    fireEvent.keyDown(logoTarget, { key: 'F10', shiftKey: true })
     assert.ok(
       await screen.findByRole('dialog', {
         name: 'desktop-material repository logo',
@@ -487,10 +497,11 @@ describe('repository element appearance editors', () => {
         view.container.querySelector('.repository-tab-icon [fill="#414141"]')
       )
     )
-    fireEvent.contextMenu(
+    fireEvent.keyDown(
       await screen.findByRole('button', {
         name: 'Customize desktop-material repository logo',
-      })
+      }),
+      { key: 'F10', shiftKey: true }
     )
     await screen.findByRole('dialog', {
       name: 'desktop-material repository logo',

@@ -692,6 +692,11 @@ export type TranslationKey =
   | 'repositoryPicker.itemHiddenAria'
   | 'repositoryPicker.hideMenu'
   | 'repositoryPicker.unhideMenu'
+  | 'repositoryPicker.customizeNameMenu'
+  | 'repositoryPicker.customizeLogoMenu'
+  | 'removeRepository.trashFailedMessage'
+  | 'removeRepository.trashFailedWarning'
+  | 'removeRepository.forceDeleteButton'
   | 'patchSeries.initialStatus'
   | 'patchSeries.runningExport'
   | 'patchSeries.runningImport'
@@ -989,6 +994,21 @@ export type TranslationKey =
   | 'ollama.manager.configurationPartial'
   | 'ollama.manager.renamePartial'
   | 'ollama.manager.pullCancelled'
+  | 'ollama.manager.chatTitle'
+  | 'ollama.manager.chatHint'
+  | 'ollama.manager.chatModelLabel'
+  | 'ollama.manager.chatPlaceholder'
+  | 'ollama.manager.chatSend'
+  | 'ollama.manager.chatStop'
+  | 'ollama.manager.chatClear'
+  | 'ollama.manager.chatStreaming'
+  | 'ollama.manager.chatEmpty'
+  | 'ollama.manager.chatNoModel'
+  | 'ollama.manager.chatUnsupported'
+  | 'ollama.manager.chatError'
+  | 'ollama.manager.chatYou'
+  | 'ollama.manager.chatAssistant'
+  | 'ollama.manager.chatMessageLabel'
   | 'ollama.manager.unknown'
   | 'ollama.manager.never'
   | 'ollama.manager.showing'
@@ -1046,6 +1066,48 @@ export type TranslationKey =
   | 'clone.languageLabel'
   | 'clone.languageFilterLabel'
   | 'clone.languageFilterAria'
+  | 'clone.orgScopeMissing'
+  | 'clone.orgReconnect'
+  | 'clone.orgRestrictionNote'
+  | 'clone.orgReviewAccess'
+  | 'palette.selectAll'
+  | 'palette.toggleTheme'
+  | 'palette.preferencesAccounts'
+  | 'palette.preferencesAppearance'
+  | 'palette.preferencesIntegrations'
+  | 'palette.preferencesAutomation'
+  | 'palette.preferencesAdvanced'
+  | 'palette.preferencesNotifications'
+  | 'palette.preferencesGit'
+  | 'palette.preferencesAccessibility'
+  | 'palette.notificationHistory'
+  | 'palette.notificationAutomations'
+  | 'palette.copyRepoPath'
+  | 'palette.copyBranchName'
+  | 'palette.copyCommitSha'
+  | 'buildRun.closeDisabledRunning'
+  | 'buildRun.fixingWithOpencode'
+  | 'buildRun.stopConfirmTitle'
+  | 'buildRun.stopConfirmBody'
+  | 'buildRun.stopConfirmConfirm'
+  | 'buildRun.stopConfirmCancel'
+  | 'buildRun.sendToOpencode'
+  | 'buildRun.sendIntro'
+  | 'buildRun.sendPromptLabel'
+  | 'buildRun.sendPromptPlaceholder'
+  | 'buildRun.sendEmptyError'
+  | 'buildRun.sendSubmit'
+  | 'buildRun.sendAutoApproveLabel'
+  | 'buildRun.sendAutoApproveWarning'
+  | 'buildRun.sendAutoApproveNote'
+  | 'buildRun.sendRunningTitle'
+  | 'workflowDispatch.searchPlaceholder'
+  | 'workflowDispatch.searchAriaLabel'
+  | 'workflowDispatch.listAriaLabel'
+  | 'workflowDispatch.empty'
+  | 'workflowDispatch.noMatches'
+  | 'workflowDispatch.stateActive'
+  | 'workflowDispatch.stateDisabled'
 
 /** Complete base catalog. Every missing locale entry falls back to this. */
 export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
@@ -1894,6 +1956,13 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'repositoryPicker.itemHiddenAria': '{repository}, hidden',
   'repositoryPicker.hideMenu': 'Hide repository',
   'repositoryPicker.unhideMenu': 'Unhide repository',
+  'repositoryPicker.customizeNameMenu': 'Customize name appearance',
+  'repositoryPicker.customizeLogoMenu': 'Customize logo appearance',
+  'removeRepository.trashFailedMessage':
+    "The repository couldn't be moved to {trash}. A file may be open in another program, or the location (such as a network or removable drive) may not support {trash}.",
+  'removeRepository.trashFailedWarning':
+    'Force delete permanently removes the folder and all of its contents from your disk. This cannot be undone.',
+  'removeRepository.forceDeleteButton': 'Force delete permanently',
   'patchSeries.initialStatus': 'Choose an export or import operation.',
   'patchSeries.runningExport':
     'Exporting commits ahead of the configured upstream',
@@ -2259,6 +2328,22 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'ollama.manager.renamePartial':
     'The copy succeeded, but the original model could not be removed.',
   'ollama.manager.pullCancelled': 'Model installation canceled.',
+  'ollama.manager.chatTitle': 'Chat',
+  'ollama.manager.chatHint':
+    'Send a prompt to a model on this endpoint and stream the reply.',
+  'ollama.manager.chatModelLabel': 'Chat model',
+  'ollama.manager.chatPlaceholder': 'Send a message…',
+  'ollama.manager.chatSend': 'Send',
+  'ollama.manager.chatStop': 'Stop',
+  'ollama.manager.chatClear': 'Clear chat',
+  'ollama.manager.chatStreaming': 'Generating a reply…',
+  'ollama.manager.chatEmpty': 'Start a conversation with the selected model.',
+  'ollama.manager.chatNoModel': 'Install a model to start chatting.',
+  'ollama.manager.chatUnsupported': 'Chat is unavailable for this provider.',
+  'ollama.manager.chatError': 'The chat request could not be completed.',
+  'ollama.manager.chatYou': 'You',
+  'ollama.manager.chatAssistant': 'Assistant',
+  'ollama.manager.chatMessageLabel': 'Message',
   'ollama.manager.unknown': 'Unknown',
   'ollama.manager.never': 'Never',
   'ollama.manager.showing': 'Showing {visible} of {total} models',
@@ -2325,6 +2410,57 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'clone.languageLabel': 'Language: {language}',
   'clone.languageFilterLabel': 'Language',
   'clone.languageFilterAria': 'Filter repositories by language',
+  'clone.orgScopeMissing':
+    "We couldn't see any organizations. This sign-in may be missing organization access.",
+  'clone.orgReconnect': 'Reconnect to load organizations',
+  'clone.orgRestrictionNote':
+    'Organizations that restrict third-party access must approve this app before they appear here.',
+  'clone.orgReviewAccess': 'Review OAuth app access',
+  'palette.selectAll': 'Select all',
+  'palette.toggleTheme': 'Toggle light/dark theme',
+  'palette.preferencesAccounts': 'Preferences: Accounts',
+  'palette.preferencesAppearance': 'Preferences: Appearance',
+  'palette.preferencesIntegrations': 'Preferences: Integrations',
+  'palette.preferencesAutomation': 'Preferences: Automation',
+  'palette.preferencesAdvanced': 'Preferences: Advanced',
+  'palette.preferencesNotifications': 'Preferences: Notifications',
+  'palette.preferencesGit': 'Preferences: Git',
+  'palette.preferencesAccessibility': 'Preferences: Accessibility',
+  'palette.notificationHistory': 'Open notification centre',
+  'palette.notificationAutomations': 'Notification automations',
+  'palette.copyRepoPath': 'Copy repository path',
+  'palette.copyBranchName': 'Copy current branch name',
+  'palette.copyCommitSha': 'Copy current commit SHA',
+  'buildRun.closeDisabledRunning':
+    'A task is running — stop it before closing the panel',
+  'buildRun.fixingWithOpencode': 'Fixing with OpenCode…',
+  'buildRun.stopConfirmTitle': 'Stop the running task?',
+  'buildRun.stopConfirmBody':
+    'The in-progress build and any OpenCode work will be terminated. This cannot be undone.',
+  'buildRun.stopConfirmConfirm': 'Stop',
+  'buildRun.stopConfirmCancel': 'Cancel',
+  'buildRun.sendToOpencode': 'Send to opencode',
+  'buildRun.sendIntro':
+    'opencode is an AI coding agent. Type a request and it will work in this repository, running entirely on your machine.',
+  'buildRun.sendPromptLabel': 'What should opencode do?',
+  'buildRun.sendPromptPlaceholder':
+    'Describe what you want opencode to do in this repository…',
+  'buildRun.sendEmptyError': 'Type a request before sending it to opencode.',
+  'buildRun.sendSubmit': 'Send to opencode',
+  'buildRun.sendAutoApproveLabel':
+    "Auto-approve opencode's edits and commands for this run (yolo)",
+  'buildRun.sendAutoApproveWarning':
+    'opencode will edit files and run shell commands in this repository without asking for confirmation. It is scoped to this repository — it cannot touch files outside it.',
+  'buildRun.sendAutoApproveNote':
+    'opencode will ask before editing files or running commands. Turn on auto-approve above to let it work unattended in this repository.',
+  'buildRun.sendRunningTitle': 'opencode is working on your request…',
+  'workflowDispatch.searchPlaceholder': 'Filter workflows by name or file…',
+  'workflowDispatch.searchAriaLabel': 'Filter workflows',
+  'workflowDispatch.listAriaLabel': 'Workflows',
+  'workflowDispatch.empty': 'No workflows available.',
+  'workflowDispatch.noMatches': 'No workflows match the current filter.',
+  'workflowDispatch.stateActive': 'Active',
+  'workflowDispatch.stateDisabled': 'Disabled',
 }
 
 /** Hong Kong Cantonese catalog. Missing entries deliberately use English. */
@@ -3082,6 +3218,13 @@ export const cantoneseTranslations: Readonly<
   'repositoryPicker.itemHiddenAria': '{repository}，已隱藏',
   'repositoryPicker.hideMenu': '隱藏 repo',
   'repositoryPicker.unhideMenu': '取消隱藏 repo',
+  'repositoryPicker.customizeNameMenu': '自訂名稱外觀',
+  'repositoryPicker.customizeLogoMenu': '自訂標誌外觀',
+  'removeRepository.trashFailedMessage':
+    '呢個 repo 無法移去{trash}。可能有檔案喺其他程式度開住，又或者呢個位置（例如網絡磁碟或者可移除磁碟）唔支援{trash}。',
+  'removeRepository.trashFailedWarning':
+    '強制刪除會永久喺你嘅磁碟度移除呢個資料夾同埋入面所有內容，無法復原。',
+  'removeRepository.forceDeleteButton': '強制永久刪除',
   'patchSeries.initialStatus': '揀匯出或者匯入操作。',
   'patchSeries.runningExport': '匯出緊領先上游嘅 commit',
   'patchSeries.runningImport': '套用緊已覆核嘅 patch 系列',
@@ -3419,6 +3562,21 @@ export const cantoneseTranslations: Readonly<
     'Ollama 操作成功咗，不過未能更新已設定嘅模型清單。',
   'ollama.manager.renamePartial': '複製成功咗，不過未能移除原本模型。',
   'ollama.manager.pullCancelled': '已取消安裝模型。',
+  'ollama.manager.chatTitle': '傾偈',
+  'ollama.manager.chatHint': '揀個模型傾偈，佢會即時串流回覆畀你。',
+  'ollama.manager.chatModelLabel': '傾偈模型',
+  'ollama.manager.chatPlaceholder': '打句嘢傾下…',
+  'ollama.manager.chatSend': '傳送',
+  'ollama.manager.chatStop': '停',
+  'ollama.manager.chatClear': '清空對話',
+  'ollama.manager.chatStreaming': '回覆緊…',
+  'ollama.manager.chatEmpty': '同揀咗嘅模型開始傾偈啦。',
+  'ollama.manager.chatNoModel': '要先安裝一個模型先可以傾偈。',
+  'ollama.manager.chatUnsupported': '呢個供應商用唔到傾偈功能。',
+  'ollama.manager.chatError': '未能完成傾偈要求。',
+  'ollama.manager.chatYou': '你',
+  'ollama.manager.chatAssistant': '助手',
+  'ollama.manager.chatMessageLabel': '訊息',
   'ollama.manager.unknown': '未知',
   'ollama.manager.never': '永不',
   'ollama.manager.showing': '顯示緊 {visible}/{total} 個模型',
@@ -3484,4 +3642,51 @@ export const cantoneseTranslations: Readonly<
   'clone.languageLabel': '語言：{language}',
   'clone.languageFilterLabel': '語言',
   'clone.languageFilterAria': '按語言篩選倉庫',
+  'clone.orgScopeMissing': '睇唔到任何組織，可能今次登入未攞到組織權限。',
+  'clone.orgReconnect': '重新連接以載入組織',
+  'clone.orgRestrictionNote':
+    '有啲組織限制第三方存取，要批准咗呢個 app 先會喺度出現。',
+  'clone.orgReviewAccess': '查看 OAuth app 存取權',
+  'palette.selectAll': '全部揀晒',
+  'palette.toggleTheme': '切換光暗主題',
+  'palette.preferencesAccounts': '設定：帳戶',
+  'palette.preferencesAppearance': '設定：外觀',
+  'palette.preferencesIntegrations': '設定：整合',
+  'palette.preferencesAutomation': '設定：自動化',
+  'palette.preferencesAdvanced': '設定：進階',
+  'palette.preferencesNotifications': '設定：通知',
+  'palette.preferencesGit': '設定：Git',
+  'palette.preferencesAccessibility': '設定：無障礙',
+  'palette.notificationHistory': '打開通知中心',
+  'palette.notificationAutomations': '通知自動化',
+  'palette.copyRepoPath': '複製倉庫路徑',
+  'palette.copyBranchName': '複製而家分支個名',
+  'palette.copyCommitSha': '複製而家 commit SHA',
+  'buildRun.closeDisabledRunning': '而家有任務行緊，要先停咗佢先可以閂呢個面板',
+  'buildRun.fixingWithOpencode': 'OpenCode 修緊…',
+  'buildRun.stopConfirmTitle': '要停咗行緊嘅任務？',
+  'buildRun.stopConfirmBody':
+    '行緊嘅 build 同 OpenCode 嘅工作都會即刻終止，停咗就無得返轉頭。',
+  'buildRun.stopConfirmConfirm': '停止',
+  'buildRun.stopConfirmCancel': '唔好',
+  'buildRun.sendToOpencode': '傳去 opencode',
+  'buildRun.sendIntro':
+    'opencode 係個 AI 寫程式助手。你打低想做乜，佢就會喺呢個 repo 度做，全部喺你部機度行。',
+  'buildRun.sendPromptLabel': '想 opencode 做啲乜？',
+  'buildRun.sendPromptPlaceholder': '講低你想 opencode 喺呢個 repo 度做啲乜…',
+  'buildRun.sendEmptyError': '傳去 opencode 之前，要先打低你嘅要求。',
+  'buildRun.sendSubmit': '傳去 opencode',
+  'buildRun.sendAutoApproveLabel': '呢次自動批准 opencode 改嘢同行指令（yolo）',
+  'buildRun.sendAutoApproveWarning':
+    'opencode 會喺呢個 repo 度改檔案同行 shell 指令，唔會問過你。佢淨係鎖死喺呢個 repo，掂唔到出面嘅檔案。',
+  'buildRun.sendAutoApproveNote':
+    'opencode 改檔案或者行指令之前會問你。撳上面嗰個自動批准，佢就可以喺呢個 repo 度自己搞掂。',
+  'buildRun.sendRunningTitle': 'opencode 幫緊你搞緊個要求…',
+  'workflowDispatch.searchPlaceholder': '打字搵 workflow，睇個名或者檔案…',
+  'workflowDispatch.searchAriaLabel': '篩 workflow',
+  'workflowDispatch.listAriaLabel': 'Workflow 清單',
+  'workflowDispatch.empty': '未有任何 workflow。',
+  'workflowDispatch.noMatches': '冇 workflow 啱而家嘅篩選。',
+  'workflowDispatch.stateActive': '開緊',
+  'workflowDispatch.stateDisabled': '停咗',
 }

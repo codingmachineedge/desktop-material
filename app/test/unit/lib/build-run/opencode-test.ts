@@ -2,9 +2,11 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   PROMPT_TAIL_CAP,
+  USER_PROMPT_CAP,
   buildOpencodeFixPrompt,
   buildOpencodeRepoConfig,
   buildOpencodeRunArgs,
+  buildOpencodeUserPrompt,
   mergeOpencodeRepoConfig,
 } from '../../../../src/lib/build-run/opencode'
 
@@ -89,6 +91,40 @@ describe('buildOpencodeFixPrompt', () => {
     assert.match(prompt, /install/)
     assert.match(prompt, /127/)
     assert.match(prompt, /\/work\/proj/)
+  })
+})
+
+describe('buildOpencodeUserPrompt', () => {
+  it('rejects a blank prompt so nothing is ever sent', () => {
+    for (const blank of ['', '   ', '\n\t  \n']) {
+      assert.equal(buildOpencodeUserPrompt(blank), null)
+    }
+  })
+
+  it('keeps the user text and appends the repository guard rail', () => {
+    const prompt = buildOpencodeUserPrompt('Add a health-check endpoint')
+    assert.ok(prompt !== null)
+    assert.match(prompt!, /Add a health-check endpoint/)
+    // The guard rail scopes the agent to this repository.
+    assert.match(prompt!, /only within this repository/i)
+  })
+
+  it('bounds an oversized prompt to USER_PROMPT_CAP characters', () => {
+    const huge = 'y'.repeat(USER_PROMPT_CAP * 3)
+    const prompt = buildOpencodeUserPrompt(huge)
+    assert.ok(prompt !== null)
+    const runs = prompt!.match(/y+/g) ?? []
+    const longestRun = Math.max(...runs.map(r => r.length))
+    assert.ok(
+      longestRun <= USER_PROMPT_CAP,
+      `embedded user text ${longestRun} exceeds cap ${USER_PROMPT_CAP}`
+    )
+  })
+
+  it('trims surrounding whitespace before bounding', () => {
+    const prompt = buildOpencodeUserPrompt('   do the thing   ')
+    assert.ok(prompt !== null)
+    assert.match(prompt!, /^do the thing/)
   })
 })
 

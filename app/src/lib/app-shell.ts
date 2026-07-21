@@ -7,10 +7,18 @@ import {
   showFolderContents,
   openExternal,
   moveItemToTrash,
+  forceDeleteDirectory,
 } from '../ui/main-process-proxy'
 
 export interface IAppShell {
   readonly moveItemToTrash: (path: string) => Promise<void>
+  /**
+   * Permanently and recursively delete a directory. Last-resort fallback used
+   * when {@link moveItemToTrash} fails; the main process validates and contains
+   * the path (refusing empty/root paths and symlink/junction escapes) before
+   * deleting.
+   */
+  readonly forceDeleteDirectory: (path: string) => Promise<void>
   readonly beep: () => void
   readonly openExternal: (path: string) => Promise<boolean>
   /**
@@ -45,6 +53,7 @@ export const shell: IAppShell = {
   // on Windows. Therefore, we must invoke it from the main process. See
   // https://github.com/electron/electron/issues/29598
   moveItemToTrash,
+  forceDeleteDirectory,
   beep: electronShell.beep,
   openExternal,
   showItemInFolder,

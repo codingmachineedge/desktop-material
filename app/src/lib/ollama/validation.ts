@@ -1,4 +1,6 @@
 import {
+  IOllamaChatMessage,
+  IOllamaChatResponseChunk,
   IOllamaMetadataEntry,
   IOllamaModel,
   IOllamaModelDetails,
@@ -6,6 +8,7 @@ import {
   IOllamaPullProgress,
   IOllamaRunningModel,
   IOllamaVersion,
+  OllamaChatRole,
   OllamaClientError,
 } from './types'
 
@@ -19,6 +22,14 @@ export const MaxOllamaIdentityLength = 1_024
 export const MaxOllamaMetadataKeyLength = 256
 export const MaxOllamaMetadataValueLength = 2_048
 export const MaxOllamaLargeTextLength = 64 * 1_024
+export const MaxOllamaChatMessageLength = MaxOllamaLargeTextLength
+export const MaxOllamaChatMessages = 256
+
+const OllamaChatRoles: ReadonlySet<string> = new Set<OllamaChatRole>([
+  'system',
+  'user',
+  'assistant',
+])
 
 const MaxVersionLength = 256
 const MaxDateLength = 128
@@ -348,6 +359,81 @@ export function parsePullProgress(value: unknown): IOllamaPullProgress {
     completed,
     done: status.toLowerCase() === 'success',
   }
+}
+
+/**
+ * Validate and normalize an outbound chat transcript. Roles are restricted to
+ * the known set, content is bounded, and only the two wire fields are kept so
+ * no caller-attached metadata is serialized to the endpoint.
+ */
+export function normalizeOllamaChatMessages(
+  messages: ReadonlyArray<IOllamaChatMessage>
+): ReadonlyArray<IOllamaChatMessage> {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new OllamaClientError(
+      'validation',
+      'The Ollama chat transcript is empty.'
+    )
+  }
+  if (messages.length > MaxOllamaChatMessages) {
+    throw new OllamaClientError(
+      'validation',
+      'The Ollama chat transcript is too long.'
+    )
+  }
+  return messages.map(message => {
+    if (
+      message === null ||
+      typeof message !== 'object' ||
+      !OllamaChatRoles.has(message.role) ||
+      typeof message.content !== 'string' ||
+      message.content.length > MaxOllamaChatMessageLength
+    ) {
+      throw new OllamaClientError(
+        'validation',
+        'The Ollama chat message is invalid.'
+      )
+    }
+    return { role: message.role, content: message.content }
+  })
+}
+
+export function parseChatResponseChunk(
+  value: unknown
+): IOllamaChatResponseChunk {
+  const message = 'Ollama returned a malformed chat response.'
+  const record = requireObject(value, message)
+  const done = record.done
+  if (typeof done !== 'boolean') {
+    throw malformedResponse(message)
+  }
+
+  let role: OllamaChatRole | undefined
+  let content = ''
+  if (record.message !== undefined && record.message !== null) {
+    const chatMessage = requireObject(record.message, message)
+    const rawRole = optionalString(
+      chatMessage,
+      'role',
+      MaxOllamaIdentityLength,
+      message
+    )
+    if (rawRole !== undefined) {
+      if (!OllamaChatRoles.has(rawRole)) {
+        throw malformedResponse(message)
+      }
+      role = rawRole as OllamaChatRole
+    }
+    content =
+      optionalString(
+        chatMessage,
+        'content',
+        MaxOllamaChatMessageLength,
+        message
+      ) ?? ''
+  }
+
+  return { role, content, done }
 }
 
 export function validateGenerateResponse(value: unknown): void {

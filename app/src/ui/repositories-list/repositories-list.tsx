@@ -245,6 +245,17 @@ export class RepositoriesList extends React.Component<
    */
   private getSelectedListItem = memoizeOne(findMatchingListItem)
 
+  /**
+   * Live references to the mounted row components, keyed by repository id, so
+   * the row context menu's "Customize …" items can open the anchored appearance
+   * editor owned by the correct row.
+   */
+  private itemRefs = new Map<number, RepositoryListItem>()
+  private itemRefCallbacks = new Map<
+    number,
+    (instance: RepositoryListItem | null) => void
+  >()
+
   public constructor(props: IRepositoriesListProps) {
     super(props)
 
@@ -264,6 +275,29 @@ export class RepositoriesList extends React.Component<
       repositoryLogoChange: { revision: 0, repositoryPath: null },
       languageMode: getPersistedLanguageMode(),
     }
+  }
+
+  private getItemRef = (id: number) => {
+    let callback = this.itemRefCallbacks.get(id)
+    if (callback === undefined) {
+      callback = (instance: RepositoryListItem | null) => {
+        if (instance === null) {
+          this.itemRefs.delete(id)
+        } else {
+          this.itemRefs.set(id, instance)
+        }
+      }
+      this.itemRefCallbacks.set(id, callback)
+    }
+    return callback
+  }
+
+  private onCustomizeNameAppearance = (repository: Repositoryish) => {
+    this.itemRefs.get(repository.id)?.openNameAppearanceEditorFromMenu()
+  }
+
+  private onCustomizeLogoAppearance = (repository: Repositoryish) => {
+    this.itemRefs.get(repository.id)?.openLogoAppearanceEditorFromMenu()
   }
 
   public componentDidMount() {
@@ -362,6 +396,7 @@ export class RepositoriesList extends React.Component<
     return (
       <RepositoryListItem
         key={repository.id}
+        ref={this.getItemRef(repository.id)}
         repository={repository}
         needsDisambiguation={item.needsDisambiguation}
         matches={matches}
@@ -548,6 +583,8 @@ export class RepositoriesList extends React.Component<
       languageMode: this.state.languageMode,
       onHideRepository: this.onHideRepository,
       onUnhideRepository: this.onUnhideRepository,
+      onCustomizeNameAppearance: this.onCustomizeNameAppearance,
+      onCustomizeLogoAppearance: this.onCustomizeLogoAppearance,
       repository: item.repository,
       shellLabel: this.props.shellLabel,
     })

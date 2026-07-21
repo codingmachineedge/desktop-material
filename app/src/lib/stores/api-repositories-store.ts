@@ -3,6 +3,10 @@ import { AccountsStore } from './accounts-store'
 import { IAPIOrganization, IAPIRepository, API } from '../api'
 import { Account, accountEquals } from '../../models/account'
 import { merge } from '../merge'
+import {
+  missingRequiredScopes,
+  parseGrantedScopes,
+} from '../oauth-scope-validation'
 
 /**
  * Attempt to look up an existing account in the account state
@@ -99,6 +103,30 @@ export interface IAccountRepositories {
    */
   readonly organizationsError?: Error | null
 
+  /**
+   * Whether at least one organization load has completed for this account
+   * (successfully or with a failure). Distinguishes "not loaded yet" from
+   * "loaded and empty" so the UI only shows an empty-organizations state once
+   * a load has actually resolved, never as a pre-load flash.
+   *
+   * Optional so pre-existing partial fixtures remain valid; the store always
+   * populates it.
+   */
+  readonly organizationsLoaded?: boolean
+
+  /**
+   * True when a completed organization load returned zero organizations *and*
+   * the account's granted classic OAuth scopes are missing `read:org` (or an
+   * implication). Private organization memberships are concealed from
+   * `/user/orgs` when the token predates the `read:org` scope, so an empty list
+   * in that case is a scope problem the user can fix by reconnecting rather than
+   * a genuine "belongs to no organizations".
+   *
+   * Only meaningful when `organizations` is empty and `organizationsLoaded` is
+   * true. Optional so pre-existing partial fixtures remain valid.
+   */
+  readonly organizationsScopeMissing?: boolean
+
   /** Full repository lists loaded on demand for individual organizations. */
   readonly organizationRepositories: ReadonlyMap<
     string,
@@ -119,6 +147,8 @@ const EmptyAccountRepositories: IAccountRepositories = {
   organizations: [],
   organizationsLoading: false,
   organizationsError: null,
+  organizationsLoaded: false,
+  organizationsScopeMissing: false,
   organizationRepositories: new Map(),
 }
 
@@ -234,6 +264,7 @@ export class ApiRepositoriesStore extends BaseStore {
     this.updateAccount(account, {
       organizationsLoading: true,
       organizationsError: null,
+      organizationsScopeMissing: false,
     })
     try {
       const api = this.apiForAccount(resolveAccount(account, this.accountState))
@@ -254,21 +285,56 @@ export class ApiRepositoriesStore extends BaseStore {
           organizationRepositories.delete(login)
         }
       }
+      // An empty organization list is ambiguous: the account may genuinely
+      // belong to no organizations, or the token may lack `read:org` (created
+      // before that scope was requested) so private memberships are concealed.
+      // Only when the list is empty do we spend an extra request to inspect the
+      // granted scopes and disambiguate — a non-empty list already proves the
+      // scope is sufficient.
+      const organizationsScopeMissing =
+        organizations.length === 0 ? await this.hasMissingOrgScope(api) : false
       this.updateAccount(account, {
         organizations,
         organizationRepositories,
         organizationsError: null,
+        organizationsScopeMissing,
+        organizationsLoaded: true,
       })
     } catch (error) {
       const organizationsError =
         error instanceof Error ? error : new Error(String(error))
-      this.updateAccount(account, { organizationsError })
+      this.updateAccount(account, {
+        organizationsError,
+        organizationsLoaded: true,
+      })
       log.warn(
         `Unable to load organizations for ${account.friendlyEndpoint}`,
         organizationsError
       )
     } finally {
       this.updateAccount(account, { organizationsLoading: false })
+    }
+  }
+
+  /**
+   * Whether the account's granted classic OAuth scopes are missing the ability
+   * to read organization membership. Returns false when the host does not
+   * report scopes at all (fine-grained tokens or non-GitHub providers report a
+   * null `X-OAuth-Scopes` header), since we cannot then prove a scope problem
+   * and would rather surface the third-party-access restriction hint. Any
+   * failure inspecting the scopes is treated as "not a scope problem".
+   */
+  private async hasMissingOrgScope(api: API): Promise<boolean> {
+    try {
+      const header = await api.fetchGrantedOAuthScopes()
+      if (header === null) {
+        return false
+      }
+      const missing = missingRequiredScopes(parseGrantedScopes(header))
+      return missing.includes('read:org') || missing.includes('user')
+    } catch (error) {
+      log.warn('Unable to inspect granted OAuth scopes', error)
+      return false
     }
   }
 

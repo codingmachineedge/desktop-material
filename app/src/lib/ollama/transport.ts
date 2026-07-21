@@ -23,6 +23,7 @@ const NativeApiMethods: Readonly<Record<string, 'GET' | 'POST' | 'DELETE'>> = {
   [OllamaApiRoutes.copy]: 'POST',
   [OllamaApiRoutes.delete]: 'DELETE',
   [OllamaApiRoutes.generate]: 'POST',
+  [OllamaApiRoutes.chat]: 'POST',
 }
 
 interface INativeRequestOptions extends RequestOptions {

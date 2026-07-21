@@ -81,6 +81,21 @@ export interface IOllamaPullProgress {
   readonly done: boolean
 }
 
+export type OllamaChatRole = 'system' | 'user' | 'assistant'
+
+/** A single bounded chat turn sent to (or streamed from) the native chat API. */
+export interface IOllamaChatMessage {
+  readonly role: OllamaChatRole
+  readonly content: string
+}
+
+/** One decoded NDJSON chat chunk: an assistant delta plus completion state. */
+export interface IOllamaChatResponseChunk {
+  readonly role?: OllamaChatRole
+  readonly content: string
+  readonly done: boolean
+}
+
 export interface IOllamaRequestOptions {
   readonly signal?: AbortSignal
   /** Total operation deadline. */
@@ -89,6 +104,10 @@ export interface IOllamaRequestOptions {
 
 export interface IOllamaPullOptions extends IOllamaRequestOptions {
   readonly onProgress?: (progress: IOllamaPullProgress) => void
+}
+
+export interface IOllamaChatOptions extends IOllamaRequestOptions {
+  readonly onChunk?: (chunk: IOllamaChatResponseChunk) => void
 }
 
 /** The fetch response subset consumed by the bounded Ollama client. */
@@ -111,6 +130,8 @@ export interface IOllamaClientOptions {
   readonly loadTimeoutMs?: number
   readonly pullInactivityTimeoutMs?: number
   readonly pullTotalTimeoutMs?: number
+  readonly chatInactivityTimeoutMs?: number
+  readonly chatTotalTimeoutMs?: number
 }
 
 /** The bounded operation surface consumed by the model-manager store. */
@@ -138,4 +159,9 @@ export interface IOllamaClient {
   delete(model: string, options?: IOllamaRequestOptions): Promise<void>
   load(model: string, options?: IOllamaRequestOptions): Promise<void>
   unload(model: string, options?: IOllamaRequestOptions): Promise<void>
+  chat(
+    model: string,
+    messages: ReadonlyArray<IOllamaChatMessage>,
+    options?: IOllamaChatOptions
+  ): Promise<string>
 }

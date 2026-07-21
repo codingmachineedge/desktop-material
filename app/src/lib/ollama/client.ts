@@ -5,6 +5,8 @@ import {
 } from './endpoint'
 import { nodeOllamaFetch } from './transport'
 import {
+  IOllamaChatMessage,
+  IOllamaChatOptions,
   IOllamaClient,
   IOllamaClientOptions,
   IOllamaModel,
@@ -20,7 +22,9 @@ import {
 } from './types'
 import {
   hasServerError,
+  normalizeOllamaChatMessages,
   normalizeOllamaModelName,
+  parseChatResponseChunk,
   parseModelsResponse,
   parsePullProgress,
   parseRunningModelsResponse,
@@ -33,11 +37,16 @@ export const DefaultOllamaRequestTimeoutMs = 30_000
 export const DefaultOllamaLoadTimeoutMs = 10 * 60 * 1_000
 export const DefaultOllamaPullInactivityTimeoutMs = 120_000
 export const DefaultOllamaPullTotalTimeoutMs = 6 * 60 * 60 * 1_000
+export const DefaultOllamaChatInactivityTimeoutMs = 120_000
+export const DefaultOllamaChatTotalTimeoutMs = 30 * 60 * 1_000
 export const MaxOllamaJsonBodyBytes = 2 * 1_024 * 1_024
 export const MaxOllamaErrorBodyBytes = 16 * 1_024
 export const MaxOllamaNdjsonLineBytes = 64 * 1_024
 export const MaxOllamaPullBytes = 8 * 1_024 * 1_024
 export const MaxOllamaPullEvents = 4_096
+export const MaxOllamaChatBytes = 8 * 1_024 * 1_024
+export const MaxOllamaChatEvents = 65_536
+export const MaxOllamaChatResponseBytes = 1_024 * 1_024
 
 const MaxTimerDelayMs = 2_147_483_647
 
@@ -312,7 +321,10 @@ async function httpError(
   )
 }
 
-function parseNdjsonLine(bytes: Uint8Array): unknown | undefined {
+function parseNdjsonValue(
+  bytes: Uint8Array,
+  invalidMessage: string
+): unknown | undefined {
   const content =
     bytes.length > 0 && bytes[bytes.length - 1] === 13
       ? bytes.slice(0, -1)
@@ -325,10 +337,7 @@ function parseNdjsonLine(bytes: Uint8Array): unknown | undefined {
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(content)
   } catch {
-    throw new OllamaClientError(
-      'response',
-      'Ollama returned invalid pull progress.'
-    )
+    throw new OllamaClientError('response', invalidMessage)
   }
   if (text.trim().length === 0) {
     return undefined
@@ -336,11 +345,12 @@ function parseNdjsonLine(bytes: Uint8Array): unknown | undefined {
   try {
     return JSON.parse(text) as unknown
   } catch {
-    throw new OllamaClientError(
-      'response',
-      'Ollama returned invalid pull progress.'
-    )
+    throw new OllamaClientError('response', invalidMessage)
   }
+}
+
+function parseNdjsonLine(bytes: Uint8Array): unknown | undefined {
+  return parseNdjsonValue(bytes, 'Ollama returned invalid pull progress.')
 }
 
 async function readPullProgress(
@@ -451,6 +461,132 @@ async function readPullProgress(
   }
 }
 
+async function readChatStream(
+  response: IOllamaResponse,
+  context: IRequestContext,
+  options: IOllamaChatOptions
+): Promise<string> {
+  await assertContentLength(response, MaxOllamaChatBytes)
+  if (response.body === null) {
+    throw new OllamaClientError(
+      'response',
+      'Ollama returned an empty chat stream.'
+    )
+  }
+
+  const reader = response.body.getReader()
+  const lineParts = new Array<Uint8Array>()
+  let lineSize = 0
+  let totalBytes = 0
+  let eventCount = 0
+  let assistantText = ''
+  let done = false
+
+  const append = (part: Uint8Array) => {
+    if (lineSize + part.byteLength > MaxOllamaNdjsonLineBytes) {
+      throw new OllamaClientError(
+        'response',
+        'An Ollama chat response line exceeded the allowed size.'
+      )
+    }
+    if (part.byteLength > 0) {
+      lineParts.push(part)
+      lineSize += part.byteLength
+    }
+  }
+
+  const emit = () => {
+    const value = parseNdjsonValue(
+      combineBytes(lineParts, lineSize),
+      'Ollama returned an invalid chat response.'
+    )
+    lineParts.length = 0
+    lineSize = 0
+    if (value === undefined) {
+      return
+    }
+    eventCount++
+    if (eventCount > MaxOllamaChatEvents) {
+      throw new OllamaClientError(
+        'response',
+        'Ollama returned too many chat response events.'
+      )
+    }
+    if (hasServerError(value)) {
+      throw serverError()
+    }
+    const chunk = parseChatResponseChunk(value)
+    if (chunk.content.length > 0) {
+      if (
+        assistantText.length + chunk.content.length >
+        MaxOllamaChatResponseBytes
+      ) {
+        throw new OllamaClientError(
+          'response',
+          'The Ollama chat response exceeded the allowed size.'
+        )
+      }
+      assistantText += chunk.content
+      try {
+        options.onChunk?.(chunk)
+      } catch {
+        throw new OllamaClientError(
+          'response',
+          'The Ollama chat response handler failed.'
+        )
+      }
+    }
+    if (chunk.done) {
+      done = true
+    }
+    throwIfAborted(context.signal)
+  }
+
+  try {
+    while (true) {
+      const next = await raceWithAbort(reader.read(), context.signal, () =>
+        cancelReader(reader)
+      )
+      throwIfAborted(context.signal)
+      if (next.done) {
+        if (lineSize > 0) {
+          emit()
+        }
+        if (!done) {
+          throw new OllamaClientError(
+            'response',
+            'The Ollama chat stream ended before completion.'
+          )
+        }
+        return assistantText
+      }
+
+      context.touch()
+      totalBytes += next.value.byteLength
+      if (totalBytes > MaxOllamaChatBytes) {
+        throw new OllamaClientError(
+          'response',
+          'The Ollama chat stream exceeded the allowed size.'
+        )
+      }
+
+      let segmentStart = 0
+      for (let index = 0; index < next.value.byteLength; index++) {
+        if (next.value[index] !== 10) {
+          continue
+        }
+        append(next.value.slice(segmentStart, index))
+        emit()
+        segmentStart = index + 1
+      }
+      append(next.value.slice(segmentStart))
+    }
+  } catch (error) {
+    await cancelReader(reader)
+    throw error
+  }
+}
+
 /** Native Ollama API client for model discovery and lifecycle operations. */
 export class OllamaClient implements IOllamaClient {
   public readonly endpoint: string
@@ -460,6 +596,8 @@ export class OllamaClient implements IOllamaClient {
   private readonly loadTimeoutMs: number
   private readonly pullInactivityTimeoutMs: number
   private readonly pullTotalTimeoutMs: number
+  private readonly chatInactivityTimeoutMs: number
+  private readonly chatTotalTimeoutMs: number
 
   public constructor(endpoint: string, options: IOllamaClientOptions = {}) {
     this.endpoint = normalizeOllamaEndpoint(endpoint)
@@ -479,6 +617,14 @@ export class OllamaClient implements IOllamaClient {
     this.pullTotalTimeoutMs = resolveTimeout(
       options.pullTotalTimeoutMs,
       DefaultOllamaPullTotalTimeoutMs
+    )
+    this.chatInactivityTimeoutMs = resolveTimeout(
+      options.chatInactivityTimeoutMs,
+      DefaultOllamaChatInactivityTimeoutMs
+    )
+    this.chatTotalTimeoutMs = resolveTimeout(
+      options.chatTotalTimeoutMs,
+      DefaultOllamaChatTotalTimeoutMs
     )
   }
 
@@ -533,6 +679,31 @@ export class OllamaClient implements IOllamaClient {
       totalTimeoutMs,
       this.pullInactivityTimeoutMs,
       (response, context) => readPullProgress(response, context, options)
+    )
+  }
+
+  public async chat(
+    model: string,
+    messages: ReadonlyArray<IOllamaChatMessage>,
+    options: IOllamaChatOptions = {}
+  ): Promise<string> {
+    const totalTimeoutMs = resolveTimeout(
+      options.timeoutMs,
+      this.chatTotalTimeoutMs
+    )
+    const normalizedMessages = normalizeOllamaChatMessages(messages)
+    return this.request(
+      'POST',
+      'chat',
+      {
+        model: normalizeOllamaModelName(model),
+        messages: normalizedMessages,
+        stream: true,
+      },
+      options,
+      totalTimeoutMs,
+      this.chatInactivityTimeoutMs,
+      (response, context) => readChatStream(response, context, options)
     )
   }
 

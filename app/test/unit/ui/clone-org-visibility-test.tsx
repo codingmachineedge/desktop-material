@@ -68,6 +68,107 @@ describe('OrgFilterChips', () => {
 
     assert.match(markup, /Loading organizations/)
   })
+
+  it('renders nothing before the first load resolves even with the empty-state props', () => {
+    // loaded=false means no load has resolved yet — the actionable empty state
+    // must not flash before the first fetch completes.
+    const markup = renderToStaticMarkup(
+      <OrgFilterChips
+        organizations={[]}
+        selectedOrganization={null}
+        loading={false}
+        onSelect={() => {}}
+        loaded={false}
+        scopeMissing={true}
+        scopeMissingMessage="missing scope"
+        reconnectLabel="Reconnect to load organizations"
+        onReconnect={() => {}}
+        restrictionNote="restricted"
+        reviewAccessLabel="Review OAuth app access"
+        settingsUrl="https://github.com/settings/connections/applications"
+      />
+    )
+
+    assert.equal(markup, '')
+  })
+
+  it('surfaces the reconnect action when the empty list is a missing-scope problem', () => {
+    const markup = renderToStaticMarkup(
+      <OrgFilterChips
+        organizations={[]}
+        selectedOrganization={null}
+        loading={false}
+        onSelect={() => {}}
+        loaded={true}
+        scopeMissing={true}
+        scopeMissingMessage="This sign-in may be missing organization access."
+        reconnectLabel="Reconnect to load organizations"
+        onReconnect={() => {}}
+        restrictionNote="restricted"
+        reviewAccessLabel="Review OAuth app access"
+        settingsUrl="https://github.com/settings/connections/applications"
+      />
+    )
+
+    assert.match(markup, /org-scope-missing/)
+    assert.match(markup, /missing organization access/)
+    assert.match(markup, /Reconnect to load organizations/)
+    // The scope-problem state offers a reconnect, not the restriction link.
+    assert.doesNotMatch(markup, /Review OAuth app access/)
+  })
+
+  it('surfaces the restriction note and settings link when the scope is present', () => {
+    const markup = renderToStaticMarkup(
+      <OrgFilterChips
+        organizations={[]}
+        selectedOrganization={null}
+        loading={false}
+        onSelect={() => {}}
+        loaded={true}
+        scopeMissing={false}
+        scopeMissingMessage="missing scope"
+        reconnectLabel="Reconnect to load organizations"
+        onReconnect={() => {}}
+        restrictionNote="Organizations that restrict third-party access must approve this app."
+        reviewAccessLabel="Review OAuth app access"
+        settingsUrl="https://github.com/settings/connections/applications"
+      />
+    )
+
+    assert.match(markup, /org-restricted/)
+    assert.match(markup, /restrict third-party access/)
+    assert.match(markup, /Review OAuth app access/)
+    assert.match(
+      markup,
+      /https:\/\/github\.com\/settings\/connections\/applications/
+    )
+    // The restriction state must not offer the reconnect button.
+    assert.doesNotMatch(markup, /Reconnect to load organizations/)
+  })
+
+  it('renders organization chips with no empty-state when the list is non-empty', () => {
+    const markup = renderToStaticMarkup(
+      <OrgFilterChips
+        organizations={[org('acme', 1)]}
+        selectedOrganization={null}
+        loading={false}
+        onSelect={() => {}}
+        loaded={true}
+        scopeMissing={true}
+        scopeMissingMessage="missing scope"
+        reconnectLabel="Reconnect to load organizations"
+        onReconnect={() => {}}
+        restrictionNote="restricted"
+        reviewAccessLabel="Review OAuth app access"
+        settingsUrl="https://github.com/settings/connections/applications"
+      />
+    )
+
+    assert.match(markup, /org-filter-chips/)
+    assert.match(markup, /acme/)
+    assert.doesNotMatch(markup, /org-scope-missing/)
+    assert.doesNotMatch(markup, /org-empty-state/)
+  })
 })
 
 describe('shouldTriggerInitialCloneLoad', () => {

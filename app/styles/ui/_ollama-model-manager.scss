@@ -666,6 +666,212 @@
     }
   }
 
+  .ollama-chat {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-large);
+    background: var(--md-sys-color-surface-container-low);
+    padding: 12px 14px;
+  }
+
+  .ollama-chat-toggle {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible {
+      border-radius: var(--md-sys-shape-corner-small);
+      box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+    }
+  }
+
+  .ollama-chat-title {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .ollama-chat-toggle-hint {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+  }
+
+  .ollama-chat-panel {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ollama-chat-controls {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px 8px;
+    align-items: center;
+
+    label {
+      flex: none;
+    }
+
+    .button-component {
+      flex: none;
+    }
+  }
+
+  .ollama-chat-transcript {
+    display: flex;
+    min-width: 0;
+    max-height: min(320px, 42vh);
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+    background: var(--md-sys-color-surface-container-lowest);
+    padding: 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .ollama-chat-empty {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-sm);
+    text-align: center;
+  }
+
+  .ollama-chat-message {
+    display: flex;
+    min-width: 0;
+    max-width: 88%;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: var(--md-sys-shape-corner-medium);
+    padding: 7px 10px;
+
+    p {
+      min-width: 0;
+      font-size: var(--font-size-sm);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    &.is-user {
+      align-self: flex-end;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+
+    &.is-assistant {
+      align-self: flex-start;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface);
+    }
+  }
+
+  .ollama-chat-role {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .ollama-chat-streaming {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--font-size-xs);
+  }
+
+  .ollama-chat-error {
+    border-radius: var(--md-sys-shape-corner-small);
+    background: var(--md-sys-color-error-container);
+    color: var(--md-sys-color-on-error-container);
+    padding: 7px 9px;
+    font-size: var(--font-size-xs);
+  }
+
+  .ollama-chat-composer {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+
+    textarea {
+      min-width: 0;
+      max-width: 100%;
+      min-height: 44px;
+      grid-column: 1 / -1;
+      border: 1px solid var(--md-sys-color-outline);
+      border-radius: var(--md-sys-shape-corner-small);
+      outline: none;
+      background: var(--md-sys-color-surface-container-lowest);
+      color: var(--md-sys-color-on-surface);
+      padding: 8px 10px;
+      font: inherit;
+      line-height: 1.45;
+      resize: vertical;
+
+      &:focus-visible {
+        border-color: var(--md-sys-color-primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent);
+      }
+
+      &::placeholder {
+        color: var(--md-sys-color-on-surface-variant);
+        opacity: 0.82;
+      }
+    }
+  }
+
+  .ollama-chat-composer-actions {
+    display: flex;
+    justify-content: flex-end;
+    grid-column: 1 / -1;
+
+    .button-component {
+      min-width: 100px;
+      justify-content: center;
+    }
+  }
+
+  .ollama-chat-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    border: 0;
+    clip: rect(0 0 0 0);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  @container ollama-model-manager (max-width: 460px) {
+    .ollama-chat-controls {
+      grid-template-columns: minmax(0, 1fr);
+
+      .button-component {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .ollama-chat-message {
+      max-width: 100%;
+    }
+  }
+
   @container ollama-model-manager (min-width: 900px) {
     .ollama-model-details {
       display: grid;

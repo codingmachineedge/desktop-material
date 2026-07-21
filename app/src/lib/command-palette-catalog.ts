@@ -4,17 +4,61 @@
  * Pure data + filtering so node-only tests can exercise it.
  */
 
+import type { TranslationKey } from './i18n-resources'
+
+/**
+ * The application-selection snapshot an availability predicate inspects to
+ * decide whether a command can be dispatched right now. Kept as a flat, plain
+ * object so node-only tests can drive predicates without any app state.
+ */
+export interface IPaletteCommandContext {
+  /** The current process platform (mirrors `process.platform`). */
+  readonly platform?: string
+  /** A real (non-cloning) repository is selected. */
+  readonly hasRepository: boolean
+  /** The selected repository has a configured remote. */
+  readonly hasRemote: boolean
+  /** The selected repository is on a valid, named branch. */
+  readonly hasBranch: boolean
+  /** The selected repository is associated with a GitHub repository. */
+  readonly isGitHubRepository: boolean
+}
+
+/**
+ * Decides whether a command should be offered for the given selection. A
+ * command with no predicate is always available.
+ */
+export type PaletteAvailability = (context: IPaletteCommandContext) => boolean
+
+/** Available whenever any real repository is selected. */
+const whenRepository: PaletteAvailability = context => context.hasRepository
+
+/** Available only when the selected repository is on a named branch. */
+const whenBranch: PaletteAvailability = context =>
+  context.hasRepository && context.hasBranch
+
 export interface IPaletteCommand {
   /** The menu event (or palette-only action id) executed on selection. */
   readonly event: string
-  /** The user-facing title. */
+  /** The user-facing title (English; also the fallback when untranslated). */
   readonly title: string
+  /**
+   * The i18n key resolving the visible title in the active language mode.
+   * When present the palette shows the translated title in English, playful
+   * Hong Kong Cantonese, or the bilingual view; otherwise `title` is shown.
+   */
+  readonly titleKey?: TranslationKey
   /** The logical group shown beside the title. */
   readonly group: string
   /** Extra search terms. */
   readonly keywords?: string
   /** Restricts the command to one platform. */
   readonly platform?: 'darwin' | 'win32'
+  /**
+   * Restricts the command to selection states where it can actually run, so
+   * it is never dispatched (e.g. push with no repository) from the palette.
+   */
+  readonly isAvailable?: PaletteAvailability
 }
 
 export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
@@ -270,23 +314,149 @@ export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
     group: 'App',
     platform: 'darwin',
   },
+
+  // Edit
+  {
+    event: 'select-all',
+    title: 'Select all',
+    titleKey: 'palette.selectAll',
+    group: 'Edit',
+    keywords: 'highlight everything whole',
+  },
+
+  // Appearance
+  {
+    event: 'palette:toggle-theme',
+    title: 'Toggle light/dark theme',
+    titleKey: 'palette.toggleTheme',
+    group: 'App',
+    keywords: 'dark light mode colour color appearance switch',
+  },
+
+  // Settings panes
+  {
+    event: 'palette:preferences-accounts',
+    title: 'Preferences: Accounts',
+    titleKey: 'palette.preferencesAccounts',
+    group: 'App',
+    keywords: 'settings sign in login github account',
+  },
+  {
+    event: 'palette:preferences-appearance',
+    title: 'Preferences: Appearance',
+    titleKey: 'palette.preferencesAppearance',
+    group: 'App',
+    keywords: 'settings theme language font look',
+  },
+  {
+    event: 'palette:preferences-integrations',
+    title: 'Preferences: Integrations',
+    titleKey: 'palette.preferencesIntegrations',
+    group: 'App',
+    keywords: 'settings editor shell external tools',
+  },
+  {
+    event: 'palette:preferences-automation',
+    title: 'Preferences: Automation',
+    titleKey: 'palette.preferencesAutomation',
+    group: 'App',
+    keywords: 'settings automation rules scheduled',
+  },
+  {
+    event: 'palette:preferences-advanced',
+    title: 'Preferences: Advanced',
+    titleKey: 'palette.preferencesAdvanced',
+    group: 'App',
+    keywords: 'settings advanced diagnostics usage',
+  },
+  {
+    event: 'palette:preferences-notifications',
+    title: 'Preferences: Notifications',
+    titleKey: 'palette.preferencesNotifications',
+    group: 'App',
+    keywords: 'settings notifications alerts',
+  },
+  {
+    event: 'palette:preferences-git',
+    title: 'Preferences: Git',
+    titleKey: 'palette.preferencesGit',
+    group: 'App',
+    keywords: 'settings git name email identity',
+  },
+  {
+    event: 'palette:preferences-accessibility',
+    title: 'Preferences: Accessibility',
+    titleKey: 'palette.preferencesAccessibility',
+    group: 'App',
+    keywords: 'settings accessibility a11y motion contrast',
+  },
+
+  // Notifications
+  {
+    event: 'palette:notification-history',
+    title: 'Open notification centre',
+    titleKey: 'palette.notificationHistory',
+    group: 'App',
+    keywords: 'notifications centre center history alerts inbox',
+  },
+  {
+    event: 'palette:notification-automations',
+    title: 'Notification automations',
+    titleKey: 'palette.notificationAutomations',
+    group: 'App',
+    keywords: 'notifications automation rules alerts',
+  },
+
+  // Clipboard
+  {
+    event: 'palette:copy-repo-path',
+    title: 'Copy repository path',
+    titleKey: 'palette.copyRepoPath',
+    group: 'Repository',
+    keywords: 'clipboard folder directory location',
+    isAvailable: whenRepository,
+  },
+  {
+    event: 'palette:copy-branch-name',
+    title: 'Copy current branch name',
+    titleKey: 'palette.copyBranchName',
+    group: 'Branch',
+    keywords: 'clipboard head ref',
+    isAvailable: whenBranch,
+  },
+  {
+    event: 'palette:copy-commit-sha',
+    title: 'Copy current commit SHA',
+    titleKey: 'palette.copyCommitSha',
+    group: 'Branch',
+    keywords: 'clipboard hash tip head revision',
+    isAvailable: whenBranch,
+  },
 ]
 
 /**
  * Narrow and rank the catalog for a query: title prefix matches first, then
  * title substrings, then group/keyword/event matches, preserving catalog
  * order within each band.
+ *
+ * When `context` is supplied, commands whose availability predicate rejects
+ * the current selection are dropped so they can never be dispatched in an
+ * invalid state. Omitting `context` keeps the whole platform-eligible catalog.
  */
 export function filterPaletteCommands(
   commands: ReadonlyArray<IPaletteCommand>,
   query: string,
-  platform?: string
+  platform?: string,
+  context?: IPaletteCommandContext
 ): ReadonlyArray<IPaletteCommand> {
   const platformEligible = commands.filter(
     command =>
-      command.platform === undefined ||
-      platform === undefined ||
-      command.platform === platform
+      (command.platform === undefined ||
+        platform === undefined ||
+        command.platform === platform) &&
+      (context === undefined ||
+        command.isAvailable === undefined ||
+        command.isAvailable(context))
   )
 
   const trimmed = query.trim().toLowerCase()

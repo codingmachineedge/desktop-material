@@ -206,6 +206,18 @@
         color: var(--md-sys-color-on-primary);
       }
 
+      // The live "Fixing with OpenCode…" chip pairs an indeterminate spinner
+      // with the label inline.
+      &.is-opencode {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+
+        .material-symbol {
+          line-height: 1;
+        }
+      }
+
       &.success {
         background: var(--dm-green);
         color: var(--dm-on-green);

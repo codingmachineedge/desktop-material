@@ -49,6 +49,12 @@ export const SearchSurfaceRegistry: ReadonlyArray<ISearchSurfaceRegistration> =
       implementation: 'standalone',
     },
     {
+      id: 'actions-workflow-dispatch',
+      label: 'Run workflow picker',
+      source: 'actions/workflow-dispatch-dialog.tsx',
+      implementation: 'standalone',
+    },
+    {
       id: 'branches',
       label: 'Branches',
       source: 'branches/branch-list.tsx',

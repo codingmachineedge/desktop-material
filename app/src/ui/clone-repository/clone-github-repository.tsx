@@ -5,7 +5,7 @@ import { DialogContent } from '../dialog'
 import { TextBox } from '../lib/text-box'
 import { Row } from '../lib/row'
 import { Button } from '../lib/button'
-import { IAPIOrganization, IAPIRepository } from '../../lib/api'
+import { getHTMLURL, IAPIOrganization, IAPIRepository } from '../../lib/api'
 import { CloneableRepositoryFilterList } from './cloneable-repository-filter-list'
 import {
   ICloneableRepositoryListItem,
@@ -79,12 +79,34 @@ interface ICloneGithubRepositoryProps {
    * organization filter chips.
    */
   readonly organizationsError: Error | null
+
+  /**
+   * Whether at least one organization load has resolved for this account. Gates
+   * the actionable empty-organizations state so it never flashes before the
+   * first fetch completes.
+   */
+  readonly organizationsLoaded: boolean
+
+  /**
+   * When the loaded organization list is empty, whether the cause is the
+   * account's token missing the `read:org` scope. Drives whether the empty
+   * state offers a reconnect (scope problem) or a third-party-access hint.
+   */
+  readonly organizationsScopeMissing: boolean
+
   readonly selectedOrganization: string | null
   readonly organizationError: Error | null
   readonly onSelectedOrganizationChanged: (
     organization: IAPIOrganization | null
   ) => void
   readonly onRefreshOrganization: () => void
+
+  /**
+   * Re-runs the sign-in/OAuth flow for the selected account, requesting the
+   * fuller scope set (including `read:org`) so concealed organization
+   * memberships become visible.
+   */
+  readonly onReconnectAccount: () => void
 
   /**
    * The contents of the filter text box used to filter the list of
@@ -439,6 +461,17 @@ export class CloneGithubRepository extends React.PureComponent<
           selectedOrganization={this.props.selectedOrganization}
           loading={this.props.organizationsLoading}
           onSelect={this.props.onSelectedOrganizationChanged}
+          loaded={
+            this.props.organizationsLoaded &&
+            this.props.organizationsError === null
+          }
+          scopeMissing={this.props.organizationsScopeMissing}
+          scopeMissingMessage={this.localize('clone.orgScopeMissing')}
+          reconnectLabel={this.localize('clone.orgReconnect')}
+          onReconnect={this.props.onReconnectAccount}
+          restrictionNote={this.localize('clone.orgRestrictionNote')}
+          reviewAccessLabel={this.localize('clone.orgReviewAccess')}
+          settingsUrl={this.getOAuthAppSettingsUrl()}
         />
         {this.props.organizationsError !== null &&
           !this.props.organizationsLoading && (
@@ -512,6 +545,18 @@ export class CloneGithubRepository extends React.PureComponent<
         {this.renderBatchControls()}
       </DialogContent>
     )
+  }
+
+  /**
+   * The account's authorized-OAuth-apps settings page, where a user can review
+   * and request organization approval for third-party (OAuth) access. Derived
+   * from the account endpoint so it resolves to github.com for GitHub.com
+   * accounts and the matching host for GitHub Enterprise.
+   */
+  private getOAuthAppSettingsUrl(): string {
+    return `${getHTMLURL(
+      this.props.account.endpoint
+    )}/settings/connections/applications`
   }
 
   private renderAccountRepositoryRefresh = () => {

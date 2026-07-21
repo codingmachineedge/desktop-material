@@ -11,6 +11,7 @@ export const OllamaApiRoutes = {
   copy: '/api/copy',
   delete: '/api/delete',
   generate: '/api/generate',
+  chat: '/api/chat',
 } as const
 
 export type OllamaOperation = keyof typeof OllamaApiRoutes

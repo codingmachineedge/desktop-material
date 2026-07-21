@@ -2,7 +2,10 @@ import assert from 'node:assert'
 import { EventEmitter } from 'node:events'
 import { before, beforeEach, describe, it, mock } from 'node:test'
 
-import { buildOpencodeRunArgs } from '../../../../src/lib/build-run/opencode'
+import {
+  buildOpencodeRunArgs,
+  buildOpencodeUserPrompt,
+} from '../../../../src/lib/build-run/opencode'
 
 /** A recorded spawn invocation plus the fake child it returned. */
 interface ISpawnCall {
@@ -104,6 +107,64 @@ describe('OpencodeRunner.runFix argv/stdin discipline', () => {
       [...spawnCalls[0].args],
       ['run', '--auto', '--dir', 'C:\\repo\\sub', '--model', 'anthropic/claude']
     )
+  })
+})
+
+describe('OpencodeRunner "Send to opencode" (free-form prompt) flow', () => {
+  const cleanEnv = { Path: '', PATHEXT: '' }
+
+  it('feeds a user-composed prompt via stdin with the same --auto --dir argv', async () => {
+    const runner = new OpencodeRunner()
+    // A free-form user request carrying cmd.exe metacharacters — must never
+    // reach argv, must arrive intact on stdin.
+    const composed = buildOpencodeUserPrompt(
+      'Rename the config & delete "old" | %TMP%'
+    )
+    assert.ok(composed !== null)
+    const result = await runner.runFix(
+      {
+        repoPath: 'C:\\repo',
+        cwd: 'C:\\repo',
+        autoApprove: true,
+        prompt: composed!,
+      },
+      () => {},
+      new AbortController().signal,
+      cleanEnv
+    )
+
+    assert.equal(result.ok, true)
+    assert.equal(spawnCalls.length, 1)
+    const call = spawnCalls[0]
+    assert.equal(call.child.stdinInput, composed)
+    assert.ok(
+      !call.args.some(a => a.includes('Rename the config')),
+      'user prompt leaked into argv'
+    )
+    // Identical invocation to the fix flow.
+    assert.deepEqual([...call.args], ['run', '--auto', '--dir', 'C:\\repo'])
+  })
+
+  it('cancels the run when the abort signal fires before spawn', async () => {
+    const runner = new OpencodeRunner()
+    const controller = new AbortController()
+    controller.abort()
+    const composed = buildOpencodeUserPrompt('do the thing')
+    assert.ok(composed !== null)
+    const result = await runner.runFix(
+      {
+        repoPath: 'C:\\repo',
+        cwd: 'C:\\repo',
+        autoApprove: false,
+        prompt: composed!,
+      },
+      () => {},
+      controller.signal,
+      cleanEnv
+    )
+    // An already-aborted signal means opencode is never spawned.
+    assert.equal(spawnCalls.length, 0)
+    assert.equal(result.ok, true)
   })
 })
 

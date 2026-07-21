@@ -565,7 +565,7 @@ import {
 } from '../../models/build-run-preferences'
 import { RepositoryIndicatorUpdater } from './helpers/repository-indicator-updater'
 import { isAttributableEmailFor } from '../email'
-import { TrashNameLabel } from '../../ui/lib/context-menu'
+import { RemoveRepositoryResult } from '../../models/remove-repository-result'
 import { GitError as DugiteError } from 'dugite'
 import {
   ErrorWithMetadata,
@@ -12800,30 +12800,50 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   public async _removeRepository(
     repository: Repository | CloningRepository,
-    moveToTrash: boolean
-  ): Promise<void> {
+    moveToTrash: boolean,
+    forceDelete: boolean = false
+  ): Promise<RemoveRepositoryResult> {
     if (isSubmoduleRepository(repository)) {
       this.emitError(
         new Error(
           'This submodule is open temporarily and is not in the repository list. Return to the main repository to remove or deinitialize it.'
         )
       )
-      return
+      return 'error'
     }
 
     try {
       if (moveToTrash) {
-        try {
-          await shell.moveItemToTrash(repository.path)
-        } catch (error) {
-          log.error('Failed moving repository to trash', error)
+        if (forceDelete) {
+          // Last-resort fallback for when the Recycle Bin/Trash move is
+          // impossible (locked files, unsupported volumes, network/exFAT
+          // paths). The main process validates and contains the path before
+          // permanently deleting it.
+          try {
+            await shell.forceDeleteDirectory(repository.path)
+          } catch (error) {
+            log.error('Failed permanently deleting repository', error)
 
-          this.emitError(
-            new Error(
-              `Failed to move the repository directory to ${TrashNameLabel}.\n\nA common reason for this is that the directory or one of its files is open in another program.`
+            this.emitError(
+              new Error(
+                `Failed to permanently delete the repository directory.\n\n${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              )
             )
-          )
-          return
+            return 'error'
+          }
+        } else {
+          try {
+            await shell.moveItemToTrash(repository.path)
+          } catch (error) {
+            // Do not surface a terminal global error here. Instead report that
+            // the Recycle Bin/Trash step failed so the confirmation flow can
+            // offer an explicit, clearly-warned "Force delete permanently"
+            // fallback. The repository is left untouched.
+            log.error('Failed moving repository to trash', error)
+            return 'trash-failed'
+          }
         }
       }
 
@@ -12834,7 +12854,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
     } catch (err) {
       this.emitError(err)
-      return
+      return 'error'
     }
 
     const allRepositories = await this.repositoriesStore.getAll()
@@ -12843,6 +12863,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     } else {
       this._showFoldout({ type: FoldoutType.Repository })
     }
+    return 'removed'
   }
 
   public async _cloneAgain(

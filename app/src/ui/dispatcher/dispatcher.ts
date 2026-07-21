@@ -12,6 +12,7 @@ import {
   IAPICreatePushProtectionBypassResponse,
 } from '../../lib/api'
 import { getAccountForRepository } from '../../lib/get-account-for-repository'
+import { RemoveRepositoryResult } from '../../models/remove-repository-result'
 import { IGitHubRelease } from '../../lib/github-releases'
 import { IGitHubReleaseTransferProgressEvent } from '../../lib/github-release-transfer'
 import {
@@ -244,6 +245,7 @@ import {
   detectOpencode,
   installOpencode,
   runOpencodeFix,
+  runOpencodePrompt,
   cancelOpencode,
   onOpencodeLog,
 } from '../main-process-proxy'
@@ -997,8 +999,20 @@ export class Dispatcher {
   public async removeRepository(
     repository: Repository | CloningRepository,
     moveToTrash: boolean
-  ): Promise<void> {
+  ): Promise<RemoveRepositoryResult> {
     return this.appStore._removeRepository(repository, moveToTrash)
+  }
+
+  /**
+   * Permanently, recursively delete a repository's directory from disk and
+   * remove it from the app. Last-resort fallback used when moving the
+   * repository to the Recycle Bin/Trash failed. The main process validates and
+   * contains the path before deleting.
+   */
+  public async forceRemoveRepository(
+    repository: Repository | CloningRepository
+  ): Promise<RemoveRepositoryResult> {
+    return this.appStore._removeRepository(repository, true, true)
   }
 
   /** Update the repository's `missing` flag. */
@@ -3636,11 +3650,17 @@ export class Dispatcher {
     }
   }
 
-  /** Cancel the in-flight build & run for a repository, if any. */
+  /**
+   * Cancel whatever Build & Run work is in flight for a repository: the build
+   * process itself and/or a detached "Fix with opencode" run (which is not a
+   * build run, so it has its own operation id rather than an `activeRunId`).
+   */
   public async cancelBuildRun(repository: Repository): Promise<void> {
-    const { activeRunId } = this.buildRunStore.getStateForRepository(
-      repository.id
-    )
+    const { activeRunId, opencodeOperationId } =
+      this.buildRunStore.getStateForRepository(repository.id)
+    if (opencodeOperationId !== null) {
+      await cancelOpencode(opencodeOperationId)
+    }
     if (activeRunId !== null) {
       await cancelBuildRun(activeRunId)
     }
@@ -3708,6 +3728,11 @@ export class Dispatcher {
     const dispose = this.pipeOpencodeLog(repository, operationId, onLog)
     const onAbort = () => void cancelOpencode(operationId)
     signal?.addEventListener('abort', onAbort, { once: true })
+    // Surface a live "Fixing with OpenCode…" status while the detached agent
+    // works; the build phase stays at its pre-fix terminal value until the
+    // re-run below supersedes it. Recording the operation id lets Stop reach
+    // the opencode process.
+    this.buildRunStore.setOpencodeRunning(repository.id, true, operationId)
     let run: IOpencodeRunResult
     try {
       run = await runOpencodeFix({
@@ -3723,6 +3748,9 @@ export class Dispatcher {
     } finally {
       dispose()
       signal?.removeEventListener('abort', onAbort)
+      // Clear the flag once opencode exits (success, failure, or abort). The
+      // re-run started below re-enters `beginRun`, which also resets it.
+      this.buildRunStore.setOpencodeRunning(repository.id, false)
     }
 
     // Success is measured by a re-run, never opencode's (buggy) exit code. The
@@ -3731,6 +3759,61 @@ export class Dispatcher {
       await this.startBuildRun(repository)
     }
     return { phaseBefore, run }
+  }
+
+  /**
+   * Launch the opencode agent with a free-form, user-authored prompt, then
+   * RE-RUN Build & Run — exactly as {@link runOpencodeFix} does — so the panel
+   * reflects the repository's real state afterwards. Shares the same detached
+   * lifecycle: the `opencodeRunning` flag and operation id drive the panel's
+   * "Running OpenCode…" chip and let Stop cancel the run. Streams the agent's
+   * output into the log panel and to `onLog`; cancellable via `signal`.
+   */
+  public async runOpencodePrompt(
+    repository: Repository,
+    request: {
+      readonly prompt: string
+      readonly cwd: string
+      readonly autoApprove: boolean
+      readonly model?: string
+    },
+    onLog: (line: IOpencodeLogEvent) => void,
+    signal?: AbortSignal
+  ): Promise<IOpencodeRunResult> {
+    if (repository instanceof SubmoduleRepository) {
+      throw new Error(
+        'Automated code execution is unavailable while a submodule is open temporarily.'
+      )
+    }
+    const operationId = randomUUID()
+    const dispose = this.pipeOpencodeLog(repository, operationId, onLog)
+    const onAbort = () => void cancelOpencode(operationId)
+    signal?.addEventListener('abort', onAbort, { once: true })
+    // Surface a live "Running OpenCode…" status and record the operation id so
+    // Stop can reach the opencode process (same lifecycle as the fix flow).
+    this.buildRunStore.setOpencodeRunning(repository.id, true, operationId)
+    let run: IOpencodeRunResult
+    try {
+      run = await runOpencodePrompt({
+        operationId,
+        repoPath: repository.path,
+        cwd: request.cwd,
+        autoApprove: request.autoApprove,
+        prompt: request.prompt,
+        model: request.model,
+      })
+    } finally {
+      dispose()
+      signal?.removeEventListener('abort', onAbort)
+      this.buildRunStore.setOpencodeRunning(repository.id, false)
+    }
+
+    // Judge the repository's state by re-running Build & Run, never by
+    // opencode's (buggy) exit code — matching the fix flow.
+    if (!signal?.aborted) {
+      await this.startBuildRun(repository)
+    }
+    return run
   }
 
   /** Cancel an in-flight opencode operation by its id. */

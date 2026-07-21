@@ -9,14 +9,29 @@ import {
   parseWorkflowDispatchInputs,
 } from '../../lib/actions-workflow-inputs'
 import { ActionsStore } from '../../lib/stores/actions-store'
+import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
+import { t } from '../../lib/i18n'
 import { Select } from '../lib/select'
+import { TextBox } from '../lib/text-box'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { trapActionsDialogFocus } from './actions-dialog-focus'
-import { getWorkflowFileName } from './workflow-templates'
+import { getWorkflowFileName, getWorkflowGlyph } from './workflow-templates'
 
 /** How many quick-pick ref chips the popover shows before falling back. */
 export const WorkflowDispatchRefChipMaximum = 6
+
+/**
+ * Stable audit identity shared by the workflow picker's search input, filter
+ * mode control, and persisted filter mode. Registered in the collection
+ * surface registry.
+ */
+export const WorkflowDispatchPickerSearchSurfaceId = 'actions-workflow-dispatch'
 
 interface IWorkflowDispatchDialogProps {
   readonly repository: Repository
@@ -42,6 +57,15 @@ interface IWorkflowDispatchDialogState {
   readonly freeform: string
   readonly submitting: boolean
   readonly error: Error | null
+
+  /** Free-text query narrowing the workflow list by name or file path. */
+  readonly filterText: string
+
+  /** The active fuzzy/substring/regex matching strategy. */
+  readonly filterMode: FilterMode
+
+  /** Whether substring/regex matching is case sensitive. */
+  readonly filterCaseSensitive: boolean
 }
 
 export class WorkflowDispatchDialog extends React.Component<
@@ -50,6 +74,9 @@ export class WorkflowDispatchDialog extends React.Component<
 > {
   private dialog: HTMLFormElement | null = null
   private previousFocus: HTMLElement | null = null
+
+  /** Live references to each rendered option row, keyed by workflow id. */
+  private readonly rowRefs = new Map<number, HTMLButtonElement>()
 
   public constructor(props: IWorkflowDispatchDialogProps) {
     super(props)
@@ -66,6 +93,11 @@ export class WorkflowDispatchDialog extends React.Component<
       freeform: '',
       submitting: false,
       error: null,
+      filterText: '',
+      filterMode: readPersistedFilterMode(
+        WorkflowDispatchPickerSearchSurfaceId
+      ),
+      filterCaseSensitive: false,
     }
   }
 
@@ -130,13 +162,112 @@ export class WorkflowDispatchDialog extends React.Component<
     }
   }
 
-  private onWorkflowChipClick = (
-    event: React.MouseEvent<HTMLButtonElement>
-  ) => {
-    const workflowId = Number(event.currentTarget.dataset.workflowId)
+  private selectWorkflow(workflowId: number, focusRow: boolean) {
     if (workflowId !== this.state.workflowId) {
       this.setState({ workflowId }, this.loadDefinitionCallback)
     }
+    if (focusRow) {
+      this.rowRefs.get(workflowId)?.focus()
+    }
+  }
+
+  private onWorkflowRowClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const workflowId = Number(event.currentTarget.dataset.workflowId)
+    this.selectWorkflow(workflowId, false)
+  }
+
+  private setRowRef =
+    (workflowId: number) => (element: HTMLButtonElement | null) => {
+      if (element === null) {
+        this.rowRefs.delete(workflowId)
+      } else {
+        this.rowRefs.set(workflowId, element)
+      }
+    }
+
+  /**
+   * Arrow-key navigation for the workflow list box. Selection follows focus,
+   * matching the single-select listbox pattern, and Enter commits the row that
+   * already carries the roving selection.
+   */
+  private onWorkflowListKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    const visible = this.getVisibleWorkflows().workflows
+    if (visible.length === 0) {
+      return
+    }
+    const currentIndex = visible.findIndex(w => w.id === this.state.workflowId)
+    let nextIndex: number | null = null
+    switch (event.key) {
+      case 'ArrowDown':
+        nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % visible.length
+        break
+      case 'ArrowUp':
+        nextIndex =
+          currentIndex < 0
+            ? visible.length - 1
+            : (currentIndex - 1 + visible.length) % visible.length
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = visible.length - 1
+        break
+      case 'Enter':
+      case ' ':
+        if (currentIndex >= 0) {
+          event.preventDefault()
+          this.selectWorkflow(visible[currentIndex].id, true)
+        }
+        return
+      default:
+        return
+    }
+    if (nextIndex !== null) {
+      event.preventDefault()
+      this.selectWorkflow(visible[nextIndex].id, true)
+    }
+  }
+
+  private onFilterChanged = (filterText: string) => {
+    this.setState({ filterText })
+  }
+
+  private onFilterModeChanged = (filterMode: FilterMode) => {
+    persistFilterMode(WorkflowDispatchPickerSearchSurfaceId, filterMode)
+    this.setState({ filterMode })
+  }
+
+  private onFilterCaseSensitiveChanged = (filterCaseSensitive: boolean) =>
+    this.setState({ filterCaseSensitive })
+
+  private onFilterPatternApply = (filterText: string) =>
+    this.setState({ filterText })
+
+  private getFilterSampleItems = (): ReadonlyArray<string> =>
+    this.props.workflows.flatMap(workflow => [workflow.name, workflow.path])
+
+  private getVisibleWorkflows(): {
+    readonly workflows: ReadonlyArray<IAPIWorkflow>
+    readonly regexError: string | null
+  } {
+    const { workflows } = this.props
+    const query = this.state.filterText.trim()
+    if (query.length === 0) {
+      return { workflows, regexError: null }
+    }
+    const { results, regexError } = matchWithMode(
+      query,
+      workflows,
+      workflow => [workflow.name, workflow.path],
+      {
+        mode: this.state.filterMode,
+        caseSensitive: this.state.filterCaseSensitive,
+      }
+    )
+    return { workflows: results.map(r => r.item), regexError }
   }
 
   private loadDefinitionCallback = () => {
@@ -190,20 +321,117 @@ export class WorkflowDispatchDialog extends React.Component<
     }
   }
 
-  private renderWorkflowChip = (workflow: IAPIWorkflow) => {
-    const on = workflow.id === this.state.workflowId
+  private renderWorkflowRow = (workflow: IAPIWorkflow) => {
+    const selected = workflow.id === this.state.workflowId
+    const fileName = getWorkflowFileName(workflow.path) || workflow.path
+    const active = workflow.state === 'active'
+    const stateLabel = active
+      ? t('workflowDispatch.stateActive')
+      : t('workflowDispatch.stateDisabled')
     return (
       <button
         key={workflow.id}
         type="button"
-        className={classNames('workflow-dispatch-chip', { on })}
-        aria-pressed={on}
-        aria-label={`Workflow: ${workflow.name}`}
+        role="option"
+        id={`workflow-dispatch-option-${workflow.id}`}
+        aria-selected={selected}
+        ref={this.setRowRef(workflow.id)}
+        tabIndex={selected ? 0 : -1}
+        className={classNames('workflow-dispatch-option', { selected })}
         data-workflow-id={workflow.id}
-        onClick={this.onWorkflowChipClick}
+        onClick={this.onWorkflowRowClick}
       >
-        {getWorkflowFileName(workflow.path) || workflow.name}
+        <span className="workflow-dispatch-option-icon" aria-hidden="true">
+          <Octicon
+            symbol={getWorkflowGlyph(`${workflow.name} ${workflow.path}`)}
+          />
+        </span>
+        <span className="workflow-dispatch-option-text">
+          <span className="workflow-dispatch-option-name">{workflow.name}</span>
+          <span className="workflow-dispatch-option-file">{fileName}</span>
+        </span>
+        <span
+          className={classNames('workflow-dispatch-option-state', {
+            disabled: !active,
+          })}
+        >
+          {stateLabel}
+        </span>
       </button>
+    )
+  }
+
+  private renderWorkflowPicker() {
+    const { workflows } = this.props
+    const { workflows: visible, regexError } = this.getVisibleWorkflows()
+    return (
+      <div
+        className="workflow-dispatch-section"
+        role="group"
+        aria-labelledby="workflow-dispatch-workflow-label"
+      >
+        <span
+          className="workflow-dispatch-label"
+          id="workflow-dispatch-workflow-label"
+        >
+          Workflow
+        </span>
+        <div
+          className={classNames('workflow-dispatch-search', {
+            invalid: regexError !== null,
+          })}
+        >
+          <Octicon symbol={octicons.search} />
+          <TextBox
+            searchSurfaceId="actions-workflow-dispatch"
+            className="workflow-dispatch-search-input"
+            type="search"
+            value={this.state.filterText}
+            onValueChanged={this.onFilterChanged}
+            placeholder={t('workflowDispatch.searchPlaceholder')}
+            ariaLabel={t('workflowDispatch.searchAriaLabel')}
+            ariaControls="workflow-dispatch-listbox"
+            spellcheck={false}
+          />
+          <FilterModeControl
+            searchSurfaceId="actions-workflow-dispatch"
+            mode={this.state.filterMode}
+            caseSensitive={this.state.filterCaseSensitive}
+            onModeChange={this.onFilterModeChanged}
+            onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
+            regexBuilderTarget="Workflows"
+            getSampleItems={this.getFilterSampleItems}
+            filterText={this.state.filterText}
+            onRegexPatternApply={this.onFilterPatternApply}
+          />
+        </div>
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+        <div
+          className="workflow-dispatch-listbox"
+          id="workflow-dispatch-listbox"
+          role="listbox"
+          tabIndex={0}
+          aria-label={t('workflowDispatch.listAriaLabel')}
+          aria-activedescendant={
+            this.state.workflowId !== 0
+              ? `workflow-dispatch-option-${this.state.workflowId}`
+              : undefined
+          }
+          onKeyDown={this.onWorkflowListKeyDown}
+        >
+          {workflows.length === 0 ? (
+            <p className="workflow-dispatch-list-empty">
+              {t('workflowDispatch.empty')}
+            </p>
+          ) : visible.length === 0 ? (
+            <p className="workflow-dispatch-list-empty">
+              {t('workflowDispatch.noMatches')}
+            </p>
+          ) : (
+            visible.map(this.renderWorkflowRow)
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -304,21 +532,7 @@ export class WorkflowDispatchDialog extends React.Component<
               {this.state.error.message}
             </div>
           )}
-          <div
-            className="workflow-dispatch-section"
-            role="group"
-            aria-labelledby="workflow-dispatch-workflow-label"
-          >
-            <span
-              className="workflow-dispatch-label"
-              id="workflow-dispatch-workflow-label"
-            >
-              Workflow
-            </span>
-            <div className="workflow-dispatch-chips">
-              {this.props.workflows.map(this.renderWorkflowChip)}
-            </div>
-          </div>
+          {this.renderWorkflowPicker()}
           <div
             className="workflow-dispatch-section"
             role="group"

@@ -46,6 +46,19 @@ export interface IRepositoryBuildRunState {
   readonly panelMinimized: boolean
   /** True once detection has completed at least once for this repository. */
   readonly detected: boolean
+  /**
+   * True while a detached "Fix with opencode" run is actively working on this
+   * repository. The build phase stays at its pre-fix terminal value (usually
+   * `failed`) during this window, so the panel keys its live "Fixing with
+   * OpenCode…" status on this flag rather than on `phase`.
+   */
+  readonly opencodeRunning: boolean
+  /**
+   * The in-flight opencode operation id, or `null` when none is running. Lets a
+   * Stop action reach the detached opencode process, which is not a build run
+   * (`activeRunId` is null while it works).
+   */
+  readonly opencodeOperationId: string | null
 }
 
 /** Max lines retained in the per-repository log ring buffer. */
@@ -62,6 +75,8 @@ const emptyState: IRepositoryBuildRunState = {
   panelOpen: false,
   panelMinimized: false,
   detected: false,
+  opencodeRunning: false,
+  opencodeOperationId: null,
 }
 
 /** The set of phases that terminate a run. */
@@ -151,6 +166,27 @@ export class BuildRunStore extends TypedBaseStore<number | null> {
       panelOpen: true,
       // A fresh run always restores the panel so its output is visible.
       panelMinimized: false,
+      // A build run supersedes any in-flight opencode fix (the re-run a fix
+      // kicks off arrives here), so the "Fixing with OpenCode…" state clears.
+      opencodeRunning: false,
+      opencodeOperationId: null,
+    })
+  }
+
+  /**
+   * Flag (or clear) that a detached "Fix with opencode" run is working on this
+   * repository. While set, the panel shows a live running status instead of the
+   * pre-fix terminal phase, and Stop can reach the opencode process through the
+   * recorded `operationId`.
+   */
+  public setOpencodeRunning(
+    repositoryId: number,
+    opencodeRunning: boolean,
+    opencodeOperationId: string | null = null
+  ): void {
+    this.mutate(repositoryId, {
+      opencodeRunning,
+      opencodeOperationId: opencodeRunning ? opencodeOperationId : null,
     })
   }
 

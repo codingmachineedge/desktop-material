@@ -80,6 +80,21 @@ const ollamaManagerTranslationKeys: ReadonlyArray<TranslationKey> = [
   'ollama.manager.configurationPartial',
   'ollama.manager.renamePartial',
   'ollama.manager.pullCancelled',
+  'ollama.manager.chatTitle',
+  'ollama.manager.chatHint',
+  'ollama.manager.chatModelLabel',
+  'ollama.manager.chatPlaceholder',
+  'ollama.manager.chatSend',
+  'ollama.manager.chatStop',
+  'ollama.manager.chatClear',
+  'ollama.manager.chatStreaming',
+  'ollama.manager.chatEmpty',
+  'ollama.manager.chatNoModel',
+  'ollama.manager.chatUnsupported',
+  'ollama.manager.chatError',
+  'ollama.manager.chatYou',
+  'ollama.manager.chatAssistant',
+  'ollama.manager.chatMessageLabel',
   'ollama.manager.unknown',
   'ollama.manager.never',
   'ollama.manager.showing',
@@ -103,7 +118,7 @@ describe('Ollama model manager internationalization', () => {
     const expectedKeys = [...ollamaManagerTranslationKeys].sort()
 
     assert.deepEqual(actualKeys, expectedKeys)
-    assert.equal(ollamaManagerTranslationKeys.length, 86)
+    assert.equal(ollamaManagerTranslationKeys.length, 101)
 
     for (const key of ollamaManagerTranslationKeys) {
       assert.equal(typeof englishTranslations[key], 'string', key)
@@ -199,6 +214,28 @@ describe('Ollama model manager internationalization', () => {
         destination: 'demo:new',
       }),
       'Renamed demo:old to demo:new.'
+    )
+  })
+
+  it('resolves the chat panel strings in all three modes', () => {
+    assert.equal(translate('ollama.manager.chatTitle', 'english'), 'Chat')
+    assert.equal(translate('ollama.manager.chatSend', 'english'), 'Send')
+    assert.equal(translate('ollama.manager.chatStop', 'english'), 'Stop')
+
+    assert.equal(translate('ollama.manager.chatTitle', 'cantonese'), '傾偈')
+    assert.equal(translate('ollama.manager.chatSend', 'cantonese'), '傳送')
+    assert.equal(
+      translate('ollama.manager.chatError', 'cantonese'),
+      '未能完成傾偈要求。'
+    )
+
+    assert.equal(
+      translate('ollama.manager.chatTitle', 'bilingual'),
+      'Chat · 傾偈'
+    )
+    assert.equal(
+      translate('ollama.manager.chatModelLabel', 'bilingual'),
+      'Chat model · 傾偈模型'
     )
   })
 

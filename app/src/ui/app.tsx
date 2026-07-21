@@ -25,6 +25,7 @@ import { RepositoryTabStrip } from './repository-tabs/repository-tab-strip'
 import { BuildRunToolbarButton } from './build-run/build-run-toolbar-button'
 import { BuildRunPanel } from './build-run/build-run-panel'
 import { OpencodeFixDialog } from './build-run/opencode-fix-dialog'
+import { OpencodeSendDialog } from './build-run/opencode-send-dialog'
 import { assertNever } from '../lib/fatal-error'
 import { shell } from '../lib/app-shell'
 import { updateStore, UpdateStatus } from './lib/update-store'
@@ -309,7 +310,8 @@ import { offsetFromNow } from '../lib/offset-from'
 import { getNumber } from '../lib/local-storage'
 import { IconPreviewDialog } from './octicons/icon-preview-dialog'
 import { isCertificateErrorSuppressedFor } from '../lib/suppress-certificate-error'
-import { webUtils } from 'electron'
+import { webUtils, clipboard } from 'electron'
+import { IPaletteCommandContext } from '../lib/command-palette-catalog'
 import { showTestUI } from './lib/test-ui-components/test-ui-components'
 import { ConfirmCommitFilteredChanges } from './changes/confirm-commit-filtered-changes-dialog'
 import { AboutTestDialog } from './about/about-test-dialog'
@@ -1132,11 +1134,106 @@ export class App extends React.Component<IAppProps, IAppState> {
 
   /** Execute a command chosen in the master command palette. */
   private onPaletteCommand = (event: string) => {
-    if (event === 'palette:find-in-view') {
-      this.findText()
-      return
+    switch (event) {
+      case 'palette:find-in-view':
+        return this.findText()
+      case 'palette:toggle-theme':
+        return this.toggleSelectedTheme()
+      case 'palette:preferences-accounts':
+        return this.showPreferencesTab(PreferencesTab.Accounts)
+      case 'palette:preferences-appearance':
+        return this.showPreferencesTab(PreferencesTab.Appearance)
+      case 'palette:preferences-integrations':
+        return this.showPreferencesTab(PreferencesTab.Integrations)
+      case 'palette:preferences-automation':
+        return this.showPreferencesTab(PreferencesTab.Automation)
+      case 'palette:preferences-advanced':
+        return this.showPreferencesTab(PreferencesTab.Advanced)
+      case 'palette:preferences-notifications':
+        return this.showPreferencesTab(PreferencesTab.Notifications)
+      case 'palette:preferences-git':
+        return this.showPreferencesTab(PreferencesTab.Git)
+      case 'palette:preferences-accessibility':
+        return this.showPreferencesTab(PreferencesTab.Accessibility)
+      case 'palette:notification-history':
+        return this.props.dispatcher.showPopup({
+          type: PopupType.NotificationHistory,
+        })
+      case 'palette:notification-automations':
+        return this.props.dispatcher.showPopup({
+          type: PopupType.NotificationAutomations,
+        })
+      case 'palette:copy-repo-path':
+        return this.copyCurrentRepositoryPath()
+      case 'palette:copy-branch-name':
+        return this.copyCurrentBranchName()
+      case 'palette:copy-commit-sha':
+        return this.copyCurrentCommitSha()
+      default:
+        return this.onMenuEvent(event as MenuEvent)
     }
-    this.onMenuEvent(event as MenuEvent)
+  }
+
+  private showPreferencesTab(initialSelectedTab: PreferencesTab) {
+    this.props.dispatcher.showPopup({
+      type: PopupType.Preferences,
+      initialSelectedTab,
+    })
+  }
+
+  /** Flip between the light and dark themes, resolving "system" to its match. */
+  private toggleSelectedTheme() {
+    const current = this.state.selectedTheme
+    const next =
+      current === ApplicationTheme.Dark
+        ? ApplicationTheme.Light
+        : ApplicationTheme.Dark
+    this.props.dispatcher.setSelectedTheme(next)
+  }
+
+  /** The selection's repository state, or null when none is fully selected. */
+  private getSelectedRepositoryState() {
+    const state = this.state.selectedState
+    if (state == null || state.type !== SelectionType.Repository) {
+      return null
+    }
+    return state
+  }
+
+  private copyCurrentRepositoryPath() {
+    const state = this.getSelectedRepositoryState()
+    if (state !== null && state.repository instanceof Repository) {
+      clipboard.writeText(state.repository.path)
+    }
+  }
+
+  private copyCurrentBranchName() {
+    const tip = this.getSelectedRepositoryState()?.state.branchesState.tip
+    if (tip !== undefined && tip.kind === TipState.Valid) {
+      clipboard.writeText(tip.branch.name)
+    }
+  }
+
+  private copyCurrentCommitSha() {
+    const tip = this.getSelectedRepositoryState()?.state.branchesState.tip
+    if (tip !== undefined && tip.kind === TipState.Valid) {
+      clipboard.writeText(tip.branch.tip.sha)
+    }
+  }
+
+  /** The current selection snapshot the command palette gates commands on. */
+  private getPaletteAvailabilityContext(): IPaletteCommandContext {
+    const state = this.getSelectedRepositoryState()
+    const tip = state?.state.branchesState.tip
+    const repository = state?.repository
+    return {
+      platform: process.platform,
+      hasRepository: repository instanceof Repository,
+      hasRemote: state?.state.remote != null,
+      hasBranch: tip?.kind === TipState.Valid,
+      isGitHubRepository:
+        repository instanceof Repository && repository.gitHubRepository != null,
+    }
   }
 
   private onReauthorizeAccount = (account: Account) => {
@@ -2094,7 +2191,14 @@ export class App extends React.Component<IAppProps, IAppState> {
     repository: Repository,
     deleteRepoFromDisk: boolean
   ) => {
-    await this.props.dispatcher.removeRepository(repository, deleteRepoFromDisk)
+    return this.props.dispatcher.removeRepository(
+      repository,
+      deleteRepoFromDisk
+    )
+  }
+
+  private onForceDeleteRepo = async (repository: Repository) => {
+    await this.props.dispatcher.forceRemoveRepository(repository)
   }
 
   private getRepository(): Repository | CloningRepository | null {
@@ -3126,6 +3230,17 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
           />
         )
+      case PopupType.OpencodeSend:
+        return (
+          <OpencodeSendDialog
+            key="opencode-send"
+            dispatcher={this.props.dispatcher}
+            repository={popup.repository}
+            context={popup.context}
+            buildRunStore={this.props.buildRunStore}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
       case PopupType.CreateBranch: {
         const state = this.props.repositoryStateManager.get(popup.repository)
         const branchesState = state.branchesState
@@ -3252,6 +3367,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             key="confirm-remove-repository"
             repository={popup.repository}
             onConfirmation={this.onConfirmRepoRemoval}
+            onForceDelete={this.onForceDeleteRepo}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -3776,6 +3892,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           <CommandPalette
             key="command-palette"
             onExecute={this.onPaletteCommand}
+            availabilityContext={this.getPaletteAvailabilityContext()}
             onDismissed={onPopupDismissedFn}
           />
         )
