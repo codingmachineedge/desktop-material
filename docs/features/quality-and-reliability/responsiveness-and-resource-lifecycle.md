@@ -6,16 +6,22 @@ no preference, language string, credential format, or provider API.
 
 ## Behavior
 
-- A fetch first validates the local `refs/remotes/<remote>/HEAD` symbolic ref
-  and verifies that its local target still exists. Desktop then reuses it
-  instead of running another online `git remote set-head -a`. Missing, dangling,
-  empty, malformed, or cross-remote values trigger exactly one authenticated
-  discovery.
+- A background fetch first validates the local `refs/remotes/<remote>/HEAD`
+  symbolic ref and verifies that its local target still exists. Desktop then
+  reuses it instead of running another online `git remote set-head -a`.
+  Missing, dangling, empty, malformed, or cross-remote values trigger exactly
+  one authenticated discovery. A user-initiated fetch always refreshes the
+  remote default, but aborts that non-critical lookup after five seconds; this
+  catches a default-branch rename even while the old branch still exists
+  without restoring the multi-minute hang.
 - Askpass and sign-in UI requests share one first-in, first-out prompt queue.
   Host-key acceptance, SSH key passphrases, SSH passwords, generic Git
   credentials, and GitHub sign-in therefore cannot replace or silently drop a
   concurrent prompt of the same type. Manager removal or eviction settles the
-  affected prompt and lets the queue continue.
+  affected prompt and lets the queue continue. When a contextual sheet or
+  sign-in popup is deliberately replaced, the old owner is notified exactly
+  once with a replacement reason. A replaced sign-in prompt settles its caller
+  without clearing the global state now owned by the replacement.
 - Adjacent synchronous appearance-setting calls share one mutation and persist
   only the latest normalized value. Queued `get()` reads, flushes, and history
   operations are ordering barriers, while separately awaited writes keep their
@@ -35,12 +41,12 @@ different owners or cross a queued `get()`/history barrier. Every caller in one
 burst settles from the same mutation result, and the last normalized
 description is the one recorded for that burst.
 
-Remote-HEAD reuse is local, namespace-validated, and target-validated.
-Repositories with provider metadata continue to use the provider's declared
-default branch. Fetch/prune turns a deleted old default into a dangling ref,
-which Desktop repairs automatically. If a generic host changes its default
-while the previous branch still exists, update it in Remote Manager; Desktop
-deliberately does not rescan every remote after every fetch.
+Remote-HEAD reuse is local, namespace-validated, target-validated, and limited
+to background refreshes. Repositories with provider metadata continue to use
+the provider's declared default branch. Fetch/prune turns a deleted old default
+into a dangling ref, which Desktop repairs automatically. An explicit fetch
+also discovers a generic host's renamed default even when the prior branch
+still exists; its abort signal bounds the secondary lookup to five seconds.
 
 ## Failure modes and recovery
 
@@ -48,10 +54,11 @@ An askpass popup-dispatch failure rejects the affected prompt, normalizes the
 queue tail, and allows the next request to appear. GitHub sign-in retains its
 existing logged `undefined` result on dispatch failure. External removal and
 stack eviction settle the affected prompt as cancelled; sign-in additionally
-resets its retained store callback. A failed appearance batch rejects every
-caller in that batch without poisoning later store operations. Invalid or
-dangling local remote-HEAD refs use the existing authenticated discovery path
-and retain its bounded success/error handling.
+resets its retained store callback. Replacement also settles the old owner, but
+does not reset state needed by the new sign-in popup. A failed appearance batch
+rejects every caller in that batch without poisoning later store operations.
+Invalid or dangling local remote-HEAD refs use the existing authenticated
+discovery path and retain its bounded success/error handling.
 
 Network errors remove only the exact failed request ID. The next request can
 reuse an Electron request ID without inheriting a stale origin. Markdown
@@ -73,12 +80,13 @@ script, style, or content privileges.
 
 ## Verification
 
-`fetch-authenticated-git-test.ts` covers the validated fast path, a
-never-resolving discovery regression, dangling-target and invalid-namespace
-fallback, background mode, and exact account forwarding. `popup-manager-test.ts`
+`fetch-authenticated-git-test.ts` covers the validated background fast path,
+bounded user refresh, a renamed default whose old target remains, dangling-target
+and invalid-namespace fallback, and exact account forwarding. `popup-manager-test.ts`
 and `trampoline-ui-helper-test.ts` cover FIFO settlement for every prompt
 family, pre-existing sign-in reuse, duplicate/removed/evicted popup settlement,
-sign-in state reset, and recovery after dispatch failure.
+replacement reasons, replacement-safe sign-in state, sign-in reset on ordinary
+removal, and recovery after dispatch failure.
 `dedicated-setting-store-test.ts` covers a 500-call burst, queued-read/history
 and flush barriers, sequential writes, and failed-batch recovery.
 

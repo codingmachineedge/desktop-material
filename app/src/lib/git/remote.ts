@@ -122,29 +122,53 @@ export async function updateRemoteHEAD(
   remote: IRemote,
   isBackgroundTask: boolean,
   /** Stable account identity to force for this remote lookup. Never a token. */
-  accountKey?: string
+  accountKey?: string,
+  /** Test seam; production bounds discovery so a responsive fetch can finish. */
+  discoveryTimeoutMs = 5_000
 ): Promise<void> {
   // Discovering the remote's default branch requires contacting the remote and
-  // can be disproportionately expensive for repositories with many refs. If
-  // the local remote HEAD already points within this remote's namespace, it is
-  // usable as-is and no network lookup is necessary.
-  if ((await getRemoteHEAD(repository, remote.name)) !== null) {
+  // can be disproportionately expensive for repositories with many refs.
+  // Background fetches may reuse a valid local target, but a user-initiated
+  // fetch must refresh it so a remote default-branch rename is discovered.
+  if (
+    isBackgroundTask &&
+    (await getRemoteHEAD(repository, remote.name)) !== null
+  ) {
     return
   }
 
+  const env = await envForRemoteOperation(remote.url)
+  const controller = new AbortController()
+  const timeout = setTimeout(
+    () => controller.abort(),
+    Math.max(1, discoveryTimeoutMs)
+  )
+
   const options = {
     successExitCodes: new Set([0, 1, 128]),
-    env: await envForRemoteOperation(remote.url),
+    env,
     isBackgroundTask,
     credentialAccountKey: accountKey,
+    signal: controller.signal,
   }
 
-  await git(
-    ['remote', 'set-head', '-a', remote.name],
-    repository.path,
-    'updateRemoteHEAD',
-    options
-  )
+  try {
+    await git(
+      ['remote', 'set-head', '-a', remote.name],
+      repository.path,
+      'updateRemoteHEAD',
+      options
+    )
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      throw error
+    }
+    log.warn(
+      `Timed out updating ${remote.name} remote HEAD after ${discoveryTimeoutMs}ms.`
+    )
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export async function getRemoteHEAD(

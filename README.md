@@ -134,9 +134,10 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
 - Repository-bound HTTPS Git fetch, pull, push, post-push refresh, scheduled
   sync, refspec fetch, and remote-HEAD discovery use the exact selected account.
-  A namespace-validated local remote HEAD skips the redundant online
-  default-branch scan after fetch; missing or invalid refs still perform one
-  authenticated discovery. Legacy unbound organization repositories prefer a
+  Background sync reuses a namespace- and target-validated local remote HEAD;
+  an explicit fetch performs a five-second-bounded refresh so a renamed default
+  is still discovered even when the old branch exists. Missing or invalid refs
+  still perform one authenticated discovery. Legacy unbound organization repositories prefer a
   verified write-capable same-host identity, while a missing explicit binding
   fails closed instead of silently using another account
 - GitHub browser sign-in requests the bounded feature scopes used by the app: repository/user access, workflow-file updates, notifications, and read-only organization membership. Unrelated destructive and administrative OAuth scopes are intentionally excluded
@@ -232,9 +233,8 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 
 ### Responsiveness and resource lifecycle
 
-- Reuse a valid local remote default instead of rescanning every server ref after
-  each fetch; first-time, invalid, and dangling states retain exact-account
-  discovery
+- Reuse a valid local remote default during background sync; explicit fetches
+  refresh it with a five-second bound so default-branch renames remain visible
 - Collapse synchronous appearance bursts into one latest-value write without
   crossing queued `get()` reads, flushes, or owner-history operations
 - Release same-origin request records on success, failure, and cancellation,

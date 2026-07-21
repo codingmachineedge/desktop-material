@@ -16,11 +16,14 @@ historical test receipts stay in [`PLAN.md`](PLAN.md) and
 Publication verification is pending.
 
 - Valid, locally resolvable remote defaults no longer trigger a potentially
-  multi-minute online `git remote set-head -a` scan after every fetch. Missing,
-  invalid, or dangling refs retain exact-account discovery.
+  multi-minute online `git remote set-head -a` scan during background sync.
+  Explicit fetches refresh the default with a five-second hard bound, so a
+  rename is detected even if the old target still exists. Missing, invalid, or
+  dangling refs retain exact-account discovery.
 - Concurrent GitHub, Git, and SSH credential prompts settle through one
   recoverable FIFO instead of allowing popup de-duplication or forced removal
-  to strand a caller.
+  to strand a caller. Replaced popup owners receive one explicit replacement
+  settlement; replacing sign-in state does not clear the new owner's flow.
 - High-frequency appearance updates coalesce into one latest-value store
   mutation without crossing queued `get()` reads, flushes, or owner-history
   operations.

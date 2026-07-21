@@ -236,6 +236,31 @@ describe('PopupManager', () => {
       assert.equal(popupManager.currentPopup?.type, PopupType.BranchRules)
     })
 
+    it('settles a replaced popup owner exactly once with its reason', () => {
+      const popupManager = new PopupManager()
+      const firstReasons: string[] = []
+      const replacementReasons: string[] = []
+      popupManager.addPopup({
+        type: PopupType.BranchRules,
+        repository: { id: 1 } as never,
+        initialBranch: 'main',
+        onRemoved: reason => firstReasons.push(reason),
+      })
+
+      const replacement = popupManager.addPopup({
+        type: PopupType.BranchRules,
+        repository: { id: 2 } as never,
+        initialBranch: 'release',
+        onRemoved: reason => replacementReasons.push(reason),
+      })
+
+      assert.deepEqual(firstReasons, ['replaced'])
+      assert.deepEqual(replacementReasons, [])
+      popupManager.removePopup(replacement)
+      assert.deepEqual(firstReasons, ['replaced'])
+      assert.deepEqual(replacementReasons, ['removed'])
+    })
+
     it('retargets repeated sparse-checkout sheets for the same or a different repository', () => {
       const popupManager = new PopupManager()
       const firstRepository = { id: 1 } as never

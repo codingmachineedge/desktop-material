@@ -308,6 +308,32 @@ describe('TrampolineUIHelper prompt queue', () => {
     assert.equal(popupManager.getPopupsOfType(PopupType.SignIn).length, 0)
   })
 
+  it('settles a replaced sign-in prompt without resetting the new owner', async () => {
+    const popupManager = new PopupManager()
+    let resetCalls = 0
+    const helper = new TrampolineUIHelper()
+    helper.setDispatcher({
+      beginDotComSignIn: () => undefined,
+      showPopup: async (popup: Popup) => {
+        popupManager.addPopup(popup)
+      },
+      resetSignInState: async () => {
+        resetCalls++
+      },
+    } as unknown as Dispatcher)
+
+    const result = helper.promptForGitHubSignIn('https://github.com')
+    await flushPromptQueue()
+    popupManager.addPopup({
+      type: PopupType.SignIn,
+      isCredentialHelperSignIn: false,
+    })
+
+    assert.equal(await result, undefined)
+    assert.equal(resetCalls, 0)
+    assert.equal(popupManager.currentPopup?.type, PopupType.SignIn)
+  })
+
   it('continues with the next prompt after popup dispatch rejects', async () => {
     let attempts = 0
     const { helper, popups } = createHelper(async () => {

@@ -1,6 +1,6 @@
 import { Account } from '../../models/account'
 import { IGitAccount } from '../../models/git-account'
-import { PopupType } from '../../models/popup'
+import { PopupRemovalReason, PopupType } from '../../models/popup'
 import { Dispatcher } from '../../ui/dispatcher'
 import { SignInResult } from '../stores'
 
@@ -142,8 +142,14 @@ export class TrampolineUIHelper {
             this.dispatcher.closePopup(PopupType.SignIn)
           }
 
-          const cancelAndReset = () => {
+          const cancelAndReset = (reason: PopupRemovalReason = 'removed') => {
             if (!settle(undefined)) {
+              return
+            }
+
+            // A replacement owns the same global sign-in state. Settle this
+            // prompt's caller, but leave that state intact for the new popup.
+            if (reason === 'replaced') {
               return
             }
 

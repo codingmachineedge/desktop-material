@@ -1,4 +1,4 @@
-import { Popup, PopupType } from '../models/popup'
+import { Popup, PopupRemovalReason, PopupType } from '../models/popup'
 import { sendNonFatalException } from './helpers/non-fatal-exception'
 
 /**
@@ -106,12 +106,15 @@ export class PopupManager {
           candidate => candidate.type !== popupToAdd.type
         )
         this.insertBeforeErrorPopups(popup)
+        for (const replacedPopup of existingPopup) {
+          this.notifyPopupRemoved(replacedPopup, 'replaced')
+        }
         return popup
       }
       log.warn(
         `Attempted to add a popup of already existing type - ${popupToAdd.type}.`
       )
-      this.notifyPopupRemoved(popupToAdd)
+      this.notifyPopupRemoved(popupToAdd, 'removed')
       return popupToAdd
     }
 
@@ -170,7 +173,7 @@ export class PopupManager {
         )
       )
       this.popupStack = this.popupStack.slice(1)
-      this.notifyPopupRemoved(oldest)
+      this.notifyPopupRemoved(oldest, 'removed')
     }
   }
 
@@ -208,7 +211,7 @@ export class PopupManager {
     const removed = this.popupStack.filter(p => p.id === popup.id)
     this.popupStack = this.popupStack.filter(p => p.id !== popup.id)
     for (const removedPopup of removed) {
-      this.notifyPopupRemoved(removedPopup)
+      this.notifyPopupRemoved(removedPopup, 'removed')
     }
   }
 
@@ -219,7 +222,7 @@ export class PopupManager {
     const removed = this.popupStack.filter(p => p.type === popupType)
     this.popupStack = this.popupStack.filter(p => p.type !== popupType)
     for (const removedPopup of removed) {
-      this.notifyPopupRemoved(removedPopup)
+      this.notifyPopupRemoved(removedPopup, 'removed')
     }
   }
 
@@ -230,13 +233,13 @@ export class PopupManager {
     const removed = this.popupStack.filter(p => p.id === popupId)
     this.popupStack = this.popupStack.filter(p => p.id !== popupId)
     for (const removedPopup of removed) {
-      this.notifyPopupRemoved(removedPopup)
+      this.notifyPopupRemoved(removedPopup, 'removed')
     }
   }
 
-  private notifyPopupRemoved(popup: Popup) {
+  private notifyPopupRemoved(popup: Popup, reason: PopupRemovalReason) {
     try {
-      popup.onRemoved?.()
+      popup.onRemoved?.(reason)
     } catch (error) {
       log.error(`Popup removal callback failed for ${popup.type}.`, error)
     }

@@ -20,14 +20,14 @@ it is never a token, command-line argument, or environment variable. This
 keeps a personal GitHub.com account from being selected merely because it was
 signed in before the organization-authorized account.
 
-Remote-HEAD lookup first validates the local symbolic ref and reuses it only
-when it points below `refs/remotes/<remote>/`. That avoids an online
-`git remote set-head -a` scan after every successful fetch, which can otherwise
-scale with the server's complete ref inventory. A missing, empty, malformed, or
-other-remote ref performs exactly one discovery with the same selected account
-and background-task mode. A generic remote is not continuously polled for a
-host-side default-branch rename; update its default in Remote Manager or remove
-the stale local ref to request discovery.
+Background remote-HEAD lookup first validates the local symbolic ref and reuses
+it only when it points below `refs/remotes/<remote>/` and its target exists.
+That avoids an online `git remote set-head -a` scan during every scheduled
+refresh, which can otherwise scale with the server's complete ref inventory. A
+missing, empty, malformed, dangling, or other-remote background ref performs
+exactly one discovery with the same selected account. A user-initiated fetch
+always refreshes the default with a five-second hard bound, so a generic host's
+rename is detected even while the old branch still exists.
 
 An explicit binding is authoritative. If that account is no longer available,
 the operation fails with account recovery rather than silently using another

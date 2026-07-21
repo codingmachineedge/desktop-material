@@ -191,17 +191,22 @@ rebased onto `09b3a0ee89f520621f0db6be077f0ab70b2b4221` without overwriting it.
   [desktop/desktop#22039](https://github.com/desktop/desktop/issues/22039)
   records a roughly 10-second fetch followed by repeated 365–371-second
   `git remote set-head -a` calls on a very large ref inventory. Desktop Material
-  now validates and reuses an existing local remote-HEAD symref only while its
-  target exists. Missing, dangling, malformed, empty, and cross-remote values
-  retain exactly one authenticated discovery with the selected account and
-  background mode.
+  now validates and reuses an existing local remote-HEAD symref during
+  background refresh only while its target exists. A user-initiated fetch
+  refreshes the remote default with the selected account and a five-second hard
+  bound, detecting a rename even when the old branch remains. Missing,
+  dangling, malformed, empty, and cross-remote background values retain exactly
+  one authenticated discovery.
 - `PopupManager` intentionally de-duplicates popup types, but concurrent
   askpass calls previously created a second promise without a second visible
   prompt, leaving that caller unresolved forever. `TrampolineUIHelper` now
   serializes host-key, key-passphrase, SSH password, generic Git credential, and
   GitHub sign-in prompts through a non-poisoning FIFO. Manager de-duplication,
   explicit removal, and stack eviction now settle promise-backed popups; a
-  removed sign-in flow also clears its retained store callback.
+  removed sign-in flow also clears its retained store callback. A deliberate
+  contextual replacement now settles the old popup owner exactly once with a
+  `replaced` reason; sign-in replacement preserves global state for the new
+  owner while an ordinary removal still resets it.
 - Appearance sliders could enqueue hundreds of full ownership checks,
   crash-safe file writes, state emissions, and local-Git work in one gesture.
   `DedicatedSettingStore.set()` now coalesces adjacent synchronous calls into
@@ -223,6 +228,11 @@ rebased onto `09b3a0ee89f520621f0db6be077f0ab70b2b4221` without overwriting it.
   passes **27/27** tests. The real-DOM Markdown lifecycle regression passes
   **1/1** after 25 content reloads and verifies that a post-unmount scroll no
   longer invokes the component.
+- The exact rebased branch passes **79/79** focused tests across Git routing,
+  popup management, trampoline prompts, appearance-store coalescing,
+  same-origin cleanup, and sandboxed-Markdown lifecycle. Root TypeScript also
+  passes on that exact source; targeted ESLint/Prettier and diff validation pass
+  on the correction.
 - Each implementation lane also passed full app TypeScript, targeted ESLint and
   Prettier, and `git diff --check` before integration.
 - The pre-change full unit run completed 1,593 passes and one intentional skip;

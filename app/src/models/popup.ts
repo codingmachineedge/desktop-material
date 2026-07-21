@@ -209,8 +209,11 @@ interface IBasePopup {
    * normal UI, explicit cleanup, de-duplication, or the stack limit.
    * Promise-backed popups use this to settle if their UI vanishes.
    */
-  readonly onRemoved?: () => void
+  readonly onRemoved?: (reason: PopupRemovalReason) => void
 }
+
+/** Why a popup owner lost its surface. */
+export type PopupRemovalReason = 'removed' | 'replaced'
 
 /**
  * Narrows the settings-history viewer to a single subject instead of the whole

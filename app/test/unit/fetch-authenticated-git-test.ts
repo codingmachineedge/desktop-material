@@ -54,7 +54,14 @@ mock.module('../../src/lib/git/core', {
       }
 
       if (name === 'updateRemoteHEAD' && remoteHEADDiscoveryNeverResolves) {
-        return await new Promise<never>(() => {})
+        return await new Promise<never>((_resolve, reject) => {
+          const signal = options.signal as AbortSignal | undefined
+          signal?.addEventListener(
+            'abort',
+            () => reject(new Error('remote HEAD discovery aborted')),
+            { once: true }
+          )
+        })
       }
 
       return { exitCode: 0, stdout: '', stderr: '', gitError: null }
@@ -145,7 +152,7 @@ describe('authenticated fetch Git execution', () => {
     assertCredentialScope(invocations[0])
   })
 
-  it('skips a hanging remote HEAD discovery when the local symref is valid', async () => {
+  it('skips remote HEAD discovery for a valid background symref', async () => {
     const { updateRemoteHEAD } = await import('../../src/lib/git/remote')
     resetGitMocks()
     symbolicRefExitCode = 0
@@ -153,7 +160,7 @@ describe('authenticated fetch Git execution', () => {
     remoteHEADDiscoveryNeverResolves = true
 
     await settlesWithin(
-      updateRemoteHEAD(repository, remote, false, accountKey),
+      updateRemoteHEAD(repository, remote, true, accountKey),
       100
     )
 
@@ -175,6 +182,37 @@ describe('authenticated fetch Git execution', () => {
     assert.equal(remoteOperationURLs.length, 0)
   })
 
+  it('refreshes a valid remote HEAD after a user-initiated fetch', async () => {
+    const { updateRemoteHEAD } = await import('../../src/lib/git/remote')
+    resetGitMocks()
+    symbolicRefExitCode = 0
+    symbolicRefStdout = 'refs/remotes/origin/main\n'
+
+    await updateRemoteHEAD(repository, remote, false, accountKey)
+
+    assert.equal(invocations.length, 1)
+    assert.equal(invocations[0].name, 'updateRemoteHEAD')
+    assertCredentialScope(invocations[0])
+    assert.deepStrictEqual(remoteOperationURLs, [remote.url])
+  })
+
+  it('bounds a hanging user-initiated remote HEAD refresh', async () => {
+    const { updateRemoteHEAD } = await import('../../src/lib/git/remote')
+    resetGitMocks()
+    symbolicRefExitCode = 0
+    symbolicRefStdout = 'refs/remotes/origin/main\n'
+    remoteHEADDiscoveryNeverResolves = true
+
+    await settlesWithin(
+      updateRemoteHEAD(repository, remote, false, accountKey, 10),
+      100
+    )
+
+    assert.equal(invocations.length, 1)
+    assert.equal(invocations[0].name, 'updateRemoteHEAD')
+    assert.equal((invocations[0].options.signal as AbortSignal).aborted, true)
+  })
+
   it('repairs a namespace-valid remote HEAD whose target is missing', async () => {
     const { updateRemoteHEAD } = await import('../../src/lib/git/remote')
     resetGitMocks()
@@ -182,7 +220,7 @@ describe('authenticated fetch Git execution', () => {
     symbolicRefStdout = 'refs/remotes/origin/retired\n'
     remoteHEADTargetExitCode = 1
 
-    await updateRemoteHEAD(repository, remote, false, accountKey)
+    await updateRemoteHEAD(repository, remote, true, accountKey)
 
     assert.equal(invocations.length, 3)
     assert.equal(invocations[0].name, 'getSymbolicRef')
@@ -222,7 +260,7 @@ describe('authenticated fetch Git execution', () => {
       symbolicRefExitCode = 0
       symbolicRefStdout = symbolicRef
 
-      await updateRemoteHEAD(repository, remote, false, accountKey)
+      await updateRemoteHEAD(repository, remote, true, accountKey)
 
       assert.equal(
         invocations.filter(invocation => invocation.name === 'updateRemoteHEAD')
@@ -230,7 +268,7 @@ describe('authenticated fetch Git execution', () => {
         1
       )
       assertCredentialScope(invocations[1])
-      assert.equal(invocations[1].options.isBackgroundTask, false)
+      assert.equal(invocations[1].options.isBackgroundTask, true)
       assert.deepStrictEqual(remoteOperationURLs, [remote.url])
     })
   }

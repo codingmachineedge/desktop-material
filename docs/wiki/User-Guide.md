@@ -263,11 +263,12 @@ GitHub.com identity. For an older unassigned repository, Desktop Material verifi
 accounts against the remote and prefers an account that can push before a read-only account, then
 saves that verified choice for later operations.
 
-After fetch, a local `refs/remotes/<remote>/HEAD` is reused only when it points inside that exact
-remote namespace. This avoids an expensive online default-branch scan on every refresh. Missing,
-malformed, or cross-remote refs still run one lookup with the repository's selected account. If a
-generic host renames its default branch, update it in Remote Manager or remove the stale local ref
-to request fresh discovery.
+During background fetch, a local `refs/remotes/<remote>/HEAD` is reused only when it points inside
+that exact remote namespace and its target still exists. This avoids an expensive online
+default-branch scan on every scheduled refresh. Missing, malformed, dangling, or cross-remote refs
+still run one lookup with the repository's selected account. An explicit Fetch always refreshes
+the default with a five-second hard bound, so a generic host's rename is detected even when its old
+branch still exists.
 
 ---
 
