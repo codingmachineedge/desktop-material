@@ -43,6 +43,8 @@ buttons in both the API surface and **Repository tools → API functions**.
   remain pending the fixed MCP environment.
 - No screenshot or public wiki/Pages image claim is made until the rebuilt
   headless app passes the acceptance gate.
+- The checked-in Pages source is aligned with the functions-first wording and
+  does not claim a new screenshot or remote Pages deployment.
 
 ## 2026-07-20 M24 — guided sparse checkout accepted locally
 
