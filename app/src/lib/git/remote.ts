@@ -4,6 +4,10 @@ import { GitError } from 'dugite'
 import { Repository } from '../../models/repository'
 import { IRemote } from '../../models/remote'
 import { envForRemoteOperation } from './environment'
+import {
+  createGitProcessAbortHandler,
+  type GitProcessTerminator,
+} from './process-abort'
 import { getSymbolicRef } from './refs'
 
 /**
@@ -124,7 +128,9 @@ export async function updateRemoteHEAD(
   /** Stable account identity to force for this remote lookup. Never a token. */
   accountKey?: string,
   /** Test seam; production bounds discovery so a responsive fetch can finish. */
-  discoveryTimeoutMs = 5_000
+  discoveryTimeoutMs = 5_000,
+  /** Test seam for process-tree termination without launching real children. */
+  processTerminator?: GitProcessTerminator
 ): Promise<void> {
   // Discovering the remote's default branch requires contacting the remote and
   // can be disproportionately expensive for repositories with many refs.
@@ -137,28 +143,44 @@ export async function updateRemoteHEAD(
     return
   }
 
-  const env = await envForRemoteOperation(remote.url)
   const controller = new AbortController()
-  const timeout = setTimeout(
-    () => controller.abort(),
-    Math.max(1, discoveryTimeoutMs)
+  const processAbort = createGitProcessAbortHandler(
+    controller.signal,
+    processTerminator
   )
-
-  const options = {
-    successExitCodes: new Set([0, 1, 128]),
-    env,
-    isBackgroundTask,
-    credentialAccountKey: accountKey,
-    signal: controller.signal,
-  }
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort()
+      reject(new Error('Remote HEAD discovery timed out.'))
+    }, Math.max(1, discoveryTimeoutMs))
+  })
 
   try {
-    await git(
-      ['remote', 'set-head', '-a', remote.name],
-      repository.path,
-      'updateRemoteHEAD',
-      options
-    )
+    // Proxy discovery can involve operating-system services. Include it in the
+    // same deadline as Git so a stalled resolver cannot block fetch completion.
+    const env = await Promise.race([
+      envForRemoteOperation(remote.url),
+      deadline,
+    ])
+    const options = {
+      successExitCodes: new Set([0, 1, 128]),
+      env,
+      isBackgroundTask,
+      credentialAccountKey: accountKey,
+      signal: controller.signal,
+      processCallback: processAbort.processCallback(undefined),
+    }
+
+    await Promise.race([
+      git(
+        ['remote', 'set-head', '-a', remote.name],
+        repository.path,
+        'updateRemoteHEAD',
+        options
+      ),
+      deadline,
+    ])
   } catch (error) {
     if (!controller.signal.aborted) {
       throw error
@@ -167,7 +189,16 @@ export async function updateRemoteHEAD(
       `Timed out updating ${remote.name} remote HEAD after ${discoveryTimeoutMs}ms.`
     )
   } finally {
-    clearTimeout(timeout)
+    if (timeout !== undefined) {
+      clearTimeout(timeout)
+    }
+    // A signal alone can leave SSH, helpers, or hooks alive on Windows. Do not
+    // report timeout completion until the owned process tree has closed.
+    if (controller.signal.aborted) {
+      await processAbort.abortAndWait()
+    } else {
+      await processAbort.waitForTermination()
+    }
   }
 }
 

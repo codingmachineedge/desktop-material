@@ -64,6 +64,17 @@ interface ISandboxedMarkdownState {
   readonly tooltipOffset?: DOMRect
 }
 
+interface IMarkdownRenderOwner {
+  readonly generation: number
+  readonly frame: HTMLIFrameElement
+  readonly props: ISandboxedMarkdownProps
+}
+
+interface IPendingDocumentReady {
+  readonly doc: Document
+  readonly listener: EventListener
+}
+
 /**
  * Parses and sanitizes markdown into html and outputs it inside a sandboxed
  * iframe.
@@ -75,6 +86,10 @@ export class SandboxedMarkdown extends React.PureComponent<
   private frameRef: HTMLIFrameElement | null = null
   private currentDocument: Document | null = null
   private frameContainingDivRef = React.createRef<HTMLDivElement>()
+  private renderGeneration = 0
+  private pendingDocumentAnimationFrame: number | null = null
+  private pendingDocumentReady: IPendingDocumentReady | null = null
+  private readonly initializedDocuments = new WeakSet<Document>()
 
   private onDocumentScroll = debounce(() => {
     if (this.frameRef == null) {
@@ -129,7 +144,36 @@ export class SandboxedMarkdown extends React.PureComponent<
   }
 
   public renderMarkdown = async () => {
-    const { markdown } = this.props
+    const {
+      markdown,
+      baseHref,
+      emoji,
+      repository,
+      markdownContext,
+      underlineLinks,
+      customCSS,
+    } = this.props
+    const props: ISandboxedMarkdownProps = {
+      ...this.props,
+      markdown,
+      baseHref,
+      emoji,
+      repository,
+      markdownContext,
+      underlineLinks,
+      customCSS,
+    }
+    const frame = this.frameRef
+    const generation = ++this.renderGeneration
+
+    this.cancelPendingDocumentWork()
+    this.currentDocument = null
+
+    if (frame === null) {
+      return
+    }
+
+    const owner = { generation, frame, props }
 
     const body = DOMPurify.sanitize(
       marked(markdown, {
@@ -143,18 +187,16 @@ export class SandboxedMarkdown extends React.PureComponent<
       })
     )
 
-    const styleSheet = await this.getInlineStyleSheet()
+    const styleSheet = await this.getInlineStyleSheet(props)
 
-    // If component got unmounted while we were loading the style sheet
-    // frameref will be null.
-    if (this.frameRef === null) {
+    if (!this.isRenderOwned(owner)) {
       return
     }
 
     const src = `
       <html>
         <head>
-          ${this.getBaseTag(this.props.baseHref)}
+          ${this.getBaseTag(baseHref)}
           ${styleSheet}
         </head>
         <body class="markdown-body">
@@ -173,41 +215,13 @@ export class SandboxedMarkdown extends React.PureComponent<
     // `srcdoc` property because the `srcdoc` property renders the html in the
     // parent dom and we want all rendering to be isolated to our sandboxed iframe.
     // -- https://csplite.com/csp/test188/
-    const oldDocument = this.frameRef.contentDocument
-    this.currentDocument = null
-    this.frameRef.src = `data:text/html;charset=utf-8;base64,${b64src}`
-
-    const waitForNewDocument = () => {
-      if (!this.frameRef) {
-        return
-      }
-      const doc = this.frameRef.contentDocument
-      if (doc === oldDocument) {
-        requestAnimationFrame(waitForNewDocument)
-      } else if (doc !== null) {
-        this.currentDocument = doc
-        if (doc.readyState === 'loading') {
-          doc.addEventListener('DOMContentLoaded', () =>
-            this.onDocumentDOMContentLoaded(doc)
-          )
-        } else {
-          this.onDocumentDOMContentLoaded(doc)
-        }
-        return
-      }
-    }
-
-    requestAnimationFrame(waitForNewDocument)
+    const oldDocument = frame.contentDocument
+    frame.src = `data:text/html;charset=utf-8;base64,${b64src}`
+    this.queueDocumentCheck(owner, oldDocument)
   }
 
   public async componentDidUpdate(prevProps: ISandboxedMarkdownProps) {
-    // rerender iframe contents if provided markdown changes
-    if (
-      prevProps.markdown !== this.props.markdown ||
-      this.props.emoji !== prevProps.emoji ||
-      this.props.repository?.hash !== prevProps.repository?.hash ||
-      this.props.markdownContext !== prevProps.markdownContext
-    ) {
+    if (this.haveRenderingPropsChanged(prevProps, this.props)) {
       this.renderMarkdown()
     }
   }
@@ -219,8 +233,90 @@ export class SandboxedMarkdown extends React.PureComponent<
       DocumentScrollListenerCapture
     )
     this.onDocumentScroll.cancel()
+    this.renderGeneration++
+    this.cancelPendingDocumentWork()
     this.currentDocument = null
     this.frameRef = null
+  }
+
+  private haveRenderingPropsChanged(
+    previous: ISandboxedMarkdownProps,
+    current: ISandboxedMarkdownProps
+  ): boolean {
+    return (
+      previous.markdown !== current.markdown ||
+      previous.baseHref !== current.baseHref ||
+      previous.emoji !== current.emoji ||
+      previous.repository?.hash !== current.repository?.hash ||
+      previous.markdownContext !== current.markdownContext ||
+      previous.underlineLinks !== current.underlineLinks ||
+      previous.customCSS !== current.customCSS
+    )
+  }
+
+  private isRenderOwned(owner: IMarkdownRenderOwner, doc?: Document): boolean {
+    return (
+      owner.generation === this.renderGeneration &&
+      owner.frame === this.frameRef &&
+      !this.haveRenderingPropsChanged(owner.props, this.props) &&
+      (doc === undefined || doc === this.currentDocument)
+    )
+  }
+
+  private cancelPendingDocumentWork(): void {
+    if (this.pendingDocumentAnimationFrame !== null) {
+      cancelAnimationFrame(this.pendingDocumentAnimationFrame)
+      this.pendingDocumentAnimationFrame = null
+    }
+
+    if (this.pendingDocumentReady !== null) {
+      const { doc, listener } = this.pendingDocumentReady
+      doc.removeEventListener('DOMContentLoaded', listener)
+      this.pendingDocumentReady = null
+    }
+  }
+
+  private queueDocumentCheck(
+    owner: IMarkdownRenderOwner,
+    oldDocument: Document | null
+  ): void {
+    const scheduleDocumentCheck = () => {
+      const animationFrame = requestAnimationFrame(() => {
+        if (this.pendingDocumentAnimationFrame === animationFrame) {
+          this.pendingDocumentAnimationFrame = null
+        }
+        waitForNewDocument()
+      })
+      this.pendingDocumentAnimationFrame = animationFrame
+    }
+
+    const waitForNewDocument = () => {
+      if (!this.isRenderOwned(owner)) {
+        return
+      }
+
+      const doc = owner.frame.contentDocument
+      if (doc === null || doc === oldDocument) {
+        scheduleDocumentCheck()
+        return
+      }
+
+      this.currentDocument = doc
+      if (doc.readyState === 'loading') {
+        const listener = () => {
+          if (this.pendingDocumentReady?.listener === listener) {
+            this.pendingDocumentReady = null
+          }
+          this.onDocumentDOMContentLoaded(owner, doc)
+        }
+        this.pendingDocumentReady = { doc, listener }
+        doc.addEventListener('DOMContentLoaded', listener, { once: true })
+      } else {
+        this.onDocumentDOMContentLoaded(owner, doc)
+      }
+    }
+
+    scheduleDocumentCheck()
   }
 
   /**
@@ -232,7 +328,9 @@ export class SandboxedMarkdown extends React.PureComponent<
    * thus we will scrape the subset of them needed for the markdown css from the
    * document body and provide them aswell.
    */
-  private async getInlineStyleSheet(): Promise<string> {
+  private async getInlineStyleSheet(
+    props: ISandboxedMarkdownProps
+  ): Promise<string> {
     const css = await readFile(
       Path.join(__dirname, 'static', 'markdown.css'),
       'utf8'
@@ -267,7 +365,7 @@ export class SandboxedMarkdown extends React.PureComponent<
       ${css}
 
       .markdown-body a {
-        text-decoration: ${this.props.underlineLinks ? 'underline' : 'inherit'};
+        text-decoration: ${props.underlineLinks ? 'underline' : 'inherit'};
       }
 
       img {
@@ -275,11 +373,11 @@ export class SandboxedMarkdown extends React.PureComponent<
         height: auto;
       }
 
-      ${this.props.customCSS ?? ''}
+      ${props.customCSS ?? ''}
     </style>`
   }
 
-  private setupTooltips(doc: Document) {
+  private setupTooltips(doc: Document, owner: IMarkdownRenderOwner) {
     const tooltipElements = new Array<HTMLElement>()
 
     for (const e of doc.querySelectorAll('[aria-label]')) {
@@ -290,18 +388,27 @@ export class SandboxedMarkdown extends React.PureComponent<
       }
     }
 
-    this.setState({
-      tooltipElements,
-      tooltipOffset: this.frameRef?.getBoundingClientRect(),
-    })
+    if (this.isRenderOwned(owner, doc)) {
+      this.setState({
+        tooltipElements,
+        tooltipOffset: owner.frame.getBoundingClientRect(),
+      })
+    }
   }
 
   /**
    * We still want to be able to navigate to links provided in the markdown.
    * However, we want to intercept them an verify they are valid links first.
    */
-  private setupLinkInterceptor(doc: Document): void {
+  private setupLinkInterceptor(
+    doc: Document,
+    owner: IMarkdownRenderOwner
+  ): void {
     doc.addEventListener('click', ev => {
+      if (!this.isRenderOwned(owner, doc)) {
+        return
+      }
+
       if (doc.defaultView && ev.target instanceof doc.defaultView.Element) {
         const a = ev.target.closest('a')
         if (a !== null) {
@@ -328,30 +435,42 @@ export class SandboxedMarkdown extends React.PureComponent<
     return base.outerHTML
   }
 
-  private onDocumentDOMContentLoaded = (doc: Document) => {
-    if (this.currentDocument !== doc) {
+  private onDocumentDOMContentLoaded = (
+    owner: IMarkdownRenderOwner,
+    doc: Document
+  ) => {
+    if (!this.isRenderOwned(owner, doc) || this.initializedDocuments.has(doc)) {
       return
     }
+    this.initializedDocuments.add(doc)
 
     this.refreshHeight()
 
+    const refreshOwnedHeight = () => {
+      if (this.isRenderOwned(owner, doc)) {
+        this.refreshHeight()
+      }
+    }
+
     Array.from(doc.querySelectorAll('img')).forEach(img =>
-      img.addEventListener('load', this.refreshHeight)
+      img.addEventListener('load', refreshOwnedHeight)
     )
 
     Array.from(doc.querySelectorAll('details')).forEach(detail =>
-      detail.addEventListener('toggle', this.refreshHeight)
+      detail.addEventListener('toggle', refreshOwnedHeight)
     )
 
-    this.applyFilters(doc)
-    this.setupLinkInterceptor(doc)
-    this.setupTooltips(doc)
+    void this.applyFilters(doc, owner)
+    this.setupLinkInterceptor(doc, owner)
+    this.setupTooltips(doc, owner)
 
-    this.props.onMarkdownParsed?.()
+    if (this.isRenderOwned(owner, doc)) {
+      this.props.onMarkdownParsed?.()
+    }
   }
 
-  private async applyFilters(doc: Document) {
-    const { emoji, repository, markdownContext } = this.props
+  private async applyFilters(doc: Document, owner: IMarkdownRenderOwner) {
+    const { emoji, repository, markdownContext } = owner.props
     const filters = buildCustomMarkDownNodeFilterPipe({
       emoji,
       repository,
@@ -359,6 +478,10 @@ export class SandboxedMarkdown extends React.PureComponent<
     })
 
     for (const nodeFilter of filters) {
+      if (!this.isRenderOwned(owner, doc)) {
+        return
+      }
+
       let docMutated = false
       const walker = nodeFilter.createFilterTreeWalker(doc)
 
@@ -366,8 +489,7 @@ export class SandboxedMarkdown extends React.PureComponent<
       while (node !== null) {
         const replacementNodes = await nodeFilter.filter(node)
 
-        if (this.currentDocument !== doc) {
-          // Abort, the document has changed
+        if (!this.isRenderOwned(owner, doc)) {
           return
         }
 
@@ -386,7 +508,7 @@ export class SandboxedMarkdown extends React.PureComponent<
         currentNode.parentNode?.removeChild(currentNode)
       }
 
-      if (docMutated) {
+      if (docMutated && this.isRenderOwned(owner, doc)) {
         this.refreshHeight()
       }
     }

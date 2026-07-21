@@ -3565,7 +3565,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
       // Pull has mutated the checkout. Finish reconciliation even if the user
       // changes the visible repository while Git is running.
-      await updateRemoteHEAD(repository, remote, false, accountKey).catch(
+      await updateRemoteHEAD(repository, remote, true, accountKey).catch(
         error =>
           log.error(
             'Failed updating remote HEAD after automatic pull',

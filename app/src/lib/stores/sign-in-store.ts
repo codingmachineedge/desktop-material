@@ -161,10 +161,23 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
     super()
   }
 
-  private emitAuthenticate(account: Account) {
+  private emitAuthenticate(account: Account): boolean {
+    const state = this.state
+    const resultCallback = state?.resultCallback
+
+    // Release the callback before invoking observers. A callback can
+    // synchronously start another sign-in flow, whose initial reset must not
+    // re-enter the completed callback.
+    if (state !== null && this.state === state) {
+      this.state = { ...state, resultCallback: noop }
+    }
+    const releasedState = this.state
+
     const event: IAuthenticationEvent = { account }
     this.emitter.emit('did-authenticate', event)
-    this.state?.resultCallback({ kind: 'success', account })
+    resultCallback?.({ kind: 'success', account })
+
+    return this.state === releasedState
   }
 
   /**
@@ -298,10 +311,16 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
         }
 
         log.info('[SignInStore] account resolved')
-        this.emitAuthenticate(account)
+        if (!this.emitAuthenticate(account)) {
+          log.info(
+            '[SignInStore] authentication callback replaced the sign-in session'
+          )
+          return
+        }
+
         this.setState({
           kind: SignInStep.Success,
-          resultCallback: this.state.resultCallback,
+          resultCallback: noop,
         })
       })
       .catch(e => {

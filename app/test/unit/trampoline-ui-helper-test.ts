@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import { TrampolineUIHelper } from '../../src/lib/trampoline/trampoline-ui-helper'
 import { PopupManager } from '../../src/lib/popup-manager'
 import { SignInResult } from '../../src/lib/stores'
+import { Account } from '../../src/models/account'
 import { Popup, PopupType } from '../../src/models/popup'
 import { Dispatcher } from '../../src/ui/dispatcher'
 
@@ -364,5 +365,34 @@ describe('TrampolineUIHelper prompt queue', () => {
       secret: 'next-password',
       storeSecret: true,
     })
+  })
+
+  it('ignores a stale sign-in callback after its first result', async () => {
+    let callback: ((result: SignInResult) => void) | undefined
+    let closeCalls = 0
+    const account = {} as Account
+    const helper = new TrampolineUIHelper()
+    helper.setDispatcher({
+      beginDotComSignIn: (resultCallback: (result: SignInResult) => void) => {
+        callback = resultCallback
+      },
+      showPopup: async () => undefined,
+      closePopup: () => {
+        closeCalls++
+      },
+    } as unknown as Dispatcher)
+
+    const result = helper.promptForGitHubSignIn('https://github.com')
+    await flushPromptQueue()
+    if (callback === undefined) {
+      throw new Error('Expected the sign-in result callback')
+    }
+
+    callback({ kind: 'success', account })
+    assert.equal(await result, account)
+    assert.equal(closeCalls, 1)
+
+    callback({ kind: 'cancelled' })
+    assert.equal(closeCalls, 1)
   })
 })

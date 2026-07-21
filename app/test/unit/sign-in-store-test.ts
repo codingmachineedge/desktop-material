@@ -1,10 +1,11 @@
-import { describe, it, beforeEach } from 'node:test'
+import { describe, it, beforeEach, mock } from 'node:test'
 import assert from 'node:assert'
 import { SignInStore, SignInStep } from '../../src/lib/stores/sign-in-store'
 import { AccountsStore } from '../../src/lib/stores'
 import { Account } from '../../src/models/account'
 import { getDotComAPIEndpoint } from '../../src/lib/api'
 import { InMemoryStore, AsyncInMemoryStore } from '../helpers/stores'
+import { shell } from '../../src/lib/app-shell'
 
 function createAccountsStore(
   accounts: ReadonlyArray<Account> = []
@@ -205,6 +206,71 @@ describe('SignInStore', () => {
       signInStore.reset()
       assert.notEqual(result, null)
       assert.equal(result.kind, 'cancelled')
+    })
+  })
+
+  describe('successful authentication cleanup', () => {
+    it('releases the completed callback before a later reset', async () => {
+      const results = new Array<string>()
+      const openExternal = mock.method(shell, 'openExternal', async () => true)
+
+      try {
+        signInStore.beginDotComSignIn(result => results.push(result.kind))
+        await signInStore.authenticateWithBrowser()
+
+        const state = signInStore.getState()
+        if (
+          state?.kind !== SignInStep.Authentication ||
+          state.oauthState === undefined
+        ) {
+          throw new Error('Expected an active OAuth session')
+        }
+
+        state.oauthState.onAuthCompleted(createDotComAccount())
+        await new Promise<void>(resolve => setImmediate(resolve))
+
+        assert.equal(signInStore.getState()?.kind, SignInStep.Success)
+        signInStore.reset()
+        assert.deepEqual(results, ['success'])
+      } finally {
+        openExternal.mock.restore()
+      }
+    })
+
+    it('does not overwrite a replacement flow started by the callback', async () => {
+      const firstResults = new Array<string>()
+      const replacementResults = new Array<string>()
+      const openExternal = mock.method(shell, 'openExternal', async () => true)
+
+      try {
+        signInStore.beginDotComSignIn(result => {
+          firstResults.push(result.kind)
+          if (result.kind === 'success') {
+            signInStore.beginEnterpriseSignIn(replacementResult =>
+              replacementResults.push(replacementResult.kind)
+            )
+          }
+        })
+        await signInStore.authenticateWithBrowser()
+
+        const state = signInStore.getState()
+        if (
+          state?.kind !== SignInStep.Authentication ||
+          state.oauthState === undefined
+        ) {
+          throw new Error('Expected an active OAuth session')
+        }
+
+        state.oauthState.onAuthCompleted(createDotComAccount())
+        await new Promise<void>(resolve => setImmediate(resolve))
+
+        assert.deepEqual(firstResults, ['success'])
+        assert.equal(signInStore.getState()?.kind, SignInStep.EndpointEntry)
+        signInStore.reset()
+        assert.deepEqual(replacementResults, ['cancelled'])
+      } finally {
+        openExternal.mock.restore()
+      }
     })
   })
 

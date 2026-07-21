@@ -54,7 +54,10 @@ describe('organization repository Git authentication wiring', () => {
     )
     requiresAccountRouting(scheduledPull)
     assert.match(scheduledPull, /pullRepo[\s\S]+accountKey/)
-    assert.match(scheduledPull, /updateRemoteHEAD[\s\S]+accountKey/)
+    assert.match(
+      scheduledPull,
+      /updateRemoteHEAD\(repository, remote, true, accountKey\)/
+    )
   })
 
   it('uses one effective account for push and its follow-up fetch', () => {

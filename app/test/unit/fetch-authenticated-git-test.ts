@@ -1,5 +1,7 @@
 import { describe, it, mock } from 'node:test'
 import assert from 'node:assert'
+import { type ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 import { Repository } from '../../src/models/repository'
 
 interface IInvocation {
@@ -15,11 +17,16 @@ let symbolicRefExitCode = 1
 let symbolicRefStdout = ''
 let remoteHEADTargetExitCode = 0
 let remoteHEADDiscoveryNeverResolves = false
+let remoteHEADDiscoveryExposesProcess = false
+let remoteOperationNeverResolves = false
 
 mock.module('../../src/lib/git/environment', {
   namedExports: {
     envForRemoteOperation: async (url: string) => {
       remoteOperationURLs.push(url)
+      if (remoteOperationNeverResolves) {
+        return await new Promise<never>(() => {})
+      }
       return { HTTPS_PROXY: 'proxy-safe' }
     },
   },
@@ -54,6 +61,13 @@ mock.module('../../src/lib/git/core', {
       }
 
       if (name === 'updateRemoteHEAD' && remoteHEADDiscoveryNeverResolves) {
+        if (remoteHEADDiscoveryExposesProcess) {
+          const child = new EventEmitter() as ChildProcess
+          const processCallback = options.processCallback as
+            | ((process: ChildProcess) => void)
+            | undefined
+          processCallback?.(child)
+        }
         return await new Promise<never>((_resolve, reject) => {
           const signal = options.signal as AbortSignal | undefined
           signal?.addEventListener(
@@ -76,6 +90,8 @@ const resetGitMocks = () => {
   symbolicRefStdout = ''
   remoteHEADTargetExitCode = 0
   remoteHEADDiscoveryNeverResolves = false
+  remoteHEADDiscoveryExposesProcess = false
+  remoteOperationNeverResolves = false
 }
 
 const settlesWithin = async <T>(promise: Promise<T>, timeoutMs: number) => {
@@ -211,6 +227,68 @@ describe('authenticated fetch Git execution', () => {
     assert.equal(invocations.length, 1)
     assert.equal(invocations[0].name, 'updateRemoteHEAD')
     assert.equal((invocations[0].options.signal as AbortSignal).aborted, true)
+  })
+
+  it('awaits process-tree termination before a timed-out refresh settles', async () => {
+    const { updateRemoteHEAD } = await import('../../src/lib/git/remote')
+    resetGitMocks()
+    remoteHEADDiscoveryNeverResolves = true
+    remoteHEADDiscoveryExposesProcess = true
+
+    let releaseTermination: () => void = () => {}
+    const terminationGate = new Promise<void>(resolve => {
+      releaseTermination = resolve
+    })
+    let markTerminationStarted: () => void = () => {}
+    const terminationStarted = new Promise<void>(resolve => {
+      markTerminationStarted = resolve
+    })
+    let terminatedChild: ChildProcess | null = null
+    let terminationCount = 0
+
+    const update = updateRemoteHEAD(
+      repository,
+      remote,
+      false,
+      accountKey,
+      10,
+      async child => {
+        terminationCount++
+        terminatedChild = child
+        markTerminationStarted()
+        await terminationGate
+        child.emit('close', null, null)
+      }
+    )
+    let settled = false
+    void update.then(() => {
+      settled = true
+    })
+
+    await settlesWithin(terminationStarted, 100)
+    await new Promise<void>(resolve => setImmediate(resolve))
+    assert.equal(settled, false)
+    assert.notEqual(terminatedChild, null)
+    assert.equal(typeof invocations[0].options.processCallback, 'function')
+
+    releaseTermination()
+    await settlesWithin(update, 100)
+    assert.equal(settled, true)
+    assert.equal(terminationCount, 1)
+  })
+
+  it('includes remote environment preparation in the discovery deadline', async () => {
+    const { updateRemoteHEAD } = await import('../../src/lib/git/remote')
+    resetGitMocks()
+    remoteOperationNeverResolves = true
+
+    await settlesWithin(
+      updateRemoteHEAD(repository, remote, false, accountKey, 10),
+      100
+    )
+
+    assert.deepStrictEqual(remoteOperationURLs, [remote.url])
+    assert.equal(invocations.length, 0)
   })
 
   it('repairs a namespace-valid remote HEAD whose target is missing', async () => {

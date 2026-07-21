@@ -138,7 +138,12 @@ export class TrampolineUIHelper {
           }
 
           const cb = (result: SignInResult) => {
-            settle(result.kind === 'success' ? result.account : undefined)
+            if (
+              !settle(result.kind === 'success' ? result.account : undefined)
+            ) {
+              return
+            }
+
             this.dispatcher.closePopup(PopupType.SignIn)
           }
 
