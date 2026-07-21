@@ -45,7 +45,12 @@ describe('SSH Docker deployment after push wiring', () => {
     assert.match(implementation, /catch \(error\)/)
     assert.match(implementation, /title: 'Docker deployment failed'/)
 
-    const scheduledPush = source.indexOf('private async performScheduledPush')
+    // The scheduled push resolves the repository in a thin delegator
+    // (performScheduledPush) and performs the actual push in
+    // performScheduledPushWithResolvedRepository; anchor on the latter.
+    const scheduledPush = source.indexOf(
+      'private async performScheduledPushWithResolvedRepository'
+    )
     const scheduledPushCall = source.indexOf('await pushRepo(', scheduledPush)
     const scheduledRefresh = source.indexOf(
       'await this._refreshRepository(repository)',

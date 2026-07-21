@@ -693,6 +693,10 @@ export class GitHubAPIExplorer extends React.Component<
     }
   }
 
+  private onShowApiTab = () => {
+    this.props.onShow?.()
+  }
+
   private onCancelRequest = () => {
     if (this.executionController === null) {
       return
@@ -2260,9 +2264,7 @@ export class GitHubAPIExplorer extends React.Component<
             {this.props.onHide === undefined &&
             this.props.onShow === undefined ? null : this.props.onHide ===
               undefined ? (
-              <Button onClick={() => this.props.onShow?.()}>
-                Show API tab
-              </Button>
+              <Button onClick={this.onShowApiTab}>Show API tab</Button>
             ) : (
               <Button onClick={this.props.onHide}>Hide API tab</Button>
             )}

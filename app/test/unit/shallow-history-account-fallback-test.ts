@@ -33,7 +33,7 @@ const authenticationError = (kind: DugiteError) =>
   )
 
 describe('shallow-history account fallback', () => {
-  it('retries an authentication ambiguity with the repository-bound account', async () => {
+  it('forces the repository-bound account and never falls back from it', async () => {
     const first = account(1)
     const second = account(2)
     const attempts: Array<string | undefined> = []
@@ -44,14 +44,14 @@ describe('shallow-history account fallback', () => {
       getAccountKey(second),
       async accountKey => {
         attempts.push(accountKey)
-        if (accountKey === undefined) {
-          throw authenticationError(DugiteError.HTTPSRepositoryNotFound)
-        }
       }
     )
 
-    assert.deepStrictEqual(attempts, [undefined, getAccountKey(second)])
-    assert.deepStrictEqual(result, { usedFallbackAccount: true })
+    assert.deepStrictEqual(attempts, [getAccountKey(second)])
+    assert.deepStrictEqual(result, {
+      usedFallbackAccount: false,
+      accountKey: getAccountKey(second),
+    })
     assert.equal(
       attempts.some(value => value?.includes(first.token) === true),
       false
@@ -60,6 +60,27 @@ describe('shallow-history account fallback', () => {
       attempts.some(value => value?.includes(second.token) === true),
       false
     )
+  })
+
+  it('propagates a bound-account failure instead of switching identity', async () => {
+    const first = account(1)
+    const second = account(2)
+    const error = authenticationError(DugiteError.HTTPSAuthenticationFailed)
+    const attempts: Array<string | undefined> = []
+
+    await assert.rejects(
+      fetchShallowHistoryWithAccountFallback(
+        'https://github.com/material/proof.git',
+        [first, second],
+        getAccountKey(second),
+        async accountKey => {
+          attempts.push(accountKey)
+          throw error
+        }
+      ),
+      candidate => candidate === error
+    )
+    assert.deepStrictEqual(attempts, [getAccountKey(second)])
   })
 
   it('keeps a generic or accountless remote on the normal unforced path', async () => {
