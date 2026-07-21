@@ -30,6 +30,14 @@ describe('CI environment setup', () => {
     assert.match(setupAction, /actions\/setup-python@v6/)
     assert.match(setupAction, /missing Playwright ffmpeg/)
     assert.match(setupAction, /refusing to save or use this exact cache key/)
+    assert.match(
+      setupAction,
+      /find "\$root"[\s\S]*?-mindepth 2[\s\S]*?-maxdepth 2[\s\S]*?-type f[\s\S]*?-path "\$root\/ffmpeg-\*\/\*"/
+    )
+    assert.match(setupAction, /-name ffmpeg-linux/)
+    assert.match(setupAction, /-name ffmpeg-mac/)
+    assert.match(setupAction, /-name ffmpeg-win64\.exe/)
+    assert.doesNotMatch(setupAction, /-name ['"]?ffmpeg\*['"]?/)
     assert.match(setupAction, /copilot-win32-\$\{\{ inputs\.arch \}\}/)
   })
 

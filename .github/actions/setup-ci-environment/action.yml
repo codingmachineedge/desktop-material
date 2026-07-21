@@ -158,7 +158,13 @@ runs:
         done
         playwright_ffmpeg=false
         for root in "$HOME/.cache/ms-playwright" "$HOME/AppData/Local/ms-playwright"; do
-          if [ -d "$root" ] && find "$root" -type f \( -name ffmpeg -o -name ffmpeg.exe \) -print -quit | grep -q .; then
+          if [ -d "$root" ] && find "$root" \
+            -mindepth 2 \
+            -maxdepth 2 \
+            -type f \
+            -path "$root/ffmpeg-*/*" \
+            \( -name ffmpeg-linux -o -name ffmpeg-mac -o -name ffmpeg-win64.exe \) \
+            -print -quit | grep -q .; then
             playwright_ffmpeg=true
             break
           fi
