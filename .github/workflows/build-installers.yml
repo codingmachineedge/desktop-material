@@ -188,6 +188,7 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           required=(
             installers/RELEASES
+            "installers/GitHub Desktop-x64.zip"
             installers/GitHubDesktopSetup-x64.exe
             installers/GitHubDesktopSetup-x64.msi
             "installers/GitHubDesktop-${version}-full.nupkg"

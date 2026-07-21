@@ -32,7 +32,9 @@ Desktop Material's repository automation uses CI as the release boundary:
 - the installer workflow checks the intended SHA against `origin/main` and
   refuses an existing immutable tag both before packaging and again immediately
   before publication;
-- each expected installer asset must exist and be non-empty; and
+- each expected Windows release asset—including the portable x64 ZIP, setup
+  EXE, MSI, update manifest, and canonical/full NuGet names—must exist and be
+  non-empty; and
 - one successful eligible workflow run has one release-publication action, producing one
   uniquely tagged, non-draft release.
 

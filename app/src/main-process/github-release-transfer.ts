@@ -1,8 +1,14 @@
 import { net, session } from 'electron'
+import { spawn } from 'child_process'
+import type {
+  ChildProcessWithoutNullStreams,
+  SpawnOptionsWithoutStdio,
+} from 'child_process'
 import { createHash } from 'crypto'
-import { createReadStream } from 'fs'
-import { isAbsolute, resolve } from 'path'
-import { lstat, open } from 'fs/promises'
+import { createReadStream, realpathSync, statSync } from 'fs'
+import { tmpdir } from 'os'
+import { isAbsolute, join, resolve, win32 } from 'path'
+import { lstat, mkdir, mkdtemp, open, rm } from 'fs/promises'
 import { EndpointToken } from '../lib/endpoint-token'
 import {
   downloadGitHubReleaseAsset,
@@ -12,11 +18,14 @@ import {
 import { boundedGitHubReleaseResponse } from '../lib/github-release-json'
 import {
   GitHubReleaseAssetMaximumDownloadBytes,
+  GitHubReleaseAssetMaximumPages,
   GitHubReleaseAssetMaximumUploadBytes,
+  IGitHubReleaseAsset,
   isSupportedGitHubReleaseAssetDigest,
   normalizeGitHubReleaseAssetLabel,
   normalizeGitHubReleaseAssetName,
   parseGitHubReleaseAsset,
+  parseGitHubReleaseAssetList,
 } from '../lib/github-releases'
 import {
   GitHubReleaseAssetDownloadTransferResult,
@@ -38,6 +47,7 @@ import {
   fetchActionsTransferRedirect,
   IActionsTransferRedirectDependencies,
 } from './actions-transfer-redirect'
+import { killTreeAndWait } from './build-run/kill-tree'
 
 type ReleaseFetcher = IActionsTransferDependencies['fetch']
 
@@ -61,9 +71,56 @@ type ReleaseUploadFetcher = (
   onProgress?: (uploadedBytes: number) => void
 ) => Promise<Response>
 
+interface IGitHubReleaseCliUploadRequest {
+  readonly endpoint: URL
+  readonly uploadURL: string
+  readonly token: string
+  readonly owner: string
+  readonly repository: string
+  readonly releaseId: number
+  readonly source: IReleaseUploadSource & { readonly digest: string }
+  readonly name: string
+  readonly label: string | null
+}
+
+interface IGitHubReleaseCliUploadResult {
+  readonly asset: IGitHubReleaseAsset
+  readonly localDigest: string
+}
+
+type ReleaseCliUploadFallback = (
+  request: IGitHubReleaseCliUploadRequest,
+  signal: AbortSignal,
+  onProgress?: (uploadedBytes: number) => void
+) => Promise<IGitHubReleaseCliUploadResult>
+
+type GitHubCliSpawner = (
+  command: string,
+  args: ReadonlyArray<string>,
+  options: SpawnOptionsWithoutStdio
+) => ChildProcessWithoutNullStreams
+
+export interface IGitHubCliReleaseUploadFallbackDependencies {
+  readonly fetch?: ReleaseFetcher
+  readonly spawn?: GitHubCliSpawner
+  readonly resolveExecutable?: () => string
+  readonly killTree?: (
+    pid: number,
+    isStillOwned: () => boolean
+  ) => Promise<boolean>
+  readonly environment?: NodeJS.ProcessEnv
+  readonly maximumRuntimeMs?: number
+  readonly stallTimeoutMs?: number
+  readonly maximumOutputBytes?: number
+  readonly assetDetectionAttempts?: number
+  readonly assetDetectionIntervalMs?: number
+  readonly reconciliationTimeoutMs?: number
+}
+
 export interface IGitHubReleaseTransferDependencies {
   readonly fetch: ReleaseFetcher
   readonly upload: ReleaseUploadFetcher
+  readonly cliUpload?: ReleaseCliUploadFallback
   readonly redirects?: IActionsTransferRedirectDependencies
 }
 
@@ -92,9 +149,12 @@ interface IActiveTransfer {
   readonly controller: AbortController
   readonly sender: IGitHubReleaseTransferSender
   readonly onDestroyed: () => void
+  readonly done: Promise<void>
+  readonly complete: () => void
 }
 
 const activeTransfers = new Map<string, IActiveTransfer>()
+let acceptingTransfers = true
 let allowedEndpointTokens = new Map<string, ReadonlySet<string>>()
 const operationIdPattern = /^[a-f0-9]{32}$/
 const forbiddenPartCharacters = /[\u0000-\u001f\u007f/\\?#]/
@@ -102,6 +162,15 @@ const gitHubDotComReleaseAssetHost =
   /^(?:(?:release-assets|objects)\.githubusercontent\.com|github-production-release-asset-[a-f0-9]+\.s3(?:\.[a-z0-9-]+)?\.amazonaws\.com)$/
 const transferPartition = 'github-release-transfer'
 let transferSession: Electron.Session | null = null
+
+/** Abort a request that reports no actual network upload progress for 2 min. */
+export const GitHubReleaseUploadStallTimeoutMs = 2 * 60 * 1000
+const GitHubReleaseUploadProgressIntervalMs = 250
+
+interface IGitHubReleaseUploadWatchdogOptions {
+  readonly stallTimeoutMs?: number
+  readonly progressIntervalMs?: number
+}
 
 const transferKey = (senderId: number, operationId: string) =>
   `${senderId}:${operationId}`
@@ -121,6 +190,10 @@ function throwIfAborted(signal: AbortSignal) {
   if (signal.aborted) {
     throw abortError()
   }
+}
+
+function isAbort(error: unknown): error is Error {
+  return (error as Error)?.name === 'AbortError'
 }
 
 function validateOperationId(value: unknown): string {
@@ -250,13 +323,20 @@ function beginTransfer(
   operationId: string
 ): IActiveTransfer {
   validateOperationId(operationId)
+  if (!acceptingTransfers) {
+    throw new ReleaseTransferFailure('canceled')
+  }
   const key = transferKey(sender.id, operationId)
   if (activeTransfers.has(key)) {
     throw new ReleaseTransferFailure('invalid-request')
   }
   const controller = new AbortController()
   const onDestroyed = () => controller.abort()
-  const active = { controller, sender, onDestroyed }
+  let complete!: () => void
+  const done = new Promise<void>(resolveDone => {
+    complete = resolveDone
+  })
+  const active = { controller, sender, onDestroyed, done, complete }
   activeTransfers.set(key, active)
   sender.once('destroyed', onDestroyed)
   if (sender.isDestroyed()) {
@@ -267,9 +347,26 @@ function beginTransfer(
 
 function endTransfer(operationId: string, active: IActiveTransfer) {
   activeTransfers.delete(transferKey(active.sender.id, operationId))
-  if (!active.sender.isDestroyed()) {
-    active.sender.removeListener('destroyed', active.onDestroyed)
+  try {
+    if (!active.sender.isDestroyed()) {
+      active.sender.removeListener('destroyed', active.onDestroyed)
+    }
+  } catch {
+    // Renderer teardown can race listener cleanup. The owned transfer is
+    // already removed, so a sender error must not strand the shutdown barrier.
+  } finally {
+    active.complete()
   }
+}
+
+/** Stop accepting transfers, cancel every owned request, and await teardown. */
+export async function cancelAllGitHubReleaseTransfers(): Promise<void> {
+  acceptingTransfers = false
+  const active = [...activeTransfers.values()]
+  for (const transfer of active) {
+    transfer.controller.abort()
+  }
+  await Promise.all(active.map(transfer => transfer.done))
 }
 
 function mapFailure(error: unknown): IGitHubReleaseTransferFailure {
@@ -396,6 +493,732 @@ function uploadEndpoint(endpoint: URL): URL {
   }
   return upload
 }
+
+const GitHubCliUploadMaximumRuntimeMs = 30 * 60 * 1000
+const GitHubCliUploadMaximumExtendedRuntimeMs = 8 * 60 * 60 * 1000
+const GitHubCliUploadMinimumAssumedBytesPerSecond = 128 * 1024
+const GitHubCliUploadMaximumOutputBytes = 2 * 1024 * 1024
+const GitHubCliReconciliationTimeoutMs = 30 * 1000
+const GitHubCliAssetDetectionAttempts = 10
+const GitHubCliAssetDetectionIntervalMs = 500
+
+function githubCliMaximumRuntime(length: number): number {
+  const projected = Math.ceil(
+    (length / GitHubCliUploadMinimumAssumedBytesPerSecond) * 1000
+  )
+  return Math.min(
+    GitHubCliUploadMaximumExtendedRuntimeMs,
+    Math.max(GitHubCliUploadMaximumRuntimeMs, projected)
+  )
+}
+
+function githubCliHost(endpoint: URL): string {
+  if (endpoint.hostname === 'api.github.com') {
+    return 'github.com'
+  }
+  if (
+    endpoint.hostname.startsWith('api.') &&
+    endpoint.hostname.endsWith('.ghe.com')
+  ) {
+    return endpoint.hostname.slice('api.'.length)
+  }
+  return endpoint.hostname
+}
+
+function githubCliEnvironment(
+  endpoint: URL,
+  token: string,
+  configPath: string,
+  inheritedEnvironment: NodeJS.ProcessEnv
+): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {}
+  for (const [key, value] of Object.entries(inheritedEnvironment)) {
+    if (
+      !/^(?:GH|GITHUB)_/i.test(key) &&
+      !/^(?:DEBUG|NO_COLOR|CLICOLOR|CLICOLOR_FORCE|DO_NOT_TRACK)$/i.test(key)
+    ) {
+      environment[key] = value
+    }
+  }
+  const host = githubCliHost(endpoint)
+  environment.GH_CONFIG_DIR = configPath
+  environment.GH_PROMPT_DISABLED = '1'
+  environment.GH_NO_UPDATE_NOTIFIER = '1'
+  environment.GH_NO_EXTENSION_UPDATE_NOTIFIER = '1'
+  environment.GH_SPINNER_DISABLED = '1'
+  environment.GH_TELEMETRY = '0'
+  environment.DO_NOT_TRACK = '1'
+  environment.NO_COLOR = '1'
+  environment.CLICOLOR = '0'
+  if (host === 'github.com' || host.endsWith('.ghe.com')) {
+    environment.GH_TOKEN = token
+  } else {
+    environment.GH_ENTERPRISE_TOKEN = token
+  }
+  return environment
+}
+
+function resolveGitHubCliExecutable(environment: NodeJS.ProcessEnv): string {
+  const programFilesRoots = new Set<string>()
+  for (const [key, value] of Object.entries(environment)) {
+    if (
+      /^(?:ProgramFiles|ProgramW6432)$/i.test(key) &&
+      value !== undefined &&
+      /^[A-Za-z]:[\\/](?![\\/])/.test(value)
+    ) {
+      programFilesRoots.add(value)
+    }
+  }
+  for (const configuredRoot of programFilesRoots) {
+    try {
+      const trustedRoot = realpathSync(configuredRoot)
+      const candidate = win32.join(trustedRoot, 'GitHub CLI', 'gh.exe')
+      const resolved = realpathSync(candidate)
+      const stats = statSync(resolved)
+      if (
+        stats.isFile() &&
+        win32.relative(trustedRoot, resolved).toLowerCase() ===
+          'github cli\\gh.exe'
+      ) {
+        return resolved
+      }
+    } catch {
+      // Continue through the bounded well-known installation roots.
+    }
+  }
+  throw new ReleaseTransferFailure('cli-unavailable')
+}
+
+async function findExistingStalledUpload(
+  fetcher: ReleaseFetcher,
+  request: IGitHubReleaseCliUploadRequest,
+  signal: AbortSignal
+): Promise<IGitHubReleaseAsset | null> {
+  let page = 1
+  let match: IGitHubReleaseAsset | null = null
+  for (
+    let requestIndex = 0;
+    requestIndex < GitHubReleaseAssetMaximumPages;
+    requestIndex++
+  ) {
+    const path = `repos/${request.owner}/${request.repository}/releases/${request.releaseId}/assets?per_page=100&page=${page}`
+    const headers = createGitHubAPIRequestHeaders(
+      request.endpoint.toString(),
+      path,
+      {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${request.token}`,
+        'User-Agent': 'DesktopMaterial-ReleasesTransfer',
+      }
+    )
+    const response = await fetcher(new URL(path, request.endpoint).toString(), {
+      method: 'GET',
+      headers,
+      redirect: 'error',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+      signal,
+    })
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined)
+      throw new ReleaseTransferFailure('cli-failed', response.status)
+    }
+    const assets = parseGitHubReleaseAssetList(
+      await boundedGitHubReleaseResponse(response, signal),
+      page
+    )
+    for (const asset of assets.assets) {
+      if (asset.name === request.name) {
+        if (match !== null) {
+          throw new ReleaseTransferFailure('invalid-response')
+        }
+        match = asset
+      }
+    }
+    if (assets.nextPage === null) {
+      break
+    }
+    page = assets.nextPage
+  }
+  if (match === null) {
+    return null
+  }
+  return match
+}
+
+async function waitForCliAssetPoll(
+  signal: AbortSignal,
+  milliseconds: number
+): Promise<void> {
+  throwIfAborted(signal)
+  await new Promise<void>((resolveWait, rejectWait) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      rejectWait(abortError())
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolveWait()
+    }, milliseconds)
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) {
+      onAbort()
+    }
+  })
+}
+
+async function fetchStalledUploadById(
+  fetcher: ReleaseFetcher,
+  request: IGitHubReleaseCliUploadRequest,
+  assetId: number,
+  signal: AbortSignal
+): Promise<IGitHubReleaseAsset> {
+  const path = `repos/${request.owner}/${request.repository}/releases/assets/${assetId}`
+  const headers = createGitHubAPIRequestHeaders(
+    request.endpoint.toString(),
+    path,
+    {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${request.token}`,
+      'User-Agent': 'DesktopMaterial-ReleasesTransfer',
+    }
+  )
+  const response = await fetcher(new URL(path, request.endpoint).toString(), {
+    method: 'GET',
+    headers,
+    redirect: 'error',
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    cache: 'no-store',
+    signal,
+  })
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined)
+    throw new ReleaseTransferFailure('cli-failed', response.status)
+  }
+  return parseGitHubReleaseAsset(
+    await boundedGitHubReleaseResponse(response, signal),
+    assetId
+  )
+}
+
+async function reconcileStalledUpload(
+  fetcher: ReleaseFetcher,
+  request: IGitHubReleaseCliUploadRequest,
+  signal: AbortSignal,
+  detectionAttempts: number,
+  detectionIntervalMs: number,
+  reconciliationTimeoutMs: number
+): Promise<IGitHubReleaseAsset | null> {
+  throwIfAborted(signal)
+  const controller = new AbortController()
+  const onAbort = () => controller.abort()
+  const timeout = setTimeout(() => controller.abort(), reconciliationTimeoutMs)
+  signal.addEventListener('abort', onAbort, { once: true })
+  try {
+    let asset = await findExistingStalledUpload(
+      fetcher,
+      request,
+      controller.signal
+    )
+    if (asset === null) {
+      return null
+    }
+    for (let attempt = 0; attempt < detectionAttempts; attempt++) {
+      if (
+        asset.state === 'uploaded' &&
+        asset.name === request.name &&
+        asset.label === request.label &&
+        asset.sizeInBytes === request.source.length &&
+        asset.digest === request.source.digest
+      ) {
+        return asset
+      }
+      const mayStillFinish =
+        asset.name === request.name &&
+        (asset.state === 'starter' ||
+          (asset.state === 'uploaded' && asset.digest === null))
+      if (!mayStillFinish || attempt + 1 === detectionAttempts) {
+        // Never overwrite, delete, or accept an object whose ownership or
+        // exact content is ambiguous after a transport timed out.
+        throw new ReleaseTransferFailure(
+          mayStillFinish ? 'incomplete-asset' : 'cli-failed'
+        )
+      }
+      await waitForCliAssetPoll(controller.signal, detectionIntervalMs)
+      asset = await fetchStalledUploadById(
+        fetcher,
+        request,
+        asset.id,
+        controller.signal
+      )
+    }
+    throw new ReleaseTransferFailure('cli-failed')
+  } catch (error) {
+    if (signal.aborted) {
+      throw abortError()
+    }
+    if (isAbort(error)) {
+      throw new ReleaseTransferFailure('cli-failed')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+    signal.removeEventListener('abort', onAbort)
+  }
+}
+
+function writeGitHubCliInput(
+  child: ChildProcessWithoutNullStreams,
+  chunk: Buffer,
+  signal: AbortSignal
+): Promise<void> {
+  throwIfAborted(signal)
+  return new Promise<void>((resolveWrite, rejectWrite) => {
+    let settled = false
+    const finish = (error?: Error | null) => {
+      if (!settled) {
+        settled = true
+        signal.removeEventListener('abort', onAbort)
+        child.stdin.removeListener('error', onError)
+        if (error === undefined || error === null) {
+          resolveWrite()
+        } else if (error.name === 'AbortError') {
+          rejectWrite(error)
+        } else {
+          rejectWrite(new ReleaseTransferFailure('cli-failed'))
+        }
+      }
+    }
+    const onAbort = () => finish(abortError())
+    const onError = (error: Error) => finish(error)
+    signal.addEventListener('abort', onAbort, { once: true })
+    child.stdin.once('error', onError)
+    if (signal.aborted) {
+      finish(abortError())
+      return
+    }
+    child.stdin.write(chunk, error => finish(error))
+  })
+}
+
+function endGitHubCliInput(
+  child: ChildProcessWithoutNullStreams,
+  signal: AbortSignal
+): Promise<void> {
+  throwIfAborted(signal)
+  return new Promise<void>((resolveEnd, rejectEnd) => {
+    let settled = false
+    const finish = (error?: Error | null) => {
+      if (!settled) {
+        settled = true
+        signal.removeEventListener('abort', onAbort)
+        child.stdin.removeListener('error', onError)
+        if (error === undefined || error === null) {
+          resolveEnd()
+        } else if (error.name === 'AbortError') {
+          rejectEnd(error)
+        } else {
+          rejectEnd(new ReleaseTransferFailure('cli-failed'))
+        }
+      }
+    }
+    const onAbort = () => finish(abortError())
+    const onError = (error: Error) => finish(error)
+    signal.addEventListener('abort', onAbort, { once: true })
+    child.stdin.once('error', onError)
+    if (signal.aborted) {
+      finish(abortError())
+      return
+    }
+    child.stdin.end(() => finish())
+  })
+}
+
+async function terminateGitHubCli(
+  child: ChildProcessWithoutNullStreams,
+  processClosed: Promise<void>,
+  killTree: (pid: number, isStillOwned: () => boolean) => Promise<boolean>,
+  isStillOwned: () => boolean
+): Promise<void> {
+  const waitBounded = async (
+    pending: ReadonlyArray<Promise<unknown>>,
+    milliseconds: number
+  ) => {
+    let timer: NodeJS.Timeout | undefined
+    try {
+      await Promise.race([
+        ...pending,
+        new Promise<void>(resolveWait => {
+          timer = setTimeout(resolveWait, milliseconds)
+        }),
+      ])
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer)
+      }
+    }
+  }
+  child.stdin.destroy()
+  if (isStillOwned()) {
+    try {
+      // Terminate the direct gh process first so normal shutdown completes
+      // well inside the app's 10-second owned-process barrier.
+      child.kill()
+    } catch {
+      // The process may have closed at the termination boundary.
+    }
+  }
+  await waitBounded([processClosed], 2_000).catch(() => undefined)
+  const pid = child.pid
+  if (pid !== undefined && pid > 0 && isStillOwned()) {
+    const treeKill = killTree(pid, isStillOwned).catch(() => false)
+    await waitBounded(
+      [processClosed, treeKill.then(() => undefined)],
+      5_000
+    ).catch(() => undefined)
+  }
+  if (isStillOwned()) {
+    try {
+      child.kill()
+    } catch {
+      // The process may have closed after the bounded tree-kill attempt.
+    }
+  }
+  await waitBounded([processClosed], 500).catch(() => undefined)
+}
+
+async function streamSourceToGitHubCli(
+  child: ChildProcessWithoutNullStreams,
+  source: IReleaseUploadSource,
+  signal: AbortSignal,
+  onProgress: ((uploadedBytes: number) => void) | undefined,
+  onActivity: () => void,
+  setSourceStream: (stream: ReturnType<typeof createReadStream>) => void
+): Promise<string> {
+  const hash = createHash('sha256')
+  let streamedBytes = 0
+  const stream = createReadStream(source.path, {
+    start: source.offset,
+    end: source.offset + source.length - 1,
+  })
+  setSourceStream(stream)
+  const cancel = () => stream.destroy(abortError())
+  signal.addEventListener('abort', cancel, { once: true })
+  try {
+    for await (const value of stream) {
+      throwIfAborted(signal)
+      const chunk = value as Buffer
+      await writeGitHubCliInput(child, chunk, signal)
+      hash.update(chunk)
+      streamedBytes += chunk.byteLength
+      onActivity()
+      onProgress?.(streamedBytes)
+    }
+    if (streamedBytes !== source.length) {
+      throw new ReleaseTransferFailure('source')
+    }
+    await endGitHubCliInput(child, signal)
+    return `sha256:${hash.digest('hex')}`
+  } catch (error) {
+    if (error instanceof ReleaseTransferFailure || isAbort(error)) {
+      throw error
+    }
+    throw new ReleaseTransferFailure('source')
+  } finally {
+    signal.removeEventListener('abort', cancel)
+  }
+}
+
+async function runGitHubCliUpload(
+  executable: string,
+  args: ReadonlyArray<string>,
+  options: SpawnOptionsWithoutStdio,
+  request: IGitHubReleaseCliUploadRequest,
+  signal: AbortSignal,
+  onProgress: ((uploadedBytes: number) => void) | undefined,
+  dependencies: Required<
+    Pick<
+      IGitHubCliReleaseUploadFallbackDependencies,
+      | 'killTree'
+      | 'maximumOutputBytes'
+      | 'maximumRuntimeMs'
+      | 'spawn'
+      | 'stallTimeoutMs'
+    >
+  >
+): Promise<{ readonly body: Buffer; readonly localDigest: string }> {
+  throwIfAborted(signal)
+  let child: ChildProcessWithoutNullStreams
+  try {
+    child = dependencies.spawn(executable, args, options)
+  } catch {
+    throw new ReleaseTransferFailure('cli-unavailable')
+  }
+  let processIsClosed = false
+  let processHasExited = false
+  const sourceStream: {
+    current: ReturnType<typeof createReadStream> | null
+  } = { current: null }
+  let stdoutLength = 0
+  let stderrLength = 0
+  let outputOverflow = false
+  const stdout = new Array<Buffer>()
+  let activityTimer: NodeJS.Timeout | undefined
+  let runtimeTimer: NodeJS.Timeout | undefined
+  let rejectActivity: ((error: Error) => void) | undefined
+  let rejectRuntime: ((error: Error) => void) | undefined
+
+  const processClosed = new Promise<void>(resolveClosed => {
+    child.once('close', () => {
+      processIsClosed = true
+      resolveClosed()
+    })
+  })
+  child.once('exit', () => {
+    processHasExited = true
+  })
+  const processResult = new Promise<Buffer>((resolveProcess, rejectProcess) => {
+    let settled = false
+    const finish = (error?: Error) => {
+      if (!settled) {
+        settled = true
+        if (error === undefined) {
+          resolveProcess(Buffer.concat(stdout, stdoutLength))
+        } else {
+          rejectProcess(error)
+        }
+      }
+    }
+    child.once('error', () =>
+      finish(new ReleaseTransferFailure('cli-unavailable'))
+    )
+    child.once('close', code => {
+      if (code === 0 && !outputOverflow) {
+        finish()
+      } else {
+        finish(new ReleaseTransferFailure('cli-failed'))
+      }
+    })
+  })
+  const armActivityWatchdog = () => {
+    if (activityTimer !== undefined) {
+      clearTimeout(activityTimer)
+    }
+    activityTimer = setTimeout(
+      () => rejectActivity?.(new ReleaseTransferFailure('cli-failed')),
+      dependencies.stallTimeoutMs
+    )
+  }
+  child.stdout.on('data', (value: Buffer) => {
+    armActivityWatchdog()
+    if (stdoutLength + value.byteLength <= dependencies.maximumOutputBytes) {
+      stdout.push(Buffer.from(value))
+      stdoutLength += value.byteLength
+    } else {
+      outputOverflow = true
+    }
+  })
+  child.stderr.on('data', (value: Buffer) => {
+    stderrLength += value.byteLength
+    if (stderrLength > dependencies.maximumOutputBytes) {
+      outputOverflow = true
+    }
+  })
+  const abortResult = new Promise<never>((_resolve, rejectAbort) => {
+    const onAbort = () => rejectAbort(abortError())
+    signal.addEventListener('abort', onAbort, { once: true })
+    processClosed.finally(() => signal.removeEventListener('abort', onAbort))
+    if (signal.aborted) {
+      onAbort()
+    }
+  })
+  const activityResult = new Promise<never>((_resolve, rejectStall) => {
+    rejectActivity = rejectStall
+    armActivityWatchdog()
+  })
+  const runtimeResult = new Promise<never>((_resolve, rejectDeadline) => {
+    rejectRuntime = rejectDeadline
+    runtimeTimer = setTimeout(
+      () => rejectRuntime?.(new ReleaseTransferFailure('cli-failed')),
+      dependencies.maximumRuntimeMs
+    )
+  })
+  const streamResult = streamSourceToGitHubCli(
+    child,
+    request.source,
+    signal,
+    onProgress,
+    armActivityWatchdog,
+    stream => {
+      sourceStream.current = stream
+    }
+  )
+  try {
+    const [body, localDigest] = await Promise.race([
+      Promise.all([processResult, streamResult]),
+      abortResult,
+      activityResult,
+      runtimeResult,
+    ])
+    return { body, localDigest }
+  } catch (error) {
+    sourceStream.current?.destroy()
+    await terminateGitHubCli(
+      child,
+      processClosed,
+      dependencies.killTree,
+      () => !processHasExited && !processIsClosed
+    )
+    if (isAbort(error)) {
+      throw error
+    }
+    if (error instanceof ReleaseTransferFailure) {
+      throw error
+    }
+    throw new ReleaseTransferFailure('cli-failed')
+  } finally {
+    if (activityTimer !== undefined) {
+      clearTimeout(activityTimer)
+    }
+    if (runtimeTimer !== undefined) {
+      clearTimeout(runtimeTimer)
+    }
+  }
+}
+
+export const createGitHubCliReleaseUploadFallback =
+  (
+    providedDependencies: IGitHubCliReleaseUploadFallbackDependencies = {}
+  ): ReleaseCliUploadFallback =>
+  async (request, signal, onProgress) => {
+    const environment = providedDependencies.environment ?? process.env
+    const fetcher = providedDependencies.fetch ?? createElectronActionsFetcher()
+    const dependencies = {
+      spawn: providedDependencies.spawn ?? spawn,
+      killTree: providedDependencies.killTree ?? killTreeAndWait,
+      maximumRuntimeMs:
+        providedDependencies.maximumRuntimeMs ??
+        githubCliMaximumRuntime(request.source.length),
+      stallTimeoutMs:
+        providedDependencies.stallTimeoutMs ??
+        GitHubReleaseUploadStallTimeoutMs,
+      maximumOutputBytes:
+        providedDependencies.maximumOutputBytes ??
+        GitHubCliUploadMaximumOutputBytes,
+      assetDetectionAttempts:
+        providedDependencies.assetDetectionAttempts ??
+        GitHubCliAssetDetectionAttempts,
+      assetDetectionIntervalMs:
+        providedDependencies.assetDetectionIntervalMs ??
+        GitHubCliAssetDetectionIntervalMs,
+      reconciliationTimeoutMs:
+        providedDependencies.reconciliationTimeoutMs ??
+        GitHubCliReconciliationTimeoutMs,
+    }
+    const existing = await reconcileStalledUpload(
+      fetcher,
+      request,
+      signal,
+      dependencies.assetDetectionAttempts,
+      dependencies.assetDetectionIntervalMs,
+      dependencies.reconciliationTimeoutMs
+    )
+    if (existing !== null) {
+      onProgress?.(request.source.length)
+      return { asset: existing, localDigest: request.source.digest }
+    }
+    const root = await mkdtemp(join(tmpdir(), 'desktop-material-gh-lfs-'))
+    const configPath = join(root, 'gh-config')
+    try {
+      await mkdir(configPath)
+      throwIfAborted(signal)
+      const host = githubCliHost(request.endpoint)
+      let executable: string
+      try {
+        executable =
+          providedDependencies.resolveExecutable?.() ??
+          resolveGitHubCliExecutable(environment)
+      } catch (error) {
+        if (error instanceof ReleaseTransferFailure) {
+          throw error
+        }
+        throw new ReleaseTransferFailure('cli-unavailable')
+      }
+      try {
+        const result = await runGitHubCliUpload(
+          executable,
+          [
+            'api',
+            request.uploadURL,
+            '--hostname',
+            host,
+            '--method',
+            'POST',
+            '--header',
+            'Accept: application/vnd.github+json',
+            '--header',
+            'Content-Type: application/octet-stream',
+            '--header',
+            `Content-Length: ${request.source.length}`,
+            '--input',
+            '-',
+          ],
+          {
+            cwd: root,
+            env: githubCliEnvironment(
+              request.endpoint,
+              request.token,
+              configPath,
+              environment
+            ),
+            shell: false,
+            windowsHide: true,
+          },
+          request,
+          signal,
+          onProgress,
+          dependencies
+        )
+        let asset: IGitHubReleaseAsset
+        try {
+          asset = parseGitHubReleaseAsset(
+            JSON.parse(result.body.toString('utf8')) as unknown
+          )
+        } catch {
+          throw new ReleaseTransferFailure('cli-failed')
+        }
+        return { asset, localDigest: result.localDigest }
+      } catch (error) {
+        if (
+          error instanceof ReleaseTransferFailure &&
+          error.reason === 'cli-failed'
+        ) {
+          const completed = await reconcileStalledUpload(
+            fetcher,
+            request,
+            signal,
+            dependencies.assetDetectionAttempts,
+            dependencies.assetDetectionIntervalMs,
+            dependencies.reconciliationTimeoutMs
+          )
+          if (completed !== null) {
+            onProgress?.(request.source.length)
+            return {
+              asset: completed,
+              localDigest: request.source.digest,
+            }
+          }
+        }
+        throw error
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 3 }).catch(
+        () => undefined
+      )
+    }
+  }
 
 /** Best-effort cleanup for an asset created by a response we cannot accept. */
 async function removeRejectedUploadAsset(
@@ -685,69 +1508,158 @@ export async function handleGitHubReleaseAssetUpload(
     )
     let lastProgressAt = 0
     let lastProgressBytes = 0
-    const response = await dependencies.upload(
-      url.toString(),
-      Object.fromEntries(headers.entries()),
-      source,
-      active.controller.signal,
-      uploadedBytes => {
-        const boundedBytes = Math.min(source.length, Math.max(0, uploadedBytes))
-        const now = Date.now()
-        if (
-          boundedBytes > lastProgressBytes &&
-          (now - lastProgressAt >= 100 || boundedBytes === source.length)
-        ) {
-          lastProgressAt = now
-          lastProgressBytes = boundedBytes
-          sendProgress(
-            sender,
-            {
-              operationId: request.operationId,
-              direction: 'upload',
-              transferredBytes: boundedBytes,
-              totalBytes: source.length,
-            },
-            active!
-          )
-        }
+    const reportUploadedBytes = (uploadedBytes: number) => {
+      // The transport accepting the final byte is not proof that GitHub
+      // accepted the asset. Reserve 100% for a parsed/reconciled response.
+      if (uploadedBytes >= source.length) {
+        return
       }
-    )
+      const boundedBytes = Math.min(
+        Math.max(0, source.length - 1),
+        Math.max(0, uploadedBytes)
+      )
+      const now = Date.now()
+      if (boundedBytes > lastProgressBytes && now - lastProgressAt >= 100) {
+        lastProgressAt = now
+        lastProgressBytes = boundedBytes
+        sendProgress(
+          sender,
+          {
+            operationId: request.operationId,
+            direction: 'upload',
+            transferredBytes: boundedBytes,
+            totalBytes: source.length,
+          },
+          active!
+        )
+      }
+    }
+    let asset: IGitHubReleaseAsset
+    let uploadedDigest = source.digest
+    let response: Response | null = null
+    const runGitHubCliFallback = async (
+      cliUpload: ReleaseCliUploadFallback
+    ): Promise<IGitHubReleaseCliUploadResult> => {
+      // This is a fresh transport/reconciliation attempt over the whole range.
+      // Reset the visible attempt progress so a retry from byte zero never
+      // appears frozen behind the native attempt's previous high-water mark.
+      lastProgressAt = 0
+      lastProgressBytes = 0
+      sendProgress(
+        sender,
+        {
+          operationId: request.operationId,
+          direction: 'upload',
+          transferredBytes: 0,
+          totalBytes: source.length,
+        },
+        active!
+      )
+      return await cliUpload(
+        {
+          endpoint: base.endpoint,
+          uploadURL: url.toString(),
+          token: base.token,
+          owner: base.owner,
+          repository: base.repository,
+          releaseId,
+          source,
+          name,
+          label,
+        },
+        active!.controller.signal,
+        reportUploadedBytes
+      )
+    }
+    try {
+      response = await dependencies.upload(
+        url.toString(),
+        Object.fromEntries(headers.entries()),
+        source,
+        active.controller.signal,
+        reportUploadedBytes
+      )
+    } catch (error) {
+      if (
+        error instanceof ReleaseTransferFailure &&
+        error.reason === 'stalled' &&
+        dependencies.cliUpload !== undefined
+      ) {
+        const fallback = await runGitHubCliFallback(dependencies.cliUpload)
+        asset = fallback.asset
+        uploadedDigest = fallback.localDigest
+      } else {
+        throw error
+      }
+    }
     throwIfAborted(active.controller.signal)
-    if (response.status >= 300 && response.status < 400) {
-      await response.body?.cancel().catch(() => undefined)
-      throw new ReleaseTransferFailure('unsafe-redirect')
+    if (response !== null) {
+      if (response.status >= 300 && response.status < 400) {
+        await response.body?.cancel().catch(() => undefined)
+        throw new ReleaseTransferFailure('unsafe-redirect')
+      }
+      if (!response.ok) {
+        const status = response.status
+        await response.body?.cancel().catch(() => undefined)
+        if (
+          (status === 411 || status === 502) &&
+          dependencies.cliUpload !== undefined
+        ) {
+          // GitHub documents Content-Length as required, while Electron needs
+          // chunked encoding to avoid buffering multi-gigabyte request bodies.
+          // A 502 can also leave an ambiguous `starter` asset. The CLI path
+          // performs bounded exact-content reconciliation before uploading, so
+          // it accepts a completed object and fails closed on an incomplete one.
+          const fallback = await runGitHubCliFallback(dependencies.cliUpload)
+          asset = fallback.asset
+          uploadedDigest = fallback.localDigest
+        } else {
+          throw new ReleaseTransferFailure('http', status)
+        }
+      } else {
+        asset = parseGitHubReleaseAsset(
+          await boundedGitHubReleaseResponse(response, active.controller.signal)
+        )
+      }
     }
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => undefined)
-      throw new ReleaseTransferFailure('http', response.status)
+    if (uploadedDigest !== source.digest) {
+      await removeRejectedUploadAsset(
+        base.endpoint,
+        base.owner,
+        base.repository,
+        base.token,
+        asset!.id,
+        active.controller.signal,
+        dependencies
+      )
+      throwIfAborted(active.controller.signal)
+      throw new ReleaseTransferFailure('source')
     }
-    const asset = parseGitHubReleaseAsset(
-      await boundedGitHubReleaseResponse(response, active.controller.signal)
-    )
     if (
-      asset.state !== 'uploaded' ||
-      asset.name !== name ||
-      asset.sizeInBytes !== source.length
+      asset!.state !== 'uploaded' ||
+      asset!.name !== name ||
+      asset!.label !== label ||
+      asset!.sizeInBytes !== source.length
     ) {
       await removeRejectedUploadAsset(
         base.endpoint,
         base.owner,
         base.repository,
         base.token,
-        asset.id,
+        asset!.id,
         active.controller.signal,
         dependencies
       )
       throwIfAborted(active.controller.signal)
       throw new ReleaseTransferFailure('invalid-response')
     }
-    if (asset.digest !== null && asset.digest !== source.digest) {
+    if (asset!.digest !== null && asset!.digest !== source.digest) {
       await removeRejectedUploadAsset(
         base.endpoint,
         base.owner,
         base.repository,
         base.token,
-        asset.id,
+        asset!.id,
         active.controller.signal,
         dependencies
       )
@@ -768,7 +1680,7 @@ export async function handleGitHubReleaseAssetUpload(
     }
     return {
       ok: true,
-      asset,
+      asset: asset!,
       bytes: source.length,
       localDigest: source.digest,
     }
@@ -807,7 +1719,8 @@ export const createElectronGitHubReleaseUploadFetcher =
     requestFactory: (
       options: Electron.ClientRequestConstructorOptions
     ) => Electron.ClientRequest = options => net.request(options),
-    sessionProvider: () => Electron.Session = getTransferSession
+    sessionProvider: () => Electron.Session = getTransferSession,
+    watchdogOptions: IGitHubReleaseUploadWatchdogOptions = {}
   ): ReleaseUploadFetcher =>
   async (url, headers, source, signal, onProgress) =>
     await new Promise<Response>((resolvePromise, rejectPromise) => {
@@ -845,38 +1758,108 @@ export const createElectronGitHubReleaseUploadFetcher =
         end: source.offset + source.length - 1,
       })
       let uploadedBytes = 0
+      let reportedBytes = 0
       let settled = false
+      let responseStarted = false
+      let stallTimer: NodeJS.Timeout | undefined
+      let progressTimer: NodeJS.Timeout | undefined
+      const stallTimeoutMs =
+        Number.isSafeInteger(watchdogOptions.stallTimeoutMs) &&
+        watchdogOptions.stallTimeoutMs! > 0
+          ? watchdogOptions.stallTimeoutMs!
+          : GitHubReleaseUploadStallTimeoutMs
+      const progressIntervalMs =
+        Number.isSafeInteger(watchdogOptions.progressIntervalMs) &&
+        watchdogOptions.progressIntervalMs! > 0
+          ? watchdogOptions.progressIntervalMs!
+          : GitHubReleaseUploadProgressIntervalMs
       const settle = (callback: () => void) => {
         if (!settled) {
           settled = true
           signal.removeEventListener('abort', onAbort)
+          if (stallTimer !== undefined) {
+            clearTimeout(stallTimer)
+          }
+          if (progressTimer !== undefined) {
+            clearInterval(progressTimer)
+          }
           body.destroy()
           callback()
         }
       }
+      const armStallWatchdog = () => {
+        if (stallTimer !== undefined) {
+          clearTimeout(stallTimer)
+        }
+        stallTimer = setTimeout(
+          () =>
+            settle(() => {
+              request.abort()
+              rejectPromise(new ReleaseTransferFailure('stalled'))
+            }),
+          stallTimeoutMs
+        )
+      }
+      const supportsNativeProgress =
+        typeof request.getUploadProgress === 'function'
+      const sampleNativeProgress = () => {
+        if (!supportsNativeProgress || settled) {
+          return
+        }
+        try {
+          const progress = request.getUploadProgress()
+          if (!progress.active || !progress.started) {
+            return
+          }
+          const current = Math.min(
+            source.length,
+            Math.max(0, Math.floor(progress.current))
+          )
+          if (current > reportedBytes) {
+            reportedBytes = current
+            armStallWatchdog()
+            onProgress?.(reportedBytes)
+          }
+        } catch {
+          // A request may become inactive between the timer and this sample.
+        }
+      }
       const onAbort = () => {
-        request.abort()
-        settle(() => rejectPromise(abortError()))
+        settle(() => {
+          request.abort()
+          rejectPromise(abortError())
+        })
       }
       const failSource = () => {
-        request.abort()
-        settle(() => rejectPromise(new ReleaseTransferFailure('source')))
+        settle(() => {
+          request.abort()
+          rejectPromise(new ReleaseTransferFailure('source'))
+        })
       }
       signal.addEventListener('abort', onAbort, { once: true })
+      armStallWatchdog()
+      if (supportsNativeProgress) {
+        progressTimer = setInterval(sampleNativeProgress, progressIntervalMs)
+      }
       request.on('redirect', status => {
-        request.abort()
-        settle(() => resolvePromise(new Response(null, { status })))
+        settle(() => {
+          request.abort()
+          resolvePromise(new Response(null, { status }))
+        })
       })
       request.on('response', response => {
+        responseStarted = true
+        armStallWatchdog()
         const chunks = new Array<Buffer>()
         let length = 0
         response.on('data', (chunk: Buffer) => {
+          armStallWatchdog()
           length += chunk.byteLength
           if (length > 2 * 1024 * 1024) {
-            request.abort()
-            settle(() =>
+            settle(() => {
+              request.abort()
               rejectPromise(new ReleaseTransferFailure('invalid-response'))
-            )
+            })
           } else {
             chunks.push(chunk)
           }
@@ -893,8 +1876,16 @@ export const createElectronGitHubReleaseUploadFetcher =
           )
         )
         response.on('error', error => settle(() => rejectPromise(error)))
+        response.on('aborted', () =>
+          settle(() => rejectPromise(new ReleaseTransferFailure('network')))
+        )
       })
       request.on('error', error => settle(() => rejectPromise(error)))
+      request.on('close', () => {
+        if (!responseStarted) {
+          settle(() => rejectPromise(new ReleaseTransferFailure('network')))
+        }
+      })
       body.on('data', (chunk: Buffer) => {
         if (settled) {
           return
@@ -916,7 +1907,13 @@ export const createElectronGitHubReleaseUploadFetcher =
             return
           }
           uploadedBytes = nextUploadedBytes
-          onProgress?.(uploadedBytes)
+          if (supportsNativeProgress) {
+            sampleNativeProgress()
+          } else {
+            reportedBytes = uploadedBytes
+            armStallWatchdog()
+            onProgress?.(reportedBytes)
+          }
           body.resume()
         })
       })
@@ -935,7 +1932,11 @@ export const createElectronGitHubReleaseUploadFetcher =
       body.on('error', () => failSource())
     })
 
+const defaultReleaseFetcher = createElectronActionsFetcher()
 const defaultDependencies: IGitHubReleaseTransferDependencies = {
-  fetch: createElectronActionsFetcher(),
+  fetch: defaultReleaseFetcher,
   upload: createElectronGitHubReleaseUploadFetcher(),
+  cliUpload: createGitHubCliReleaseUploadFallback({
+    fetch: defaultReleaseFetcher,
+  }),
 }

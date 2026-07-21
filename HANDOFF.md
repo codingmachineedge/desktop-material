@@ -1,5 +1,73 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-21 Cheap-LFS recovery, output controls, and portable-ZIP checkpoint
+
+The current follow-up removes two misleading Cheap-LFS progress states. Native
+Electron uploads now sample `ClientRequest.getUploadProgress()` so the visible
+counter reflects bytes actually moving over the network rather than bytes merely
+accepted by Electron's local write callback. A two-minute no-forward-progress
+watchdog aborts the owned request, and the transfer reserves 100% until an exact
+provider response or reconciled asset proves GitHub accepted the object. This is
+the bounded recovery for the reported indefinite 0%/1% state.
+
+A stalled request now retries automatically through a fixed `gh api` transport.
+HTTP 411 also selects that exact-length path because GitHub requires
+`Content-Length` while Electron needs chunked mode for memory-bounded
+multi-gigabyte requests; HTTP 502 selects it because the failed native request
+may have left an asset in `starter`. Each reconciliation scans at most the ten
+100-object Release pages once, then polls only the discovered asset ID. An exact
+uploaded name, label, size, and digest is reused, while a persistent incomplete
+object fails closed without clobbering or deleting it. A failed CLI process gets
+one post-failure reconciliation in case GitHub committed the upload before the
+transport error.
+
+The fallback resolves only the real `Program Files\GitHub CLI\gh.exe`, uses no
+shell, and supplies the selected account token only through a scrubbed child
+environment and one temporary empty `GH_CONFIG_DIR`. Inherited GitHub
+credentials/debug state, prompts, update checks, telemetry, spinner, and color
+are disabled. The exact validated source range streams through stdin while its
+SHA-256 and progress are calculated; stdout/stderr, no-activity time, and total
+runtime are bounded. Cancellation terminates and awaits the owned process, and
+the temporary configuration root is removed. Application quit now stops
+accepting Release transfers, aborts all active native/CLI work, and waits for
+their completion through the existing owned-process shutdown barrier. Missing
+CLI, failed CLI, and incomplete-asset results have localized English and playful
+Hong Kong Cantonese recovery text; bilingual mode composes both. The explicit
+browser/Explorer drag-and-drop handoff remains available when the user chooses
+manual recovery.
+
+The Build & Run panel now exposes a one-shot **Scroll to bottom** action,
+persisted **Auto-scroll output**, and persisted **Truncate long lines**. Reading
+older output automatically pauses auto-scroll; enabling it again jumps to the
+tail. Truncation is display-only: the full line remains in the DOM and **Copy all
+output** retains the original text. Both toggles expose pressed state and all
+three names use the English, Cantonese, or shared bilingual translation path.
+
+Windows packaging now creates `dist/GitHub Desktop-x64.zip` from the complete
+packaged application tree before building the Squirrel outputs. Native Windows
+`tar.exe` streams a ZIP64-capable archive to `.partial.zip`, lists it to reject a
+truncated/corrupt result, requires non-zero size, then promotes it atomically.
+The release workflow collects that ZIP beside the EXE, MSI, update manifest, and
+NuGet packages and treats a missing or empty ZIP as a publication failure. This
+also makes the same portable output available from a local Windows production
+build and `yarn package` if remote CI is unavailable.
+
+Verification is deliberately recorded by subset rather than as one unrun total:
+
+- transfer plus localization passed **34/34** (21 transfer and 13 i18n) after
+  the watchdog, CLI, reconciliation, error-copy, and shutdown changes;
+- Build & Run UI, style, and localization passed **42/42**;
+- portable-ZIP and CI workflow contracts passed **11/11**; and
+- root TypeScript no-emit, script TypeScript, and the applicable focused
+  ESLint, Prettier, and diff checks passed at those checkpoints.
+
+The combined Cheap-LFS, transfer, output-control, style, localization, workflow,
+and portable-ZIP gate passed **165/165** across 18 suites. A complete local
+production package has not yet run. Therefore this checkpoint does not yet
+claim a full-size local ZIP/installer, an exact production-build receipt, remote
+CI, or a published release containing the ZIP. Those receipts must be appended
+after they exist.
+
 ## 2026-07-21 Cheap-LFS 0% transport repair and manual Release handoff
 
 The automatic Release-asset upload's 0% deadlock was traced to Electron's

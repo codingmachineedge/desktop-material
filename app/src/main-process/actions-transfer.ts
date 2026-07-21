@@ -453,11 +453,17 @@ export function createElectronActionsFetcher(
         return
       }
 
+      const method = (init.method ?? 'GET').toUpperCase()
+      if (method !== 'GET' && method !== 'DELETE') {
+        reject(new Error('The transfer request method is not allowed.'))
+        return
+      }
+
       let request: Electron.ClientRequest
       try {
         request = requestFactory({
           url: input,
-          method: 'GET',
+          method,
           headers: toElectronRequestHeaders(init.headers),
           session: sessionFactory(),
           redirect: 'manual',

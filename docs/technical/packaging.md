@@ -20,16 +20,31 @@ Windows x64.
 
 `yarn package` runs `script/package.ts` and `electron-winstaller` to create:
 
+- a portable ZIP containing the complete packaged Windows application tree;
 - a Squirrel current-user setup executable;
 - a Windows Installer (`.msi`) package;
-- NuGet packages and the `RELEASES` update-feed manifest; and
-- a portable application archive during the CI build.
+- NuGet packages and the `RELEASES` update-feed manifest.
 
-The automated release workflow publishes the x64 setup executable, MSI,
-`RELEASES`, and both exact-name copies of the full NuGet package. It verifies
-that every required asset is non-empty before publication. Current public
-builds are unsigned; adding signing requires the existing Azure signing secret
-set and a reviewed workflow change.
+The portable archive is not CI-only: a local Windows x64 production build
+followed by `yarn package` writes `dist/GitHub Desktop-x64.zip` alongside the
+installer outputs. This provides a directly movable build even when a remote
+release run is unavailable. It contains the packaged application directory,
+so extract the ZIP before starting the executable.
+
+`script/windows-portable-zip.ts` uses the native
+`%SystemRoot%\System32\tar.exe` ZIP writer so archive data is streamed instead
+of retained in Node memory and ZIP64-capable tooling handles large package
+entries. It writes to a controlled `.partial.zip`, lists the completed archive
+to reject truncation or corruption, requires a non-empty result, and atomically
+renames it to the final path. A stale destination or failed partial archive is
+removed rather than mistaken for the current package. The destination must stay
+outside the packaged source tree.
+
+The automated release workflow publishes the x64 portable ZIP, setup
+executable, MSI, `RELEASES`, and both exact-name copies of the full NuGet
+package. It verifies that every required asset is non-empty before publication.
+Current public builds are unsigned; adding signing requires the existing Azure
+signing secret set and a reviewed workflow change.
 
 ## Publication boundary
 
@@ -45,7 +60,13 @@ E2E lane is part of the supported pipeline.
 
 ## Failure modes and verification
 
-Build, unit, script, package, installed-E2E, missing-asset, stale-head, existing
-tag, and remote-query failures stop release publication. The tracked CI safety
-test enforces the Windows-only matrix and rejects macOS runners or Apple signing
-inputs in the application workflow.
+Build, unit, script, package, archive-create/list, installed-E2E, missing-asset,
+stale-head, existing-tag, and remote-query failures stop release publication.
+The tracked CI safety test enforces the Windows-only matrix, requires the x64
+portable ZIP as a non-empty release asset, and rejects macOS runners or Apple
+signing inputs in the application workflow. Portable-ZIP and CI focused checks
+passed 11/11 along with script TypeScript and focused lint, format, and diff
+checks. The combined changed-surface gate passed 165/165 across 18 suites. A
+complete local production package has not yet run for this change, so there is
+not yet a full-size local installer/ZIP artifact receipt; remote release
+verification is also pending.

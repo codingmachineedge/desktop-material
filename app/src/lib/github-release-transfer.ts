@@ -1,5 +1,6 @@
 import { IGitHubReleaseAssetDownloadResult } from './github-release-asset-download'
 import { IGitHubReleaseAsset } from './github-releases'
+import { t } from './i18n'
 
 export const GitHubReleaseTransferMaximumRedirects = 5
 
@@ -65,6 +66,10 @@ export type GitHubReleaseTransferFailureReason =
   | 'size-mismatch'
   | 'digest-mismatch'
   | 'missing-body'
+  | 'stalled'
+  | 'cli-unavailable'
+  | 'cli-failed'
+  | 'incomplete-asset'
   | 'invalid-response'
 
 export interface IGitHubReleaseTransferFailure {
@@ -142,6 +147,14 @@ export function githubReleaseTransferFailureMessage(
       return 'The release asset did not match the digest reported by GitHub.'
     case 'missing-body':
       return 'GitHub returned the release asset without content.'
+    case 'stalled':
+      return t('githubReleaseTransfer.stalled')
+    case 'cli-unavailable':
+      return t('githubReleaseTransfer.cliUnavailable')
+    case 'cli-failed':
+      return t('githubReleaseTransfer.cliFailed')
+    case 'incomplete-asset':
+      return t('githubReleaseTransfer.incompleteAsset')
     case 'invalid-response':
       return 'GitHub returned release asset data the app could not safely process.'
   }

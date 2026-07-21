@@ -188,6 +188,35 @@ describe('main-process Actions transfer', () => {
     )
   })
 
+  it('honors only the GET and DELETE methods used by bounded transfers', async () => {
+    let requestedMethod: string | undefined
+    let request: FakeClientRequest
+    const fetcher = createElectronActionsFetcher(options => {
+      requestedMethod = options.method
+      request = new FakeClientRequest(() => {
+        const response = Object.assign(new EventEmitter(), {
+          statusCode: 204,
+          statusMessage: 'No Content',
+          headers: {},
+        })
+        request.emit('response', response)
+      })
+      return request as unknown as Electron.ClientRequest
+    })
+
+    const response = await fetcher('https://api.github.com/rejected-asset', {
+      method: 'DELETE',
+      redirect: 'error',
+    })
+
+    assert.equal(response.status, 204)
+    assert.equal(requestedMethod, 'DELETE')
+    await assert.rejects(
+      fetcher('https://api.github.com/unsafe-method', { method: 'POST' }),
+      /method is not allowed/
+    )
+  })
+
   it('streams Electron responses and binds body cancellation to ClientRequest', async () => {
     const responseStream = Object.assign(Readable.from([archive]), {
       statusCode: 200,

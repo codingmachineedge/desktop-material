@@ -75,6 +75,21 @@ describe('recent UI internationalization', () => {
     )
   })
 
+  it('localizes stalled release-upload recovery in all three modes', () => {
+    for (const key of [
+      'githubReleaseTransfer.stalled',
+      'githubReleaseTransfer.cliUnavailable',
+      'githubReleaseTransfer.cliFailed',
+      'githubReleaseTransfer.incompleteAsset',
+    ] as const) {
+      const english = translate(key, 'english')
+      const cantonese = translate(key, 'cantonese')
+      const bilingual = translate(key, 'bilingual')
+      assert.notEqual(english, cantonese)
+      assert.equal(bilingual, `${english} · ${cantonese}`)
+    }
+  })
+
   it('explains an uninitialized submodule in all three modes', () => {
     assert.equal(
       translate('submodule.openUnavailable', 'english'),

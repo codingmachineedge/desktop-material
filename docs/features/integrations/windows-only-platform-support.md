@@ -11,7 +11,8 @@ Desktop Material product surfaces.
 - CI builds Windows x64 and Windows arm64 and runs the full unit suite on
   Windows x64.
 - Packaged end-to-end smoke testing installs and exercises Windows x64.
-- Automated releases publish the Windows x64 Squirrel feed, EXE, and MSI.
+- Local packaging and automated releases produce the Windows x64 portable ZIP,
+  Squirrel feed, EXE, and MSI.
 - WSL, UNC shares, mapped drives, Windows editor registration, and Windows
   shell behavior remain first-class integrations.
 
@@ -39,5 +40,7 @@ permit Windows-only code to bypass those controls.
 The tracked CI safety test rejects macOS runners and Apple signing inputs in the
 application workflow, requires Windows 2022 x64/arm64 build targets, and keeps
 the packaged Windows x64 E2E lane. The installer workflow validates the exact
-current `main` SHA and publishes only non-empty Windows release assets after CI
-succeeds.
+current `main` SHA and publishes only non-empty Windows release assets—including
+the portable x64 ZIP—after CI succeeds. Focused ZIP/workflow checks pass; the
+full local package and remote publication proof for this addition remain
+pending.

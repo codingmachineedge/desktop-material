@@ -70,7 +70,10 @@ import {
   handleActionsArtifactTransfer,
   handleActionsJobLogTransfer,
 } from './actions-transfer'
-import { updateGitHubReleaseTransferAccounts } from './github-release-transfer'
+import {
+  cancelAllGitHubReleaseTransfers,
+  updateGitHubReleaseTransferAccounts,
+} from './github-release-transfer'
 import { registerGitHubReleaseTransferIPC } from './github-release-transfer-ipc'
 import { registerNotificationAutomationIpc } from './notification-automation-runner'
 import {
@@ -240,6 +243,10 @@ app.on('child-process-gone', (_event, details) => {
 })
 
 const ownedShutdownTasks: ReadonlyArray<IOwnedShutdownTask> = [
+  {
+    name: 'GitHub release transfers',
+    run: cancelAllGitHubReleaseTransfers,
+  },
   {
     name: 'Actions provenance verification',
     run: killAllActionsArtifactProvenanceVerifications,

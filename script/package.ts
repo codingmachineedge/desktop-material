@@ -17,6 +17,7 @@ import {
   getDistRoot,
   getDistArchitecture,
   getIconDirectory,
+  getWindowsPortableZipPath,
 } from './dist-info'
 import { isGitHubActions } from './build-platforms'
 import { existsSync, rmSync, writeFileSync } from 'fs'
@@ -25,6 +26,7 @@ import { computeBundleHashSync } from '../app/src/lib/compute-bundle-hash'
 import { rename } from 'fs/promises'
 import { join } from 'path'
 import { assertNonNullable } from '../app/src/lib/fatal-error'
+import { createWindowsPortableZip } from './windows-portable-zip'
 
 const distPath = getDistPath()
 const productName = getProductName()
@@ -90,6 +92,12 @@ function packageWindows() {
   }
 
   const iconUrl = 'https://desktop.githubusercontent.com/app-icon.ico'
+
+  const portableZip = createWindowsPortableZip(
+    distPath,
+    getWindowsPortableZipPath()
+  )
+  console.log(`Portable Windows ZIP created at ${portableZip}`)
 
   const nugetPkgName = getWindowsIdentifierName()
   const options: electronInstaller.Options = {

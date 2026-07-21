@@ -24,6 +24,11 @@ import {
   t,
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import { getBoolean, setBoolean } from '../../lib/local-storage'
+
+export const BuildRunAutoScrollStorageKey = 'build-run-panel-auto-scroll-v1'
+export const BuildRunTruncateOutputStorageKey =
+  'build-run-panel-truncate-output-v1'
 
 /** Build phases that terminate a run (nothing is actively working). */
 const TERMINAL_PHASES: ReadonlySet<BuildRunViewPhase> =
@@ -41,6 +46,10 @@ interface IBuildRunPanelState {
   readonly languageMode: LanguageMode
   /** True while the Stop confirmation dialog is shown. */
   readonly confirmingStop: boolean
+  /** Whether incoming output keeps the log pinned to its newest line. */
+  readonly autoScroll: boolean
+  /** Whether long output lines are visually shortened to one row. */
+  readonly truncateOutput: boolean
 }
 
 /** Human-readable label + tone class for a phase's status chip. */
@@ -83,7 +92,6 @@ export class BuildRunPanel extends React.Component<
 > {
   private storeSubscription: Disposable | null = null
   private scrollRef = React.createRef<HTMLDivElement>()
-  private stickToBottom = true
 
   public constructor(props: IBuildRunPanelProps) {
     super(props)
@@ -91,6 +99,8 @@ export class BuildRunPanel extends React.Component<
       view: props.buildRunStore.getStateForRepository(props.repository.id),
       languageMode: getPersistedLanguageMode(),
       confirmingStop: false,
+      autoScroll: getBoolean(BuildRunAutoScrollStorageKey, true),
+      truncateOutput: getBoolean(BuildRunTruncateOutputStorageKey, false),
     }
   }
 
@@ -100,6 +110,7 @@ export class BuildRunPanel extends React.Component<
       LanguageModeChangedEvent,
       this.onLanguageModeChanged
     )
+    this.maybeScrollToBottom()
   }
 
   private onLanguageModeChanged = (event: Event) => {
@@ -116,10 +127,12 @@ export class BuildRunPanel extends React.Component<
     prevState: IBuildRunPanelState
   ) {
     if (prevProps.repository.id !== this.props.repository.id) {
-      this.stickToBottom = true
       this.subscribe()
     }
-    if (prevState.view.logLines !== this.state.view.logLines) {
+    if (
+      prevState.view.logLines !== this.state.view.logLines ||
+      prevState.truncateOutput !== this.state.truncateOutput
+    ) {
       this.maybeScrollToBottom()
     }
   }
@@ -158,18 +171,47 @@ export class BuildRunPanel extends React.Component<
 
   private maybeScrollToBottom() {
     const el = this.scrollRef.current
-    if (el !== null && this.stickToBottom) {
+    if (el !== null && this.state.autoScroll) {
       el.scrollTop = el.scrollHeight
     }
   }
 
   private onScroll = () => {
     const el = this.scrollRef.current
-    if (el === null) {
+    if (el === null || !this.state.autoScroll) {
       return
     }
-    // Within 24px of the bottom counts as "following the tail".
-    this.stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+
+    // Deliberately scrolling up pauses auto-scroll so new output does not pull
+    // the reader away from history. The pressed state makes that pause visible.
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+    if (!atBottom) {
+      setBoolean(BuildRunAutoScrollStorageKey, false)
+      this.setState({ autoScroll: false })
+    }
+  }
+
+  private onScrollToBottom = () => {
+    const el = this.scrollRef.current
+    if (el !== null) {
+      el.scrollTop = el.scrollHeight
+    }
+  }
+
+  private onToggleAutoScroll = () => {
+    const autoScroll = !this.state.autoScroll
+    setBoolean(BuildRunAutoScrollStorageKey, autoScroll)
+    this.setState({ autoScroll }, () => {
+      if (autoScroll) {
+        this.onScrollToBottom()
+      }
+    })
+  }
+
+  private onToggleTruncateOutput = () => {
+    const truncateOutput = !this.state.truncateOutput
+    setBoolean(BuildRunTruncateOutputStorageKey, truncateOutput)
+    this.setState({ truncateOutput })
   }
 
   private onClose = () => {
@@ -448,6 +490,32 @@ export class BuildRunPanel extends React.Component<
           )}
           <Button
             className="header-action"
+            onClick={this.onScrollToBottom}
+            ariaLabel={t('buildRun.scrollToBottom')}
+            dataVerification="build-run-scroll-to-bottom"
+          >
+            <Octicon symbol={octicons.moveToBottom} />
+          </Button>
+          <Button
+            className="header-action output-toggle"
+            onClick={this.onToggleAutoScroll}
+            ariaLabel={t('buildRun.autoScroll')}
+            ariaPressed={this.state.autoScroll}
+            dataVerification="build-run-auto-scroll"
+          >
+            <Octicon symbol={octicons.sync} />
+          </Button>
+          <Button
+            className="header-action output-toggle"
+            onClick={this.onToggleTruncateOutput}
+            ariaLabel={t('buildRun.truncateOutput')}
+            ariaPressed={this.state.truncateOutput}
+            dataVerification="build-run-truncate-output"
+          >
+            <Octicon symbol={octicons.fold} />
+          </Button>
+          <Button
+            className="header-action"
             onClick={this.onCopyAll}
             ariaLabel="Copy all output"
           >
@@ -470,7 +538,9 @@ export class BuildRunPanel extends React.Component<
           {this.renderCloseButton()}
         </div>
         <div
-          className="build-run-log"
+          className={classNames('build-run-log', {
+            'truncate-output': this.state.truncateOutput,
+          })}
           ref={this.scrollRef}
           onScroll={this.onScroll}
         >

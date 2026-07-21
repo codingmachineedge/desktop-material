@@ -40,6 +40,14 @@ export function getOSXZipPath() {
   return Path.join(getDistPath(), '..', getOSXZipName())
 }
 
+export function getWindowsPortableZipName() {
+  return `${productName}-${getDistArchitecture()}.zip`
+}
+
+export function getWindowsPortableZipPath() {
+  return Path.join(getDistRoot(), getWindowsPortableZipName())
+}
+
 export function getWindowsInstallerName() {
   const productName = getExecutableName()
   return `${productName}Setup-${getDistArchitecture()}.msi`

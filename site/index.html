@@ -342,8 +342,12 @@
             <p class="install-note">
               Current automated builds are unsigned and x64 only. The script
               reports the unsigned status after digest verification and stops on
-              an unsupported architecture or unverified download. Review remote
-              code before running it.
+              an unsupported architecture or unverified download. Windows
+              packaging also produces a portable
+              <code>GitHub Desktop-x64.zip</code> beside the installer assets;
+              extract it before running the packaged executable. Review remote
+              code before running it. The first full package and remote release
+              containing the new ZIP are still pending.
             </p>
             <div class="hero-cta install-links">
               <a
@@ -557,8 +561,10 @@
               <p>
                 Detect nested projects across common language ecosystems, show
                 the project folder beside every profile, and install, build, and
-                run the selected project with responsive output that does not
-                clip long names.
+                run the selected project. Jump to the latest line, persist
+                auto-scroll while following output, or visually truncate long
+                lines without changing what Copy all returns. The controls use
+                English, playful Hong Kong Cantonese, or bilingual labels.
               </p>
             </article>
           </div>
@@ -647,19 +653,19 @@
               </div>
               <h3>
                 Release-backed large files
-                <span class="tag">Verified handoff</span>
+                <span class="tag">Focused checks passed</span>
               </h3>
               <p>
-                Stream real accepted-byte progress through Electron's
-                memory-bounded chunked transport while oversized files move to
-                Release assets. If an automatic upload stalls, switch the same
-                commit to one temporary folder containing every remaining
-                single-asset file. The exact Release upload editor opens for a
-                simple drag and drop; Desktop Material detects only new assets,
-                downloads and hashes them, preserves original nested paths,
-                rechecks every source, and resumes with verified pointers. Each
-                Release holds at most 1,000 objects; complete multipart files
-                and manual batches roll together through <code>assets</code>,
+                Stream real network progress through Electron's memory-bounded
+                chunked transport and stop a request after two minutes without
+                movement. A stall or HTTP 411/502 automatically uses an isolated
+                trusted GitHub CLI exact-range fallback: scan up to 1,000 assets
+                once, then poll only an exact ID and fail closed if it remains
+                incomplete. The exact Release editor and temporary drag/drop
+                folder remain the manual recovery path; Desktop Material hashes
+                new assets, preserves nested paths, rechecks each source, and
+                resumes with verified pointers. Complete multipart files and
+                manual batches roll together through <code>assets</code>,
                 <code>assets-2</code>, and later exact pointer tags.
               </p>
             </article>

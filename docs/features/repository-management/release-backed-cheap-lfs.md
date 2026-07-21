@@ -35,13 +35,40 @@ default for compatibility:
   The panel also offers explicit per-file and Materialize all actions.
 
 Automatic pinning reports separate hashing, release preparation, upload, and
-verification phases, streams accepted-byte progress, pins files sequentially,
-reloads status, and stages the pointer rather than the original binary. The
-first pin failure aborts the commit. The Electron transport removes the
-fixed-length header at its final request boundary and enables chunked encoding
-before writing, preventing Electron from retaining an entire multi-gigabyte
-asset in process memory. Exact source-range checks still reject files that grow
-or shrink after validation.
+verification phases, pins files sequentially, reloads status, and stages the
+pointer rather than the original binary. The first pin failure aborts the
+commit. The Electron transport removes the fixed-length header at its final
+request boundary and enables chunked encoding before writing, preventing
+Electron from retaining an entire multi-gigabyte asset in process memory. Its
+visible progress samples Electron's actual network-upload counter rather than
+the source-read callbacks; 100% is reserved until a valid provider response or
+reconciled asset proves acceptance. If that counter makes no forward progress
+for two minutes, Desktop Material aborts the native request instead of leaving
+the operation indefinitely at 0% or 1%. Exact source-range checks still reject
+files that grow or shrink after validation.
+
+A stalled native request automatically enters the bounded GitHub CLI fallback.
+The same fallback handles HTTP 411, where GitHub requires an exact
+`Content-Length` that conflicts with Electron's memory-safe chunked mode, and
+HTTP 502, which can leave an asset in an ambiguous processing state. Before it
+uploads again, Desktop Material scans the selected Release's complete bounded
+inventory once—up to ten 100-object pages. If it finds one exact-name object,
+it polls only that immutable asset ID. An already completed exact-size,
+exact-label, exact-digest object is reused; a persistent `starter` or other
+incomplete object fails closed. The inventory is not repeatedly reloaded for
+each poll.
+
+When no prior object exists, Desktop Material launches only the real-path
+`GitHub CLI\gh.exe` below a validated `Program Files` root and invokes a fixed
+`gh api` upload. The exact validated file range is streamed to standard input,
+hashed locally, and reported through bounded progress. The selected host and
+upload URL are fixed by the account-bound request. The token is supplied only
+through an isolated child environment, never an argument; inherited GitHub CLI
+credentials and debug settings are removed, an empty temporary CLI config is
+used, and the directory is deleted afterward. The process has bounded output,
+inactivity and total-runtime limits, runs without a shell, and is terminated and
+awaited on cancel. A failed CLI request receives one more bounded reconciliation
+because GitHub may have accepted the bytes before returning an error.
 
 While an automatic upload is active, **Manual upload** switches the same commit
 operation to a browser-assisted handoff. Desktop Material stops the current
@@ -78,11 +105,13 @@ and replace the pointer atomically only after the final verification succeeds.
 ## Failure modes and recovery
 
 An unavailable Releases account, missing release or asset, stale release
-review, upload/download error, changed source file, digest or size mismatch,
-oversized pointer projection, or cancellation leaves the original source or
-tracked pointer in place. Failed multipart pins attempt to delete only assets
-uploaded by that attempt and report any cleanup failure without touching
-pre-existing assets.
+review, upload/download error, missing trusted GitHub CLI, CLI timeout or
+failure, changed source file, digest or size mismatch, oversized pointer
+projection, or cancellation leaves the original source or tracked pointer in
+place. Failed multipart pins attempt to delete only assets uploaded by that
+attempt and report any cleanup failure without touching pre-existing assets.
+CLI-unavailable, CLI-failed, and incomplete-asset messages direct the user to
+retry or use the explicit manual handoff.
 
 A group requiring more than 1,000 assets is rejected before hashing or Release
 mutation. A concurrent uploader can consume capacity after allocation; if the
@@ -92,6 +121,8 @@ such as `starter` still reserve capacity and names, but are shown as processing
 and are never accepted as uploaded, downloaded, or materialized. When an upload
 response creates an object the app cannot accept, the isolated transfer process
 also makes a best-effort authenticated deletion of that exact returned asset ID.
+The CLI recovery never uses a clobber operation and never deletes an ambiguous
+object discovered after a timed-out native request.
 
 One automatic materialization failure is recorded per pointer and does not
 stop the remaining batch; cancellation stops the batch and the summary reports
@@ -120,6 +151,15 @@ publish the release before relying on unauthenticated collaborator access. The
 feature never puts provider credentials in a pointer. Temporary downloads are
 cleaned on success and failure, and unverified bytes never replace a tracked
 file.
+
+GitHub CLI recovery accepts only the trusted well-known installation path; it
+does not search the current directory or `PATH`. The exact account token is
+placed in `GH_TOKEN` or `GH_ENTERPRISE_TOKEN` only for the owned child process,
+with prompting, telemetry, update checks, color, inherited `GH_*`/`GITHUB_*`
+credentials, and debug output disabled. Standard output and standard error are
+bounded and never surfaced as credential-bearing diagnostics. Application quit
+stops accepting new Release transfers, aborts all active native or CLI work,
+and waits for their teardown through the owned-process shutdown barrier.
 
 Manual mode snapshots every pre-existing asset ID through all ten bounded pages
 before opening the handoff. It accepts only a new exact-name and exact-size
@@ -157,5 +197,14 @@ preference/account gating, failure aborts, and status reload before commit.
 controls, reviewed panel actions, inventory, cancellation, progress, and
 persisted preferences. `github-release-transfer-test.ts` additionally proves
 chunked mode is enabled before the first Electron write, `Content-Length` is
-removed only at that boundary, required headers remain, and source chunks are
-advanced one at a time.
+removed only at that boundary, required headers remain, source chunks are
+advanced one at a time, native network-progress sampling and stall
+cancellation, trusted CLI resolution, sanitized token/config isolation,
+exact-range stdin streaming and digest, GitHub.com/GHE host mapping, bounded
+output/process teardown, one complete 1,000-object scan followed by ID polling,
+late completion reconciliation, fail-closed persistent `starter` handling,
+automatic stall/411/502 fallback, 100%-only-after-acceptance progress, and
+application-quit teardown. The latest transfer and localization checkpoint
+passed 34/34 tests (21 transfer and 13 localization), plus root TypeScript
+no-emit and focused lint, format, and diff checks. The combined changed-surface
+gate passed 165/165 across 18 suites.

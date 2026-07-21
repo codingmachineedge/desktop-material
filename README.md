@@ -3,9 +3,9 @@
 Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [GitHub Desktop](https://github.com/desktop/desktop). It rebuilds the entire application shell around Material Design 3 while keeping GitHub Desktop's full Git workflow and the same underlying stack: [TypeScript](https://www.typescriptlang.org), [React](https://react.dev), [Electron](https://www.electronjs.org), and [Sass](https://sass-lang.com). This project is in active development.
 
 > **Platform support:** Desktop Material is a Windows-only application. Windows
-> x64 is the published installer target; Windows x64/arm64 builds and Windows
-> packaged E2E are the supported CI gates. macOS and Linux application packages
-> are not produced or supported.
+> x64 is the installer and portable-ZIP target; Windows x64/arm64 builds and
+> Windows packaged E2E are the supported CI gates. macOS and Linux application
+> packages are not produced or supported.
 
 <img
   width="1072"
@@ -174,9 +174,9 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 
 **One-click Build & Run**
 - Auto-detects bounded, nested project roots and runnable profiles for Node/npm/yarn/pnpm/bun, Deno, Rust, Go, .NET, Python, Java/Kotlin, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; each choice shows its project folder so similarly named profiles are unambiguous
-- Installs dependencies, builds, and runs the selected profile in one action, streaming output to an MD3 log panel with responsive wrapping and no clipped project names
+- Installs dependencies, builds, and runs the selected profile in one action, streaming output to an MD3 log panel with a one-shot **Scroll to bottom** action, persisted auto-scroll that pauses when the user reads history, and persisted display-only long-line truncation that leaves the complete text available to **Copy all output**
 - Auto-ignores build outputs (applies the matching `.gitignore` template + an artifacts section) before building
-- Bounded auto-fix on failure, a per-repo Build & Run settings tab, bounded discovery of nested projects, and optional single-prompt UAC pre-elevation
+- Bounded auto-fix on failure, a per-repo Build & Run settings tab, bounded discovery of nested projects, optional single-prompt UAC pre-elevation, and English, playful Hong Kong Cantonese, or bilingual output-control labels
 
 **Automation and GitHub Actions**
 - Configure scheduled commit-and-push and pull globally, override them per account or repository, and rely on safety guards that skip unsafe repositories and preserve draft commit messages
@@ -200,7 +200,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 
 **Guided Git and provider administration**
 - Manage cone-mode sparse checkout through a three-step **Choose/Adjust/Restore → Review selection → Apply and refresh** guide that remains visible above the scrolling editor and review content. State-aware guidance distinguishes empty, invalid, ready, running, and completed states; review freezes and shows every bounded normalized selection entry before Git updates and refreshes the worktree
-- Exchange reviewed patch series, rewrite local commits from an explicit plan, configure commit/tag signing, administer Git LFS, and run bounded guided bisect sessions from named Repository Tools panels. Release-backed cheap LFS labels hashing/upload/verification separately from the final branch commit, streams each large request through Electron's memory-bounded chunked mode with accepted-byte progress, opens the exact Release upload editor plus a verified whole-batch drag/drop handoff when an automatic upload stalls, maps flat assets back to original nested paths, keeps at most 1,000 objects in each `assets`, `assets-2`, … Release without splitting a multipart file or manual batch, and transparently verifies/reassembles the original bytes
+- Exchange reviewed patch series, rewrite local commits from an explicit plan, configure commit/tag signing, administer Git LFS, and run bounded guided bisect sessions from named Repository Tools panels. Release-backed cheap LFS labels hashing/upload/verification separately from the final branch commit; reports Electron's actual network-upload progress; aborts two minutes of no progress; and automatically retries a stall, HTTP 411, or HTTP 502 through a trusted, isolated `gh api` exact-range upload. Its reconciliation scans up to 1,000 objects once then polls only an exact asset ID, fails closed on an incomplete object, retains the exact Release editor plus verified whole-batch drag/drop recovery, maps flat assets back to original nested paths, keeps at most 1,000 objects in each `assets`, `assets-2`, … Release without splitting a multipart file or manual batch, and transparently verifies/reassembles the original bytes
 - Rebase the current branch onto a searched target through a reviewed current→target summary with ahead/behind context and a bounded commit preview. Fresh preflight state blocks dirty or conflicted repositories and ongoing operations, exact refs are revalidated before Git starts, conflicts remain in the existing continue/abort flow, and Desktop Material never force-pushes automatically
 - Manage every named remote with guarded add/rename/update/default/remove operations, and inspect or create exact known client hooks through the effective `core.hooksPath` without displaying hook contents or absolute paths. Remote rows stack before their name, URL, and controls collapse below a readable width, and the Repository Tools workspace keeps its diagnostics and results vertically reachable at compact heights
 - Save a credential-vault-backed SSH working copy in **Repository Settings → Remote**, then Clone, inspect Status, Fetch, Pull, Push, or deploy Docker Compose. The paired remote site can list the same redacted host definitions and request a reviewed clone without receiving a password or key. Updates are fast-forward-only on the configured branch; Desktop never resets or force-checks out the host. Public site hosting remains explicit server configuration: point DNS at that SSH host and configure its reverse proxy, TLS certificate, and container port outside Desktop Material
@@ -304,9 +304,11 @@ automation, and account isolation. The diagrams are reproducible with
 
 ## Install on Windows
 
-Desktop Material's automated releases currently provide a per-user x64 Windows
-installer. Run this one line in Windows PowerShell 5.1 or PowerShell 7; it does
-not require an administrator shell:
+Desktop Material's automated releases provide a per-user x64 Windows installer.
+The Windows package command also creates `dist/GitHub Desktop-x64.zip`, and the
+gated release workflow requires that portable archive beside the installer
+assets. Run this one line in Windows PowerShell 5.1 or PowerShell 7; it does not
+require an administrator shell:
 
 ```powershell
 Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
@@ -321,7 +323,10 @@ workflow publishes unsigned x64 builds, so the script reports that status and
 stops on ARM64 until an ARM64 asset is available. Review the script before
 running any remote command, or use the
 [latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest)
-for a manual download.
+for a manual installer or portable-ZIP download. Extract the ZIP before running
+the packaged executable. The focused archive/workflow contract is green; a
+complete local production package and the first remote publication containing
+this ZIP are still pending.
 
 ## Building
 

@@ -1091,6 +1091,13 @@ export type TranslationKey =
   | 'buildRun.stopConfirmBody'
   | 'buildRun.stopConfirmConfirm'
   | 'buildRun.stopConfirmCancel'
+  | 'buildRun.scrollToBottom'
+  | 'buildRun.autoScroll'
+  | 'buildRun.truncateOutput'
+  | 'githubReleaseTransfer.stalled'
+  | 'githubReleaseTransfer.cliUnavailable'
+  | 'githubReleaseTransfer.cliFailed'
+  | 'githubReleaseTransfer.incompleteAsset'
   | 'buildRun.sendToOpencode'
   | 'buildRun.sendIntro'
   | 'buildRun.sendPromptLabel'
@@ -2454,6 +2461,17 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'The in-progress build and any OpenCode work will be terminated. This cannot be undone.',
   'buildRun.stopConfirmConfirm': 'Stop',
   'buildRun.stopConfirmCancel': 'Cancel',
+  'buildRun.scrollToBottom': 'Scroll to bottom',
+  'buildRun.autoScroll': 'Auto-scroll output',
+  'buildRun.truncateOutput': 'Truncate long lines',
+  'githubReleaseTransfer.stalled':
+    'The release asset upload stopped making network progress. Retry it or use Manual upload.',
+  'githubReleaseTransfer.cliUnavailable':
+    'The release asset upload stalled and GitHub CLI is unavailable. Retry it or use Manual upload.',
+  'githubReleaseTransfer.cliFailed':
+    'The release asset upload stalled and GitHub CLI could not finish the fallback. Retry it or use Manual upload.',
+  'githubReleaseTransfer.incompleteAsset':
+    'This release has an incomplete asset with the same name. Remove it on the release page, then retry.',
   'buildRun.sendToOpencode': 'Send to opencode',
   'buildRun.sendIntro':
     'opencode is an AI coding agent. Type a request and it will work in this repository, running entirely on your machine.',
@@ -3703,6 +3721,17 @@ export const cantoneseTranslations: Readonly<
     '行緊嘅 build 同 OpenCode 嘅工作都會即刻終止，停咗就無得返轉頭。',
   'buildRun.stopConfirmConfirm': '停止',
   'buildRun.stopConfirmCancel': '唔好',
+  'buildRun.scrollToBottom': '碌到最底',
+  'buildRun.autoScroll': '自動碌去最新輸出',
+  'buildRun.truncateOutput': '截短太長嘅輸出行',
+  'githubReleaseTransfer.stalled':
+    'Release 資產上載停止咗網絡進度。請重試，或者使用手動上載。',
+  'githubReleaseTransfer.cliUnavailable':
+    'Release 資產上載停咗，而且搵唔到 GitHub CLI。請重試，或者使用手動上載。',
+  'githubReleaseTransfer.cliFailed':
+    'Release 資產上載停咗，而 GitHub CLI 後備上載亦未能完成。請重試，或者使用手動上載。',
+  'githubReleaseTransfer.incompleteAsset':
+    '呢個 release 有一個同名但未完成嘅資產。請喺 release 頁面移除佢，然後重試。',
   'buildRun.sendToOpencode': '傳去 opencode',
   'buildRun.sendIntro':
     'opencode 係個 AI 寫程式助手。你打低想做乜，佢就會喺呢個 repo 度做，全部喺你部機度行。',

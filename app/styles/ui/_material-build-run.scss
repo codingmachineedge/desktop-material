@@ -257,6 +257,17 @@
         color: var(--md-sys-color-error);
       }
 
+      // Toggle buttons keep a visible state in addition to aria-pressed so
+      // auto-scroll and line truncation are understandable at a glance.
+      &.output-toggle[aria-pressed='true'] {
+        background: var(--md-sys-color-primary);
+        color: var(--md-sys-color-on-primary);
+
+        &:hover {
+          background: color-mix(in srgb, var(--md-sys-color-primary) 88%, white);
+        }
+      }
+
       // "Fix with opencode" — a prominent tinted action shown only when the
       // most recent run failed. Reads as an offer, not a destructive control.
       &.fix-opencode {
@@ -326,6 +337,14 @@
       &.stream-meta .line-text {
         color: var(--dm-term-meta);
       }
+    }
+
+    // Display-only: the complete text remains in the DOM and clipboard copy
+    // while each long line is visually collapsed to a single row.
+    &.truncate-output .build-run-log-line .line-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: pre;
     }
   }
 }

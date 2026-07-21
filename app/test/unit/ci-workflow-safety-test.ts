@@ -75,6 +75,10 @@ describe('CI workflow safety', () => {
       installerWorkflow.match(/softprops\/action-gh-release@v2/g)?.length,
       1
     )
+    assert.match(
+      installerWorkflow,
+      /required=\([\s\S]*?"installers\/GitHub Desktop-x64\.zip"/
+    )
   })
 
   it('runs CI on every branch push', () => {

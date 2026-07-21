@@ -5,9 +5,9 @@
 Use this map to choose a starting point: learn the daily workflow in the User Guide, browse shipped surfaces in the Feature Gallery, or open a specialist guide for deeper details.
 
 > **Platform support:** Desktop Material is a Windows-only application. The
-> published installer is Windows x64, with Windows x64/arm64 build validation
-> and Windows packaged E2E. macOS and Linux application packages are not
-> produced or supported.
+> installer and portable-ZIP target is Windows x64, with Windows x64/arm64
+> build validation and Windows packaged E2E. macOS and Linux application
+> packages are not produced or supported.
 
 **Desktop Material** is an independent Material Design 3 (M3 Expressive) remake of GitHub Desktop.
 It is a fork of [desktop/desktop](https://github.com/desktop/desktop) (MIT) with the entire
@@ -58,8 +58,10 @@ links every request to a dedicated safety and verification contract.
 
 ## Install on Windows
 
-The automated release currently supports x64 Windows. From Windows PowerShell
-5.1 or PowerShell 7, run this one line in a normal, non-administrator shell:
+The automated release supports x64 Windows, and Windows packaging now produces
+a portable `GitHub Desktop-x64.zip` beside the installer outputs. From Windows
+PowerShell 5.1 or PowerShell 7, run this one line in a normal,
+non-administrator shell:
 
 ```powershell
 Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
@@ -71,7 +73,7 @@ matching GitHub SHA-256 asset digest, checks any Authenticode signature, install
 silently for the current user, and cleans up its temporary download. Current
 builds are unsigned; the script reports that fact and refuses an unsupported
 architecture or an unverified download. See the [User Guide](User-Guide#install-on-windows)
-for details and the manual-download path.
+for details, the portable-ZIP extraction note, and the manual-download path.
 
 ---
 
@@ -79,7 +81,7 @@ for details and the manual-download path.
 
 | Page | What it covers |
 | --- | --- |
-| [Install on Windows](User-Guide#install-on-windows) | Fully automatic PowerShell install, integrity checks, architecture limits, and manual download. |
+| [Install on Windows](User-Guide#install-on-windows) | Fully automatic PowerShell install, portable ZIP, integrity checks, architecture limits, and manual download. |
 | [User Guide](User-Guide) | Task-oriented walkthrough for the Material welcome, appearance scopes, adaptive toolbar, accounts, guided Git/GitHub functions, organizations, tabs, automation, Actions, History, stashes, pull-all, multi-window, and the MD3 shell. |
 | [Guided Feature Gallery](Feature-Gallery) | One distinct screenshot for each of 68 named visual functions and states, with automated missing/duplicate coverage checks. |
 | [Automation](Automation) | Scheduled commit & push and pull, layered overrides, safety guards, and merge-all branches/worktrees. |

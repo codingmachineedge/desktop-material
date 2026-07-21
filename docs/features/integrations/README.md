@@ -5,6 +5,7 @@ editor, shell, provider, and user-level Git configuration without placing
 credentials or machine-specific state in a repository.
 
 - [Windows-only platform support](windows-only-platform-support.md)
+- [Build & Run output controls](build-run-output-controls.md)
 - [Custom Git command presets](custom-git-command-presets.md)
 - [WSL-aware editor opening](wsl-aware-editor-opening.md)
 - [Global ignore management](global-ignore-management.md)

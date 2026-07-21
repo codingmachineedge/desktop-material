@@ -120,6 +120,14 @@ describe('post-shell MD3 style contracts', () => {
     assert.match(style, /@media \(max-width: 640px\), \(max-height: 420px\)/)
   })
 
+  it('visually truncates Build & Run lines without removing their text', () => {
+    const style = readStyle('_material-build-run.scss')
+    assert.match(
+      style,
+      /&\.truncate-output \.build-run-log-line \.line-text\s*\{[\s\S]*?overflow: hidden;[\s\S]*?text-overflow: ellipsis;[\s\S]*?white-space: pre;/
+    )
+  })
+
   it('colors terminal log accents from inverse-aware tokens for AA contrast', () => {
     const style = readStyle('_material-build-run.scss')
     // The panel is an inverse-surface card, so normal-surface error/primary/

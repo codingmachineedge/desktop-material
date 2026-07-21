@@ -51,6 +51,7 @@ catalogued function or state owns one distinct screenshot rather than borrowing 
 - [Guided Git and GitHub functions](#guided-git-and-github-functions)
 - [GitHub API Explorer](#github-api-explorer)
 - [One-click commit & push](#one-click-commit--push)
+- [Build & Run output controls](#build--run-output-controls)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
 - [Repository Releases](#repository-releases)
@@ -101,9 +102,10 @@ links to behavior, recovery, security, and test details for every workflow.
 
 ## Install on Windows
 
-Desktop Material's automated releases currently provide an x64 per-user
-installer. Open Windows PowerShell 5.1 or PowerShell 7 as your normal user and
-run:
+Desktop Material's automated releases provide an x64 per-user installer. The
+Windows package command also creates `GitHub Desktop-x64.zip`, and the gated
+release job requires that portable ZIP beside the installer and update-feed
+assets. Open Windows PowerShell 5.1 or PowerShell 7 as your normal user and run:
 
 ```powershell
 Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
@@ -127,6 +129,10 @@ warns about the missing signature after verifying the GitHub digest, and it
 stops rather than selecting a different package on ARM64 or 32-bit Windows. To
 inspect or download the asset yourself, use the
 [latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest).
+When the portable ZIP is present, download and extract it before starting the
+packaged executable; it does not run the Squirrel installer. The focused ZIP
+contract is green, but the first complete local package and remote release
+containing this new asset are still pending.
 
 ## Creating a GitHub release
 
@@ -761,21 +767,32 @@ see [Automation](Automation).
 
 When a selected file is larger than GitHub's ordinary 100 MiB object limit and release-backed
 **cheap LFS** is available, every commit entry point prepares it before invoking Git. The commit
-button reports hashing, real accepted-byte upload progress, and final source verification; only the
-small-pointer commit says **Committing … to _branch_**. If an automatic upload stalls, choose
-**Manual upload** beside the progress controls. Desktop Material stops that attempt, places all
-remaining files that fit one Release asset into one temporary **upload-these-files** folder using
-symlinks, hardlinks, or copies. It opens the exact selected Release edit/upload page first, then puts
-that folder in front: select all prepared files, drag them onto GitHub's asset drop zone, and let the
-browser finish the upload (then choose its save/update action if shown). The app detects only new
-exact-name assets, downloads and hashes all of them, rechecks every source, writes the pointers, and
-resumes the same commit automatically. Older GitHub Enterprise versions safely fall back to the
-repository Releases listing. **Cancel** stops
-either path. Multipart files continue through the automatic ranged uploader. New uploads otherwise
-skip compression: a file fitting the release-asset cap is stored as one raw asset, while a larger
-file is split into ordered raw ranges. Downloads verify each range and the complete file before
-replacing the pointer. Existing compressed cheap-LFS pointers remain readable for backward
-compatibility.
+button reports hashing, actual Electron network-upload progress, and final source verification;
+100% appears only after GitHub accepts or the app reconciles the exact asset, and only the
+small-pointer commit says **Committing … to _branch_**. Two minutes without network progress aborts
+the native request instead of leaving the panel indefinitely at 0% or 1%.
+
+After a native stall, HTTP 411, or HTTP 502, Desktop Material automatically tries a bounded
+exact-length `gh api` upload when GitHub CLI exists in its trusted Program Files location. The app
+uses the selected account and host, streams and hashes only the validated file range, passes the
+token through an isolated temporary child environment rather than the command line, and tears down
+the CLI on cancel or app quit. Before uploading again, it scans all ten bounded Release pages once;
+if an exact-name object exists, later checks poll only its ID. A completed exact-size/digest asset is
+reused, while a persistent `starter` asset fails closed so it cannot be overwritten or mistaken for
+success.
+
+For explicit recovery, choose **Manual upload** beside the progress controls. Desktop Material
+stops that attempt and places all remaining files that fit one Release asset into one temporary
+**upload-these-files** folder using symlinks, hardlinks, or copies. It opens the exact selected
+Release edit/upload page first, then puts that folder in front: select all prepared files, drag them
+onto GitHub's asset drop zone, and let the browser finish the upload (then choose its save/update
+action if shown). The app detects only new exact-name assets, downloads and hashes all of them,
+rechecks every source, writes the pointers, and resumes the same commit automatically. Older GitHub
+Enterprise versions safely fall back to the repository Releases listing. **Cancel** stops either
+path. Multipart files continue through the automatic ranged uploader. New uploads otherwise skip
+compression: a file fitting the release-asset cap is stored as one raw asset, while a larger file is
+split into ordered raw ranges. Downloads verify each range and the complete file before replacing
+the pointer. Existing compressed cheap-LFS pointers remain readable for backward compatibility.
 
 Each Cheap LFS Release holds at most 1,000 objects. Desktop Material counts all ten asset pages and
 uses `assets`, then `assets-2`, `assets-3`, and later buckets as needed. A multipart file or one
@@ -789,6 +806,23 @@ part is read incrementally instead of being retained as one in-process request b
 The prepared folder is flat because GitHub Release assets cannot contain subfolders. Cheap LFS still
 remembers every original repository-relative path: files in nested folders return to those exact
 paths, and duplicate basenames receive distinct hash-suffixed asset names.
+
+---
+
+## Build & Run output controls
+
+Open **Build & Run** and start the selected project profile. The log panel keeps three output
+navigation/display choices in its header:
+
+- **Scroll to bottom** jumps to the newest line once and does not change another setting.
+- **Auto-scroll output** starts enabled and follows incoming lines. Scrolling upward to read older
+  output pauses and saves this setting; enable it again to jump back to the tail and resume following.
+- **Truncate long lines** starts disabled. Enabling it displays each long line on one row with an
+  ellipsis. It does not delete output: disabling it restores normal wrapping, and **Copy all output**
+  always retains the complete line.
+
+Auto-scroll and truncation persist locally when the panel or app is reopened. Their pressed states
+and accessible names follow English, playful Hong Kong Cantonese, and bilingual language mode.
 
 ---
 
