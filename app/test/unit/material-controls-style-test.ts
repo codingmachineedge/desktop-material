@@ -75,11 +75,15 @@ describe('Material Design 3 control layer', () => {
       css,
       /&::-webkit-progress-value\s*\{\s*background: var\(--md-sys-color-primary\);/
     )
-    // The indeterminate stripe tracks the same 6px height.
+    // The indeterminate bar is the M3 single traveling active-indicator
+    // (a primary segment swept with the emphasized easing), not the legacy
+    // diagonal barber-pole stripe.
+    const progressCss = read('app', 'styles', 'ui', '_progress.scss')
     assert.match(
-      read('app', 'styles', 'ui', '_progress.scss'),
-      /background-size: 25px 6px/
+      progressCss,
+      /&:indeterminate\s*\{[\s\S]*?background-image: linear-gradient\(\s*to right,\s*var\(--md-sys-color-primary\),\s*var\(--md-sys-color-primary\)\s*\);[\s\S]*?animation: progress-indeterminate-animation [\d.]+s var\(--emph\) infinite;/
     )
+    assert.doesNotMatch(progressCss, /-webkit-linear-gradient\(-45deg/)
   })
 
   it('gives buttons the full-radius M3 pill shape', () => {

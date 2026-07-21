@@ -6,6 +6,7 @@ import {
   OkCancelButtonGroup,
 } from '../dialog'
 import { LinkButton } from '../lib/link-button'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface ICopilotDisclaimerProps {
   /**
@@ -49,7 +50,7 @@ export class CopilotDisclaimer extends React.Component<ICopilotDisclaimerProps> 
             Copilot is powered by AI, so mistakes are possible.
             {children !== undefined && <> {children}</>}{' '}
             <LinkButton uri="https://gh.io/copilot-for-desktop-transparency">
-              Learn more about Copilot in GitHub Desktop.
+              Learn more about Copilot in {DefaultAppDisplayName}.
             </LinkButton>
           </p>
         </DialogContent>

@@ -5,6 +5,7 @@ import { Ref } from '../lib/ref'
 import { Repository } from '../../models/repository'
 import { TrashNameLabel } from '../lib/context-menu'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface IConfirmRemoveRepositoryProps {
   /** The repository to be removed */
@@ -67,10 +68,10 @@ export class ConfirmRemoveRepository extends React.Component<
         <DialogContent>
           <p>
             Are you sure you want to remove the repository "
-            {this.props.repository.name}" from GitHub Desktop?
+            {this.props.repository.name}" from {DefaultAppDisplayName}?
           </p>
           <div className="description">
-            <p>The repository will be removed from GitHub Desktop:</p>
+            <p>The repository will be removed from {DefaultAppDisplayName}:</p>
             <p>
               <Ref>{this.props.repository.path}</Ref>
             </p>

@@ -15,6 +15,7 @@ import { ClickSource } from '../lib/list'
 import { AccountPicker } from '../account-picker'
 import { GitModulesProbe } from '../../lib/submodules/gitmodules-probe'
 import { IGitModulesEntry } from '../../lib/git/gitmodules'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface INoRepositoriesProps {
   /** A function to call when the user chooses to create a repository. */
@@ -183,7 +184,9 @@ export class NoRepositoriesView extends React.Component<
         <section aria-label="Let's get started!">
           <header>
             <h1>Let's get started!</h1>
-            <p>Add a repository to GitHub Desktop to start collaborating</p>
+            <p>
+              Add a repository to {DefaultAppDisplayName} to start collaborating
+            </p>
           </header>
 
           <div className="content">

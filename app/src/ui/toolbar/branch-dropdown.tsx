@@ -1,7 +1,5 @@
 import * as React from 'react'
 import { Dispatcher } from '../dispatcher'
-import * as octicons from '../octicons/octicons.generated'
-import { OcticonSymbol } from '../octicons'
 import {
   isRepositoryWithGitHubRepository,
   Repository,
@@ -142,7 +140,6 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
 
     const tipKind = tip.kind
 
-    let icon: OcticonSymbol | undefined
     let materialSymbol: MaterialSymbolName | undefined = 'alt_route'
     let iconClassName: string | undefined = undefined
     let title: string
@@ -152,8 +149,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
     let tooltip: string
 
     if (this.props.currentPullRequest) {
-      icon = octicons.gitPullRequest
-      materialSymbol = undefined
+      materialSymbol = 'call_split'
     }
 
     if (tip.kind === TipState.Unknown) {
@@ -168,8 +164,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
     } else if (tip.kind === TipState.Detached) {
       title = `On ${tip.currentSha.substring(0, 7)}`
       tooltip = 'Currently on a detached HEAD'
-      icon = octicons.gitCommit
-      materialSymbol = undefined
+      materialSymbol = 'commit'
       description = 'Detached HEAD'
     } else if (tip.kind === TipState.Valid) {
       title = tooltip = tip.branch.name
@@ -190,15 +185,13 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
 
       tooltip = `Checking out ${checkoutProgress.target}`
       progressValue = checkoutProgress.value
-      icon = undefined
       materialSymbol = 'progress_activity'
       iconClassName = 'spin'
       canOpen = false
     } else if (conflictState !== null && isRebaseConflictState(conflictState)) {
       title = conflictState.targetBranch
       description = 'Rebasing branch'
-      icon = octicons.gitBranch
-      materialSymbol = undefined
+      materialSymbol = 'alt_route'
       canOpen = false
       disabled = true
       tooltip = `Rebasing ${conflictState.targetBranch}`
@@ -215,7 +208,6 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
         <>
           <ToolbarDropdown
             className="branch-button"
-            icon={icon}
             materialSymbol={materialSymbol}
             materialSymbolSize={19}
             iconClassName={iconClassName}
@@ -263,7 +255,6 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
         >
           <ToolbarDropdown
             className="branch-button"
-            icon={icon}
             materialSymbol={materialSymbol}
             materialSymbolSize={19}
             iconClassName={iconClassName}

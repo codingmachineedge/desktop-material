@@ -11,12 +11,13 @@ import { Toolbar } from '../../../src/ui/toolbar/toolbar'
 import { render, screen } from '../../helpers/ui/render'
 
 describe('component primitives', () => {
-  it('renders the loading spinner octicon', () => {
+  it('renders the loading spinner as a spinning material symbol', () => {
     const view = render(<Loading />)
 
-    const spinner = view.container.querySelector('svg.octicon.spin')
+    const spinner = view.container.querySelector('span.material-symbol.spin')
 
     assert.notEqual(spinner, null)
+    assert.equal(spinner?.textContent, 'progress_activity')
     assert.equal(spinner?.getAttribute('aria-hidden'), 'true')
   })
 

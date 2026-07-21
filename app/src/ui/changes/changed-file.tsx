@@ -1,7 +1,8 @@
 import * as React from 'react'
 
 import { PathLabel } from '../lib/path-label'
-import { Octicon, iconForStatus } from '../octicons'
+import { materialSymbolForStatus } from '../octicons'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { mapStatus } from '../../lib/status'
 import { WorkingDirectoryFileChange } from '../../models/status'
@@ -111,8 +112,9 @@ export class ChangedFile extends React.Component<IChangedFileProps, {}> {
           tooltip={fileStatus}
           direction={TooltipDirection.EAST}
         >
-          <Octicon
-            symbol={iconForStatus(status)}
+          <MaterialSymbol
+            name={materialSymbolForStatus(status)}
+            size={16}
             className={'status status-' + fileStatus.toLowerCase()}
           />
         </TooltippedContent>

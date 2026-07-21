@@ -1,7 +1,6 @@
 import * as React from 'react'
 import * as Path from 'path'
 import { Dispatcher } from '../dispatcher'
-import * as octicons from '../octicons/octicons.generated'
 import { Repository, SubmoduleRepository } from '../../models/repository'
 import { ToolbarDropdown, DropdownState } from './dropdown'
 import { FoldoutType, IConstrainedValue } from '../../lib/app-state'
@@ -222,7 +221,8 @@ export class WorktreeDropdown extends React.Component<
     const toolbarDropdown = (
       <ToolbarDropdown
         className="worktree-button"
-        icon={octicons.fileDirectory}
+        materialSymbol="account_tree"
+        materialSymbolSize={19}
         title={title}
         description={description}
         tooltip={isOpen ? undefined : `Current worktree is ${title}`}

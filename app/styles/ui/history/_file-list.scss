@@ -16,33 +16,62 @@
     color: var(--md-sys-color-on-surface-variant);
   }
 
-  // Committed file rows: name typography + status-tinted glyph. The row
-  // background/selection is owned by the shared list layer; here we only
-  // refine the row content (CSS-only, DOM untouched).
+  // Committed file rows: name typography + a Material status glyph housed in the
+  // same 20×20 tonal chip the Changes pane uses, so History and Changes share
+  // one status treatment.
   .file-list .file {
     padding: 0 4px;
+    padding-right: 10px;
 
     .path {
       font-size: 12.5px;
       font-weight: 500;
     }
 
-    .octicon.status {
-      &.status-new,
-      &.status-added,
-      &.status-untracked,
-      &.status-copied {
-        fill: var(--dm-green);
-      }
+    .path-label-component {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-right: 6px;
+    }
 
-      &.status-modified,
-      &.status-renamed {
-        fill: var(--dm-amber);
-      }
+    // Status Material Symbol → 20×20 tonal chip. `content-box` keeps the 16px
+    // glyph and adds 2px padding around it inside the coloured box.
+    .status {
+      box-sizing: content-box;
+      width: 16px;
+      height: 16px;
+      padding: 2px;
+      border-radius: var(--md-sys-shape-corner-small);
+      vertical-align: middle;
+      transition: transform 200ms var(--spring-fast);
+    }
 
-      &.status-deleted {
-        fill: var(--md-sys-color-error);
-      }
+    &:hover .status {
+      transform: scale(1.12);
+    }
+
+    // New / added / untracked / copied → green container.
+    .status-new,
+    .status-added,
+    .status-untracked,
+    .status-copied {
+      background: var(--dm-green-container);
+      color: var(--dm-green);
+    }
+
+    // Modified / renamed → amber container.
+    .status-modified,
+    .status-renamed {
+      background: var(--dm-amber-container);
+      color: var(--dm-amber);
+    }
+
+    // Deleted → error container.
+    .status-deleted {
+      background: var(--md-sys-color-error-container);
+      color: var(--md-sys-color-on-error-container);
     }
   }
 }

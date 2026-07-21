@@ -63,6 +63,23 @@ dialog#about {
       width: 64px;
       height: 64px;
     }
+
+    // The fork's Material identity mark: a 64x64 primary-container tile hosting
+    // the app glyph, replacing the legacy GitHub Desktop logo raster.
+    .about-app-logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+      transition: background-color 480ms var(--emph), color 480ms var(--emph);
+
+      .material-symbol {
+        color: inherit;
+      }
+    }
   }
 
   .update-status {

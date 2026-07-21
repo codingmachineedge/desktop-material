@@ -355,7 +355,8 @@
     color: var(--md-sys-color-on-primary-container);
     animation: dmBounce calc(480ms * var(--mdur)) var(--spring-fast) backwards;
 
-    .octicon {
+    .octicon,
+    .material-symbol {
       width: 14px;
       height: 14px;
     }

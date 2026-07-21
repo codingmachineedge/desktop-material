@@ -130,6 +130,7 @@ export type RequestChannels = {
   'window-state-changed': (windowState: WindowState) => void
   error: (crashDetails: ICrashDetails) => void
   'zoom-factor-changed': (zoomFactor: number) => void
+  'window-content-size-changed': (width: number, height: number) => void
   'app-menu': (menu: IMenu) => void
   'launch-timing-stats': (stats: ILaunchStats) => void
   'url-action': (action: URLActionType) => void

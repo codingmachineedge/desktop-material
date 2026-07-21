@@ -472,7 +472,15 @@ export class RepositoryView extends React.Component<
         {this.showsGitHubReleases() && (
           <span className="rail-item" id="releases-tab" data-dm-feature={true}>
             <span className="rail-pill">
-              <Octicon symbol={octicons.tag} className="rail-icon" />
+              <span className="rail-icon">
+                <MaterialSymbol
+                  name="sell"
+                  size={22}
+                  fill={
+                    selectedSection === RepositorySectionTab.Releases ? 1 : 0
+                  }
+                />
+              </span>
             </span>
             <span className="rail-label">Releases</span>
           </span>
@@ -480,7 +488,13 @@ export class RepositoryView extends React.Component<
         {this.showsGitHubIssues() && (
           <span className="rail-item" id="issues-tab" data-dm-feature={true}>
             <span className="rail-pill">
-              <Octicon symbol={octicons.issueOpened} className="rail-icon" />
+              <span className="rail-icon">
+                <MaterialSymbol
+                  name="flag"
+                  size={22}
+                  fill={selectedSection === RepositorySectionTab.Issues ? 1 : 0}
+                />
+              </span>
             </span>
             <span className="rail-label">Issues</span>
           </span>
@@ -492,14 +506,28 @@ export class RepositoryView extends React.Component<
             data-dm-feature={true}
           >
             <span className="rail-pill">
-              <Octicon symbol={octicons.codeSquare} className="rail-icon" />
+              <span className="rail-icon">
+                <MaterialSymbol
+                  name="code"
+                  size={22}
+                  fill={
+                    selectedSection === RepositorySectionTab.GitHubAPI ? 1 : 0
+                  }
+                />
+              </span>
             </span>
             <span className="rail-label">API</span>
           </span>
         )}
         <span className="rail-item" id="triage-tab" data-dm-feature={true}>
           <span className="rail-pill">
-            <Octicon symbol={octicons.checklist} className="rail-icon" />
+            <span className="rail-icon">
+              <MaterialSymbol
+                name="library_add_check"
+                size={22}
+                fill={selectedSection === RepositorySectionTab.Triage ? 1 : 0}
+              />
+            </span>
           </span>
           <span className="rail-label">Triage</span>
         </span>
@@ -509,7 +537,17 @@ export class RepositoryView extends React.Component<
           data-dm-feature={true}
         >
           <span className="rail-pill">
-            <Octicon symbol={octicons.tools} className="rail-icon" />
+            <span className="rail-icon">
+              <MaterialSymbol
+                name="build"
+                size={22}
+                fill={
+                  selectedSection === RepositorySectionTab.RepositoryTools
+                    ? 1
+                    : 0
+                }
+              />
+            </span>
           </span>
           <span className="rail-label">Tools</span>
         </span>

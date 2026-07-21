@@ -37,10 +37,10 @@ describe('branch empty states', () => {
     const button = screen.getByRole('button', {
       name: __DARWIN__ ? 'Create New Branch' : 'Create new branch',
     })
-    const image = document.querySelector('.no-branches .blankslate-image')
+    const tile = document.querySelector('.no-branches .empty-state-tile')
     const protip = document.querySelector('.no-branches .protip')
 
-    assert.notEqual(image, null)
+    assert.notEqual(tile, null)
     assert.ok(screen.getByText("Sorry, I can't find that branch"))
     assert.ok(screen.getByText('Do you want to create a new branch instead?'))
     assert.ok(

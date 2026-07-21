@@ -2,6 +2,7 @@ import * as React from 'react'
 import * as URL from 'url'
 import { Dialog, DialogContent, DialogFooter } from '../dialog'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface IUntrustedCertificateProps {
   /** The untrusted certificate. */
@@ -44,8 +45,9 @@ export class UntrustedCertificate extends React.Component<
       >
         <DialogContent>
           <p>
-            GitHub Desktop cannot verify the identity of {host}. The certificate
-            ({this.props.certificate.subjectName}) is invalid or untrusted.{' '}
+            {DefaultAppDisplayName} cannot verify the identity of {host}. The
+            certificate ({this.props.certificate.subjectName}) is invalid or
+            untrusted.{' '}
             <strong>
               This may indicate attackers are trying to steal your data.
             </strong>

@@ -18,17 +18,26 @@ progress {
 
   // The determinate track/value now come from the final
   // `_material-controls.scss` cascade layer (6px, secondary-container). The
-  // indeterminate stripe stays here; its size tracks that 6px height.
+  // indeterminate bar is the M3 single traveling active-indicator: one solid
+  // primary segment sweeping across the tonal track with the emphasized
+  // easing, mirroring the app's div-based `dmBar` motion. A bare <progress>
+  // can't host a positioned child, so the indicator is an animated background
+  // segment rather than the legacy diagonal barber-pole stripe.
   &:indeterminate {
-    background-image: -webkit-linear-gradient(-45deg, transparent 33%, var(--md-sys-color-primary) 33%, var(--md-sys-color-primary) 66%, transparent 66%);
-    background-size: 25px 6px, 100% 100%, 100% 100%;
+    background-image: linear-gradient(to right, var(--md-sys-color-primary), var(--md-sys-color-primary));
+    background-repeat: no-repeat;
+    background-size: 34% 100%;
+    background-position: -55% 0;
 
-    -webkit-animation: progress-indeterminate-animation 5s linear infinite;
+    animation: progress-indeterminate-animation 1.1s var(--emph) infinite;
   }
 }
 
-@-webkit-keyframes progress-indeterminate-animation {
+@keyframes progress-indeterminate-animation {
+  0% {
+    background-position: -55% 0;
+  }
   100% {
-    background-position: 100px 0px;
+    background-position: 160% 0;
   }
 }

@@ -18,12 +18,10 @@ import { ILocalRepositoryState, Repository } from '../../models/repository'
 import { DensityPreference } from '../../models/appearance-customization'
 import { Dispatcher } from '../dispatcher'
 import { Button } from '../lib/button'
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { showContextualMenu } from '../../lib/menu-item'
 import { IMenuItem } from '../../lib/menu-item'
 import { PopupType } from '../../models/popup'
-import { encodePathAsUrl } from '../../lib/path'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import memoizeOne from 'memoize-one'
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
@@ -74,8 +72,6 @@ import {
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { LocalizedText } from '../lib/localized-text'
-
-const BlankSlateImage = encodePathAsUrl(__dirname, 'static/empty-no-repo.svg')
 
 interface IRepositoriesListProps {
   /** Signed-in identities used by the account and provider scope controls. */
@@ -441,8 +437,14 @@ export class RepositoriesList extends React.Component<
           <div>
             <div className="label">
               <div className="ahead-behind">
-                {ahead > 0 && <Octicon symbol={octicons.arrowUp} />}
-                {behind > 0 && <Octicon symbol={octicons.arrowDown} />}
+                {ahead > 0 && <MaterialSymbol name="arrow_upward" size={14} />}
+                {behind > 0 && (
+                  <MaterialSymbol
+                    name="arrow_upward"
+                    size={14}
+                    className="behind-indicator"
+                  />
+                )}
               </div>
             </div>
             {aheadBehindTooltip}
@@ -452,7 +454,7 @@ export class RepositoriesList extends React.Component<
           <div>
             <div className="label">
               <span className="change-indicator-wrapper">
-                <Octicon symbol={octicons.dotFill} />
+                <MaterialSymbol name="circle" fill={1} size={10} />
               </span>
             </div>
             {uncommittedChangesTooltip}
@@ -813,13 +815,7 @@ export class RepositoriesList extends React.Component<
               }
               onClick={this.onShowHiddenRepositoriesToggle}
             >
-              <Octicon
-                symbol={
-                  this.state.showHiddenRepositories
-                    ? octicons.eyeClosed
-                    : octicons.eye
-                }
-              />
+              <MaterialSymbol name="visibility" size={16} />
               <LocalizedText
                 translationKey={
                   this.state.showHiddenRepositories
@@ -848,7 +844,7 @@ export class RepositoriesList extends React.Component<
           onClick={this.onCloseClick}
           aria-label="Close"
         >
-          <Octicon symbol={octicons.x} />
+          <MaterialSymbol name="close" size={20} />
         </button>
       </header>
     )
@@ -865,13 +861,13 @@ export class RepositoriesList extends React.Component<
           className="pull-all-repositories-button"
           onClick={this.onPullAllRepositories}
         >
-          <Octicon symbol={octicons.sync} /> Sync repositories
+          <MaterialSymbol name="sync" size={16} /> Sync repositories
         </Button>
         <Button
           className="commit-push-all-repositories-button"
           onClick={this.onCommitAndPushAllRepositories}
         >
-          <Octicon symbol={octicons.arrowUp} /> Commit &amp; push all
+          <MaterialSymbol name="arrow_upward" size={16} /> Commit &amp; push all
         </Button>
         <Button
           className="new-repository-button"
@@ -880,7 +876,7 @@ export class RepositoriesList extends React.Component<
           onKeyDown={this.onNewRepositoryButtonKeyDown}
         >
           Add
-          <Octicon symbol={octicons.triangleDown} />
+          <MaterialSymbol name="expand_more" size={18} />
         </Button>
       </div>
     )
@@ -909,7 +905,9 @@ export class RepositoriesList extends React.Component<
   private renderNoItems = () => {
     return (
       <div className="no-items no-results-found">
-        <img src={BlankSlateImage} className="blankslate-image" alt="" />
+        <div className="blankslate-symbol" aria-hidden="true">
+          <MaterialSymbol name="search_off" size={34} />
+        </div>
         <div className="title">Sorry, I can't find that repository</div>
 
         <div className="protip">

@@ -30,37 +30,61 @@
     background-color: var(--box-border-color);
   }
 
+  // M3 primary/secondary tab bar: a single shared bottom track carrying an
+  // animated active-indicator underline plus hover/press state layers. This
+  // replaces the legacy boxed grid (per-tab 1px borders, radius 0, inset
+  // box-shadow selected bar).
+  &.tabs {
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+
   &.tabs &-item {
+    position: relative;
     border-radius: 0;
 
     // Give each item equal space
     flex: 1;
 
-    // Center item contest horizontally and vertically
+    // Center item content horizontally and vertically
     display: flex;
     align-items: center;
     justify-content: center;
 
-    border-bottom: 1px solid var(--box-border-color);
-    border-right: 1px solid var(--box-border-color);
+    border: none;
+    color: var(--md-sys-color-on-surface-variant);
+    background: transparent;
+    transition: background-color 180ms var(--emph), color 180ms var(--emph);
 
-    // This makes it so that we never render a double-width item border.
-    // It has the unintended consequence of making it impossible to have a tab
-    // bar with just one item but we can live with that.
-    &:last-child {
-      border-right: none;
-    }
-
-    // We intentionally swap foreground and background here to create
-    // a more intense selected state. The tab bar is kind of a special snowflake
-    // in so far that it doesn't have an active selection state, just a selected
-    // one.
-    &.selected {
-      box-shadow: inset 0 -3px 0px var(--tab-bar-active-color);
-    }
-
+    // M3 state layers on hover / press.
     &:hover {
-      background: var(--tab-bar-hover-background-color);
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+    }
+
+    &:active {
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+    }
+
+    // M3 active-indicator underline: a rounded primary bar that grows in from
+    // the tab centre, replacing the inverted/inset selected treatment.
+    &::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 0;
+      height: 3px;
+      border-radius: 3px 3px 0 0;
+      background: var(--md-sys-color-primary);
+      transform: translateX(-50%);
+      transition: width 220ms var(--spring);
+    }
+
+    &.selected {
+      color: var(--md-sys-color-primary);
+
+      &::after {
+        width: 100%;
+      }
     }
 
     .with-indicator {

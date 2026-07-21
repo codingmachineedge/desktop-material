@@ -1,12 +1,29 @@
 #multiple-commits-selected {
   padding: 0;
   display: block;
-  ul {
-    margin-top: 0px;
-  }
 
   .panel {
     height: 100%;
     text-align: left;
+  }
+
+  // The shared Material empty-state centers its tile + title; the actionable
+  // "You can:" list underneath reads better left-aligned within a bounded
+  // column.
+  .empty-state {
+    max-width: 420px;
+  }
+
+  .multiple-commits-help {
+    margin-top: 14px;
+    text-align: left;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--md-sys-color-on-surface-variant);
+
+    ul {
+      margin-top: 6px;
+      padding-left: 20px;
+    }
   }
 }

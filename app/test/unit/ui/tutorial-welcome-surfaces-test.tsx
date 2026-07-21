@@ -11,6 +11,7 @@ import type { Dispatcher } from '../../../src/ui/dispatcher'
 import { TutorialDone } from '../../../src/ui/tutorial/done'
 import { TutorialStepInstructions } from '../../../src/ui/tutorial/tutorial-step-instruction'
 import { TutorialWelcome } from '../../../src/ui/tutorial/welcome'
+import { DefaultAppDisplayName } from '../../../src/models/app-identity'
 import { render, screen } from '../../helpers/ui/render'
 
 class TestDispatcher {
@@ -51,10 +52,10 @@ describe('tutorial welcome surfaces', () => {
       image => image.getAttribute('alt')
     )
 
-    assert.ok(screen.getByText('Welcome to GitHub Desktop'))
+    assert.ok(screen.getByText(`Welcome to ${DefaultAppDisplayName}`))
     assert.ok(
       screen.getByText(
-        'Use this tutorial to get comfortable with Git, GitHub, and GitHub Desktop.'
+        `Use this tutorial to get comfortable with Git, GitHub, and ${DefaultAppDisplayName}.`
       )
     )
     assert.equal(definitions.length, 3)

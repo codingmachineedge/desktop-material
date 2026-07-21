@@ -123,6 +123,7 @@ import {
   isSubmoduleRepository,
   SubmoduleRepository,
 } from '../../models/repository'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 import {
   buildGitHubPullRequestTargets,
   getGitHubPullRequestBaseBranchName,
@@ -443,9 +444,11 @@ import {
 import {
   clampZoom,
   computeAutoFitMultiplier,
+  resolveEffectiveZoom,
   stepZoom,
   EffectiveZoomEpsilon,
   AutoFitDebounceMs,
+  MaxAutoFitAppliesPerInput,
 } from '../zoom'
 import { ExternalEditorError, suggestedExternalEditor } from '../editors/shared'
 import { ApiRepositoriesStore } from './api-repositories-store'
@@ -933,6 +936,35 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private autoFitMultiplier: number = 1
   /** Pending debounced resize recompute timer id, if any. */
   private zoomResizeDebounceId: number | null = null
+  /**
+   * The window content size (device-independent pixels) most recently delivered
+   * by the main process via the 'window-content-size-changed' channel. This is
+   * the auto-fit input: unlike `window.innerWidth × appliedZoom` it does NOT
+   * change when we apply a zoom (nor when a scrollbar toggles), so feeding it
+   * back through recomputeAutoFit is a true fixed point and can't oscillate.
+   * `null` until the first delivery, during which we fall back to the viewport.
+   */
+  private lastContentSize: { width: number; height: number } | null = null
+  /**
+   * The device-independent size the current auto-fit multiplier was computed
+   * against. Used to detect a genuine input change (vs. a self-triggered
+   * re-entry) so the apply budget below is only refilled when the window
+   * actually changed size.
+   */
+  private lastAutoFitDip: { width: number; height: number } | null = null
+  /** The base the current auto-fit multiplier was computed against. */
+  private lastAutoFitBase: number | null = null
+  /** The auto-fit-enabled state the current multiplier was computed against. */
+  private lastAutoFitEnabled: boolean | null = null
+  /**
+   * Remaining effective-zoom applications allowed for the current (unchanged)
+   * auto-fit input. Refilled whenever the input genuinely changes; drained on
+   * each apply. A convergence backstop — with the zoom-invariant content-size
+   * input a single apply already settles, so this only ever engages under
+   * pathological drift, and because a real size change refills it, it can never
+   * deadlock. See MaxAutoFitAppliesPerInput.
+   */
+  private autoFitApplyBudget: number = MaxAutoFitAppliesPerInput
 
   private resizablePaneActive = false
   private isUpdateAvailableBannerVisible: boolean = false
@@ -1157,16 +1189,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
       this.updateResizableConstraints()
       this.emitUpdate()
 
-      // Debounce the auto-fit recompute so dragging a window edge doesn't
-      // thrash the zoom. The epsilon guard inside applyEffectiveZoom prevents
-      // oscillation once we do recompute.
-      if (this.zoomResizeDebounceId !== null) {
-        window.clearTimeout(this.zoomResizeDebounceId)
+      // Auto-fit is driven by the zoom-invariant content size the main process
+      // delivers (see onWindowContentSizeChanged). We deliberately do NOT feed
+      // this renderer 'resize' into the recompute once that channel is alive —
+      // applying a zoom fires a resize, and recomputing from the post-zoom
+      // `innerWidth` here is exactly what caused the vibration. Until the first
+      // content-size delivery proves the channel is alive we fall back to the
+      // viewport so auto-fit still works (e.g. in tests or a stale main process).
+      if (this.lastContentSize === null) {
+        this.scheduleRecomputeAutoFit()
       }
-      this.zoomResizeDebounceId = window.setTimeout(() => {
-        this.zoomResizeDebounceId = null
-        this.recomputeAutoFit()
-      }, AutoFitDebounceMs)
     })
 
     this.initializeWindowState()
@@ -1276,15 +1308,59 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /**
+   * The zoom-invariant device-independent size auto-fit is computed from.
+   *
+   * We prefer the main-process content bounds delivered over
+   * 'window-content-size-changed': `getContentSize` does NOT change when we
+   * change the renderer zoom (and is unaffected by the page's own scrollbars),
+   * so it's a true fixed point — recomputing after applying a zoom yields the
+   * same input and therefore the same result, which is what stops the vibration.
+   *
+   * Before the first delivery we fall back to the renderer viewport. Note that
+   * `innerWidth × appliedZoom` is only zoom-invariant while our belief matches
+   * Chromium's actual (post-rounding) zoom; that fragility is exactly why the
+   * main-process size is preferred once it arrives.
+   */
+  private getAutoFitDipSize(): { width: number; height: number } {
+    if (this.lastContentSize !== null) {
+      return this.lastContentSize
+    }
+    const applied = this.windowZoomFactor
+    return {
+      width: window.innerWidth * applied,
+      height: window.innerHeight * applied,
+    }
+  }
+
+  /**
    * Push the current effective zoom into the single sink (webContents via
-   * setWindowZoomFactor). No-ops when the change is within the epsilon to avoid
-   * oscillation. Does NOT persist — only the base is persisted, when it changes.
+   * setWindowZoomFactor). No-ops when the newly resolved zoom is within the
+   * epsilon of what's applied (the hysteresis that makes the resize → apply →
+   * resize sequence an idempotent fixed point). A drained apply budget clamps to
+   * the last value rather than continue flipping. Does NOT persist — only the
+   * base is persisted, when it changes.
    */
   private applyEffectiveZoom() {
-    const next = this.computeEffectiveZoom()
-    if (Math.abs(next - this.windowZoomFactor) <= EffectiveZoomEpsilon) {
+    const { width, height } = this.getAutoFitDipSize()
+    const next = resolveEffectiveZoom(
+      width,
+      height,
+      this.zoomBaseFactor,
+      this.windowZoomFactor,
+      this.autoFitZoomEnabled
+    )
+    // resolveEffectiveZoom returns the current value unchanged when within the
+    // epsilon, so an identity check cleanly detects the no-op case.
+    if (next === this.windowZoomFactor) {
       return
     }
+    if (this.autoFitApplyBudget <= 0) {
+      log.warn(
+        'Auto-fit zoom stopped re-applying for one window size to avoid oscillation'
+      )
+      return
+    }
+    this.autoFitApplyBudget -= 1
     this.windowZoomFactor = next
     setWindowZoomFactor(next)
     this.updateResizableConstraints()
@@ -1292,27 +1368,62 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /**
-   * Recompute the auto-fit multiplier from the current window size and apply the
-   * resulting effective zoom. The DIP input is reconstructed as
-   * `innerWidth × appliedEffectiveZoom` so applying a zoom doesn't move the
-   * input (a fixed point) — this is the feedback-loop guard.
+   * Recompute the auto-fit multiplier from the (zoom-invariant) window size and
+   * apply the resulting effective zoom. Refills the convergence budget on a
+   * genuine input change — a resize, a new base, or an auto-fit toggle — but not
+   * on a self-triggered re-entry with the same input, which is what bounds any
+   * residual oscillation should we ever be running on the viewport fallback.
    */
   private recomputeAutoFit() {
-    if (!this.autoFitZoomEnabled) {
-      this.autoFitMultiplier = 1
-      this.applyEffectiveZoom()
+    const { width, height } = this.getAutoFitDipSize()
+
+    const dipChanged =
+      this.lastAutoFitDip === null ||
+      Math.abs(this.lastAutoFitDip.width - width) > 0.5 ||
+      Math.abs(this.lastAutoFitDip.height - height) > 0.5
+    if (
+      dipChanged ||
+      this.zoomBaseFactor !== this.lastAutoFitBase ||
+      this.autoFitZoomEnabled !== this.lastAutoFitEnabled
+    ) {
+      this.autoFitApplyBudget = MaxAutoFitAppliesPerInput
+    }
+    this.lastAutoFitDip = { width, height }
+    this.lastAutoFitBase = this.zoomBaseFactor
+    this.lastAutoFitEnabled = this.autoFitZoomEnabled
+
+    this.autoFitMultiplier = this.autoFitZoomEnabled
+      ? computeAutoFitMultiplier(width, height, this.zoomBaseFactor)
+      : 1
+    this.applyEffectiveZoom()
+  }
+
+  /**
+   * Debounce an auto-fit recompute so a burst of size events settles into a
+   * single computation.
+   */
+  private scheduleRecomputeAutoFit() {
+    if (this.zoomResizeDebounceId !== null) {
+      window.clearTimeout(this.zoomResizeDebounceId)
+    }
+    this.zoomResizeDebounceId = window.setTimeout(() => {
+      this.zoomResizeDebounceId = null
+      this.recomputeAutoFit()
+    }, AutoFitDebounceMs)
+  }
+
+  /**
+   * Consume a zoom-invariant window content size delivered by the main process.
+   * This is the sole driver of auto-fit once the channel is alive; because the
+   * value is independent of the applied zoom, feeding it back through the
+   * recompute is a fixed point and cannot oscillate.
+   */
+  private onWindowContentSizeChanged(width: number, height: number) {
+    if (!(width > 0) || !(height > 0)) {
       return
     }
-
-    const applied = this.windowZoomFactor
-    const dipW = window.innerWidth * applied
-    const dipH = window.innerHeight * applied
-    this.autoFitMultiplier = computeAutoFitMultiplier(
-      dipW,
-      dipH,
-      this.zoomBaseFactor
-    )
-    this.applyEffectiveZoom()
+    this.lastContentSize = { width, height }
+    this.scheduleRecomputeAutoFit()
   }
 
   /** Step the scale base up one notch on the zoom ladder. */
@@ -1522,6 +1633,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
     ipcRenderer.on('zoom-factor-changed', (event: any, zoomFactor: number) => {
       this.onWindowZoomFactorChanged(zoomFactor)
     })
+
+    ipcRenderer.on(
+      'window-content-size-changed',
+      (_, width: number, height: number) => {
+        this.onWindowContentSizeChanged(width, height)
+      }
+    )
 
     ipcRenderer.on('app-menu', (_, menu) => this.setAppMenu(menu))
   }
@@ -11387,7 +11505,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
         if (match === null) {
           this.emitError(
             new ExternalEditorError(
-              `No suitable editors installed for GitHub Desktop to launch. Install ${suggestedExternalEditor.name} for your platform and restart GitHub Desktop to try again.`,
+              `No suitable editors installed for ${DefaultAppDisplayName} to launch. Install ${suggestedExternalEditor.name} for your platform and restart ${DefaultAppDisplayName} to try again.`,
               { suggestDefaultEditor: true }
             )
           )
@@ -11421,7 +11539,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       if (match === null) {
         this.emitError(
           new ExternalEditorError(
-            `No suitable editors installed for GitHub Desktop to launch. Install ${suggestedExternalEditor.name} for your platform and restart GitHub Desktop to try again.`,
+            `No suitable editors installed for ${DefaultAppDisplayName} to launch. Install ${suggestedExternalEditor.name} for your platform and restart ${DefaultAppDisplayName} to try again.`,
             { suggestDefaultEditor: true }
           )
         )

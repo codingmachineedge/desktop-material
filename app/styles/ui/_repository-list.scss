@@ -108,7 +108,8 @@
       text-overflow: ellipsis;
       white-space: nowrap;
 
-      .octicon {
+      .octicon,
+      .material-symbol {
         flex-shrink: 0;
       }
     }
@@ -134,7 +135,8 @@
   .new-repository-button {
     flex-shrink: 0;
 
-    .octicon {
+    .octicon,
+    .material-symbol {
       margin-left: 5px;
     }
   }
@@ -152,7 +154,9 @@
     width: 100%;
 
     .pull-all-repositories-button .octicon,
-    .commit-push-all-repositories-button .octicon {
+    .pull-all-repositories-button .material-symbol,
+    .commit-push-all-repositories-button .octicon,
+    .commit-push-all-repositories-button .material-symbol {
       margin-right: 4px;
     }
   }
@@ -251,7 +255,8 @@
   .repository-hidden-toggle {
     justify-self: start;
 
-    .octicon {
+    .octicon,
+    .material-symbol {
       flex: 0 0 auto;
     }
   }
@@ -261,10 +266,19 @@
     padding: var(--spacing);
     word-wrap: break-word;
 
-    .blankslate-image {
-      margin: 0 auto;
-      max-width: 300px;
-      min-width: auto;
+    // Material blank-slate tile (prototype empty-state pattern): a rounded
+    // tonal tile hosting a translucent `search_off` glyph, replacing the legacy
+    // empty-no-repo.svg raster.
+    .blankslate-symbol {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto var(--spacing);
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface-variant);
+      animation: dmGrow calc(480ms * var(--mdur, 1)) var(--spring) backwards;
     }
 
     .title {
@@ -435,7 +449,8 @@ body[data-dm-repository-list-density='compact'] #foldout-container .repository-l
         }
 
         .change-indicator-wrapper {
-          .octicon {
+          .octicon,
+          .material-symbol {
             color: var(--text-color);
           }
         }
@@ -465,7 +480,8 @@ body[data-dm-repository-list-density='compact'] #foldout-container .repository-l
     align-items: center;
     margin-left: var(--spacing-half);
 
-    .octicon {
+    .octicon,
+    .material-symbol {
       color: var(--tab-bar-active-color);
       width: auto;
     }
@@ -494,6 +510,17 @@ body[data-dm-repository-list-density='compact'] #foldout-container .repository-l
       margin: 0;
       height: 20px;
       width: 12px;
+    }
+
+    // The ahead/behind arrows are Material `arrow_upward`; the behind glyph is
+    // the same arrow rotated to point down (arrow_downward is not in the
+    // bundled Material Symbols subset).
+    .material-symbol {
+      margin: 0;
+
+      &.behind-indicator {
+        transform: rotate(180deg);
+      }
     }
   }
 }

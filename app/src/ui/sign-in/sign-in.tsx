@@ -15,6 +15,7 @@ import { Dialog, DialogError, DialogContent, DialogFooter } from '../dialog'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { Ref } from '../lib/ref'
 import { getHTMLURL } from '../../lib/api'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface ISignInProps {
   readonly dispatcher: Dispatcher
@@ -36,9 +37,9 @@ const DefaultTitle = 'Sign in'
 
 const browserSignInInfoContent = (
   <p>
-    Your browser will redirect you back to GitHub Desktop once you've signed in.
-    If your browser asks for your permission to launch GitHub Desktop, please
-    allow it.
+    Your browser will redirect you back to {DefaultAppDisplayName} once you've
+    signed in. If your browser asks for your permission to launch{' '}
+    {DefaultAppDisplayName}, please allow it.
   </p>
 )
 

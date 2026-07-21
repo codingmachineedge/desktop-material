@@ -965,17 +965,10 @@
       text-align: center;
       justify-content: initial;
 
-      .blankslate-image {
-        max-height: 150px;
-      }
-
-      .description {
-        margin-top: var(--spacing);
-        margin-bottom: var(--spacing);
-
-        p {
-          margin: 0;
-        }
+      // The shared Material empty-state supplies the tile, copy and the
+      // "Show diff" action button; give the action room below the copy.
+      .empty-state .button-component {
+        margin-top: var(--spacing-double);
       }
     }
   }
@@ -1052,7 +1045,7 @@
 
   // When focus moves to the virtualized grid, we want to show a focus ring.
   &:has(.ReactVirtualized__Grid:focus-visible) {
-    outline: 2px solid var(--focus-color);
+    outline: 2px solid var(--md-sys-color-primary);
     border-radius: var(--border-radius);
 
     // Move the content over to make room for the focus ring
@@ -1086,12 +1079,18 @@
   --diff-add-border-color: var(--diff-add-gutter);
   --diff-add-gutter-color: var(--diff-add-gutter);
   --diff-add-text-color: color-mix(in srgb, var(--dm-green) 55%, var(--md-sys-color-on-surface));
+  // Word-level intra-line highlight: the accent (--dm-green) mixed into the
+  // line-level add background so it reads as a stronger patch of the same
+  // Material diff family. Overrides the legacy Primer values (root + dark
+  // partial); both themes flip via the token operands.
+  --diff-add-inner-background-color: color-mix(in srgb, var(--dm-green) 32%, var(--diff-add-bg));
 
   --diff-delete-background-color: var(--diff-del-bg);
   --diff-delete-gutter-background-color: var(--diff-del-gutter);
   --diff-delete-border-color: var(--diff-del-gutter);
   --diff-delete-gutter-color: var(--diff-del-gutter);
   --diff-delete-text-color: color-mix(in srgb, var(--md-sys-color-error) 50%, var(--md-sys-color-on-surface));
+  --diff-delete-inner-background-color: color-mix(in srgb, var(--md-sys-color-error) 32%, var(--diff-del-bg));
 
   --diff-hunk-background-color: var(--diff-hunk-bg);
   --diff-hunk-gutter-background-color: var(--diff-hunk-bg);

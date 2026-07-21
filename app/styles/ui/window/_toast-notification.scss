@@ -40,11 +40,12 @@
   &-appear-active {
     transform: scale(1);
     opacity: 1;
-    transition: all 100ms ease-out;
+    // M3 spring pop-in (dmPop/dmBounce feel) instead of the stock ease-out.
+    transition: transform 260ms var(--spring-fast), opacity 160ms var(--emph);
   }
 
   &-exit-active {
     opacity: 0;
-    transition: all 250ms ease-out;
+    transition: all 250ms var(--emph);
   }
 }

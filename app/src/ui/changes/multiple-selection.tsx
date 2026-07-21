@@ -1,10 +1,5 @@
 import * as React from 'react'
-import { encodePathAsUrl } from '../../lib/path'
-
-const BlankSlateImage = encodePathAsUrl(
-  __dirname,
-  'static/multiple-files-selected.svg'
-)
+import { EmptyState } from '../lib/empty-state'
 
 interface IMultipleSelectionProps {
   /** Called when the user chooses to open the repository. */
@@ -18,8 +13,10 @@ export class MultipleSelection extends React.Component<
   public render() {
     return (
       <div className="panel blankslate" id="no-changes">
-        <img src={BlankSlateImage} className="blankslate-image" alt="" />
-        <div>{this.props.count} files selected</div>
+        <EmptyState
+          symbol="stacks"
+          title={`${this.props.count} files selected`}
+        />
       </div>
     )
   }

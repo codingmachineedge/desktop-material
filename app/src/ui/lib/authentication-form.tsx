@@ -3,10 +3,10 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { Form } from './form'
 import { Button } from './button'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
-/** Text to let the user know their browser will send them back to GH Desktop */
-export const BrowserRedirectMessage =
-  "Your browser will redirect you back to GitHub Desktop once you've signed in. If your browser asks for your permission to launch GitHub Desktop please allow it to."
+/** Text to let the user know their browser will send them back to the app */
+export const BrowserRedirectMessage = `Your browser will redirect you back to ${DefaultAppDisplayName} once you've signed in. If your browser asks for your permission to launch ${DefaultAppDisplayName} please allow it to.`
 
 interface IAuthenticationFormProps {
   /**

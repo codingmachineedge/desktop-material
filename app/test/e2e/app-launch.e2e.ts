@@ -432,7 +432,7 @@ test.describe('Auto-update', () => {
       await dialog.waitFor({ state: 'visible', timeout: 5000 })
 
       await expect(dialog.locator('.updating-message')).toContainText(
-        'Do not close GitHub Desktop while the update is in progress'
+        'Do not close Desktop Material while the update is in progress'
       )
 
       // Reset mock and trigger quit again to test Quit Anyway

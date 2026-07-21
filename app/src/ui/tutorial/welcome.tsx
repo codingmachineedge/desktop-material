@@ -1,6 +1,7 @@
 import * as React from 'react'
 
 import { encodePathAsUrl } from '../../lib/path'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 const CodeImage = encodePathAsUrl(__dirname, 'static/code.svg')
 const TeamDiscussionImage = encodePathAsUrl(
@@ -17,10 +18,10 @@ export class TutorialWelcome extends React.Component {
     return (
       <div id="tutorial-welcome">
         <div className="header">
-          <h1>Welcome to GitHub Desktop</h1>
+          <h1>Welcome to {DefaultAppDisplayName}</h1>
           <p>
-            Use this tutorial to get comfortable with Git, GitHub, and GitHub
-            Desktop.
+            Use this tutorial to get comfortable with Git, GitHub, and{' '}
+            {DefaultAppDisplayName}.
           </p>
         </div>
         <ul className="definitions">
@@ -43,8 +44,8 @@ export class TutorialWelcome extends React.Component {
           <li>
             <img src={CloudServerImage} alt="Server stack with cloud" />
             <p>
-              <strong>GitHub Desktop</strong> helps you work with GitHub
-              locally.
+              <strong>{DefaultAppDisplayName}</strong> helps you work with
+              GitHub locally.
             </p>
           </li>
         </ul>

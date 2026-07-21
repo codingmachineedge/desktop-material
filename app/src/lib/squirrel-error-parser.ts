@@ -1,3 +1,5 @@
+import { DefaultAppDisplayName } from '../models/app-identity'
+
 // an error that Electron raises when it can't find the installation for the running app
 const squirrelMissingRegex = /^Can not find Squirrel$/
 
@@ -23,12 +25,12 @@ export function parseError(error: Error): Error | null {
   }
   if (squirrelDNSRegex.test(error.message)) {
     return new Error(
-      'GitHub Desktop was not able to contact the update server. Ensure you have internet connectivity and try again.'
+      `${DefaultAppDisplayName} was not able to contact the update server. Ensure you have internet connectivity and try again.`
     )
   }
   if (squirrelTimeoutRegex.test(error.message)) {
     return new Error(
-      'GitHub Desktop was not able to check for updates due to a timeout. Ensure you have internet connectivity and try again.'
+      `${DefaultAppDisplayName} was not able to check for updates due to a timeout. Ensure you have internet connectivity and try again.`
     )
   }
 

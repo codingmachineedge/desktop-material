@@ -1,9 +1,11 @@
 import * as React from 'react'
-import { Octicon, syncClockwise } from '../octicons'
+import { MaterialSymbol } from './material-symbol'
 
 /** A Loading component. */
 export class Loading extends React.Component<{}, {}> {
   public render() {
-    return <Octicon className="spin" symbol={syncClockwise} />
+    return (
+      <MaterialSymbol name="progress_activity" className="spin" size={16} />
+    )
   }
 }

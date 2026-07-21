@@ -50,7 +50,7 @@ describe('v2 shell Material Symbol contracts', () => {
     )
   })
 
-  it('uses Material Symbols for only the v2 core rail destinations', () => {
+  it('uses Material Symbols for every v2 rail destination', () => {
     const repository = read('app/src/ui/repository.tsx')
     const railStyle = read('app/styles/ui/_material-rail.scss')
 
@@ -66,9 +66,17 @@ describe('v2 shell Material Symbol contracts', () => {
 
     assert.match(repository, /aria-label="Branches"/)
     assert.match(repository, /aria-label="Settings"/)
-    // Extension-only destinations deliberately stay in the Octicon system.
-    assert.match(repository, /id="releases-tab"[^]*?octicons\.tag/)
-    assert.match(repository, /id="issues-tab"[^]*?octicons\.issueOpened/)
+    // Extension destinations now also render Material Symbols in the M3 rail,
+    // matching their migrated Changes/History/Actions siblings.
+    assert.match(repository, /id="releases-tab"[^]*?name="sell"/)
+    assert.match(repository, /id="issues-tab"[^]*?name="flag"/)
+    assert.match(repository, /id="github-api-tab"[^]*?name="code"/)
+    assert.match(repository, /id="triage-tab"[^]*?name="library_add_check"/)
+    assert.match(repository, /id="repository-tools-tab"[^]*?name="build"/)
+    assert.doesNotMatch(
+      repository,
+      /octicons\.(tag|issueOpened|codeSquare|checklist|tools)\b/
+    )
     assert.match(
       railStyle,
       /\.rail-icon[^]*?\.material-symbol[^]*?transition: font-variation-settings 260ms var\(--emph\);/

@@ -8,9 +8,7 @@ import {
   getAppLogoInitial,
   IAppIdentityCustomization,
 } from '../../models/app-identity'
-import { Octicon } from '../octicons/octicon'
-import { OcticonSymbol } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 
 interface IAppBrandProps {
   readonly identity: IAppIdentityCustomization
@@ -18,20 +16,27 @@ interface IAppBrandProps {
   readonly preview?: boolean
 }
 
-function getLogoSymbol(identity: IAppIdentityCustomization): OcticonSymbol {
+/**
+ * The fork's Material identity mark for each logo choice. The default
+ * ('github'), monogram fallback and custom-image fallback all resolve to the
+ * neutral Material app glyph rather than the legacy GitHub Octocat.
+ */
+function getLogoSymbolName(
+  identity: IAppIdentityCustomization
+): MaterialSymbolName {
   switch (identity.logo) {
     case 'repository':
-      return octicons.repo
+      return 'book_2'
     case 'terminal':
-      return octicons.terminal
+      return 'terminal'
     case 'code':
-      return octicons.code
+      return 'code'
     case 'sparkle':
-      return octicons.sparkle
+      return 'auto_awesome'
     case 'github':
     case 'monogram':
     case 'custom':
-      return octicons.markGithub
+      return 'deployed_code'
   }
 }
 
@@ -48,6 +53,14 @@ export class AppBrand extends React.Component<IAppBrandProps> {
     const showMonogram = identity.logo === 'monogram'
     const customLogoPath =
       identity.logo === 'custom' ? identity.customLogoPath : null
+
+    // Fit the glyph inside the profile-sized tile (tile size minus its inset on
+    // each edge). MaterialSymbol clamps this to its supported range.
+    const logoSize =
+      typeof identity.logoSize === 'number' ? identity.logoSize : 21
+    const logoInset =
+      typeof identity.logoInset === 'number' ? identity.logoInset : 3
+    const glyphSize = Math.max(12, Math.round(logoSize - logoInset * 2))
 
     return (
       <span
@@ -70,7 +83,11 @@ export class AppBrand extends React.Component<IAppBrandProps> {
                 {getAppLogoInitial(identity.displayName)}
               </span>
             ) : (
-              <Octicon className="app-icon" symbol={getLogoSymbol(identity)} />
+              <MaterialSymbol
+                className="app-icon"
+                name={getLogoSymbolName(identity)}
+                size={glyphSize}
+              />
             )}
             {customLogoPath !== null && (
               <img

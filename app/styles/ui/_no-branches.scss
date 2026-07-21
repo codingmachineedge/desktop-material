@@ -9,19 +9,11 @@
 
   padding: var(--spacing);
 
-  .title {
-    font-weight: var(--font-weight-semibold);
-    text-align: center;
-  }
-
-  .subtitle {
-    margin-left: var(--spacing-double);
-    margin-right: var(--spacing-double);
-
-    text-align: center;
-    font-size: var(--font-size-sm);
-    // MD3 de-stock: helper copy reads as on-surface-variant.
-    color: var(--md-sys-color-on-surface-variant);
+  // The shared Material empty-state (tile + title + subtitle) fills the panel
+  // so its stretched create-branch action spans the column as before.
+  .empty-state {
+    width: 100%;
+    max-width: none;
   }
 
   .create-branch-button {

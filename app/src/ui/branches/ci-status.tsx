@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { Octicon, OcticonSymbol } from '../octicons'
+import { OcticonSymbol } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 import classNames from 'classnames'
 import { GitHubRepository } from '../../models/github-repository'
 import type { Disposable } from 'event-kit'
@@ -131,20 +132,30 @@ export class CIStatus extends React.PureComponent<
       return null
     }
 
+    const accessibleName = translateForAccessibleName(
+      'ci.status',
+      { status: translatedVariable(getTranslationKeyForCheck(check)) },
+      this.state.languageMode
+    )
+
+    // MaterialSymbol is always decorative (aria-hidden); the status meaning is
+    // carried by the labelled wrapper so the check remains announced/hoverable.
     return (
-      <Octicon
+      <span
         className={classNames(
           'ci-status',
           `ci-status-${getClassNameForCheck(check)}`,
           this.props.className
         )}
-        symbol={getSymbolForCheck(check)}
-        title={translateForAccessibleName(
-          'ci.status',
-          { status: translatedVariable(getTranslationKeyForCheck(check)) },
-          this.state.languageMode
-        )}
-      />
+        role="img"
+        aria-label={accessibleName}
+      >
+        <MaterialSymbol
+          name={getMaterialSymbolForCheck(check)}
+          size={16}
+          fill={1}
+        />
+      </span>
     )
   }
 }
@@ -214,6 +225,39 @@ export function getSymbolForCheck(
 
   // Pending
   return octicons.dotFill
+}
+
+/**
+ * The Material Symbols Rounded ligature used by the {@link CIStatus} indicator.
+ * Kept separate from {@link getSymbolForCheck} (which still feeds the
+ * Octicon-based check-run surfaces) so the coloured `ci-status-*` role classes
+ * drive the glyph tint while the prototype's run glyphs (check_circle / cancel /
+ * schedule / do_not_disturb_on …) render as Material Symbols.
+ */
+export function getMaterialSymbolForCheck(
+  check: ICombinedRefCheck | IRefCheck | IAPIWorkflowJobStep
+): MaterialSymbolName {
+  switch (check.conclusion) {
+    case 'timed_out':
+      return 'schedule'
+    case 'failure':
+      return 'error'
+    case 'neutral':
+      return 'do_not_disturb_on'
+    case 'success':
+      return 'check_circle'
+    case 'cancelled':
+      return 'cancel'
+    case 'action_required':
+      return 'warning'
+    case 'skipped':
+      return 'do_not_disturb_on'
+    case 'stale':
+      return 'sync_problem'
+  }
+
+  // Pending
+  return 'circle'
 }
 
 export function getClassNameForCheck(

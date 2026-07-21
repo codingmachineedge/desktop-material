@@ -9,6 +9,7 @@ import { MenuLabelsEvent } from '../../models/menu-labels'
 import * as ipcWebContents from '../ipc-webcontents'
 import { mkdir } from 'fs/promises'
 import { buildTestMenu } from './build-test-menu'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 const createPullRequestLabel = __DARWIN__
   ? 'Create Pull Request'
@@ -63,10 +64,10 @@ export function buildDefaultMenuTemplate({
 
   if (__DARWIN__) {
     template.push({
-      label: 'GitHub Desktop',
+      label: DefaultAppDisplayName,
       submenu: [
         {
-          label: 'About GitHub Desktop',
+          label: `About ${DefaultAppDisplayName}`,
           click: emit('show-about'),
           id: 'about',
         },
@@ -601,7 +602,9 @@ export function buildDefaultMenuTemplate({
     label: __DARWIN__ ? 'Report Issue…' : 'Report issue…',
     click() {
       shell
-        .openExternal('https://github.com/desktop/desktop/issues/new/choose')
+        .openExternal(
+          'https://github.com/Ding-Ding-Projects/desktop-material/issues/new/choose'
+        )
         .catch(err => log.error('Failed opening issue creation page', err))
     },
   }
@@ -621,7 +624,9 @@ export function buildDefaultMenuTemplate({
     label: 'Show User Guides',
     click() {
       shell
-        .openExternal('https://docs.github.com/en/desktop')
+        .openExternal(
+          'https://github.com/Ding-Ding-Projects/desktop-material/wiki/User-Guide'
+        )
         .catch(err => log.error('Failed opening user guides page', err))
     },
   }
@@ -631,7 +636,7 @@ export function buildDefaultMenuTemplate({
     click() {
       shell
         .openExternal(
-          'https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/overview/keyboard-shortcuts'
+          'https://github.com/Ding-Ding-Projects/desktop-material/wiki/User-Guide'
         )
         .catch(err => log.error('Failed opening keyboard shortcuts page', err))
     },
@@ -682,7 +687,7 @@ export function buildDefaultMenuTemplate({
         ...helpItems,
         separator,
         {
-          label: '&About GitHub Desktop',
+          label: `&About ${DefaultAppDisplayName}`,
           click: emit('show-about'),
           id: 'about',
         },

@@ -34,6 +34,7 @@ import {
   AppWindowRendererFailure,
   isFatalRendererLoadFailure,
 } from './renderer-failure'
+import { AutoFitDebounceMs } from '../lib/zoom'
 
 const rendererUnresponsiveRecoveryDelay = 15_000
 
@@ -56,6 +57,10 @@ export class AppWindow {
   private quitting = false
   private quittingEvenIfUpdating = false
   private rendererFailureReported = false
+
+  // Debounces the delivery of the BrowserWindow content size to the renderer.
+  // See sendContentSize/scheduleSendContentSize.
+  private contentSizeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
   public constructor(public readonly scope: string) {
     const savedWindowState = windowStateKeeper({
@@ -279,6 +284,9 @@ export class AppWindow {
         }
         this._rendererReadyTime = readyTime
         this.maybeEmitDidLoad()
+        // Give the renderer an authoritative, zoom-invariant window size right
+        // away so the store's auto-fit can settle without waiting for a resize.
+        this.sendContentSize()
         removeRendererReadyListener()
       }
     )
@@ -292,6 +300,22 @@ export class AppWindow {
     )
 
     registerWindowStateChangedEvents(this.window)
+
+    // Deliver the (zoom-invariant) content size to the renderer whenever the
+    // native window is resized. The renderer's auto-fit reads THIS rather than
+    // its own post-zoom `innerWidth`, which is what removes the
+    // resize → apply-zoom → resize feedback loop that made the UI vibrate.
+    const onWindowResize = () => this.scheduleSendContentSize()
+    this.window.on('resize', onWindowResize)
+    this.addCleanupTask(() =>
+      this.window.removeListener('resize', onWindowResize)
+    )
+    this.addCleanupTask(() => {
+      if (this.contentSizeDebounceTimer !== null) {
+        clearTimeout(this.contentSizeDebounceTimer)
+        this.contentSizeDebounceTimer = null
+      }
+    })
 
     // We want to have the locale country code available in the renderer on load
     // so that it can be used to try to deduce some sane date/time/number
@@ -674,6 +698,36 @@ export class AppWindow {
 
   public setWindowZoomFactor(zoomFactor: number) {
     this.window.webContents.zoomFactor = zoomFactor
+  }
+
+  /**
+   * Send the current window content size (in device-independent pixels) to the
+   * renderer. `getContentSize` is invariant to the webContents zoom factor and
+   * unaffected by the page's own scrollbars, so it's the stable, feedback-free
+   * input the renderer's auto-fit needs (see AppStore.onWindowContentSizeChanged).
+   */
+  private sendContentSize() {
+    if (this.window.isDestroyed() || this.window.webContents.isDestroyed()) {
+      return
+    }
+    const [width, height] = this.window.getContentSize()
+    ipcWebContents.send(
+      this.window.webContents,
+      'window-content-size-changed',
+      width,
+      height
+    )
+  }
+
+  /** Debounce content-size delivery so dragging a window edge stays cheap. */
+  private scheduleSendContentSize = () => {
+    if (this.contentSizeDebounceTimer !== null) {
+      clearTimeout(this.contentSizeDebounceTimer)
+    }
+    this.contentSizeDebounceTimer = setTimeout(() => {
+      this.contentSizeDebounceTimer = null
+      this.sendContentSize()
+    }, AutoFitDebounceMs)
   }
 
   /**

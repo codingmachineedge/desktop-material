@@ -31,8 +31,7 @@ import {
 } from '../../models/pull-request'
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
 import { formatNumber } from '../../lib/format-number'
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
 
 function formatMenuItemLabel(text: string) {
   if (__WIN32__ || __LINUX__) {
@@ -776,7 +775,7 @@ export class NoChanges extends React.Component<
         <div className="content">
           <div className="interstitial-header">
             <div className="interstitial-icon" aria-hidden="true">
-              <Octicon symbol={octicons.checkCircleFill} height={28} />
+              <MaterialSymbol name="task_alt" size={28} fill={1} />
             </div>
             <div className="text">
               <h1>No local changes</h1>

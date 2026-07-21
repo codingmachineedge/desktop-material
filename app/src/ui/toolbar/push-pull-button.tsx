@@ -8,8 +8,7 @@ import { FetchType } from '../../models/fetch'
 import { Resizable } from '../resizable'
 
 import { Dispatcher } from '../dispatcher'
-import { Octicon, OcticonSymbol, OcticonSymbolVariant } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { OcticonSymbol, OcticonSymbolVariant } from '../octicons'
 import { RelativeTime } from '../relative-time'
 
 import { ToolbarButton, ToolbarButtonStyle } from './button'
@@ -26,7 +25,7 @@ import { PushPullButtonDropDown } from './push-pull-button-dropdown'
 import { AriaLiveContainer } from '../accessibility/aria-live-container'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
 import { formatCompactNumber } from '../../lib/format-number'
-import { MaterialSymbol } from '../lib/material-symbol'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 
 export const DropdownItemClassName = 'push-pull-dropdown-item'
 
@@ -140,6 +139,8 @@ export type DropdownItem = {
   readonly description: string | JSX.Element
   readonly action: () => void
   readonly icon: OcticonSymbol
+  /** A bundled Material Symbol rendered instead of the legacy Octicon. */
+  readonly materialSymbol?: MaterialSymbolName
 }
 
 function renderAheadBehind(aheadBehind: IAheadBehind, numTagsToPush: number) {
@@ -162,7 +163,12 @@ function renderAheadBehind(aheadBehind: IAheadBehind, numTagsToPush: number) {
     content.push(
       <span key="behind">
         {formatCompactNumber(behind)}
-        <Octicon symbol={octicons.arrowDown} />
+        <span
+          className="behind-arrow"
+          style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}
+        >
+          <MaterialSymbol name="arrow_upward" size={12} />
+        </span>
       </span>
     )
   }

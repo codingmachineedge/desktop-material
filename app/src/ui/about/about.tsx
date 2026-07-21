@@ -14,15 +14,11 @@ import { Loading } from '../lib/loading'
 import { RelativeTime } from '../relative-time'
 import { assertNever } from '../../lib/fatal-error'
 import { ReleaseNotesUri } from '../lib/releases'
-import { encodePathAsUrl } from '../../lib/path'
 import { isOSNoLongerSupportedByElectron } from '../../lib/get-os'
 import { AriaLiveContainer } from '../accessibility/aria-live-container'
 import { formatDate } from '../../lib/format-date'
-
-const logoPath = __DARWIN__
-  ? 'static/logo-64x64@2x.png'
-  : 'static/windows-logo-64x64@2x.png'
-const DesktopLogo = encodePathAsUrl(__dirname, logoPath)
+import { DefaultAppDisplayName } from '../../models/app-identity'
+import { MaterialSymbol } from '../lib/material-symbol'
 
 interface IAboutProps {
   /**
@@ -210,7 +206,7 @@ export class About extends React.Component<IAboutProps> {
         <DialogError>
           This operating system is no longer supported. Software updates have
           been disabled.{' '}
-          <LinkButton uri="https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/overview/supported-operating-systems">
+          <LinkButton uri="https://ding-ding-projects.github.io/desktop-material/">
             Supported operating systems
           </LinkButton>
         </DialogError>
@@ -240,7 +236,7 @@ export class About extends React.Component<IAboutProps> {
         <p className="no-padding">Looking for the latest features?</p>
         <p className="no-padding">
           Check out the{' '}
-          <LinkButton uri="https://desktop.github.com/beta">
+          <LinkButton uri="https://ding-ding-projects.github.io/desktop-material/">
             Beta Channel
           </LinkButton>
         </p>
@@ -268,12 +264,9 @@ export class About extends React.Component<IAboutProps> {
         {this.renderUpdateErrors()}
         <DialogContent>
           <Row className="logo">
-            <img
-              src={DesktopLogo}
-              alt="GitHub Desktop"
-              width="64"
-              height="64"
-            />
+            <span className="about-app-logo" role="img" aria-label={name}>
+              <MaterialSymbol name="deployed_code" size={40} />
+            </span>
           </Row>
           <h1 id={titleId}>About {name}</h1>
           <p className="no-padding">
@@ -298,7 +291,7 @@ export class About extends React.Component<IAboutProps> {
             </p>
             <p className="terms-and-license">
               <LinkButton uri="https://gh.io/copilot-for-desktop-transparency">
-                Responsible use of Copilot in GitHub Desktop
+                Responsible use of Copilot in {DefaultAppDisplayName}
               </LinkButton>
             </p>
           </div>

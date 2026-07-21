@@ -369,9 +369,19 @@
     }
   }
 
-  // The floating expander button (top-right).
+  // The floating expander button (top-right). The `expand_more` chevron flips
+  // to point up when the summary is expanded (accordion pattern), replacing the
+  // legacy fold/unfold octicon pair.
   .ecs-title .expander {
     color: var(--md-sys-color-on-surface-variant);
+
+    .ecs-expander-glyph {
+      transition: transform 240ms var(--spring);
+
+      &.expanded {
+        transform: rotate(180deg);
+      }
+    }
   }
 
   // Graceful tonal avatar fallback (see _commit-list.scss note).

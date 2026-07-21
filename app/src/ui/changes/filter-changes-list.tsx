@@ -4,7 +4,6 @@ import * as Path from 'path'
 import { Dispatcher } from '../dispatcher'
 import { IMenuItem } from '../../lib/menu-item'
 import { revealInFileManager } from '../../lib/app-shell'
-import { encodePathAsUrl } from '../../lib/path'
 import {
   WorkingDirectoryStatus,
   WorkingDirectoryFileChange,
@@ -67,6 +66,7 @@ import memoizeOne from 'memoize-one'
 import { FilterMode, IMatches } from '../../lib/fuzzy-find'
 import { TextBox } from '../lib/text-box'
 import { Button } from '../lib/button'
+import { EmptyState } from '../lib/empty-state'
 import { LinkButton } from '../lib/link-button'
 import { plural } from '../lib/plural'
 import {
@@ -1741,29 +1741,22 @@ export class FilterChangesList extends React.Component<
     // Check if any filters are active (including text filter)
     const filtersActive = hasActiveFilters(this.props.fileListFilter)
 
-    const BlankSlateImage = encodePathAsUrl(
-      __dirname,
-      'static/empty-no-file-selected.svg'
-    )
-
     return (
       <div className="no-changes-filtered">
-        <img src={BlankSlateImage} className="blankslate-image" alt="" />
-
-        <div className="title">No files match your current filters</div>
-
-        <div className="subtitle">
-          {getNoResultsMessage(this.props.fileListFilter)}
-        </div>
-
-        {filtersActive && (
-          <Button
-            className="clear-filters-button"
-            onClick={this.onClearAllFilters}
-          >
-            Clear filters
-          </Button>
-        )}
+        <EmptyState
+          symbol="search_off"
+          title="No files match your current filters"
+          description={getNoResultsMessage(this.props.fileListFilter)}
+        >
+          {filtersActive && (
+            <Button
+              className="clear-filters-button"
+              onClick={this.onClearAllFilters}
+            >
+              Clear filters
+            </Button>
+          )}
+        </EmptyState>
       </div>
     )
   }

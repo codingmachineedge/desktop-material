@@ -21,12 +21,17 @@
   --diff-add-border-color: var(--diff-add-gutter);
   --diff-add-gutter-color: var(--diff-add-gutter);
   --diff-add-text-color: color-mix(in srgb, var(--dm-green) 55%, var(--md-sys-color-on-surface));
+  // Word-level intra-line highlight (mirrors the .diff-container remap in
+  // _diff.scss): accent mixed into the line-level background, overriding the
+  // legacy Primer inner values in both themes.
+  --diff-add-inner-background-color: color-mix(in srgb, var(--dm-green) 32%, var(--diff-add-bg));
 
   --diff-delete-background-color: var(--diff-del-bg);
   --diff-delete-gutter-background-color: var(--diff-del-gutter);
   --diff-delete-border-color: var(--diff-del-gutter);
   --diff-delete-gutter-color: var(--diff-del-gutter);
   --diff-delete-text-color: color-mix(in srgb, var(--md-sys-color-error) 50%, var(--md-sys-color-on-surface));
+  --diff-delete-inner-background-color: color-mix(in srgb, var(--md-sys-color-error) 32%, var(--diff-del-bg));
 
   --diff-hunk-background-color: var(--diff-hunk-bg);
   --diff-hunk-gutter-background-color: var(--diff-hunk-bg);
@@ -601,9 +606,13 @@
   }
 
   .cm-search-result {
-    // match codemirror for now
-    // https://github.com/codemirror/CodeMirror/blob/264022ee4af4abca1c158944dc299a8faf8696d6/lib/codemirror.css#L333
-    background-color: rgba(255, 255, 0, 0.4);
+    // Search matches read as an M3 tertiary-container patch. This design
+    // system expresses its tertiary tone through the amber container role
+    // (--dm-amber-container), which is theme-aware: a soft amber in light
+    // theme and a deep amber in dark theme, so the highlight stays visible on
+    // the added/removed/context row backgrounds in both themes while the
+    // matched code keeps its own text color.
+    background-color: var(--dm-amber-container);
 
     &.cm-selected {
       background: Highlight;

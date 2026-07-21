@@ -1,8 +1,8 @@
 import * as React from 'react'
 
 import { Repository } from '../../models/repository'
-import { Octicon, iconForRepository } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { CloningRepository } from '../../models/cloning-repository'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 import { Repositoryish } from './group-repositories'
 import { HighlightText } from '../lib/highlight-text'
 import { IMatches } from '../../lib/fuzzy-find'
@@ -41,6 +41,39 @@ import {
   RepositoryLogoAppearanceEditor,
 } from '../appearance'
 import { IVersionedStoreHistorySource } from '../version-history'
+
+/**
+ * The Material Symbols Rounded ligature for a repository row's leading glyph.
+ * Mirrors the octicon `iconForRepository` mapping (which still serves surfaces
+ * outside the repository picker) using the prototype's `book_2`/`fork_right`
+ * vocabulary. `computer` (the design's local-repo glyph) is not in the bundled
+ * subset, so a local-only repo falls back to the generic `book_2` repo glyph.
+ */
+function materialSymbolForRepository(
+  repository: Repositoryish
+): MaterialSymbolName {
+  if (repository instanceof CloningRepository) {
+    return 'cloud_download'
+  }
+
+  if (repository.missing) {
+    return 'warning'
+  }
+
+  const gitHubRepo = repository.gitHubRepository
+  if (!gitHubRepo) {
+    return 'book_2'
+  }
+
+  if (gitHubRepo.isPrivate) {
+    return 'lock'
+  }
+  if (gitHubRepo.fork) {
+    return 'fork_right'
+  }
+
+  return 'book_2'
+}
 
 export interface IRepositoryLogoChange {
   readonly revision: number
@@ -654,7 +687,7 @@ export class RepositoryListItem extends React.Component<
 
         {this.props.branchName !== null && (
           <span className="repository-branch-pill">
-            <Octicon symbol={octicons.gitBranch} />
+            <MaterialSymbol name="alt_route" size={14} />
             {this.props.branchName}
           </span>
         )}
@@ -680,9 +713,10 @@ export class RepositoryListItem extends React.Component<
           (current) row, matching the existing primary-container icon-tile
           treatment.
         */}
-        <Octicon
+        <MaterialSymbol
           className="current-repo-indicator"
-          symbol={octicons.checkCircle}
+          name="check_circle"
+          size={20}
         />
         {this.renderAppearanceEditor()}
       </div>
@@ -726,9 +760,10 @@ export class RepositoryListItem extends React.Component<
     }
 
     return (
-      <Octicon
+      <MaterialSymbol
         className="icon-for-repository"
-        symbol={iconForRepository(repository)}
+        name={materialSymbolForRepository(repository)}
+        size={16}
       />
     )
   }
@@ -839,8 +874,14 @@ const renderAheadBehindIndicator = (aheadBehind: IAheadBehind) => {
       tooltip={aheadBehindTooltip}
       disabled={enableAccessibleListToolTips()}
     >
-      {ahead > 0 && <Octicon symbol={octicons.arrowUp} />}
-      {behind > 0 && <Octicon symbol={octicons.arrowDown} />}
+      {ahead > 0 && <MaterialSymbol name="arrow_upward" size={14} />}
+      {behind > 0 && (
+        <MaterialSymbol
+          name="arrow_upward"
+          size={14}
+          className="behind-indicator"
+        />
+      )}
     </TooltippedContent>
   )
 }
@@ -852,7 +893,7 @@ const renderChangesIndicator = () => {
       tooltip="There are uncommitted changes in this repository"
       disabled={enableAccessibleListToolTips()}
     >
-      <Octicon symbol={octicons.dotFill} />
+      <MaterialSymbol name="circle" fill={1} size={10} />
     </TooltippedContent>
   )
 }

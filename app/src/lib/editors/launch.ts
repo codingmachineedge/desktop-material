@@ -7,6 +7,7 @@ import {
   parseCustomIntegrationArguments,
 } from '../custom-integration'
 import { getWslEditorArguments, resolveWslPath } from './wsl'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 async function launchEditor(
   editorPath: string,
@@ -46,7 +47,7 @@ async function launchEditor(
     )
     throw new ExternalEditorError(
       e && typeof e === 'object' && 'code' in e && e.code === 'EACCES'
-        ? `GitHub Desktop doesn't have the proper permissions to start ${editorName}. Please open ${label} and try another editor.`
+        ? `${DefaultAppDisplayName} doesn't have the proper permissions to start ${editorName}. Please open ${label} and try another editor.`
         : `Something went wrong while trying to start ${editorName}. Please open ${label} and try another editor.`,
       { openPreferences: true }
     )

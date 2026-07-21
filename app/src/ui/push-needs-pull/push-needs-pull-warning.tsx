@@ -4,6 +4,7 @@ import { DialogFooter, DialogContent, Dialog } from '../dialog'
 import { FetchType } from '../../models/fetch'
 import { Repository } from '../../models/repository'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface IPushNeedsPullWarningProps {
   readonly dispatcher: Dispatcher
@@ -42,10 +43,10 @@ export class PushNeedsPullWarning extends React.Component<
       >
         <DialogContent>
           <p>
-            GitHub Desktop is unable to push commits to this branch because
-            there are commits on the remote that are not present on your local
-            branch. Fetch these new commits before pushing in order to reconcile
-            them with your local commits.
+            {DefaultAppDisplayName} is unable to push commits to this branch
+            because there are commits on the remote that are not present on your
+            local branch. Fetch these new commits before pushing in order to
+            reconcile them with your local commits.
           </p>
         </DialogContent>
         <DialogFooter>

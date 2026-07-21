@@ -10,6 +10,15 @@
     margin-bottom: var(--spacing-third);
   }
 
+  // Wraps the native <select> so the M3 dropdown chevron can be overlaid on
+  // its trailing edge without disturbing the select's DOM semantics. Sized to
+  // the select (no flex-grow) so the vertically-centred chevron always tracks
+  // the control, then stretched to full width by the column's align-items.
+  .select-input {
+    position: relative;
+    display: flex;
+  }
+
   // Custom styles for select components because a) they look horrible
   // on Windows and b) because we need them to inherit colors and other
   // appearance from our global variables. Therefore we treat them more
@@ -18,8 +27,27 @@
     // Make the select look like a text box.
     @include textboxish;
 
-    // Don't include the default padding from textboxish, it's too much
-    padding: 0;
+    // Strip the OS-native combobox chrome (dropdown arrow + native option
+    // popup) so the M3 outlined-field styling from the material shell and the
+    // overlaid Material chevron own the appearance.
+    appearance: none;
+    -webkit-appearance: none;
+
+    // Don't include the default padding from textboxish, it's too much, but
+    // reserve room on the trailing edge for the overlaid chevron so option
+    // text never collides with it.
+    padding: 0 var(--spacing-quad) 0 var(--spacing-half);
     width: 100%;
+  }
+
+  // M3 trailing dropdown affordance. Decorative and click-through so the native
+  // select still receives every pointer event.
+  .select-chevron {
+    position: absolute;
+    top: 50%;
+    right: var(--spacing-half);
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--md-sys-color-on-surface-variant);
   }
 }

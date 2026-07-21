@@ -62,7 +62,9 @@ describe('dialog composition and toggle components', () => {
     )
 
     const title = view.container.querySelector('h1#rename-branch-title')
-    const spinner = view.container.querySelector('svg.octicon.icon.spin')
+    const spinner = view.container.querySelector(
+      'span.material-symbol.icon.spin'
+    )
     const closeButton = screen.getByRole('button', { name: 'Close' })
 
     assert.equal(title?.textContent, 'Rename Branch')

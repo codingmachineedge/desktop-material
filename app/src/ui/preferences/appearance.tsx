@@ -9,7 +9,6 @@ import { DialogContent } from '../dialog'
 import { RadioGroup } from '../lib/radio-group'
 import { Select } from '../lib/select'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
-import { encodePathAsUrl } from '../../lib/path'
 import { tabSizeDefault } from '../../lib/stores/app-store'
 import { enableFormattingPreferences } from '../../lib/feature-flag'
 import {
@@ -252,36 +251,56 @@ export class Appearance extends React.Component<
     }
   }
 
-  public renderThemeSwatch = (theme: ApplicationTheme) => {
-    const darkThemeImage = encodePathAsUrl(__dirname, 'static/ghd_dark.svg')
-    const lightThemeImage = encodePathAsUrl(__dirname, 'static/ghd_light.svg')
+  /**
+   * A token-driven Material mini-window mockup depicting a theme. Built from
+   * pure CSS (no raster screenshot) like the v2 prototype's Appearance cards.
+   * The preview must always depict its target theme regardless of the active
+   * one, so the light/dark surface, rail and line colors are fixed per variant
+   * via the `theme-swatch-preview--{variant}` modifier in _preferences.scss.
+   */
+  private renderThemePreview(variant: 'light' | 'dark') {
+    return (
+      <span
+        className={`theme-swatch-preview theme-swatch-preview--${variant}`}
+        aria-hidden={true}
+      >
+        <span className="theme-swatch-bar" />
+        <span className="theme-swatch-body">
+          <span className="theme-swatch-rail" />
+          <span className="theme-swatch-content">
+            <span className="theme-swatch-line" />
+            <span className="theme-swatch-line theme-swatch-line--short" />
+          </span>
+        </span>
+      </span>
+    )
+  }
 
+  public renderThemeSwatch = (theme: ApplicationTheme) => {
     switch (theme) {
       case ApplicationTheme.Light:
         return (
           <span>
-            <img src={lightThemeImage} alt="" />
+            {this.renderThemePreview('light')}
             <span className="theme-value-label">Light</span>
           </span>
         )
       case ApplicationTheme.Dark:
         return (
           <span>
-            <img src={darkThemeImage} alt="" />
+            {this.renderThemePreview('dark')}
             <span className="theme-value-label">Dark</span>
           </span>
         )
       case ApplicationTheme.System:
-        /** Why three images? The system theme swatch uses the first image
-         * positioned relatively to get the label container size and uses the
-         * second and third positioned absolutely over first and third one
-         * clipped in half to render a split dark and light theme swatch. */
+        /** The system swatch splits a light preview and a dark preview down the
+         * diagonal (the second is clipped to its right half) to depict "follow
+         * system". */
         return (
           <span>
             <span className="system-theme-swatch">
-              <img src={lightThemeImage} alt="" />
-              <img src={lightThemeImage} alt="" />
-              <img src={darkThemeImage} alt="" />
+              {this.renderThemePreview('light')}
+              {this.renderThemePreview('dark')}
             </span>
             <span className="theme-value-label">System</span>
           </span>

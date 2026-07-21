@@ -1,7 +1,6 @@
 import { clipboard } from 'electron'
 import React from 'react'
-import * as octicons from './octicons/octicons.generated'
-import { Octicon } from './octicons'
+import { MaterialSymbol } from './lib/material-symbol'
 import { sleep } from '../lib/promise'
 import { Button } from './lib/button'
 import { AriaLiveContainer } from './accessibility/aria-live-container'
@@ -41,9 +40,9 @@ export class CopyButton extends React.Component<
   public renderSymbol() {
     const { showCopied } = this.state
 
-    const symbol = showCopied ? octicons.check : octicons.copy
+    const name = showCopied ? 'check' : 'content_copy'
 
-    return <Octicon symbol={symbol} height={24} />
+    return <MaterialSymbol name={name} size={24} />
   }
 
   public render() {

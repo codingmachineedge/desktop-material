@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createUniqueId, releaseUniqueId } from './id-pool'
 import classNames from 'classnames'
+import { MaterialSymbol } from './material-symbol'
 
 interface ISelectProps {
   /** Form name used to identify this select in shared change handlers. */
@@ -64,16 +65,23 @@ export class Select extends React.Component<ISelectProps, ISelectState> {
     return (
       <div className={classNames('select-component', this.props.className)}>
         {this.renderLabel()}
-        <select
-          name={this.props.name}
-          id={this.state.inputId}
-          onChange={this.props.onChange}
-          value={this.props.value}
-          defaultValue={this.props.defaultValue}
-          disabled={this.props.disabled}
-        >
-          {this.props.children}
-        </select>
+        <div className="select-input">
+          <select
+            name={this.props.name}
+            id={this.state.inputId}
+            onChange={this.props.onChange}
+            value={this.props.value}
+            defaultValue={this.props.defaultValue}
+            disabled={this.props.disabled}
+          >
+            {this.props.children}
+          </select>
+          <MaterialSymbol
+            name="expand_more"
+            className="select-chevron"
+            size={20}
+          />
+        </div>
       </div>
     )
   }

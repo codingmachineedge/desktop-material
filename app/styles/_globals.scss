@@ -149,7 +149,10 @@ button {
 
 :focus-visible {
   outline: auto;
-  outline-color: var(--focus-color);
+  // M3 focus ring: the theme-aware primary role. Consumed directly (rather than
+  // via --focus-color) so the ring stays primary in both themes regardless of
+  // any legacy --focus-color override in the theme partials.
+  outline-color: var(--md-sys-color-primary);
 }
 
 .more-dropdown {

@@ -674,7 +674,7 @@
   // greater than or equal to the height that `UndoCommit` will want.
   max-height: 200px;
 
-  transition: max-height var(--undo-animation-duration) ease-in;
+  transition: max-height var(--undo-animation-duration) var(--emph);
 }
 
 .undo-exit {
@@ -684,7 +684,7 @@
 .undo-exit.undo-exit-active {
   max-height: 0;
 
-  transition: max-height var(--undo-animation-duration) ease-out;
+  transition: max-height var(--undo-animation-duration) var(--emph);
 }
 
 .hidden-changes-warning {
@@ -713,6 +713,7 @@
   flex: 1;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   max-width: 365px;
   min-width: 180px;
   width: 100%;
@@ -723,43 +724,23 @@
   container-type: size;
   overflow: hidden;
 
-  .blankslate-image {
-    width: 100%;
-    max-width: 80px;
-    height: auto;
-    margin-bottom: var(--spacing);
-    opacity: 0.8;
-    object-fit: contain;
-    flex-shrink: 0;
+  // The shared Material empty-state (tile + copy) replaces the legacy raster
+  // blank-slate image. In short containers the tile is dropped so the copy and
+  // clear-filters action stay reachable, matching the old image's behaviour.
+  .empty-state-description {
+    max-height: 100px;
+    white-space: pre-line;
+  }
 
-    // Hide image in small containers
-    @container (max-height: 310px) {
+  @container (max-height: 310px) {
+    .empty-state-tile {
       display: none;
     }
   }
 
-  .title {
-    margin-bottom: var(--spacing-half);
-    font-size: var(--font-size);
-    font-weight: var(--font-weight-semibold);
-    line-height: 1.3;
-    color: var(--text-color);
-    flex-shrink: 0;
-  }
-
-  .subtitle {
-    max-height: 100px;
-    margin: 0 var(--spacing-half) var(--spacing) var(--spacing-half);
-    font-size: var(--font-size-sm);
-    line-height: 1.4;
-    color: var(--text-secondary-color);
-    white-space: pre-line;
-    flex-shrink: 1;
-  }
-
   .clear-filters-button {
     min-width: 120px;
-    margin-top: var(--spacing-half);
+    margin-top: var(--spacing);
     flex-shrink: 0;
   }
 }
@@ -1172,31 +1153,32 @@
       transform: scale(1.12);
     }
 
-    // New / added / copied / resolved → green container.
+    // New / added / copied / resolved → green container. The inner glyph is a
+    // Material Symbol (text), so it is coloured through `color`, not `fill`.
     .status-new,
     .status-copied,
     .status-resolved {
       background: var(--dm-green-container);
-      fill: var(--dm-green);
+      color: var(--dm-green);
     }
 
     // Modified / renamed → amber container.
     .status-modified,
     .status-renamed {
       background: var(--dm-amber-container);
-      fill: var(--dm-amber);
+      color: var(--dm-amber);
     }
 
     // Deleted → error container.
     .status-deleted {
       background: var(--md-sys-color-error-container);
-      fill: var(--md-sys-color-on-error-container);
+      color: var(--md-sys-color-on-error-container);
     }
 
     // Conflicted → error container with strong error glyph.
     .status-conflicted {
       background: var(--md-sys-color-error-container);
-      fill: var(--md-sys-color-error);
+      color: var(--md-sys-color-error);
     }
   }
 }

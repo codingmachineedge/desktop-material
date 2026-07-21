@@ -2,11 +2,15 @@
   margin-left: auto;
   font-size: var(--font-size-sm);
 
+  // Stat counts route through the Material diff/status accent roles used across
+  // the diff surfaces (e.g. the diff header status chips and file-list
+  // indicators): --dm-green for additions, --md-sys-color-error for deletions.
+  // Both are theme-aware, replacing the legacy Primer --color-new/--color-deleted.
   .lines-added {
-    color: var(--color-new);
+    color: var(--dm-green);
   }
 
   .lines-deleted {
-    color: var(--color-deleted);
+    color: var(--md-sys-color-error);
   }
 }

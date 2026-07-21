@@ -246,7 +246,7 @@ export class CommitListItem extends React.PureComponent<
         tooltip={this.props.unpushedIndicatorTitle}
         disabled={enableAccessibleListToolTips()}
       >
-        <Octicon symbol={octicons.arrowUp} />
+        <MaterialSymbol name="arrow_upward" size={14} />
       </TooltippedContent>
     )
   }

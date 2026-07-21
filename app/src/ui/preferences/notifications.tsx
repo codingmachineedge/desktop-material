@@ -13,6 +13,7 @@ import {
 } from '../main-process-proxy'
 import { RadioGroup } from '../lib/radio-group'
 import { ErrorPresentationStyle } from '../../models/error-presentation'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 import {
   getPersistedLanguageMode,
   LanguageModeChangedEvent,
@@ -202,7 +203,7 @@ export class Notifications extends React.Component<
           <LinkButton onClick={this.onGrantNotificationPermission}>
             grant permission
           </LinkButton>{' '}
-          to display these notifications from GitHub Desktop.
+          to display these notifications from {DefaultAppDisplayName}.
         </>
       )
     }
@@ -216,8 +217,8 @@ export class Notifications extends React.Component<
     if (warnNotificationsDenied) {
       return (
         <div className="setting-hint-warning">
-          <span className="warning-icon">⚠️</span> GitHub Desktop has no
-          permission to display notifications. Please, enable them in the{' '}
+          <span className="warning-icon">⚠️</span> {DefaultAppDisplayName} has
+          no permission to display notifications. Please, enable them in the{' '}
           <LinkButton uri={notificationSettingsURL}>
             Notifications Settings
           </LinkButton>
@@ -233,7 +234,7 @@ export class Notifications extends React.Component<
     return (
       <>
         {' '}
-        Make sure notifications are {verb} for GitHub Desktop in the{' '}
+        Make sure notifications are {verb} for {DefaultAppDisplayName} in the{' '}
         <LinkButton uri={notificationSettingsURL}>
           Notifications Settings
         </LinkButton>

@@ -8,6 +8,7 @@ import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { SuggestedAction } from '../suggested-actions'
 import { SuggestedActionGroup } from '../suggested-actions'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 const ClappingHandsImage = encodePathAsUrl(
   __dirname,
@@ -62,8 +63,8 @@ export class TutorialDone extends React.Component<ITutorialDoneProps, {}> {
             <div className="text">
               <h1 ref={this.header}>You're done!</h1>
               <p>
-                You’ve learned the basics on how to use GitHub Desktop. Here are
-                some suggestions for what to do next.
+                You’ve learned the basics on how to use {DefaultAppDisplayName}.
+                Here are some suggestions for what to do next.
               </p>
             </div>
             <img
@@ -93,7 +94,7 @@ export class TutorialDone extends React.Component<ITutorialDoneProps, {}> {
             />
             <SuggestedAction
               title="Add a local repository"
-              description="Work on an existing project in GitHub Desktop"
+              description={`Work on an existing project in ${DefaultAppDisplayName}`}
               buttonText={__DARWIN__ ? 'Add Repository' : 'Add repository'}
               onClick={this.onAddExistingRepository}
               type="normal"

@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { countActiveFilterOptions } from './filter-changes-logic'
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { IFileListFilterState } from '../../lib/app-state'
 import memoizeOne from 'memoize-one'
 import { Button } from '../lib/button'
@@ -47,7 +46,7 @@ export class ChangesFilterButton extends React.Component<IChangesFilterButtonPro
         ariaLabel={buttonTextLabel}
       >
         <span>
-          <Octicon symbol={octicons.filter} />
+          <MaterialSymbol name="filter_list" size={16} />
         </span>
         {hasActiveFilters ? (
           <span className="active-badge">
@@ -137,7 +136,9 @@ export class ChangesFilterChipRow extends React.Component<IChangesFilterChipRowP
         aria-pressed={chip.on}
         onClick={chip.onToggle}
       >
-        {chip.on && <Octicon className="chip-check" symbol={octicons.check} />}
+        {chip.on && (
+          <MaterialSymbol className="chip-check" name="check" size={14} />
+        )}
         <span className="chip-label">{chip.label}</span>
         <span className="chip-count">{chip.count}</span>
       </button>

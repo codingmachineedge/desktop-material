@@ -1479,12 +1479,71 @@
             font-weight: var(--font-weight-bold);
           }
 
-          img {
+          // Token-driven Material mini-window mockup (replaces the legacy
+          // ghd_light / ghd_dark screenshot SVGs). Each preview always depicts
+          // its target theme, so its surface/bar/rail/line colors are fixed per
+          // variant rather than following the active theme.
+          .theme-swatch-preview {
+            display: flex;
+            flex-direction: column;
             width: 100%;
             height: 84px;
-            object-fit: cover;
+            overflow: hidden;
             border-bottom: 1px solid var(--md-sys-color-outline-variant);
-            display: block;
+            background: var(--dm-swatch-surface);
+
+            .theme-swatch-bar {
+              flex: 0 0 20px;
+              background: var(--dm-swatch-bar);
+              border-bottom: 1px solid var(--dm-swatch-border);
+            }
+
+            .theme-swatch-body {
+              flex: 1;
+              display: flex;
+              min-height: 0;
+            }
+
+            .theme-swatch-rail {
+              flex: 0 0 16px;
+              background: var(--dm-swatch-rail);
+              border-right: 1px solid var(--dm-swatch-border);
+            }
+
+            .theme-swatch-content {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              gap: 7px;
+              padding: 0 10px;
+            }
+
+            .theme-swatch-line {
+              height: 6px;
+              border-radius: 999px;
+              background: var(--dm-swatch-line);
+
+              &--short {
+                width: 60%;
+              }
+            }
+          }
+
+          .theme-swatch-preview--light {
+            --dm-swatch-surface: #f8f9ff;
+            --dm-swatch-bar: #e6e8ee;
+            --dm-swatch-border: #c1c7ce;
+            --dm-swatch-rail: #c9e6ff;
+            --dm-swatch-line: #c1c7ce;
+          }
+
+          .theme-swatch-preview--dark {
+            --dm-swatch-surface: #111417;
+            --dm-swatch-bar: #282a2e;
+            --dm-swatch-border: #41474d;
+            --dm-swatch-rail: #004b70;
+            --dm-swatch-line: #41474d;
           }
 
           .system-theme-swatch {
@@ -1494,16 +1553,14 @@
             display: block;
             border-bottom: 1px solid var(--md-sys-color-outline-variant);
 
-            img {
+            .theme-swatch-preview {
               position: absolute;
-              top: 0;
+              inset: 0;
               height: 84px;
               border-bottom: 0;
 
-              &:first-child {
-                position: inherit;
-              }
-
+              // The dark half is clipped to the right so the two previews meet
+              // on the diagonal, depicting "follow system".
               &:last-child {
                 clip-path: polygon(50% 0, 100% 0%, 100% 100%, 50% 100%);
               }

@@ -16,8 +16,7 @@ import { Button } from '../lib/button'
 import { Loading } from '../lib/loading'
 import { AuthorInput } from '../lib/author-input/author-input'
 import { FocusContainer } from '../lib/focus-container'
-import { Octicon, OcticonSymbolVariant } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { Author, UnknownAuthor, isKnownAuthor } from '../../models/author'
 import { IMenuItem } from '../../lib/menu-item'
 import { Commit, ICommitContext } from '../../models/commit'
@@ -84,19 +83,6 @@ import { AriaLiveContainer } from '../accessibility/aria-live-container'
 import { HookProgress } from '../../lib/git'
 import { assertNever } from '../../lib/fatal-error'
 import { getShowCommitAuthorInfo } from '../../models/commit-author-display'
-
-const addAuthorIcon: OcticonSymbolVariant = {
-  w: 18,
-  h: 13,
-  p: [
-    'M14 6V4.25a.75.75 0 0 1 1.5 0V6h1.75a.75.75 0 1 1 0 1.5H15.5v1.75a.75.75 0 0 ' +
-      '1-1.5 0V7.5h-1.75a.75.75 0 1 1 0-1.5H14zM8.5 4a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 ' +
-      '0zm.063 3.064a3.995 3.995 0 0 0 1.2-4.429A3.996 3.996 0 0 0 8.298.725a4.01 4.01 0 0 ' +
-      '0-6.064 1.91 3.987 3.987 0 0 0 1.2 4.43A5.988 5.988 0 0 0 0 12.2a.748.748 0 0 0 ' +
-      '.716.766.751.751 0 0 0 .784-.697 4.49 4.49 0 0 1 1.39-3.04 4.51 4.51 0 0 1 6.218 ' +
-      '0 4.49 4.49 0 0 1 1.39 3.04.748.748 0 0 0 .786.73.75.75 0 0 0 .714-.8 5.989 5.989 0 0 0-3.435-5.136z',
-  ],
-}
 
 /** Cheap LFS uses upload progress completion while it re-hashes the source. */
 const isCheapLfsVerificationPhase = (phase: CommitOperationPhase | null) =>
@@ -1141,12 +1127,9 @@ export class CommitMessage extends React.Component<
               isGeneratingCommitMessage ? 'Generating commit details…' : ''
             }
           />
-          <Octicon
-            symbol={
-              showCancelGenerateCommitMessage
-                ? octicons.squareCircle
-                : octicons.copilot
-            }
+          <MaterialSymbol
+            name={showCancelGenerateCommitMessage ? 'cancel' : 'auto_awesome'}
+            size={18}
           />
           {shouldShowGenerateCommitMessageCallOut && (
             <span className="call-to-action-bubble">New</span>
@@ -1175,7 +1158,7 @@ export class CommitMessage extends React.Component<
           ariaLabel={ariaLabel}
           tooltip={ariaLabel}
         >
-          <Octicon symbol={octicons.gear} />
+          <MaterialSymbol name="settings" size={18} />
         </Button>
       </>
     )
@@ -1246,7 +1229,7 @@ export class CommitMessage extends React.Component<
           this.props.isGeneratingCommitMessage
         }
       >
-        <Octicon symbol={addAuthorIcon} />
+        <MaterialSymbol name="group_add" size={18} />
       </Button>
     )
   }
@@ -1838,7 +1821,7 @@ export class CommitMessage extends React.Component<
         tooltipClassName="length-hint-tooltip"
         ariaLabel="Open Summary Length Info"
       >
-        <Octicon symbol={octicons.lightBulb} />
+        <MaterialSymbol name="live_help" size={12} />
       </ToggledtippedContent>
     )
   }
@@ -1871,8 +1854,9 @@ export class CommitMessage extends React.Component<
         aria-expanded={this.state.isRuleFailurePopoverOpen}
         onClick={this.toggleRuleFailurePopover}
       >
-        <Octicon
-          symbol={canBypass ? octicons.alert : octicons.stop}
+        <MaterialSymbol
+          name={canBypass ? 'warning' : 'error'}
+          size={12}
           className={canBypass ? 'warning-icon' : 'error-icon'}
         />
       </button>
@@ -1906,7 +1890,7 @@ export class CommitMessage extends React.Component<
         <div className="description">{text}</div>
         {onShowCommitProgress && (
           <Button tooltip="Show commit progress" onClick={onShowCommitProgress}>
-            <Octicon symbol={octicons.terminal} />
+            <MaterialSymbol name="terminal" size={12} />
           </Button>
         )}
       </div>

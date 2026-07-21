@@ -118,3 +118,54 @@ export function computeAutoFitMultiplier(
   // base × multiplier >= ZoomMin; the ceiling never grows past the base.
   return clamp(effectiveFit / base, ZoomMin / base, 1)
 }
+
+/**
+ * How many times auto-fit may re-apply the effective zoom for a *single*
+ * unchanged input before it clamps to the last value instead of continuing to
+ * flip. This is a convergence backstop: the zoom-invariant content-size input
+ * already makes a single apply reach a fixed point, so a well-behaved system
+ * never spends more than one apply per input. The budget only bites if some
+ * pathological drift (e.g. an old main process that never delivers the
+ * content-size and leaves the renderer deriving size from `innerWidth`) keeps
+ * nudging the applied zoom back and forth. It is refilled whenever the input
+ * actually changes, so it can never deadlock.
+ */
+export const MaxAutoFitAppliesPerInput = 3
+
+/**
+ * Resolve the effective zoom to apply for a given *zoom-invariant*
+ * device-independent window size, the user's chosen base, and the
+ * currently-applied effective zoom.
+ *
+ * The auto-fit multiplier is folded into the base and clamped to the supported
+ * range, then compared against the currently-applied zoom: when the freshly
+ * computed value is within `EffectiveZoomEpsilon` we return `currentApplied`
+ * unchanged. That epsilon is the hysteresis that turns the
+ * resize → apply → resize sequence into an idempotent fixed point — re-feeding
+ * the same (zoom-invariant) size after an apply is guaranteed to be a no-op, so
+ * the loop converges in a single step and stays put. Feeding a size derived
+ * from the renderer's post-zoom `innerWidth` would defeat this (the input would
+ * move every time we apply); callers must pass a size that does NOT depend on
+ * the applied zoom (e.g. the main-process `getContentSize`).
+ *
+ * @param dipW           Zoom-invariant device-independent window width.
+ * @param dipH           Zoom-invariant device-independent window height.
+ * @param base           The user's chosen zoom base (the scale slider value).
+ * @param currentApplied The effective zoom currently applied to the webContents.
+ * @param autoFitEnabled Whether the auto-fit shrink is active.
+ */
+export function resolveEffectiveZoom(
+  dipW: number,
+  dipH: number,
+  base: number,
+  currentApplied: number,
+  autoFitEnabled: boolean
+): number {
+  const multiplier = autoFitEnabled
+    ? computeAutoFitMultiplier(dipW, dipH, base)
+    : 1
+  const next = clampZoom(base * multiplier)
+  return Math.abs(next - currentApplied) <= EffectiveZoomEpsilon
+    ? currentApplied
+    : next
+}

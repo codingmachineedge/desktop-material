@@ -3,7 +3,8 @@ import * as React from 'react'
 import { CommittedFileChange } from '../../models/status'
 import { mapStatus } from '../../lib/status'
 import { PathLabel } from '../lib/path-label'
-import { Octicon, iconForStatus } from '../octicons'
+import { materialSymbolForStatus } from '../octicons'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { TooltipDirection } from '../lib/tooltip'
 
@@ -42,8 +43,9 @@ export class CommittedFileItem extends React.Component<ICommittedFileItemProps> 
           tooltip={fileStatus}
           direction={TooltipDirection.NORTH}
         >
-          <Octicon
-            symbol={iconForStatus(status)}
+          <MaterialSymbol
+            name={materialSymbolForStatus(status)}
+            size={16}
             className={'status status-' + fileStatus.toLowerCase()}
           />
         </TooltippedContent>

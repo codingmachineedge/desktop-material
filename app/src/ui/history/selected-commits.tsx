@@ -7,7 +7,6 @@ import { CommittedFileChange } from '../../models/status'
 import { Commit } from '../../models/commit'
 import { IDiff, ImageDiffType } from '../../models/diff'
 
-import { encodePathAsUrl } from '../../lib/path'
 import { revealInFileManager } from '../../lib/app-shell'
 
 import { openFile } from '../lib/open-file'
@@ -39,6 +38,7 @@ import { DiffHeader } from '../diff/diff-header'
 import { Account } from '../../models/account'
 import { Emoji } from '../../lib/emoji'
 import { createFileHistoryMenuItem } from '../file-history'
+import { EmptyState } from '../lib/empty-state'
 
 interface ISelectedCommitsProps {
   readonly repository: Repository
@@ -340,30 +340,28 @@ export class SelectedCommits extends React.Component<
   }
 
   private renderMultipleCommitsBlankSlate(): JSX.Element {
-    const BlankSlateImage = encodePathAsUrl(
-      __dirname,
-      'static/empty-no-commit.svg'
-    )
-
     return (
       <div id="multiple-commits-selected" className="blankslate">
         <div className="panel blankslate">
-          <img src={BlankSlateImage} className="blankslate-image" alt="" />
-          <div>
-            <p>
-              Unable to display diff when multiple non-consecutive selected.
-            </p>
-            <div>You can:</div>
-            <ul>
-              <li>
-                Select a single commit or a range of consecutive commits to view
-                a diff.
-              </li>
-              <li>Drag the commits to the branch menu to cherry-pick them.</li>
-              <li>Drag the commits to squash or reorder them.</li>
-              <li>Right click on multiple commits to see options.</li>
-            </ul>
-          </div>
+          <EmptyState
+            symbol="difference"
+            title="Unable to display diff when multiple non-consecutive selected."
+          >
+            <div className="multiple-commits-help">
+              <div>You can:</div>
+              <ul>
+                <li>
+                  Select a single commit or a range of consecutive commits to
+                  view a diff.
+                </li>
+                <li>
+                  Drag the commits to the branch menu to cherry-pick them.
+                </li>
+                <li>Drag the commits to squash or reorder them.</li>
+                <li>Right click on multiple commits to see options.</li>
+              </ul>
+            </div>
+          </EmptyState>
         </div>
         {this.renderDragOverlay()}
       </div>
@@ -452,15 +450,9 @@ export class SelectedCommits extends React.Component<
 }
 
 function NoCommitSelected() {
-  const BlankSlateImage = encodePathAsUrl(
-    __dirname,
-    'static/empty-no-commit.svg'
-  )
-
   return (
     <div className="panel blankslate">
-      <img src={BlankSlateImage} className="blankslate-image" alt="" />
-      No commit selected
+      <EmptyState symbol="commit" title="No commit selected" />
     </div>
   )
 }

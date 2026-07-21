@@ -8,8 +8,7 @@ import {
   PopoverDecoration,
 } from '../lib/popover'
 import { createUniqueId, releaseUniqueId } from '../lib/id-pool'
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { ToolbarButton } from './button'
 import {
   calculateToolbarOverflow,
@@ -541,7 +540,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
               ariaLabel="Close more toolbar actions"
               onClick={this.closeOverflow}
             >
-              <Octicon symbol={octicons.x} />
+              <MaterialSymbol name="close" size={18} />
             </Button>
           </div>
           <div className="toolbar-overflow-items">
@@ -583,7 +582,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
       <div className="toolbar-overflow-control">
         <ToolbarButton
           className="toolbar-overflow-trigger"
-          icon={octicons.kebabHorizontal}
+          materialSymbol="unfold_more"
           tooltip={label}
           ariaLabel={label}
           ariaHaspopup="dialog"

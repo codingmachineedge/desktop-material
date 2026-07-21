@@ -58,12 +58,13 @@
     flex-shrink: 0;
     margin-left: auto;
 
-    // Each button contains a single SVG element with a Windows 10-replica
-    // icon for the function it represents
+    // Each button centers a single Material Symbols Rounded glyph for the
+    // function it represents (v2 prototype Title bar screen).
     button {
       -webkit-app-region: no-drag;
 
-      display: inline-block;
+      display: grid;
+      place-items: center;
       position: relative;
       width: 46px;
       height: 100%;
@@ -79,10 +80,6 @@
       color: var(--md-sys-color-on-surface-variant);
       background-color: transparent;
       transition: background-color 0.25s ease;
-
-      // Explicitly setting the line height to the height
-      // of the SVG illustrations helps with vertical alignment.
-      line-height: 10px;
 
       &:focus {
         outline: none;
@@ -109,23 +106,19 @@
         }
       }
 
-      // Close button is a special case, it needs to be red
-      // on hover and slightly lighter red on active.
+      // Close button is a special case: it flips to the M3 error role on
+      // hover (matching the prototype Title bar) and a slightly lighter error
+      // tone on active. Both tokens are theme-aware.
       &.close:hover {
-        background-color: #e81123;
-        color: #fff;
+        background-color: var(--md-sys-color-error);
+        color: var(--md-sys-color-on-error);
 
         &:active {
-          background-color: #bf0f1d;
+          background-color: color-mix(in srgb, var(--md-sys-color-on-error) 20%, var(--md-sys-color-error));
 
           // Immediate feedback when clicking
           transition: none;
         }
-      }
-
-      /* https://css-tricks.com/cascading-svg-fill-color/ */
-      svg {
-        fill: currentColor;
       }
     }
   }
@@ -157,14 +150,11 @@
       }
 
       &.close:hover {
-        background-color: #e81123;
-
-        svg {
-          fill: #fff;
-        }
+        background-color: var(--md-sys-color-error);
+        color: var(--md-sys-color-on-error);
 
         &:active {
-          background-color: #f1707a;
+          background-color: color-mix(in srgb, var(--md-sys-color-on-error) 20%, var(--md-sys-color-error));
         }
       }
     }

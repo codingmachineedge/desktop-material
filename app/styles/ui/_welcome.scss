@@ -230,11 +230,11 @@
 
   &.exiting {
     .welcome-left {
-      transition: transform 250ms ease-in-out;
+      transition: transform 250ms var(--spring);
       transform: translateX(-100%);
     }
     .welcome-right {
-      transition: transform 250ms ease-in-out;
+      transition: transform 250ms var(--spring);
       transform: translateX(100%);
     }
   }

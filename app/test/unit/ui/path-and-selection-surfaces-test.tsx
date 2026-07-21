@@ -65,11 +65,10 @@ describe('path and selection surfaces', () => {
     const view = render(<MultipleSelection count={3} />)
 
     const panel = view.container.querySelector('#no-changes.panel.blankslate')
-    const image = view.container.querySelector('.blankslate-image')
+    const tile = view.container.querySelector('.empty-state-tile')
 
     assert.notEqual(panel, null)
-    assert.notEqual(image, null)
-    assert.equal(image?.getAttribute('alt'), '')
+    assert.notEqual(tile, null)
     assert.ok(view.container.textContent?.includes('3 files selected'))
   })
 })

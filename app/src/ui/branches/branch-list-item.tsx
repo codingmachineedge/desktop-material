@@ -2,8 +2,7 @@ import * as React from 'react'
 
 import { IMatches } from '../../lib/fuzzy-find'
 
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { HighlightText } from '../lib/highlight-text'
 import { dragAndDropManager } from '../../lib/drag-and-drop-manager'
 import { DragType, DropTargetType } from '../../models/drag-drop'
@@ -107,9 +106,10 @@ export class BranchListItem extends React.Component<
       name,
     } = this.props
 
-    // The leading glyph stays the branch icon for every row; the "current"
-    // branch is marked instead by a trailing check_circle (spec-overlays §4.3).
-    const icon = isLocalOnly ? octicons.upload : octicons.gitBranch
+    // The leading glyph stays the branch icon (Material `alt_route`) for every
+    // row; the "current" branch is marked instead by a trailing check_circle
+    // (spec-overlays §4.3), and the local-only state is conveyed by the tertiary
+    // tint on `.local-only .icon`.
     const className = classNames('branches-list-item', {
       'drop-target': this.state.isDragInProgress,
       'current-branch': isCurrentBranch,
@@ -128,11 +128,7 @@ export class BranchListItem extends React.Component<
         onMouseLeave={this.onMouseLeave}
         onMouseUp={this.onMouseUp}
       >
-        <Octicon
-          className="icon"
-          symbol={icon}
-          title={isLocalOnly ? 'Branch has not been published' : undefined}
-        />
+        <MaterialSymbol className="icon" name="alt_route" size={19} />
         <TooltippedContent
           className="name"
           tooltip={name}
@@ -154,16 +150,18 @@ export class BranchListItem extends React.Component<
             />
           ))}
         {isPinned && (
-          <Octicon
+          <MaterialSymbol
             className="pinned-branch-indicator"
-            symbol={octicons.pin}
-            title="Pinned branch"
+            name="star"
+            fill={1}
+            size={16}
           />
         )}
         {isCurrentBranch && (
-          <Octicon
+          <MaterialSymbol
             className="current-branch-indicator"
-            symbol={octicons.checkCircle}
+            name="check_circle"
+            size={20}
           />
         )}
       </div>

@@ -10,6 +10,7 @@ import {
 import { updateStore, IUpdateState, UpdateStatus } from '../lib/update-store'
 import { Disposable } from 'event-kit'
 import { Dispatcher } from '../dispatcher'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface IInstallingUpdateProps {
   /**
@@ -94,8 +95,8 @@ export class InstallingUpdate extends React.Component<IInstallingUpdateProps> {
       >
         <DialogContent>
           <Row className="updating-message">
-            Do not close GitHub Desktop while the update is in progress. Closing
-            now may break your installation.
+            Do not close {DefaultAppDisplayName} while the update is in
+            progress. Closing now may break your installation.
           </Row>
         </DialogContent>
         <DialogFooter>

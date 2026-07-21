@@ -54,6 +54,7 @@ describe('IPC channel contract', () => {
     'window-state-changed',
     'error',
     'zoom-factor-changed',
+    'window-content-size-changed',
     'app-menu',
     'launch-timing-stats',
     'url-action',

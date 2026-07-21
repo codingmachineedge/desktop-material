@@ -38,6 +38,11 @@
         height: 28px;
         fill: currentColor;
       }
+
+      // task_alt Material Symbol replacing the legacy filled check octicon.
+      .material-symbol {
+        color: currentColor;
+      }
     }
 
     .text {

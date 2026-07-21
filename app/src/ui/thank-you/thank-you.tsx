@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from '../dialog'
 import { RichText } from '../lib/rich-text'
 import Confetti from 'react-confetti'
 import { Emoji } from '../../lib/emoji'
+import { DefaultAppDisplayName } from '../../models/app-identity'
 
 interface IThankYouProps {
   readonly onDismissed: () => void
@@ -91,9 +92,9 @@ export class ThankYou extends React.Component<IThankYouProps, IThankYouState> {
       this.props.latestVersion !== null ? ` ${this.props.latestVersion}` : ''
     const thankYouNote = (
       <>
-        Thanks so much for all your hard work on GitHub Desktop{version}. We're
-        so grateful for your willingness to contribute and make the app better
-        for everyone!
+        Thanks so much for all your hard work on {DefaultAppDisplayName}
+        {version}. We're so grateful for your willingness to contribute and make
+        the app better for everyone!
       </>
     )
 

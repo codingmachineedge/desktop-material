@@ -1,4 +1,4 @@
 export const ReleaseNotesUri =
   __RELEASE_CHANNEL__ === 'beta'
-    ? 'https://desktop.github.com/release-notes/?env=beta'
-    : 'https://desktop.github.com/release-notes/'
+    ? 'https://github.com/Ding-Ding-Projects/desktop-material/releases?q=prerelease%3Atrue'
+    : 'https://github.com/Ding-Ding-Projects/desktop-material/releases'

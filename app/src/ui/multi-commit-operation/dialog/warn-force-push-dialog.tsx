@@ -3,6 +3,7 @@ import { Checkbox, CheckboxValue } from '../../lib/checkbox'
 import { Dispatcher } from '../../dispatcher'
 import { DialogFooter, DialogContent, Dialog } from '../../dialog'
 import { OkCancelButtonGroup } from '../../dialog/ok-cancel-button-group'
+import { DefaultAppDisplayName } from '../../../models/app-identity'
 
 interface IWarnForcePushProps {
   /**
@@ -85,10 +86,11 @@ export class WarnForcePushDialog extends React.Component<
             Are you sure you want to {operation.toLowerCase()}?
           </p>
           <p id="warn-force-push-confirmation-message">
-            At the end of the {operation.toLowerCase()} flow, GitHub Desktop
-            will enable you to force push the branch to update the upstream
-            branch. Force pushing will alter the history on the remote and
-            potentially cause problems for others collaborating on this branch.
+            At the end of the {operation.toLowerCase()} flow,{' '}
+            {DefaultAppDisplayName} will enable you to force push the branch to
+            update the upstream branch. Force pushing will alter the history on
+            the remote and potentially cause problems for others collaborating
+            on this branch.
           </p>
           <div>
             <Checkbox

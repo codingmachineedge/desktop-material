@@ -1,6 +1,7 @@
 import React from 'react'
 import { Button } from '../lib/button'
 import { Octicon, syncClockwise } from '../octicons'
+import { MaterialSymbol } from '../lib/material-symbol'
 import {
   DropdownItem,
   DropdownItemClassName,
@@ -75,6 +76,7 @@ export class PushPullButtonDropDown extends React.Component<IPushPullButtonDropD
           description: `Fetch the latest changes from ${remoteName}`,
           action: this.props.fetch,
           icon: syncClockwise,
+          materialSymbol: 'sync',
         }
       case DropdownItemType.ForcePush: {
         const forcePushWarning = this.props
@@ -96,6 +98,7 @@ export class PushPullButtonDropDown extends React.Component<IPushPullButtonDropD
           ),
           action: this.props.forcePushWithLease,
           icon: forcePushIcon,
+          materialSymbol: 'arrow_upward',
         }
       }
     }
@@ -109,7 +112,11 @@ export class PushPullButtonDropDown extends React.Component<IPushPullButtonDropD
         key={type}
         onClick={item.action}
       >
-        <Octicon symbol={item.icon} />
+        {item.materialSymbol ? (
+          <MaterialSymbol name={item.materialSymbol} size={16} />
+        ) : (
+          <Octicon symbol={item.icon} />
+        )}
         <div className="text-container">
           <div className="title">{item.title}</div>
           <div className="detail">{item.description}</div>

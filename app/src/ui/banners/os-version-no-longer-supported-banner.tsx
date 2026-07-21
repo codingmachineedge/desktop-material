@@ -26,7 +26,7 @@ export class OSVersionNoLongerSupportedBanner extends React.Component<{
         <Octicon className="alert-icon" symbol={octicons.alert} />
         This operating system is no longer supported. Software updates have been
         disabled.
-        <LinkButton uri="https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/overview/supported-operating-systems">
+        <LinkButton uri="https://ding-ding-projects.github.io/desktop-material/">
           Support details
         </LinkButton>
       </Banner>

@@ -1,6 +1,11 @@
 .ci-status {
   height: 16px;
   flex-shrink: 0;
+  // The status glyph is a Material Symbol wrapped in this labelled span; align
+  // it like the former inline octicon. The `ci-status-*` role classes tint the
+  // glyph through inherited `color`.
+  display: inline-flex;
+  align-items: center;
 }
 
 .repository-ci-status {

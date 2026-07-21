@@ -1,7 +1,6 @@
 import * as React from 'react'
 
 import { assertNever } from '../../lib/fatal-error'
-import { encodePathAsUrl } from '../../lib/path'
 
 import { Repository } from '../../models/repository'
 import {
@@ -38,9 +37,7 @@ import {
   buildStructuredDiff,
   MaxStructuredDiffBytes,
 } from './structured-diff-data'
-
-// image used when no diff is displayed
-const NoDiffImage = encodePathAsUrl(__dirname, 'static/ufo-alert.svg')
+import { EmptyState } from '../lib/empty-state'
 
 type ChangedFile = WorkingDirectoryFileChange | CommittedFileChange
 
@@ -194,17 +191,22 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
   private renderLargeTextDiff() {
     return (
       <div className="panel empty large-diff">
-        <img src={NoDiffImage} className="blankslate-image" alt="" />
-        <div className="description">
-          <p>The diff is too large to be displayed by default.</p>
-          <p>
-            You can try to show it anyway, but performance may be negatively
-            impacted.
-          </p>
-        </div>
-        <Button onClick={this.showLargeDiff}>
-          {__DARWIN__ ? 'Show Diff' : 'Show diff'}
-        </Button>
+        <EmptyState
+          symbol="difference"
+          description={
+            <>
+              <p>The diff is too large to be displayed by default.</p>
+              <p>
+                You can try to show it anyway, but performance may be negatively
+                impacted.
+              </p>
+            </>
+          }
+        >
+          <Button onClick={this.showLargeDiff}>
+            {__DARWIN__ ? 'Show Diff' : 'Show diff'}
+          </Button>
+        </EmptyState>
       </div>
     )
   }
@@ -212,8 +214,10 @@ export class Diff extends React.Component<IDiffProps, IDiffState> {
   private renderUnrenderableDiff() {
     return (
       <div className="panel empty large-diff">
-        <img src={NoDiffImage} alt="" />
-        <p>The diff is too large to be displayed.</p>
+        <EmptyState
+          symbol="difference"
+          description="The diff is too large to be displayed."
+        />
       </div>
     )
   }

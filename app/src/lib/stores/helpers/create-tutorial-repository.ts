@@ -13,14 +13,15 @@ import { IRemote } from '../../../models/remote'
 import { getDefaultBranch } from '../../helpers/default-branch'
 import { envForRemoteOperation } from '../../git/environment'
 import { pathExists } from '../../path-exists'
+import { DefaultAppDisplayName } from '../../../models/app-identity'
 
 const nl = __WIN32__ ? '\r\n' : '\n'
 const InitialReadmeContents =
-  `# Welcome to GitHub Desktop!${nl}${nl}` +
+  `# Welcome to ${DefaultAppDisplayName}!${nl}${nl}` +
   `This is your README. READMEs are where you can communicate ` +
   `what your project is and how to use it.${nl}${nl}` +
   `Write your name on line 6, save it, and then head ` +
-  `back to GitHub Desktop.${nl}`
+  `back to ${DefaultAppDisplayName}.${nl}`
 
 async function createAPIRepository(account: Account, name: string) {
   const api = new API(account.endpoint, account.token)
@@ -29,7 +30,7 @@ async function createAPIRepository(account: Account, name: string) {
     return await api.createRepository(
       null,
       name,
-      'GitHub Desktop tutorial repository',
+      `${DefaultAppDisplayName} tutorial repository`,
       true
     )
   } catch (err) {

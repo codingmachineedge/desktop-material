@@ -27,76 +27,10 @@ body > .tooltip,
     font-size: var(--font-size-sm);
   }
 
-  &::before {
-    position: absolute;
-    z-index: 1;
-    display: inline-block;
-    width: 0;
-    height: 0;
-    pointer-events: none;
-    content: '';
-    border: 6px solid transparent;
-    color: var(--tooltip-background-color);
-  }
-
-  &.tooltip-s,
-  &.tooltip-se,
-  &.tooltip-sw {
-    &::before {
-      top: -12px;
-      right: 50%;
-      bottom: auto;
-      margin-right: -6px;
-      border-bottom-color: var(--tooltip-background-color);
-    }
-  }
-
-  &.tooltip-n,
-  &.tooltip-ne,
-  &.tooltip-nw {
-    &::before {
-      bottom: -12px;
-      right: 50%;
-      top: auto;
-      margin-right: -6px;
-      border-top-color: var(--tooltip-background-color);
-    }
-  }
-
-  &.tooltip-w {
-    &::before {
-      top: 50%;
-      bottom: 50%;
-      right: -12px;
-      margin-top: -6px;
-      border-left-color: var(--tooltip-background-color);
-    }
-  }
-
-  &.tooltip-e {
-    &::before {
-      top: 50%;
-      bottom: 50%;
-      left: -12px;
-      margin-top: -6px;
-      border-right-color: var(--tooltip-background-color);
-    }
-  }
-
-  &.tooltip-sw,
-  &.tooltip-nw {
-    &::before {
-      right: 10px;
-      margin-right: 0;
-    }
-  }
-
-  &.tooltip-se,
-  &.tooltip-ne {
-    &::before {
-      left: 10px;
-    }
-  }
+  // M3 plain tooltips are a simple rounded inverse-surface pill with no
+  // directional caret. The legacy Primer border-triangle pointer (and its
+  // per-direction colour overrides) has been removed; positioning classes
+  // (tooltip-s/n/e/w …) still drive placement via inline coordinates.
 
   &.interactive {
     pointer-events: auto;
@@ -216,10 +150,6 @@ body > .tooltip,
   &.window-controls-tooltip {
     background-color: var(--toolbar-tooltip-background-color);
     box-shadow: 0 8px 24px var(--toolbar-tooltip-shadow-color);
-
-    &::before {
-      border-bottom-color: var(--toolbar-tooltip-background-color);
-    }
   }
 
   .list-item-tooltip {

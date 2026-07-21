@@ -3,6 +3,7 @@ import { setCrashMenu } from './menu'
 import { formatError } from '../lib/logging/format-error'
 import { CrashWindow } from './crash-window'
 import { createCrashRecovery } from './crash-recovery'
+import { DefaultAppDisplayName } from '../models/app-identity'
 
 let hasReportedUncaughtException = false
 
@@ -26,7 +27,7 @@ export function showUncaughtException(isLaunchError: boolean, error: Error) {
         type: 'error',
         title: __DARWIN__ ? `Unrecoverable Error` : 'Unrecoverable error',
         message:
-          `GitHub Desktop encountered an unrecoverable error and must restart. ` +
+          `${DefaultAppDisplayName} encountered an unrecoverable error and must restart. ` +
           `The crash renderer also failed, so detailed diagnostics are available in the application logs.`,
       }),
     relaunch: () => app.relaunch(),

@@ -10,15 +10,17 @@ import {
 } from '../main-process-proxy'
 import * as ipcRenderer from '../../lib/ipc-renderer'
 import { Button } from '../lib/button'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 
-// These paths are all drawn to a 10x10 view box and replicate the symbols
-// seen on Windows 10 window controls.
-const closePath =
-  'M 0,0 0,0.7 4.3,5 0,9.3 0,10 0.7,10 5,5.7 9.3,10 10,10 10,9.3 5.7,5 10,0.7 10,0 9.3,0 5,4.3 0.7,0 Z'
-const restorePath =
-  'm 2,1e-5 0,2 -2,0 0,8 8,0 0,-2 2,0 0,-8 z m 1,1 6,0 0,6 -1,0 0,-5 -5,0 z m -2,2 6,0 0,6 -6,0 z'
-const maximizePath = 'M 0,0 0,10 10,10 10,0 Z M 1,1 9,1 9,9 1,9 Z'
-const minimizePath = 'M 0,5 10,5 10,6 0,6 Z'
+// The v2 prototype renders the window controls with Material Symbols Rounded
+// glyphs (Title bar screen), routing every color/hover state through the M3
+// token set. `restore` has no bundled Material Symbols glyph (`filter_none`
+// is outside the pinned prototype subset), so `content_copy` — the closest
+// bundled overlapping-squares glyph — stands in for the restore-down control.
+const closeSymbol: MaterialSymbolName = 'close'
+const restoreSymbol: MaterialSymbolName = 'content_copy'
+const maximizeSymbol: MaterialSymbolName = 'crop_square'
+const minimizeSymbol: MaterialSymbolName = 'remove'
 
 interface IWindowControlState {
   readonly windowState: WindowState | null
@@ -91,7 +93,8 @@ export class WindowControls extends React.Component<{}, IWindowControlState> {
   private renderButton(
     name: string,
     onClick: React.EventHandler<React.MouseEvent<any>>,
-    path: string
+    symbol: MaterialSymbolName,
+    symbolSize: number
   ) {
     const className = classNames('window-control', name)
     const title = name[0].toUpperCase() + name.substring(1)
@@ -106,9 +109,7 @@ export class WindowControls extends React.Component<{}, IWindowControlState> {
         tooltip={title}
         tooltipClassName="window-controls-tooltip"
       >
-        <svg aria-hidden="true" version="1.1" width="10" height="10">
-          <path d={path} />
-        </svg>
+        <MaterialSymbol name={symbol} size={symbolSize} />
       </Button>
     )
   }
@@ -119,12 +120,17 @@ export class WindowControls extends React.Component<{}, IWindowControlState> {
       return <span />
     }
 
-    const min = this.renderButton('minimize', this.onMinimize, minimizePath)
+    const min = this.renderButton(
+      'minimize',
+      this.onMinimize,
+      minimizeSymbol,
+      18
+    )
     const maximizeOrRestore =
       this.state.windowState === 'maximized'
-        ? this.renderButton('restore', this.onRestore, restorePath)
-        : this.renderButton('maximize', this.onMaximize, maximizePath)
-    const close = this.renderButton('close', this.onClose, closePath)
+        ? this.renderButton('restore', this.onRestore, restoreSymbol, 16)
+        : this.renderButton('maximize', this.onMaximize, maximizeSymbol, 16)
+    const close = this.renderButton('close', this.onClose, closeSymbol, 18)
 
     return (
       <div className="window-controls">

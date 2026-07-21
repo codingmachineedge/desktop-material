@@ -364,16 +364,19 @@ $overlay-background-color: rgba(0, 0, 0, 0.4);
    * percentage changing or the app toggling between full screen and normal
    * window mode.
    */
-  --toast-notification-color: #{$gray-000};
-  --toast-notification-background-color: #{rgba($gray-900, 0.6)};
+  // Toast / zoom-overlay pills follow the M3 snackbar pattern: the theme-aware
+  // inverse-surface roles (an inverse pill in each theme), matching the tooltip
+  // remap in _material.scss. (The dark-theme override lives in themes/_dark.scss.)
+  --toast-notification-color: var(--md-sys-color-inverse-on-surface);
+  --toast-notification-background-color: var(--md-sys-color-inverse-surface);
 
   --tip-box-background-color: #{rgba($blue-500, 0.06)};
   --tip-box-border-color: #{$blue-200};
 
   /** The highlight color used for focus rings and focus box shadows */
-  --focus-color: #{$blue};
+  --focus-color: var(--md-sys-color-primary);
   --accent-color: #{$blue-400};
-  --diff-linenumber-focus-color: #{$blue-600};
+  --diff-linenumber-focus-color: var(--md-sys-color-primary);
 
   /**
    * Variables for form elements

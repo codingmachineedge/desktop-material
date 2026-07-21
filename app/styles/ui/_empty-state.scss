@@ -1,0 +1,79 @@
+// Shared Material empty-state (see app/src/ui/lib/empty-state.tsx).
+//
+// A rounded tonal tile hosting a large Material Symbol above optional
+// title/description copy. This replaces the fork's legacy raster "blank slate"
+// illustrations (empty-no-commit / ufo-alert / empty-no-file-selected /
+// multiple-files-selected / empty-no-branches) with the v2 prototype's
+// tile-and-copy pattern. Motion + shape come entirely from --md-sys / --dm /
+// --spring tokens; the global reduce-motion guard in _material-shell.scss
+// neutralizes the entrances under prefers-reduced-motion and
+// body[data-dm-motion='reduced'].
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 340px;
+  margin: 0 auto;
+  animation: dmGrow calc(520ms * var(--mdur)) var(--spring) backwards;
+
+  // 64x64 rounded tonal tile hosting the large glyph (prototype: radius-22
+  // container tile). Neutral tone by default; modifiers below opt into other
+  // MD3 container/on-container role pairs.
+  .empty-state-tile {
+    width: 64px;
+    height: 64px;
+    border-radius: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    animation: dmBounce calc(620ms * var(--mdur)) var(--spring-fast) backwards;
+    transition: background-color 480ms var(--emph), color 480ms var(--emph);
+
+    .material-symbol {
+      // The glyph inherits the tile's on-container color.
+      color: inherit;
+    }
+  }
+
+  .empty-state-title {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.35;
+    color: var(--md-sys-color-on-surface);
+  }
+
+  .empty-state-description {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--md-sys-color-on-surface-variant);
+
+    p {
+      margin: 0;
+    }
+
+    p + p {
+      margin-top: 8px;
+    }
+  }
+}
+
+.empty-state--primary .empty-state-tile {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.empty-state--success .empty-state-tile {
+  background: var(--dm-green-container);
+  color: var(--dm-green);
+}
+
+.empty-state--error .empty-state-tile {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}

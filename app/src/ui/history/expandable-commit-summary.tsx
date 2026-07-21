@@ -1,8 +1,6 @@
 import * as React from 'react'
 import classNames from 'classnames'
 
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
 import { RichText } from '../lib/rich-text'
 import { Repository } from '../../models/repository'
 import { Commit } from '../../models/commit'
@@ -228,7 +226,11 @@ export class ExpandableCommitSummary extends React.Component<
         }
         ariaControls="expandable-commit-summary"
       >
-        <Octicon symbol={isExpanded ? octicons.fold : octicons.unfold} />
+        <MaterialSymbol
+          name="expand_more"
+          size={16}
+          className={classNames('ecs-expander-glyph', { expanded: isExpanded })}
+        />
       </Button>
     )
   }
@@ -363,7 +365,7 @@ export class ExpandableCommitSummary extends React.Component<
 
     return (
       <div className="commit-unreachable-info">
-        <Octicon symbol={octicons.info} />
+        <MaterialSymbol name="live_help" size={16} />
         <LinkButton
           onClick={this.showUnreachableCommits}
           onMouseOver={this.onHighlightShasNotInDiff}
@@ -437,7 +439,7 @@ export class ExpandableCommitSummary extends React.Component<
 
     return (
       <div className="ecs-meta-item commit-ref">
-        <Octicon symbol={octicons.gitCommit} />
+        <MaterialSymbol name="commit" size={16} />
         <div className="ref selectable">{isExpanded ? sha : shortSha}</div>
         <CopyButton ariaLabel="Copy the full SHA" copyContent={sha} />
       </div>
@@ -572,7 +574,7 @@ export class ExpandableCommitSummary extends React.Component<
 
     return (
       <div className="ecs-meta-item lines-added-deleted">
-        {isExpanded ? <Octicon symbol={octicons.diff} /> : null}
+        {isExpanded ? <MaterialSymbol name="difference" size={16} /> : null}
         <div className="lines-added">
           {!isExpanded ? <>+{linesAdded}</> : <>{linesAdded} added lines</>}
         </div>
