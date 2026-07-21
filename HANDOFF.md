@@ -1,5 +1,44 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-21 Screenshot renewal — infrastructure proven, blocked on driver
+
+The full gallery renewal against the shipped Material UI was attempted end to
+end. Everything except the driver's assertions works: fresh production build
+(`out/main.js`/`renderer.js` at `main` tip `148b297f2b`, 231s), deterministic
+fixture + loopback provider (53 runs, 31 artifacts, releases/issues/branch
+rules), disposable keychain credential, hidden Win32 desktop, Electron launch
+with CDP, and canonical capture. Five images captured cleanly at 1440×960 —
+`material-welcome`, `material-workspace-changes`, `material-history`,
+`material-history-context-actions`, `material-branches-sheet` — with all four
+Material fonts (Roboto/Roboto Mono/Roboto Serif/Material Symbols Rounded)
+reporting `loaded` and light/english state verified. A diagnostic capture of
+the Repositories sheet confirms the shipped UI is correct (Sync repositories,
+Commit & push all, Add all present and unclipped, Material Symbols rendering).
+
+**Blocker (well specified):** `.codex/verification/capture_gallery_cdp.js`
+matches UI elements by raw `element.textContent.trim()` in ~20 spots across 85
+scenes (e.g. the `repositories-sheet` assertion at ~line 2769). The Material
+Symbol migration renders glyphs as `aria-hidden` font **ligatures**, so a
+button's `textContent` is now e.g. `"syncSync repositories"` instead of
+`"Sync repositories"` — the driver's label match fails and the strict canonical
+run aborts (`CAPTURE_EXIT:1`) even though the UI is correct.
+
+**Fix spec:** add a visible-text helper the driver can inject into its CDP
+evaluations — clone the node, remove `[aria-hidden="true"]` descendants
+(this excludes `.material-symbol`), then read `textContent.trim()` — and use it
+in place of raw `textContent.trim()` at the 20 label-matching sites (leave
+content-reading sites, e.g. diff text, on raw `textContent`). Then re-run the
+canonical, audit-design, and responsive passes and promote byte-for-byte with
+the privacy/dimension gate. This is best fanned out (helper + per-site edits +
+re-run) once subagent capacity is available. Per policy **no partial gallery
+was promoted**; the existing `docs/assets/screenshots` set is unchanged.
+
+Capture teardown is complete: app and provider processes stopped, keychain
+credential deleted, disposable Temp run root removed. One empty headless
+desktop (`DesktopMaterialShots20260721`) could not be removed via the MCP
+`remove_headless_desktop` tool (returns a TaskGroup error); it holds no windows
+or processes and clears on MCP server restart.
+
 ## 2026-07-21 Backend handoff for Codex
 
 Division of labor (user-directed 2026-07-21): Claude owns the frontend
