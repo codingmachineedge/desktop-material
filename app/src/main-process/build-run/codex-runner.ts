@@ -16,6 +16,7 @@ import {
   planCodexInstall,
 } from '../../lib/build-run/codex-install'
 import { OnAgentLog, OpencodeRunner } from './opencode-runner'
+import { AgentOperationRegistry } from './agent-operation-registry'
 
 /** Parameters for one repository-scoped Codex invocation. */
 export interface ICodexFixRun {
@@ -111,15 +112,16 @@ function parseCodexVersion(output: string): string | null {
 
 export const codexRunner = new CodexRunner()
 
-const controllers = new Map<string, AbortController>()
+const operations = new AgentOperationRegistry()
 
 function emit(
   sender: WebContents,
   operationId: string,
   stream: BuildRunLogStream,
-  text: string
+  text: string,
+  signal: AbortSignal
 ): void {
-  if (!sender.isDestroyed()) {
+  if (!signal.aborted && !sender.isDestroyed()) {
     ipcWebContents.send(sender, 'codex-log', { operationId, stream, text })
   }
 }
@@ -129,68 +131,81 @@ export function registerCodexIpc(): void {
   ipcMain.handle('codex-detect', async () => codexRunner.detect())
 
   ipcMain.handle('codex-install', async (event, request) => {
-    const controller = new AbortController()
-    controllers.set(request.operationId, controller)
-    try {
-      return await codexRunner.install(
+    return operations.run(event.sender, request.operationId, controller =>
+      codexRunner.install(
         planCodexInstall(),
-        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        (stream, text) =>
+          emit(
+            event.sender,
+            request.operationId,
+            stream,
+            text,
+            controller.signal
+          ),
         controller.signal
       )
-    } finally {
-      controllers.delete(request.operationId)
-    }
+    )
   })
 
   ipcMain.handle('codex-run-fix', async (event, request) => {
-    const controller = new AbortController()
-    controllers.set(request.operationId, controller)
     const prompt = buildCodexFixPrompt({
+      repoPath: request.repoPath,
       stageKind: request.stageKind,
       exitCode: request.exitCode,
       tailText: request.tailText,
       cwd: request.cwd,
     })
-    try {
-      return await codexRunner.runCodex(
+    return operations.run(event.sender, request.operationId, controller =>
+      codexRunner.runCodex(
         {
           repoPath: request.repoPath,
           autoApprove: request.autoApprove,
           prompt,
           model: request.model,
         },
-        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        (stream, text) =>
+          emit(
+            event.sender,
+            request.operationId,
+            stream,
+            text,
+            controller.signal
+          ),
         controller.signal
       )
-    } finally {
-      controllers.delete(request.operationId)
-    }
+    )
   })
 
   ipcMain.handle('codex-run-prompt', async (event, request) => {
-    const prompt = buildCodexUserPrompt(request.prompt)
+    const prompt = buildCodexUserPrompt(request.prompt, {
+      repoPath: request.repoPath,
+      cwd: request.cwd,
+    })
     if (prompt === null) {
       return { ok: false }
     }
-    const controller = new AbortController()
-    controllers.set(request.operationId, controller)
-    try {
-      return await codexRunner.runCodex(
+    return operations.run(event.sender, request.operationId, controller =>
+      codexRunner.runCodex(
         {
           repoPath: request.repoPath,
           autoApprove: request.autoApprove,
           prompt,
           model: request.model,
         },
-        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        (stream, text) =>
+          emit(
+            event.sender,
+            request.operationId,
+            stream,
+            text,
+            controller.signal
+          ),
         controller.signal
       )
-    } finally {
-      controllers.delete(request.operationId)
-    }
+    )
   })
 
-  ipcMain.handle('codex-cancel', async (_event, operationId) => {
-    controllers.get(operationId)?.abort()
+  ipcMain.handle('codex-cancel', async (event, operationId) => {
+    await operations.cancel(event.sender, operationId)
   })
 }

@@ -11,6 +11,7 @@ import {
   buildOpencodeFixPrompt,
   buildOpencodeUserPrompt,
 } from './opencode'
+import { isAbsolute, relative, resolve, sep } from 'path'
 
 /** Providers supported by the repository-scoped Build & Run repair flow. */
 export type BuildFixProvider = 'opencode' | 'codex'
@@ -33,6 +34,9 @@ export type ICodexLogEvent = IOpencodeLogEvent
 export const CODEX_PROMPT_TAIL_CAP = PROMPT_TAIL_CAP
 export const CODEX_USER_PROMPT_CAP = USER_PROMPT_CAP
 
+/** Longest selected working-directory value embedded in Codex stdin context. */
+export const CODEX_WORKING_DIRECTORY_CAP = 1024
+
 export interface ICodexExecArgsOptions {
   /** Whether Codex may proceed without pausing for command approval. */
   readonly autoApprove: boolean
@@ -49,8 +53,10 @@ export interface ICodexExecArgsOptions {
  * making that working directory Codex's repository root. Both modes retain the
  * `workspace-write` sandbox. Auto-approve changes only Codex's documented
  * approval policy (`never` versus `on-request`); it never enables the dangerous
- * sandbox-bypass flag. In Codex CLI 0.144, `--ask-for-approval` belongs to the
- * root command and must precede `exec`.
+ * sandbox-bypass flag. Detached runs also disable lifecycle hooks and ignore
+ * user/project execpolicy rules so trusted project configuration cannot silently
+ * change the explicit approval choice. In Codex CLI 0.144,
+ * `--ask-for-approval` belongs to the root command and must precede `exec`.
  */
 export function buildCodexExecArgs({
   autoApprove,
@@ -62,8 +68,11 @@ export function buildCodexExecArgs({
     'exec',
     '--sandbox',
     'workspace-write',
+    '--disable',
+    'hooks',
     '--ephemeral',
     '--ignore-user-config',
+    '--ignore-rules',
     '--color',
     'never',
     ...(model ? ['--model', model] : []),
@@ -71,14 +80,60 @@ export function buildCodexExecArgs({
   ]
 }
 
+/** Keep a renderer-supplied profile directory lexically inside the repo root. */
+export function resolveCodexPromptWorkingDirectory(
+  repoPath: string,
+  requestedCwd: string
+): string {
+  const root = resolve(repoPath)
+  const candidate = resolve(root, requestedCwd)
+  const fromRoot = relative(root, candidate)
+  const isWithinRoot =
+    fromRoot === '' ||
+    (fromRoot !== '..' &&
+      !fromRoot.startsWith(`..${sep}`) &&
+      !isAbsolute(fromRoot))
+  return isWithinRoot ? candidate : root
+}
+
+/** Render a bounded, control-character-safe path inside natural-language stdin. */
+function formatCodexPromptWorkingDirectory(path: string): string {
+  const safe = path.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, '\ufffd')
+  const bounded =
+    safe.length > CODEX_WORKING_DIRECTORY_CAP
+      ? `\u2026${safe.slice(-(CODEX_WORKING_DIRECTORY_CAP - 1))}`
+      : safe
+  return JSON.stringify(bounded)
+}
+
 /** Compose bounded failed-build context for Codex's stdin. */
 export function buildCodexFixPrompt(
-  options: Parameters<typeof buildOpencodeFixPrompt>[0]
+  options: Parameters<typeof buildOpencodeFixPrompt>[0] & {
+    readonly repoPath: string
+  }
 ): string {
-  return buildOpencodeFixPrompt(options)
+  const cwd = resolveCodexPromptWorkingDirectory(options.repoPath, options.cwd)
+  return buildOpencodeFixPrompt({
+    ...options,
+    cwd: formatCodexPromptWorkingDirectory(cwd),
+  })
 }
 
 /** Compose a bounded free-form request for Codex's stdin. */
-export function buildCodexUserPrompt(rawPrompt: string): string | null {
-  return buildOpencodeUserPrompt(rawPrompt)
+export function buildCodexUserPrompt(
+  rawPrompt: string,
+  context: { readonly repoPath: string; readonly cwd: string }
+): string | null {
+  const prompt = buildOpencodeUserPrompt(rawPrompt)
+  if (prompt === null) {
+    return null
+  }
+  const cwd = resolveCodexPromptWorkingDirectory(context.repoPath, context.cwd)
+  return [
+    prompt,
+    '',
+    `Use ${formatCodexPromptWorkingDirectory(
+      cwd
+    )} as the selected project working directory while keeping all work inside the repository.`,
+  ].join('\n')
 }

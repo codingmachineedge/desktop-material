@@ -68,11 +68,15 @@ host platform-neutral repository automation.
   OpenCode, with a provider choice persisted per repository.
 - Codex detection is shell-free. Noninteractive work uses bounded stdin context,
   a workspace-write sandbox, explicit per-run approval policy, ephemeral state,
-  ignored user config, bounded streaming, and owned process-tree cancellation.
+  ignored user config and rules, disabled lifecycle hooks, bounded streaming,
+  and renderer-owned process-tree cancellation. Trusted project Codex config
+  remains part of the repository trust boundary because Codex CLI 0.144 has no
+  verified blanket MCP-disable override.
 - Installation and authentication stay explicit: the UI shows the official npm
   package command and terminal login guidance, and never asks for a credential.
-- Agent completion never implies success. Desktop Material always reruns the
-  selected Build & Run profile and reports that result.
+- Agent completion never implies success. Unless the user cancels the owning
+  operation, Desktop Material reruns the selected Build & Run profile and
+  reports that result; **Stop** suppresses that rerun.
 - See the [local AI build-repair feature
   guide](docs/features/integrations/local-ai-build-fix.md). Local focused and
   TypeScript receipts are recorded in `HANDOFF.md`; default-branch integration,

@@ -96,6 +96,8 @@ export class Repository {
       this.buildRunPreferences.autoRunAfterBuild,
       this.buildRunPreferences.autoIgnoreBuildOutputs,
       this.buildRunPreferences.autoBuildOnPull,
+      this.buildRunPreferences.buildFixProvider,
+      this.buildRunPreferences.buildFixAutoApprove,
       this.groupName,
       this.defaultBranch,
       getEditorOverrideHash(this.customEditorOverride)

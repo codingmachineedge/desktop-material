@@ -374,13 +374,20 @@ process owns separate typed IPC handlers for Codex and OpenCode. Codex detection
 spawns `codex --version` and `codex login status` with `shell: false`.
 Execution spawns the verified Codex stdin form with the root
 `--ask-for-approval` option before `exec`, `workspace-write`, an explicit
-`on-request`/`never` policy, `--ephemeral`,
-`--ignore-user-config`, and `--color never`. The repository is the child `cwd`;
-neither its path nor the natural-language prompt is put in argv.
+`on-request`/`never` policy, `--disable hooks`, `--ephemeral`,
+`--ignore-user-config`, `--ignore-rules`, and `--color never`. The repository is
+the child `cwd`; neither its path nor the natural-language prompt is put in
+argv. A validated nested profile directory is bounded and supplied in stdin
+context only. Codex CLI 0.144 has no verified blanket MCP-disable override, so
+trusted project `.codex/config.toml` remains part of the repository trust
+boundary; do not claim project MCP isolation.
 
 Keep prompt, line, dialog, and store bounds intact. Cancellation must continue
-through the shared process-tree teardown. New providers must not bypass the
-dispatcher's unconditional `startBuildRun(repository)` verification rerun.
+through the shared process-tree teardown. An operation must remain owned by its
+exact renderer `WebContents`: reject duplicate IDs, scope cancellation to the
+owner, and abort-and-await on navigation or destruction. New providers must not
+bypass the dispatcher's `startBuildRun(repository)` verification rerun unless
+the owning renderer operation was cancelled; **Stop** must fence that rerun.
 Focused tests live under `app/test/unit/lib/build-run`,
 `app/test/unit/main-process/build-run`, and `app/test/unit/ui`; the typed IPC
 inventory is enforced by `app/test/unit/ipc-contract-test.ts`.

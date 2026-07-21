@@ -156,19 +156,35 @@ status`. Execution uses the supported stdin form:
 
 ```text
 codex --ask-for-approval <on-request|never> exec --sandbox workspace-write \
-  --ephemeral --ignore-user-config --color never -
+  --disable hooks --ephemeral --ignore-user-config --ignore-rules \
+  --color never -
 ```
 
 A local parser dry run of that complete option prefix with `--help` exited 0;
-putting `--ask-for-approval` after `exec` exited 2. The exact root-option order
-is locked into the pure and runner tests.
+putting `--ask-for-approval` after `exec` exited 2. A second installed-CLI probe
+confirmed that `--disable hooks` disables the stable hooks feature and
+`--ignore-rules` is accepted. The exact root-option order and flags are locked
+into the pure and runner tests.
 
 The child `cwd` is the repository root. Neither the repository path nor prompt
-enters argv. Failed-build output is capped at 4,000 characters, free-form input
-at 8,000 characters, captured detection output at 8,000 characters, and each
-streamed line at 16,000 characters. Both providers retain the existing bounded
-dialog/panel buffers, abort-driven process-tree teardown, and application-owned
-shutdown barrier. Codex never receives the dangerous sandbox-bypass flag.
+enters argv. A selected nested profile directory is lexically validated to stay
+inside the repository, capped at 1,024 characters, and included in stdin only.
+Failed-build output is capped at 4,000 characters, free-form input at 8,000
+characters, captured detection output at 8,000 characters, and each streamed
+line at 16,000 characters. Both providers retain the existing bounded
+dialog/panel buffers and application-owned shutdown barrier. Operations are
+owned by the exact renderer `WebContents`; duplicate IDs are rejected, foreign
+cancellation is ignored, owner navigation/destruction aborts and awaits the
+process tree, and panel **Stop** fences the verification rerun. Codex never
+receives the dangerous sandbox-bypass flag.
+
+`--ignore-user-config` skips the user's base config, `--disable hooks` disables
+lifecycle hooks, and `--ignore-rules` skips user/project execution-policy rules.
+An inert installed-CLI probe also established that `mcp_servers={}` does not
+clear MCP servers contributed by trusted project `.codex/config.toml`, and
+Codex CLI 0.144 exposes no verified blanket MCP-disable switch. Project Codex
+configuration therefore remains an explicit repository trust boundary; the
+integration does not claim MCP isolation.
 
 Missing Codex installs show `npm install --global @openai/codex` behind explicit
 consent. Missing authentication points to `codex login` in a terminal and
@@ -177,15 +193,14 @@ never establishes success: the dispatcher still runs the selected Build & Run
 profile again unless the operation was cancelled.
 
 Verification from the isolated `codex/codex-build-fix` worktree based on
-`dce7b9417f30568171d37033b27fb176f92c8dd9`:
+`2a2742796bdf65fc8562b317dcb73423bff9aa30`:
 
-- the focused Codex/OpenCode pure, install, runner, localization, IPC, shutdown,
-  settings, panel, failed-build-dialog, and send-dialog suite passed **89/89**;
-- root TypeScript `--noEmit` passed;
-- script TypeScript compilation passed;
-- the complete source ESLint and ESLint/Prettier compatibility gate passed;
-- changed-file Prettier and `git diff --check` passed; and
-- the new categorized feature guide and integrations index passed markdownlint.
+- focused Codex/OpenCode, ownership, cancellation, repository-identity,
+  localization, IPC, shutdown, settings, panel, and dialog tests passed
+  **115/115**;
+- root TypeScript `--noEmit` and script TypeScript compilation passed;
+- changed-source ESLint and Prettier passed; and
+- the categorized feature guide/index and `git diff --check` passed.
 
 The README, categorized feature documentation, roadmap, local wiki sources,
 Developer Guide, User Guide, and Pages source now describe the feature and its

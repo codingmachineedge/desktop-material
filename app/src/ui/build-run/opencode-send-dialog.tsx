@@ -482,9 +482,11 @@ export class OpencodeSendDialog extends React.Component<
           <p className="opencode-fix-warning" role="alert">
             <Octicon symbol={octicons.alert} />
             <span>
-              {t('buildRun.autoApproveWarningProvider', {
-                provider: this.providerLabel,
-              })}
+              {this.state.provider === 'codex'
+                ? t('buildRun.codexAutoApproveTrustWarning')
+                : t('buildRun.autoApproveWarningProvider', {
+                    provider: this.providerLabel,
+                  })}
             </span>
           </p>
         ) : (

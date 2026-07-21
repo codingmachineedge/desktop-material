@@ -477,12 +477,20 @@ export class BuildRunSettings extends React.Component<
           ariaLabel={t('buildRun.autoApproveRepositoryProvider', {
             provider: providerLabel,
           })}
-          ariaLiveMessage={t('buildRun.autoApproveRepositoryHelp', {
-            provider: providerLabel,
-          })}
-          tooltip={t('buildRun.autoApproveRepositoryHelp', {
-            provider: providerLabel,
-          })}
+          ariaLiveMessage={
+            normalizeBuildFixProvider(prefs.buildFixProvider) === 'codex'
+              ? t('buildRun.codexAutoApproveTrustWarning')
+              : t('buildRun.autoApproveRepositoryHelp', {
+                  provider: providerLabel,
+                })
+          }
+          tooltip={
+            normalizeBuildFixProvider(prefs.buildFixProvider) === 'codex'
+              ? t('buildRun.codexAutoApproveTrustWarning')
+              : t('buildRun.autoApproveRepositoryHelp', {
+                  provider: providerLabel,
+                })
+          }
         >
           <Octicon symbol={octicons.alert} />
         </ToggledtippedContent>

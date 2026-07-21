@@ -380,6 +380,10 @@ export class Dispatcher {
   private readonly errorHandlers = new Array<ErrorHandler>()
   private readonly pullRequestLifecycleStore = new PullRequestLifecycleStore()
   private readonly pullRequestCreationStore = new PullRequestCreationStore()
+  private readonly buildFixOperationControllers = new Map<
+    string,
+    AbortController
+  >()
   public incrementMetric: StatsStore['increment']
 
   public constructor(
@@ -3686,6 +3690,10 @@ export class Dispatcher {
     const { activeRunId, opencodeOperationId, buildFixProvider } =
       this.buildRunStore.getStateForRepository(repository.id)
     if (opencodeOperationId !== null) {
+      // Abort the renderer-owned signal as well as the main-process child. The
+      // signal is the fence which prevents a cancelled agent from immediately
+      // starting its mandatory verification rerun.
+      this.buildFixOperationControllers.get(opencodeOperationId)?.abort()
       await this.cancelBuildFixProvider(
         buildFixProvider ?? 'opencode',
         opencodeOperationId
@@ -3734,16 +3742,17 @@ export class Dispatcher {
       operationId,
       onLog
     )
-    const onAbort = () =>
-      void this.cancelBuildFixProvider(provider, operationId)
-    signal?.addEventListener('abort', onAbort, { once: true })
+    const operation = this.ownBuildFixOperation(provider, operationId, signal)
     try {
+      if (operation.controller.signal.aborted) {
+        return { ok: false, code: -1 }
+      }
       return provider === 'codex'
         ? await installCodex({ operationId })
         : await installOpencode({ operationId })
     } finally {
       dispose()
-      signal?.removeEventListener('abort', onAbort)
+      operation.dispose()
     }
   }
 
@@ -3816,9 +3825,7 @@ export class Dispatcher {
       operationId,
       onLog
     )
-    const onAbort = () =>
-      void this.cancelBuildFixProvider(provider, operationId)
-    signal?.addEventListener('abort', onAbort, { once: true })
+    const operation = this.ownBuildFixOperation(provider, operationId, signal)
     // Surface a live "Fixing with OpenCode…" status while the detached agent
     // works; the build phase stays at its pre-fix terminal value until the
     // re-run below supersedes it. Recording the operation id lets Stop reach
@@ -3831,20 +3838,23 @@ export class Dispatcher {
     )
     let run: IOpencodeRunResult
     try {
-      const invokeRun = provider === 'codex' ? runCodexFix : runOpencodeFix
-      run = await invokeRun({
-        operationId,
-        repoPath: repository.path,
-        cwd: request.cwd,
-        autoApprove: request.autoApprove,
-        stageKind: request.stageKind,
-        exitCode: request.exitCode,
-        tailText: request.tailText,
-        model: request.model,
-      })
+      if (operation.controller.signal.aborted) {
+        run = { ok: false }
+      } else {
+        run = await this.invokeBuildFixProvider(provider, {
+          operationId,
+          repoPath: repository.path,
+          cwd: request.cwd,
+          autoApprove: request.autoApprove,
+          stageKind: request.stageKind,
+          exitCode: request.exitCode,
+          tailText: request.tailText,
+          model: request.model,
+        })
+      }
     } finally {
       dispose()
-      signal?.removeEventListener('abort', onAbort)
+      operation.dispose()
       // Clear the flag once opencode exits (success, failure, or abort). The
       // re-run started below re-enters `beginRun`, which also resets it.
       this.buildRunStore.setOpencodeRunning(repository.id, false)
@@ -3852,7 +3862,7 @@ export class Dispatcher {
 
     // Success is measured by a re-run, never opencode's (buggy) exit code. The
     // resulting phase is observed by the store as the re-run streams state.
-    if (!signal?.aborted) {
+    if (!operation.controller.signal.aborted) {
       await this.startBuildRun(repository)
     }
     return { phaseBefore, run }
@@ -3911,9 +3921,7 @@ export class Dispatcher {
       operationId,
       onLog
     )
-    const onAbort = () =>
-      void this.cancelBuildFixProvider(provider, operationId)
-    signal?.addEventListener('abort', onAbort, { once: true })
+    const operation = this.ownBuildFixOperation(provider, operationId, signal)
     // Surface a live "Running OpenCode…" status and record the operation id so
     // Stop can reach the opencode process (same lifecycle as the fix flow).
     this.buildRunStore.setOpencodeRunning(
@@ -3924,25 +3932,27 @@ export class Dispatcher {
     )
     let run: IOpencodeRunResult
     try {
-      const invokeRun =
-        provider === 'codex' ? runCodexPrompt : runOpencodePrompt
-      run = await invokeRun({
-        operationId,
-        repoPath: repository.path,
-        cwd: request.cwd,
-        autoApprove: request.autoApprove,
-        prompt: request.prompt,
-        model: request.model,
-      })
+      if (operation.controller.signal.aborted) {
+        run = { ok: false }
+      } else {
+        run = await this.invokeBuildFixPrompt(provider, {
+          operationId,
+          repoPath: repository.path,
+          cwd: request.cwd,
+          autoApprove: request.autoApprove,
+          prompt: request.prompt,
+          model: request.model,
+        })
+      }
     } finally {
       dispose()
-      signal?.removeEventListener('abort', onAbort)
+      operation.dispose()
       this.buildRunStore.setOpencodeRunning(repository.id, false)
     }
 
     // Judge the repository's state by re-running Build & Run, never by
     // opencode's (buggy) exit code — matching the fix flow.
-    if (!signal?.aborted) {
+    if (!operation.controller.signal.aborted) {
       await this.startBuildRun(repository)
     }
     return run
@@ -3960,6 +3970,63 @@ export class Dispatcher {
     return provider === 'codex'
       ? cancelCodex(operationId)
       : cancelOpencode(operationId)
+  }
+
+  /** Invoke the exact typed IPC path for a failed-build repair. */
+  private invokeBuildFixProvider(
+    provider: BuildFixProvider,
+    request: Parameters<typeof runOpencodeFix>[0]
+  ): Promise<IOpencodeRunResult> {
+    return provider === 'codex' ? runCodexFix(request) : runOpencodeFix(request)
+  }
+
+  /** Invoke the exact typed IPC path for a bounded free-form request. */
+  private invokeBuildFixPrompt(
+    provider: BuildFixProvider,
+    request: Parameters<typeof runOpencodePrompt>[0]
+  ): Promise<IOpencodeRunResult> {
+    return provider === 'codex'
+      ? runCodexPrompt(request)
+      : runOpencodePrompt(request)
+  }
+
+  /**
+   * Bridge a dialog signal into an operation owned by the dispatcher. The build
+   * panel can abort this controller after the launch dialog has detached, and
+   * the same signal fences the verification rerun after cancellation.
+   */
+  private ownBuildFixOperation(
+    provider: BuildFixProvider,
+    operationId: string,
+    externalSignal?: AbortSignal
+  ): { readonly controller: AbortController; readonly dispose: () => void } {
+    const controller = new AbortController()
+    const cancelMain = () => {
+      void this.cancelBuildFixProvider(provider, operationId).catch(error =>
+        log.error('Could not cancel local-agent operation', error)
+      )
+    }
+    const relayExternalAbort = () => controller.abort()
+    controller.signal.addEventListener('abort', cancelMain, { once: true })
+    if (externalSignal?.aborted) {
+      controller.abort()
+    } else {
+      externalSignal?.addEventListener('abort', relayExternalAbort, {
+        once: true,
+      })
+    }
+    this.buildFixOperationControllers.set(operationId, controller)
+
+    return {
+      controller,
+      dispose: () => {
+        controller.signal.removeEventListener('abort', cancelMain)
+        externalSignal?.removeEventListener('abort', relayExternalAbort)
+        if (this.buildFixOperationControllers.get(operationId) === controller) {
+          this.buildFixOperationControllers.delete(operationId)
+        }
+      },
+    }
   }
 
   /**

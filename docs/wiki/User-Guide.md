@@ -878,12 +878,16 @@ Auto-approve is a separate per-run choice and defaults off. With it off, an
 agent can stop when an action needs approval. With it on, Codex still retains
 its repository workspace-write sandbox and OpenCode retains its repository
 permission block. Both agents stream bounded output to Build & Run, and **Stop**
-terminates the owned process tree.
+terminates the owned process tree and prevents the verification rerun from
+starting. A selected nested project folder is included in the bounded prompt,
+while the repository root remains the actual process and sandbox root.
 
-After the agent exits, Desktop Material always starts Build & Run again. Trust
-the rerun result—not an agent's message or exit code—to decide whether the
-repair worked. Review Changes after cancellation or a failed rerun because
-partial edits may remain.
+Unless you cancelled it, Desktop Material starts Build & Run again after the
+agent exits. Trust the rerun result—not an agent's message or exit code—to decide
+whether the repair worked. Review Changes after cancellation or a failed rerun
+because partial edits may remain. A trusted repository's `.codex/config.toml`
+can still enable MCP servers, so review project Codex configuration before using
+repair; Desktop Material does not claim to isolate project MCPs.
 
 ---
 

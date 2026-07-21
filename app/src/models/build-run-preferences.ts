@@ -56,7 +56,9 @@ export interface IBuildRunPreferences {
   /**
    * Auto-approve the selected provider's repository-scoped edits and commands.
    * Optional for back-compat; when absent, the legacy OpenCode preference is
-   * used. Codex always retains its `workspace-write` sandbox even when enabled.
+   * used. Codex retains its `workspace-write` sandbox, ignores execution rules,
+   * and disables lifecycle hooks even when enabled. Trusted project MCP config
+   * remains part of Codex's user trust boundary and is called out in the UI.
    */
   readonly buildFixAutoApprove?: boolean
 

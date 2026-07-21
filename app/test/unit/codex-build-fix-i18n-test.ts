@@ -23,6 +23,7 @@ const keys: ReadonlyArray<TranslationKey> = [
   'buildRun.promptPlaceholderProvider',
   'buildRun.autoApproveProvider',
   'buildRun.autoApproveWarningProvider',
+  'buildRun.codexAutoApproveTrustWarning',
   'buildRun.approvalOnRequestProvider',
   'buildRun.diagnosingProvider',
   'buildRun.verifyingProvider',
@@ -72,6 +73,17 @@ describe('Codex/OpenCode build-fix internationalization', () => {
       })
       assert.match(text, /codex login/)
       assert.ok(!/paste (your )?(api )?key/i.test(text))
+    }
+  })
+
+  it('states the residual trusted-project MCP boundary in every mode', () => {
+    for (const mode of ['english', 'cantonese', 'bilingual'] as const) {
+      const text = translate('buildRun.codexAutoApproveTrustWarning', mode)
+      assert.match(text, /workspace-write/)
+      assert.match(text, /rules/)
+      assert.match(text, /hooks/)
+      assert.match(text, /MCP/)
+      assert.match(text, /\.codex\/config\.toml/)
     }
   })
 })

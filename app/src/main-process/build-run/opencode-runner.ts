@@ -19,6 +19,7 @@ import {
 } from '../../lib/build-run/opencode-install'
 import { batchSpawnSpec, resolveExecutable } from './runner'
 import { killTreeAndWait } from './kill-tree'
+import { AgentOperationRegistry } from './agent-operation-registry'
 
 /**
  * Main-process launcher for the opencode AI coding agent CLI.
@@ -367,16 +368,17 @@ function isAuthConfigured(result: IAgentProcessResult): boolean {
 /** The process-wide opencode runner wired into the IPC layer and lifecycle. */
 export const opencodeRunner = new OpencodeRunner()
 
-/** Correlates in-flight IPC operations with their cancellation controllers. */
-const controllers = new Map<string, AbortController>()
+/** Correlates in-flight IPC operations with their exact renderer owners. */
+const operations = new AgentOperationRegistry()
 
 function emit(
   sender: WebContents,
   operationId: string,
   stream: BuildRunLogStream,
-  text: string
+  text: string,
+  signal: AbortSignal
 ): void {
-  if (sender.isDestroyed()) {
+  if (signal.aborted || sender.isDestroyed()) {
     return
   }
   ipcWebContents.send(sender, 'opencode-log', { operationId, stream, text })
@@ -391,30 +393,31 @@ export function registerOpencodeIpc(): void {
   ipcMain.handle('opencode-detect', async () => opencodeRunner.detect())
 
   ipcMain.handle('opencode-install', async (event, request) => {
-    const controller = new AbortController()
-    controllers.set(request.operationId, controller)
-    try {
-      return await opencodeRunner.install(
+    return operations.run(event.sender, request.operationId, controller =>
+      opencodeRunner.install(
         planOpencodeInstall(process.platform),
-        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        (stream, text) =>
+          emit(
+            event.sender,
+            request.operationId,
+            stream,
+            text,
+            controller.signal
+          ),
         controller.signal
       )
-    } finally {
-      controllers.delete(request.operationId)
-    }
+    )
   })
 
   ipcMain.handle('opencode-run-fix', async (event, request) => {
-    const controller = new AbortController()
-    controllers.set(request.operationId, controller)
     const prompt = buildOpencodeFixPrompt({
       stageKind: request.stageKind,
       exitCode: request.exitCode,
       tailText: request.tailText,
       cwd: request.cwd,
     })
-    try {
-      return await opencodeRunner.runFix(
+    return operations.run(event.sender, request.operationId, controller =>
+      opencodeRunner.runFix(
         {
           repoPath: request.repoPath,
           cwd: request.cwd,
@@ -422,12 +425,17 @@ export function registerOpencodeIpc(): void {
           prompt,
           model: request.model,
         },
-        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        (stream, text) =>
+          emit(
+            event.sender,
+            request.operationId,
+            stream,
+            text,
+            controller.signal
+          ),
         controller.signal
       )
-    } finally {
-      controllers.delete(request.operationId)
-    }
+    )
   })
 
   ipcMain.handle('opencode-run-prompt', async (event, request) => {
@@ -437,10 +445,8 @@ export function registerOpencodeIpc(): void {
     if (prompt === null) {
       return { ok: false }
     }
-    const controller = new AbortController()
-    controllers.set(request.operationId, controller)
-    try {
-      return await opencodeRunner.runFix(
+    return operations.run(event.sender, request.operationId, controller =>
+      opencodeRunner.runFix(
         {
           repoPath: request.repoPath,
           cwd: request.cwd,
@@ -448,15 +454,20 @@ export function registerOpencodeIpc(): void {
           prompt,
           model: request.model,
         },
-        (stream, text) => emit(event.sender, request.operationId, stream, text),
+        (stream, text) =>
+          emit(
+            event.sender,
+            request.operationId,
+            stream,
+            text,
+            controller.signal
+          ),
         controller.signal
       )
-    } finally {
-      controllers.delete(request.operationId)
-    }
+    )
   })
 
-  ipcMain.handle('opencode-cancel', async (_event, operationId) => {
-    controllers.get(operationId)?.abort()
+  ipcMain.handle('opencode-cancel', async (event, operationId) => {
+    await operations.cancel(event.sender, operationId)
   })
 }

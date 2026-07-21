@@ -1210,6 +1210,7 @@ export type TranslationKey =
   | 'buildRun.promptPlaceholderProvider'
   | 'buildRun.autoApproveProvider'
   | 'buildRun.autoApproveWarningProvider'
+  | 'buildRun.codexAutoApproveTrustWarning'
   | 'buildRun.approvalOnRequestProvider'
   | 'buildRun.diagnosingProvider'
   | 'buildRun.verifyingProvider'
@@ -2732,6 +2733,8 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     "Auto-approve {provider}'s edits and commands for this run",
   'buildRun.autoApproveWarningProvider':
     '{provider} may edit files and run commands here without pausing. Codex keeps its workspace-write sandbox; OpenCode keeps its repository permission block.',
+  'buildRun.codexAutoApproveTrustWarning':
+    "Codex is fixed here to workspace-write, ignores execution rules, and disables lifecycle hooks. Trusted project MCP configuration remains part of Codex's user trust boundary; review .codex/config.toml before unattended auto-approve.",
   'buildRun.approvalOnRequestProvider':
     '{provider} uses approval-on-request. This detached run may stop rather than perform an action that needs approval.',
   'buildRun.diagnosingProvider':
@@ -4133,6 +4136,8 @@ export const cantoneseTranslations: Readonly<
   'buildRun.autoApproveProvider': '呢次自動批准 {provider} 改檔案同行指令',
   'buildRun.autoApproveWarningProvider':
     '{provider} 可以唔停低問你就喺呢度改檔案同行指令。Codex 仍然受 workspace-write sandbox 限制；OpenCode 仍然受 repo 權限設定限制。',
+  'buildRun.codexAutoApproveTrustWarning':
+    '呢度 Codex 固定用 workspace-write、唔會套用 execution rules，亦會關閉 lifecycle hooks。不過受信任 repo 嘅 MCP 設定仍然係 Codex 嘅 user trust boundary；畀佢自動批准自己做之前，請先睇清楚 .codex/config.toml。',
   'buildRun.approvalOnRequestProvider':
     '{provider} 會按需要要求批准。呢個背景工作遇到要批准嘅動作時，可能會停低而唔係照做。',
   'buildRun.diagnosingProvider': '{provider} 搵緊問題兼修緊個 build…',
