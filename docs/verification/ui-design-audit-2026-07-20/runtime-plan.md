@@ -118,15 +118,19 @@ require a direct child of the system Temp directory whose basename begins
 Do not weaken those contracts. Retain the existing root for the immutable ZIP
 extraction and create this separate sibling runtime root for the first pass:
 
-`%TEMP%\desktop-material-p0-ui-design-audit-20260720-9f64a2c1-baseline`
+`%TEMP%\desktop-material-p0-ui-baseline`
 
 Add that exact root and all of its child paths to `cleanup-ledger.md` before it
-is created. The path must be absent at fixture preparation time. Canonical
-gallery scenes mutate the fixture (for example, the final Cheap-LFS scene creates
-an evidence branch and a large file), so independent final passes must not share
-a mutated fixture/profile. Use fresh direct-Temp siblings suffixed with a bounded
-pass id, such as `-gallery-en-light` or `-responsive-bi-dark`, and ledger each
-one before creation. Do not clone a dirty post-gallery fixture into another pass.
+is created. The path must be absent at fixture preparation time. Keep the
+resolved root at or below 96 characters: dedicated appearance repositories add
+as many as 139 characters below the root, and longer audit labels can cross the
+Windows Git object-path limit even when the coordinator itself initializes.
+Canonical gallery scenes mutate the fixture (for example, the final Cheap-LFS
+scene creates an evidence branch and a large file), so independent final passes
+must not share a mutated fixture/profile. Use fresh direct-Temp siblings with a
+short bounded pass id, such as `desktop-material-p0-ui-g1` or
+`desktop-material-p0-ui-r1`, and ledger each one before creation. Do not clone a
+dirty post-gallery fixture into another pass.
 
 ### Prototype network and font dependencies
 
@@ -249,7 +253,7 @@ $AuditPython = Join-Path $AuditMcp '.venv\Scripts\python.exe'
 $AuditClient = Join-Path $AuditRepo '.codex\skills\verify-desktop-material-headless\scripts\lowlevel_mcp_client.py'
 $AuditEndpoint = 'http://127.0.0.1:8765/mcp'
 $AuditPass = 'baseline'
-$AuditP0Root = Join-Path $env:TEMP "desktop-material-p0-ui-design-audit-20260720-9f64a2c1-$AuditPass"
+$AuditP0Root = Join-Path $env:TEMP "desktop-material-p0-ui-$AuditPass"
 $AuditDesktop = 'DesktopMaterialAudit-20260720-9f64a2c1'
 $AuditReferenceRoot = Join-Path $env:TEMP 'desktop-material-ui-audit-20260720-9f64a2c1\reference'
 ```
