@@ -8,6 +8,7 @@ import {
   IBuildRunStateEvent,
 } from '../build-run/types'
 import { onBuildRunLog, onBuildRunState } from '../../ui/main-process-proxy'
+import type { BuildFixProvider } from '../build-run/codex'
 
 /**
  * Renderer-side view store for the one-click Build & Run feature.
@@ -59,6 +60,8 @@ export interface IRepositoryBuildRunState {
    * (`activeRunId` is null while it works).
    */
   readonly opencodeOperationId: string | null
+  /** Which provider owns `opencodeOperationId`; name kept for store back-compat. */
+  readonly buildFixProvider?: BuildFixProvider | null
 }
 
 /** Max lines retained in the per-repository log ring buffer. */
@@ -77,6 +80,7 @@ const emptyState: IRepositoryBuildRunState = {
   detected: false,
   opencodeRunning: false,
   opencodeOperationId: null,
+  buildFixProvider: null,
 }
 
 /** The set of phases that terminate a run. */
@@ -174,6 +178,7 @@ export class BuildRunStore extends TypedBaseStore<number | null> {
       // kicks off arrives here), so the "Fixing with OpenCode…" state clears.
       opencodeRunning: false,
       opencodeOperationId: null,
+      buildFixProvider: null,
     })
   }
 
@@ -186,11 +191,13 @@ export class BuildRunStore extends TypedBaseStore<number | null> {
   public setOpencodeRunning(
     repositoryId: number,
     opencodeRunning: boolean,
-    opencodeOperationId: string | null = null
+    opencodeOperationId: string | null = null,
+    buildFixProvider: BuildFixProvider = 'opencode'
   ): void {
     this.mutate(repositoryId, {
       opencodeRunning,
       opencodeOperationId: opencodeRunning ? opencodeOperationId : null,
+      buildFixProvider: opencodeRunning ? buildFixProvider : null,
     })
   }
 

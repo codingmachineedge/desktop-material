@@ -9,13 +9,17 @@ import * as octicons from '../octicons/octicons.generated'
 import { Dispatcher } from '../dispatcher'
 import { Repository } from '../../models/repository'
 import { IOpencodeSendContext } from '../../models/popup'
+import { planOpencodeInstall } from '../../lib/build-run/opencode-install'
+import { planCodexInstall } from '../../lib/build-run/codex-install'
 import {
-  OPENCODE_MIN,
-  planOpencodeInstall,
-} from '../../lib/build-run/opencode-install'
+  BuildFixProvider,
+  normalizeBuildFixProvider,
+} from '../../lib/build-run/codex'
 import { BuildRunLogStream } from '../../lib/build-run/types'
 import type { IOpencodeLogEvent } from '../../lib/build-run/opencode'
 import { t } from '../../lib/i18n'
+import { getBuildFixAutoApprove } from '../../models/build-run-preferences'
+import { Select } from '../lib/select'
 
 /** Longest opencode output tail kept in the dialog's scrollback. */
 const MAX_DIALOG_LOG_LINES = 400
@@ -53,6 +57,8 @@ export interface IOpencodeSendDialogProps {
 
 interface IOpencodeSendDialogState {
   readonly status: OpencodeSendStatus
+
+  readonly provider: BuildFixProvider
 
   /** The opencode version reported by detection, when installed. */
   readonly version: string | null
@@ -94,15 +100,18 @@ export class OpencodeSendDialog extends React.Component<
 > {
   private abortController: AbortController | null = null
   private runDetachedToBuildPanel = false
+  private detectionRequest = 0
 
   public constructor(props: IOpencodeSendDialogProps) {
     super(props)
     this.state = {
       status: 'detecting',
+      provider: normalizeBuildFixProvider(
+        props.repository.buildRunPreferences.buildFixProvider
+      ),
       version: null,
       prompt: props.context.initialPrompt ?? '',
-      autoApprove:
-        props.repository.buildRunPreferences.opencodeAutoApprove ?? false,
+      autoApprove: getBuildFixAutoApprove(props.repository.buildRunPreferences),
       logLines: [],
       error: null,
     }
@@ -121,9 +130,20 @@ export class OpencodeSendDialog extends React.Component<
 
   /** Probe the host for a usable opencode install and branch on the result. */
   private detect = async () => {
+    const request = ++this.detectionRequest
+    const provider = this.state.provider
     this.setState({ status: 'detecting', error: null })
     try {
-      const status = await this.props.dispatcher.detectOpencode()
+      const status =
+        provider === 'opencode'
+          ? await this.props.dispatcher.detectOpencode()
+          : await this.props.dispatcher.detectBuildFixProvider('codex')
+      if (
+        request !== this.detectionRequest ||
+        provider !== this.state.provider
+      ) {
+        return
+      }
       if (!status.installed) {
         this.setState({ status: 'not-installed', version: null })
       } else if (!status.authConfigured) {
@@ -132,6 +152,9 @@ export class OpencodeSendDialog extends React.Component<
         this.setState({ status: 'ready', version: status.version })
       }
     } catch (e) {
+      if (request !== this.detectionRequest) {
+        return
+      }
       this.setState({
         status: 'detect-error',
         error: e instanceof Error ? e.message : String(e),
@@ -145,11 +168,19 @@ export class OpencodeSendDialog extends React.Component<
     this.abortController = controller
     this.setState({ status: 'installing', error: null, logLines: [] })
     try {
-      const result = await this.props.dispatcher.installOpencode(
-        this.props.repository,
-        this.onLog,
-        controller.signal
-      )
+      const result =
+        this.state.provider === 'opencode'
+          ? await this.props.dispatcher.installOpencode(
+              this.props.repository,
+              this.onLog,
+              controller.signal
+            )
+          : await this.props.dispatcher.installBuildFixProvider(
+              'codex',
+              this.props.repository,
+              this.onLog,
+              controller.signal
+            )
       if (controller.signal.aborted) {
         this.setState({ status: 'not-installed' })
         return
@@ -192,18 +223,29 @@ export class OpencodeSendDialog extends React.Component<
     this.runDetachedToBuildPanel = true
     this.props.onDismissed()
     try {
-      await this.props.dispatcher.runOpencodePrompt(
-        this.props.repository,
-        {
-          prompt,
-          cwd: this.props.context.cwd,
-          autoApprove: this.state.autoApprove,
-        },
-        this.onLog,
-        controller.signal
-      )
+      const request = {
+        prompt,
+        cwd: this.props.context.cwd,
+        autoApprove: this.state.autoApprove,
+      }
+      if (this.state.provider === 'opencode') {
+        await this.props.dispatcher.runOpencodePrompt(
+          this.props.repository,
+          request,
+          this.onLog,
+          controller.signal
+        )
+      } else {
+        await this.props.dispatcher.runBuildFixPrompt(
+          'codex',
+          this.props.repository,
+          request,
+          this.onLog,
+          controller.signal
+        )
+      }
     } catch (e) {
-      log.error('Detached "Send to opencode" run failed', e)
+      log.error('Detached local-agent request failed', e)
     } finally {
       this.abortController = null
     }
@@ -225,6 +267,43 @@ export class OpencodeSendDialog extends React.Component<
 
   private onAutoApproveChanged = (event: React.FormEvent<HTMLInputElement>) => {
     this.setState({ autoApprove: event.currentTarget.checked })
+  }
+
+  private onProviderChanged = (event: React.FormEvent<HTMLSelectElement>) => {
+    const provider = event.currentTarget.value as BuildFixProvider
+    this.detectionRequest++
+    this.setState({ provider, version: null, error: null }, this.detect)
+    void this.props.dispatcher
+      .updateRepositoryBuildRunPreferences(this.props.repository, {
+        ...this.props.repository.buildRunPreferences,
+        buildFixProvider: provider,
+      })
+      .catch(error => log.error('Could not persist build-fix provider', error))
+  }
+
+  private get cliName(): 'codex' | 'opencode' {
+    return this.state.provider === 'codex' ? 'codex' : 'opencode'
+  }
+
+  private get providerLabel(): 'Codex' | 'OpenCode' {
+    return this.state.provider === 'codex' ? 'Codex' : 'OpenCode'
+  }
+
+  private renderProviderPicker() {
+    return (
+      <Select
+        className="build-fix-provider-select"
+        label={t('buildRun.providerLabel')}
+        value={this.state.provider}
+        disabled={
+          this.state.status === 'installing' || this.state.status === 'running'
+        }
+        onChange={this.onProviderChanged}
+      >
+        <option value="codex">Codex</option>
+        <option value="opencode">OpenCode</option>
+      </Select>
+    )
   }
 
   /** Abort the in-flight install without dismissing the dialog. */
@@ -270,14 +349,23 @@ export class OpencodeSendDialog extends React.Component<
   }
 
   private renderIntro() {
-    return <p className="opencode-fix-intro">{t('buildRun.sendIntro')}</p>
+    return (
+      <>
+        {this.renderProviderPicker()}
+        <p className="opencode-fix-intro">
+          {t('buildRun.sendIntroProvider', {
+            provider: this.providerLabel,
+          })}
+        </p>
+      </>
+    )
   }
 
   private renderDetecting() {
     return (
       <DialogContent>
         {this.renderIntro()}
-        <p>Checking for the opencode CLI…</p>
+        <p>{t('buildRun.checkingCli', { cli: this.cliName })}</p>
       </DialogContent>
     )
   }
@@ -286,27 +374,32 @@ export class OpencodeSendDialog extends React.Component<
     return (
       <DialogContent>
         {this.renderIntro()}
-        <p>opencode could not be detected on this machine.</p>
+        <p>
+          {t('buildRun.detectFailedProvider', {
+            provider: this.providerLabel,
+          })}
+        </p>
       </DialogContent>
     )
   }
 
   private renderNotInstalled() {
-    const plan = planOpencodeInstall(process.platform)
+    const plan =
+      this.state.provider === 'codex'
+        ? planCodexInstall()
+        : planOpencodeInstall(process.platform)
+    const safetyKey =
+      this.state.provider === 'codex'
+        ? 'buildRun.codexInstallSafety'
+        : 'buildRun.opencodeInstallSafety'
     return (
       <DialogContent>
         {this.renderIntro()}
-        <p>
-          The opencode CLI is not installed. It can be installed now with this
-          command:
-        </p>
+        <p>{t('buildRun.notInstalledCli', { cli: this.cliName })}</p>
         <pre className="opencode-fix-command">{plan.label}</pre>
         <p className="opencode-fix-note">
           <Octicon symbol={octicons.shield} />
-          <span>
-            {OPENCODE_MIN.installNote} No remote install script is downloaded or
-            executed — only npm runs.
-          </span>
+          <span>{t(safetyKey)}</span>
         </p>
       </DialogContent>
     )
@@ -315,7 +408,7 @@ export class OpencodeSendDialog extends React.Component<
   private renderInstalling() {
     return (
       <DialogContent>
-        <p>Installing the opencode CLI…</p>
+        <p>{t('buildRun.installingCli', { cli: this.cliName })}</p>
         {this.renderLog()}
       </DialogContent>
     )
@@ -326,12 +419,17 @@ export class OpencodeSendDialog extends React.Component<
       <DialogContent>
         {this.renderIntro()}
         <p>
-          opencode is installed but has no provider configured, so it cannot run
-          yet.
+          {t('buildRun.authMissingProvider', {
+            provider: this.providerLabel,
+          })}
         </p>
         <p>
-          Open a terminal and run <code>opencode auth login</code> to configure
-          a provider, then re-check.
+          {t('buildRun.authCommandGuidance', {
+            command:
+              this.state.provider === 'codex'
+                ? 'codex login'
+                : 'opencode auth login',
+          })}
         </p>
       </DialogContent>
     )
@@ -342,7 +440,9 @@ export class OpencodeSendDialog extends React.Component<
     const { autoApprove, prompt, version } = this.state
     const autoApproveLabel = (
       <span className="opencode-fix-toggle-label">
-        {t('buildRun.sendAutoApproveLabel')}
+        {t('buildRun.autoApproveProvider', {
+          provider: this.providerLabel,
+        })}
       </span>
     )
     return (
@@ -353,7 +453,7 @@ export class OpencodeSendDialog extends React.Component<
             <dt>Repository</dt>
             <dd>
               {repository.name}
-              {version !== null ? ` · opencode ${version}` : ''}
+              {version !== null ? ` · ${this.cliName} ${version}` : ''}
             </dd>
           </div>
           <div>
@@ -362,8 +462,12 @@ export class OpencodeSendDialog extends React.Component<
           </div>
         </dl>
         <TextArea
-          label={t('buildRun.sendPromptLabel')}
-          placeholder={t('buildRun.sendPromptPlaceholder')}
+          label={t('buildRun.promptLabelProvider', {
+            provider: this.providerLabel,
+          })}
+          placeholder={t('buildRun.promptPlaceholderProvider', {
+            provider: this.providerLabel,
+          })}
           value={prompt}
           autoFocus={true}
           rows={5}
@@ -377,12 +481,20 @@ export class OpencodeSendDialog extends React.Component<
         {autoApprove ? (
           <p className="opencode-fix-warning" role="alert">
             <Octicon symbol={octicons.alert} />
-            <span>{t('buildRun.sendAutoApproveWarning')}</span>
+            <span>
+              {t('buildRun.autoApproveWarningProvider', {
+                provider: this.providerLabel,
+              })}
+            </span>
           </p>
         ) : (
           <p className="opencode-fix-note">
             <Octicon symbol={octicons.info} />
-            <span>{t('buildRun.sendAutoApproveNote')}</span>
+            <span>
+              {t('buildRun.approvalOnRequestProvider', {
+                provider: this.providerLabel,
+              })}
+            </span>
           </p>
         )}
       </DialogContent>
@@ -392,7 +504,11 @@ export class OpencodeSendDialog extends React.Component<
   private renderRunning() {
     return (
       <DialogContent>
-        <p>{t('buildRun.sendRunningTitle')}</p>
+        <p>
+          {t('buildRun.workingProvider', {
+            provider: this.providerLabel,
+          })}
+        </p>
         {this.renderLog()}
       </DialogContent>
     )
@@ -445,7 +561,9 @@ export class OpencodeSendDialog extends React.Component<
         return (
           <DialogFooter>
             <OkCancelButtonGroup
-              okButtonText="Install opencode"
+              okButtonText={t('buildRun.installCliAction', {
+                cli: this.cliName,
+              })}
               cancelButtonText="Cancel"
             />
           </DialogFooter>
@@ -463,7 +581,9 @@ export class OpencodeSendDialog extends React.Component<
         return (
           <DialogFooter>
             <OkCancelButtonGroup
-              okButtonText={t('buildRun.sendSubmit')}
+              okButtonText={t('buildRun.sendToProvider', {
+                provider: this.cliName,
+              })}
               okButtonDisabled={this.state.prompt.trim().length === 0}
               cancelButtonText="Cancel"
             />
@@ -483,7 +603,9 @@ export class OpencodeSendDialog extends React.Component<
       <Dialog
         id="opencode-send"
         className="opencode-fix-dialog"
-        title={t('buildRun.sendToOpencode')}
+        title={t('buildRun.sendToProvider', {
+          provider: this.providerLabel,
+        })}
         loading={isBusy}
         onSubmit={this.onSubmit}
         onDismissed={this.props.onDismissed}

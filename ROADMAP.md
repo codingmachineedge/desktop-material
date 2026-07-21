@@ -62,6 +62,23 @@ Windows x64 installer/portable-ZIP release workflow. macOS and Linux application
 runtimes and packages are outside the roadmap; non-Windows runners may still
 host platform-neutral repository automation.
 
+## 2026-07-21 maintenance — Codex CLI build repair — **Implementation complete; integration verification pending**
+
+- Failed Build & Run stages and free-form repository requests can use Codex or
+  OpenCode, with a provider choice persisted per repository.
+- Codex detection is shell-free. Noninteractive work uses bounded stdin context,
+  a workspace-write sandbox, explicit per-run approval policy, ephemeral state,
+  ignored user config, bounded streaming, and owned process-tree cancellation.
+- Installation and authentication stay explicit: the UI shows the official npm
+  package command and terminal login guidance, and never asks for a credential.
+- Agent completion never implies success. Desktop Material always reruns the
+  selected Build & Run profile and reports that result.
+- See the [local AI build-repair feature
+  guide](docs/features/integrations/local-ai-build-fix.md). Local focused and
+  TypeScript receipts are recorded in `HANDOFF.md`; default-branch integration,
+  packaged UI acceptance, CI, Pages, wiki publication, and release verification
+  remain pending.
+
 ## M24 — Guided sparse checkout — **Local acceptance complete; publication verification pending**
 
 - The sparse-checkout sheet keeps a three-step **Choose/Adjust/Restore → Review

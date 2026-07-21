@@ -60,6 +60,8 @@ interface IFakeDispatcherOptions {
   readonly runResult?: { phaseBefore: BuildRunViewPhase; ok: boolean }
   readonly runCalls?: IRunFixCall[]
   readonly installCalls?: { count: number }
+  readonly providerRunCalls?: Array<'codex' | 'opencode'>
+  readonly providerUpdates?: Array<'codex' | 'opencode'>
 }
 
 /** A Build & Run store stub reporting a fixed phase for the re-run check. */
@@ -75,11 +77,18 @@ function fakeStore(phase: BuildRunViewPhase): IOpencodeReRunObserver {
 function fakeDispatcher(options: IFakeDispatcherOptions): Dispatcher {
   return {
     detectOpencode: () => options.detect(),
+    detectBuildFixProvider: () => options.detect(),
     installOpencode: async () => {
       if (options.installCalls) {
         options.installCalls.count++
       }
       options.onInstall?.()
+      return { ok: true, code: 0 }
+    },
+    installBuildFixProvider: async () => {
+      if (options.installCalls) {
+        options.installCalls.count++
+      }
       return { ok: true, code: 0 }
     },
     runOpencodeFix: async (
@@ -102,10 +111,30 @@ function fakeDispatcher(options: IFakeDispatcherOptions): Dispatcher {
         run: { ok: result.ok },
       }
     },
+    runBuildFixProvider: async (
+      provider: 'codex' | 'opencode',
+      _repository: Repository,
+      request: IRunFixCall
+    ) => {
+      options.providerRunCalls?.push(provider)
+      options.runCalls?.push(request)
+      return { phaseBefore: 'failed', run: { ok: true } }
+    },
+    updateRepositoryBuildRunPreferences: async (
+      _repository: Repository,
+      preferences: { buildFixProvider?: 'codex' | 'opencode' }
+    ) => {
+      if (preferences.buildFixProvider) {
+        options.providerUpdates?.push(preferences.buildFixProvider)
+      }
+    },
   } as unknown as Dispatcher
 }
 
-function repository(opencodeAutoApprove = false) {
+function repository(
+  autoApprove = false,
+  buildFixProvider: 'codex' | 'opencode' = 'opencode'
+) {
   return new Repository(
     'C:/opencode-repo',
     1,
@@ -118,7 +147,9 @@ function repository(opencodeAutoApprove = false) {
     null,
     {
       ...defaultBuildRunPreferences,
-      opencodeAutoApprove,
+      buildFixProvider,
+      buildFixAutoApprove: autoApprove,
+      opencodeAutoApprove: autoApprove,
     }
   )
 }
@@ -192,6 +223,69 @@ describe('OpencodeFixDialog', () => {
       null
     )
     assert.equal(runCalls.length, 0)
+  })
+
+  it('offers the exact official install command when Codex is missing', async () => {
+    const installCalls = { count: 0 }
+    let detectCount = 0
+    const dispatcher = fakeDispatcher({
+      detect: async () => {
+        detectCount++
+        return detectCount === 1
+          ? { installed: false, version: null, authConfigured: false }
+          : { installed: true, version: '0.144.0', authConfigured: true }
+      },
+      installCalls,
+    })
+
+    renderDialog({ dispatcher, repository: repository(false, 'codex') })
+
+    await screen.findByText(/^npm install --global @openai\/codex$/i)
+    await screen.findByText(/official @openai\/codex npm package/i)
+    fireEvent.click(screen.getByRole('button', { name: /install codex/i }))
+
+    await waitFor(() => assert.equal(installCalls.count, 1))
+    await screen.findByRole('button', { name: /^run codex$/i })
+  })
+
+  it('guides Codex login without asking for a secret', async () => {
+    const providerRunCalls: Array<'codex' | 'opencode'> = []
+    const dispatcher = fakeDispatcher({
+      detect: async () => ({
+        installed: true,
+        version: '0.144.0',
+        authConfigured: false,
+      }),
+      providerRunCalls,
+    })
+
+    renderDialog({ dispatcher, repository: repository(false, 'codex') })
+
+    await screen.findByText(/codex login/i)
+    await screen.findByText(/never asks you to paste or store a secret/i)
+    assert.equal(screen.queryByRole('button', { name: /^run codex$/i }), null)
+    assert.equal(providerRunCalls.length, 0)
+  })
+
+  it('persists a Codex choice and launches the Codex provider path', async () => {
+    const providerRunCalls: Array<'codex' | 'opencode'> = []
+    const providerUpdates: Array<'codex' | 'opencode'> = []
+    const dispatcher = fakeDispatcher({
+      detect: installedAndAuthed,
+      providerRunCalls,
+      providerUpdates,
+    })
+    renderDialog({ dispatcher })
+
+    const picker = await screen.findByLabelText<HTMLSelectElement>(
+      /ai coding provider/i
+    )
+    fireEvent.change(picker, { target: { value: 'codex' } })
+    fireEvent.click(await screen.findByRole('button', { name: /^run codex$/i }))
+
+    await waitFor(() => assert.equal(providerRunCalls.length, 1))
+    assert.deepEqual(providerRunCalls, ['codex'])
+    assert.deepEqual(providerUpdates, ['codex'])
   })
 
   it('runs with auto-approve off by default and moves output to the build panel', async () => {

@@ -142,6 +142,57 @@ not start because this host has no `yarn` executable; no headless GUI capture is
 claimed. Integration must preserve the exact workflow filename and include the
 generator, workflow, runtime, tests, feature docs, wiki, Pages, roadmap, and this
 handoff together.
+## 2026-07-21 Codex CLI support for Build & Run repair
+
+Build & Run's existing OpenCode repair path now also supports the Codex CLI.
+The failed-build and free-form send dialogs expose the same provider selector,
+persist it per repository, and retain a separately gated per-run auto-approve
+choice. Settings exposes both preferences. New labels and guidance use English,
+playful Hong Kong Cantonese, and compact bilingual resources.
+
+The installed `codex-cli 0.144.0` help was inspected directly before the runner
+was written. Detection uses shell-free `codex --version` and `codex login
+status`. Execution uses the supported stdin form:
+
+```text
+codex --ask-for-approval <on-request|never> exec --sandbox workspace-write \
+  --ephemeral --ignore-user-config --color never -
+```
+
+A local parser dry run of that complete option prefix with `--help` exited 0;
+putting `--ask-for-approval` after `exec` exited 2. The exact root-option order
+is locked into the pure and runner tests.
+
+The child `cwd` is the repository root. Neither the repository path nor prompt
+enters argv. Failed-build output is capped at 4,000 characters, free-form input
+at 8,000 characters, captured detection output at 8,000 characters, and each
+streamed line at 16,000 characters. Both providers retain the existing bounded
+dialog/panel buffers, abort-driven process-tree teardown, and application-owned
+shutdown barrier. Codex never receives the dangerous sandbox-bypass flag.
+
+Missing Codex installs show `npm install --global @openai/codex` behind explicit
+consent. Missing authentication points to `codex login` in a terminal and
+states that Desktop Material does not request or store secrets. Agent completion
+never establishes success: the dispatcher still runs the selected Build & Run
+profile again unless the operation was cancelled.
+
+Verification from the isolated `codex/codex-build-fix` worktree based on
+`dce7b9417f30568171d37033b27fb176f92c8dd9`:
+
+- the focused Codex/OpenCode pure, install, runner, localization, IPC, shutdown,
+  settings, panel, failed-build-dialog, and send-dialog suite passed **89/89**;
+- root TypeScript `--noEmit` passed;
+- script TypeScript compilation passed;
+- the complete source ESLint and ESLint/Prettier compatibility gate passed;
+- changed-file Prettier and `git diff --check` passed; and
+- the new categorized feature guide and integrations index passed markdownlint.
+
+The README, categorized feature documentation, roadmap, local wiki sources,
+Developer Guide, User Guide, and Pages source now describe the feature and its
+safety/failure contract. A packaged production UI run, screenshot acceptance,
+default-branch integration, remote CI, wiki/Pages publication, and release proof
+remain pending. This branch is intentionally committed without push or merge so
+the coordinating agent can integrate it with the other July 21 worktrees.
 
 ## 2026-07-21 Cheap-LFS recovery, output controls, and portable-ZIP checkpoint
 

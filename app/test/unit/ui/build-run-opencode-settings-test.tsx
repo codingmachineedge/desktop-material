@@ -16,6 +16,8 @@ describe('Build & Run opencode preferences', () => {
   it('defaults the offer on and auto-approve (yolo) off', () => {
     assert.equal(defaultBuildRunPreferences.offerOpencodeAutoFix, true)
     assert.equal(defaultBuildRunPreferences.opencodeAutoApprove, false)
+    assert.equal(defaultBuildRunPreferences.buildFixAutoApprove, false)
+    assert.equal(defaultBuildRunPreferences.buildFixProvider, 'opencode')
   })
 
   it('toggles offerOpencodeAutoFix through the settings checkbox', () => {
@@ -60,8 +62,29 @@ describe('Build & Run opencode preferences', () => {
 
     assert.equal(changes.length, 1)
     assert.equal(changes[0].opencodeAutoApprove, true)
+    assert.equal(changes[0].buildFixAutoApprove, true)
     // The yolo toggle must not disturb the offer, which defaults on.
     assert.equal(changes[0].offerOpencodeAutoFix, true)
+  })
+
+  it('persists the selected Codex provider without changing consent', () => {
+    const changes: IBuildRunPreferences[] = []
+    render(
+      <BuildRunSettings
+        repository={repository()}
+        preferences={defaultBuildRunPreferences}
+        onPreferencesChanged={p => changes.push(p)}
+      />
+    )
+
+    fireEvent.change(
+      screen.getByLabelText<HTMLSelectElement>(/preferred build-fix provider/i),
+      { target: { value: 'codex' } }
+    )
+
+    assert.equal(changes.length, 1)
+    assert.equal(changes[0].buildFixProvider, 'codex')
+    assert.equal(changes[0].buildFixAutoApprove, false)
   })
 
   it('renders both checkboxes reflecting the persisted preferences', () => {
@@ -71,6 +94,7 @@ describe('Build & Run opencode preferences', () => {
         preferences={{
           ...defaultBuildRunPreferences,
           offerOpencodeAutoFix: true,
+          buildFixAutoApprove: true,
           opencodeAutoApprove: true,
         }}
         onPreferencesChanged={() => {}}

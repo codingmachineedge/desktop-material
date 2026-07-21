@@ -768,6 +768,10 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+
+      .build-fix-provider-select {
+        max-width: 320px;
+      }
     }
 
     .build-run-toggle-label {

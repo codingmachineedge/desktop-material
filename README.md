@@ -197,7 +197,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 - Auto-detects bounded, nested project roots and runnable profiles for Node/npm/yarn/pnpm/bun, Deno, Rust, Go, .NET, Python, Java/Kotlin, PHP, Ruby, Swift, Dart/Flutter, Elixir, Scala, Haskell, Zig, Make, and CMake; each choice shows its project folder so similarly named profiles are unambiguous
 - Installs dependencies, builds, and runs the selected profile in one action, streaming output to an MD3 log panel with a one-shot **Scroll to bottom** action, persisted auto-scroll that pauses when the user reads history, and persisted display-only long-line truncation that leaves the complete text available to **Copy all output**
 - Auto-ignores build outputs (applies the matching `.gitignore` template + an artifacts section) before building
-- Bounded auto-fix on failure, a per-repo Build & Run settings tab, bounded discovery of nested projects, optional single-prompt UAC pre-elevation, and English, playful Hong Kong Cantonese, or bilingual output-control labels
+- Bounded auto-fix on failure through a per-repository choice of Codex CLI or OpenCode, stdin-only prompts, explicit install/auth/auto-approve consent, process-tree cancellation, and a mandatory Build & Run verification rerun; plus a per-repo settings tab, bounded nested-project discovery, optional single-prompt UAC pre-elevation, and English, playful Hong Kong Cantonese, or bilingual labels
 
 **Automation and GitHub Actions**
 - Configure scheduled commit-and-push and pull globally, override them per account or repository, and rely on safety guards that skip unsafe repositories and preserve draft commit messages

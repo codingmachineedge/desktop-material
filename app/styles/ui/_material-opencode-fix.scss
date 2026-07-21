@@ -4,7 +4,8 @@
 // log + long working-directory paths wrap or scroll inside their own box rather
 // than forcing the sheet wider.
 
-dialog#opencode-fix {
+dialog#opencode-fix,
+dialog#opencode-send {
   width: min(560px, calc(100vw - var(--spacing-double)));
   max-width: 100%;
 
@@ -15,6 +16,11 @@ dialog#opencode-fix {
   .opencode-fix-intro {
     color: var(--md-sys-color-on-surface-variant);
     margin-top: 0;
+  }
+
+  .build-fix-provider-select {
+    margin-bottom: 12px;
+    max-width: 280px;
   }
 
   // The exact install command — a copyable, wrapping code block.

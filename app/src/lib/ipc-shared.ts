@@ -32,6 +32,15 @@ import {
   IOpencodeStatus,
 } from './build-run/opencode'
 import {
+  ICodexInstallRequest,
+  ICodexInstallResult,
+  ICodexLogEvent,
+  ICodexRunFixRequest,
+  ICodexRunPromptRequest,
+  ICodexRunResult,
+  ICodexStatus,
+} from './build-run/codex'
+import {
   AgentCommandResult,
   IAgentCommandEnvelope,
   IAgentServerConfiguration,
@@ -174,6 +183,7 @@ export type RequestChannels = {
   'build-run-log': (event: IBuildRunLogEvent) => void
   'build-run-state': (event: IBuildRunStateEvent) => void
   'opencode-log': (event: IOpencodeLogEvent) => void
+  'codex-log': (event: ICodexLogEvent) => void
   'cli-command-output': (event: ICLICommandOutputEvent) => void
   'cli-command-state': (event: ICLICommandStateEvent) => void
 }
@@ -288,6 +298,15 @@ export type RequestResponseChannels = {
     request: IOpencodeRunPromptRequest
   ) => Promise<IOpencodeRunResult>
   'opencode-cancel': (operationId: string) => Promise<void>
+  'codex-detect': () => Promise<ICodexStatus>
+  'codex-install': (
+    request: ICodexInstallRequest
+  ) => Promise<ICodexInstallResult>
+  'codex-run-fix': (request: ICodexRunFixRequest) => Promise<ICodexRunResult>
+  'codex-run-prompt': (
+    request: ICodexRunPromptRequest
+  ) => Promise<ICodexRunResult>
+  'codex-cancel': (operationId: string) => Promise<void>
   'get-cli-workbench-runtime': () => Promise<ICLIWorkbenchRuntime>
   'start-cli-command': (request: ICLIWorkbenchOperationRequest) => Promise<void>
   'cancel-cli-command': (id: string) => Promise<boolean>

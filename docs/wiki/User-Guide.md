@@ -52,6 +52,7 @@ catalogued function or state owns one distinct screenshot rather than borrowing 
 - [GitHub API Explorer](#github-api-explorer)
 - [One-click commit & push](#one-click-commit--push)
 - [Build & Run output controls](#build--run-output-controls)
+- [Repair a failed build with Codex or OpenCode](#repair-a-failed-build-with-codex-or-opencode)
 - [Notification centre](#notification-centre)
 - [GitHub Actions panel](#github-actions-panel)
 - [Repository Releases](#repository-releases)
@@ -856,6 +857,33 @@ navigation/display choices in its header:
 
 Auto-scroll and truncation persist locally when the panel or app is reopened. Their pressed states
 and accessible names follow English, playful Hong Kong Cantonese, and bilingual language mode.
+
+---
+
+## Repair a failed build with Codex or OpenCode
+
+When Build & Run fails, choose **Fix with Codex** or **Fix with opencode**. The
+launch sheet lets you switch between the two local CLIs; that choice is saved
+for this repository and is also available under **Repository settings → Build &
+Run**. **Send to Codex/OpenCode** uses the same selector for a bounded free-form
+repository request.
+
+Nothing starts when the button merely appears. If the selected CLI is absent,
+Desktop Material shows its exact npm install command and waits for consent. If
+it is not signed in, open a terminal and run the displayed `codex login` or
+`opencode auth login` command. Never paste a key, password, or token into the
+dialog.
+
+Auto-approve is a separate per-run choice and defaults off. With it off, an
+agent can stop when an action needs approval. With it on, Codex still retains
+its repository workspace-write sandbox and OpenCode retains its repository
+permission block. Both agents stream bounded output to Build & Run, and **Stop**
+terminates the owned process tree.
+
+After the agent exits, Desktop Material always starts Build & Run again. Trust
+the rerun result—not an agent's message or exit code—to decide whether the
+repair worked. Review Changes after cancellation or a failed rerun because
+partial edits may remain.
 
 ---
 

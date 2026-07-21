@@ -249,6 +249,12 @@ import {
   runOpencodePrompt,
   cancelOpencode,
   onOpencodeLog,
+  detectCodex,
+  installCodex,
+  runCodexFix,
+  runCodexPrompt,
+  cancelCodex,
+  onCodexLog,
 } from '../main-process-proxy'
 import {
   IOpencodeInstallResult,
@@ -256,6 +262,7 @@ import {
   IOpencodeRunResult,
   IOpencodeStatus,
 } from '../../lib/build-run/opencode'
+import { BuildFixProvider, ICodexStatus } from '../../lib/build-run/codex'
 import { BuildRunViewPhase } from '../../lib/stores/build-run-store'
 import { resolveWithin } from '../../lib/path'
 import { CherryPickResult } from '../../lib/git/cherry-pick'
@@ -3672,14 +3679,17 @@ export class Dispatcher {
 
   /**
    * Cancel whatever Build & Run work is in flight for a repository: the build
-   * process itself and/or a detached "Fix with opencode" run (which is not a
+   * process itself and/or a detached local-agent run (which is not a
    * build run, so it has its own operation id rather than an `activeRunId`).
    */
   public async cancelBuildRun(repository: Repository): Promise<void> {
-    const { activeRunId, opencodeOperationId } =
+    const { activeRunId, opencodeOperationId, buildFixProvider } =
       this.buildRunStore.getStateForRepository(repository.id)
     if (opencodeOperationId !== null) {
-      await cancelOpencode(opencodeOperationId)
+      await this.cancelBuildFixProvider(
+        buildFixProvider ?? 'opencode',
+        opencodeOperationId
+      )
     }
     if (activeRunId !== null) {
       await cancelBuildRun(activeRunId)
@@ -3691,6 +3701,13 @@ export class Dispatcher {
     return detectOpencode()
   }
 
+  /** Probe the chosen local agent without using a shell. */
+  public detectBuildFixProvider(
+    provider: BuildFixProvider
+  ): Promise<IOpencodeStatus | ICodexStatus> {
+    return provider === 'codex' ? detectCodex() : detectOpencode()
+  }
+
   /**
    * Install the opencode CLI, streaming its output into the repository's Build &
    * Run log panel and to `onLog`. Cancellable via `signal`.
@@ -3700,12 +3717,30 @@ export class Dispatcher {
     onLog: (line: IOpencodeLogEvent) => void,
     signal?: AbortSignal
   ): Promise<IOpencodeInstallResult> {
+    return this.installBuildFixProvider('opencode', repository, onLog, signal)
+  }
+
+  /** Install the selected CLI after explicit dialog consent. */
+  public async installBuildFixProvider(
+    provider: BuildFixProvider,
+    repository: Repository,
+    onLog: (line: IOpencodeLogEvent) => void,
+    signal?: AbortSignal
+  ): Promise<IOpencodeInstallResult> {
     const operationId = randomUUID()
-    const dispose = this.pipeOpencodeLog(repository, operationId, onLog)
-    const onAbort = () => void cancelOpencode(operationId)
+    const dispose = this.pipeBuildFixLog(
+      provider,
+      repository,
+      operationId,
+      onLog
+    )
+    const onAbort = () =>
+      void this.cancelBuildFixProvider(provider, operationId)
     signal?.addEventListener('abort', onAbort, { once: true })
     try {
-      return await installOpencode({ operationId })
+      return provider === 'codex'
+        ? await installCodex({ operationId })
+        : await installOpencode({ operationId })
     } finally {
       dispose()
       signal?.removeEventListener('abort', onAbort)
@@ -3736,6 +3771,36 @@ export class Dispatcher {
     readonly phaseBefore: BuildRunViewPhase
     readonly run: IOpencodeRunResult
   }> {
+    return this.runBuildFixProvider(
+      'opencode',
+      repository,
+      request,
+      onLog,
+      signal
+    )
+  }
+
+  /**
+   * Run the selected agent and then verify with a mandatory Build & Run rerun.
+   * An agent exit code is never treated as evidence that the build was fixed.
+   */
+  public async runBuildFixProvider(
+    provider: BuildFixProvider,
+    repository: Repository,
+    request: {
+      readonly stageKind: BuildStageKind
+      readonly exitCode: number
+      readonly tailText: string
+      readonly cwd: string
+      readonly autoApprove: boolean
+      readonly model?: string
+    },
+    onLog: (line: IOpencodeLogEvent) => void,
+    signal?: AbortSignal
+  ): Promise<{
+    readonly phaseBefore: BuildRunViewPhase
+    readonly run: IOpencodeRunResult
+  }> {
     if (repository instanceof SubmoduleRepository) {
       throw new Error(
         'Automated code execution is unavailable while a submodule is open temporarily.'
@@ -3745,17 +3810,29 @@ export class Dispatcher {
     const phaseBefore = this.buildRunStore.getStateForRepository(
       repository.id
     ).phase
-    const dispose = this.pipeOpencodeLog(repository, operationId, onLog)
-    const onAbort = () => void cancelOpencode(operationId)
+    const dispose = this.pipeBuildFixLog(
+      provider,
+      repository,
+      operationId,
+      onLog
+    )
+    const onAbort = () =>
+      void this.cancelBuildFixProvider(provider, operationId)
     signal?.addEventListener('abort', onAbort, { once: true })
     // Surface a live "Fixing with OpenCode…" status while the detached agent
     // works; the build phase stays at its pre-fix terminal value until the
     // re-run below supersedes it. Recording the operation id lets Stop reach
     // the opencode process.
-    this.buildRunStore.setOpencodeRunning(repository.id, true, operationId)
+    this.buildRunStore.setOpencodeRunning(
+      repository.id,
+      true,
+      operationId,
+      provider
+    )
     let run: IOpencodeRunResult
     try {
-      run = await runOpencodeFix({
+      const invokeRun = provider === 'codex' ? runCodexFix : runOpencodeFix
+      run = await invokeRun({
         operationId,
         repoPath: repository.path,
         cwd: request.cwd,
@@ -3800,21 +3877,56 @@ export class Dispatcher {
     onLog: (line: IOpencodeLogEvent) => void,
     signal?: AbortSignal
   ): Promise<IOpencodeRunResult> {
+    return this.runBuildFixPrompt(
+      'opencode',
+      repository,
+      request,
+      onLog,
+      signal
+    )
+  }
+
+  /** Run a bounded free-form request, followed by the same mandatory rerun. */
+  public async runBuildFixPrompt(
+    provider: BuildFixProvider,
+    repository: Repository,
+    request: {
+      readonly prompt: string
+      readonly cwd: string
+      readonly autoApprove: boolean
+      readonly model?: string
+    },
+    onLog: (line: IOpencodeLogEvent) => void,
+    signal?: AbortSignal
+  ): Promise<IOpencodeRunResult> {
     if (repository instanceof SubmoduleRepository) {
       throw new Error(
         'Automated code execution is unavailable while a submodule is open temporarily.'
       )
     }
     const operationId = randomUUID()
-    const dispose = this.pipeOpencodeLog(repository, operationId, onLog)
-    const onAbort = () => void cancelOpencode(operationId)
+    const dispose = this.pipeBuildFixLog(
+      provider,
+      repository,
+      operationId,
+      onLog
+    )
+    const onAbort = () =>
+      void this.cancelBuildFixProvider(provider, operationId)
     signal?.addEventListener('abort', onAbort, { once: true })
     // Surface a live "Running OpenCode…" status and record the operation id so
     // Stop can reach the opencode process (same lifecycle as the fix flow).
-    this.buildRunStore.setOpencodeRunning(repository.id, true, operationId)
+    this.buildRunStore.setOpencodeRunning(
+      repository.id,
+      true,
+      operationId,
+      provider
+    )
     let run: IOpencodeRunResult
     try {
-      run = await runOpencodePrompt({
+      const invokeRun =
+        provider === 'codex' ? runCodexPrompt : runOpencodePrompt
+      run = await invokeRun({
         operationId,
         repoPath: repository.path,
         cwd: request.cwd,
@@ -3841,17 +3953,28 @@ export class Dispatcher {
     return cancelOpencode(operationId)
   }
 
+  private cancelBuildFixProvider(
+    provider: BuildFixProvider,
+    operationId: string
+  ): Promise<void> {
+    return provider === 'codex'
+      ? cancelCodex(operationId)
+      : cancelOpencode(operationId)
+  }
+
   /**
    * Subscribe to streamed opencode log lines for one operation, forwarding them
    * to `onLog` and into the repository's Build & Run log panel. Returns a
    * disposer that removes the subscription.
    */
-  private pipeOpencodeLog(
+  private pipeBuildFixLog(
+    provider: BuildFixProvider,
     repository: Repository,
     operationId: string,
     onLog: (line: IOpencodeLogEvent) => void
   ): () => void {
-    return onOpencodeLog((_event, line) => {
+    const subscribe = provider === 'codex' ? onCodexLog : onOpencodeLog
+    return subscribe((_event, line) => {
       if (line.operationId !== operationId) {
         return
       }

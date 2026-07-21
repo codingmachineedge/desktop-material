@@ -46,7 +46,10 @@ function fakeStore(state: IRepositoryBuildRunState): BuildRunStore {
   } as unknown as BuildRunStore
 }
 
-function repository(offerOpencodeAutoFix: boolean) {
+function repository(
+  offerOpencodeAutoFix: boolean,
+  buildFixProvider: 'codex' | 'opencode' = 'opencode'
+) {
   return new Repository(
     'C:/opencode-repo',
     1,
@@ -57,7 +60,11 @@ function repository(offerOpencodeAutoFix: boolean) {
     false,
     undefined,
     null,
-    { ...defaultBuildRunPreferences, offerOpencodeAutoFix }
+    {
+      ...defaultBuildRunPreferences,
+      offerOpencodeAutoFix,
+      buildFixProvider,
+    }
   )
 }
 
@@ -105,6 +112,19 @@ describe('BuildRunPanel — Fix with opencode', () => {
     assert.equal(popup.failure.stageKind, 'build')
     assert.equal(popup.failure.exitCode, 2)
     assert.equal(popup.failure.cwd, 'C:/opencode-repo')
+  })
+
+  it('reflects a persisted Codex preference in both launch buttons', () => {
+    render(
+      <BuildRunPanel
+        repository={repository(true, 'codex')}
+        dispatcher={{} as Dispatcher}
+        buildRunStore={fakeStore(failedState())}
+      />
+    )
+
+    assert.ok(screen.getByRole('button', { name: /fix with codex/i }))
+    assert.ok(screen.getByRole('button', { name: /send to codex/i }))
   })
 })
 

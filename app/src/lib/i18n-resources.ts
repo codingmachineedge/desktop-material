@@ -1194,6 +1194,36 @@ export type TranslationKey =
   | 'buildRun.sendAutoApproveWarning'
   | 'buildRun.sendAutoApproveNote'
   | 'buildRun.sendRunningTitle'
+  | 'buildRun.providerLabel'
+  | 'buildRun.fixingWithProvider'
+  | 'buildRun.fixWithProvider'
+  | 'buildRun.sendToProvider'
+  | 'buildRun.fixIntroProvider'
+  | 'buildRun.sendIntroProvider'
+  | 'buildRun.checkingCli'
+  | 'buildRun.detectFailedProvider'
+  | 'buildRun.notInstalledCli'
+  | 'buildRun.installingCli'
+  | 'buildRun.authMissingProvider'
+  | 'buildRun.authCommandGuidance'
+  | 'buildRun.promptLabelProvider'
+  | 'buildRun.promptPlaceholderProvider'
+  | 'buildRun.autoApproveProvider'
+  | 'buildRun.autoApproveWarningProvider'
+  | 'buildRun.approvalOnRequestProvider'
+  | 'buildRun.diagnosingProvider'
+  | 'buildRun.verifyingProvider'
+  | 'buildRun.workingProvider'
+  | 'buildRun.preferredProvider'
+  | 'buildRun.offerAgents'
+  | 'buildRun.autoApproveRepositoryProvider'
+  | 'buildRun.installCliAction'
+  | 'buildRun.runCliAction'
+  | 'buildRun.runCliAgainAction'
+  | 'buildRun.offerAgentsHelp'
+  | 'buildRun.autoApproveRepositoryHelp'
+  | 'buildRun.codexInstallSafety'
+  | 'buildRun.opencodeInstallSafety'
   | 'cheapLfs.files.one'
   | 'cheapLfs.files.many'
   | 'cheapLfs.managerRail'
@@ -2677,6 +2707,53 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'buildRun.sendAutoApproveNote':
     'opencode will ask before editing files or running commands. Turn on auto-approve above to let it work unattended in this repository.',
   'buildRun.sendRunningTitle': 'opencode is working on your request…',
+  'buildRun.providerLabel': 'AI coding provider',
+  'buildRun.fixingWithProvider': 'Fixing with {provider}…',
+  'buildRun.fixWithProvider': 'Fix with {provider}',
+  'buildRun.sendToProvider': 'Send to {provider}',
+  'buildRun.fixIntroProvider':
+    '{provider} is a local AI coding agent. It receives bounded build-failure context and can try to fix this repository on your machine.',
+  'buildRun.sendIntroProvider':
+    '{provider} is a local AI coding agent. Type a bounded request and it will work in this repository on your machine.',
+  'buildRun.checkingCli': 'Checking for the {cli} CLI…',
+  'buildRun.detectFailedProvider':
+    '{provider} could not be detected on this machine.',
+  'buildRun.notInstalledCli':
+    'The {cli} CLI is not installed. It can be installed now with this command:',
+  'buildRun.installingCli': 'Installing the {cli} CLI…',
+  'buildRun.authMissingProvider':
+    '{provider} is installed but is not authenticated, so it cannot run yet.',
+  'buildRun.authCommandGuidance':
+    'Open a terminal and run {command}, then re-check. Desktop Material never asks you to paste or store a secret here.',
+  'buildRun.promptLabelProvider': 'What should {provider} do?',
+  'buildRun.promptPlaceholderProvider':
+    'Describe what you want {provider} to do in this repository…',
+  'buildRun.autoApproveProvider':
+    "Auto-approve {provider}'s edits and commands for this run",
+  'buildRun.autoApproveWarningProvider':
+    '{provider} may edit files and run commands here without pausing. Codex keeps its workspace-write sandbox; OpenCode keeps its repository permission block.',
+  'buildRun.approvalOnRequestProvider':
+    '{provider} uses approval-on-request. This detached run may stop rather than perform an action that needs approval.',
+  'buildRun.diagnosingProvider':
+    '{provider} is diagnosing and fixing the build…',
+  'buildRun.verifyingProvider':
+    '{provider} finished. Re-running Build & Run to verify the build rather than trusting the agent exit status…',
+  'buildRun.workingProvider': '{provider} is working on your request…',
+  'buildRun.preferredProvider': 'Preferred build-fix provider',
+  'buildRun.offerAgents': 'Offer opencode to fix build errors, or use Codex',
+  'buildRun.autoApproveRepositoryProvider':
+    'Auto-approve {provider} in this repository',
+  'buildRun.installCliAction': 'Install {cli}',
+  'buildRun.runCliAction': 'Run {cli}',
+  'buildRun.runCliAgainAction': 'Run {cli} again',
+  'buildRun.offerAgentsHelp':
+    'When a run fails, offer OpenCode or Codex to diagnose and fix the errors. Nothing runs until you choose a provider and approve the launch dialog.',
+  'buildRun.autoApproveRepositoryHelp':
+    'Runs {provider} in auto-approve mode, applying repository-scoped edits and commands without pausing. Codex retains its workspace-write sandbox; OpenCode retains its repository permission block. Leave this off unless you trust the selected agent to work unattended.',
+  'buildRun.codexInstallSafety':
+    'Installs the official @openai/codex npm package globally. Desktop Material never asks for or stores your OpenAI credentials.',
+  'buildRun.opencodeInstallSafety':
+    'Installs OpenCode using its official npm package. Desktop Material never asks for or stores your OpenCode credentials.',
   'cheapLfs.files.one': '{count} large file',
   'cheapLfs.files.many': '{count} large files',
   'cheapLfs.managerRail': 'Large files',
@@ -4034,6 +4111,48 @@ export const cantoneseTranslations: Readonly<
   'buildRun.sendAutoApproveNote':
     'opencode 改檔案或者行指令之前會問你。撳上面嗰個自動批准，佢就可以喺呢個 repo 度自己搞掂。',
   'buildRun.sendRunningTitle': 'opencode 幫緊你搞緊個要求…',
+  'buildRun.providerLabel': 'AI 寫程式助手',
+  'buildRun.fixingWithProvider': '{provider} 執緊個 build…',
+  'buildRun.fixWithProvider': '用 {provider} 修正',
+  'buildRun.sendToProvider': '傳去 {provider}',
+  'buildRun.fixIntroProvider':
+    '{provider} 係本機 AI 寫程式助手。佢只會收到有限長度嘅 build 失敗資料，然後喺你部機度試修正呢個 repo。',
+  'buildRun.sendIntroProvider':
+    '{provider} 係本機 AI 寫程式助手。打低有限長度嘅要求，佢就會喺你部機同呢個 repo 度做。',
+  'buildRun.checkingCli': '搵緊 {cli} CLI…',
+  'buildRun.detectFailedProvider': '呢部機搵唔到 {provider}。',
+  'buildRun.notInstalledCli': '未裝 {cli} CLI。你可以確認後用以下指令安裝：',
+  'buildRun.installingCli': '裝緊 {cli} CLI…',
+  'buildRun.authMissingProvider':
+    '{provider} 已經裝好，但未登入，所以暫時未行得。',
+  'buildRun.authCommandGuidance':
+    '請開 terminal 行 {command}，之後再檢查。Desktop Material 唔會叫你喺呢度貼出或儲存秘密資料。',
+  'buildRun.promptLabelProvider': '想 {provider} 做啲乜？',
+  'buildRun.promptPlaceholderProvider':
+    '講低想 {provider} 喺呢個 repo 度做啲乜…',
+  'buildRun.autoApproveProvider': '呢次自動批准 {provider} 改檔案同行指令',
+  'buildRun.autoApproveWarningProvider':
+    '{provider} 可以唔停低問你就喺呢度改檔案同行指令。Codex 仍然受 workspace-write sandbox 限制；OpenCode 仍然受 repo 權限設定限制。',
+  'buildRun.approvalOnRequestProvider':
+    '{provider} 會按需要要求批准。呢個背景工作遇到要批准嘅動作時，可能會停低而唔係照做。',
+  'buildRun.diagnosingProvider': '{provider} 搵緊問題兼修緊個 build…',
+  'buildRun.verifyingProvider':
+    '{provider} 做完喇。依家重新行 Build & Run 驗證，唔會淨係信 AI 個結束狀態…',
+  'buildRun.workingProvider': '{provider} 幫緊你搞個要求…',
+  'buildRun.preferredProvider': '預設 build 修正助手',
+  'buildRun.offerAgents': 'Build 出錯時提供 OpenCode 或 Codex 修正',
+  'buildRun.autoApproveRepositoryProvider': '喺呢個 repo 自動批准 {provider}',
+  'buildRun.installCliAction': '安裝 {cli}',
+  'buildRun.runCliAction': '執行 {cli}',
+  'buildRun.runCliAgainAction': '再執行 {cli}',
+  'buildRun.offerAgentsHelp':
+    'Build 出錯時，可以畀 OpenCode 或 Codex 搵問題兼修正。你揀好助手、再喺啟動視窗批准之前，乜都唔會自動行。',
+  'buildRun.autoApproveRepositoryHelp':
+    '{provider} 會用自動批准模式，喺呢個 repo 改檔案同行指令，唔會中途停低。Codex 仍然受 workspace-write sandbox 限制；OpenCode 仍然受 repo 權限設定限制。除非你信任個助手可以自己做，否則請保持關閉。',
+  'buildRun.codexInstallSafety':
+    '會用 npm 全域安裝 OpenAI 官方嘅 @openai/codex 套件。Desktop Material 唔會問你攞、亦唔會儲存 OpenAI 登入資料。',
+  'buildRun.opencodeInstallSafety':
+    '會用 OpenCode 官方 npm 套件安裝 OpenCode。Desktop Material 唔會問你攞、亦唔會儲存 OpenCode 登入資料。',
   'cheapLfs.files.one': '{count} 個大檔案',
   'cheapLfs.files.many': '{count} 個大檔案',
   'cheapLfs.managerRail': '大檔案',

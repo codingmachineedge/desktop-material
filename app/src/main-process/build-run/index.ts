@@ -1,9 +1,11 @@
 import { buildRunner } from './runner'
 import { registerOpencodeIpc } from './opencode-runner'
+import { registerCodexIpc } from './codex-runner'
 import * as ipcMain from '../ipc-main'
 
 export { BuildRunner, buildRunner } from './runner'
 export { OpencodeRunner, opencodeRunner } from './opencode-runner'
+export { CodexRunner, codexRunner } from './codex-runner'
 export { killTree } from './kill-tree'
 
 /**
@@ -23,4 +25,5 @@ export function registerBuildRunIpc(): void {
   })
 
   registerOpencodeIpc()
+  registerCodexIpc()
 }

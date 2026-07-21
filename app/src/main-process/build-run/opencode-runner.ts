@@ -36,8 +36,11 @@ import { killTreeAndWait } from './kill-tree'
 /** Trailing characters of detection output kept for parsing. */
 const DETECT_OUTPUT_CAP = 8000
 
+/** Longest individual agent output line retained or sent across IPC. */
+const STREAM_LINE_CAP = 16000
+
 /** A line sink for streamed opencode output. */
-type OnLog = (stream: BuildRunLogStream, text: string) => void
+export type OnAgentLog = (stream: BuildRunLogStream, text: string) => void
 
 /** Parameters for a single opencode fix run (prompt already composed). */
 export interface IOpencodeFixRun {
@@ -80,7 +83,7 @@ async function resolveSpawn(
 }
 
 /** The outcome of running a spawned opencode-family process to completion. */
-interface IProcessResult {
+export interface IAgentProcessResult {
   readonly code: number
   readonly output: string
   readonly spawnError: boolean
@@ -88,7 +91,7 @@ interface IProcessResult {
 
 export class OpencodeRunner {
   /** Live children, tracked so shutdown can tear every one down. */
-  private readonly children = new Set<ChildProcessWithoutNullStreams>()
+  protected readonly children = new Set<ChildProcessWithoutNullStreams>()
 
   /**
    * Probe the host for a usable opencode install. Runs `opencode --version` and
@@ -119,7 +122,7 @@ export class OpencodeRunner {
    */
   public async install(
     plan: IOpencodeInstallPlan,
-    onLog: OnLog,
+    onLog: OnAgentLog,
     signal: AbortSignal,
     env: Record<string, string> = resolveRunEnv()
   ): Promise<IOpencodeInstallResult> {
@@ -146,7 +149,7 @@ export class OpencodeRunner {
    */
   public async runFix(
     run: IOpencodeFixRun,
-    onLog: OnLog,
+    onLog: OnAgentLog,
     signal: AbortSignal,
     env: Record<string, string> = resolveRunEnv()
   ): Promise<IOpencodeRunResult> {
@@ -202,11 +205,11 @@ export class OpencodeRunner {
   }
 
   /** Spawn a process and capture bounded, non-streamed output for detection. */
-  private capture(
+  protected capture(
     exe: string,
     args: ReadonlyArray<string>,
     env: Record<string, string>
-  ): Promise<IProcessResult> {
+  ): Promise<IAgentProcessResult> {
     const noop = () => {}
     const controller = new AbortController()
     return this.stream(exe, args, env, undefined, null, noop, controller.signal)
@@ -218,16 +221,16 @@ export class OpencodeRunner {
    * `stdin` (when provided) and closes it, kills the tree on `signal` abort, and
    * resolves once the process closes.
    */
-  private stream(
+  protected stream(
     exe: string,
     args: ReadonlyArray<string>,
     env: Record<string, string>,
     cwd: string | undefined,
     stdin: string | null,
-    onLog: OnLog,
+    onLog: OnAgentLog,
     signal: AbortSignal
-  ): Promise<IProcessResult> {
-    return new Promise<IProcessResult>(resolve => {
+  ): Promise<IAgentProcessResult> {
+    return new Promise<IAgentProcessResult>(resolve => {
       if (signal.aborted) {
         resolve({ code: -1, output: '', spawnError: false })
         return
@@ -279,9 +282,20 @@ export class OpencodeRunner {
           buffers[name] += text.replace(/\r\n/g, '\n')
           let idx = buffers[name].indexOf('\n')
           while (idx !== -1) {
-            onLog(name, buffers[name].slice(0, idx))
+            const line = buffers[name].slice(0, idx)
+            onLog(
+              name,
+              line.length > STREAM_LINE_CAP
+                ? `…${line.slice(-STREAM_LINE_CAP)}`
+                : line
+            )
             buffers[name] = buffers[name].slice(idx + 1)
             idx = buffers[name].indexOf('\n')
+          }
+          // A child can stream forever without a newline. Keep only a bounded
+          // tail so malformed output cannot grow the main process indefinitely.
+          if (buffers[name].length > STREAM_LINE_CAP) {
+            buffers[name] = buffers[name].slice(-STREAM_LINE_CAP)
           }
         }
         child.stdout.on('data', onData('stdout'))
@@ -308,7 +322,7 @@ export class OpencodeRunner {
           this.children.delete(child)
           for (const name of ['stdout', 'stderr'] as const) {
             if (buffers[name].length > 0) {
-              onLog(name, buffers[name])
+              onLog(name, buffers[name].slice(-STREAM_LINE_CAP))
             }
           }
           resolve({ code, output, spawnError })
@@ -339,7 +353,7 @@ function parseVersion(output: string): string | null {
  * doesn't announce an empty state as "configured". Heuristic by necessity, but a
  * false negative only prompts the user to run `opencode auth login`.
  */
-function isAuthConfigured(result: IProcessResult): boolean {
+function isAuthConfigured(result: IAgentProcessResult): boolean {
   if (result.spawnError || result.code !== 0) {
     return false
   }

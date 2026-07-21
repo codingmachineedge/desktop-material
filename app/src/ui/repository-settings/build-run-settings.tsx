@@ -1,7 +1,10 @@
 import * as React from 'react'
 import { DialogContent } from '../dialog'
 import { Repository } from '../../models/repository'
-import { IBuildRunPreferences } from '../../models/build-run-preferences'
+import {
+  IBuildRunPreferences,
+  getBuildFixAutoApprove,
+} from '../../models/build-run-preferences'
 import {
   BuildStageKind,
   IBuildProfile,
@@ -16,6 +19,12 @@ import { TextBox } from '../lib/text-box'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { ToggledtippedContent } from '../lib/toggletipped-content'
+import { Select } from '../lib/select'
+import {
+  BuildFixProvider,
+  normalizeBuildFixProvider,
+} from '../../lib/build-run/codex'
+import { t } from '../../lib/i18n'
 
 interface IBuildRunSettingsProps {
   readonly repository: Repository
@@ -232,11 +241,22 @@ export class BuildRunSettings extends React.Component<
     })
   }
 
+  private onBuildFixProviderChanged = (
+    event: React.FormEvent<HTMLSelectElement>
+  ) => {
+    this.props.onPreferencesChanged({
+      ...this.props.preferences,
+      buildFixProvider: event.currentTarget.value as BuildFixProvider,
+    })
+  }
+
   private onOpencodeAutoApproveChanged = (
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onPreferencesChanged({
       ...this.props.preferences,
+      buildFixAutoApprove: event.currentTarget.checked,
+      // Keep the legacy field in sync for older Desktop Material builds.
       opencodeAutoApprove: event.currentTarget.checked,
     })
   }
@@ -431,30 +451,38 @@ export class BuildRunSettings extends React.Component<
 
     const offerOpencodeLabel = (
       <span className="build-run-toggle-label">
-        {__DARWIN__
-          ? 'Offer opencode to Fix Build Errors'
-          : 'Offer opencode to fix build errors'}
+        {t('buildRun.offerAgents')}
         <ToggledtippedContent
           className="build-run-toggle-tip"
-          ariaLabel="About fixing build errors with opencode"
-          ariaLiveMessage="When a run fails, show a Fix with opencode button that launches the opencode AI coding agent to diagnose and fix the errors. Nothing runs until you launch it, and the launch dialog carries every consent step."
-          tooltip="When a run fails, show a “Fix with opencode” button that launches the opencode AI coding agent to diagnose and fix the errors. Nothing runs until you launch it; the launch dialog carries every consent step."
+          ariaLabel={t('buildRun.offerAgents')}
+          ariaLiveMessage={t('buildRun.offerAgentsHelp')}
+          tooltip={t('buildRun.offerAgentsHelp')}
         >
           <Octicon symbol={octicons.info} />
         </ToggledtippedContent>
       </span>
     )
 
+    const providerLabel =
+      normalizeBuildFixProvider(prefs.buildFixProvider) === 'codex'
+        ? 'Codex'
+        : 'OpenCode'
     const opencodeAutoApproveLabel = (
       <span className="build-run-toggle-label">
-        {__DARWIN__
-          ? 'Auto-Approve opencode in This Repository (yolo)'
-          : 'Auto-approve opencode in this repository (yolo)'}
+        {t('buildRun.autoApproveRepositoryProvider', {
+          provider: providerLabel,
+        })}
         <ToggledtippedContent
           className="build-run-toggle-tip"
-          ariaLabel="About auto-approving opencode"
-          ariaLiveMessage="Runs opencode in auto-approve mode, applying edits and running shell commands without asking, scoped to this repository. It cannot touch files outside the repository, but it can change and run code here unattended. Leave this off unless you trust it to work on its own."
-          tooltip="Runs opencode in auto-approve (“yolo”) mode: it applies edits and runs shell commands without asking, scoped to this repository. It cannot touch files outside the repository, but it can change and run code here unattended. Leave this off unless you trust it to work on its own."
+          ariaLabel={t('buildRun.autoApproveRepositoryProvider', {
+            provider: providerLabel,
+          })}
+          ariaLiveMessage={t('buildRun.autoApproveRepositoryHelp', {
+            provider: providerLabel,
+          })}
+          tooltip={t('buildRun.autoApproveRepositoryHelp', {
+            provider: providerLabel,
+          })}
         >
           <Octicon symbol={octicons.alert} />
         </ToggledtippedContent>
@@ -544,10 +572,19 @@ export class BuildRunSettings extends React.Component<
             }
             onChange={this.onOfferOpencodeAutoFixChanged}
           />
+          <Select
+            className="build-fix-provider-select"
+            label={t('buildRun.preferredProvider')}
+            value={normalizeBuildFixProvider(prefs.buildFixProvider)}
+            onChange={this.onBuildFixProviderChanged}
+          >
+            <option value="codex">Codex</option>
+            <option value="opencode">OpenCode</option>
+          </Select>
           <Checkbox
             label={opencodeAutoApproveLabel}
             value={
-              prefs.opencodeAutoApprove ?? false
+              getBuildFixAutoApprove(prefs)
                 ? CheckboxValue.On
                 : CheckboxValue.Off
             }

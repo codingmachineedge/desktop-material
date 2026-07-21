@@ -1,3 +1,5 @@
+import type { BuildFixProvider } from '../lib/build-run/codex'
+
 /**
  * Per-repository preferences for the one-click Build & Run feature.
  *
@@ -43,6 +45,20 @@ export interface IBuildRunPreferences {
    * treat an absent value as enabled (see {@link defaultBuildRunPreferences}).
    */
   readonly offerOpencodeAutoFix?: boolean
+
+  /**
+   * Preferred local AI build-fix provider. Stored per repository and seeded
+   * into both the failed-build and free-form dialogs. Existing repositories
+   * without this field keep OpenCode until the user chooses Codex.
+   */
+  readonly buildFixProvider?: BuildFixProvider
+
+  /**
+   * Auto-approve the selected provider's repository-scoped edits and commands.
+   * Optional for back-compat; when absent, the legacy OpenCode preference is
+   * used. Codex always retains its `workspace-write` sandbox even when enabled.
+   */
+  readonly buildFixAutoApprove?: boolean
 
   /**
    * Run opencode in `--auto` (auto-approve, "yolo") mode, scoped to this
@@ -97,7 +113,18 @@ export const defaultBuildRunPreferences: IBuildRunPreferences = {
   autoInstallMissingTools: true,
   autoBuildOnPull: false,
   offerOpencodeAutoFix: true,
+  buildFixProvider: 'opencode',
+  buildFixAutoApprove: false,
   opencodeAutoApprove: false,
   autoMaterializeCheapLfs: true,
   autoPinLargeFilesOnCommit: true,
+}
+
+/** Resolve the renamed provider-neutral approval setting compatibly. */
+export function getBuildFixAutoApprove(
+  preferences: IBuildRunPreferences
+): boolean {
+  return (
+    preferences.buildFixAutoApprove ?? preferences.opencodeAutoApprove ?? false
+  )
 }

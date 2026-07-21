@@ -3,6 +3,7 @@ import { RequestResponseChannels, RequestChannels } from '../lib/ipc-shared'
 import * as ipcRenderer from '../lib/ipc-renderer'
 import { IBuildRunLogEvent, IBuildRunStateEvent } from '../lib/build-run/types'
 import { IOpencodeLogEvent } from '../lib/build-run/opencode'
+import { ICodexLogEvent } from '../lib/build-run/codex'
 import {
   ICLICommandOutputEvent,
   ICLICommandStateEvent,
@@ -492,6 +493,29 @@ export function onOpencodeLog(
 ): () => void {
   ipcRenderer.on('opencode-log', handler)
   return () => ipcRenderer.removeListener('opencode-log', handler)
+}
+
+/** Probe the installed Codex CLI with shell-free version/login-status calls. */
+export const detectCodex = invokeProxy('codex-detect', 0)
+
+/** Install the official Codex npm package; output streams on `codex-log`. */
+export const installCodex = invokeProxy('codex-install', 1)
+
+/** Launch bounded Codex exec stdin for a failure; output uses `codex-log`. */
+export const runCodexFix = invokeProxy('codex-run-fix', 1)
+
+/** Launch Codex exec with a bounded free-form stdin prompt. */
+export const runCodexPrompt = invokeProxy('codex-run-prompt', 1)
+
+/** Cancel one Codex process tree. */
+export const cancelCodex = invokeProxy('codex-cancel', 1)
+
+/** Subscribe to bounded Codex stdout/stderr lines. */
+export function onCodexLog(
+  handler: (event: Electron.IpcRendererEvent, log: ICodexLogEvent) => void
+): () => void {
+  ipcRenderer.on('codex-log', handler)
+  return () => ipcRenderer.removeListener('codex-log', handler)
 }
 
 /** Query tool availability without exposing a command catalog to the UI. */

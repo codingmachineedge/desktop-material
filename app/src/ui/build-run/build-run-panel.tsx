@@ -25,6 +25,7 @@ import {
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { getBoolean, setBoolean } from '../../lib/local-storage'
+import { normalizeBuildFixProvider } from '../../lib/build-run/codex'
 
 export const BuildRunAutoScrollStorageKey = 'build-run-panel-auto-scroll-v1'
 export const BuildRunTruncateOutputStorageKey =
@@ -321,6 +322,14 @@ export class BuildRunPanel extends React.Component<
     })
   }
 
+  private selectedBuildFixProviderLabel(): 'Codex' | 'OpenCode' {
+    return normalizeBuildFixProvider(
+      this.props.repository.buildRunPreferences.buildFixProvider
+    ) === 'codex'
+      ? 'Codex'
+      : 'OpenCode'
+  }
+
   private renderLine(line: IBuildRunLogLine, index: number) {
     return (
       <div
@@ -340,6 +349,10 @@ export class BuildRunPanel extends React.Component<
    */
   private renderStatusChip() {
     if (this.state.view.opencodeRunning) {
+      const provider = normalizeBuildFixProvider(
+        this.state.view.buildFixProvider ??
+          this.props.repository.buildRunPreferences.buildFixProvider
+      )
       return (
         <span
           className="status-chip busy is-opencode"
@@ -347,7 +360,11 @@ export class BuildRunPanel extends React.Component<
           aria-live="polite"
         >
           <MaterialSymbol name="progress_activity" className="spin" size={13} />
-          <span>{t('buildRun.fixingWithOpencode')}</span>
+          <span>
+            {t('buildRun.fixingWithProvider', {
+              provider: provider === 'codex' ? 'Codex' : 'OpenCode',
+            })}
+          </span>
         </span>
       )
     }
@@ -422,6 +439,7 @@ export class BuildRunPanel extends React.Component<
     const title = selected
       ? getBuildProfileDisplayName(selected)
       : 'Build & run'
+    const buildFixProviderLabel = this.selectedBuildFixProviderLabel()
 
     // Minimized: collapse to a slim bar (title + status + restore + close).
     if (view.panelMinimized) {
@@ -459,10 +477,16 @@ export class BuildRunPanel extends React.Component<
               <Button
                 className="header-action send-opencode"
                 onClick={this.onSendToOpencode}
-                ariaLabel={t('buildRun.sendToOpencode')}
+                ariaLabel={t('buildRun.sendToProvider', {
+                  provider: buildFixProviderLabel,
+                })}
               >
                 <Octicon symbol={octicons.paperAirplane} />
-                <span>{t('buildRun.sendToOpencode')}</span>
+                <span>
+                  {t('buildRun.sendToProvider', {
+                    provider: buildFixProviderLabel,
+                  })}
+                </span>
               </Button>
             )}
           {view.phase === 'failed' &&
@@ -472,10 +496,16 @@ export class BuildRunPanel extends React.Component<
               <Button
                 className="header-action fix-opencode"
                 onClick={this.onFixWithOpencode}
-                ariaLabel="Fix with opencode"
+                ariaLabel={t('buildRun.fixWithProvider', {
+                  provider: buildFixProviderLabel,
+                })}
               >
                 <Octicon symbol={octicons.tools} />
-                <span>Fix with opencode</span>
+                <span>
+                  {t('buildRun.fixWithProvider', {
+                    provider: buildFixProviderLabel,
+                  })}
+                </span>
               </Button>
             )}
           {isActive && (

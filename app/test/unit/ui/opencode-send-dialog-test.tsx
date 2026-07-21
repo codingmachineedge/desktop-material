@@ -56,6 +56,8 @@ interface IFakeDispatcherOptions {
   }>
   readonly runCalls?: IRunPromptCall[]
   readonly installCalls?: { count: number }
+  readonly providerRuns?: Array<'codex' | 'opencode'>
+  readonly providerUpdates?: Array<'codex' | 'opencode'>
 }
 
 function fakePanel(): IOpencodePanelController & { openCalls: number } {
@@ -72,7 +74,14 @@ function fakePanel(): IOpencodePanelController & { openCalls: number } {
 function fakeDispatcher(options: IFakeDispatcherOptions): Dispatcher {
   return {
     detectOpencode: () => options.detect(),
+    detectBuildFixProvider: () => options.detect(),
     installOpencode: async () => {
+      if (options.installCalls) {
+        options.installCalls.count++
+      }
+      return { ok: true, code: 0 }
+    },
+    installBuildFixProvider: async () => {
       if (options.installCalls) {
         options.installCalls.count++
       }
@@ -91,10 +100,30 @@ function fakeDispatcher(options: IFakeDispatcherOptions): Dispatcher {
       })
       return { ok: true }
     },
+    runBuildFixPrompt: async (
+      provider: 'codex' | 'opencode',
+      _repository: Repository,
+      request: IRunPromptCall
+    ) => {
+      options.providerRuns?.push(provider)
+      options.runCalls?.push(request)
+      return { ok: true }
+    },
+    updateRepositoryBuildRunPreferences: async (
+      _repository: Repository,
+      preferences: { buildFixProvider?: 'codex' | 'opencode' }
+    ) => {
+      if (preferences.buildFixProvider) {
+        options.providerUpdates?.push(preferences.buildFixProvider)
+      }
+    },
   } as unknown as Dispatcher
 }
 
-function repository(opencodeAutoApprove = false) {
+function repository(
+  autoApprove = false,
+  buildFixProvider: 'codex' | 'opencode' = 'opencode'
+) {
   return new Repository(
     'C:/opencode-repo',
     1,
@@ -107,7 +136,9 @@ function repository(opencodeAutoApprove = false) {
     null,
     {
       ...defaultBuildRunPreferences,
-      opencodeAutoApprove,
+      buildFixProvider,
+      buildFixAutoApprove: autoApprove,
+      opencodeAutoApprove: autoApprove,
     }
   )
 }
@@ -179,6 +210,34 @@ describe('OpencodeSendDialog', () => {
     // The run detaches to the Build & Run panel.
     assert.equal(dismissed, 1)
     assert.ok(panel.openCalls >= 1)
+  })
+
+  it('lets the user persist Codex and sends the free-form prompt to it', async () => {
+    const runCalls: IRunPromptCall[] = []
+    const providerRuns: Array<'codex' | 'opencode'> = []
+    const providerUpdates: Array<'codex' | 'opencode'> = []
+    const dispatcher = fakeDispatcher({
+      detect: installedAndAuthed,
+      runCalls,
+      providerRuns,
+      providerUpdates,
+    })
+    renderDialog({ dispatcher })
+
+    const picker = await screen.findByLabelText<HTMLSelectElement>(
+      /ai coding provider/i
+    )
+    fireEvent.change(picker, { target: { value: 'codex' } })
+    const box = await screen.findByLabelText<HTMLTextAreaElement>(
+      /what should codex do/i
+    )
+    fireEvent.change(box, { target: { value: 'Fix the flaky test' } })
+    fireEvent.click(screen.getByRole('button', { name: /send to codex/i }))
+
+    await waitFor(() => assert.equal(runCalls.length, 1))
+    assert.deepEqual(providerRuns, ['codex'])
+    assert.deepEqual(providerUpdates, ['codex'])
+    assert.equal(runCalls[0].prompt, 'Fix the flaky test')
   })
 
   it('never sends when the prompt is only whitespace', async () => {
