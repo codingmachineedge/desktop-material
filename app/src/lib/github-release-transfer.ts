@@ -17,6 +17,7 @@ export interface IGitHubReleaseAssetDownloadRequest
   readonly asset: {
     readonly id: number
     readonly name: string
+    readonly state: string
     readonly sizeInBytes: number
     readonly digest: string | null
   }

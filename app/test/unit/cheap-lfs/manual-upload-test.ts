@@ -107,6 +107,16 @@ function asset(
   }
 }
 
+function numberedAssets(
+  count: number,
+  state: IGitHubReleaseAsset['state'] = 'uploaded'
+): ReadonlyArray<IGitHubReleaseAsset> {
+  return Array.from({ length: count }, (_, index) => ({
+    ...asset(1_000 + index, `existing-${index}.bin`, 1),
+    state,
+  }))
+}
+
 function gateway(
   overrides: Partial<ICheapLfsManualReleasesGateway>
 ): ICheapLfsManualReleasesGateway {
@@ -476,6 +486,246 @@ describe('manual cheap LFS upload', () => {
     })
   })
 
+  it('rolls a two-file manual batch together when the base has one slot', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const firstPath = join(directory, 'first.bin')
+      const secondPath = join(directory, 'second.bin')
+      await writeFile(firstPath, 'first batch object')
+      await writeFile(secondPath, 'second batch object')
+
+      const baseRelease: IGitHubRelease = {
+        ...release,
+        assets: numberedAssets(999),
+      }
+      let derivedRelease: IGitHubRelease | undefined
+      const createdTags = new Array<string>()
+      const releases = gateway({
+        getReleaseByTag: async (_repository, tag) =>
+          tag === 'assets' ? baseRelease : derivedRelease ?? null,
+        createDraft: async (_repository, draft) => {
+          createdTags.push(draft.tagName)
+          derivedRelease = {
+            ...release,
+            id: 8,
+            tagName: draft.tagName,
+            targetCommitish: draft.targetCommitish,
+            name: draft.name,
+            assets: [],
+          }
+          return derivedRelease
+        },
+        listAssets: async (_repository, releaseId) => ({
+          assets: releaseId === baseRelease.id ? baseRelease.assets : [],
+          page: 1,
+          nextPage: null,
+          capped: false,
+        }),
+      })
+
+      const plan = await planCheapLfsManualUpload(
+        releases,
+        repository,
+        selected,
+        [
+          {
+            absoluteFilePath: firstPath,
+            trackedRelativePath: 'first.bin',
+            releaseTag: 'assets',
+          },
+          {
+            absoluteFilePath: secondPath,
+            trackedRelativePath: 'second.bin',
+            releaseTag: 'assets',
+          },
+        ]
+      )
+
+      assert.equal(plan.release.tagName, 'assets-2')
+      assert.deepEqual(
+        plan.files.map(file => file.pointer.releaseTag),
+        ['assets-2', 'assets-2']
+      )
+      assert.deepEqual(createdTags, ['assets-2'])
+      assert.equal(plan.preexistingAssetIds.size, 0)
+      assert.equal(baseRelease.assets.length, 999)
+    })
+  })
+
+  it('accepts an exact 1000-asset capped inventory and rolls to the next release', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const sourcePath = join(directory, 'next.bin')
+      await writeFile(sourcePath, 'next bucket object')
+      const allAssets = numberedAssets(1000)
+      const baseRelease: IGitHubRelease = {
+        ...release,
+        assets: allAssets,
+      }
+      let derivedRelease: IGitHubRelease | undefined
+      const listedBasePages = new Array<number>()
+      const releases = gateway({
+        getReleaseByTag: async (_repository, tag) =>
+          tag === 'assets' ? baseRelease : derivedRelease ?? null,
+        createDraft: async (_repository, draft) => {
+          derivedRelease = {
+            ...release,
+            id: 8,
+            tagName: draft.tagName,
+            targetCommitish: draft.targetCommitish,
+            name: draft.name,
+            assets: [],
+          }
+          return derivedRelease
+        },
+        listAssets: async (_repository, releaseId, page = 1) => {
+          if (releaseId !== baseRelease.id) {
+            return {
+              assets: [],
+              page,
+              nextPage: null,
+              capped: false,
+            }
+          }
+          listedBasePages.push(page)
+          const start = (page - 1) * 100
+          return {
+            assets: allAssets.slice(start, start + 100),
+            page,
+            nextPage: page < 10 ? page + 1 : null,
+            capped: page === 10,
+          }
+        },
+      })
+
+      const plan = await planCheapLfsManualUpload(
+        releases,
+        repository,
+        selected,
+        [
+          {
+            absoluteFilePath: sourcePath,
+            trackedRelativePath: 'next.bin',
+            releaseTag: 'assets',
+          },
+        ]
+      )
+
+      assert.deepEqual(listedBasePages, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      assert.equal(plan.release.tagName, 'assets-2')
+      assert.equal(plan.files[0].pointer.releaseTag, 'assets-2')
+    })
+  })
+
+  it('rejects a 1001-file manual batch before source or release I/O', async () => {
+    await withTempRepository(async (directory, repository) => {
+      let sourceIO = 0
+      let releaseIO = 0
+      const releases = gateway({
+        getReleaseByTag: async () => {
+          releaseIO++
+          return release
+        },
+        createDraft: async () => {
+          releaseIO++
+          return release
+        },
+        listAssets: async () => {
+          releaseIO++
+          return { assets: [], page: 1, nextPage: null, capped: false }
+        },
+      })
+      const options = Array.from({ length: 1001 }, (_, index) => ({
+        absoluteFilePath: join(directory, `file-${index}.bin`),
+        trackedRelativePath: `file-${index}.bin`,
+        releaseTag: 'assets',
+      }))
+
+      await assert.rejects(
+        planCheapLfsManualUpload(
+          releases,
+          repository,
+          selected,
+          options,
+          undefined,
+          undefined,
+          {
+            ...defaultCheapLfsFileSystem,
+            statSize: async () => {
+              sourceIO++
+              return 1
+            },
+            hashFileParts: async () => {
+              sourceIO++
+              throw new Error('hash must not start')
+            },
+          }
+        ),
+        /at most 1000 files/
+      )
+      assert.equal(sourceIO, 0)
+      assert.equal(releaseIO, 0)
+    })
+  })
+
+  it('ignores a starter asset until GitHub reports it uploaded', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const sourcePath = join(directory, 'processing.bin')
+      const sourceBytes = Buffer.from('eventually uploaded bytes')
+      await writeFile(sourcePath, sourceBytes)
+      let opened = false
+      let postOpenPolls = 0
+      let expectedName = ''
+      const releases = gateway({
+        listAssets: async () => {
+          if (!opened) {
+            return { assets: [], page: 1, nextPage: null, capped: false }
+          }
+          postOpenPolls++
+          const uploaded = asset(90, expectedName, sourceBytes.byteLength)
+          return {
+            assets: [
+              postOpenPolls === 1
+                ? { ...uploaded, state: 'starter' }
+                : uploaded,
+            ],
+            page: 1,
+            nextPage: null,
+            capped: false,
+          }
+        },
+        downloadAsset: async (_repository, _releaseId, remote, destination) => {
+          assert.equal(remote.state, 'uploaded')
+          await writeFile(destination, sourceBytes)
+          return { path: destination, bytes: sourceBytes.byteLength }
+        },
+      })
+
+      const result = await manualPinFilesToRelease(
+        releases,
+        repository,
+        selected,
+        [
+          {
+            absoluteFilePath: sourcePath,
+            trackedRelativePath: 'processing.bin',
+            releaseTag: 'assets',
+          },
+        ],
+        new AbortController().signal,
+        {
+          onReady: async (_handoff, plan) => {
+            expectedName = plan.files[0].assetName
+            opened = true
+          },
+        },
+        undefined,
+        { maximumPollAttempts: 2, pollIntervalMs: 0 }
+      )
+
+      assert.equal(postOpenPolls, 2)
+      assert.equal(result[0].result.pointer.releaseTag, 'assets')
+    })
+  })
+
   it('rejects multipart sources before starting an expensive hash pass', async () => {
     await withTempRepository(async (_directory, repository) => {
       let hashCalls = 0
@@ -517,7 +767,7 @@ describe('manual cheap LFS upload', () => {
           gateway({
             listAssets: async () => ({
               assets: [],
-              page: 5,
+              page: 1,
               nextPage: null,
               capped: true,
             }),

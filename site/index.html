@@ -657,7 +657,10 @@
                 single-asset file. The exact Release upload editor opens for a
                 simple drag and drop; Desktop Material detects only new assets,
                 downloads and hashes them, preserves original nested paths,
-                rechecks every source, and resumes with verified pointers.
+                rechecks every source, and resumes with verified pointers. Each
+                Release holds at most 1,000 objects; complete multipart files
+                and manual batches roll together through <code>assets</code>,
+                <code>assets-2</code>, and later exact pointer tags.
               </p>
             </article>
 

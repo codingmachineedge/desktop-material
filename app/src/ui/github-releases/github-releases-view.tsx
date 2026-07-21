@@ -2111,7 +2111,9 @@ export class GitHubReleasesView extends React.Component<
                     <h4>{asset.name}</h4>
                     <span>{asset.label || 'Release asset'}</span>
                   </div>
-                  <span className="github-release-asset-state">Uploaded</span>
+                  <span className="github-release-asset-state">
+                    {asset.state === 'uploaded' ? 'Uploaded' : 'Processing'}
+                  </span>
                 </div>
                 <dl>
                   <dt>File size</dt>
@@ -2132,7 +2134,9 @@ export class GitHubReleasesView extends React.Component<
                 <div className="github-releases-controls">
                   <Button
                     id={`download-release-asset-${asset.id}`}
-                    disabled={this.state.busy !== null}
+                    disabled={
+                      this.state.busy !== null || asset.state !== 'uploaded'
+                    }
                     onClick={this.downloadAssetFromButton}
                   >
                     Download

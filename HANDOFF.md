@@ -37,6 +37,31 @@ can release streamed chunks instead of retaining the complete asset in process
 memory. The focused transfer suite proves the flag is already active on the
 first write, the length header is absent, authentication/type headers survive,
 only one source chunk is in flight, and the exact range reaches the request.
+Commit `e90f1765017892a857cc6d4ecad791b122c03412` is on `origin/main`; its
+[CI run 29858326644](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29858326644)
+passed lint, Windows x64 tests/package, Windows arm64 package, and packaged x64
+E2E.
+
+The same repair now enforces GitHub's 1,000-asset Release capacity as a complete
+repository-local bucket family: `assets`, `assets-2`, `assets-3`, and later
+exact tags. All ten 100-item pages are inventoried. An automatic multipart file
+or complete manual batch is allocated as one group, so a group that would cross
+the remaining slots moves intact to the next Release and every pointer,
+refresh, rollback, handoff, and verification uses that selected tag. A group
+above 1,000 is rejected before hashing or per-file I/O. Provider objects still
+in the `starter` state count toward capacity and name collision checks but are
+shown as processing and cannot satisfy manual detection, upload success,
+download, or materialization. Exact single-release JSON remains bounded at
+8 MiB so a legitimate 1,000-record response fits; list responses keep their
+smaller 2 MiB boundary.
+
+Rollover acceptance covers 998 existing objects plus a two-part file staying in
+the base bucket, 999 plus two parts moving together to `assets-2`, the matching
+two-file manual case, exactly 1,000 objects across ten capped pages, pre-I/O
+1,001 rejection, and `starter`-to-`uploaded` polling. The expanded related
+suite passed **165/165**; after the final audit added rejected-asset cleanup and
+wrong-tag refresh guards, its focused transfer/operations rerun passed
+**34/34**. TypeScript no-emit, scoped formatting, and diff validation also pass.
 
 Local acceptance passed **104/104 focused tests** across the transfer pump,
 cheap-LFS operations/automation/manual flow, GitHub Release parsing/API/store,

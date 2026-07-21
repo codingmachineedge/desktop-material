@@ -397,6 +397,42 @@ function uploadEndpoint(endpoint: URL): URL {
   return upload
 }
 
+/** Best-effort cleanup for an asset created by a response we cannot accept. */
+async function removeRejectedUploadAsset(
+  endpoint: URL,
+  owner: string,
+  repository: string,
+  token: string,
+  assetId: number,
+  signal: AbortSignal,
+  dependencies: IGitHubReleaseTransferDependencies
+): Promise<void> {
+  const path = `repos/${owner}/${repository}/releases/assets/${assetId}`
+  const headers = createGitHubAPIRequestHeaders(endpoint.toString(), path, {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'User-Agent': 'DesktopMaterial-ReleasesTransfer',
+  })
+  try {
+    const response = await dependencies.fetch(
+      new URL(path, endpoint).toString(),
+      {
+        method: 'DELETE',
+        headers,
+        redirect: 'error',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        signal,
+      }
+    )
+    await response.body?.cancel().catch(() => undefined)
+  } catch {
+    // The original validation failure remains authoritative. The caller's
+    // higher-level inventory still counts any provider object that survives.
+  }
+}
+
 function validateUploadRange(
   value: unknown,
   fileSize: number
@@ -538,6 +574,7 @@ export async function handleGitHubReleaseAssetDownload(
     const assetId = validateIdentifier(request.asset?.id)
     const assetName = normalizeGitHubReleaseAssetName(request.asset?.name)
     if (
+      request.asset?.state !== 'uploaded' ||
       typeof request.asset?.sizeInBytes !== 'number' ||
       !Number.isSafeInteger(request.asset.sizeInBytes) ||
       request.asset.sizeInBytes < 0 ||
@@ -687,10 +724,34 @@ export async function handleGitHubReleaseAssetUpload(
     const asset = parseGitHubReleaseAsset(
       await boundedGitHubReleaseResponse(response, active.controller.signal)
     )
-    if (asset.name !== name || asset.sizeInBytes !== source.length) {
+    if (
+      asset.state !== 'uploaded' ||
+      asset.name !== name ||
+      asset.sizeInBytes !== source.length
+    ) {
+      await removeRejectedUploadAsset(
+        base.endpoint,
+        base.owner,
+        base.repository,
+        base.token,
+        asset.id,
+        active.controller.signal,
+        dependencies
+      )
+      throwIfAborted(active.controller.signal)
       throw new ReleaseTransferFailure('invalid-response')
     }
     if (asset.digest !== null && asset.digest !== source.digest) {
+      await removeRejectedUploadAsset(
+        base.endpoint,
+        base.owner,
+        base.repository,
+        base.token,
+        asset.id,
+        active.controller.signal,
+        dependencies
+      )
+      throwIfAborted(active.controller.signal)
       throw new ReleaseTransferFailure('digest-mismatch')
     }
     if (lastProgressBytes < source.length) {

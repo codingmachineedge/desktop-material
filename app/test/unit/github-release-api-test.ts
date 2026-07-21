@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { API } from '../../src/lib/api'
 import {
+  GitHubReleaseExactJSONMaximumBytes,
   GitHubReleaseJSONError,
   GitHubReleaseJSONMaximumBytes,
 } from '../../src/lib/github-release-json'
@@ -141,6 +142,33 @@ describe('GitHub Releases API', () => {
     await assert.rejects(() =>
       api.fetchReleaseByTag('desktop', 'material', ' ')
     )
+  })
+
+  it('accepts a bounded exact release containing all 1,000 asset records', async () => {
+    const api = new API('https://api.github.com', 'secret-token')
+    const assets = Array.from({ length: 1000 }, (_, index) => ({
+      ...apiAsset,
+      id: index + 1,
+      name: `object-${String(index + 1).padStart(4, '0')}.bin`,
+      // Real GitHub asset records carry fields the app intentionally ignores.
+      // Keep the fixture above the list-response cap to prove exact responses
+      // use their larger, still-bounded allowance.
+      provider_padding: 'x'.repeat(1900),
+    }))
+    const payload = JSON.stringify({ ...apiRelease, assets })
+    const payloadBytes = new TextEncoder().encode(payload).byteLength
+    assert.ok(payloadBytes > GitHubReleaseJSONMaximumBytes)
+    assert.ok(payloadBytes < GitHubReleaseExactJSONMaximumBytes)
+    Reflect.set(
+      api,
+      'ghRequest',
+      async () => new Response(payload, { status: 200 })
+    )
+
+    const exact = await api.fetchRelease('desktop', 'material', 42)
+
+    assert.equal(exact.assets.length, 1000)
+    assert.equal(exact.assets.at(-1)?.id, 1000)
   })
 
   it('creates reviewed public releases or drafts with the requested state', async () => {

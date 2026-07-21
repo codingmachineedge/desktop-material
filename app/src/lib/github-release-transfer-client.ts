@@ -111,6 +111,7 @@ export async function downloadGitHubReleaseAssetThroughMainProcess(
     asset: {
       id: asset.id,
       name: asset.name,
+      state: asset.state,
       sizeInBytes: asset.sizeInBytes,
       digest: asset.digest,
     },

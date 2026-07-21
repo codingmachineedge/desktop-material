@@ -1,6 +1,8 @@
 import { APIError } from './http'
 
 export const GitHubReleaseJSONMaximumBytes = 2 * 1024 * 1024
+/** Exact releases can embed all 1,000 full asset records. */
+export const GitHubReleaseExactJSONMaximumBytes = 8 * 1024 * 1024
 
 export class GitHubReleaseJSONError extends Error {
   public constructor(
@@ -117,11 +119,12 @@ function boundedAPIError(value: unknown): { readonly message?: string } | null {
 /** Parse a bounded response and preserve the repository API's typed error. */
 export async function boundedGitHubReleaseResponse(
   response: Response,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maximumBytes: number = GitHubReleaseJSONMaximumBytes
 ): Promise<unknown> {
   let value: unknown
   try {
-    value = await readBoundedGitHubReleaseJSON(response, signal)
+    value = await readBoundedGitHubReleaseJSON(response, signal, maximumBytes)
   } catch (error) {
     if (!response.ok && error instanceof GitHubReleaseJSONError) {
       throw new APIError(response, null)

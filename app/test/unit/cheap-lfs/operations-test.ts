@@ -111,6 +111,137 @@ const release: IGitHubRelease = {
   assets: [asset],
 }
 
+function numberedAssets(count: number): ReadonlyArray<IGitHubReleaseAsset> {
+  return Array.from({ length: count }, (_, index) => ({
+    ...asset,
+    id: 1_000 + index,
+    name: `existing-${index}.bin`,
+  }))
+}
+
+function multipartBucketGateway(baseTag: string, baseAssetCount: number) {
+  const remotes = new Map<string, IGitHubRelease>([
+    [
+      baseTag,
+      {
+        ...release,
+        id: 70,
+        tagName: baseTag,
+        assets: numberedAssets(baseAssetCount),
+      },
+    ],
+  ])
+  const createdTags = new Array<string>()
+  const requestedTags = new Array<string>()
+  const reviewedTags = new Array<string>()
+  const uploadedReleaseIds = new Array<number>()
+  let uploadIndex = 0
+
+  const gateway: ICheapLfsReleasesGateway = {
+    getReleaseByTag: async (_repository, tag) => {
+      requestedTags.push(tag)
+      return remotes.get(tag) ?? null
+    },
+    createDraft: async (_repository, draft) => {
+      createdTags.push(draft.tagName)
+      const created: IGitHubRelease = {
+        ...release,
+        id: 70 + remotes.size,
+        tagName: draft.tagName,
+        targetCommitish: draft.targetCommitish,
+        name: draft.name,
+        assets: [],
+      }
+      remotes.set(draft.tagName, created)
+      return created
+    },
+    listAssets: async (_repository, releaseId) => ({
+      assets:
+        [...remotes.values()].find(candidate => candidate.id === releaseId)
+          ?.assets ?? [],
+      page: 1,
+      nextPage: null,
+      capped: false,
+    }),
+    createMutationReview: (_repository, reviewedRelease, reviewedAsset) => {
+      reviewedTags.push(reviewedRelease.tagName)
+      return {
+        repositoryFingerprint: 'fixture',
+        accountKey: 'fixture',
+        accountGeneration: 1,
+        releaseId: reviewedRelease.id,
+        releaseFingerprint: 'fixture',
+        assetId: reviewedAsset?.id ?? null,
+        assetFingerprint: reviewedAsset == null ? null : 'fixture',
+      }
+    },
+    uploadAsset: async (
+      _repository,
+      review,
+      _sourcePath,
+      name,
+      _label,
+      _signal,
+      _onProgress,
+      range
+    ) => {
+      uploadedReleaseIds.push(review.releaseId)
+      const targetEntry = [...remotes.entries()].find(
+        ([, candidate]) => candidate.id === review.releaseId
+      )
+      assert.ok(targetEntry)
+      const partSha = uploadIndex === 0 ? 'b'.repeat(64) : 'c'.repeat(64)
+      const uploaded = {
+        ...asset,
+        id: 10_000 + uploadIndex++,
+        name,
+        sizeInBytes: range?.length ?? 0,
+      }
+      remotes.set(targetEntry[0], {
+        ...targetEntry[1],
+        assets: [...targetEntry[1].assets, uploaded],
+      })
+      return {
+        asset: uploaded,
+        bytes: range?.length ?? 0,
+        localDigest: `sha256:${partSha}`,
+      }
+    },
+    deleteAsset: async () => undefined,
+    downloadAsset: async () => {
+      throw new Error('download not expected')
+    },
+  }
+
+  return {
+    gateway,
+    remotes,
+    createdTags,
+    requestedTags,
+    reviewedTags,
+    uploadedReleaseIds,
+  }
+}
+
+function twoPartFileSystem(
+  writePointer: ICheapLfsFileSystem['writePointer'] = async () => undefined
+): ICheapLfsFileSystem {
+  return {
+    ...defaultCheapLfsFileSystem,
+    statSize: async () => 20,
+    hashFile: async () => ({ sha256: 'a'.repeat(64), sizeInBytes: 20 }),
+    hashFileParts: async () => ({
+      sha256: 'a'.repeat(64),
+      sizeInBytes: 20,
+      parts: [
+        { offset: 0, length: 10, sha256: 'b'.repeat(64) },
+        { offset: 10, length: 10, sha256: 'c'.repeat(64) },
+      ],
+    }),
+    writePointer,
+  }
+}
+
 class FakeAccountsStore {
   private readonly callbacks = new Set<
     (accounts: ReadonlyArray<Account>) => void
@@ -147,7 +278,12 @@ function fakeAPI(
       capped: false,
     }),
     fetchReleaseAsset: async () => asset,
-    createReleaseDraft: async () => release,
+    createReleaseDraft: async (_owner, _name, draft) => ({
+      ...release,
+      tagName: draft.tagName,
+      targetCommitish: draft.targetCommitish,
+      name: draft.name,
+    }),
     createRelease: async (_owner, _name, _draft, publishImmediately) => ({
       ...release,
       draft: !publishImmediately,
@@ -211,6 +347,12 @@ function inMemoryReleaseGateway(
   return {
     getReleaseByTag: async () => currentRelease(),
     createDraft: async () => currentRelease(),
+    listAssets: async () => ({
+      assets: currentRelease().assets,
+      page: 1,
+      nextPage: null,
+      capped: false,
+    }),
     createMutationReview: (_repository, reviewedRelease, reviewedAsset) => ({
       repositoryFingerprint: 'fixture',
       accountKey: 'fixture',
@@ -316,7 +458,11 @@ describe('cheap LFS operations', () => {
       }
       const expectedSha = createHash('sha256').update(content).digest('hex')
 
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v1.0.0',
+        assets: [],
+      }
       let createdTargetCommitish: string | undefined
       let uploaded: { sourcePath: string; name: string } | undefined
       let uploadedBytes: Buffer | undefined
@@ -327,7 +473,7 @@ describe('cheap LFS operations', () => {
               fetchReleaseByTag: async () => null,
               createReleaseDraft: async (_owner, _name, releaseDraft) => {
                 createdTargetCommitish = releaseDraft.targetCommitish
-                return draft
+                return { ...draft, tagName: releaseDraft.tagName }
               },
               fetchRelease: async () => draft,
             }),
@@ -420,7 +566,11 @@ describe('cheap LFS operations', () => {
     await withTempRepository(async (dir, _repository) => {
       const repository = repositoryAt(dir, null)
       let createdTargetCommitish: string | undefined
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v-current-branch',
+        assets: [],
+      }
       const store = await storeWith(
         dependencies(
           () =>
@@ -428,7 +578,7 @@ describe('cheap LFS operations', () => {
               fetchReleaseByTag: async () => null,
               createReleaseDraft: async (_owner, _name, releaseDraft) => {
                 createdTargetCommitish = releaseDraft.targetCommitish
-                return draft
+                return { ...draft, tagName: releaseDraft.tagName }
               },
               fetchRelease: async () => draft,
             }),
@@ -615,7 +765,11 @@ describe('cheap LFS operations', () => {
         { offset: 2 * cap, length: 100, sha256: partShas[2] },
       ]
 
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v4.0.0',
+        assets: [],
+      }
       const uploads = new Array<{
         sourcePath: string
         name: string
@@ -718,9 +872,71 @@ describe('cheap LFS operations', () => {
     })
   })
 
+  it('keeps a two-part object in a base release with exactly two slots', async () => {
+    await withTempRepository(async (dir, repository) => {
+      const fixture = multipartBucketGateway('assets', 998)
+      const result = await pinFileToRelease(
+        fixture.gateway,
+        repository,
+        selected,
+        {
+          absoluteFilePath: join(dir, 'two-parts.bin'),
+          trackedRelativePath: 'two-parts.bin',
+          releaseTag: 'assets',
+        },
+        undefined,
+        undefined,
+        twoPartFileSystem()
+      )
+
+      assert.equal(result.pointer.releaseTag, 'assets')
+      assert.equal(result.pointer.parts?.length, 2)
+      assert.deepEqual(fixture.createdTags, [])
+      assert.deepEqual(fixture.reviewedTags, ['assets', 'assets'])
+      assert.deepEqual(fixture.uploadedReleaseIds, [70, 70])
+      assert.equal(fixture.remotes.get('assets')?.assets.length, 1000)
+      assert.equal(fixture.remotes.has('assets-2'), false)
+    })
+  })
+
+  it('rolls a two-part object as one group when the base has one slot', async () => {
+    await withTempRepository(async (dir, repository) => {
+      const fixture = multipartBucketGateway('assets', 999)
+      let pointerText = ''
+      const result = await pinFileToRelease(
+        fixture.gateway,
+        repository,
+        selected,
+        {
+          absoluteFilePath: join(dir, 'two-parts.bin'),
+          trackedRelativePath: 'two-parts.bin',
+          releaseTag: 'assets',
+        },
+        undefined,
+        undefined,
+        twoPartFileSystem(async (_path, text) => {
+          pointerText = text
+        })
+      )
+
+      assert.equal(result.pointer.releaseTag, 'assets-2')
+      assert.equal(parseCheapLfsPointer(pointerText)?.releaseTag, 'assets-2')
+      assert.deepEqual(fixture.createdTags, ['assets-2'])
+      assert.deepEqual(fixture.reviewedTags, ['assets-2', 'assets-2'])
+      assert.deepEqual(fixture.uploadedReleaseIds, [71, 71])
+      assert.deepEqual(fixture.requestedTags, [
+        'assets',
+        'assets-2',
+        'assets-2',
+      ])
+      assert.equal(fixture.remotes.get('assets')?.assets.length, 999)
+      assert.equal(fixture.remotes.get('assets-2')?.assets.length, 2)
+    })
+  })
+
   it('rejects an oversized multipart pointer before uploading any part', async () => {
     await withTempRepository(async (dir, repository) => {
-      const partCount = 2000
+      const partCount = 1001
       const projectedSize = CHEAP_LFS_PART_SIZE_BYTES * (partCount - 1) + 1
       const draft: IGitHubRelease = { ...release, assets: [] }
       let uploadCount = 0
@@ -776,7 +992,7 @@ describe('cheap LFS operations', () => {
           undefined,
           fs
         ),
-        /pointer larger than the 512 KiB safety limit/
+        /needs 1001 cheap LFS parts.*at most 1000/
       )
       assert.equal(uploadCount, 0)
       assert.equal(hashCount, 0)
@@ -803,6 +1019,12 @@ describe('cheap LFS operations', () => {
       const gateway: ICheapLfsReleasesGateway = {
         getReleaseByTag: async () => currentRelease(),
         createDraft: async () => currentRelease(),
+        listAssets: async () => ({
+          assets: currentRelease().assets,
+          page: 1,
+          nextPage: null,
+          capped: false,
+        }),
         createMutationReview: (
           _repository,
           reviewedRelease,
@@ -913,7 +1135,11 @@ describe('cheap LFS operations', () => {
         range: { offset: number; length: number } | undefined
       }>()
       const logicalProgress = new Array<number>()
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v4.1.0',
+        assets: [],
+      }
       const store = await storeWith(
         dependencies(
           () =>
@@ -1008,6 +1234,7 @@ describe('cheap LFS operations', () => {
       const hashedFirstName = `${'a'.repeat(239)}-aaaaaaa.part001`
       const draft: IGitHubRelease = {
         ...release,
+        tagName: 'v4.2.0',
         assets: [
           { ...asset, id: 20, name: rawFirstName, sizeInBytes: 10 },
           { ...asset, id: 21, name: hashedFirstName, sizeInBytes: 10 },
@@ -1094,7 +1321,11 @@ describe('cheap LFS operations', () => {
     await withTempRepository(async (dir, repository) => {
       const baseName = 'a'.repeat(255)
       const filePath = join(dir, baseName)
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v4.3.0',
+        assets: [],
+      }
       let uploadedName = ''
       const store = await storeWith(
         dependencies(
@@ -1164,6 +1395,7 @@ describe('cheap LFS operations', () => {
       const firstRetryName = `${'a'.repeat(243)}-aaaaaaa.iso`
       const draft: IGitHubRelease = {
         ...release,
+        tagName: 'v4.3.1',
         assets: [
           { ...asset, id: 20, name: baseName, sizeInBytes: 100 },
           { ...asset, id: 21, name: firstRetryName, sizeInBytes: 100 },
@@ -1430,7 +1662,11 @@ describe('cheap LFS operations', () => {
     await withTempRepository(async (dir, repository) => {
       const filePath = join(dir, 'changing-huge.bin')
       await writeFile(filePath, 'original bytes')
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v4.5.0',
+        assets: [],
+      }
       const partShas = ['b'.repeat(64), 'c'.repeat(64)]
       let pointerWritten = false
       let uploadIndex = 0
@@ -1516,7 +1752,11 @@ describe('cheap LFS operations', () => {
         { offset: first.length, length: second.length, sha256: digest(second) },
       ]
       const wholeSha = digest(original)
-      const draft: IGitHubRelease = { ...release, assets: [] }
+      const draft: IGitHubRelease = {
+        ...release,
+        tagName: 'v4.6.0',
+        assets: [],
+      }
       let uploadIndex = 0
       let pointerWritten = false
       const store = await storeWith(

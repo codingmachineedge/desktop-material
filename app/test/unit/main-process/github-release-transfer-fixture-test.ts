@@ -144,6 +144,7 @@ describe('GitHub release transfer loopback GHES fixture', () => {
         asset: {
           id: 19,
           name: 'fixture.bin',
+          state: 'uploaded',
           sizeInBytes: bytes.byteLength,
           digest,
         },

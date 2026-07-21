@@ -765,7 +765,7 @@ button reports hashing, real accepted-byte upload progress, and final source ver
 small-pointer commit says **Committing … to _branch_**. If an automatic upload stalls, choose
 **Manual upload** beside the progress controls. Desktop Material stops that attempt, places all
 remaining files that fit one Release asset into one temporary **upload-these-files** folder using
-symlinks, hardlinks, or copies. It opens the exact `assets` Release edit/upload page first, then puts
+symlinks, hardlinks, or copies. It opens the exact selected Release edit/upload page first, then puts
 that folder in front: select all prepared files, drag them onto GitHub's asset drop zone, and let the
 browser finish the upload (then choose its save/update action if shown). The app detects only new
 exact-name assets, downloads and hashes all of them, rechecks every source, writes the pointers, and
@@ -776,6 +776,12 @@ skip compression: a file fitting the release-asset cap is stored as one raw asse
 file is split into ordered raw ranges. Downloads verify each range and the complete file before
 replacing the pointer. Existing compressed cheap-LFS pointers remain readable for backward
 compatibility.
+
+Each Cheap LFS Release holds at most 1,000 objects. Desktop Material counts all ten asset pages and
+uses `assets`, then `assets-2`, `assets-3`, and later buckets as needed. A multipart file or one
+manual batch always stays together; if the current bucket lacks enough slots, every object in that
+group moves to the next Release and its pointer stores the exact tag. Assets still marked
+`starter` by GitHub reserve a slot but remain unavailable until GitHub reports them uploaded.
 
 Automatic assets are sent with Electron's memory-bounded chunked request mode. Even a multi-gigabyte
 part is read incrementally instead of being retained as one in-process request body.

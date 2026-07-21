@@ -166,7 +166,10 @@ import {
   parseActionsCacheList,
   parseActionsCacheUsage,
 } from './actions-caches'
-import { boundedGitHubReleaseResponse } from './github-release-json'
+import {
+  boundedGitHubReleaseResponse,
+  GitHubReleaseExactJSONMaximumBytes,
+} from './github-release-json'
 import {
   IAPIProviderTriagePage,
   normalizeProviderTriageLimit,
@@ -4046,7 +4049,11 @@ export class API {
     )}/releases/${safeReleaseId}`
     const response = await this.ghRequest('GET', path, { signal })
     return parseGitHubRelease(
-      await boundedGitHubReleaseResponse(response, signal),
+      await boundedGitHubReleaseResponse(
+        response,
+        signal,
+        GitHubReleaseExactJSONMaximumBytes
+      ),
       safeReleaseId
     )
   }
@@ -4074,7 +4081,11 @@ export class API {
       return null
     }
     return parseGitHubRelease(
-      await boundedGitHubReleaseResponse(response, signal)
+      await boundedGitHubReleaseResponse(
+        response,
+        signal,
+        GitHubReleaseExactJSONMaximumBytes
+      )
     )
   }
 
@@ -4155,7 +4166,11 @@ export class API {
       signal,
     })
     const release = parseGitHubRelease(
-      await boundedGitHubReleaseResponse(response, signal)
+      await boundedGitHubReleaseResponse(
+        response,
+        signal,
+        GitHubReleaseExactJSONMaximumBytes
+      )
     )
     if (release.draft === publishImmediately) {
       throw new Error(
@@ -4201,7 +4216,11 @@ export class API {
       signal,
     })
     return parseGitHubRelease(
-      await boundedGitHubReleaseResponse(response, signal),
+      await boundedGitHubReleaseResponse(
+        response,
+        signal,
+        GitHubReleaseExactJSONMaximumBytes
+      ),
       safeUpdate.releaseId
     )
   }
@@ -4225,7 +4244,11 @@ export class API {
       signal,
     })
     const release = parseGitHubRelease(
-      await boundedGitHubReleaseResponse(response, signal),
+      await boundedGitHubReleaseResponse(
+        response,
+        signal,
+        GitHubReleaseExactJSONMaximumBytes
+      ),
       safeReleaseId
     )
     if (release.draft) {

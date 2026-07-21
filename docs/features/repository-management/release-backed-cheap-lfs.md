@@ -16,6 +16,14 @@ ordered raw parts smaller than 2 GiB, and the pointer records every part's name,
 size, and SHA-256 as well as the whole-file size and digest. Current uploads do
 not add a compression pass; legacy deflated pointers remain readable.
 
+GitHub permits 1,000 assets per Release. Cheap LFS inventories all ten bounded
+100-item pages and keeps at most 1,000 objects in each repository Release
+bucket. The configured tag names the first bucket (normally `assets`), followed
+by `assets-2`, `assets-3`, and so on. A single multipart file or one complete
+manual batch is allocated atomically: when it would cross the remaining slots,
+the entire group moves to the next bucket and every generated pointer records
+that exact derived tag.
+
 Repository Build & Run settings provide two preferences, both enabled by
 default for compatibility:
 
@@ -40,8 +48,8 @@ operation to a browser-assisted handoff. Desktop Material stops the current
 automatic attempt, plans every remaining file that fits one Release asset,
 creates one random temporary folder containing the exact asset names, opens
 the exact validated release editor and then that folder in front for drag and
-drop, and waits for the user to upload and save all files to the `assets`
-release. Older GitHub Enterprise responses without a usable release web URL
+drop, and waits for the user to upload and save all files to the selected
+`assets` bucket. Older GitHub Enterprise responses without a usable release web URL
 fall back to the validated repository Releases listing. File symlinks are
 preferred; the app falls back to hardlinks and then streamed copies when the
 host or volume cannot create a link. **Cancel** stops either the automatic or
@@ -76,6 +84,15 @@ tracked pointer in place. Failed multipart pins attempt to delete only assets
 uploaded by that attempt and report any cleanup failure without touching
 pre-existing assets.
 
+A group requiring more than 1,000 assets is rejected before hashing or Release
+mutation. A concurrent uploader can consume capacity after allocation; if the
+provider then rejects the upload, the operation fails without splitting the
+group and applies the same attempt-owned cleanup. Incomplete provider records
+such as `starter` still reserve capacity and names, but are shown as processing
+and are never accepted as uploaded, downloaded, or materialized. When an upload
+response creates an object the app cannot accept, the isolated transfer process
+also makes a best-effort authenticated deletion of that exact returned asset ID.
+
 One automatic materialization failure is recorded per pointer and does not
 stop the remaining batch; cancellation stops the batch and the summary reports
 what stayed as pointers. In an automatic pin batch, an earlier file may already
@@ -104,7 +121,7 @@ feature never puts provider credentials in a pointer. Temporary downloads are
 cleaned on success and failure, and unverified bytes never replace a tracked
 file.
 
-Manual mode snapshots every pre-existing asset ID through bounded pagination
+Manual mode snapshots every pre-existing asset ID through all ten bounded pages
 before opening the handoff. It accepts only a new exact-name and exact-size
 asset, downloads and hashes every detected asset, then re-hashes every source
 before writing any pointer. Cross-file asset names are reserved as one batch,
@@ -121,12 +138,16 @@ deleted.
 `cheap-lfs/pointer-test.ts` covers canonical single/multipart pointers, legacy
 deflated compatibility, size limits, part totals, path normalization, and the
 below-2-GiB upload plan. `cheap-lfs/operations-test.ts` covers raw uploads,
-deduplicated asset names, mutation reviews, attempt-owned cleanup, source race
-checks, cancellation, per-part and whole-file verification, and atomic
-materialization. `cheap-lfs/manual-upload-test.ts` covers whole-batch handoff
-names, symlink/hardlink/copy fallbacks, pagination and pre-existing-asset
-exclusion, cancel-safe cleanup, remote and source hash verification, and
-provider-bound Releases URLs. `cheap-lfs/automation-test.ts`,
+deduplicated asset names, 1,000-object rollover without splitting groups,
+mutation reviews, attempt-owned cleanup, source race checks, cancellation,
+per-part and whole-file verification, and atomic materialization.
+`cheap-lfs/manual-upload-test.ts` covers whole-batch handoff names, atomic
+bucket rollover, symlink/hardlink/copy fallbacks, pagination and
+pre-existing-asset exclusion, cancel-safe cleanup, remote and source hash
+verification, and provider-bound Releases URLs. Release model/API and transfer
+tests prove a complete 1,000-record exact response remains bounded, incomplete
+objects count but cannot transfer, and the smaller multi-release response cap
+is unchanged. `cheap-lfs/automation-test.ts`,
 `cheap-lfs/commit-entry-points-test.ts`, and
 `cheap-lfs/commit-status-refresh-test.ts` cover the 100-MiB commit gate, every
 routed commit entry point, phase and byte progress, manual switching,

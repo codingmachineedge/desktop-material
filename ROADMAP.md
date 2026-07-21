@@ -1,6 +1,6 @@
 # Desktop Material roadmap
 
-Updated: **July 20, 2026**
+Updated: **July 21, 2026**
 
 Desktop Material's feature roadmap is complete through the **M21 advanced
 workflow wave** below, with the **M22 owner-scoped management and publication
@@ -103,7 +103,10 @@ platform-neutral repository automation.
   Electron's chunked request mode so multi-gigabyte assets stay memory-bounded,
   streams accepted-byte progress, and can switch a stalled upload to one temporary,
   whole-batch browser handoff whose newly uploaded assets are downloaded,
-  hashed, and source-revalidated before any pointer is written.
+  hashed, and source-revalidated before any pointer is written. Each repository
+  Release bucket holds at most 1,000 objects; atomic file/manual groups roll from
+  `assets` to `assets-2`, `assets-3`, and later exact pointer tags without being
+  split across Releases.
 - Add Local Repository performs bounded parent-folder discovery. Repository
   Settings is wider and includes temporary submodule navigation, a full subtree
   manager, and a create-remote-repository-and-add-as-submodule workflow.

@@ -165,6 +165,11 @@ automatic transfer, open one temporary folder containing every remaining
 single-asset file, and resume only after newly detected browser uploads and all
 local sources pass SHA-256 verification.
 
+Every repository bucket is bounded to GitHub's 1,000-object Release limit.
+Whole multipart files and whole manual batches roll together from `assets` to
+`assets-2`, `assets-3`, and later exact pointer tags; processing assets count
+toward capacity but cannot be downloaded until GitHub marks them uploaded.
+
 ## Repository administration
 
 ![Unfinished file tiles stored temporarily and restored intact](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/stash-recovery.png)

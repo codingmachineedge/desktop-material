@@ -21,8 +21,11 @@ import {
   IGitHubReleaseAsset,
   IGitHubReleaseAssetList,
   IGitHubReleaseDraft,
+  GitHubReleaseAssetMaximumCount,
   GitHubReleaseAssetMaximumPages,
+  isUploadedGitHubReleaseAsset,
   normalizeGitHubReleaseAssetName,
+  validateGitHubReleaseTag,
 } from '../github-releases'
 import {
   IGitHubReleaseAssetUploadRange,
@@ -64,6 +67,8 @@ const CheapLfsMaximumWalkEntries = 4000
 const CheapLfsMaximumWalkDepth = 8
 /** Cap on pointers returned by {@link listCheapLfsPointers}. */
 const CheapLfsMaximumPointerEntries = 256
+/** Bound sequential rollover lookup to one million documented asset slots. */
+const CheapLfsMaximumReleaseBuckets = 1000
 /** Only the first bytes of a file are read to classify it as a pointer. */
 const CheapLfsSniffBytes = 4096
 /** Directories skipped by the pointer-listing walk. */
@@ -113,6 +118,12 @@ export interface ICheapLfsReleasesGateway {
     draft: IGitHubReleaseDraft,
     signal?: AbortSignal
   ): Promise<IGitHubRelease>
+  listAssets(
+    repository: Repository,
+    releaseId: number,
+    page?: number,
+    signal?: AbortSignal
+  ): Promise<IGitHubReleaseAssetList>
   createMutationReview(
     repository: Repository,
     release: IGitHubRelease,
@@ -831,6 +842,11 @@ function preflightProjectedPointer(
     1,
     Math.ceil(sourceSizeInBytes / CHEAP_LFS_PART_SIZE_BYTES)
   )
+  if (partCount > GitHubReleaseAssetMaximumCount) {
+    throw new Error(
+      `This file needs ${partCount} cheap LFS parts, but one object may use at most ${GitHubReleaseAssetMaximumCount} assets in a single release.`
+    )
+  }
   const placeholderSha256 = '0'.repeat(64)
   let projectedBytes = cheapLfsPointerTextSizeInBytes(
     serializeCheapLfsPointer({
@@ -904,6 +920,7 @@ async function removeAttemptAssets(
           `The release tagged “${releaseTag}” disappeared before cheap LFS could remove this attempt's uploaded assets.`
         )
       }
+      ensureCheapLfsBucketTag(currentRelease, releaseTag)
       const review = releases.createMutationReview(
         repository,
         currentRelease,
@@ -983,6 +1000,7 @@ export async function pinFileToRelease(
     )
   }
   ensureReleasesAccount(repository, account)
+  ensureCheapLfsReleaseFamilyTag(options.releaseTag)
 
   const baseName = normalizeGitHubReleaseAssetName(
     basename(options.absoluteFilePath)
@@ -997,31 +1015,39 @@ export async function pinFileToRelease(
     signal
   )
   onStage?.('release')
-  const existing = await releases.getReleaseByTag(
+  const bucket = await allocateCheapLfsReleaseBucket(
+    releases,
     repository,
     options.releaseTag,
+    options.releaseName,
+    hashed.parts.length,
+    async (releaseTag, releaseName) =>
+      await releases.createDraft(
+        repository,
+        {
+          tagName: releaseTag,
+          targetCommitish: await releaseTargetCommitish(
+            repository,
+            options,
+            fs
+          ),
+          name: releaseName,
+          body: '',
+          prerelease: false,
+        },
+        signal
+      ),
     signal
   )
-  const release =
-    existing ??
-    (await releases.createDraft(
-      repository,
-      {
-        tagName: options.releaseTag,
-        targetCommitish: await releaseTargetCommitish(repository, options, fs),
-        name: options.releaseName ?? options.releaseTag,
-        body: '',
-        prerelease: false,
-      },
-      signal
-    ))
+  const { release, releaseTag, assets: releaseAssets } = bucket
+  preflightProjectedPointer(sourceSizeInBytes, releaseTag, baseName)
 
   if (hashed.parts.length <= 1) {
     const part = hashed.parts[0]
-    const assetName = dedupeAssetName(baseName, release.assets, hashed.sha256)
+    const assetName = dedupeAssetName(baseName, releaseAssets, hashed.sha256)
     const pointer: ICheapLfsPointer = {
       version: CHEAP_LFS_POINTER_VERSION,
-      releaseTag: options.releaseTag,
+      releaseTag,
       assetName,
       sizeInBytes: hashed.sizeInBytes,
       sha256: hashed.sha256,
@@ -1029,7 +1055,7 @@ export async function pinFileToRelease(
     const pointerText = serializeCheapLfsPointer(pointer)
     ensurePointerFitsOnDisk(pointerText)
 
-    const preexistingAssetIds = new Set(release.assets.map(asset => asset.id))
+    const preexistingAssetIds = new Set(releaseAssets.map(asset => asset.id))
     const attemptAssets = new Array<IGitHubReleaseAsset>()
     try {
       onStage?.('uploading')
@@ -1065,7 +1091,7 @@ export async function pinFileToRelease(
         error,
         releases,
         repository,
-        options.releaseTag,
+        releaseTag,
         preexistingAssetIds,
         attemptAssets
       )
@@ -1074,7 +1100,7 @@ export async function pinFileToRelease(
 
   const partBaseName = dedupeMultiPartBaseName(
     baseName,
-    release.assets,
+    releaseAssets,
     hashed.sha256,
     hashed.parts.length
   )
@@ -1087,7 +1113,7 @@ export async function pinFileToRelease(
   )
   const pointer: ICheapLfsPointer = {
     version: CHEAP_LFS_POINTER_VERSION,
-    releaseTag: options.releaseTag,
+    releaseTag,
     assetName: partBaseName,
     sizeInBytes: hashed.sizeInBytes,
     sha256: hashed.sha256,
@@ -1098,7 +1124,7 @@ export async function pinFileToRelease(
 
   let firstAsset: IGitHubReleaseAsset | undefined
   let transferred = 0
-  const preexistingAssetIds = new Set(release.assets.map(asset => asset.id))
+  const preexistingAssetIds = new Set(releaseAssets.map(asset => asset.id))
   const attemptAssets = new Array<IGitHubReleaseAsset>()
   // The release snapshot is refreshed before each part: an earlier part adds an
   // asset, so the mutation review must reflect the release's current state.
@@ -1111,14 +1137,15 @@ export async function pinFileToRelease(
       if (index > 0) {
         const refreshed = await releases.getReleaseByTag(
           repository,
-          options.releaseTag,
+          releaseTag,
           signal
         )
         if (refreshed === null) {
           throw new Error(
-            `The release tagged “${options.releaseTag}” disappeared while its parts were uploading.`
+            `The release tagged “${releaseTag}” disappeared while its parts were uploading.`
           )
         }
+        ensureCheapLfsBucketTag(refreshed, releaseTag)
         currentRelease = refreshed
       }
       const review = releases.createMutationReview(repository, currentRelease)
@@ -1167,23 +1194,15 @@ export async function pinFileToRelease(
       error,
       releases,
       repository,
-      options.releaseTag,
+      releaseTag,
       preexistingAssetIds,
       attemptAssets
     )
   }
 }
 
-/** Release methods needed only by the browser-assisted manual fallback. */
-export interface ICheapLfsManualReleasesGateway
-  extends ICheapLfsReleasesGateway {
-  listAssets(
-    repository: Repository,
-    releaseId: number,
-    page?: number,
-    signal?: AbortSignal
-  ): Promise<IGitHubReleaseAssetList>
-}
+/** Release methods used by the browser-assisted manual fallback. */
+export type ICheapLfsManualReleasesGateway = ICheapLfsReleasesGateway
 
 /** One exact release asset and eventual pointer in a manual batch. */
 export interface ICheapLfsManualFilePlan {
@@ -1204,7 +1223,7 @@ export interface ICheapLfsManualPinPlan {
 }
 
 async function listAllCheapLfsReleaseAssets(
-  releases: ICheapLfsManualReleasesGateway,
+  releases: ICheapLfsReleasesGateway,
   repository: Repository,
   releaseId: number,
   signal?: AbortSignal
@@ -1219,6 +1238,9 @@ async function listAllCheapLfsReleaseAssets(
       page,
       signal
     )
+    if (result.page !== page) {
+      throw new Error('GitHub returned an unexpected release asset page.')
+    }
     for (const asset of result.assets) {
       if (assetIds.has(asset.id)) {
         throw new Error('GitHub returned duplicate release asset ids.')
@@ -1226,10 +1248,13 @@ async function listAllCheapLfsReleaseAssets(
       assetIds.add(asset.id)
       assets.push(asset)
     }
-    if (result.capped) {
+    if (result.capped && assets.length !== GitHubReleaseAssetMaximumCount) {
       throw new Error(
-        'This release has too many assets to choose a collision-safe manual cheap LFS name.'
+        'This release has too many assets to count safely because GitHub capped its inventory early.'
       )
+    }
+    if (assets.length > GitHubReleaseAssetMaximumCount) {
+      throw new Error('GitHub returned too many assets for one release.')
     }
     if (result.nextPage === null) {
       return assets
@@ -1240,7 +1265,219 @@ async function listAllCheapLfsReleaseAssets(
     page = result.nextPage
   }
   throw new Error(
-    'This release has too many assets to choose a collision-safe manual cheap LFS name.'
+    'This release has too many assets to count safely because GitHub capped its inventory early.'
+  )
+}
+
+interface ICheapLfsReleaseBucket {
+  readonly release: IGitHubRelease
+  readonly releaseTag: string
+  readonly assets: ReadonlyArray<IGitHubReleaseAsset>
+  readonly index: number
+}
+
+function cheapLfsReleaseBucketTag(baseTag: string, index: number): string {
+  return validateGitHubReleaseTag(index === 1 ? baseTag : `${baseTag}-${index}`)
+}
+
+function ensureCheapLfsReleaseFamilyTag(baseTag: string): void {
+  try {
+    cheapLfsReleaseBucketTag(baseTag, 1)
+    cheapLfsReleaseBucketTag(baseTag, CheapLfsMaximumReleaseBuckets)
+  } catch {
+    throw new Error(
+      'The cheap LFS release tag is too long to reserve safe rollover suffixes.'
+    )
+  }
+}
+
+function cheapLfsReleaseBucketName(
+  configuredName: string | undefined,
+  releaseTag: string
+): string {
+  // Reuse an explicitly configured display name. Appending a bucket suffix can
+  // push an otherwise valid 1,024-character name over GitHub's API limit; the
+  // exact derived tag already identifies the bucket unambiguously.
+  return configuredName ?? releaseTag
+}
+
+function ensureCheapLfsBucketTag(
+  release: IGitHubRelease,
+  expectedTag: string
+): void {
+  if (release.tagName !== expectedTag) {
+    throw new Error(
+      `GitHub returned release “${release.tagName}” while cheap LFS requested “${expectedTag}”.`
+    )
+  }
+}
+
+function mergeCheapLfsReleaseAssetSnapshots(
+  release: IGitHubRelease,
+  listedAssets: ReadonlyArray<IGitHubReleaseAsset>
+): ReadonlyArray<IGitHubReleaseAsset> {
+  const byId = new Map(listedAssets.map(asset => [asset.id, asset]))
+  // A GET-by-tag preview and the paginated inventory are separate provider
+  // snapshots. Retaining a preview-only id is conservative under concurrent
+  // deletion and also prevents a stale name from being reused accidentally.
+  for (const asset of release.assets) {
+    if (!byId.has(asset.id)) {
+      byId.set(asset.id, asset)
+    }
+  }
+  return [...byId.values()]
+}
+
+/**
+ * Choose the latest contiguous release bucket with enough room for one atomic
+ * cheap-LFS object group. Exponential and binary exact-tag probes avoid paging
+ * every historical bucket on each upload. Buckets use `<base>`, `<base>-2`,
+ * `<base>-3`, and never exceed GitHub's documented 1,000-asset capacity.
+ */
+async function allocateCheapLfsReleaseBucket(
+  releases: ICheapLfsReleasesGateway,
+  repository: Repository,
+  baseTag: string,
+  configuredName: string | undefined,
+  requiredAssetCount: number,
+  createRelease: (
+    releaseTag: string,
+    releaseName: string
+  ) => Promise<IGitHubRelease>,
+  signal?: AbortSignal
+): Promise<ICheapLfsReleaseBucket> {
+  if (
+    !Number.isSafeInteger(requiredAssetCount) ||
+    requiredAssetCount < 1 ||
+    requiredAssetCount > GitHubReleaseAssetMaximumCount
+  ) {
+    throw new Error(
+      `One cheap LFS object group must use between 1 and ${GitHubReleaseAssetMaximumCount} release assets.`
+    )
+  }
+
+  const releaseCache = new Map<number, IGitHubRelease | null>()
+  const releaseAt = async (index: number): Promise<IGitHubRelease | null> => {
+    if (signal?.aborted) {
+      throw abortError('Cheap LFS release preparation canceled.')
+    }
+    const releaseTag = cheapLfsReleaseBucketTag(baseTag, index)
+    if (!releaseCache.has(index)) {
+      releaseCache.set(
+        index,
+        await releases.getReleaseByTag(repository, releaseTag, signal)
+      )
+    }
+    const release = releaseCache.get(index) ?? null
+    if (release !== null) {
+      ensureCheapLfsBucketTag(release, releaseTag)
+    }
+    return release
+  }
+
+  let activeIndex = 1
+  const firstRelease = await releaseAt(1)
+  let derivedTagsSupported = true
+  try {
+    cheapLfsReleaseBucketTag(baseTag, 2)
+  } catch {
+    derivedTagsSupported = false
+  }
+  if (firstRelease !== null) {
+    const firstListedAssets = await listAllCheapLfsReleaseAssets(
+      releases,
+      repository,
+      firstRelease.id,
+      signal
+    )
+    const firstAssets = mergeCheapLfsReleaseAssetSnapshots(
+      firstRelease,
+      firstListedAssets
+    )
+    if (
+      firstAssets.length <=
+      GitHubReleaseAssetMaximumCount - requiredAssetCount
+    ) {
+      return {
+        release: firstRelease,
+        releaseTag: cheapLfsReleaseBucketTag(baseTag, 1),
+        assets: firstAssets,
+        index: 1,
+      }
+    }
+    activeIndex = 2
+  }
+  if (
+    firstRelease !== null &&
+    derivedTagsSupported &&
+    (await releaseAt(2)) !== null
+  ) {
+    let lower = 2
+    let upper = 4
+    while (upper <= CheapLfsMaximumReleaseBuckets) {
+      const candidate = await releaseAt(upper)
+      if (candidate === null) {
+        break
+      }
+      lower = upper
+      if (lower === CheapLfsMaximumReleaseBuckets) {
+        break
+      }
+      upper = Math.min(CheapLfsMaximumReleaseBuckets, upper * 2)
+    }
+    while (lower + 1 < upper) {
+      const middle = Math.floor((lower + upper) / 2)
+      if ((await releaseAt(middle)) === null) {
+        upper = middle
+      } else {
+        lower = middle
+      }
+    }
+    activeIndex = lower
+  }
+
+  for (
+    let index = activeIndex;
+    index <= CheapLfsMaximumReleaseBuckets;
+    index++
+  ) {
+    if (signal?.aborted) {
+      throw abortError('Cheap LFS release preparation canceled.')
+    }
+    const releaseTag = cheapLfsReleaseBucketTag(baseTag, index)
+    const releaseName = cheapLfsReleaseBucketName(configuredName, releaseTag)
+    let release = await releaseAt(index)
+    if (release === null) {
+      try {
+        release = await createRelease(releaseTag, releaseName)
+      } catch (createError) {
+        // A second operation may have claimed the same missing bucket after our
+        // lookup. Re-read once; otherwise retain the provider's original error.
+        release = await releases.getReleaseByTag(repository, releaseTag, signal)
+        if (release === null) {
+          throw createError
+        }
+      }
+      // Keep provider identity validation outside the conflict-recovery catch:
+      // a successful create that returns the wrong tag is never a conflict.
+      ensureCheapLfsBucketTag(release, releaseTag)
+      releaseCache.set(index, release)
+    }
+
+    const listedAssets = await listAllCheapLfsReleaseAssets(
+      releases,
+      repository,
+      release.id,
+      signal
+    )
+    const assets = mergeCheapLfsReleaseAssetSnapshots(release, listedAssets)
+    if (assets.length <= GitHubReleaseAssetMaximumCount - requiredAssetCount) {
+      return { release, releaseTag, assets, index }
+    }
+  }
+
+  throw new Error(
+    `Cheap LFS could not find room after checking ${CheapLfsMaximumReleaseBuckets} release buckets.`
   )
 }
 
@@ -1261,10 +1498,16 @@ export async function planCheapLfsManualUpload(
   if (options.length === 0) {
     throw new Error('Cheap LFS has no files to prepare for manual upload.')
   }
-  const releaseTag = options[0].releaseTag
-  if (options.some(candidate => candidate.releaseTag !== releaseTag)) {
+  if (options.length > GitHubReleaseAssetMaximumCount) {
+    throw new Error(
+      `One manual cheap LFS batch can contain at most ${GitHubReleaseAssetMaximumCount} files.`
+    )
+  }
+  const baseReleaseTag = options[0].releaseTag
+  if (options.some(candidate => candidate.releaseTag !== baseReleaseTag)) {
     throw new Error('A manual cheap LFS batch must use one release tag.')
   }
+  ensureCheapLfsReleaseFamilyTag(baseReleaseTag)
   ensureReleasesAccount(repository, account)
   onStage?.('hashing')
   const hashedFiles = new Array<{
@@ -1286,7 +1529,7 @@ export async function planCheapLfsManualUpload(
       basename(candidate.absoluteFilePath)
     )
     const sourceSize = await fs.statSize(candidate.absoluteFilePath)
-    preflightProjectedPointer(sourceSize, releaseTag, baseName)
+    preflightProjectedPointer(sourceSize, baseReleaseTag, baseName)
     if (sourceSize > CHEAP_LFS_PART_SIZE_BYTES) {
       throw new Error(
         `“${trackedRelativePath}” needs multipart assets. Manual cheap LFS upload currently supports files under 2 GiB; use the automatic upload for this file.`
@@ -1311,34 +1554,31 @@ export async function planCheapLfsManualUpload(
   }
 
   onStage?.('release')
-  const existing = await releases.getReleaseByTag(
-    repository,
-    releaseTag,
-    signal
-  )
-  const release =
-    existing ??
-    (await releases.createDraft(
-      repository,
-      {
-        tagName: releaseTag,
-        targetCommitish: await releaseTargetCommitish(
-          repository,
-          options[0],
-          fs
-        ),
-        name: options[0].releaseName ?? releaseTag,
-        body: '',
-        prerelease: false,
-      },
-      signal
-    ))
-  const allAssets = await listAllCheapLfsReleaseAssets(
+  const bucket = await allocateCheapLfsReleaseBucket(
     releases,
     repository,
-    release.id,
+    baseReleaseTag,
+    options[0].releaseName,
+    hashedFiles.length,
+    async (releaseTag, releaseName) =>
+      await releases.createDraft(
+        repository,
+        {
+          tagName: releaseTag,
+          targetCommitish: await releaseTargetCommitish(
+            repository,
+            options[0],
+            fs
+          ),
+          name: releaseName,
+          body: '',
+          prerelease: false,
+        },
+        signal
+      ),
     signal
   )
+  const { release, releaseTag, assets: allAssets } = bucket
   const preexistingAssetIds = new Set(allAssets.map(asset => asset.id))
   const reservedNames = new Set(allAssets.map(asset => asset.name))
   const files = hashedFiles.map(file => {
@@ -1349,6 +1589,11 @@ export async function planCheapLfsManualUpload(
       reservedNames
     )
     reservedNames.add(assetName)
+    preflightProjectedPointer(
+      file.hashed.sizeInBytes,
+      releaseTag,
+      file.baseName
+    )
     const pointer: ICheapLfsPointer = {
       version: CHEAP_LFS_POINTER_VERSION,
       releaseTag,
@@ -1379,6 +1624,11 @@ function resolveReleaseAsset(
   const asset = release.assets.find(candidate => candidate.name === name)
   if (asset === undefined) {
     throw new Error(`Release “${releaseTag}” has no asset named “${name}”.`)
+  }
+  if (!isUploadedGitHubReleaseAsset(asset)) {
+    throw new Error(
+      `Release “${releaseTag}” has not finished uploading asset “${name}”.`
+    )
   }
   return asset
 }

@@ -15,9 +15,11 @@ import { Account } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { getHTMLURL } from '../api'
 import {
+  GitHubReleaseAssetMaximumCount,
   GitHubReleaseAssetMaximumPages,
   IGitHubRelease,
   IGitHubReleaseAsset,
+  isUploadedGitHubReleaseAsset,
 } from '../github-releases'
 import {
   CheapLfsAutoPinPhase,
@@ -322,6 +324,9 @@ async function listAllAssets(
       page,
       signal
     )
+    if (result.page !== page) {
+      throw new Error('GitHub returned an unexpected release asset page.')
+    }
     for (const asset of result.assets) {
       if (assetIds.has(asset.id)) {
         throw new Error('GitHub returned duplicate release asset ids.')
@@ -329,7 +334,12 @@ async function listAllAssets(
       assetIds.add(asset.id)
       assets.push(asset)
     }
-    if (result.capped) {
+    if (result.capped && assets.length !== GitHubReleaseAssetMaximumCount) {
+      throw new Error(
+        'This release has too many assets to verify a manual cheap LFS upload safely.'
+      )
+    }
+    if (assets.length > GitHubReleaseAssetMaximumCount) {
       throw new Error(
         'This release has too many assets to verify a manual cheap LFS upload safely.'
       )
@@ -366,6 +376,7 @@ async function waitForNewAssets(
     for (const file of plan.files) {
       const named = assets.filter(
         asset =>
+          isUploadedGitHubReleaseAsset(asset) &&
           asset.name === file.assetName &&
           !plan.preexistingAssetIds.has(asset.id)
       )

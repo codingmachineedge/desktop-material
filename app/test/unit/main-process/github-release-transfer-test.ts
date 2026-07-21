@@ -61,6 +61,7 @@ const downloadRequest = (
   asset: {
     id: 19,
     name: 'desktop.exe',
+    state: 'uploaded',
     sizeInBytes: bytes.byteLength,
     digest,
   },
@@ -252,6 +253,62 @@ describe('main-process GitHub release transfer', () => {
         sender.sent.map(progress => progress.transferredBytes),
         [0, bytes.byteLength]
       )
+    })
+  })
+
+  it('refuses incomplete provider assets for uploads and downloads', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'desktop.exe')
+      await writeFile(source, bytes)
+      const cleanupRequests = new Array<{ url: string; method: string }>()
+      const dependencies: IGitHubReleaseTransferDependencies = {
+        fetch: async (url, init) => {
+          cleanupRequests.push({ url, method: init.method ?? 'GET' })
+          return new Response(null, { status: 204 })
+        },
+        upload: async () =>
+          new Response(
+            JSON.stringify({ ...uploadedAsset(), state: 'starter' }),
+            { status: 201 }
+          ),
+        redirects: noRedirects,
+      }
+
+      const upload = await handleGitHubReleaseAssetUpload(
+        new TestSender(20),
+        uploadRequest(source),
+        dependencies
+      )
+      const download = await handleGitHubReleaseAssetDownload(
+        new TestSender(21),
+        downloadRequest(join(directory, 'incomplete.exe'), {
+          asset: {
+            id: 19,
+            name: 'desktop.exe',
+            state: 'starter',
+            sizeInBytes: bytes.byteLength,
+            digest,
+          },
+        }),
+        dependencies
+      )
+
+      assert.deepEqual(upload, {
+        ok: false,
+        reason: 'invalid-response',
+        status: null,
+      })
+      assert.deepEqual(download, {
+        ok: false,
+        reason: 'invalid-request',
+        status: null,
+      })
+      assert.deepEqual(cleanupRequests, [
+        {
+          url: 'https://api.github.com/repos/desktop/material/releases/assets/19',
+          method: 'DELETE',
+        },
+      ])
     })
   })
 

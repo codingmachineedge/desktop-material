@@ -124,6 +124,7 @@ describe('GitHub release transfer renderer client', () => {
     assert.deepEqual(requests[0].request.asset, {
       id: 19,
       name: 'desktop.exe',
+      state: 'uploaded',
       sizeInBytes: 4,
       digest: asset.digest,
     })

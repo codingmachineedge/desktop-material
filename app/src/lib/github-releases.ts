@@ -7,8 +7,12 @@ export const GitHubReleaseMaximumPages = 10
 /** GitHub's maximum documented page size for release assets. */
 export const GitHubReleaseAssetPageSize = 100
 
-/** Keep one release's asset browser bounded to 500 records. */
-export const GitHubReleaseAssetMaximumPages = 5
+/** GitHub permits at most 1,000 assets on one release. */
+export const GitHubReleaseAssetMaximumCount = 1000
+
+/** Cover one release's complete documented asset capacity. */
+export const GitHubReleaseAssetMaximumPages =
+  GitHubReleaseAssetMaximumCount / GitHubReleaseAssetPageSize
 
 /** Asset uploads are streamed from disk by the isolated main-process transfer. */
 export const GitHubReleaseAssetMaximumUploadBytes = 2 * 1024 * 1024 * 1024
@@ -20,7 +24,8 @@ export interface IGitHubReleaseAsset {
   readonly id: number
   readonly name: string
   readonly label: string | null
-  readonly state: 'uploaded'
+  /** Provider lifecycle state; only `uploaded` assets may be downloaded. */
+  readonly state: string
   readonly contentType: string
   readonly sizeInBytes: number
   readonly downloadCount: number
@@ -242,9 +247,6 @@ function digest(value: unknown): string | null {
 function parseReleaseAsset(value: unknown): IGitHubReleaseAsset {
   const input = record(value, 'release asset')
   const state = boundedText(input.state, 'release asset state', 32)
-  if (state !== 'uploaded') {
-    throw new Error('GitHub returned a release asset that is not uploaded.')
-  }
   const name = boundedText(input.name, 'release asset name', 255)
   if (invalidAssetNameCharacters.test(name) || name === '.' || name === '..') {
     throw new Error('GitHub returned an unsafe release asset name.')
@@ -271,6 +273,13 @@ function parseReleaseAsset(value: unknown): IGitHubReleaseAsset {
   }
 }
 
+/** Incomplete provider assets still consume release capacity but are not files. */
+export function isUploadedGitHubReleaseAsset(
+  asset: IGitHubReleaseAsset
+): boolean {
+  return asset.state === 'uploaded'
+}
+
 function parseRelease(value: unknown): IGitHubRelease {
   const input = record(value, 'release')
   if (
@@ -279,7 +288,10 @@ function parseRelease(value: unknown): IGitHubRelease {
   ) {
     throw new Error('GitHub returned an invalid release state.')
   }
-  if (!Array.isArray(input.assets) || input.assets.length > 100) {
+  if (
+    !Array.isArray(input.assets) ||
+    input.assets.length > GitHubReleaseAssetMaximumCount
+  ) {
     throw new Error('GitHub returned an invalid release asset preview.')
   }
   const author = record(input.author, 'release author')

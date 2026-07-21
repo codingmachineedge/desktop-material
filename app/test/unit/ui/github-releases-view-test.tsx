@@ -183,6 +183,41 @@ describe('GitHub Releases view', () => {
     assert.deepEqual(pages, [1, 2])
   })
 
+  it('shows incomplete assets as processing and blocks their download', async () => {
+    const starter = { ...asset, state: 'starter' }
+    let downloads = 0
+    const store = fakeStore({
+      listAssets: async () => ({
+        assets: [starter],
+        page: 1,
+        nextPage: null,
+        capped: false,
+      }),
+      downloadAsset: async () => {
+        downloads++
+        throw new Error('unexpected incomplete download')
+      },
+    })
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+
+    await waitFor(() => assert.ok(screen.getByText('Processing')))
+    const download = screen.getByRole('button', { name: 'Download' })
+    assert.equal(download.getAttribute('aria-disabled'), 'true')
+    assert.equal(
+      screen
+        .getByRole('button', { name: 'Delete' })
+        .getAttribute('aria-disabled'),
+      null
+    )
+    assert.equal(downloads, 0)
+  })
+
   it('summarizes, filters, and exposes rich metadata for loaded releases', async () => {
     const stable = {
       ...draft,
