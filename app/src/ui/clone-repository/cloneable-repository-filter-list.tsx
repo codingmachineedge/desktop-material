@@ -1,4 +1,5 @@
 import * as React from 'react'
+import classNames from 'classnames'
 import { Account, accountEquals } from '../../models/account'
 import { IFilterListGroup } from '../lib/filter-list'
 import { IAPIRepository } from '../../lib/api'
@@ -19,6 +20,15 @@ import { Ref } from '../lib/ref'
 import { SectionFilterList } from '../lib/section-filter-list'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
+import {
+  formatRepositoryCount,
+  formatRepositorySize,
+  formatRepositoryUpdated,
+  getLanguageColor,
+} from './repository-metadata'
+import { LanguageMode } from '../../models/language-mode'
+import { getPersistedLanguageMode, translate } from '../../lib/i18n'
 
 interface ICloneableRepositoryFilterListProps {
   /** The account to clone from. */
@@ -127,6 +137,20 @@ interface ICloneableRepositoryFilterListProps {
         readonly index: unknown
         readonly item: ICloneableRepositoryListItem | null
       }) => number)
+
+  /**
+   * The active language mode used to localize the per-row metadata labels. When
+   * omitted, the persisted mode is read directly (the reused submodule/subtree
+   * lists that don't localize their rows can leave this unset).
+   */
+  readonly languageMode?: LanguageMode
+
+  /**
+   * When true each row paints the rich repository metadata card used by the
+   * Clone dialog. The reused submodule and subtree pickers leave this off and
+   * keep the compact single-line row.
+   */
+  readonly showMetadata?: boolean
 }
 
 const RowHeight = 31
@@ -187,14 +211,33 @@ interface ICloneableRepositoryListItemProps {
 
   /** Called with the row's clone URL when the submodule badge is clicked. */
   readonly onShowSubmodules?: (url: string) => void
+
+  /**
+   * When true the row paints the rich metadata card (description, language,
+   * stars, forks, size, default branch, last updated, visibility pill). The
+   * reused compact lists (submodules, subtree) leave this false.
+   */
+  readonly showMetadata?: boolean
+
+  /** Active language mode for localizing the metadata labels. */
+  readonly languageMode: LanguageMode
+}
+
+interface IRepositoryMetadataItem {
+  readonly key: string
+  readonly icon: MaterialSymbolName
+  readonly value: string
+  readonly label: string
 }
 
 /**
  * A single row in the cloneable repository list. Encapsulated in its own
  * component so the per-row checkbox handlers can be stable instance methods
  * rather than inline arrow functions.
+ *
+ * Exported for focused row-rendering tests.
  */
-class CloneableRepositoryListItem extends React.PureComponent<ICloneableRepositoryListItemProps> {
+export class CloneableRepositoryListItem extends React.PureComponent<ICloneableRepositoryListItemProps> {
   private onCheckboxClick = (event: React.MouseEvent<HTMLSpanElement>) => {
     // Prevent the row's own click/selection handler from firing when the user
     // is only toggling the multi-clone checkbox.
@@ -242,12 +285,188 @@ class CloneableRepositoryListItem extends React.PureComponent<ICloneableReposito
     )
   }
 
-  public render() {
-    const { item, matches, checked, onToggleItemChecked } = this.props
-    const checkable = onToggleItemChecked !== undefined
+  private localize = (
+    key: Parameters<typeof translate>[0],
+    variables?: Parameters<typeof translate>[2]
+  ) => translate(key, this.props.languageMode, variables)
+
+  private renderVisibilityPill() {
+    const isPrivate = this.props.item.isPrivate
+    const label = isPrivate
+      ? this.localize('clone.visibilityPrivate')
+      : this.localize('clone.visibilityPublic')
 
     return (
-      <div className="clone-repository-list-item">
+      <span
+        className={classNames('visibility-pill', {
+          private: isPrivate,
+        })}
+      >
+        <MaterialSymbol name={isPrivate ? 'lock' : 'public'} size={12} />
+        {label}
+      </span>
+    )
+  }
+
+  private renderDescription() {
+    const { description } = this.props.item
+    const hasDescription =
+      description !== null &&
+      description !== undefined &&
+      description.trim().length > 0
+
+    return (
+      <TooltippedContent
+        className={classNames('repo-description', { empty: !hasDescription })}
+        tooltip={hasDescription ? description! : undefined}
+        onlyWhenOverflowed={true}
+        tagName="div"
+      >
+        {hasDescription ? description : this.localize('clone.noDescription')}
+      </TooltippedContent>
+    )
+  }
+
+  private getMetadataItems(): ReadonlyArray<IRepositoryMetadataItem> {
+    const { item } = this.props
+    const items = new Array<IRepositoryMetadataItem>()
+
+    const stars = formatRepositoryCount(item.stargazers)
+    if (stars !== null) {
+      items.push({
+        key: 'stars',
+        icon: 'star',
+        value: stars,
+        label: this.localize('clone.starsLabel', { count: stars }),
+      })
+    }
+
+    const forks = formatRepositoryCount(item.forks)
+    if (forks !== null) {
+      items.push({
+        key: 'forks',
+        icon: 'fork_right',
+        value: forks,
+        label: this.localize('clone.forksLabel', { count: forks }),
+      })
+    }
+
+    const size = formatRepositorySize(item.sizeInKilobytes)
+    if (size !== null) {
+      items.push({
+        key: 'size',
+        icon: 'database',
+        value: size,
+        label: this.localize('clone.sizeLabel', { size }),
+      })
+    }
+
+    if (item.defaultBranch !== undefined && item.defaultBranch.length > 0) {
+      items.push({
+        key: 'branch',
+        icon: 'alt_route',
+        value: item.defaultBranch,
+        label: this.localize('clone.defaultBranchLabel', {
+          branch: item.defaultBranch,
+        }),
+      })
+    }
+
+    const updated = formatRepositoryUpdated(item.updatedAt)
+    if (updated !== null) {
+      items.push({
+        key: 'updated',
+        icon: 'schedule',
+        value: updated,
+        label: this.localize('clone.updatedLabel', { time: updated }),
+      })
+    }
+
+    return items
+  }
+
+  private renderMetadata() {
+    const { item } = this.props
+    const hasLanguage =
+      item.language !== null &&
+      item.language !== undefined &&
+      item.language.length > 0
+    const metadataItems = this.getMetadataItems()
+
+    // The container is always rendered (even when a sparse older-GHES response
+    // yields no metrics) so every metadata row paints at the same fixed height
+    // the virtualized list is told to hit-test against.
+    return (
+      <div className="repo-meta">
+        {hasLanguage && (
+          <span
+            className="meta-item meta-language"
+            role="img"
+            aria-label={this.localize('clone.languageLabel', {
+              language: item.language!,
+            })}
+          >
+            <span
+              className="lang-dot"
+              style={{ backgroundColor: getLanguageColor(item.language) }}
+              aria-hidden={true}
+            />
+            {item.language}
+          </span>
+        )}
+        {metadataItems.map(metadata => (
+          <span
+            key={metadata.key}
+            className="meta-item"
+            role="img"
+            aria-label={metadata.label}
+          >
+            <MaterialSymbol name={metadata.icon} size={14} />
+            <span aria-hidden={true}>{metadata.value}</span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  public render() {
+    const { item, matches, checked, onToggleItemChecked, showMetadata } =
+      this.props
+    const checkable = onToggleItemChecked !== undefined
+
+    if (showMetadata !== true) {
+      return (
+        <div className="clone-repository-list-item">
+          {checkable && (
+            <span
+              className="checkbox"
+              role="presentation"
+              onClick={this.onCheckboxClick}
+            >
+              <Checkbox
+                value={checked ? CheckboxValue.On : CheckboxValue.Off}
+                onChange={this.onCheckboxChange}
+                ariaLabel={`Select ${item.text[0]} for cloning`}
+              />
+            </span>
+          )}
+          <Octicon className="icon" symbol={item.icon} />
+          <TooltippedContent
+            className="name"
+            tooltip={item.text[0]}
+            onlyWhenOverflowed={true}
+            tagName="div"
+          >
+            <HighlightText text={item.text[0]} highlight={matches.title} />
+          </TooltippedContent>
+          {this.renderSubmoduleBadge()}
+          {item.archived && <div className="archived">Archived</div>}
+        </div>
+      )
+    }
+
+    return (
+      <div className="clone-repository-list-item with-metadata">
         {checkable && (
           <span
             className="checkbox"
@@ -262,16 +481,23 @@ class CloneableRepositoryListItem extends React.PureComponent<ICloneableReposito
           </span>
         )}
         <Octicon className="icon" symbol={item.icon} />
-        <TooltippedContent
-          className="name"
-          tooltip={item.text[0]}
-          onlyWhenOverflowed={true}
-          tagName="div"
-        >
-          <HighlightText text={item.text[0]} highlight={matches.title} />
-        </TooltippedContent>
-        {this.renderSubmoduleBadge()}
-        {item.archived && <div className="archived">Archived</div>}
+        <div className="repo-details">
+          <div className="repo-header">
+            <TooltippedContent
+              className="name"
+              tooltip={item.text[0]}
+              onlyWhenOverflowed={true}
+              tagName="div"
+            >
+              <HighlightText text={item.text[0]} highlight={matches.title} />
+            </TooltippedContent>
+            {this.renderVisibilityPill()}
+            {this.renderSubmoduleBadge()}
+            {item.archived && <div className="archived">Archived</div>}
+          </div>
+          {this.renderDescription()}
+          {this.renderMetadata()}
+        </div>
       </div>
     )
   }
@@ -440,6 +666,8 @@ export class CloneableRepositoryFilterList extends React.PureComponent<ICloneabl
         onShowSubmodules={
           this.props.onShowSubmodules ? this.onShowSubmodulesForUrl : undefined
         }
+        showMetadata={this.props.showMetadata}
+        languageMode={this.props.languageMode ?? getPersistedLanguageMode()}
       />
     )
   }

@@ -393,6 +393,31 @@ export interface IAPIRepository {
   readonly pushed_at: string
   readonly has_issues: boolean
   readonly archived: boolean
+
+  /**
+   * Rich listing metadata surfaced in the clone dialog rows. These are all
+   * optional because older GitHub Enterprise Server responses (and the GitLab
+   * / Bitbucket adapters below) may omit them; every consumer degrades
+   * gracefully when a field is absent.
+   */
+
+  /** Short repository description, or null when the owner left it blank. */
+  readonly description?: string | null
+
+  /** Primary language as detected by GitHub, or null when undetermined. */
+  readonly language?: string | null
+
+  /** Number of users that have starred the repository. */
+  readonly stargazers_count?: number
+
+  /** Number of forks of the repository. */
+  readonly forks_count?: number
+
+  /** On-disk size of the repository in kilobytes. */
+  readonly size?: number
+
+  /** ISO-8601 timestamp of the repository's last update. */
+  readonly updated_at?: string
 }
 
 /** Information needed to clone a repository. */

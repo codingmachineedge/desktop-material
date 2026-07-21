@@ -1,0 +1,54 @@
+// Material Design 3 ripple (state layer) + theme reveal pulse.
+//
+// The `dmRipple` and `dmReveal` @keyframes are declared globally in
+// `app/styles/material/_motion.scss`; this partial only styles the transient
+// elements that consume them. The ripple span is spawned by
+// `app/src/ui/lib/ripple.ts` (`attachRipple`) and the reveal overlay by
+// `AppTheme` (`app/src/ui/app-theme.tsx`). Both mirror `Desktop Material
+// v2.dc.html` 1:1.
+
+// The ripple span. Sized/positioned inline by `attachRipple`; it inherits the
+// host's text colour so the state layer matches each control's `on-*` role.
+.md-ripple {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 999px;
+  background-color: currentColor;
+  opacity: 0.22;
+  transform: scale(0);
+  will-change: transform, opacity;
+  animation: dmRipple 620ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+// Give the shared Button a positioning + clipping context so ripples originate
+// at the press point and stay within the pill silhouette. `.button-component`
+// already clips via `overflow: hidden` (the `ellipsis` mixin); we only need to
+// establish the containing block for the absolutely positioned span.
+.button-component {
+  position: relative;
+}
+
+// Full-screen reveal pulse mounted transiently on every theme change. Radiates
+// from the app-bar theme toggle corner (transform-origin 78% 8%) and is removed
+// on `animationend`.
+.theme-reveal-overlay {
+  position: fixed;
+  inset: -60vmax;
+  z-index: 100;
+  pointer-events: none;
+  border-radius: 999px;
+  transform-origin: 78% 8%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--md-sys-color-primary) 32%, transparent) 0%, transparent 62%);
+  animation: dmReveal calc(750ms * var(--mdur, 1)) var(--emph, cubic-bezier(0.2, 0, 0, 1)) forwards;
+}
+
+// Explicit instant-fade fallback. `attachRipple`/`AppTheme` already skip
+// spawning under reduced motion (system or `data-dm-motion="reduced"`), and the
+// global reduced-motion rules in `_material-shell.scss` force every animation to
+// ~0. This keeps the intent local to the feature as well.
+@media (prefers-reduced-motion: reduce) {
+  .md-ripple,
+  .theme-reveal-overlay {
+    animation-duration: 0.01ms;
+  }
+}

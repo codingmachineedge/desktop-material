@@ -15,12 +15,15 @@ if (globalThis.localStorage === undefined) {
 // These constants are defined by Webpack at build time, but since tests aren't
 // built with Webpack we need to make sure these exist at runtime.
 const packageInfo = await import('../package.json')
+const { AppDisplayName } = await import('../app-info')
 
 Object.assign(globalThis, {
   __DEV__: false,
   __TEST__: true,
   __DEV_SECRETS__: false,
-  __APP_NAME__: packageInfo.productName,
+  // Mirror production: `__APP_NAME__` is the user-visible display name
+  // (`Desktop Material`), NOT the on-disk `productName` (`GitHub Desktop`).
+  __APP_NAME__: AppDisplayName,
   __APP_VERSION__: packageInfo.version,
   __RELEASE_CHANNEL__: 'development',
   __UPDATES_URL__: '',

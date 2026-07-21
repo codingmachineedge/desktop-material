@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { DialogContent } from '../dialog'
-import { Checkbox, CheckboxValue } from '../lib/checkbox'
+import { MaterialSwitch } from '../lib/material-switch'
 import { LinkButton } from '../lib/link-button'
 import {
   getNotificationSettingsUrl,
@@ -13,6 +13,12 @@ import {
 } from '../main-process-proxy'
 import { RadioGroup } from '../lib/radio-group'
 import { ErrorPresentationStyle } from '../../models/error-presentation'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
 interface INotificationPreferencesProps {
   readonly notificationsEnabled: boolean
@@ -24,6 +30,7 @@ interface INotificationPreferencesProps {
 }
 
 interface INotificationPreferencesState {
+  readonly languageMode: LanguageMode
   readonly suggestGrantNotificationPermission: boolean
   readonly warnNotificationsDenied: boolean
   readonly suggestConfigureNotifications: boolean
@@ -37,6 +44,7 @@ export class Notifications extends React.Component<
     super(props)
 
     this.state = {
+      languageMode: getPersistedLanguageMode(),
       suggestGrantNotificationPermission: false,
       warnNotificationsDenied: false,
       suggestConfigureNotifications: false,
@@ -45,12 +53,25 @@ export class Notifications extends React.Component<
 
   public componentDidMount() {
     this.updateNotificationsState()
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
   }
 
-  private onNotificationsEnabledChanged = (
-    event: React.FormEvent<HTMLInputElement>
-  ) => {
-    this.props.onNotificationsEnabledChanged(event.currentTarget.checked)
+  public componentWillUnmount() {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
   }
 
   private onErrorPresentationStyleChanged = (style: ErrorPresentationStyle) => {
@@ -78,23 +99,39 @@ export class Notifications extends React.Component<
   }
 
   public render() {
+    const { languageMode } = this.state
     return (
       <DialogContent>
         <div className="advanced-section">
           <h2>Notifications</h2>
-          <Checkbox
-            label="Enable notifications"
-            value={
-              this.props.notificationsEnabled
-                ? CheckboxValue.On
-                : CheckboxValue.Off
-            }
-            onChange={this.onNotificationsEnabledChanged}
-          />
-          <p className="settings-description">
-            Allows the display of notifications when high-signal events take
-            place in the current repository.{this.renderNotificationHint()}
-          </p>
+          <div className="preference-toggle-card">
+            <div className="preference-toggle-row">
+              <div className="preference-toggle-text">
+                <span
+                  className="preference-toggle-title"
+                  id="notifications-enable-title"
+                >
+                  {translate('settings.notificationsEnableTitle', languageMode)}
+                </span>
+                <p
+                  className="settings-description"
+                  id="notifications-enable-description"
+                >
+                  {translate(
+                    'settings.notificationsEnableDescription',
+                    languageMode
+                  )}
+                  {this.renderNotificationHint()}
+                </p>
+              </div>
+              <MaterialSwitch
+                checked={this.props.notificationsEnabled}
+                onChange={this.props.onNotificationsEnabledChanged}
+                ariaLabelledBy="notifications-enable-title"
+                ariaDescribedBy="notifications-enable-description"
+              />
+            </div>
+          </div>
         </div>
         <div className="advanced-section error-presentation-preferences">
           <h2 id="error-presentation-heading">Application errors</h2>

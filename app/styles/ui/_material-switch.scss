@@ -1,0 +1,98 @@
+// Material Design 3 switch (see app/src/ui/lib/material-switch.tsx).
+//
+// A role="switch" button whose pill track and sliding thumb are drawn entirely
+// from --md-sys-* tokens, mirroring the Desktop Material v2 design: a 54x32
+// track, an 18px thumb that grows to 24px and slides across when on, and an
+// embedded check glyph that fades in. Spring motion matches the prototype and
+// is suppressed under reduced motion.
+
+.material-switch-component {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing);
+  flex: none;
+}
+
+.material-switch-labelled {
+  gap: var(--spacing-double);
+
+  .material-switch-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface);
+  }
+}
+
+button.material-switch {
+  flex: none;
+  box-sizing: border-box;
+  width: 54px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: 2px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container-high);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 280ms var(--emph), border-color 280ms var(--emph);
+
+  .material-switch-thumb {
+    position: absolute;
+    top: 50%;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--md-sys-color-outline);
+    transform: translateY(-50%) translateX(3px);
+    display: grid;
+    place-items: center;
+    transition: transform 320ms var(--spring), width 200ms var(--spring-fast), height 200ms var(--spring-fast), background-color 280ms var(--emph);
+  }
+
+  .material-switch-check {
+    color: var(--md-sys-color-primary);
+    opacity: 0;
+    transition: opacity 200ms var(--emph);
+  }
+
+  &[aria-checked='true'] {
+    background: var(--md-sys-color-primary);
+    border-color: var(--md-sys-color-primary);
+
+    .material-switch-thumb {
+      width: 24px;
+      height: 24px;
+      background: var(--md-sys-color-on-primary);
+      // Track inset is 2px; the 24px thumb travels 22px so it lands 3px from
+      // the trailing edge, matching the prototype.
+      transform: translateY(-50%) translateX(22px);
+    }
+
+    .material-switch-check {
+      opacity: 1;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.38;
+  }
+}
+
+// No thumb spring when the user prefers reduced motion; the color crossfade may
+// remain but position and size snap instantly.
+@media (prefers-reduced-motion: reduce) {
+  button.material-switch .material-switch-thumb {
+    transition: background-color 280ms var(--emph);
+  }
+}
+
+body[data-dm-motion='reduced'] button.material-switch .material-switch-thumb {
+  transition: background-color 280ms var(--emph);
+}

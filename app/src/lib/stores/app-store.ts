@@ -367,6 +367,7 @@ import {
   isUsingLFS,
 } from '../git/lfs'
 import { inferLastPushForRepository } from '../infer-last-push-for-repository'
+import { shouldRetryPushWithGitHubCLICredentials } from '../gh-cli'
 import { updateMenuState } from '../menu-update'
 import { merge } from '../merge'
 import {
@@ -8022,6 +8023,38 @@ export class AppStore extends TypedBaseStore<IAppState> {
       const accountKey =
         options?.accountKey ??
         getRepositoryCredentialAccountKey(this.accounts, repository)
+
+      // When a push to an organization (or otherwise non-personal) GitHub/GHES
+      // repository is rejected for authentication reasons, retry it once using
+      // the developer's GitHub CLI credentials. The eligibility and gh probe
+      // live in `../gh-cli`; the retry mechanism lives in `git/push.ts`. The
+      // publish-repository flow pushes through this same `performPush`, so it
+      // inherits the fallback for free.
+      const gitHubCLIFallback = {
+        shouldAttempt: (error: unknown) =>
+          shouldRetryPushWithGitHubCLICredentials(error, {
+            gitHubRepository: repository.gitHubRepository,
+            account: getAccountForRepository(this.accounts, repository),
+            remoteUrl: safeRemote.url,
+          }),
+        onSuccess: () =>
+          this.postNotification({
+            kind: 'info',
+            title: t('push.ghCliFallbackSuccessTitle'),
+            body: t('push.ghCliFallbackSuccessBody', { remote: remoteName }),
+            repositoryId: repository.id,
+            action: {
+              kind: 'open-repository' as const,
+              repositoryId: repository.id,
+            },
+          }),
+        onFailure: (originalError: unknown) =>
+          log.warn(
+            'GitHub CLI credential push fallback also failed; surfacing the original push failure.',
+            originalError instanceof Error ? originalError : undefined
+          ),
+      }
+
       await gitStore.performFailableOperation(
         async () => {
           let aborted = false
@@ -8036,6 +8069,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
                 onHookFailure: this.onHookFailure(() => (aborted = true)),
                 ...options,
                 accountKey,
+                gitHubCLIFallback,
               },
               progress => {
                 this.updatePushPullFetchProgress(repository, {

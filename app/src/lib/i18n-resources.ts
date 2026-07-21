@@ -64,6 +64,14 @@ export type TranslationKey =
   | 'appearance.toolbarInheritColor'
   | 'appearance.toolbarCustomColor'
   | 'tabs.appearanceLoading'
+  | 'tabs.settingsCommitSaved'
+  | 'tabs.settingsCommitCommitted'
+  | 'tabs.settingsCommitTitle'
+  | 'tabs.settingsHistory'
+  | 'tabs.undoSettingsChange'
+  | 'tabs.redoSettingsChange'
+  | 'tabs.settingsChangeUndone'
+  | 'tabs.settingsChangeRedone'
   | 'language.english'
   | 'language.cantonese'
   | 'language.bilingual'
@@ -851,6 +859,43 @@ export type TranslationKey =
   | 'color.green'
   | 'color.amber'
   | 'color.rose'
+  | 'settings.notificationsEnableTitle'
+  | 'settings.notificationsEnableDescription'
+  | 'settings.automationAutoCommitPushTitle'
+  | 'settings.automationAutoCommitPushDescription'
+  | 'settings.automationAutoPullTitle'
+  | 'settings.automationAutoPullDescription'
+  | 'settings.automationIntervalEvery'
+  | 'settings.automationIntervalMinutes'
+  | 'settings.automationIntervalGroupLabel'
+  | 'settings.advancedUsageStatsTitle'
+  | 'settings.advancedUsageStatsDescription'
+  | 'settings.advancedCredentialStorageTitle'
+  | 'settings.advancedCredentialStorageDescription'
+  | 'settings.integrationsExternalEditorTitle'
+  | 'settings.integrationsExternalEditorSubtitle'
+  | 'settings.integrationsShellTitle'
+  | 'settings.integrationsShellSubtitle'
+  | 'settings.integrationsChooseEditor'
+  | 'settings.integrationsChooseShell'
+  | 'settings.integrationsCustomEditorChoice'
+  | 'settings.integrationsCustomShellChoice'
+  | 'settings.integrationsCustomEditorLabel'
+  | 'settings.integrationsCustomShellLabel'
+  | 'settings.integrationsSelectEditor'
+  | 'push.ghCliFallbackSuccessTitle'
+  | 'push.ghCliFallbackSuccessBody'
+  | 'clone.visibilityPublic'
+  | 'clone.visibilityPrivate'
+  | 'clone.noDescription'
+  | 'clone.starsLabel'
+  | 'clone.forksLabel'
+  | 'clone.sizeLabel'
+  | 'clone.defaultBranchLabel'
+  | 'clone.updatedLabel'
+  | 'clone.languageLabel'
+  | 'clone.languageFilterLabel'
+  | 'clone.languageFilterAria'
 
 /** Complete base catalog. Every missing locale entry falls back to this. */
 export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
@@ -923,6 +968,15 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'appearance.toolbarInheritColor': 'Inherit profile color',
   'appearance.toolbarCustomColor': 'Custom text color',
   'tabs.appearanceLoading': 'Tab appearance is still loading. Try again.',
+  'tabs.settingsCommitSaved': 'Saved · {sha}',
+  'tabs.settingsCommitCommitted': 'Committed {sha}',
+  'tabs.settingsCommitTitle':
+    "Every tab and settings change commits to this account's local settings repo.",
+  'tabs.settingsHistory': 'Settings history',
+  'tabs.undoSettingsChange': 'Undo last settings change',
+  'tabs.redoSettingsChange': 'Redo settings change',
+  'tabs.settingsChangeUndone': 'Settings change undone.',
+  'tabs.settingsChangeRedone': 'Settings change redone.',
   'language.english': 'English',
   'language.cantonese': 'Playful Hong Kong Cantonese',
   'language.bilingual': 'Bilingual',
@@ -1890,6 +1944,51 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'color.green': 'Green',
   'color.amber': 'Amber',
   'color.rose': 'Rose',
+  'settings.notificationsEnableTitle': 'Enable notifications',
+  'settings.notificationsEnableDescription':
+    'Allows the display of notifications when high-signal events take place in the current repository.',
+  'settings.automationAutoCommitPushTitle': 'Automatically commit and push',
+  'settings.automationAutoCommitPushDescription':
+    'Copilot writes the commit message; skipped while you have a draft message or an operation in flight.',
+  'settings.automationAutoPullTitle': 'Automatically pull',
+  'settings.automationAutoPullDescription':
+    'Pulls when the working tree is clean and an upstream is set.',
+  'settings.automationIntervalEvery': 'Every',
+  'settings.automationIntervalMinutes': '{minutes} min',
+  'settings.automationIntervalGroupLabel': '{title} interval',
+  'settings.advancedUsageStatsTitle': 'Usage stats',
+  'settings.advancedUsageStatsDescription':
+    'Submit anonymized usage data to help improve Desktop Material.',
+  'settings.advancedCredentialStorageTitle': 'Credential storage',
+  'settings.advancedCredentialStorageDescription':
+    'Tokens are kept in the operating-system credential store and are never written to repository configuration.',
+  'settings.integrationsExternalEditorTitle': 'External editor',
+  'settings.integrationsExternalEditorSubtitle':
+    'Used when opening files or repositories in your editor',
+  'settings.integrationsShellTitle': 'Shell',
+  'settings.integrationsShellSubtitle':
+    'Used when opening a repository in the command line',
+  'settings.integrationsChooseEditor': 'Choose external editor',
+  'settings.integrationsChooseShell': 'Choose shell',
+  'settings.integrationsCustomEditorChoice': 'Configure custom editor…',
+  'settings.integrationsCustomShellChoice': 'Configure custom shell…',
+  'settings.integrationsCustomEditorLabel': 'Custom editor',
+  'settings.integrationsCustomShellLabel': 'Custom shell',
+  'settings.integrationsSelectEditor': 'Select editor',
+  'push.ghCliFallbackSuccessTitle': 'Pushed using GitHub CLI credentials',
+  'push.ghCliFallbackSuccessBody':
+    'The push to {remote} was rejected, so Desktop Material retried it with your GitHub CLI login and it succeeded.',
+  'clone.visibilityPublic': 'Public',
+  'clone.visibilityPrivate': 'Private',
+  'clone.noDescription': 'No description provided',
+  'clone.starsLabel': '{count} stars',
+  'clone.forksLabel': '{count} forks',
+  'clone.sizeLabel': 'Repository size {size}',
+  'clone.defaultBranchLabel': 'Default branch {branch}',
+  'clone.updatedLabel': 'Updated {time}',
+  'clone.languageLabel': 'Language: {language}',
+  'clone.languageFilterLabel': 'Language',
+  'clone.languageFilterAria': 'Filter repositories by language',
 }
 
 /** Hong Kong Cantonese catalog. Missing entries deliberately use English. */
@@ -1964,6 +2063,15 @@ export const cantoneseTranslations: Readonly<
   'appearance.toolbarInheritColor': '沿用 profile 顏色',
   'appearance.toolbarCustomColor': '自訂文字顏色',
   'tabs.appearanceLoading': '分頁外觀仲載入緊，等陣再試。',
+  'tabs.settingsCommitSaved': '已存 · {sha}',
+  'tabs.settingsCommitCommitted': '啱啱存 {sha}',
+  'tabs.settingsCommitTitle':
+    '每次改分頁或設定，都會即刻 commit 落呢個帳戶嘅本機設定 repo。',
+  'tabs.settingsHistory': '設定歷史',
+  'tabs.undoSettingsChange': '復原上一個設定改動',
+  'tabs.redoSettingsChange': '重做設定改動',
+  'tabs.settingsChangeUndone': '已復原設定改動。',
+  'tabs.settingsChangeRedone': '已重做設定改動。',
   'language.english': '英文',
   'language.cantonese': '玩味港式廣東話',
   'language.bilingual': '雙語',
@@ -2827,4 +2935,48 @@ export const cantoneseTranslations: Readonly<
   'color.green': '綠色',
   'color.amber': '琥珀色',
   'color.rose': '玫瑰色',
+  'settings.notificationsEnableTitle': '開啟通知',
+  'settings.notificationsEnableDescription':
+    '喺目前 repository 有重要事件發生嗰陣，即刻彈通知話你知。',
+  'settings.automationAutoCommitPushTitle': '自動 commit 同 push',
+  'settings.automationAutoCommitPushDescription':
+    'Copilot 幫你寫 commit 訊息；如果你仲有草稿訊息或者有操作進行緊，就會自動跳過。',
+  'settings.automationAutoPullTitle': '自動 pull',
+  'settings.automationAutoPullDescription':
+    '當工作區乾淨又已經設定咗上游，先至會 pull。',
+  'settings.automationIntervalEvery': '每隔',
+  'settings.automationIntervalMinutes': '{minutes} 分鐘',
+  'settings.automationIntervalGroupLabel': '{title}間隔',
+  'settings.advancedUsageStatsTitle': '使用統計',
+  'settings.advancedUsageStatsDescription':
+    '提交匿名使用數據，幫手改善 Desktop Material。',
+  'settings.advancedCredentialStorageTitle': '憑證儲存',
+  'settings.advancedCredentialStorageDescription':
+    '權杖只會存喺作業系統嘅憑證庫，絕對唔會寫入 repository 嘅設定檔。',
+  'settings.integrationsExternalEditorTitle': '外部編輯器',
+  'settings.integrationsExternalEditorSubtitle':
+    '喺編輯器打開檔案或者 repository 時會用到',
+  'settings.integrationsShellTitle': '命令列 Shell',
+  'settings.integrationsShellSubtitle': '喺命令列打開 repository 時會用到',
+  'settings.integrationsChooseEditor': '揀外部編輯器',
+  'settings.integrationsChooseShell': '揀命令列 Shell',
+  'settings.integrationsCustomEditorChoice': '設定自訂編輯器…',
+  'settings.integrationsCustomShellChoice': '設定自訂命令列…',
+  'settings.integrationsCustomEditorLabel': '自訂編輯器',
+  'settings.integrationsCustomShellLabel': '自訂命令列',
+  'settings.integrationsSelectEditor': '揀編輯器',
+  'push.ghCliFallbackSuccessTitle': '用咗 GitHub CLI 帳戶推送成功',
+  'push.ghCliFallbackSuccessBody':
+    '推送去 {remote} 一開始俾人拒絕，所以 Desktop Material 改用你嘅 GitHub CLI 登入再試一次，今次搞掂咗。',
+  'clone.visibilityPublic': '公開',
+  'clone.visibilityPrivate': '私人',
+  'clone.noDescription': '未有描述',
+  'clone.starsLabel': '{count} 個 star',
+  'clone.forksLabel': '{count} 個 fork',
+  'clone.sizeLabel': '倉庫大細 {size}',
+  'clone.defaultBranchLabel': '預設分支 {branch}',
+  'clone.updatedLabel': '{time}更新',
+  'clone.languageLabel': '語言：{language}',
+  'clone.languageFilterLabel': '語言',
+  'clone.languageFilterAria': '按語言篩選倉庫',
 }

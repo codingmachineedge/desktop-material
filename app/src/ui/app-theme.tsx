@@ -11,6 +11,7 @@ import {
 } from '../models/appearance-customization'
 import { tabTitleStyleToCss } from '../models/repository-tab'
 import { LanguageModeChangedEvent } from '../lib/i18n'
+import { prefersReducedMotion } from './lib/ripple'
 
 interface IAppThemeProps {
   readonly theme: ApplicationTheme
@@ -64,8 +65,21 @@ const toolbarTypographyProperties = [
  * purely (a)busing the component lifecycle to manipulate the
  * body class list.
  */
+/** The class applied to the transient full-screen theme reveal overlay. */
+const ThemeRevealClassName = 'theme-reveal-overlay'
+
 export class AppTheme extends React.PureComponent<IAppThemeProps> {
   private themeRequestId = 0
+
+  /**
+   * Whether a theme class has been applied at least once. The first
+   * application happens on mount and must not trigger the reveal pulse; only
+   * subsequent theme flips do.
+   */
+  private hasAppliedInitialTheme = false
+
+  /** Fallback timer that removes the reveal overlay if `animationend` never fires. */
+  private revealFallbackTimer: number | null = null
 
   public componentDidMount() {
     this.applyAppearance()
@@ -93,6 +107,7 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
     this.themeRequestId++
     this.clearThemes()
     this.clearAppearance()
+    this.clearThemeReveal()
   }
 
   private applyAppearance() {
@@ -243,8 +258,60 @@ export class AppTheme extends React.PureComponent<IAppThemeProps> {
       themeChanged = true
     }
 
+    // Play the reveal pulse only when the applied theme actually flips, and
+    // never on the very first application (mount) so the app doesn't pulse on
+    // launch.
+    if (themeChanged && this.hasAppliedInitialTheme) {
+      this.playThemeReveal()
+    }
+    this.hasAppliedInitialTheme = true
+
     if (themeChanged || updateWindowBackground) {
       this.updateColorScheme()
+    }
+  }
+
+  /**
+   * Mount a transient full-screen radial overlay that radiates from the app-bar
+   * theme toggle corner, and remove it once its `dmReveal` animation ends.
+   * Skipped entirely under reduced motion (system or `data-dm-motion`).
+   */
+  private playThemeReveal() {
+    if (typeof document === 'undefined' || prefersReducedMotion()) {
+      return
+    }
+
+    // Never let more than one overlay linger; a rapid re-toggle replaces it.
+    this.clearThemeReveal()
+
+    const overlay = document.createElement('div')
+    overlay.className = ThemeRevealClassName
+    overlay.setAttribute('aria-hidden', 'true')
+
+    const remove = () => {
+      if (this.revealFallbackTimer !== null) {
+        window.clearTimeout(this.revealFallbackTimer)
+        this.revealFallbackTimer = null
+      }
+      overlay.remove()
+    }
+
+    overlay.addEventListener('animationend', remove, { once: true })
+    // Fallback slightly beyond the 750ms animation so the overlay can't leak.
+    this.revealFallbackTimer = window.setTimeout(remove, 1000)
+
+    document.body.appendChild(overlay)
+  }
+
+  private clearThemeReveal() {
+    if (this.revealFallbackTimer !== null) {
+      window.clearTimeout(this.revealFallbackTimer)
+      this.revealFallbackTimer = null
+    }
+    for (const overlay of document.querySelectorAll(
+      `.${ThemeRevealClassName}`
+    )) {
+      overlay.remove()
     }
   }
 

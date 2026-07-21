@@ -19,6 +19,33 @@ export function filterRepositoriesByVisibility(
       return repositories.filter(r => r.fork)
   }
 }
+
+/**
+ * Narrow a repository list to the selected set of languages. An empty selection
+ * means "no language filter" and returns the list unchanged. Matching is
+ * case-insensitive; repositories without a detected language are excluded when
+ * any language filter is active.
+ */
+export function filterRepositoriesByLanguage(
+  repositories: ReadonlyArray<IAPIRepository>,
+  languages: ReadonlySet<string>
+): ReadonlyArray<IAPIRepository> {
+  if (languages.size === 0) {
+    return repositories
+  }
+
+  const selected = new Set<string>()
+  for (const language of languages) {
+    selected.add(language.toLowerCase())
+  }
+
+  return repositories.filter(
+    r =>
+      r.language !== null &&
+      r.language !== undefined &&
+      selected.has(r.language.toLowerCase())
+  )
+}
 import { IFilterListGroup, IFilterListItem } from '../lib/filter-list'
 import { OcticonSymbol } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
@@ -47,6 +74,30 @@ export interface ICloneableRepositoryListItem extends IFilterListItem {
 
   /** Whether or not the repository is archived */
   readonly archived?: boolean
+
+  /** Whether the repository is private (drives the visibility pill). */
+  readonly isPrivate: boolean
+
+  /** Short repository description, or null/undefined when unavailable. */
+  readonly description?: string | null
+
+  /** Primary language, or null/undefined when undetermined. */
+  readonly language?: string | null
+
+  /** Star count, or undefined when the API omitted it. */
+  readonly stargazers?: number
+
+  /** Fork count, or undefined when the API omitted it. */
+  readonly forks?: number
+
+  /** On-disk size in kilobytes, or undefined when the API omitted it. */
+  readonly sizeInKilobytes?: number
+
+  /** Default branch name, or undefined when unavailable. */
+  readonly defaultBranch?: string
+
+  /** ISO-8601 last-updated timestamp, or undefined when unavailable. */
+  readonly updatedAt?: string
 }
 
 function getIcon(gitHubRepo: IAPIRepository): OcticonSymbol {
@@ -69,6 +120,14 @@ const toListItems = (repositories: ReadonlyArray<IAPIRepository>) =>
       name: repo.name,
       icon: getIcon(repo),
       archived: repo.archived,
+      isPrivate: repo.private,
+      description: repo.description,
+      language: repo.language,
+      stargazers: repo.stargazers_count,
+      forks: repo.forks_count,
+      sizeInKilobytes: repo.size,
+      defaultBranch: repo.default_branch,
+      updatedAt: repo.updated_at,
     }))
     .sort((x, y) => compare(x.name, y.name))
 

@@ -2,16 +2,19 @@ import * as React from 'react'
 import { DialogContent } from '../dialog'
 import { LinkButton } from '../lib/link-button'
 import { Row } from '../../ui/lib/row'
-import { Select } from '../lib/select'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { Shell, parse as parseShell } from '../../lib/shells'
 import { suggestedExternalEditor } from '../../lib/editors/shared'
 import { CustomIntegrationForm } from './custom-integration-form'
 import { ICustomIntegration } from '../../lib/custom-integration'
 import { enableCustomIntegration } from '../../lib/feature-flag'
 import { getExternalEditorDisplayName } from '../../lib/editors/display-name'
+import { IMenuItem, showContextualMenu } from '../../lib/menu-item'
 import {
   getPersistedLanguageMode,
   LanguageModeChangedEvent,
+  translate,
+  translateForAccessibleName,
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
@@ -166,17 +169,6 @@ export class Integrations extends React.Component<
     }
   }
 
-  private onSelectedEditorChanged = (
-    event: React.FormEvent<HTMLSelectElement>
-  ) => {
-    const value = event.currentTarget.value
-    if (!value) {
-      return
-    }
-
-    this.setSelectedEditor(value)
-  }
-
   private setSelectedEditor = (editor: string) => {
     if (editor === CustomIntegrationValue) {
       this.setState({ useCustomEditor: true })
@@ -189,17 +181,6 @@ export class Integrations extends React.Component<
       this.props.onUseCustomEditorChanged(false)
       this.props.onSelectedEditorChanged(editor)
     }
-  }
-
-  private onSelectedShellChanged = (
-    event: React.FormEvent<HTMLSelectElement>
-  ) => {
-    const value = event.currentTarget.value
-    if (!value) {
-      return
-    }
-
-    this.setSelectedShell(value)
   }
 
   private setSelectedShell = (shell: string) => {
@@ -217,55 +198,103 @@ export class Integrations extends React.Component<
     }
   }
 
-  private renderExternalEditor() {
-    const options = this.props.availableEditors
-    const { selectedExternalEditor, useCustomEditor } = this.state
-    const label = __DARWIN__ ? 'External Editor' : 'External editor'
-
-    if (!enableCustomIntegration() && options.length === 0) {
-      // this is emulating the <Select/> component's UI so the styles are
-      // consistent for either case.
-      //
-      // TODO: see whether it makes sense to have a fallback UI
-      // which we display when the select list is empty
-      return (
-        <div className="select-component no-options-found">
-          <label>{label}</label>
-          <span>
-            No editors found.{' '}
-            <LinkButton uri={suggestedExternalEditor.url}>
-              Install {suggestedExternalEditor.name}?
-            </LinkButton>
+  /**
+   * A Material Design 3 list-item card for choosing an application: an
+   * icon-badged leading tile, a title/helper column, and a trailing tonal menu
+   * button that opens the choice menu. Replaces the bare `<Select>` dropdowns
+   * while preserving the existing selection plumbing.
+   */
+  private renderApplicationCard(config: {
+    readonly icon: 'code' | 'terminal'
+    readonly title: string
+    readonly subtitle: string
+    readonly buttonLabel: string
+    readonly menuAriaLabel: string
+    readonly disabled: boolean
+    readonly onOpenMenu: () => void
+  }) {
+    return (
+      <div className="integration-application-card">
+        <span className="preference-disclosure-icon">
+          <MaterialSymbol name={config.icon} size={21} />
+        </span>
+        <span className="preference-disclosure-text">
+          <span className="preference-disclosure-title">{config.title}</span>
+          <span className="preference-disclosure-subtitle">
+            {config.subtitle}
           </span>
-        </div>
-      )
+        </span>
+        <button
+          type="button"
+          className="integration-application-menu-button"
+          aria-haspopup="menu"
+          aria-label={config.menuAriaLabel}
+          disabled={config.disabled}
+          onClick={config.onOpenMenu}
+        >
+          {config.buttonLabel}
+          <MaterialSymbol name="unfold_more" size={18} />
+        </button>
+      </div>
+    )
+  }
+
+  private renderExternalEditor() {
+    const { languageMode, selectedExternalEditor, useCustomEditor } = this.state
+    const hasChoices =
+      this.props.availableEditors.length > 0 || enableCustomIntegration()
+    const currentLabel = useCustomEditor
+      ? translate('settings.integrationsCustomEditorLabel', languageMode)
+      : selectedExternalEditor
+      ? getExternalEditorDisplayName(selectedExternalEditor, languageMode)
+      : translate('settings.integrationsSelectEditor', languageMode)
+    const purpose = translateForAccessibleName(
+      'settings.integrationsChooseEditor',
+      {},
+      languageMode
+    )
+
+    return this.renderApplicationCard({
+      icon: 'code',
+      title: translate(
+        'settings.integrationsExternalEditorTitle',
+        languageMode
+      ),
+      subtitle: translate(
+        'settings.integrationsExternalEditorSubtitle',
+        languageMode
+      ),
+      buttonLabel: currentLabel,
+      menuAriaLabel: `${purpose}: ${currentLabel}`,
+      disabled: !hasChoices,
+      onOpenMenu: this.onOpenEditorMenu,
+    })
+  }
+
+  private onOpenEditorMenu = () => {
+    const { languageMode, selectedExternalEditor, useCustomEditor } = this.state
+    const items: IMenuItem[] = this.props.availableEditors.map(
+      (editor): IMenuItem => ({
+        label: getExternalEditorDisplayName(editor, languageMode),
+        type: 'checkbox',
+        checked: !useCustomEditor && selectedExternalEditor === editor,
+        action: () => this.setSelectedEditor(editor),
+      })
+    )
+
+    if (enableCustomIntegration()) {
+      items.push({
+        label: translate(
+          'settings.integrationsCustomEditorChoice',
+          languageMode
+        ),
+        type: 'checkbox',
+        checked: useCustomEditor,
+        action: () => this.setSelectedEditor(CustomIntegrationValue),
+      })
     }
 
-    return (
-      <Select
-        label={enableCustomIntegration() ? undefined : label}
-        aria-label="External editor"
-        value={
-          useCustomEditor
-            ? CustomIntegrationValue
-            : selectedExternalEditor ?? undefined
-        }
-        onChange={this.onSelectedEditorChanged}
-      >
-        {options.map(n => (
-          <option key={n} value={n}>
-            {getExternalEditorDisplayName(n, this.state.languageMode)}
-          </option>
-        ))}
-        {enableCustomIntegration() && (
-          <option key={CustomIntegrationValue} value={CustomIntegrationValue}>
-            {__DARWIN__
-              ? 'Configure Custom Editor…'
-              : 'Configure custom editor…'}
-          </option>
-        )}
-      </Select>
-    )
+    showContextualMenu(items)
   }
 
   private renderNoExternalEditorHint() {
@@ -326,28 +355,53 @@ export class Integrations extends React.Component<
   }
 
   private renderSelectedShell() {
-    const options = this.props.availableShells
-    const { selectedShell, useCustomShell } = this.state
-
-    return (
-      <Select
-        label={enableCustomIntegration() ? undefined : 'Shell'}
-        aria-label="Shell"
-        value={useCustomShell ? CustomIntegrationValue : selectedShell}
-        onChange={this.onSelectedShellChanged}
-      >
-        {options.map(n => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-        {enableCustomIntegration() && (
-          <option key={CustomIntegrationValue} value={CustomIntegrationValue}>
-            {__DARWIN__ ? 'Configure Custom Shell…' : 'Configure custom shell…'}
-          </option>
-        )}
-      </Select>
+    const { languageMode, selectedShell, useCustomShell } = this.state
+    const hasChoices =
+      this.props.availableShells.length > 0 || enableCustomIntegration()
+    const currentLabel = useCustomShell
+      ? translate('settings.integrationsCustomShellLabel', languageMode)
+      : selectedShell
+    const purpose = translateForAccessibleName(
+      'settings.integrationsChooseShell',
+      {},
+      languageMode
     )
+
+    return this.renderApplicationCard({
+      icon: 'terminal',
+      title: translate('settings.integrationsShellTitle', languageMode),
+      subtitle: translate('settings.integrationsShellSubtitle', languageMode),
+      buttonLabel: currentLabel,
+      menuAriaLabel: `${purpose}: ${currentLabel}`,
+      disabled: !hasChoices,
+      onOpenMenu: this.onOpenShellMenu,
+    })
+  }
+
+  private onOpenShellMenu = () => {
+    const { languageMode, selectedShell, useCustomShell } = this.state
+    const items: IMenuItem[] = this.props.availableShells.map(
+      (shell): IMenuItem => ({
+        label: shell,
+        type: 'checkbox',
+        checked: !useCustomShell && selectedShell === shell,
+        action: () => this.setSelectedShell(shell),
+      })
+    )
+
+    if (enableCustomIntegration()) {
+      items.push({
+        label: translate(
+          'settings.integrationsCustomShellChoice',
+          languageMode
+        ),
+        type: 'checkbox',
+        checked: useCustomShell,
+        action: () => this.setSelectedShell(CustomIntegrationValue),
+      })
+    }
+
+    showContextualMenu(items)
   }
 
   private renderCustomShell() {
@@ -423,47 +477,32 @@ export class Integrations extends React.Component<
   }
 
   public render() {
-    if (!enableCustomIntegration()) {
-      return (
-        <DialogContent>
-          <h2>Applications</h2>
-          <Row>{this.renderExternalEditor()}</Row>
-          <Row>{this.renderSelectedShell()}</Row>
-        </DialogContent>
-      )
-    }
-
     return (
       <DialogContent>
-        <fieldset>
-          <legend>
-            <h2>{__DARWIN__ ? 'External Editor' : 'External editor'}</h2>
-          </legend>
-          <Row>{this.renderExternalEditor()}</Row>
+        <h2>Applications</h2>
+        <div className="integration-application-cards">
+          {this.renderExternalEditor()}
           {this.state.useCustomEditor && this.renderCustomExternalEditor()}
           {this.renderNoExternalEditorHint()}
-        </fieldset>
-        <fieldset>
-          <legend>
-            <h2>Shell</h2>
-          </legend>
-          <Row>{this.renderSelectedShell()}</Row>
+          {this.renderSelectedShell()}
           {this.state.useCustomShell && this.renderCustomShell()}
-        </fieldset>
-        <fieldset>
-          <legend>
-            <h2>Branch name presets</h2>
-          </legend>
-          {this.renderBranchPresetScript()}
-          <p>
-            Run a script to suggest editable branch names. Use{' '}
-            <code>%TARGET_PATH%</code> in its arguments when the output depends
-            on the current repository.{' '}
-            <LinkButton uri={BranchPresetScriptDocumentationUrl}>
-              View script format and examples.
-            </LinkButton>
-          </p>
-        </fieldset>
+        </div>
+        {enableCustomIntegration() && (
+          <fieldset>
+            <legend>
+              <h2>Branch name presets</h2>
+            </legend>
+            {this.renderBranchPresetScript()}
+            <p>
+              Run a script to suggest editable branch names. Use{' '}
+              <code>%TARGET_PATH%</code> in its arguments when the output
+              depends on the current repository.{' '}
+              <LinkButton uri={BranchPresetScriptDocumentationUrl}>
+                View script format and examples.
+              </LinkButton>
+            </p>
+          </fieldset>
+        )}
       </DialogContent>
     )
   }

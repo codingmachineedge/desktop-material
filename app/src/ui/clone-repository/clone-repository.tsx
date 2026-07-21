@@ -53,6 +53,7 @@ import { mergeOrganizationRepositories } from './org-filter-chips'
 import {
   RepositoryVisibilityFilter,
   filterRepositoriesByVisibility,
+  filterRepositoriesByLanguage,
 } from './group-repositories'
 import { PopupType } from '../../models/popup'
 import { PreferencesTab } from '../../models/preferences'
@@ -302,6 +303,12 @@ interface IGitHubTabState extends IBaseTabState {
 
   /** Visibility scope (all/public/private/forked) filtering this tab. */
   readonly visibilityFilter: RepositoryVisibilityFilter
+
+  /**
+   * Set of languages narrowing this tab. Empty means "no language filter". The
+   * available chips are derived from the loaded repository set.
+   */
+  readonly languageFilter: Set<string>
 }
 
 /** The component for cloning a repository. */
@@ -364,6 +371,7 @@ export class CloneRepository extends React.Component<
         checkedUrls: new Set<string>(),
         selectedOrganization: null,
         visibilityFilter: 'all',
+        languageFilter: new Set<string>(),
         ...initialBaseTabState,
       },
       enterpriseTabState: {
@@ -373,6 +381,7 @@ export class CloneRepository extends React.Component<
         checkedUrls: new Set<string>(),
         selectedOrganization: null,
         visibilityFilter: 'all',
+        languageFilter: new Set<string>(),
         ...initialBaseTabState,
       },
       providerTabState: {
@@ -382,6 +391,7 @@ export class CloneRepository extends React.Component<
         checkedUrls: new Set<string>(),
         selectedOrganization: null,
         visibilityFilter: 'all',
+        languageFilter: new Set<string>(),
         ...initialBaseTabState,
       },
       urlTabState: {
@@ -818,12 +828,22 @@ export class CloneRepository extends React.Component<
                   organizationState?.repositories ?? [],
                   organization.login
                 )
-          const visibleRepositories =
+          // Language chips are derived from the visibility-filtered set (before
+          // the language filter narrows it) so selecting one language never
+          // removes the other chips from the panel.
+          const languageOptionRepositories =
             mergedRepositories === null
               ? null
               : filterRepositoriesByVisibility(
                   mergedRepositories,
                   tabState.visibilityFilter
+                )
+          const visibleRepositories =
+            languageOptionRepositories === null
+              ? null
+              : filterRepositoriesByLanguage(
+                  languageOptionRepositories,
+                  tabState.languageFilter
                 )
           const loading =
             accountState === undefined ? false : accountState.loading
@@ -847,6 +867,9 @@ export class CloneRepository extends React.Component<
               onSelectedOrganizationChanged={this.onSelectedOrganizationChanged}
               visibilityFilter={tabState.visibilityFilter}
               onVisibilityFilterChanged={this.onVisibilityFilterChanged}
+              languageFilter={tabState.languageFilter}
+              onToggleLanguageFilter={this.onToggleLanguageFilter}
+              languageOptions={languageOptionRepositories}
               onRefreshOrganization={this.onRefreshOrganization}
               onRefreshRepositories={this.props.onRefreshRepositories}
               filterText={tabState.filterText}
@@ -980,6 +1003,7 @@ export class CloneRepository extends React.Component<
           selectedAccount: account,
           selectedOrganization: null,
           visibilityFilter: 'all',
+          languageFilter: new Set<string>(),
           selectedItem: null,
           checkedUrls: new Set<string>(),
           url: '',
@@ -1003,6 +1027,22 @@ export class CloneRepository extends React.Component<
     if (tab !== CloneRepositoryTab.Generic) {
       this.setGitHubTabState({ visibilityFilter: filter }, tab)
     }
+  }
+
+  private onToggleLanguageFilter = (language: string) => {
+    const tab = this.props.selectedTab
+    if (tab === CloneRepositoryTab.Generic) {
+      return
+    }
+
+    const previous = this.getGitHubTabState(tab).languageFilter
+    const languageFilter = new Set(previous)
+    if (languageFilter.has(language)) {
+      languageFilter.delete(language)
+    } else {
+      languageFilter.add(language)
+    }
+    this.setGitHubTabState({ languageFilter }, tab)
   }
 
   private onSelectedOrganizationChanged = (

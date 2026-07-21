@@ -3,8 +3,15 @@ import { ENABLE_TELEMETRY } from '../../lib/telemetry-flag'
 import { DialogContent } from '../dialog'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
 import { LinkButton } from '../lib/link-button'
+import { MaterialSymbol } from '../lib/material-symbol'
 import { SamplesURL } from '../../lib/stats'
 import { isWindowsOpenSSHAvailable } from '../../lib/ssh/ssh'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
 interface IAdvancedPreferencesProps {
   readonly useWindowsOpenSSH: boolean
@@ -24,6 +31,7 @@ interface IAdvancedPreferencesProps {
 }
 
 interface IAdvancedPreferencesState {
+  readonly languageMode: LanguageMode
   readonly optOutOfUsageTracking: boolean
   readonly canUseWindowsSSH: boolean
   readonly useExternalCredentialHelper: boolean
@@ -37,6 +45,7 @@ export class Advanced extends React.Component<
     super(props)
 
     this.state = {
+      languageMode: getPersistedLanguageMode(),
       optOutOfUsageTracking: this.props.optOutOfUsageTracking,
       canUseWindowsSSH: false,
       useExternalCredentialHelper: this.props.useExternalCredentialHelper,
@@ -45,6 +54,25 @@ export class Advanced extends React.Component<
 
   public componentDidMount() {
     this.checkSSHAvailability()
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
   }
 
   private async checkSSHAvailability() {
@@ -216,7 +244,61 @@ export class Advanced extends React.Component<
             </p>
           </div>
         </div>
+        {this.renderDataDisclosures()}
       </DialogContent>
+    )
+  }
+
+  /**
+   * Informational disclosure rows shown unconditionally, mirroring the Desktop
+   * Material v2 Advanced tab. The Usage stats card always describes telemetry
+   * (the functional opt-out toggle above stays behind ENABLE_TELEMETRY), and
+   * the Credential storage card documents that tokens live only in the OS
+   * credential store, never in repository configuration.
+   */
+  private renderDataDisclosures() {
+    const { languageMode } = this.state
+    return (
+      <div className="advanced-section">
+        <h2>Privacy and data</h2>
+        <div className="preference-surface-stack">
+          <div className="preference-disclosure-card">
+            <span className="preference-disclosure-icon">
+              <MaterialSymbol name="monitoring" size={21} />
+            </span>
+            <span className="preference-disclosure-text">
+              <span className="preference-disclosure-title">
+                {translate('settings.advancedUsageStatsTitle', languageMode)}
+              </span>
+              <span className="preference-disclosure-subtitle">
+                {translate(
+                  'settings.advancedUsageStatsDescription',
+                  languageMode
+                )}
+              </span>
+            </span>
+          </div>
+          <div className="preference-disclosure-card">
+            <span className="preference-disclosure-icon">
+              <MaterialSymbol name="key" size={21} />
+            </span>
+            <span className="preference-disclosure-text">
+              <span className="preference-disclosure-title">
+                {translate(
+                  'settings.advancedCredentialStorageTitle',
+                  languageMode
+                )}
+              </span>
+              <span className="preference-disclosure-subtitle">
+                {translate(
+                  'settings.advancedCredentialStorageDescription',
+                  languageMode
+                )}
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
     )
   }
 

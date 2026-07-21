@@ -105,10 +105,12 @@ platform-neutral repository automation.
   manager, and a create-remote-repository-and-add-as-submodule workflow.
 - Saved SSH hosts are available to the paired site through a redacted command
   contract for credential-vault-backed remote cloning.
-- Collection managers are being audited for reviewed bulk actions, beginning
-  with Releases and Actions and extending to every safe batchable list. Every
-  actual search field is being audited against the shared regex-builder and
-  invalid-pattern contract.
+- Collection managers now expose reviewed, recoverable bulk actions across
+  Releases, Actions runs and caches, branches, clone candidates, notifications,
+  repositories, and tags, while submodules, subtrees, stashes, and worktrees
+  stay one-at-a-time under a documented exclusion. Every actual search field is
+  registered against the shared regex-builder and invalid-pattern contract, and
+  a frozen registry with an enforcing test fails any unregistered search input.
 - All 68 published app screenshots used by README, Pages, and the wiki will be
   recaptured from a synthetic production build on an off-screen Win32 desktop.
   The new anchored-editor proof must display a privacy-safe collapsed local-repo

@@ -1,5 +1,70 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-20 ultracode audit and completion wave
+
+This section records the July 20 audit of the outstanding `codex/report-gitlab-*`
+work and the completion wave that followed. No production build, screenshot,
+release, or remote CI/Pages success is claimed here. Those are delivery receipts
+and are recorded only once the exact pushed commit and its green remote runs
+exist.
+
+### Branch audit outcome
+
+- Five remote branches carried the GitLab merge-request work:
+  `origin/codex/report-gitlab-core`, `-fixture`, `-live-fixture`, `-ui`, and
+  `-integration`. `git cherry` proves `origin/codex/report-gitlab-integration`
+  is the patch-superset of the other four: `core`, `fixture`, and `live-fixture`
+  each have zero commits without an equivalent already in `integration`, and the
+  only two `ui` commits absent from `integration` (`57a3728085`, `2455814988`)
+  are M23 Ollama commits already reachable from `main`, not GitLab work. Every
+  GitLab commit on the other four branches has an equivalent in `integration`.
+- The `codex/ui-design-audit-20260720` UI wave is already merged to `main`:
+  merge commit `867c8662a0` is an ancestor of `origin/main`, and
+  `app/src/ui/lib/material-symbol.tsx` and the bundled Roboto/Material fonts are
+  present on `main`. After that merge, the minimal remaining merge set for the
+  GitLab feature is `integration` alone.
+- `git merge-tree --write-tree` merges
+  `origin/codex/report-gitlab-integration` into the current `main` tip
+  `a9abc1a561` with a clean exit and zero `CONFLICT` entries (seven files
+  auto-merge without conflict). The branch adds 48 files (about 15,600
+  insertions): the GitLab merge-request model, JSON parser, workspace router,
+  account-bound store, native `GitLabAPI` methods, the merge-request workspace
+  UI, styles, i18n entries, and unit tests, plus one `.codex/run-manifests`
+  entry. It ships no `docs/features` guide, README, ROADMAP, wiki, or Pages
+  documentation. This documentation pass closes that gap with
+  [`docs/features/integrations/gitlab-merge-request.md`](docs/features/integrations/gitlab-merge-request.md).
+
+### Environment-blocked items left honestly pending
+
+Two items cannot complete in this checkout because the `LowLevelComputerUseMCP`
+server and its off-screen Win32 desktop are not available here. Both remain open
+rather than being reported done.
+
+- **M25 headless production build and off-screen verification.** The
+  repository-bound API-functions wave has passed focused source, style, and
+  navigation checks, but the exact no-download production build and the
+  off-screen UI acceptance still require the MCP build/capture window.
+- **M22 68-image visual refresh.** The full synthetic-fixture screenshot
+  recapture across README, Pages, and the wiki, including the privacy-safe
+  collapsed anchored-editor path proof, still requires the off-screen desktop
+  and remains paused.
+
+### Completion wave contents
+
+- **GitHub CLI push credential fallback.** A `gh`-CLI push fallback is
+  documented at
+  [`docs/features/integrations/gh-cli-push-fallback.md`](docs/features/integrations/gh-cli-push-fallback.md).
+- **UI gap fixes** addressing the design-prototype audit, each owned by its own
+  scoped agent: Material 3 switches, advanced-preference disclosures, and
+  integrations cards; app-wide ripple and theme-toggle reveal animations;
+  richer multi-clone details; and a tab-strip commit-SHA chip.
+- **Intentional deviation:** the auto-pull-on-select default remains **off**;
+  automatic pulling is not enabled by default.
+
+This handoff records the wave's scope. Per-item build, screenshot, release, and
+remote-CI receipts are added only when the exact pushed commit and its green
+remote runs exist.
+
 ## Platform support decision
 
 Desktop Material is a Windows-only application. Windows x64 is the published
@@ -281,10 +346,19 @@ finished.
   failure never invokes Git; if Git fails after creation, retry reuses the
   already-created remote instead of creating a duplicate. Focused UI/service/
   model/i18n tests pass.
-- The active follow-up audits collection managers for reviewed, recoverable bulk
-  actions, starting with Releases and Actions and extending to every safe
-  batchable manager. It also inventories every real search input and requires
-  the shared regex builder, plain-text modes, and safe invalid-regex behavior.
+- The collection-manager bulk-action and search-input audit is complete and
+  shipped in commit `ef8623f9e3`. Two frozen registries in
+  `app/src/lib/collection-surface-registry.ts` record the outcome: a
+  search-surface registry that maps every real search input to its shared
+  fuzzy/substring/regex control, and a bulk-action registry that lists each
+  reviewed batch manager (Releases, Actions runs and caches, branches, clone
+  candidates, notifications, repositories, and tags) alongside the deliberate
+  one-at-a-time exclusions (submodules, subtrees, stashes, worktrees) with a
+  safety rationale. The enforcing test
+  `app/test/unit/collection-surface-registry-test.ts` requires every audited
+  bulk manager to be implemented or explicitly excluded and fails an
+  unregistered search field, and the behavior is documented in
+  `docs/features/identity-and-workspace/collection-bulk-and-regex-safety.md`.
 - Publication scope is now the complete 68-image screenshot set referenced by
   README, Pages, and the canonical wiki. All images must be freshly captured
   from synthetic fixtures through the exact low-level MCP server and an
@@ -292,11 +366,16 @@ finished.
   UI and private data, promoted, and verified byte-for-byte after publication.
   The central capture driver currently covers 63 images; five specialized
   scenes and three retired appearance scenes require reconciliation.
-- The anchored editor currently prints its full absolute local repository path.
-  Before capture, its visible label must collapse the user profile/Temp prefix
-  to a privacy-safe Desktop Material data label while Copy continues to use the
-  exact path. No frame containing `C:\Users\`, a real email, token, credential,
-  or user repository content may be published.
+- The anchored-editor path redaction shipped in commit `ef8623f9e3`. Its visible
+  label now collapses the private user-data prefix through
+  `getAppearanceRepositoryDisplayPath` in
+  `app/src/ui/appearance/anchored-appearance-editor.tsx`: it keeps only the
+  logical owner path below `appearance-elements`, drops drive letters, user
+  names, AppData, Documents, and temporary run roots, and renders a leading
+  `…\` marker while Copy continues to use the exact path. Regression coverage is
+  in `app/test/unit/ui/anchored-appearance-editor-test.tsx`. The still-pending
+  screenshot capture must confirm no published frame contains `C:\Users\`, a
+  real email, token, credential, or user repository content.
 - Exact MCP build invocation is
   `npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`.
   The first integrated run completed and produced fresh `out/main.js` and

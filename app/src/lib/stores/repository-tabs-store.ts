@@ -15,6 +15,8 @@ import { PrimaryWindowScope } from '../window-scope'
 import { ITabSessionFile, TabSessionImportMode } from '../tab-session-file'
 import { IVersionedStoreHistorySource } from '../../ui/version-history'
 import { ElementAppearanceCoordinator } from './element-appearance-coordinator'
+import { IProfileHistoryPage } from '../../models/profile'
+import { Disposable } from 'event-kit'
 
 /** Additional repository names/aliases that may be searched for a tab. */
 export type RepositoryTabMatchKeyResolver = (
@@ -48,6 +50,43 @@ export interface ICloseTabsExceptPreview {
   readonly closedTabs: ReadonlyArray<IRepositoryTab>
   /** False for empty/zero-match/zero-close previews. */
   readonly canClose: boolean
+}
+
+/**
+ * A read-only snapshot of the active settings/appearance repository's HEAD used
+ * by the tab-strip commit chip and its undo/redo affordances. Presentation
+ * only: it mirrors what the settings-history dialog already surfaces and never
+ * drives commit, undo, or redo semantics.
+ */
+export interface ISettingsCommitSummary {
+  /** Full HEAD commit sha, or null when history is empty/unavailable. */
+  readonly sha: string | null
+  /** Abbreviated HEAD sha for the chip label, or null when unavailable. */
+  readonly shortSha: string | null
+  /** Whether a logical change can be undone at HEAD. */
+  readonly canUndo: boolean
+  /** Whether a prior undo can be redone at HEAD. */
+  readonly canRedo: boolean
+}
+
+/** The neutral summary shown before the first history read resolves. */
+export const emptySettingsCommitSummary: ISettingsCommitSummary = {
+  sha: null,
+  shortSha: null,
+  canUndo: false,
+  canRedo: false,
+}
+
+function settingsCommitSummaryEquals(
+  left: ISettingsCommitSummary,
+  right: ISettingsCommitSummary
+): boolean {
+  return (
+    left.sha === right.sha &&
+    left.shortSha === right.shortSha &&
+    left.canUndo === right.canUndo &&
+    left.canRedo === right.canRedo
+  )
 }
 
 /** The final path segment of a repository path (its folder name). */
@@ -106,6 +145,7 @@ function stableSortPinGroups(
  */
 export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
   private state: IProfileTabsState = emptyProfileTabsState
+  private settingsCommit: ISettingsCommitSummary = emptySettingsCommitSummary
   private readonly tabStyleRevisions = new Map<string, number>()
 
   public constructor(
@@ -123,6 +163,66 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
 
   public getActiveTab(): IRepositoryTab | null {
     return this.state.tabs.find(t => t.id === this.state.activeTabId) ?? null
+  }
+
+  /**
+   * The last-read summary of the active settings/appearance repository HEAD.
+   * Starts neutral and is refreshed lazily by `refreshSettingsCommitSummary`.
+   */
+  public getSettingsCommitSummary(): ISettingsCommitSummary {
+    return this.settingsCommit
+  }
+
+  /**
+   * Subscribe to settings-commit summary changes. Emitted only when the HEAD
+   * sha or undo/redo availability actually changes, so a subscriber can pulse
+   * the tab-strip commit chip on each genuinely new commit.
+   */
+  public onDidUpdateSettingsCommit(
+    fn: (summary: ISettingsCommitSummary) => void
+  ): Disposable {
+    return this.emitter.on('did-update-settings-commit', fn)
+  }
+
+  /**
+   * Re-read the active profile's HEAD summary (sha + undo/redo availability)
+   * and notify subscribers when it changes.
+   *
+   * Presentation only. This reuses the same profile-history read the settings
+   * history dialog performs; it does not create commits or alter undo/redo
+   * semantics. Callers debounce it past the commit window so the read observes
+   * the naturally-committed HEAD rather than forcing an early flush. Safe to
+   * call against a disabled or minimally-mocked profile store, in which case it
+   * is a no-op.
+   */
+  public async refreshSettingsCommitSummary(): Promise<void> {
+    const profileStore = this.profileStore as Partial<ProfileStore>
+    if (typeof profileStore.getSettingsHistory !== 'function') {
+      return
+    }
+
+    let page: IProfileHistoryPage
+    try {
+      page = await this.profileStore.getSettingsHistory(0, 1)
+    } catch (err) {
+      log.error('Failed to read the settings commit summary', err)
+      return
+    }
+
+    const head = page.entries[0]
+    const next: ISettingsCommitSummary = {
+      sha: head?.sha ?? null,
+      shortSha: head?.shortSha ?? null,
+      canUndo: page.canUndo,
+      canRedo: page.canRedo,
+    }
+
+    if (settingsCommitSummaryEquals(this.settingsCommit, next)) {
+      return
+    }
+
+    this.settingsCommit = next
+    this.emitter.emit('did-update-settings-commit', next)
   }
 
   /** Load persisted tabs for the active profile. */

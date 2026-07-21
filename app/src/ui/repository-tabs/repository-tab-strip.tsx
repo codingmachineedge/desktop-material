@@ -1,9 +1,14 @@
 import * as React from 'react'
+import classNames from 'classnames'
 import { Disposable } from 'event-kit'
 import { Octicon } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
+import { MaterialSymbol } from '../lib/material-symbol'
+import { TooltippedContent } from '../lib/tooltipped-content'
+import { prefersReducedMotion } from '../lib/ripple'
 import { Dispatcher } from '../dispatcher'
-import { RepositoryTabsStore } from '../../lib/stores'
+import { RepositoryTabsStore, ISettingsCommitSummary } from '../../lib/stores'
+import { PopupType } from '../../models/popup'
 import { Repository } from '../../models/repository'
 import { CloningRepository } from '../../models/cloning-repository'
 import {
@@ -42,6 +47,8 @@ interface IRepositoryTabStripProps {
 
 interface IRepositoryTabStripState {
   readonly tabs: IProfileTabsState
+  readonly settingsCommit: ISettingsCommitSummary
+  readonly commitPulse: boolean
   readonly styleEditorTabId: string | null
   readonly styleEditorAnchor: HTMLElement | null
   readonly closeMatchingAnchor: HTMLElement | null
@@ -52,19 +59,35 @@ interface IRepositoryTabStripState {
   readonly announcement: string
 }
 
+/**
+ * Debounce for the commit-chip refresh. Kept longer than the profile store's
+ * own 1s commit debounce so the history read observes the naturally-committed
+ * HEAD instead of forcing an early flush that would split batched changes.
+ */
+const SettingsCommitRefreshDelayMs = 1300
+
+/** Safety net for clearing the pulse if `animationend` never fires. */
+const CommitPulseFallbackMs = 700
+
 /** The browser-style repository tab strip shown above the toolbar. */
 export class RepositoryTabStrip extends React.Component<
   IRepositoryTabStripProps,
   IRepositoryTabStripState
 > {
   private disposable: Disposable | null = null
+  private settingsCommitDisposable: Disposable | null = null
   private readonly stripRef = React.createRef<HTMLDivElement>()
   private styleEditorRequest = 0
+  private settingsCommitRefreshTimer: ReturnType<typeof setTimeout> | null =
+    null
+  private commitPulseTimer: ReturnType<typeof setTimeout> | null = null
 
   public constructor(props: IRepositoryTabStripProps) {
     super(props)
     this.state = {
       tabs: props.tabsStore.getState(),
+      settingsCommit: props.tabsStore.getSettingsCommitSummary(),
+      commitPulse: false,
       styleEditorTabId: null,
       styleEditorAnchor: null,
       closeMatchingAnchor: null,
@@ -77,15 +100,125 @@ export class RepositoryTabStrip extends React.Component<
   }
 
   public componentDidMount() {
-    this.disposable = this.props.tabsStore.onDidUpdate(tabs =>
+    this.disposable = this.props.tabsStore.onDidUpdate(tabs => {
       this.setState({ tabs })
-    )
+      this.scheduleSettingsCommitRefresh()
+    })
+    this.settingsCommitDisposable =
+      this.props.tabsStore.onDidUpdateSettingsCommit(this.onSettingsCommit)
+    void this.props.tabsStore
+      .refreshSettingsCommitSummary()
+      .catch(err => log.error('Failed to refresh settings commit chip', err))
   }
 
   public componentWillUnmount() {
     this.styleEditorRequest++
     this.disposable?.dispose()
     this.disposable = null
+    this.settingsCommitDisposable?.dispose()
+    this.settingsCommitDisposable = null
+    if (this.settingsCommitRefreshTimer !== null) {
+      clearTimeout(this.settingsCommitRefreshTimer)
+      this.settingsCommitRefreshTimer = null
+    }
+    if (this.commitPulseTimer !== null) {
+      clearTimeout(this.commitPulseTimer)
+      this.commitPulseTimer = null
+    }
+  }
+
+  /**
+   * Coalesce commit-chip refreshes triggered by tab mutations. Waiting past the
+   * commit debounce lets the read see the committed HEAD without disturbing the
+   * profile store's own batching.
+   */
+  private scheduleSettingsCommitRefresh = () => {
+    if (this.settingsCommitRefreshTimer !== null) {
+      clearTimeout(this.settingsCommitRefreshTimer)
+    }
+    this.settingsCommitRefreshTimer = setTimeout(() => {
+      this.settingsCommitRefreshTimer = null
+      void this.props.tabsStore
+        .refreshSettingsCommitSummary()
+        .catch(err => log.error('Failed to refresh settings commit chip', err))
+    }, SettingsCommitRefreshDelayMs)
+  }
+
+  /**
+   * Apply a new HEAD summary and pulse the chip when the sha genuinely changes
+   * (never on the initial population, never under reduced motion).
+   */
+  private onSettingsCommit = (summary: ISettingsCommitSummary) => {
+    const previousSha = this.state.settingsCommit.sha
+    const shouldPulse =
+      summary.sha !== null &&
+      previousSha !== null &&
+      summary.sha !== previousSha &&
+      !prefersReducedMotion()
+
+    this.setState(state => ({
+      settingsCommit: summary,
+      commitPulse: shouldPulse || state.commitPulse,
+    }))
+
+    if (shouldPulse) {
+      if (this.commitPulseTimer !== null) {
+        clearTimeout(this.commitPulseTimer)
+      }
+      this.commitPulseTimer = setTimeout(() => {
+        this.commitPulseTimer = null
+        this.setState({ commitPulse: false })
+      }, CommitPulseFallbackMs)
+    }
+  }
+
+  private onCommitPulseEnd = () => {
+    if (this.commitPulseTimer !== null) {
+      clearTimeout(this.commitPulseTimer)
+      this.commitPulseTimer = null
+    }
+    this.setState({ commitPulse: false })
+  }
+
+  private onOpenSettingsHistory = () => {
+    this.props.dispatcher.showPopup({ type: PopupType.SettingsHistory })
+  }
+
+  /**
+   * The persistent settings-repo feedback chip: `Saved · <shortSha>` normally,
+   * flipping to `Committed <shortSha>` with a one-shot dmBounce on the commit
+   * glyph each time a new commit lands. The em dash mirrors the design's
+   * "no history yet" placeholder.
+   */
+  private renderCommitChip() {
+    const { settingsCommit, commitPulse } = this.state
+    const sha = settingsCommit.shortSha ?? '—'
+    const label = commitPulse
+      ? t('tabs.settingsCommitCommitted', { sha })
+      : t('tabs.settingsCommitSaved', { sha })
+
+    return (
+      <div
+        className={classNames('repository-tab-commit-chip', {
+          'is-pulsing': commitPulse,
+        })}
+        data-dm-feature={true}
+        onAnimationEnd={this.onCommitPulseEnd}
+      >
+        <TooltippedContent
+          tagName="span"
+          className="repository-tab-commit-inner"
+          tooltip={t('tabs.settingsCommitTitle')}
+        >
+          <MaterialSymbol
+            name="commit"
+            size={14}
+            className="repository-tab-commit-icon"
+          />
+          <span className="repository-tab-commit-label">{label}</span>
+        </TooltippedContent>
+      </div>
+    )
   }
 
   private repositoryForTab(
@@ -190,16 +323,28 @@ export class RepositoryTabStrip extends React.Component<
   }
 
   private onUndoSettingsChange = () => {
+    if (!this.state.settingsCommit.canUndo) {
+      return
+    }
     this.props.dispatcher
       .undoLastSettingsChange()
-      .then(() => this.setState({ announcement: 'Settings change undone.' }))
+      .then(() => {
+        this.setState({ announcement: t('tabs.settingsChangeUndone') })
+        return this.props.tabsStore.refreshSettingsCommitSummary()
+      })
       .catch(err => log.error('Failed to undo settings change', err))
   }
 
   private onRedoSettingsChange = () => {
+    if (!this.state.settingsCommit.canRedo) {
+      return
+    }
     this.props.dispatcher
       .redoLastSettingsChange()
-      .then(() => this.setState({ announcement: 'Settings change redone.' }))
+      .then(() => {
+        this.setState({ announcement: t('tabs.settingsChangeRedone') })
+        return this.props.tabsStore.refreshSettingsCommitSummary()
+      })
       .catch(err => log.error('Failed to redo settings change', err))
   }
 
@@ -735,21 +880,33 @@ export class RepositoryTabStrip extends React.Component<
             isOpen={this.props.isNotificationCentreOpen}
             onClick={this.onToggleNotifications}
           />
+          {this.renderCommitChip()}
           <button
             className="repository-tab-undo"
             data-dm-feature={true}
-            aria-label="Undo last settings change"
+            aria-label={t('tabs.undoSettingsChange')}
+            disabled={!this.state.settingsCommit.canUndo}
             onClick={this.onUndoSettingsChange}
           >
-            <Octicon symbol={octicons.undo} />
+            <MaterialSymbol name="undo" size={18} />
           </button>
           <button
             className="repository-tab-redo"
             data-dm-feature={true}
-            aria-label="Redo settings change"
+            aria-label={t('tabs.redoSettingsChange')}
+            disabled={!this.state.settingsCommit.canRedo}
             onClick={this.onRedoSettingsChange}
           >
-            <Octicon symbol={octicons.redo} />
+            <MaterialSymbol name="redo" size={18} />
+          </button>
+          <button
+            className="repository-tab-history"
+            data-dm-feature={true}
+            aria-label={t('tabs.settingsHistory')}
+            aria-haspopup="dialog"
+            onClick={this.onOpenSettingsHistory}
+          >
+            <MaterialSymbol name="manage_history" size={18} />
           </button>
         </div>
         {this.renderStyleEditor()}

@@ -13,6 +13,8 @@ Material installation manages many identities, repositories, and branches.
   workflows](branch-switcher-workflows.md)
 - [Owner-scoped appearance and
   history](owner-scoped-appearance-and-history.md)
+- [Tab-strip settings commit
+  chip](tab-strip-settings-commit-chip.md)
 - [Collection bulk actions and regex
   safety](collection-bulk-and-regex-safety.md)
 

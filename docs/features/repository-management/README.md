@@ -51,6 +51,11 @@ Material is displaying or how a repository is represented in the application.
   workflows](submodule-subtree-and-remote-creation.md) — manage dependency
   topology and create an initialized account-bound remote before adding it as a
   submodule.
+- [Clone dialog repository
+  metadata](clone-dialog-repository-metadata.md) — render each cloneable
+  repository as a rich card with description, language, stars, forks, size,
+  default branch, last updated, and a visibility pill, plus data-derived
+  language filter chips.
 
 ## API applicability
 

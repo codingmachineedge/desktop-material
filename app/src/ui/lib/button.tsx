@@ -3,6 +3,7 @@ import classNames from 'classnames'
 import { Tooltip, TooltipDirection } from './tooltip'
 import { createObservableRef } from './observable-ref'
 import { AriaHasPopupType } from './aria-types'
+import { attachRipple } from './ripple'
 
 export interface IButtonProps {
   /**
@@ -258,6 +259,7 @@ export class Button extends React.Component<IButtonProps, {}> {
         data-verification={this.props.dataVerification}
         onClick={disabled ? preventDefault : this.onClick}
         onKeyDown={this.props.onKeyDown}
+        onMouseDown={this.onMouseDown}
         onContextMenu={disabled ? preventDefault : this.onContextMenu}
         type={this.props.type || 'button'}
         ref={this.innerButtonRef}
@@ -295,6 +297,17 @@ export class Button extends React.Component<IButtonProps, {}> {
         {this.props.children}
       </button>
     )
+  }
+
+  /**
+   * Spawn a Material state-layer ripple at the press point. Disabled buttons
+   * (which model their state via `aria-disabled`) never ripple, and the shared
+   * utility additionally suppresses ripples under reduced motion.
+   */
+  private onMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!this.props.disabled) {
+      attachRipple(event.currentTarget, event)
+    }
   }
 
   private onClick = (event: React.MouseEvent<HTMLButtonElement>) => {

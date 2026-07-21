@@ -9,7 +9,15 @@ import {
   IAutomationSettingsState,
 } from '../../lib/automation/automation-settings'
 import { DialogContent } from '../dialog'
-import { Checkbox, CheckboxValue } from '../lib/checkbox'
+import { MaterialSwitch } from '../lib/material-switch'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+  translateForAccessibleName,
+  TranslationKey,
+} from '../../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 
 interface IAutomationPreferencesProps {
   readonly accounts: ReadonlyArray<Account>
@@ -17,13 +25,41 @@ interface IAutomationPreferencesProps {
   readonly onSettingsChanged: (settings: IAutomationSettingsState) => void
 }
 
-const intervalOptions = AutomationIntervals.map(interval => (
-  <option key={interval} value={interval}>
-    Every {interval} minutes
-  </option>
-))
+interface IAutomationPreferencesState {
+  readonly languageMode: LanguageMode
+}
 
-export class AutomationPreferences extends React.Component<IAutomationPreferencesProps> {
+export class AutomationPreferences extends React.Component<
+  IAutomationPreferencesProps,
+  IAutomationPreferencesState
+> {
+  public constructor(props: IAutomationPreferencesProps) {
+    super(props)
+    this.state = { languageMode: getPersistedLanguageMode() }
+  }
+
+  public componentDidMount() {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
+  }
+
   private onGlobalChanged = (change: Partial<IAutomationSettings>) => {
     this.props.onSettingsChanged({
       ...this.props.settings,
@@ -49,6 +85,7 @@ export class AutomationPreferences extends React.Component<IAutomationPreference
 
   public render() {
     const settings = this.props.settings.global
+    const { languageMode } = this.state
     return (
       <DialogContent className="automation-preferences">
         <section className="advanced-section">
@@ -57,28 +94,36 @@ export class AutomationPreferences extends React.Component<IAutomationPreference
             Automation runs only for the selected repository. Background jobs
             never overwrite a draft commit message and skip unsafe repositories.
           </p>
-          <AutomationToggle
-            title="Automatically commit and push"
-            enabled={settings.autoCommitPushEnabled}
-            interval={settings.autoCommitPushInterval}
-            onEnabledChanged={enabled =>
-              this.onGlobalChanged({ autoCommitPushEnabled: enabled })
-            }
-            onIntervalChanged={interval =>
-              this.onGlobalChanged({ autoCommitPushInterval: interval })
-            }
-          />
-          <AutomationToggle
-            title="Automatically pull"
-            enabled={settings.autoPullEnabled}
-            interval={settings.autoPullInterval}
-            onEnabledChanged={enabled =>
-              this.onGlobalChanged({ autoPullEnabled: enabled })
-            }
-            onIntervalChanged={interval =>
-              this.onGlobalChanged({ autoPullInterval: interval })
-            }
-          />
+          <div className="preference-surface-stack">
+            <AutomationToggle
+              idPrefix="auto-commit-push"
+              titleKey="settings.automationAutoCommitPushTitle"
+              descriptionKey="settings.automationAutoCommitPushDescription"
+              languageMode={languageMode}
+              enabled={settings.autoCommitPushEnabled}
+              interval={settings.autoCommitPushInterval}
+              onEnabledChanged={enabled =>
+                this.onGlobalChanged({ autoCommitPushEnabled: enabled })
+              }
+              onIntervalChanged={interval =>
+                this.onGlobalChanged({ autoCommitPushInterval: interval })
+              }
+            />
+            <AutomationToggle
+              idPrefix="auto-pull"
+              titleKey="settings.automationAutoPullTitle"
+              descriptionKey="settings.automationAutoPullDescription"
+              languageMode={languageMode}
+              enabled={settings.autoPullEnabled}
+              interval={settings.autoPullInterval}
+              onEnabledChanged={enabled =>
+                this.onGlobalChanged({ autoPullEnabled: enabled })
+              }
+              onIntervalChanged={interval =>
+                this.onGlobalChanged({ autoPullInterval: interval })
+              }
+            />
+          </div>
         </section>
         {this.props.accounts.length > 0 && (
           <section className="advanced-section automation-account-overrides">
@@ -168,31 +213,72 @@ function OverrideIntervalSelect(props: {
 }
 
 function AutomationToggle(props: {
-  readonly title: string
+  readonly idPrefix: string
+  readonly titleKey: TranslationKey
+  readonly descriptionKey: TranslationKey
+  readonly languageMode: LanguageMode
   readonly enabled: boolean
   readonly interval: AutomationInterval
   readonly onEnabledChanged: (enabled: boolean) => void
   readonly onIntervalChanged: (interval: AutomationInterval) => void
 }) {
+  const { idPrefix, titleKey, descriptionKey, languageMode } = props
+  const titleId = `${idPrefix}-title`
+  const descriptionId = `${idPrefix}-description`
+  const title = translate(titleKey, languageMode)
+  const description = translate(descriptionKey, languageMode)
+
+  // A single-language accessible name for the interval group; the visible chip
+  // labels supply each option's name.
+  const groupLabel = translateForAccessibleName(
+    'settings.automationIntervalGroupLabel',
+    { title: translateForAccessibleName(titleKey, {}, languageMode) },
+    languageMode
+  )
+
   return (
-    <div className="automation-toggle-row">
-      <Checkbox
-        label={props.title}
-        value={props.enabled ? CheckboxValue.On : CheckboxValue.Off}
-        onChange={event => props.onEnabledChanged(event.currentTarget.checked)}
-      />
-      <select
-        aria-label={`${props.title} interval`}
-        value={props.interval}
-        disabled={!props.enabled}
-        onChange={event =>
-          props.onIntervalChanged(
-            Number(event.currentTarget.value) as AutomationInterval
-          )
-        }
-      >
-        {intervalOptions}
-      </select>
+    <div className="preference-toggle-card">
+      <div className="preference-toggle-row">
+        <div className="preference-toggle-text">
+          <span className="preference-toggle-title" id={titleId}>
+            {title}
+          </span>
+          <span className="preference-toggle-description" id={descriptionId}>
+            {description}
+          </span>
+        </div>
+        <MaterialSwitch
+          checked={props.enabled}
+          onChange={props.onEnabledChanged}
+          ariaLabelledBy={titleId}
+          ariaDescribedBy={descriptionId}
+        />
+      </div>
+      {props.enabled && (
+        <div
+          className="preference-interval-group"
+          role="radiogroup"
+          aria-label={groupLabel}
+        >
+          <span className="preference-interval-label" aria-hidden={true}>
+            {translate('settings.automationIntervalEvery', languageMode)}
+          </span>
+          {AutomationIntervals.map(interval => (
+            <button
+              key={interval}
+              type="button"
+              role="radio"
+              aria-checked={props.interval === interval}
+              className="preference-interval-chip"
+              onClick={() => props.onIntervalChanged(interval)}
+            >
+              {translate('settings.automationIntervalMinutes', languageMode, {
+                minutes: String(interval),
+              })}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

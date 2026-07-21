@@ -17,6 +17,15 @@ import { AccountPicker } from '../account-picker'
 import { RadioGroup } from '../lib/radio-group'
 import { BatchCloneMode } from '../../models/batch-clone'
 import { OrgFilterChips } from './org-filter-chips'
+import { MaterialSymbol } from '../lib/material-symbol'
+import { getLanguageColor, getRepositoryLanguages } from './repository-metadata'
+import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+} from '../../lib/i18n'
+import memoizeOne from 'memoize-one'
 
 interface ICloneGithubRepositoryProps {
   /** The account to clone from. */
@@ -150,6 +159,28 @@ interface ICloneGithubRepositoryProps {
   readonly onVisibilityFilterChanged: (
     filter: RepositoryVisibilityFilter
   ) => void
+
+  /**
+   * The set of languages the list is currently narrowed to. Empty means "no
+   * language filter". The chips are derived from the loaded repository set.
+   */
+  readonly languageFilter: ReadonlySet<string>
+
+  /** Called when the user toggles a language filter chip. */
+  readonly onToggleLanguageFilter: (language: string) => void
+
+  /**
+   * The repository set the language chips are derived from. This is the
+   * visibility-filtered set (before the language filter narrows it) so
+   * selecting a language never removes the other chips. Falls back to
+   * `repositories` when omitted.
+   */
+  readonly languageOptions: ReadonlyArray<IAPIRepository> | null
+}
+
+interface ICloneGithubRepositoryState {
+  /** Active language mode for localizing the metadata labels and chip eyebrow. */
+  readonly languageMode: LanguageMode
 }
 
 const VisibilityFilterLabels: ReadonlyArray<{
@@ -163,15 +194,56 @@ const VisibilityFilterLabels: ReadonlyArray<{
 ]
 
 /**
- * The painted heights of the Material clone-dialog list rows (34px icon chip
- * plus 8px vertical padding) and group headers. The virtualized list must be
- * told these exact values or its pointer hit-testing drifts away from the
- * rows the user sees.
+ * The painted heights of the Material clone-dialog list rows and group headers.
+ * The virtualized list must be told these exact values or its pointer
+ * hit-testing drifts away from the rows the user sees.
+ *
+ * The rich metadata card is 20px vertical padding + a 20px header row + two
+ * 4px gaps + an 18px description line + an 18px metadata line = 84px. See
+ * `_cloneable-repository-filter-list.scss` where each of those sub-heights is
+ * pinned so the painted height matches this constant exactly.
  */
-const CloneDialogRowHeight = 50
+const CloneDialogRowHeight = 84
 const CloneDialogGroupHeaderHeight = 34
 
-export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepositoryProps> {
+export class CloneGithubRepository extends React.PureComponent<
+  ICloneGithubRepositoryProps,
+  ICloneGithubRepositoryState
+> {
+  private getLanguages = memoizeOne(getRepositoryLanguages)
+
+  public constructor(props: ICloneGithubRepositoryProps) {
+    super(props)
+    this.state = { languageMode: getPersistedLanguageMode() }
+  }
+
+  public componentDidMount() {
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount() {
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    this.setState({
+      languageMode: normalizeLanguageMode(
+        (event as CustomEvent<unknown>).detail
+      ),
+    })
+  }
+
+  private localize = (
+    key: Parameters<typeof translate>[0],
+    variables?: Parameters<typeof translate>[2]
+  ) => translate(key, this.state.languageMode, variables)
+
   private getCloneRowHeight = ({
     item,
   }: {
@@ -227,6 +299,62 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
             {label}
           </button>
         ))}
+      </div>
+    )
+  }
+
+  private onLanguageChipClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const language = event.currentTarget.dataset.language
+    if (language !== undefined) {
+      this.props.onToggleLanguageFilter(language)
+    }
+  }
+
+  private renderLanguageChips() {
+    const languages = this.getLanguages(
+      this.props.languageOptions ?? this.props.repositories
+    )
+
+    if (languages.length === 0) {
+      return null
+    }
+
+    const { languageFilter } = this.props
+
+    return (
+      <div
+        className="org-filter-chips language-filter-chips"
+        role="group"
+        aria-label={this.localize('clone.languageFilterAria')}
+      >
+        <span className="org-filter-eyebrow">
+          {this.localize('clone.languageFilterLabel')}
+        </span>
+        {languages.map(language => {
+          const selected = languageFilter.has(language)
+          return (
+            <button
+              type="button"
+              key={language}
+              data-language={language}
+              className={classNames('org-filter-chip', 'language-chip', {
+                selected,
+              })}
+              aria-pressed={selected}
+              onClick={this.onLanguageChipClick}
+            >
+              {selected && <MaterialSymbol name="check" size={14} />}
+              <span
+                className="lang-dot"
+                style={{ backgroundColor: getLanguageColor(language) }}
+                aria-hidden={true}
+              />
+              {language}
+            </button>
+          )
+        })}
       </div>
     )
   }
@@ -305,6 +433,7 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
           onSelect={this.props.onSelectedOrganizationChanged}
         />
         {this.renderVisibilityChips()}
+        {this.renderLanguageChips()}
         {this.props.repositoryError !== null && (
           <div className="org-repositories-error" role="alert">
             <span>We couldn't refresh this account's repositories.</span>
@@ -345,6 +474,8 @@ export class CloneGithubRepository extends React.PureComponent<ICloneGithubRepos
             onShowSubmodules={this.props.onShowSubmodules}
             submoduleBadgeVersion={this.props.submoduleBadgeVersion}
             rowHeight={this.getCloneRowHeight}
+            showMetadata={true}
+            languageMode={this.state.languageMode}
           />
         </Row>
 

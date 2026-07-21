@@ -1,0 +1,182 @@
+// Material Design 3 settings surfaces shared by the Notifications, Automation,
+// Advanced and Integrations tabs. These mirror the Desktop Material v2 design:
+// toggle cards with a title/description column and a trailing switch, segmented
+// interval chips, icon-badged informational disclosure rows, and the
+// icon-badged application picker cards. Colour, radius and motion come from
+// --md-sys-* / --spring* tokens.
+
+#preferences {
+  .preference-surface-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  // Toggle card: title/description column + trailing MaterialSwitch, with an
+  // optional segmented interval group revealed underneath when enabled.
+  .preference-toggle-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: var(--md-sys-color-surface);
+    transition: background-color 480ms var(--emph);
+  }
+
+  .preference-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .preference-toggle-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .preference-toggle-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface);
+  }
+
+  .preference-toggle-card .settings-description,
+  .preference-toggle-description {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.5;
+  }
+
+  // Segmented interval chips ("Every" + 5/15/30/60 min).
+  .preference-interval-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    animation: dmUp calc(320ms * var(--mdur)) var(--spring);
+  }
+
+  .preference-interval-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface-variant);
+    margin-right: 4px;
+  }
+
+  .preference-interval-chip {
+    position: relative;
+    overflow: hidden;
+    height: 30px;
+    padding: 0 13px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+    transition: background-color 220ms var(--emph), color 220ms var(--emph), transform 200ms var(--spring-fast);
+
+    &[aria-checked='true'] {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    &:active {
+      transform: scale(0.92);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  // Icon-badged informational disclosure row (Advanced usage/credential rows)
+  // and application picker cards share the same leading tile + text column.
+  .preference-disclosure-card,
+  .integration-application-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: var(--md-sys-color-surface);
+    transition: background-color 480ms var(--emph);
+  }
+
+  .preference-disclosure-icon {
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    display: grid;
+    place-items: center;
+  }
+
+  .preference-disclosure-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .preference-disclosure-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface);
+  }
+
+  .preference-disclosure-subtitle {
+    font-size: 12px;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.5;
+  }
+
+  // Trailing tonal menu button on the application picker cards.
+  .integration-application-menu-button {
+    position: relative;
+    overflow: hidden;
+    flex: none;
+    border: 0;
+    border-radius: 12px;
+    height: 40px;
+    padding: 0 14px;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 240ms var(--emph), transform 200ms var(--spring-fast);
+
+    &:hover {
+      background: var(--md-sys-color-surface-container-highest);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .integration-application-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

@@ -314,9 +314,11 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 }
 
 .repository-tab-undo,
-.repository-tab-redo {
+.repository-tab-redo,
+.repository-tab-history {
   // v2 prototype tab-strip trailing cluster: 32×32 radius-10 icon buttons for
-  // undo/redo of profile settings commits; press squashes to scale(.82).
+  // undo/redo of profile settings commits and the settings-history manager;
+  // press squashes to scale(.82).
   display: grid;
   place-items: center;
   flex: none;
@@ -328,16 +330,7 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   background: transparent;
   color: var(--md-sys-color-on-surface-variant);
   cursor: pointer;
-  transition: background 220ms var(--emph), transform 200ms var(--spring-fast);
-
-  .octicon {
-    width: 18px;
-    height: 18px;
-  }
-
-  &:hover {
-    background: var(--md-sys-color-surface-container-highest);
-  }
+  transition: background 220ms var(--emph), color 220ms var(--emph), opacity 220ms var(--emph), transform 200ms var(--spring-fast);
 
   &:active {
     transform: scale(0.82);
@@ -346,6 +339,76 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   &:focus-visible {
     outline: 2px solid var(--md-sys-color-primary);
     outline-offset: 2px;
+  }
+}
+
+.repository-tab-undo,
+.repository-tab-redo {
+  &:hover:not(:disabled) {
+    background: var(--md-sys-color-surface-container-highest);
+  }
+
+  // v2 prototype: when there is nothing to undo/redo the control dims to ~.35
+  // opacity and stops responding to the pointer, keeping the affordance
+  // present but visibly inert.
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.repository-tab-history {
+  &:hover {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+}
+
+.repository-tab-commit-chip {
+  // v2 prototype tab-strip trailing cluster: a persistent per-account settings
+  // repo indicator reading "Saved · <shortSha>" in Roboto Mono. It flips to a
+  // primary-container "Committed <shortSha>" tone while its commit glyph pulses
+  // on each new auto-commit.
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  font-family: var(--font-family-monospace);
+  font-size: 11.5px;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  transition: background-color 300ms var(--emph), color 300ms var(--emph);
+
+  &.is-pulsing {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+
+    .repository-tab-commit-icon {
+      animation: dmBounce 500ms var(--spring-fast);
+    }
+  }
+
+  // TooltippedContent wraps the glyph and label in this flex row so the tooltip
+  // has a real box to anchor to.
+  .repository-tab-commit-inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .repository-tab-commit-icon {
+    // The commit glyph carries the pulse; it never animates at rest.
+    line-height: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .repository-tab-commit-chip.is-pulsing .repository-tab-commit-icon {
+    animation: none;
   }
 }
 

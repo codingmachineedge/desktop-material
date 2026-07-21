@@ -146,4 +146,147 @@ dialog.clone-repository {
     background: var(--md-sys-color-primary-container);
     fill: var(--md-sys-color-on-primary-container);
   }
+
+  // Commit 763c44 — rich metadata card rows (description, language, stars,
+  // forks, size, default branch, last updated + visibility pill).
+  //
+  // The row height is pinned so the virtualized list's hit-testing stays exact:
+  //   10px top padding
+  // + 20px header row
+  // +  4px gap
+  // + 18px description line
+  // +  4px gap
+  // + 18px metadata line
+  // + 10px bottom padding
+  // = 84px (see CloneDialogRowHeight in clone-github-repository.tsx).
+  .clone-repository-list-item.with-metadata {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+
+    // The base row rule adds a right margin to the icon; here the flex gap
+    // already provides the spacing, so cancel it to keep the 12px rhythm.
+    .icon {
+      margin-right: 0;
+    }
+
+    .checkbox {
+      margin-top: 2px;
+    }
+
+    .repo-details {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .repo-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 20px;
+      min-width: 0;
+
+      .name {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: var(--font-weight-semibold);
+      }
+
+      // The submodule badge and archived tag keep their existing look but must
+      // not be pushed off the fixed-height header.
+      .submodule-badge,
+      .archived {
+        margin-left: 0;
+        flex-shrink: 0;
+      }
+    }
+
+    // Outlined Public/Private pill matching the v2 prototype.
+    .visibility-pill {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 20px;
+      padding: 0 9px;
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 1.5px var(--md-sys-color-outline-variant);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10.5px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .repo-description {
+      height: 18px;
+      line-height: 18px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12.5px;
+      color: var(--md-sys-color-on-surface-variant);
+
+      &.empty {
+        font-style: italic;
+        opacity: 0.75;
+      }
+    }
+
+    .repo-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 18px;
+      overflow: hidden;
+      font-size: 11.5px;
+      color: var(--md-sys-color-on-surface-variant);
+
+      .meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      .lang-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+      }
+    }
+  }
+
+  // The selected row still swaps the icon chip to the primary container; keep
+  // the metadata text legible against the tonal card background.
+  .list-item.selected .clone-repository-list-item.with-metadata {
+    .repo-description,
+    .repo-meta {
+      color: var(--md-sys-color-on-surface-variant);
+    }
+  }
+
+  // Language filter chips reuse the owner-chip shell but lead with a language
+  // color dot instead of an avatar.
+  .language-filter-chips .language-chip {
+    padding: 0 12px 0 10px;
+
+    .lang-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+  }
 }
