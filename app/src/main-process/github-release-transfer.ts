@@ -121,6 +121,8 @@ export interface IGitHubReleaseTransferDependencies {
   readonly fetch: ReleaseFetcher
   readonly upload: ReleaseUploadFetcher
   readonly cliUpload?: ReleaseCliUploadFallback
+  /** Prefer the isolated exact-length CLI transport before opening Electron net. */
+  readonly preferCliUpload?: boolean
   readonly redirects?: IActionsTransferRedirectDependencies
 }
 
@@ -165,11 +167,9 @@ let transferSession: Electron.Session | null = null
 
 /** Abort a request that reports no actual network upload progress for 2 min. */
 export const GitHubReleaseUploadStallTimeoutMs = 2 * 60 * 1000
-const GitHubReleaseUploadProgressIntervalMs = 250
 
 interface IGitHubReleaseUploadWatchdogOptions {
   readonly stallTimeoutMs?: number
-  readonly progressIntervalMs?: number
 }
 
 const transferKey = (senderId: number, operationId: string) =>
@@ -1534,7 +1534,7 @@ export async function handleGitHubReleaseAssetUpload(
         )
       }
     }
-    let asset: IGitHubReleaseAsset
+    let asset: IGitHubReleaseAsset | undefined
     let uploadedDigest = source.digest
     let response: Response | null = null
     const runGitHubCliFallback = async (
@@ -1571,25 +1571,52 @@ export async function handleGitHubReleaseAssetUpload(
         reportUploadedBytes
       )
     }
-    try {
-      response = await dependencies.upload(
-        url.toString(),
-        Object.fromEntries(headers.entries()),
-        source,
-        active.controller.signal,
-        reportUploadedBytes
-      )
-    } catch (error) {
-      if (
-        error instanceof ReleaseTransferFailure &&
-        error.reason === 'stalled' &&
-        dependencies.cliUpload !== undefined
-      ) {
-        const fallback = await runGitHubCliFallback(dependencies.cliUpload)
-        asset = fallback.asset
-        uploadedDigest = fallback.localDigest
-      } else {
-        throw error
+    let cliUnavailable = false
+    if (
+      dependencies.preferCliUpload === true &&
+      dependencies.cliUpload !== undefined
+    ) {
+      try {
+        // Electron's chunked upload pipe can terminate the renderer with a
+        // native Mojo FAILED_PRECONDITION on Windows. A trusted gh install is
+        // already exact-length, bounded, cancelable, and memory-safe, so never
+        // open that native pipe when the safer transport is available.
+        const primary = await runGitHubCliFallback(dependencies.cliUpload)
+        asset = primary.asset
+        uploadedDigest = primary.localDigest
+      } catch (error) {
+        if (
+          error instanceof ReleaseTransferFailure &&
+          error.reason === 'cli-unavailable'
+        ) {
+          cliUnavailable = true
+        } else {
+          throw error
+        }
+      }
+    }
+    if (asset === undefined) {
+      try {
+        response = await dependencies.upload(
+          url.toString(),
+          Object.fromEntries(headers.entries()),
+          source,
+          active.controller.signal,
+          reportUploadedBytes
+        )
+      } catch (error) {
+        if (
+          error instanceof ReleaseTransferFailure &&
+          error.reason === 'stalled' &&
+          dependencies.cliUpload !== undefined &&
+          !cliUnavailable
+        ) {
+          const fallback = await runGitHubCliFallback(dependencies.cliUpload)
+          asset = fallback.asset
+          uploadedDigest = fallback.localDigest
+        } else {
+          throw error
+        }
       }
     }
     throwIfAborted(active.controller.signal)
@@ -1603,7 +1630,8 @@ export async function handleGitHubReleaseAssetUpload(
         await response.body?.cancel().catch(() => undefined)
         if (
           (status === 411 || status === 502) &&
-          dependencies.cliUpload !== undefined
+          dependencies.cliUpload !== undefined &&
+          !cliUnavailable
         ) {
           // GitHub documents Content-Length as required, while Electron needs
           // chunked encoding to avoid buffering multi-gigabyte request bodies.
@@ -1762,26 +1790,17 @@ export const createElectronGitHubReleaseUploadFetcher =
       let settled = false
       let responseStarted = false
       let stallTimer: NodeJS.Timeout | undefined
-      let progressTimer: NodeJS.Timeout | undefined
       const stallTimeoutMs =
         Number.isSafeInteger(watchdogOptions.stallTimeoutMs) &&
         watchdogOptions.stallTimeoutMs! > 0
           ? watchdogOptions.stallTimeoutMs!
           : GitHubReleaseUploadStallTimeoutMs
-      const progressIntervalMs =
-        Number.isSafeInteger(watchdogOptions.progressIntervalMs) &&
-        watchdogOptions.progressIntervalMs! > 0
-          ? watchdogOptions.progressIntervalMs!
-          : GitHubReleaseUploadProgressIntervalMs
       const settle = (callback: () => void) => {
         if (!settled) {
           settled = true
           signal.removeEventListener('abort', onAbort)
           if (stallTimer !== undefined) {
             clearTimeout(stallTimer)
-          }
-          if (progressTimer !== undefined) {
-            clearInterval(progressTimer)
           }
           body.destroy()
           callback()
@@ -1800,30 +1819,6 @@ export const createElectronGitHubReleaseUploadFetcher =
           stallTimeoutMs
         )
       }
-      const supportsNativeProgress =
-        typeof request.getUploadProgress === 'function'
-      const sampleNativeProgress = () => {
-        if (!supportsNativeProgress || settled) {
-          return
-        }
-        try {
-          const progress = request.getUploadProgress()
-          if (!progress.active || !progress.started) {
-            return
-          }
-          const current = Math.min(
-            source.length,
-            Math.max(0, Math.floor(progress.current))
-          )
-          if (current > reportedBytes) {
-            reportedBytes = current
-            armStallWatchdog()
-            onProgress?.(reportedBytes)
-          }
-        } catch {
-          // A request may become inactive between the timer and this sample.
-        }
-      }
       const onAbort = () => {
         settle(() => {
           request.abort()
@@ -1838,9 +1833,6 @@ export const createElectronGitHubReleaseUploadFetcher =
       }
       signal.addEventListener('abort', onAbort, { once: true })
       armStallWatchdog()
-      if (supportsNativeProgress) {
-        progressTimer = setInterval(sampleNativeProgress, progressIntervalMs)
-      }
       request.on('redirect', status => {
         settle(() => {
           request.abort()
@@ -1907,13 +1899,14 @@ export const createElectronGitHubReleaseUploadFetcher =
             return
           }
           uploadedBytes = nextUploadedBytes
-          if (supportsNativeProgress) {
-            sampleNativeProgress()
-          } else {
-            reportedBytes = uploadedBytes
-            armStallWatchdog()
-            onProgress?.(reportedBytes)
-          }
+          // The callback only proves Chromium accepted this chunk, not that it
+          // reached the wire, so do not present a cached native progress sample
+          // as stronger evidence. Production uses gh before this path. This
+          // no-CLI fallback reports bounded queue progress and still times out
+          // if GitHub closes or never completes the response.
+          reportedBytes = uploadedBytes
+          armStallWatchdog()
+          onProgress?.(reportedBytes)
           body.resume()
         })
       })
@@ -1939,4 +1932,5 @@ const defaultDependencies: IGitHubReleaseTransferDependencies = {
   cliUpload: createGitHubCliReleaseUploadFallback({
     fetch: defaultReleaseFetcher,
   }),
+  preferCliUpload: true,
 }

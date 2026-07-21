@@ -423,7 +423,7 @@ describe('main-process GitHub release transfer', () => {
     })
   })
 
-  it('uses chunked Electron streaming without buffering or waiting for drain', async () => {
+  it('uses chunked Electron streaming without polling the native Mojo pipe', async () => {
     await withDirectory(async directory => {
       const source = join(directory, 'large-upload.bin')
       const sourceBytes = Buffer.alloc(256 * 1024, 0x61)
@@ -443,13 +443,9 @@ describe('main-process GitHub release transfer', () => {
       const written = new Array<Buffer>()
       let pendingWrites = 0
       let maximumPendingWrites = 0
-      let networkUploadedBytes = 0
-      request.getUploadProgress = () => ({
-        active: true,
-        started: networkUploadedBytes > 0,
-        current: networkUploadedBytes,
-        total: sourceBytes.byteLength,
-      })
+      request.getUploadProgress = () => {
+        throw new Error('the native upload progress pipe must not be polled')
+      }
       request.write = (chunk, _encoding, callback) => {
         assert.equal(request.chunkedEncoding, true)
         // Electron returns void and has no Writable `drain` contract.
@@ -457,7 +453,6 @@ describe('main-process GitHub release transfer', () => {
         maximumPendingWrites = Math.max(maximumPendingWrites, pendingWrites)
         setImmediate(() => {
           written.push(Buffer.from(chunk))
-          networkUploadedBytes += chunk.byteLength
           pendingWrites--
           callback()
         })
@@ -564,7 +559,7 @@ describe('main-process GitHub release transfer', () => {
       const upload = createElectronGitHubReleaseUploadFetcher(
         () => request as unknown as ClientRequest,
         () => ({} as Session),
-        { stallTimeoutMs: 25, progressIntervalMs: 5 }
+        { stallTimeoutMs: 25 }
       )
 
       await assert.rejects(
@@ -1077,7 +1072,7 @@ describe('main-process GitHub release transfer', () => {
       const upload = createElectronGitHubReleaseUploadFetcher(
         () => request as unknown as ClientRequest,
         () => ({} as Session),
-        { stallTimeoutMs: 25, progressIntervalMs: 5 }
+        { stallTimeoutMs: 25 }
       )
       let fallbackCalls = 0
       const dependencies: IGitHubReleaseTransferDependencies = {
@@ -1112,6 +1107,40 @@ describe('main-process GitHub release transfer', () => {
         sender.sent.map(event => event.transferredBytes),
         [0, 0, bytes.byteLength]
       )
+    })
+  })
+
+  it('uses GitHub CLI before opening the Electron upload pipe in production', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'cli-primary.bin')
+      await writeFile(source, bytes)
+      let nativeCalls = 0
+      let cliCalls = 0
+      const result = await handleGitHubReleaseAssetUpload(
+        new TestSender(32),
+        uploadRequest(source),
+        {
+          fetch: async () => new Response(null, { status: 500 }),
+          upload: async () => {
+            nativeCalls++
+            throw new Error('Electron upload pipe must remain unopened')
+          },
+          cliUpload: async (cliRequest, _signal, onProgress) => {
+            cliCalls++
+            assert.equal(cliRequest.source.digest, digest)
+            onProgress?.(cliRequest.source.length)
+            return {
+              asset: parseGitHubReleaseAsset(uploadedAsset()),
+              localDigest: digest,
+            }
+          },
+          preferCliUpload: true,
+        }
+      )
+
+      assert.equal(result.ok, true)
+      assert.equal(cliCalls, 1)
+      assert.equal(nativeCalls, 0)
     })
   })
 
