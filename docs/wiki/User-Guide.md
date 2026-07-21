@@ -576,8 +576,14 @@ command console.
 
 ### GitHub API Explorer
 
-Open **API** in the repository rail to work against the GitHub host and account explicitly bound to
-the selected repository. The Explorer never falls back to another identity on the same host.
+Open **API** in the repository rail, or **Repository tools → API functions**, to work against the
+GitHub host and account explicitly bound to the selected repository. The Explorer never falls back
+to another identity on the same host. Eligible repositories receive a small set of safe read
+functions automatically, and each appears as a runnable button.
+
+Choose **Hide API tab** to remove the rail item for this repository. **Show API tab** in the API
+functions tool restores it. The full REST/GraphQL operation catalog and manual request builder are
+available only after choosing **Add or edit an API function**.
 
 - Search the complete current catalog of **1,206 REST operations** by method, path, summary, or
   operation ID, narrow it by category, or choose the **New operations** scope to see exactly the

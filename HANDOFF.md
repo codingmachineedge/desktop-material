@@ -23,6 +23,27 @@ not Prettier-clean. Pages `29710664112` passed and installer run `29710722904`
 skipped. The correction formats that generator without changing any generated
 SVG content; the repository-wide Prettier gate and a fresh generator run pass.
 
+## 2026-07-20 M25 — repository-bound API functions in buttons
+
+This worktree implements the user-requested functions-first GitHub API
+workflow. Eligible GitHub repositories seed five safe read functions on first
+use: repository details, issues, pull requests, releases, and Actions
+workflows. They are stored through the existing profile-backed named-function
+registry, remain bound to the exact repository/account/provider, and run from
+buttons in both the API surface and **Repository tools → API functions**.
+
+- The API rail item is hideable per repository and restorable from Repository
+  tools; the preference is renderer-local and does not change Agent API data.
+- The full operation catalog and manual REST/GraphQL request builder stay
+  behind **Add or edit an API function**. Existing mutation review,
+  credential-redaction, response bounds, and binding checks remain in place.
+- Focused source/style/navigation checks pass. The React component test could
+  not load in this checkout because the shared dependency tree does not contain
+  `react`; the exact no-download production build and off-screen verification
+  remain pending the fixed MCP environment.
+- No screenshot or public wiki/Pages image claim is made until the rebuilt
+  headless app passes the acceptance gate.
+
 ## 2026-07-20 M24 — guided sparse checkout accepted locally
 
 This is the implementation and local-acceptance receipt for the user-directed

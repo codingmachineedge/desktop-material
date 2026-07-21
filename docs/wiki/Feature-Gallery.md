@@ -198,13 +198,15 @@ path; it never force-pushes automatically.
 
 ## GitHub lifecycle
 
-The repository rail now includes a GitHub API Explorer for expert integration
-work. Its complete searchable catalog covers all 1,206 current REST operations
-and can isolate exactly the 10 additions since the prior pinned 2026-03-10
-catalog. REST and GraphQL requests use only the account and provider host bound
-to the selected repository; every mutation stops for exact-request review,
-while returned headers and bodies are bounded and credential-redacted before
-display.
+The repository rail now includes a hideable, functions-first GitHub API
+surface for expert integration work. Eligible repositories receive safe,
+repository-bound read functions automatically, and **Repository tools → API
+functions** provides the same actions as runnable buttons. The complete REST
+and GraphQL operation catalog remains available through the explicit advanced
+builder for custom functions. Requests use only the account and provider host
+bound to the selected repository; every mutation stops for exact-request
+review, while returned headers and bodies are bounded and credential-redacted
+before display.
 
 Named API functions turn a reviewed REST or GraphQL definition into a reusable
 app extension. Each function is versioned in the active profile, fingerprinted,

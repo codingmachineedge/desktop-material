@@ -212,7 +212,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 - Compose pull requests with repository templates and metadata, then inspect, update, review, close/reopen, or merge the exact reviewed pull request through a fail-closed lifecycle
 - Browse paginated Actions artifacts, download with bounded redirect and digest checks, and inspect the effective rules that apply to the current branch
 - Use the repository Releases dashboard to compare loaded, stable, prerelease, and draft counts; search and status-filter the catalog; inspect authors, dates, targets, asset types, digests, and download totals; create reviewed releases publicly in one operation or save them as drafts; and keep bounded edit, publish, delete, upload, and download workflows. Browse, search, filter, inspect, edit, comment on, close, or reopen Issues through repository/account-bound review state
-- Use the repository-contextual GitHub API Explorer, bound to the selected account and provider host, to search all 1,206 REST operations, isolate exactly the 10 additions since the prior pinned 2026-03-10 catalog, switch between REST and GraphQL, review mutations before they run, and inspect bounded, credential-redacted responses
+- Use the repository-contextual GitHub API functions surface, bound to the selected account and provider host, to run automatically added repository, issues, pull-request, release, and workflow actions as buttons; hide the API rail item when it is not needed, and reveal the full REST/GraphQL catalog only for advanced custom functions
 
 **Fully Material, everywhere**
 - The remaining stock surfaces — tooltips, menus, banners, autocomplete popups, segmented controls, split-buttons, dialog internals, History/CI surfaces — are re-tinted through the Material token system in both light and dark themes
@@ -260,9 +260,9 @@ automation, and account isolation. The diagrams are reproducible with
 | --- | --- | --- |
 | <img src="docs/assets/screenshots/material-tab-search.png" alt="Runtime repository-tab search matching the active local fixture by name and path" width="420"><br><sub>Search and switch tabs</sub> | <img src="docs/assets/screenshots/material-history-context-actions.png" alt="History commit row with its named More actions control and hover hint" width="420"><br><sub>Right-click and keyboard-equivalent actions</sub> | <img src="docs/assets/screenshots/material-repository-tools-scroll.png" alt="Short Repository Tools workspace scrolled to its reachable final results surface" width="420"><br><sub>Verified bottom reachability</sub> |
 
-| Complete GitHub API Explorer |
+| GitHub API functions |
 | --- |
-| <img src="docs/assets/screenshots/material-github-api-explorer.png" alt="Repository-contextual GitHub API Explorer with a searchable REST catalog, REST and GraphQL request builder, and bounded redacted response" width="720"><br><sub>1,206 REST operations · exactly 10 new since the prior pinned 2026-03-10 catalog · reviewed mutations</sub> |
+| <img src="docs/assets/screenshots/material-github-api-explorer.png" alt="Repository-bound GitHub API functions with runnable buttons and an advanced request builder" width="720"><br><sub>Auto-added read functions · hideable API rail item · reviewed custom requests</sub> |
 
 | Custom repository-logo studio | Named API app functions |
 | --- | --- |
