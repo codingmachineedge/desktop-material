@@ -110,6 +110,27 @@ Source-contract tests scan every local workflow, reject
 include both `github.run_id` and `github.run_attempt`. Workflows without a
 concurrency group, including CodeQL, remain independently runnable.
 
+## Super Express release
+
+`.github/workflows/super-express-release.yml` is a separate, manual-only
+emergency lane. Dispatching it from `main` goes directly from the exact
+dependency cache to the Windows x64 production build and package. It does not
+run lint, unit, script, trampoline, or packaged E2E suites. The ordinary CI and
+tested Express Release paths remain the default release gates.
+
+The direct lane still fails closed around the produced executable content. It
+requires the exact dispatched commit, creates a unique package/tag version from
+the workflow run number and attempt, rejects an existing tag, requires every
+installer, portable ZIP, Squirrel package, and `RELEASES` entry to be non-empty,
+and generates bounded exact-commit notes. It uploads the complete payload as an
+uncompressed seven-day Actions artifact before the optional create-only GitHub
+Release step. The `publish` dispatch checkbox defaults on but can be cleared to
+build a recovery artifact without creating a Release.
+
+No shared concurrency group is declared, so overlapping manual invocations can
+finish independently. Tags and Releases are immutable: a same-tag race has one
+winner, and later attempts fail without replacing it.
+
 ## Configuration
 
 - `DESKTOP_UPDATES_URL` can replace the complete update endpoint. Coming-soon
@@ -124,6 +145,10 @@ concurrency group, including CodeQL, remain independently runnable.
   permits package-only recovery but blocks publication. A wrong/stale CI
   trigger, stale dispatch SHA, existing tag, or changed default-branch tip
   stops before publication.
+- Super Express Release must also be dispatched from `main`. It deliberately
+  omits the normal test suites, so use it only when the shorter build/package
+  path is the explicit operator choice. Clearing its `publish` input retains
+  artifacts without creating a Release.
 
 ## Failure modes and security
 
@@ -160,5 +185,8 @@ workflow wiring, exact Git range collection, subject sanitization, output
 limits, and first-release handling. The app and script TypeScript
 projects, targeted formatting/lint, workflow YAML, express-path gates,
 create-only publication, retained artifacts, and exact dependency-cache keys
-are also checked locally. Remote Actions and release publication remain
-required after integration.
+are also checked locally. The Super Express source contract additionally proves
+manual-only triggering, exact-SHA packaging, omitted test/lint commands,
+non-cancelling overlap, retained artifacts, immutable tag checks, and exact
+release targeting. Remote Actions and release publication remain required after
+integration.

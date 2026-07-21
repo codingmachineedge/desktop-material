@@ -1,0 +1,199 @@
+name: Super Express Release
+
+# Manual emergency lane. It intentionally omits lint, unit, script, and E2E
+# suites, but still requires a successful production build, package creation,
+# and exact asset checks before publishing an immutable release.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified package as a GitHub Release
+        required: true
+        default: true
+        type: boolean
+
+# Do not add a shared concurrency group: overlapping manual releases must be
+# allowed to finish independently.
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: 24.15.0
+
+jobs:
+  build-and-release:
+    name: Build Windows x64 and release
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      RELEASE_TARGET_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Require a main-branch manual dispatch
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Super Express Release must be dispatched from main." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TARGET_SHA }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Require the exact dispatched commit
+        shell: bash
+        run: |
+          checked_out=$(git rev-parse HEAD)
+          if [ "$checked_out" != "$RELEASE_TARGET_SHA" ]; then
+            echo "Checked-out commit $checked_out does not match $RELEASE_TARGET_SHA." >&2
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-ci-environment
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          arch: x64
+
+      - name: Create a unique package version
+        id: version
+        shell: bash
+        run: |
+          base=$(node -p "require('./app/package.json').version")
+          printf -v sequence '%010d' "$GITHUB_RUN_NUMBER"
+          printf -v attempt '%02d' "$GITHUB_RUN_ATTEMPT"
+          version="${base}-s${sequence}${attempt}"
+          tag="v${version}"
+          RELEASE_VERSION="$version" node -e "const fs=require('fs');const f='./app/package.json';const p=require(f);p.version=process.env.RELEASE_VERSION;fs.writeFileSync(f, JSON.stringify(p, null, 2) + '\n')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Require an unused immutable tag
+        shell: bash
+        run: |
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1
+          status=$?
+          set -e
+          case "$status" in
+            2) ;;
+            0)
+              echo "Release tag $RELEASE_TAG already exists; refusing to replace it." >&2
+              exit 1
+              ;;
+            *)
+              echo "Unable to prove $RELEASE_TAG is unused (status $status)." >&2
+              exit "$status"
+              ;;
+          esac
+
+      - name: Build production app
+        run: yarn build:prod
+        env:
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
+          DESKTOP_ERROR_REPORTING_ENDPOINT:
+            ${{ secrets.DESKTOP_ERROR_REPORTING_ENDPOINT }}
+          DESKTOP_NON_FATAL_ERROR_REPORTING_ENDPOINT:
+            ${{ secrets.DESKTOP_NON_FATAL_ERROR_REPORTING_ENDPOINT }}
+          npm_config_arch: x64
+          TARGET_ARCH: x64
+
+      - name: Package Windows x64
+        run: yarn package
+        env:
+          npm_config_arch: x64
+          TARGET_ARCH: x64
+
+      - name: Collect and verify release payload
+        shell: bash
+        run: |
+          mkdir -p release-payload/installers
+          shopt -s nullglob
+          for file in \
+            "dist/GitHub Desktop-x64.zip" \
+            dist/GitHubDesktop-*.nupkg \
+            "dist/GitHubDesktopSetup-x64.exe" \
+            "dist/GitHubDesktopSetup-x64.msi"; do
+            [ -e "$file" ] && cp "$file" release-payload/installers/
+          done
+
+          if [ -e dist/RELEASES ]; then
+            cp dist/RELEASES release-payload/installers/
+            while read -r _sha name _size || [[ -n "$name" ]]; do
+              [ -z "$name" ] && continue
+              [ -e "release-payload/installers/$name" ] && continue
+              case "$name" in
+                *-full.nupkg) source=$(ls dist/*-full.nupkg 2>/dev/null | head -n1) ;;
+                *-delta.nupkg) source=$(ls dist/*-delta.nupkg 2>/dev/null | head -n1) ;;
+                *) source="" ;;
+              esac
+              [ -n "$source" ] && [ -e "$source" ] && \
+                cp "$source" "release-payload/installers/$name"
+            done < dist/RELEASES
+          fi
+
+          required=(
+            release-payload/installers/RELEASES
+            "release-payload/installers/GitHub Desktop-x64.zip"
+            release-payload/installers/GitHubDesktopSetup-x64.exe
+            release-payload/installers/GitHubDesktopSetup-x64.msi
+            "release-payload/installers/GitHubDesktop-${RELEASE_VERSION}-full.nupkg"
+            "release-payload/installers/GitHubDesktop-${RELEASE_VERSION}-x64-full.nupkg"
+          )
+          for asset in "${required[@]}"; do
+            if [ ! -s "$asset" ]; then
+              echo "Missing or empty release asset: $asset" >&2
+              exit 1
+            fi
+          done
+
+      - name: Generate exact-commit release notes
+        shell: bash
+        run: |
+          yarn --silent ts-node -P script/tsconfig.json \
+            script/generate-automated-release-notes.ts \
+            --repository "$GITHUB_REPOSITORY" \
+            --version "$RELEASE_VERSION" \
+            --release-sha "$RELEASE_TARGET_SHA" \
+            --output release-payload/release-notes.md
+
+      - name: Preserve installer and notes artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: super-express-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-payload/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Publish immutable GitHub Release
+        if: ${{ inputs.publish }}
+        shell: bash
+        run: |
+          gh release create "$RELEASE_TAG" release-payload/installers/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_TARGET_SHA" \
+            --title "Desktop Material $RELEASE_VERSION" \
+            --notes-file release-payload/release-notes.md \
+            --latest
+
+      - name: Verify published release target
+        if: ${{ inputs.publish }}
+        shell: bash
+        run: |
+          git fetch origin "refs/tags/$RELEASE_TAG"
+          published=$(git rev-parse 'FETCH_HEAD^{commit}')
+          if [ "$published" != "$RELEASE_TARGET_SHA" ]; then
+            echo "Published tag resolves to $published, expected $RELEASE_TARGET_SHA." >&2
+            exit 1
+          fi
+          draft=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft --jq .isDraft)
+          if [ "$draft" != "false" ]; then
+            echo "Published release unexpectedly remained a draft." >&2
+            exit 1
+          fi

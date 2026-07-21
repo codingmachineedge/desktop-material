@@ -3298,3 +3298,27 @@ state: installer run `29671087924` and release
   documentation-only push. Verify the exact SHA, CI gate, release target, and
   required non-empty assets for each final push; never assume a docs-only push
   is skipped.
+## 2026-07-21 CI FFmpeg recovery and Super Express Release
+
+- CI run `29877231968` failed before build/test execution because the exact
+  dependency-cache validator searched only for `ffmpeg`/`ffmpeg.exe`, while
+  Playwright stores platform payloads as `ffmpeg-linux`, `ffmpeg-mac`, or
+  `ffmpeg-win64.exe` under a versioned `ffmpeg-*` directory. Commit
+  `239a87669c` updated the bounded two-level sentinel and its source-contract
+  test, passed 2/2 focused checks locally, and was pushed to `main` without
+  waiting for the replacement CI run.
+- `.github/workflows/super-express-release.yml` adds a separate
+  `workflow_dispatch`-only emergency lane. It accepts only a `main` dispatch,
+  checks out the exact SHA, restores the exact dependency cache, skips lint and
+  all test suites, builds/packages Windows x64 directly, verifies the complete
+  Squirrel/installer/portable payload, generates bounded exact-SHA notes, and
+  preserves an uncompressed seven-day artifact before optional create-only
+  release publication.
+- Super Express versions combine the package base with its run number and
+  attempt, keeping NuGet-compatible unique immutable tags. The workflow has no
+  shared concurrency group, so a newer dispatch cannot cancel an older one.
+  Existing-tag, missing/empty asset, release-target, or draft verification
+  failures stop publication without replacing prior assets.
+- Local verification passed 4/4 focused CI/workflow contract tests, Prettier for
+  both workflows and tests, and `git diff --check`. Remote execution and an
+  actual Super Express publication remain external verification.
