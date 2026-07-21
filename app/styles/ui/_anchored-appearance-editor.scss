@@ -3,15 +3,21 @@
 }
 
 .anchored-appearance-editor {
+  --anchored-appearance-editor-preferred-width: 390px;
+
   position: relative;
   display: flex;
-  width: min(390px, calc(var(--available-width, 100vw) - 32px));
+  width: min(var(--anchored-appearance-editor-preferred-width), calc(var(--available-width, 100vw) - 32px));
   min-width: 0;
   max-width: calc(100vw - 52px);
   max-height: min(620px, calc(var(--available-height, 100vh) - 32px));
   flex-direction: column;
   overflow: hidden;
   color: var(--md-sys-color-on-surface);
+}
+
+.anchored-appearance-editor:has(.element-appearance-editor-wide) {
+  --anchored-appearance-editor-preferred-width: 780px;
 }
 
 .anchored-appearance-editor-header {
