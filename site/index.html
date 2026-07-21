@@ -544,10 +544,11 @@
               <p>
                 Dialogs float without blocking the app, drag by their headers,
                 cascade, and come to front on focus. Preferences is an MD3
-                940×660 dialog; repo and branch pickers are side sheets.
-                Acknowledgement-only errors default to dismissible red
-                bottom-right notices, while decisions and recovery actions
-                remain dialogs.
+                940×660 dialog; wheel and trackpad gestures work anywhere over
+                its content while nested controls keep their own scroll range.
+                Pickers use side sheets. Acknowledgement-only errors default to
+                dismissible red bottom-right notices, while decisions and
+                recovery actions remain dialogs.
               </p>
             </article>
 
@@ -772,13 +773,14 @@
                 <span class="tag">No import</span>
               </h3>
               <p>
-                Open an initialized submodule in the current workspace without
-                adding it to the repository list, Recent, or persisted last
-                selection. Right-clicking its profile-customizable Back control
-                opens an editor beside that element; Back returns to the saved
-                root, while invalid or escaping paths fail closed. Mutation and
-                process-launch surfaces stay guarded while temporary, with
-                Repository Tools limited to safe inspection.
+                Open an initialized child or changed/new submodule commit card
+                in a temporary read-only viewer without adding it to the
+                repository list, Recent, or persisted last selection. A visible
+                Close viewer action clears temporary state and returns to the
+                parent; the profile-customizable Back control remains beside it.
+                Invalid or escaping paths fail closed, and
+                mutation/process-launch surfaces stay guarded while Repository
+                Tools remains safe for inspection.
               </p>
             </article>
 

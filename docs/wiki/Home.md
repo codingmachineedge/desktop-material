@@ -215,8 +215,10 @@ the tonal workspace preview hides when a compact window needs the space.
   safe repository-relative path and optional branch with exact-account routing, bounded progress,
   cancellation, and managed-list refresh.
 - **Temporary submodule navigation** — in the wider **Repository settings → Submodules** surface,
-  choose **Open & manage** on an initialized child to work there without adding it to the repository
-  list, Recent, or persisted last selection. Right-click the Back preview to open its element-owned
+  choose **Open temporary viewer** on an initialized child—or from a changed/new submodule commit
+  card—to inspect it read-only without adding it to the repository list, Recent, or persisted last
+  selection. **Close viewer** clears the temporary state and returns to the parent. Right-click the
+  Back preview to open its element-owned
   editor beside it; changes remain staged until Save. Adjacent **Subtrees** embeds add, pull, push,
   and split management. Back returns
   to the saved root; invalid or escaping paths fail closed without a partial import.

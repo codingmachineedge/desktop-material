@@ -7,22 +7,27 @@ repository catalog.
 ## User workflow
 
 1. Open the persisted root repository that owns the submodule.
-2. Open **Repository settings → Submodules**, or open **Submodule manager** from
-   **Repository Tools → Nested repositories**.
-3. Choose **Open as repository** on an initialized, checked-out submodule.
-4. Work in the temporary submodule context. A context bar identifies both the
-   submodule and its persisted root repository.
-5. Choose **Back to parent** to return to that root repository. The button can
-   instead display the parent name or only its icon, but its accessible name
-   always identifies the destination.
+2. Open **Repository settings → Submodules**, open **Submodule manager** from
+   **Repository Tools → Nested repositories**, or select a changed/new
+   submodule commit in Changes or History.
+3. Choose **Open temporary viewer** on an initialized, checked-out submodule.
+4. Inspect the child in the temporary, read-only repository context. A context
+   bar identifies both the submodule and its persisted root repository.
+5. Choose the obvious **Close viewer** action or **Back to parent** to return to
+   that root repository and clear the temporary viewer state. The Back button
+   can instead display the parent name or only its icon, but its accessible
+   name always identifies the destination.
 
+The diff-card action resolves its absolute checkout path back to the parent's
+current declared-submodule inventory and then enters the same validated
+temporary path as the manager. It never calls permanent repository import.
 An uninitialized submodule cannot be opened this way. Its action remains
 disabled with guidance to clone or initialize it first.
 
 ## Persistence boundary
 
-The temporary repository object exists only for the current navigation
-session. Opening it does not:
+The temporary repository object exists only for the current viewer session.
+Opening it does not:
 
 - add a row to the repository database or repository selector;
 - add the submodule to **Recent**;
@@ -90,13 +95,15 @@ after Back.
 
 ## Failure behavior
 
-If an initial open target is stale, missing, uninitialized, outside its parent,
-or not a valid Git worktree, the manager stays open and shows a bounded inline
-error. If an already-open temporary workspace later fails revalidation, Desktop
-Material clears its temporary repository state and caches, returns to the
-persisted root, and reports a localized error. In both cases the saved
-repository list, Recent group, tabs, and last selection remain unchanged, so the
-failure cannot leave a partially imported repository.
+If an initial open target is stale, missing, uninitialized, no longer declared,
+outside its parent, or not a valid Git worktree, the manager stays open and
+shows a bounded inline
+error. If an already-open temporary workspace later fails revalidation, or the
+user chooses **Close viewer** or Back, Desktop Material clears its temporary
+repository state and caches and returns to the persisted root. Unsafe exits
+also report a localized error. In all cases the saved repository list, Recent
+group, tabs, and last selection remain unchanged, so the failure cannot leave a
+partially imported repository.
 
 ## Acceptance coverage
 

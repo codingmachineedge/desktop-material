@@ -516,6 +516,8 @@ interactive while a dialog is open.
 - **Drag a dialog by its header** to reposition it, and keep working in the app behind it.
 - **Click or focus a dialog to bring it to front**; multiple open dialogs **cascade** so you can see
   them all.
+- **Wheel or trackpad-scroll anywhere over dialog content**; nested lists and editors consume their
+  own range first, then the outer dialog continues at the nested edge.
 - OS-native pickers (file open/save) stay native.
 
 **Preferences** is the reference surface: an MD3 940×660 dialog with a left navigation rail, an
@@ -1121,10 +1123,11 @@ list.
   rows show a submodule badge whose details dialog can clone any submodule as its own repository.
   New to submodules? The beginner-friendly [Submodules](Submodules) page walks the whole workflow
   in plain words and pictures.
-- On any initialized Submodule Manager row, choose **Open & manage** to use that checked-out
-  child in the current workspace without importing it. It does not enter the repository list,
-  Recent, or the persisted last selection. The context bar's Back control returns to the saved
-  root repository; repeated Open or Back activation is coalesced, so it cannot create another tab
+- On any initialized Submodule Manager row or changed/new submodule commit card, choose **Open
+  temporary viewer** to inspect that checked-out child read-only in the current workspace without
+  importing it. It does not enter the repository list, Recent, or the persisted last selection.
+  The context bar's **Close viewer** action and Back control both return to the saved root and
+  clear temporary state; repeated Open, Close, or Back activation cannot create another tab
   or repository entry. Right-click the actual Back control to open the same anchored editor and
   save its profile-wide style or label immediately.
   Uninitialized, stale, invalid-Git, traversal, sibling-prefix, and symlink/junction escape targets

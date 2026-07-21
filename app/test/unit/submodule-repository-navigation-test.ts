@@ -146,6 +146,46 @@ describe('temporary submodule repository navigation', () => {
     assert.equal(localStorage.getItem(RecentRepositoriesKey), '91,92')
   })
 
+  it('opens an absolute diff path through the temporary viewer boundary', async t => {
+    const rootPath = await setupFixtureRepository(t, 'submodule-basic-setup')
+    const root = new Repository(rootPath, 180, null, false)
+    const [submodule] = await getSubmodules(root)
+    const store = createSelectionStore(root)
+    localStorage.setItem(LastSelectedRepositoryIDKey, String(root.id))
+    localStorage.setItem(RecentRepositoriesKey, '81,82')
+
+    const opened = await store._openSubmodulePathAsRepository(
+      root,
+      join(rootPath, submodule.path)
+    )
+
+    assert.ok(opened instanceof SubmoduleRepository)
+    assert.equal(selectedRepository(store), opened)
+    assert.deepEqual(Reflect.get(store, 'repositories'), [root])
+    assert.equal(localStorage.getItem(LastSelectedRepositoryIDKey), '180')
+    assert.equal(localStorage.getItem(RecentRepositoriesKey), '81,82')
+  })
+
+  it('rejects relative and unrelated diff paths before temporary navigation', async t => {
+    const rootPath = await setupFixtureRepository(t, 'submodule-basic-setup')
+    const root = new Repository(rootPath, 182, null, false)
+    const store = createSelectionStore(root)
+
+    await assert.rejects(
+      store._openSubmodulePathAsRepository(root, 'relative/submodule'),
+      /not absolute/
+    )
+    await assert.rejects(
+      store._openSubmodulePathAsRepository(
+        root,
+        join(rootPath, 'not-declared')
+      ),
+      /no longer a declared submodule/
+    )
+    assert.equal(selectedRepository(store), root)
+    assert.deepEqual(Reflect.get(store, 'repositories'), [root])
+  })
+
   it('rebinds a metadata-refreshed selected parent without persisting a child', async t => {
     const rootPath = await setupFixtureRepository(t, 'submodule-basic-setup')
     const staleParent = new Repository(rootPath, 181, null, false)

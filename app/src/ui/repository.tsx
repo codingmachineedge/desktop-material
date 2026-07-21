@@ -1,4 +1,5 @@
 import * as React from 'react'
+import * as Path from 'path'
 import { Repository } from '../models/repository'
 import { Commit, CommitOneLine } from '../models/commit'
 import { TipState } from '../models/tip'
@@ -221,6 +222,7 @@ export class RepositoryView extends React.Component<
   private focusHistoryNeeded: boolean = false
   private focusChangesNeeded: boolean = false
   private repositoryViewUnmounted = false
+  private submoduleOpenFromDiffInFlight = false
 
   public constructor(props: IRepositoryViewProps) {
     super(props)
@@ -1178,9 +1180,30 @@ export class RepositoryView extends React.Component<
     openFile(fullPath, this.props.dispatcher)
   }
 
-  private onOpenSubmodule = (fullPath: string) => {
+  private onOpenSubmodule = async (fullPath: string) => {
+    if (this.submoduleOpenFromDiffInFlight) {
+      return
+    }
+
+    this.submoduleOpenFromDiffInFlight = true
     this.props.dispatcher.incrementMetric('openSubmoduleFromDiffCount')
-    this.props.dispatcher.openOrAddRepository(fullPath)
+    try {
+      await this.props.dispatcher.openSubmodulePathAsRepository(
+        this.props.repository,
+        fullPath
+      )
+    } catch (error) {
+      await this.props.dispatcher.postError(
+        new Error(
+          t('submodule.openFailed', {
+            child: Path.basename(fullPath),
+            error: String(error),
+          })
+        )
+      )
+    } finally {
+      this.submoduleOpenFromDiffInFlight = false
+    }
   }
 
   private onChangeImageDiffType = (imageDiffType: ImageDiffType) => {

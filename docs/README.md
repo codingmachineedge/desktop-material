@@ -43,10 +43,12 @@ checks, off-screen interaction review, compact/zoomed geometry gates, and
 privacy review recorded in the acceptance ledger.
 
 The locally accepted repository-navigation change adds
-**Open as repository** to initialized Submodule Manager rows. The resulting
-workspace is temporary: it does not enter the repository list, Recent group, or
-persisted last selection, and a profile-customizable Back control returns to the
-persisted root repository. Right-clicking Back opens its dedicated editor and
+**Open temporary viewer** to initialized Submodule Manager rows and changed/new
+submodule commit cards. The resulting read-only workspace is temporary: it does
+not enter the repository list, Recent group, or persisted last selection, and
+both **Close viewer** and the profile-customizable Back control return to the
+persisted root repository while clearing temporary state. Right-clicking Back
+opens its dedicated editor and
 history beside it; explicit English, playful Hong Kong Cantonese, and compact
 bilingual language remain ordinary preferences.
 Behavior, persistence, containment checks, and failure recovery are documented

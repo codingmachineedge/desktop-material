@@ -4884,6 +4884,26 @@ export class App extends React.Component<IAppProps, IAppState> {
             languageMode={this.state.appearanceCustomization.languageMode}
           />
         </p>
+        <Button
+          type="button"
+          className="submodule-context-close"
+          onClick={this.onReturnToParentRepository}
+          disabled={this.submoduleReturnInFlight.pending}
+          ariaLabel={translateForAccessibleName(
+            'submodule.closeTemporaryViewer',
+            {},
+            this.state.appearanceCustomization.languageMode
+          )}
+          tooltip={t('submodule.closeTemporaryViewer')}
+        >
+          <Octicon symbol={octicons.x} />
+          <span className="submodule-context-close-label">
+            <LocalizedText
+              translationKey="submodule.closeTemporaryViewer"
+              languageMode={this.state.appearanceCustomization.languageMode}
+            />
+          </span>
+        </Button>
       </aside>
     )
   }

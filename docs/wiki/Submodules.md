@@ -110,15 +110,16 @@ The status pills, in toy terms:
 
 Each row offers **Clone** (for a box that is not downloaded) or **Update**, plus
 **Sync**, **Configure**, and **Remove**. A downloaded row also offers
-**Open & manage**. The header adds **Add submodule…** and **Update all**,
+**Open temporary viewer**. The header adds **Add submodule…** and **Update all**,
 which clones and updates every box in one go.
 
 ---
 
 ## Open a submodule without adding another saved repository
 
-Press **Open & manage** on a downloaded submodule to look inside the small
-box with the normal Changes, History, branch, and repository tools. Desktop
+Press **Open temporary viewer** on a downloaded submodule—or use the same
+action on a changed/new submodule commit card—to inspect the small box with the
+normal Changes, History, branch, and read-only repository tools. Desktop
 Material opens it only for the current workspace visit:
 
 - it does not add the submodule to the repository list;
@@ -126,12 +127,14 @@ Material opens it only for the current workspace visit:
 - it does not replace the saved last-selected repository; and
 - it does not make a second imported copy of the project.
 
-A context bar names the submodule and the big box that opened it. Press its
-**Back to parent** control to return to that saved root repository. If you open
-a box inside another box, Back still returns to the original saved root rather
-than leaving a trail of temporary repository entries. If you click **Open &
-manage** or **Back to parent** twice by accident, Desktop Material treats it
-as one trip: it does not add another tab or saved repository entry.
+A context bar names the submodule and the big box that opened it. Press the
+obvious **Close viewer** action or its **Back to parent** control to return to
+that saved root repository and clear the temporary viewer. If you open a box
+inside another box, Back still returns to the original saved root rather
+than leaving a trail of temporary repository entries. If you click **Open
+temporary viewer**, **Close viewer**, or **Back to parent** twice by accident, Desktop
+Material treats it as one trip: it does not add another tab or saved repository
+entry.
 
 ![An initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
 

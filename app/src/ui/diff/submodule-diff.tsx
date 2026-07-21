@@ -12,6 +12,8 @@ import { Ref } from '../lib/ref'
 import { CopyButton } from '../copy-button'
 import { TooltippedContent } from '../lib/tooltipped-content'
 import { shortenSHA } from '../../models/commit'
+import { LocalizedText } from '../lib/localized-text'
+import { t } from '../../lib/i18n'
 
 type SubmoduleItemIcon =
   | {
@@ -229,9 +231,15 @@ export class SubmoduleDiff extends React.Component<ISubmoduleDiffProps> {
     return (
       <SuggestedActionGroup>
         <SuggestedAction
-          title={`Open in ${DefaultAppDisplayName}`}
-          description={`Open this submodule in ${DefaultAppDisplayName} as a normal repository to manage and commit any changes in it.`}
-          buttonText={__DARWIN__ ? 'Open Repository' : 'Open repository'}
+          title={t('submodule.diffTemporaryViewerTitle', {
+            app: DefaultAppDisplayName,
+          })}
+          description={
+            <LocalizedText translationKey="submodule.diffTemporaryViewerDescription" />
+          }
+          buttonText={
+            <LocalizedText translationKey="submodule.diffTemporaryViewerAction" />
+          }
           image={<Octicon symbol={octicons.repoClone} />}
           type="primary"
           onClick={this.onOpenSubmoduleClick}

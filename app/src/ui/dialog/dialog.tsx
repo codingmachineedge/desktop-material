@@ -7,6 +7,7 @@ import { isTopMostDialog } from './is-top-most'
 import { isMacOSSonomaOrLater, isMacOSVentura } from '../../lib/get-os'
 import { sendDialogDidOpen } from '../main-process-proxy'
 import { clampDialogOffset } from './dialog-geometry'
+import { routeDialogWheel } from './wheel-scroll'
 
 /**
  * Class name used for elements that should be focused initially when a dialog
@@ -868,6 +869,15 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
   }
 
   /**
+   * Chromium can leave wheel gestures stranded on a non-overflowing nested
+   * child even though the dialog body itself can scroll. Route the gesture to
+   * the nearest usable owner while keeping nested controls and popup ordering.
+   */
+  private onDialogWheel = (event: React.WheelEvent<HTMLDialogElement>) => {
+    routeDialogWheel(event.currentTarget, event)
+  }
+
+  /**
    * Begin a drag when the user presses the primary pointer button on the dialog
    * header (but not on a button within it). Only non-modal dialogs are
    * draggable; modal dialogs are centered by the native top layer.
@@ -1089,6 +1099,8 @@ export class Dialog extends React.Component<DialogProps, IDialogState> {
         role={this.props.role}
         onMouseDown={this.onDialogMouseDown}
         onMouseDownCapture={this.onBringToFront}
+        onWheelCapture={this.onBringToFront}
+        onWheel={this.onDialogWheel}
         onFocus={this.onBringToFront}
         onPointerDown={this.onDialogPointerDown}
         onPointerMove={this.onDialogPointerMove}

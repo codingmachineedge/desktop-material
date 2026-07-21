@@ -188,11 +188,13 @@ reachable. **Repository settings → Submodules → Add submodule…** opens the
 same provider/URL chooser as Clone, then reviews the safe relative destination
 and optional tracked branch before Git starts. The wider settings surface also
 shows the profile-wide Back preview; right-clicking it opens that element's
-editor beside it, with edits staged until the settings dialog is saved. An initialized row's
-**Open & manage** action opens that child temporarily without adding it to the
-repository list, while the adjacent **Subtrees** tab embeds add, pull, push, and
-split management; stale, invalid, or escaping targets fail closed. The
-reviewed current-branch
+editor beside it, with edits staged until the settings dialog is saved. An
+initialized row or changed/new submodule commit card's **Open temporary
+viewer** action opens that child read-only without adding it to the repository
+list. The context bar's visible **Close viewer** action clears the temporary
+state and returns to the parent, while the adjacent **Subtrees** tab embeds add,
+pull, push, and split management; stale, invalid, or escaping targets fail
+closed. The reviewed current-branch
 rebase uses searched target selection, ahead/behind context, a bounded commit
 preview, fresh safety/ref checks, and the existing conflict continue/abort
 path; it never force-pushes automatically.

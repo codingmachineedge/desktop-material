@@ -123,11 +123,14 @@ describe('Repository Settings repository-management surfaces', () => {
       submodules,
       /translationKey="submodule\.temporaryOpenDescription"/
     )
-    assert.match(resources, /'submodule\.openAsRepository': 'Open & manage'/)
+    assert.match(
+      resources,
+      /'submodule\.openAsRepository': 'Open temporary viewer'/
+    )
     assert.match(
       resources,
       /'submodule\.temporaryOpenDescription':[\s\S]*?never added to your repository list/
     )
-    assert.match(resources, /'submodule\.openAsRepository': '打開並管理'/)
+    assert.match(resources, /'submodule\.openAsRepository': '開臨時檢視器'/)
   })
 })

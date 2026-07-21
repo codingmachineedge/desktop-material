@@ -83,6 +83,10 @@ export type TranslationKey =
   | 'submodule.backLabelIcon'
   | 'submodule.openAsRepository'
   | 'submodule.temporaryOpenDescription'
+  | 'submodule.diffTemporaryViewerTitle'
+  | 'submodule.diffTemporaryViewerDescription'
+  | 'submodule.diffTemporaryViewerAction'
+  | 'submodule.closeTemporaryViewer'
   | 'submodule.appearanceHeading'
   | 'submodule.appearanceDescription'
   | 'submodule.appearancePreview'
@@ -1304,9 +1308,14 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'submodule.backLabelFull': 'Back to parent',
   'submodule.backLabelParent': 'Parent name',
   'submodule.backLabelIcon': 'Icon only',
-  'submodule.openAsRepository': 'Open & manage',
+  'submodule.openAsRepository': 'Open temporary viewer',
   'submodule.temporaryOpenDescription':
-    'Opens the submodule temporarily in this workspace. It is never added to your repository list.',
+    'Opens a temporary, read-only viewer in this workspace. Close returns to the parent; it is never added to your repository list.',
+  'submodule.diffTemporaryViewerTitle': 'Open a temporary viewer in {app}',
+  'submodule.diffTemporaryViewerDescription':
+    'Open the checked-out submodule in a temporary, read-only viewer. Close returns to the parent and clears the viewer; it is never added to your repository list.',
+  'submodule.diffTemporaryViewerAction': 'Open temporary viewer',
+  'submodule.closeTemporaryViewer': 'Close viewer',
   'submodule.appearanceHeading': 'Back button appearance',
   'submodule.appearanceDescription':
     'Right-click the preview Back button to open its editor beside the button. Save applies this to the active profile.',
@@ -1323,7 +1332,7 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'submodule.navigation': 'Temporary submodule repository navigation',
   'submodule.backToParent': 'Back to {parent}',
   'submodule.viewingContext':
-    'Viewing submodule {child} inside {parent}. It is not added to your repository list.',
+    'Temporary, read-only view of {child} inside {parent}. Close returns to the parent and clears this viewer; it is never added to your repository list.',
   'submodule.managerTitle': 'Submodule manager',
   'submodule.managerClose': 'Close',
   'submodule.title': 'Submodules',
@@ -2788,9 +2797,14 @@ export const cantoneseTranslations: Readonly<
   'submodule.backLabelFull': '返去主 repo',
   'submodule.backLabelParent': '顯示主 repo 名',
   'submodule.backLabelIcon': '淨圖示',
-  'submodule.openAsRepository': '打開並管理',
+  'submodule.openAsRepository': '開臨時檢視器',
   'submodule.temporaryOpenDescription':
-    '會喺呢個工作區臨時打開子模組；絕對唔會加落 repo 清單。',
+    '會喺呢個工作區開一個臨時唯讀檢視器；撳「關閉檢視器」就返去主 repo，亦絕對唔會加落 repo 清單。',
+  'submodule.diffTemporaryViewerTitle': '用 {app} 開臨時檢視器',
+  'submodule.diffTemporaryViewerDescription':
+    '喺臨時唯讀檢視器睇目前 checkout 嘅子模組；關閉就返去主 repo 同清走臨時狀態，絕對唔會加落 repo 清單。',
+  'submodule.diffTemporaryViewerAction': '開臨時檢視器',
+  'submodule.closeTemporaryViewer': '關閉檢視器',
   'submodule.appearanceHeading': '返回掣外觀',
   'submodule.appearanceDescription':
     '右擊預覽返回掣，就會喺掣旁邊打開編輯器。按「儲存」先套用到目前 profile。',
@@ -2807,7 +2821,7 @@ export const cantoneseTranslations: Readonly<
   'submodule.navigation': '臨時子模組 repo 導覽',
   'submodule.backToParent': '返去 {parent}',
   'submodule.viewingContext':
-    '而家睇緊 {parent} 入面嘅子模組 {child}；唔會加落 repo 清單。',
+    '而家喺 {parent} 入面臨時唯讀睇緊 {child}；關閉會返去主 repo 同清走檢視器，亦唔會加落 repo 清單。',
   'submodule.managerTitle': '子模組管理',
   'submodule.managerClose': '關閉',
   'submodule.title': '子模組',

@@ -37,9 +37,9 @@ Material is displaying or how a repository is represented in the application.
   move, sign, push, fetch, prune, and explicitly delete local and remote tags
   through stale-safe reviewed operations.
 - [Temporary submodule repository
-  navigation](submodule-repository-navigation.md) — open an initialized
-  submodule in the current workspace without importing it, then return to the
-  persisted root repository.
+  navigation](submodule-repository-navigation.md) — open an initialized child
+  or changed/new submodule commit in a temporary read-only viewer without
+  importing it, then Close or return to the persisted root repository.
 - [Release-backed large-file
   storage](release-backed-cheap-lfs.md) — replace large tracked bytes with a
   verified GitHub Release pointer, recover a stalled or length-rejected native

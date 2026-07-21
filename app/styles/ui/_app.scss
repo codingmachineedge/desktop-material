@@ -104,12 +104,36 @@
     }
 
     p {
+      flex: 1 1 auto;
       min-width: 0;
       margin: 0;
       overflow: hidden;
       color: var(--md-sys-color-on-surface-variant);
       font-size: 12px;
       line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .submodule-context-close.button-component {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      max-width: min(180px, 42vw);
+      min-height: 34px;
+      margin-left: auto;
+      padding: 5px 12px;
+      color: var(--md-sys-color-primary);
+      background: transparent;
+      border-color: var(--md-sys-color-outline);
+      border-radius: 999px;
+    }
+
+    .submodule-context-close-label {
+      min-width: 0;
+      overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -208,6 +232,11 @@
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
+    }
+
+    .submodule-context-close.button-component {
+      max-width: min(150px, 40vw);
+      padding-inline: 9px;
     }
   }
 }

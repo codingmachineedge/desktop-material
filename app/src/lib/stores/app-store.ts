@@ -11761,6 +11761,35 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return getSubmodules(repository)
   }
 
+  /**
+   * Resolve a diff's absolute checkout path back to a currently declared
+   * submodule, then open it through the temporary-repository safety boundary.
+   * This deliberately never calls the permanent repository import flow.
+   */
+  public async _openSubmodulePathAsRepository(
+    parentRepository: Repository,
+    fullPath: string
+  ): Promise<SubmoduleRepository> {
+    if (!Path.isAbsolute(fullPath)) {
+      throw new Error('The submodule checkout path is not absolute.')
+    }
+
+    const requestedPath = Path.resolve(fullPath)
+    const submodules = await getSubmodules(parentRepository)
+    const submodule = submodules.find(candidate => {
+      const declaredPath = Path.resolve(parentRepository.path, candidate.path)
+      return Path.relative(declaredPath, requestedPath).length === 0
+    })
+
+    if (submodule === undefined) {
+      throw new Error(
+        'The selected path is no longer a declared submodule of this repository.'
+      )
+    }
+
+    return this._openSubmoduleAsRepository(parentRepository, submodule)
+  }
+
   /** This shouldn't be called directly. See `Dispatcher`. */
   public async _openSubmoduleAsRepository(
     parentRepository: Repository,

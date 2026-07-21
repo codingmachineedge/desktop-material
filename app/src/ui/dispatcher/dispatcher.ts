@@ -3063,6 +3063,14 @@ export class Dispatcher {
     return this.appStore._getSubmodules(repository)
   }
 
+  /** Open a diff-selected submodule path as a temporary, non-persisted view. */
+  public openSubmodulePathAsRepository(
+    parent: Repository,
+    fullPath: string
+  ): Promise<SubmoduleRepository> {
+    return this.appStore._openSubmodulePathAsRepository(parent, fullPath)
+  }
+
   /** Open an initialized submodule as a temporary, non-persisted repository. */
   public openSubmoduleAsRepository(
     parent: Repository,

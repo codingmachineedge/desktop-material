@@ -1,5 +1,38 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-21 temporary submodule viewer and dialog-wheel checkpoint
+
+The changed/new submodule commit card no longer calls the permanent
+`openOrAddRepository` path. It resolves the clicked absolute checkout back to a
+currently declared submodule, rejects relative or unrelated paths, and enters
+the existing validated `SubmoduleRepository` path. That model remains absent
+from the repository database, Recent, tabs, and last-selection persistence and
+keeps the established read-only mutation/process boundary.
+
+The manager and diff card now say **Open temporary viewer** instead of promising
+normal repository management or commits. English, playful Hong Kong Cantonese,
+and compact bilingual resources explain the read-only/no-import boundary. The
+temporary context bar adds a visible, accessible, responsive **Close viewer**
+action beside the customizable Back control. Both use the same guarded return
+path, which disposes temporary caches and restores the persisted parent.
+
+The shared dialog shell now routes wheel and trackpad gestures from any
+descendant to the nearest vertical owner with remaining range. Nested lists and
+editors consume their own range, an owner at its edge lets the outer body take
+the next gesture, preventing controls and `Ctrl`+wheel retain ownership, and a
+background floating dialog still requests front through the existing stack.
+
+Local verification passed **103/103** checks: 67 temporary-viewer,
+localization, and Pages contracts plus 36 existing dialog/responsive/style
+regressions. Root TypeScript no-emit, targeted ESLint, targeted Prettier, and
+`git diff --check` passed. The fixed Lowlevel MCP endpoint at
+`http://127.0.0.1:8765/mcp` timed out during `startup_status`; the visible
+desktop was not used as a fallback. Therefore this checkpoint claims no exact
+production build, off-screen screenshot, remote CI, or release. After rebasing
+onto `d6dd74b9d761f3b384788af8b2a8889213017d4b`, all six changed test files pass
+**46/46**; root TypeScript and exact changed-file ESLint, Prettier, Markdown,
+and diff gates also pass.
+
 ## 2026-07-21 Cheap-LFS CLI-first crash containment and direct manager
 
 Production Release-asset uploads now try the trusted, exact-length GitHub CLI

@@ -140,7 +140,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     assert.equal(screen.getAllByRole('button', { name: '移除' }).length, 2)
     assert.ok(
       screen.getByRole('button', {
-        name: '打開並管理: vendor/docs',
+        name: '開臨時檢視器: vendor/docs',
       })
     )
     cantoneseView.unmount()
@@ -178,7 +178,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
     assert.ok(
       screen.getByRole('button', {
-        name: 'Open & manage: vendor/docs',
+        name: 'Open temporary viewer: vendor/docs',
       })
     )
     const sync = screen.getAllByRole('button', { name: 'Sync' })[0]
@@ -230,7 +230,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     const actions = within(danglingRow)
     assert.equal(actions.queryByRole('button', { name: 'Clone' }), null)
     for (const name of [
-      'Open & manage: vendor/bambu-build',
+      'Open temporary viewer: vendor/bambu-build',
       'Update',
       'Sync',
       'Configure',
@@ -337,9 +337,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     await screen.findByText('vendor/library')
 
     assert.ok(
-      screen.getByText(
-        /opens the submodule temporarily.*never added to your repository list/i
-      )
+      screen.getByText(/temporary, read-only view of library inside parent/i)
     )
     const preview = screen.getByRole('group', { name: 'Preview' })
     const previewButton = within(preview).getByRole('button', {
@@ -467,10 +465,10 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
 
     const openCloned = await screen.findByRole('button', {
-      name: 'Open & manage: vendor/library',
+      name: 'Open temporary viewer: vendor/library',
     })
     const openUnavailable = screen.getByRole('button', {
-      name: 'Open & manage: vendor/docs',
+      name: 'Open temporary viewer: vendor/docs',
     })
     assert.equal(openCloned.getAttribute('aria-disabled'), null)
     assert.equal(openUnavailable.getAttribute('aria-disabled'), 'true')
@@ -526,10 +524,10 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
 
     const sourceOpen = await screen.findByRole('button', {
-      name: 'Open & manage: vendor/library',
+      name: 'Open temporary viewer: vendor/library',
     })
     const siblingOpen = screen.getByRole('button', {
-      name: 'Open & manage: vendor/shared',
+      name: 'Open temporary viewer: vendor/shared',
     })
     const add = screen.getByRole('button', { name: 'Add submodule…' })
     const updateAll = screen.getByRole('button', { name: 'Update all' })
@@ -611,7 +609,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Open & manage: vendor/library',
+        name: 'Open temporary viewer: vendor/library',
       })
     )
 
@@ -648,7 +646,7 @@ describe('Submodule Manager temporary repository navigation', () => {
     )
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Open & manage: vendor/library',
+        name: 'Open temporary viewer: vendor/library',
       })
     )
 
