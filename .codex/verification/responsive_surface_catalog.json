@@ -21,6 +21,7 @@
         { "member": "Actions", "label": "Actions" },
         { "member": "RepositoryTools", "label": "Tools" },
         { "member": "Releases", "label": "Releases" },
+        { "member": "CheapLfs", "label": "Cheap LFS" },
         { "member": "Issues", "label": "Issues" },
         { "member": "Triage", "label": "Triage" },
         { "member": "GitHubAPI", "label": "API" }

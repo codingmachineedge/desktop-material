@@ -306,7 +306,7 @@ test('the four v2 routes are required, selector-owned catalog surfaces', () => {
   }
 
   const metadata = verifier.buildCatalogMetadata()
-  assert.equal(metadata.size, 85)
+  assert.equal(metadata.size, 86)
   for (const id of expected.keys()) {
     assert.equal(metadata.get(id)?.conditional, false)
   }

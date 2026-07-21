@@ -16,8 +16,8 @@ The repository already has two complementary verification systems:
    images, and requires an exact canonical **68/68** output set.
 2. `.codex/verification/verify_responsive_surface_matrix_cdp.js`, backed by
    `.codex/verification/responsive_surface_catalog.json`, is the exhaustive
-   geometry/accessibility driver. Its current catalog inventories **85** rows
-   (65 grouped surfaces plus 20 nested surfaces: 84 product rows and one
+   geometry/accessibility driver. Its current catalog inventories **86** rows
+   (66 grouped surfaces plus 20 nested surfaces: 85 product rows and one
    deterministic clone-recovery row) and exercises eight viewport/zoom
    scenarios. The most recent tracked 79-row receipt predates this topology and
    cannot prove current completeness.
@@ -28,7 +28,7 @@ Neither system alone proves design parity. The audit therefore has four layers:
 - compare the 24 prototype-labeled surfaces in both themes (an exact 24 x 2,
   48-pair matrix) to their production counterparts;
 - run the canonical 68-frame implementation gallery, separate exact five-frame
-  design-target set, and current 85-surface responsive matrix against the exact
+  design-target set, and current 86-surface responsive matrix against the exact
   post-fix build;
 - run focused and full regression checks so a visual fix cannot silently break
   behavior, localization, accessibility, or another surface.
@@ -560,9 +560,9 @@ resized below its supported minimum.
 
 ### Existing exhaustive responsive matrix
 
-Run all current 85 catalog rows against all existing scenarios. The exact set is
-84 product surfaces plus the paused/interrupted clone-recovery surface. It now
-includes Global ignore, account switcher, workflow manager, workflow catalog,
+Run all current 86 catalog rows against all existing scenarios. The exact set is
+85 product surfaces plus the paused/interrupted clone-recovery surface. It now
+includes Cheap LFS, Global ignore, account switcher, workflow manager, workflow catalog,
 and workflow dispatch. The ledger must derive and report the count from the
 catalog rather than trust the historical 79-row receipt.
 
@@ -593,10 +593,10 @@ canonical mode or an arbitrary scene list.
 
 Required matrix:
 
-- all 85 rows x all eight viewports in English/light;
-- all 85 rows x `desktop`, `minimum`, `narrow`, `short`, and
+- all 86 rows x all eight viewports in English/light;
+- all 86 rows x `desktop`, `minimum`, `narrow`, `short`, and
   `minimum-zoom-200` in English/dark;
-- all 85 rows x `desktop`, `minimum`, `narrow`, `short`, and
+- all 86 rows x `desktop`, `minimum`, `narrow`, `short`, and
   `minimum-zoom-200` in Cantonese and bilingual, light and dark;
 - additional 760 x 720 design-audit coverage for the 24 mapped prototype
   surfaces in bilingual mode, the highest text-width-risk combination.
@@ -895,7 +895,7 @@ The audit is complete only when:
    control have a disposition;
 3. the seven supplied 924 x 540 JPEG/JFIF states named `.png` are registered or
    explicitly resolved, including clone;
-4. canonical gallery 68/68, audit-design 5/5, the current 85-row responsive
+4. canonical gallery 68/68, audit-design 5/5, the current 86-row responsive
    matrix, theme/language passes, focused/full tests, static checks, and final
    production build pass;
 5. every required screenshot was visually inspected at original resolution;
