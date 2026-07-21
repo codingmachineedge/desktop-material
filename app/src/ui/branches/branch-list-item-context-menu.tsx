@@ -1,6 +1,7 @@
 import { IMenuItem } from '../../lib/menu-item'
 import { clipboard } from 'electron'
 import { Branch, BranchType } from '../../models/branch'
+import { getPersistedLanguageMode, translate } from '../../lib/i18n'
 
 interface IBranchContextMenuConfig {
   branch: Branch
@@ -92,7 +93,10 @@ export function generateBranchContextMenuItems(
 
   if (onViewPullRequestOnGitHub !== undefined) {
     items.push({
-      label: 'View Pull Request on GitHub',
+      label: translate(
+        'reviewRequest.openInBrowser',
+        getPersistedLanguageMode()
+      ),
       action: () => onViewPullRequestOnGitHub(),
     })
   }

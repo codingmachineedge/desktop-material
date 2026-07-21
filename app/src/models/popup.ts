@@ -37,6 +37,10 @@ import { IGitHubPullRequestTarget } from '../lib/github-pull-request'
 import { IGitModulesEntry } from '../lib/git/gitmodules'
 import { BuildStageKind } from '../lib/build-run/types'
 import { INotificationEntry } from './notification-centre'
+import {
+  IGitLabMergeRequestBranchContext,
+  IGitLabMergeRequestWorkspaceRoute,
+} from '../lib/gitlab-merge-request-workspace'
 
 /**
  * The captured failure context handed to the "Fix with opencode" dialog. Built
@@ -68,6 +72,7 @@ export enum PopupType {
   CreateGitHubIssue = 'CreateGitHubIssue',
   CreateGitHubPullRequest = 'CreateGitHubPullRequest',
   GitHubPullRequestLifecycle = 'GitHubPullRequestLifecycle',
+  GitLabMergeRequest = 'GitLabMergeRequest',
   BranchRules = 'BranchRules',
   SparseCheckout = 'SparseCheckout',
   RepositorySettings = 'RepositorySettings',
@@ -248,6 +253,16 @@ export type PopupDetail =
       repository: RepositoryWithGitHubRepository
       pullRequest: PullRequest
       baseBranchNames: ReadonlyArray<string>
+    }
+  | {
+      type: PopupType.GitLabMergeRequest
+      repository: RepositoryWithGitHubRepository
+      route: IGitLabMergeRequestWorkspaceRoute
+      branchContext: IGitLabMergeRequestBranchContext
+      contextVersion: string
+      intent:
+        | { readonly kind: 'create' }
+        | { readonly kind: 'manage'; readonly mergeRequestIID: number }
     }
   | {
       type: PopupType.BranchRules

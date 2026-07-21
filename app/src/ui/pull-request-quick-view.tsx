@@ -10,6 +10,14 @@ import * as octicons from './octicons/octicons.generated'
 import classNames from 'classnames'
 import { Emoji } from '../lib/emoji'
 import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+  translate,
+  translateForAccessibleName,
+} from '../lib/i18n'
+import { LanguageMode, normalizeLanguageMode } from '../models/language-mode'
+import { Repository } from '../models/repository'
+import {
   calculatePullRequestQuickViewGeometry,
   IQuickViewGeometry,
 } from './pull-request-quick-view-geometry'
@@ -28,6 +36,7 @@ const heightPRListItem = 47
 
 interface IPullRequestQuickViewProps {
   readonly dispatcher: Dispatcher
+  readonly repository: Repository
   readonly pullRequest: PullRequest
 
   readonly pullRequestItemTop: number
@@ -50,6 +59,7 @@ interface IPullRequestQuickViewState {
   readonly pointerTop: number
   readonly placement: IQuickViewGeometry['placement']
   readonly visibility: 'visible' | 'hidden'
+  readonly languageMode: LanguageMode
 }
 
 export class PullRequestQuickView extends React.Component<
@@ -76,16 +86,34 @@ export class PullRequestQuickView extends React.Component<
         this.quickViewHeight
       ),
       visibility: 'hidden',
+      languageMode: getPersistedLanguageMode(),
     }
   }
 
   public componentDidMount = () => {
     window.addEventListener('resize', this.updateQuickViewPosition)
+    document.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
     this.updateQuickViewPosition()
   }
 
   public componentWillUnmount = () => {
     window.removeEventListener('resize', this.updateQuickViewPosition)
+    document.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = (event: Event) => {
+    const languageMode = normalizeLanguageMode(
+      (event as CustomEvent<unknown>).detail
+    )
+    if (languageMode !== this.state.languageMode) {
+      this.setState({ languageMode })
+    }
   }
 
   public componentDidUpdate = (prevProps: IPullRequestQuickViewProps) => {
@@ -114,8 +142,11 @@ export class PullRequestQuickView extends React.Component<
     this.setState({ visibility: 'visible' })
   }
 
-  private onViewOnGitHub = () => {
-    this.props.dispatcher.showPullRequestByPR(this.props.pullRequest)
+  private onOpenInBrowser = () => {
+    this.props.dispatcher.showPullRequestByPR(
+      this.props.repository,
+      this.props.pullRequest
+    )
   }
 
   private onMouseLeave = () => {
@@ -148,13 +179,15 @@ export class PullRequestQuickView extends React.Component<
     return (
       <header className="header">
         <Octicon symbol={octicons.listUnordered} />
-        <div className="action-needed">Review requested</div>
+        <div className="action-needed">
+          {translate('reviewRequest.reviewRequested', this.state.languageMode)}
+        </div>
         <Button
           className="button-with-icon"
-          onClick={this.onViewOnGitHub}
+          onClick={this.onOpenInBrowser}
           role="link"
         >
-          View on GitHub
+          {translate('reviewRequest.openInBrowser', this.state.languageMode)}
           <Octicon symbol={octicons.linkExternal} />
         </Button>
       </header>
@@ -170,7 +203,12 @@ export class PullRequestQuickView extends React.Component<
             isDraft ? octicons.gitPullRequestDraft : octicons.gitPullRequest
           }
         />
-        <span className="state">{isDraft ? 'Draft' : 'Open'}</span>
+        <span className="state">
+          {translate(
+            isDraft ? 'reviewRequest.statusDraft' : 'reviewRequest.statusOpen',
+            this.state.languageMode
+          )}
+        </span>
       </div>
     )
   }
@@ -181,7 +219,10 @@ export class PullRequestQuickView extends React.Component<
     const displayBody =
       body !== undefined && body !== null && body.trim() !== ''
         ? body
-        : '_No description provided._'
+        : `_${translate(
+            'reviewRequest.noDescription',
+            this.state.languageMode
+          )}_`
 
     return (
       <div className="pull-request">
@@ -203,7 +244,11 @@ export class PullRequestQuickView extends React.Component<
           onMarkdownLinkClicked={this.onMarkdownLinkClicked}
           onMarkdownParsed={this.onMarkdownParsed}
           underlineLinks={this.props.underlineLinks}
-          ariaLabel="Pull request markdown body"
+          ariaLabel={translateForAccessibleName(
+            'reviewRequest.markdownBodyAriaLabel',
+            {},
+            this.state.languageMode
+          )}
         />
       </div>
     )
@@ -217,7 +262,11 @@ export class PullRequestQuickView extends React.Component<
       <div
         className={`pull-request-quick-view placement-${placement}`}
         role="dialog"
-        aria-label={`Pull request #${this.props.pullRequest.pullRequestNumber} quick view`}
+        aria-label={translateForAccessibleName(
+          'reviewRequest.quickViewAriaLabel',
+          { number: String(this.props.pullRequest.pullRequestNumber) },
+          this.state.languageMode
+        )}
         onMouseEnter={this.props.onMouseEnter}
         onMouseLeave={this.onMouseLeave}
         style={{ left, top, visibility }}

@@ -6,6 +6,9 @@ import { AriaHasPopupType } from './aria-types'
 import { attachRipple } from './ripple'
 
 export interface IButtonProps {
+  /** Stable, non-user-visible hook for deterministic UI verification. */
+  readonly dataVerification?: string
+
   /**
    * A callback which is invoked when the button is clicked
    * using a pointer device or keyboard. The source event is
@@ -49,9 +52,6 @@ export interface IButtonProps {
 
   /** CSS class names */
   readonly className?: string
-
-  /** Stable automation hook. Accessible names remain the user-facing contract. */
-  readonly dataVerification?: string
 
   /** The type of button size, e.g., normal or small. */
   readonly size?: 'normal' | 'small'
@@ -255,8 +255,8 @@ export class Button extends React.Component<IButtonProps, {}> {
     return (
       <button
         id={this.props.id}
-        className={className}
         data-verification={this.props.dataVerification}
+        className={className}
         onClick={disabled ? preventDefault : this.onClick}
         onKeyDown={this.props.onKeyDown}
         onMouseDown={this.onMouseDown}

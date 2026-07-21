@@ -393,7 +393,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
       return
     }
 
-    this.props.dispatcher.showPullRequestByPR(pr)
+    this.props.dispatcher.showPullRequestByPR(this.props.repository, pr)
   }
 
   private onDeleteBranch = async (branchName: string) => {

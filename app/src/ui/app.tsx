@@ -132,6 +132,8 @@ import {
 import { CreateGitHubIssueDialog } from './create-github-issue'
 import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
 import { GitHubPullRequestLifecycleDialog } from './github-pull-request-lifecycle'
+import { GitLabMergeRequestDialog } from './merge-request'
+import type { IGitLabMergeRequestDialogService } from './merge-request'
 import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
 import { ErrorNoticeStack } from './error-notice-stack'
@@ -2705,6 +2707,74 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
           />
         )
+      case PopupType.GitLabMergeRequest: {
+        const dispatcher = this.props.dispatcher
+        const service: IGitLabMergeRequestDialogService = {
+          availability: repository =>
+            dispatcher.getGitLabMergeRequestAvailability(repository),
+          contextCurrent: () =>
+            dispatcher.isGitLabMergeRequestContextCurrent(
+              popup.repository,
+              popup.route,
+              popup.contextVersion,
+              popup.intent
+            ),
+          listMembers: (repository, signal) =>
+            dispatcher.listGitLabMergeRequestMembers(repository, signal),
+          get: (repository, mergeRequestIID, signal) =>
+            dispatcher.getGitLabMergeRequest(
+              repository,
+              mergeRequestIID,
+              signal
+            ),
+          create: (repository, draft, signal) =>
+            dispatcher.createGitLabMergeRequest(repository, draft, signal),
+          createMutationReview: (repository, mergeRequest) =>
+            dispatcher.createGitLabMergeRequestMutationReview(
+              repository,
+              mergeRequest
+            ),
+          update: (repository, review, update, signal) =>
+            dispatcher.updateGitLabMergeRequest(
+              repository,
+              review,
+              update,
+              signal
+            ),
+          setState: (repository, review, state, signal) =>
+            dispatcher.setGitLabMergeRequestState(
+              repository,
+              review,
+              state,
+              signal
+            ),
+          approve: (repository, review, signal) =>
+            dispatcher.approveGitLabMergeRequest(repository, review, signal),
+          unapprove: (repository, review, signal) =>
+            dispatcher.unapproveGitLabMergeRequest(repository, review, signal),
+          refreshPullRequests: repository =>
+            dispatcher.refreshPullRequests(repository),
+          openInBrowser: async url => {
+            const opened = await dispatcher.openInBrowser(url)
+            if (!opened) {
+              throw new Error('The operating system did not open the URL.')
+            }
+          },
+        }
+
+        return (
+          <GitLabMergeRequestDialog
+            key={`gitlab-merge-request-${popup.id}`}
+            repository={popup.repository}
+            route={popup.route}
+            branchContext={popup.branchContext}
+            contextVersion={popup.contextVersion}
+            intent={popup.intent}
+            service={service}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      }
       case PopupType.BranchRules: {
         const selection = this.state.selectedState
         const isSelectedRepository =
@@ -3200,7 +3270,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             branch={popup.branch}
             baseBranch={popup.baseBranch}
             unPushedCommits={popup.unPushedCommits}
-            onConfirm={this.showCreateGitHubPullRequest}
+            onConfirm={this.showCreatePullRequest}
             onDismissed={onPopupDismissedFn}
           />
         )
@@ -5841,12 +5911,12 @@ export class App extends React.Component<IAppProps, IAppState> {
     this.props.dispatcher.startPullRequest(state.repository)
   }
 
-  private showCreateGitHubPullRequest = (
+  private showCreatePullRequest = (
     repository: Repository,
     branch: Branch,
     baseBranch?: Branch
-  ) => {
-    this.props.dispatcher.showCreateGitHubPullRequest(
+  ): Promise<void> => {
+    return this.props.dispatcher.continueCreatePullRequest(
       repository,
       branch,
       baseBranch
