@@ -1,4 +1,21 @@
 {
+  # Node >= 24 headers ship enable_thin_lto=true/lto_jobs=2 in config.gypi,
+  # which makes common.gypi's Release config inject clang/lld-only flags
+  # (-flto=thin, /opt:lldltojobs=N) that MSVC cl/link reject (LNK1117).
+  # This is a plain C executable, so LTO is unwanted. Includes overwrite
+  # plain top-level variables, and target-level variables are out of scope
+  # for target_defaults conditions, so set these via the
+  # conditions-inside-variables pattern, which gyp applies after includes
+  # are merged.
+  "variables": {
+    "conditions": [
+      ["OS=='win'", {
+        "enable_lto": "false",
+        "enable_thin_lto": "false",
+        "lto_jobs": "",
+      }]
+    ]
+  },
   "targets": [
     {
       "target_name": "printenvz",

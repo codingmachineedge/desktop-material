@@ -1,5 +1,25 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-21 printenvz Windows install-stage repair
+
+The install stage failed building `vendor/printenvz` with
+`LINK : fatal error LNK1117: syntax error in option 'opt:lldltojobs=2'`.
+Node >= 24 Windows headers ship `enable_thin_lto=true` and `lto_jobs=2` in
+`config.gypi`, so the bundled `common.gypi` Release config injects
+clang/lld-only flags (`-flto=thin`, `/opt:lldltojobs=N`) into every gyp
+target; MSVC `link.exe` rejects them. `vendor/printenvz/binding.gyp` now
+forces `enable_lto=false`, `enable_thin_lto=false`, and `lto_jobs=""` on
+Windows through gyp's conditions-inside-variables pattern, the only scope
+that survives `config.gypi` include merging and still applies to
+`target_defaults` Release conditions (target-level variables are evaluated
+too late, and plain top-level variables are overwritten by includes).
+Verified with the exact failing step (`node-gyp rebuild` in
+`vendor/printenvz`): `build/Release/printenvz.exe` links and runs, and the
+generated `printenvz.vcxproj` no longer contains any `-flto`/`lldltojobs`
+options. No cleanup of branches, worktrees, or stashes was needed; the
+untracked `opencode.json` predates this task and is intentionally left
+uncommitted.
+
 ## 2026-07-21 manual multipart Cheap LFS and express release checkpoint
 
 The browser-assisted Cheap LFS fallback no longer rejects a file merely because
