@@ -89,15 +89,18 @@ describe('BranchListItem', () => {
 
     const item = view.container.querySelector('.branches-list-item')
     assert.notEqual(item, null)
+    // The local-only (unpublished) state is now conveyed by the `local-only`
+    // class tinting the leading Material Symbol glyph rather than a separate
+    // labelled octicon (see BranchListItem.render).
     assert(item?.classList.contains('local-only'))
     assert.equal(
-      screen.getByLabelText('Branch has not been published').tagName,
-      'svg'
+      item?.querySelector('.icon.material-symbol')?.textContent,
+      'alt_route'
     )
   })
 
   it('exposes a pinned branch indicator', () => {
-    render(
+    const view = render(
       <BranchListItem
         name="release"
         isCurrentBranch={false}
@@ -107,7 +110,12 @@ describe('BranchListItem', () => {
       />
     )
 
-    assert.equal(screen.getByLabelText('Pinned branch').tagName, 'svg')
+    // The pinned indicator is now a decorative Material Symbol `star` span.
+    const pinned = view.container.querySelector(
+      '.pinned-branch-indicator.material-symbol'
+    )
+    assert.notEqual(pinned, null)
+    assert.equal(pinned?.textContent, 'star')
   })
 
   it('drops dragged commits onto the current branch callback', () => {

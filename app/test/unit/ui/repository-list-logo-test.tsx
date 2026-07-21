@@ -283,11 +283,20 @@ describe('repository-list custom logos', () => {
     const missingView = render(row(missing, loader))
     const cloningView = render(row(cloning, loader))
 
-    assert.ok(
-      missingView.container.querySelector('svg.octicon.icon-for-repository')
+    // Missing and cloning repositories keep a status glyph (Material Symbols
+    // `warning` / `cloud_download`) instead of a customizable logo, so their
+    // state is never masked by the appearance system.
+    assert.equal(
+      missingView.container.querySelector(
+        '.material-symbol.icon-for-repository'
+      )?.textContent,
+      'warning'
     )
-    assert.ok(
-      cloningView.container.querySelector('svg.octicon.icon-for-repository')
+    assert.equal(
+      cloningView.container.querySelector(
+        '.material-symbol.icon-for-repository'
+      )?.textContent,
+      'cloud_download'
     )
     assert.equal(
       missingView.container.querySelector('.repository-list-logo'),

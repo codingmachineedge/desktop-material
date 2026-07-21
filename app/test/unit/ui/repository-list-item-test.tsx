@@ -61,7 +61,9 @@ describe('RepositoryListItem', () => {
     assert.equal(name?.textContent, 'desktop')
     assert.notEqual(aheadBehind, null)
     assert.notEqual(changeIndicator, null)
-    assert.equal(aheadBehind?.querySelectorAll('svg').length, 2)
+    // Ahead/behind are now decorative Material Symbol arrows (spans), one for
+    // the ahead count and one for the behind count, rather than octicon svgs.
+    assert.equal(aheadBehind?.querySelectorAll('.material-symbol').length, 2)
   })
 
   it('renders owner prefix and alias when disambiguation is required', () => {
