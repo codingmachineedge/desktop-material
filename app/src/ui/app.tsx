@@ -3037,6 +3037,7 @@ export class App extends React.Component<IAppProps, IAppState> {
             onDismissed={onPopupDismissedFn}
             dispatcher={this.props.dispatcher}
             path={popup.path}
+            existingRepositories={this.state.repositories}
           />
         )
       case PopupType.CreateRepository:

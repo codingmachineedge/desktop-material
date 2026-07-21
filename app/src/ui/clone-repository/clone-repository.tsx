@@ -173,6 +173,35 @@ export function isMultiRepositoryCloneSelection(
 }
 
 /**
+ * Whether an explicit initial repositories + organizations load should be
+ * kicked off for the currently selected hosted clone tab.
+ *
+ * The repository list is refreshed lazily by the filter list whenever its
+ * `repositories` prop is still null, but the organization list is loaded only
+ * as a side effect of that same refresh. Because the ApiRepositoriesStore is
+ * long-lived, an account whose repositories are already cached (from a previous
+ * open, a background auto-clone refresh, or a prior open where the org fetch
+ * failed) never re-triggers that refresh, so its organizations are never
+ * loaded and the org filter chips never appear.
+ *
+ * This decouples the organization load from the repositories-null guard: it
+ * returns true the first time a resolvable GitHub account is seen for the tab
+ * (tracked by the caller so it fires once per account). The store's own
+ * `loading`/`organizationsLoading` guards make a redundant call a no-op, so the
+ * caller can fire unconditionally without double-fetching.
+ */
+export function shouldTriggerInitialCloneLoad(
+  tab: CloneRepositoryTab,
+  account: Account | null,
+  alreadyLoadedAccountKeys: ReadonlySet<string>
+): boolean {
+  if (tab === CloneRepositoryTab.Generic || account === null) {
+    return false
+  }
+  return !alreadyLoadedAccountKeys.has(getAccountKey(account))
+}
+
+/**
  * Preserve account affinity while allowing Git to resolve an API 404.
  *
  * GitHub deliberately uses 404 for private repositories an identity cannot
@@ -322,6 +351,14 @@ export class CloneRepository extends React.Component<
   private autoCloneHydrationKey: string | null = null
   private hasUnmounted = false
 
+  /**
+   * Account keys for which an initial repositories + organizations load has
+   * already been kicked off during this dialog's lifetime. Guards the explicit
+   * mount/account-available load so it fires exactly once per account rather
+   * than on every re-render.
+   */
+  private readonly initialCloneLoadAccountKeys = new Set<string>()
+
   private checkIsTopMostDialog = isTopMostDialog(
     () => {
       this.validatePath()
@@ -441,6 +478,7 @@ export class CloneRepository extends React.Component<
     }
 
     this.checkIsTopMostDialog(this.props.isTopMost)
+    this.ensureSelectedAccountCloneListLoaded()
   }
 
   public componentDidMount() {
@@ -451,6 +489,37 @@ export class CloneRepository extends React.Component<
 
     this.checkIsTopMostDialog(this.props.isTopMost)
     this.syncAutoCloneState()
+    this.ensureSelectedAccountCloneListLoaded()
+  }
+
+  /**
+   * Kick off the initial repositories + organizations load for the selected
+   * hosted clone tab's account. Fires on first open and again when the account
+   * first becomes available (e.g. accounts arrive after mount, or the user
+   * switches to a tab whose account hasn't been loaded yet).
+   *
+   * This is what makes the organization filter chips appear even when the
+   * account's repository list is already cached — a case the filter list's own
+   * repositories-null refresh never covers. It is idempotent: the store's
+   * loading guards absorb a redundant call, and `initialCloneLoadAccountKeys`
+   * keeps it from re-firing on every unrelated re-render.
+   */
+  private ensureSelectedAccountCloneListLoaded = () => {
+    const tab = this.props.selectedTab
+    const account =
+      tab === CloneRepositoryTab.Generic ? null : this.getAccountForTab(tab)
+    if (
+      !shouldTriggerInitialCloneLoad(
+        tab,
+        account,
+        this.initialCloneLoadAccountKeys
+      ) ||
+      account === null
+    ) {
+      return
+    }
+    this.initialCloneLoadAccountKeys.add(getAccountKey(account))
+    this.props.onRefreshRepositories(account)
   }
 
   public componentWillUnmount(): void {
@@ -862,6 +931,7 @@ export class CloneRepository extends React.Component<
               repositoryError={accountState?.error ?? null}
               organizations={accountState?.organizations ?? []}
               organizationsLoading={accountState?.organizationsLoading ?? false}
+              organizationsError={accountState?.organizationsError ?? null}
               selectedOrganization={tabState.selectedOrganization}
               organizationError={organizationState?.error ?? null}
               onSelectedOrganizationChanged={this.onSelectedOrganizationChanged}

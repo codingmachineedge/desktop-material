@@ -71,6 +71,14 @@ interface ICloneGithubRepositoryProps {
 
   readonly organizations: ReadonlyArray<IAPIOrganization>
   readonly organizationsLoading: boolean
+
+  /**
+   * The most recent failure loading the account's organization list, if any.
+   * When set, an empty organization list means the fetch failed rather than
+   * "no organizations", so a retry is offered instead of silently hiding the
+   * organization filter chips.
+   */
+  readonly organizationsError: Error | null
   readonly selectedOrganization: string | null
   readonly organizationError: Error | null
   readonly onSelectedOrganizationChanged: (
@@ -432,6 +440,18 @@ export class CloneGithubRepository extends React.PureComponent<
           loading={this.props.organizationsLoading}
           onSelect={this.props.onSelectedOrganizationChanged}
         />
+        {this.props.organizationsError !== null &&
+          !this.props.organizationsLoading && (
+            <div className="org-repositories-error" role="alert">
+              <span>We couldn't load your organizations.</span>
+              <Button
+                onClick={this.onRetryOrganizations}
+                tooltip="Retry loading organizations"
+              >
+                Try again
+              </Button>
+            </div>
+          )}
         {this.renderVisibilityChips()}
         {this.renderLanguageChips()}
         {this.props.repositoryError !== null && (
@@ -495,6 +515,13 @@ export class CloneGithubRepository extends React.PureComponent<
   }
 
   private renderAccountRepositoryRefresh = () => {
+    this.props.onRefreshRepositories(this.props.account)
+  }
+
+  private onRetryOrganizations = () => {
+    // Refreshing the account reloads both repositories and organizations
+    // (see ApiRepositoriesStore.loadAll), which re-attempts the failed
+    // organization fetch and clears the surfaced error on success.
     this.props.onRefreshRepositories(this.props.account)
   }
 }

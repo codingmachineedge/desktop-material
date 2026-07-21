@@ -232,4 +232,78 @@ describe('AddExistingRepository folder detection', () => {
     assert.equal(screen.queryByRole('alert'), null)
     assert.equal(dispatcher.addCalls.length, 0)
   })
+
+  it('excludes already-added repositories from the detected list', async t => {
+    const scanRootPath = await createTempDirectory(t)
+    const alreadyAddedPath = Path.join(scanRootPath, 'alpha')
+    const newRepositoryPath = Path.join(scanRootPath, 'beta')
+    const dispatcher = new TestDispatcher()
+
+    render(
+      <AddExistingRepository
+        dispatcher={asDispatcher(dispatcher)}
+        onDismissed={() => undefined}
+        existingRepositories={[{ path: alreadyAddedPath }]}
+        chooseRepositoryFolder={async () => scanRootPath}
+        scanRepositoryFolder={async () => ({
+          repositories: [alreadyAddedPath, newRepositoryPath],
+          truncated: false,
+        })}
+      />
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Auto-detect repositories...' })
+    )
+
+    await screen.findByText('Found 1 Git repository')
+
+    const detectedList = screen.getByRole('list', {
+      name: 'Detected Git repositories',
+    })
+    assert.ok(within(detectedList).getByText('beta'))
+    assert.equal(within(detectedList).queryByText('alpha'), null)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1 repository' }))
+
+    await waitFor(() => assert.equal(dispatcher.addCalls.length, 1))
+    assert.deepEqual(dispatcher.addCalls[0], [newRepositoryPath])
+  })
+
+  it('reports an empty state when every detected repository is already added', async t => {
+    const scanRootPath = await createTempDirectory(t)
+    const firstAddedPath = Path.join(scanRootPath, 'alpha')
+    const secondAddedPath = Path.join(scanRootPath, 'beta')
+    const dispatcher = new TestDispatcher()
+
+    render(
+      <AddExistingRepository
+        dispatcher={asDispatcher(dispatcher)}
+        onDismissed={() => undefined}
+        existingRepositories={[
+          { path: firstAddedPath },
+          { path: secondAddedPath },
+        ]}
+        chooseRepositoryFolder={async () => scanRootPath}
+        scanRepositoryFolder={async () => ({
+          repositories: [firstAddedPath, secondAddedPath],
+          truncated: false,
+        })}
+      />
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Auto-detect repositories...' })
+    )
+
+    await screen.findByText('All discovered repositories are already added.')
+    assert.equal(screen.queryByRole('list'), null)
+
+    const addButton = screen.getByRole('button', {
+      name: /^Add repository$/i,
+    })
+    assert.equal(addButton.getAttribute('aria-disabled'), 'true')
+    fireEvent.click(addButton)
+    assert.equal(dispatcher.addCalls.length, 0)
+  })
 })

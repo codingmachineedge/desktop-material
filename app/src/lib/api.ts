@@ -1932,12 +1932,31 @@ export class API {
     }
   }
 
-  /** Fetch all the orgs to which the user belongs. */
-  public async fetchOrgs(): Promise<ReadonlyArray<IAPIOrganization>> {
+  /**
+   * Fetch all the orgs to which the user belongs.
+   *
+   * By default a failure is swallowed and an empty list is returned so callers
+   * that treat organizations as optional aren't disrupted. Pass `throwOnError`
+   * to instead reject on an API or network failure so the caller can surface a
+   * retryable error rather than an ambiguous empty list — an empty list is
+   * otherwise indistinguishable from "belongs to no organizations" and would
+   * silently hide the account's organizations.
+   */
+  public async fetchOrgs(
+    throwOnError = false
+  ): Promise<ReadonlyArray<IAPIOrganization>> {
     try {
-      return await this.fetchAll<IAPIOrganization>('user/orgs')
+      return await this.fetchAll<IAPIOrganization>(
+        'user/orgs',
+        throwOnError
+          ? { suppressErrors: false, requireArrayPage: true }
+          : undefined
+      )
     } catch (e) {
       log.warn(`fetchOrgs: failed with endpoint ${this.endpoint}`, e)
+      if (throwOnError) {
+        throw e
+      }
       return []
     }
   }

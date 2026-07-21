@@ -1,10 +1,15 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
+import { Dirent } from 'fs'
 import { mkdir, opendir, symlink } from 'fs/promises'
 import * as Path from 'path'
 import { exec } from 'dugite'
 
 import { findRepositoriesInDirectory } from '../../../src/lib/git/find-repositories'
+import {
+  RepositoryType,
+  getRepositoryType,
+} from '../../../src/lib/git/rev-parse'
 import { createTempDirectory } from '../../helpers/temp'
 
 async function initializeRepository(path: string) {
@@ -15,6 +20,78 @@ async function initializeRepository(path: string) {
 
 const sorted = (paths: ReadonlyArray<string>) =>
   [...paths].sort((a, b) => a.localeCompare(b))
+
+const syntheticEntry = (name: string, kind: 'directory' | 'file'): Dirent =>
+  ({
+    name,
+    isDirectory: () => kind === 'directory',
+    isFile: () => kind === 'file',
+    isSymbolicLink: () => false,
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+  } as unknown as Dirent)
+
+const syntheticDir = (name: string) => syntheticEntry(name, 'directory')
+const syntheticFile = (name: string) => syntheticEntry(name, 'file')
+
+/**
+ * Build an `opendir` seam over an in-memory tree keyed by resolved path. Paths
+ * absent from the tree behave like directories that do not exist.
+ */
+const makeOpenDirectory = (
+  tree: ReadonlyMap<string, ReadonlyArray<Dirent>>
+): typeof opendir =>
+  (async (path: string) => {
+    const entries = tree.get(Path.resolve(path))
+
+    if (entries === undefined) {
+      const error: NodeJS.ErrnoException = new Error(
+        `synthetic ENOENT: ${path}`
+      )
+      error.code = 'ENOENT'
+      throw error
+    }
+
+    let index = 0
+
+    return {
+      async read() {
+        return index < entries.length ? entries[index++] : null
+      },
+      async close() {
+        return undefined
+      },
+    }
+  }) as unknown as typeof opendir
+
+/**
+ * Build a `getRepositoryType` seam over an in-memory map keyed by resolved
+ * path. Paths absent from the map report as missing.
+ */
+const makeGetRepositoryType = (
+  types: ReadonlyMap<string, RepositoryType>
+): typeof getRepositoryType =>
+  (async (path: string) =>
+    types.get(Path.resolve(path)) ??
+    ({ kind: 'missing' } as const)) as typeof getRepositoryType
+
+const primaryRepositoryType = (repositoryPath: string): RepositoryType => ({
+  kind: 'regular',
+  topLevelWorkingDirectory: repositoryPath,
+  gitDir: Path.join(repositoryPath, '.git'),
+})
+
+const linkedWorktreeRepositoryType = (
+  worktreePath: string,
+  mainRepositoryPath: string,
+  worktreeName: string
+): RepositoryType => ({
+  kind: 'regular',
+  topLevelWorkingDirectory: worktreePath,
+  gitDir: Path.join(mainRepositoryPath, '.git', 'worktrees', worktreeName),
+})
 
 describe('findRepositoriesInDirectory', () => {
   it('finds repositories without entering worktrees or heavy directories', async t => {
@@ -129,6 +206,86 @@ describe('findRepositoriesInDirectory', () => {
       findRepositoriesInDirectory(rootPath, { openDirectory: rejectOpen }),
       /selected folder could not be read/
     )
+  })
+
+  it('records a normal repository through the deterministic seams', async t => {
+    const rootPath = Path.resolve(await createTempDirectory(t))
+    const repositoryPath = Path.join(rootPath, 'repo')
+
+    const tree = new Map<string, ReadonlyArray<Dirent>>([
+      [rootPath, [syntheticDir('repo')]],
+      [repositoryPath, [syntheticDir('.git'), syntheticDir('src')]],
+    ])
+    const types = new Map<string, RepositoryType>([
+      [repositoryPath, primaryRepositoryType(repositoryPath)],
+    ])
+
+    const result = await findRepositoriesInDirectory(rootPath, {
+      openDirectory: makeOpenDirectory(tree),
+      getRepositoryType: makeGetRepositoryType(types),
+    })
+
+    assert.deepEqual(result.repositories, [repositoryPath])
+    assert.equal(result.truncated, false)
+  })
+
+  it('skips a linked worktree whose git dir lives under .git/worktrees', async t => {
+    const rootPath = Path.resolve(await createTempDirectory(t))
+    const worktreePath = Path.join(rootPath, 'feature-worktree')
+    const mainRepositoryPath = Path.join(rootPath, '..', 'primary-repo')
+
+    const tree = new Map<string, ReadonlyArray<Dirent>>([
+      [rootPath, [syntheticDir('feature-worktree')]],
+      // A linked worktree is marked by a `.git` FILE (not a directory).
+      [worktreePath, [syntheticFile('.git'), syntheticDir('src')]],
+    ])
+    const types = new Map<string, RepositoryType>([
+      [
+        worktreePath,
+        linkedWorktreeRepositoryType(
+          worktreePath,
+          mainRepositoryPath,
+          'feature-worktree'
+        ),
+      ],
+    ])
+
+    const result = await findRepositoriesInDirectory(rootPath, {
+      openDirectory: makeOpenDirectory(tree),
+      getRepositoryType: makeGetRepositoryType(types),
+    })
+
+    assert.deepEqual(result.repositories, [])
+    assert.equal(result.truncated, false)
+  })
+
+  it('records only the primary repository when a linked worktree sits beside it', async t => {
+    const rootPath = Path.resolve(await createTempDirectory(t))
+    const projectPath = Path.join(rootPath, 'project')
+    const primaryPath = Path.join(projectPath, 'main')
+    const worktreePath = Path.join(projectPath, 'feature')
+
+    const tree = new Map<string, ReadonlyArray<Dirent>>([
+      [rootPath, [syntheticDir('project')]],
+      [projectPath, [syntheticDir('main'), syntheticDir('feature')]],
+      [primaryPath, [syntheticDir('.git')]],
+      [worktreePath, [syntheticFile('.git')]],
+    ])
+    const types = new Map<string, RepositoryType>([
+      [primaryPath, primaryRepositoryType(primaryPath)],
+      [
+        worktreePath,
+        linkedWorktreeRepositoryType(worktreePath, primaryPath, 'feature'),
+      ],
+    ])
+
+    const result = await findRepositoriesInDirectory(rootPath, {
+      openDirectory: makeOpenDirectory(tree),
+      getRepositoryType: makeGetRepositoryType(types),
+    })
+
+    assert.deepEqual(result.repositories, [primaryPath])
+    assert.equal(result.truncated, false)
   })
 
   it('marks a scan truncated when a descendant cannot be opened', async t => {

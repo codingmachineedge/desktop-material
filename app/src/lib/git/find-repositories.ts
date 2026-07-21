@@ -49,6 +49,9 @@ export interface IFindRepositoriesOptions {
 
   /** Directory-open seam used by deterministic scanner tests. */
   readonly openDirectory?: typeof opendir
+
+  /** Repository-type seam used by deterministic scanner tests. */
+  readonly getRepositoryType?: typeof getRepositoryType
 }
 
 export interface IFindRepositoriesResult {
@@ -88,6 +91,35 @@ const pathKey = (path: string) => {
 
 const isGitMarkerName = (name: string) =>
   process.platform === 'win32' ? name.toLowerCase() === '.git' : name === '.git'
+
+const isWorktreesDirName = (name: string) =>
+  pathKey(name) === pathKey('worktrees')
+
+/**
+ * Decide whether a resolved Git directory belongs to a linked worktree.
+ *
+ * A primary working tree keeps its Git directory at `<repo>/.git`. A linked
+ * worktree instead points (via a `.git` file at its root) at
+ * `<repo>/.git/worktrees/<name>`. Such a path is administered by the primary
+ * repository and is not an independently-addable repository, so the scanner
+ * skips it. Detection walks the path segments and looks for a `.git` segment
+ * immediately followed by a `worktrees` segment, matching the platform's
+ * case sensitivity through the shared marker/path helpers.
+ */
+const isLinkedWorktreeGitDir = (gitDir: string) => {
+  const segments = Path.resolve(gitDir).split(/[\\/]+/)
+
+  for (let index = 0; index + 1 < segments.length; index++) {
+    if (
+      isGitMarkerName(segments[index]) &&
+      isWorktreesDirName(segments[index + 1])
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
 
 async function readDirectory(
   path: string,
@@ -159,6 +191,7 @@ export async function findRepositoriesInDirectory(
     DefaultMaximumEntriesPerDirectory
   )
   const openDirectory = options.openDirectory ?? opendir
+  const resolveRepositoryType = options.getRepositoryType ?? getRepositoryType
 
   const resolvedRootPath = Path.resolve(rootPath)
   const rootStats = await lstat(resolvedRootPath).catch(() => null)
@@ -218,14 +251,19 @@ export async function findRepositoriesInDirectory(
     )
 
     if (gitMarker !== undefined) {
-      const repositoryType = await getRepositoryType(current.path).catch(
+      const repositoryType = await resolveRepositoryType(current.path).catch(
         () => null
       )
 
       if (
         repositoryType?.kind === 'regular' &&
         pathKey(repositoryType.topLevelWorkingDirectory) ===
-          pathKey(current.path)
+          pathKey(current.path) &&
+        // A linked worktree passes the primary-working-tree test above, but it
+        // is administered by another repository and is not independently
+        // addable, so skip recording it (while still treating it as a boundary
+        // via the `continue` below).
+        !isLinkedWorktreeGitDir(repositoryType.gitDir)
       ) {
         const repositoryPath = Path.resolve(
           repositoryType.topLevelWorkingDirectory

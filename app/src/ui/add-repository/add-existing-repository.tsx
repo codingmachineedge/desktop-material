@@ -22,6 +22,7 @@ import {
   NetworkRepositoryPathKind,
   resolveRepositoryInputPath,
 } from '../../lib/network-repository-path'
+import { matchExistingRepository } from '../../lib/repository-matching'
 import {
   getPersistedLanguageMode,
   LanguageModeChangedEvent,
@@ -40,6 +41,13 @@ interface IAddExistingRepositoryProps {
    * Defaults to the empty string if not defined.
    */
   readonly path?: string
+
+  /**
+   * The repositories already tracked by the application. Auto-detected paths
+   * that match one of these are excluded from the results so the folder scan
+   * never surfaces a repository the user has already added.
+   */
+  readonly existingRepositories?: ReadonlyArray<{ readonly path: string }>
 
   /** Optional seams used by focused UI tests. */
   readonly chooseRepositoryFolder?: () => Promise<string | null>
@@ -67,6 +75,13 @@ interface IAddExistingRepositoryState {
   readonly isCheckingRepository: boolean
   readonly isScanningForRepositories: boolean
   readonly discoveredRepositories: ReadonlyArray<string> | null
+
+  /**
+   * How many auto-detected repositories were excluded from
+   * `discoveredRepositories` because they are already tracked by the app. Used
+   * to distinguish "nothing was found" from "everything found is already added".
+   */
+  readonly alreadyAddedCount: number
   readonly scanRootPath?: string
   readonly scanWasTruncated: boolean
   readonly repositoryScanError: string | null
@@ -96,6 +111,7 @@ export class AddExistingRepository extends React.Component<
       isCheckingRepository: false,
       isScanningForRepositories: false,
       discoveredRepositories: null,
+      alreadyAddedCount: 0,
       scanWasTruncated: false,
       repositoryScanError: null,
     }
@@ -147,6 +163,7 @@ export class AddExistingRepository extends React.Component<
       path,
       isScanningForRepositories: false,
       discoveredRepositories: null,
+      alreadyAddedCount: 0,
       scanRootPath: undefined,
       scanWasTruncated: false,
       repositoryScanError: null,
@@ -366,6 +383,16 @@ export class AddExistingRepository extends React.Component<
     }
 
     if (discoveredRepositories.length === 0) {
+      if (this.state.alreadyAddedCount > 0) {
+        return (
+          <div className="repository-folder-scan-results" role="status">
+            {this.state.alreadyAddedCount === 1
+              ? 'The discovered repository is already added.'
+              : 'All discovered repositories are already added.'}
+          </div>
+        )
+      }
+
       return (
         <div className="repository-folder-scan-results" role="status">
           No Git repositories were found
@@ -494,6 +521,7 @@ export class AddExistingRepository extends React.Component<
         this.setState({
           isScanningForRepositories: false,
           discoveredRepositories: null,
+          alreadyAddedCount: 0,
           scanRootPath: undefined,
           scanWasTruncated: false,
           repositoryScanError:
@@ -521,6 +549,7 @@ export class AddExistingRepository extends React.Component<
       repositoryUnsafePath: undefined,
       isScanningForRepositories: true,
       discoveredRepositories: null,
+      alreadyAddedCount: 0,
       scanRootPath: resolvedPath,
       scanWasTruncated: false,
       repositoryScanError: null,
@@ -537,6 +566,7 @@ export class AddExistingRepository extends React.Component<
         this.setState({
           isScanningForRepositories: false,
           discoveredRepositories: null,
+          alreadyAddedCount: 0,
           scanWasTruncated: false,
           repositoryScanError:
             "Desktop Material couldn't scan this folder. Check that it can be read and try again.",
@@ -550,12 +580,44 @@ export class AddExistingRepository extends React.Component<
       return
     }
 
+    const { repositories, alreadyAddedCount } =
+      this.excludeAlreadyAddedRepositories(result.repositories)
+
     this.setState({
       isScanningForRepositories: false,
-      discoveredRepositories: result.repositories,
+      discoveredRepositories: repositories,
+      alreadyAddedCount,
       scanWasTruncated: result.truncated,
       repositoryScanError: null,
     })
+  }
+
+  /**
+   * Remove auto-detected paths that already correspond to a tracked
+   * repository. Comparison is case-insensitive on Windows, matching how the
+   * rest of the app identifies a known repository by its path.
+   */
+  private excludeAlreadyAddedRepositories(paths: ReadonlyArray<string>): {
+    readonly repositories: ReadonlyArray<string>
+    readonly alreadyAddedCount: number
+  } {
+    const existingRepositories = this.props.existingRepositories
+
+    if (
+      existingRepositories === undefined ||
+      existingRepositories.length === 0
+    ) {
+      return { repositories: paths, alreadyAddedCount: 0 }
+    }
+
+    const repositories = paths.filter(
+      path => matchExistingRepository(existingRepositories, path) === undefined
+    )
+
+    return {
+      repositories,
+      alreadyAddedCount: paths.length - repositories.length,
+    }
   }
 
   private get addButtonText() {

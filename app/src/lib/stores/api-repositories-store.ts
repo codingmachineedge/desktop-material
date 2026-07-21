@@ -85,6 +85,20 @@ export interface IAccountRepositories {
   /** Whether organization membership is being loaded. */
   readonly organizationsLoading: boolean
 
+  /**
+   * The most recent failure loading the account's organization list, if any.
+   *
+   * An empty `organizations` list is ambiguous on its own: it could mean the
+   * user belongs to no organizations, or that the request failed. This field
+   * disambiguates the two so the UI can surface a retry instead of silently
+   * hiding the organization filter chips.
+   *
+   * Optional so pre-existing partial `IAccountRepositories` fixtures remain
+   * valid; the store always populates it (see `EmptyAccountRepositories` and
+   * `loadOrganizations`).
+   */
+  readonly organizationsError?: Error | null
+
   /** Full repository lists loaded on demand for individual organizations. */
   readonly organizationRepositories: ReadonlyMap<
     string,
@@ -104,6 +118,7 @@ const EmptyAccountRepositories: IAccountRepositories = {
   repositories: [],
   organizations: [],
   organizationsLoading: false,
+  organizationsError: null,
   organizationRepositories: new Map(),
 }
 
@@ -216,10 +231,16 @@ export class ApiRepositoriesStore extends BaseStore {
       return
     }
 
-    this.updateAccount(account, { organizationsLoading: true })
+    this.updateAccount(account, {
+      organizationsLoading: true,
+      organizationsError: null,
+    })
     try {
       const api = this.apiForAccount(resolveAccount(account, this.accountState))
-      const organizations = (await api.fetchOrgs())
+      // Ask the API to reject on a real failure rather than swallow it to an
+      // empty list. An ambiguous empty list would silently hide the account's
+      // organizations with no way for the user to retry.
+      const organizations = (await api.fetchOrgs(true))
         .slice()
         .sort((a, b) =>
           a.login.localeCompare(b.login, undefined, { sensitivity: 'base' })
@@ -233,7 +254,19 @@ export class ApiRepositoriesStore extends BaseStore {
           organizationRepositories.delete(login)
         }
       }
-      this.updateAccount(account, { organizations, organizationRepositories })
+      this.updateAccount(account, {
+        organizations,
+        organizationRepositories,
+        organizationsError: null,
+      })
+    } catch (error) {
+      const organizationsError =
+        error instanceof Error ? error : new Error(String(error))
+      this.updateAccount(account, { organizationsError })
+      log.warn(
+        `Unable to load organizations for ${account.friendlyEndpoint}`,
+        organizationsError
+      )
     } finally {
       this.updateAccount(account, { organizationsLoading: false })
     }
