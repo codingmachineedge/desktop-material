@@ -103,6 +103,14 @@ export interface IGitHubAPIExplorerProps {
   readonly accounts: ReadonlyArray<Account>
   readonly client?: IGitHubAPIExplorerClient
   readonly functionRegistry?: IGitHubAPIFunctionRegistry
+  /** Render the saved functions as the primary surface in a parent hub. */
+  readonly surface?: 'explorer' | 'functions'
+  /** Seed the repository with the safe built-in read functions on first use. */
+  readonly autoCreateFunctions?: boolean
+  /** Hide the contextual API rail item after the user leaves this surface. */
+  readonly onHide?: () => void
+  /** Restore the contextual API rail item from a compact tools surface. */
+  readonly onShow?: () => void
   /** Test seam for product/version-specific operation catalogs. */
   readonly catalogResolver?: (endpoint: string) => GitHubAPICatalogResolution
   /** Test seam for product/version-specific GraphQL root schemas. */
@@ -165,7 +173,36 @@ interface IGitHubAPIExplorerState {
   readonly functionArguments: Readonly<Record<string, string>>
   readonly functionError: string | null
   readonly functionMessage: string | null
+  readonly advancedOpen: boolean
 }
+
+const DefaultNamedAPIFunctions = [
+  {
+    name: 'repository_details',
+    operationId: 'repos/get',
+    description: 'Read the selected repository details.',
+  },
+  {
+    name: 'list_issues',
+    operationId: 'issues/list-for-repo',
+    description: 'List issues for the selected repository.',
+  },
+  {
+    name: 'list_pull_requests',
+    operationId: 'pulls/list',
+    description: 'List pull requests for the selected repository.',
+  },
+  {
+    name: 'list_releases',
+    operationId: 'repos/list-releases',
+    description: 'List releases for the selected repository.',
+  },
+  {
+    name: 'list_workflows',
+    operationId: 'actions/list-repo-workflows',
+    description: 'List Actions workflows for the selected repository.',
+  },
+] as const
 
 const defaultClient: IGitHubAPIExplorerClient = {
   execute: (account, request, confirmed, signal) =>
@@ -314,6 +351,7 @@ function initialState(props: IGitHubAPIExplorerProps): IGitHubAPIExplorerState {
     functionArguments: {},
     functionError: null,
     functionMessage: null,
+    advancedOpen: props.surface !== 'functions',
   }
 }
 
@@ -467,7 +505,55 @@ export class GitHubAPIExplorer extends React.Component<
     }
     const context = repositoryContextKey(this.props)
     try {
-      const functions = await registry.getNamedAPIFunctions()
+      let functions = await registry.getNamedAPIFunctions()
+      const account = getExplorerAccount(
+        this.props.repository,
+        this.props.accounts
+      )
+      if (account !== null && this.props.autoCreateFunctions === true) {
+        const binding = this.currentFunctionBinding(account)
+        const catalog = resolveCatalogForProps(this.props)?.catalog
+        const created = new Array<INamedAPIFunctionDefinition>()
+        for (const preset of DefaultNamedAPIFunctions) {
+          if (
+            functions.some(
+              value =>
+                value.name === preset.name &&
+                functionBelongsToBinding(value, binding)
+            )
+          ) {
+            continue
+          }
+          const operation = catalog?.operations.find(
+            value => value.id === preset.operationId
+          )
+          if (operation === undefined) {
+            continue
+          }
+          created.push(
+            await registry.saveNamedAPIFunction({
+              name: preset.name,
+              description: preset.description,
+              operationId: operation.id,
+              binding,
+              request: {
+                mode: 'rest',
+                method: operation.method,
+                path: operationPath(operation, this.props.repository),
+                bodyText: '',
+              },
+            })
+          )
+        }
+        if (created.length > 0) {
+          functions = [
+            ...functions.filter(
+              value => !created.some(candidate => candidate.id === value.id)
+            ),
+            ...created,
+          ]
+        }
+      }
       if (
         this.mounted &&
         this.props.functionRegistry === registry &&
@@ -983,7 +1069,7 @@ export class GitHubAPIExplorer extends React.Component<
         functionDescription: '',
         editingFunctionId: null,
         functionError: null,
-        functionMessage: `Function '${saved.name}' is available to the app and agent catalog.`,
+        functionMessage: `Function '${saved.name}' is now available to the app and agent.`,
       })
     } catch (error) {
       if (this.mounted) {
@@ -1023,6 +1109,10 @@ export class GitHubAPIExplorer extends React.Component<
     })
   }
 
+  private onToggleAdvanced = () => {
+    this.setState(state => ({ advancedOpen: !state.advancedOpen }))
+  }
+
   private onRemoveNamedFunction = async (
     event: React.MouseEvent<HTMLButtonElement>
   ) => {
@@ -1049,7 +1139,7 @@ export class GitHubAPIExplorer extends React.Component<
           functionMessage:
             definition === undefined
               ? 'Function removed.'
-              : `Function '${definition.name}' removed from the catalog.`,
+              : `Function '${definition.name}' removed from the saved functions.`,
         })
       }
     } catch (error) {
@@ -1876,8 +1966,7 @@ export class GitHubAPIExplorer extends React.Component<
           </p>
         ) : functions.length === 0 ? (
           <p className="github-api-functions-unavailable" role="status">
-            No functions yet. Pick an operation below to start one, or build a
-            manual request and save it here.
+            No functions yet. Open the advanced builder to add a custom one.
           </p>
         ) : (
           <ul aria-label="Named API functions">
@@ -2098,10 +2187,25 @@ export class GitHubAPIExplorer extends React.Component<
     return (
       <div className="github-api-explorer-workspace">
         {this.renderNamedFunctions(account)}
-        <div className="github-api-explorer-layout">
-          {this.renderCatalog(account)}
-          {this.renderBuilder(account)}
-        </div>
+        {this.props.surface === 'functions' ? (
+          <section className="github-api-explorer-advanced">
+            <Button onClick={this.onToggleAdvanced}>
+              {this.state.advancedOpen
+                ? 'Hide advanced request builder'
+                : 'Add or edit an API function'}
+            </Button>
+            <p>
+              Built-in functions are added to this repository automatically. Use
+              the advanced builder only when you need a custom request.
+            </p>
+          </section>
+        ) : null}
+        {this.props.surface !== 'functions' || this.state.advancedOpen ? (
+          <div className="github-api-explorer-layout">
+            {this.renderCatalog(account)}
+            {this.renderBuilder(account)}
+          </div>
+        ) : null}
         {this.renderReview(account)}
         {this.state.loading ? (
           <div className="github-api-explorer-loading" role="status">
@@ -2130,17 +2234,39 @@ export class GitHubAPIExplorer extends React.Component<
       this.props.accounts
     )
     return (
-      <main className="github-api-explorer" aria-label="GitHub API Explorer">
+      <main
+        className="github-api-explorer"
+        aria-label={
+          this.props.surface === 'functions'
+            ? 'GitHub API functions'
+            : 'GitHub API Explorer'
+        }
+      >
         <header className="github-api-explorer-header">
           <div>
-            <h1>GitHub API Explorer</h1>
+            <h1>
+              {this.props.surface === 'functions'
+                ? 'GitHub API functions'
+                : 'GitHub API Explorer'}
+            </h1>
             <p>{remote?.fullName ?? this.props.repository.name}</p>
           </div>
-          <span className="github-api-explorer-account">
-            {account === null
-              ? 'No repository-bound GitHub account'
-              : `@${account.login} · ${account.friendlyEndpoint}`}
-          </span>
+          <div className="github-api-explorer-header-actions">
+            <span className="github-api-explorer-account">
+              {account === null
+                ? 'No repository-bound GitHub account'
+                : `@${account.login} · ${account.friendlyEndpoint}`}
+            </span>
+            {this.props.onHide === undefined &&
+            this.props.onShow === undefined ? null : this.props.onHide ===
+              undefined ? (
+              <Button onClick={() => this.props.onShow?.()}>
+                Show API tab
+              </Button>
+            ) : (
+              <Button onClick={this.props.onHide}>Hide API tab</Button>
+            )}
+          </div>
         </header>
         {remote === null
           ? this.renderUnavailable()

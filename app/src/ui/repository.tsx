@@ -66,6 +66,10 @@ import {
 } from './repository-sections'
 import { getAccountForRepository } from '../lib/get-account-for-repository'
 import { AccountSwitcher } from './account-switcher/account-switcher'
+import {
+  isGitHubAPITabHidden,
+  setGitHubAPITabHidden,
+} from '../lib/github-api-tab-visibility'
 
 interface IRepositoryViewProps {
   readonly repository: Repository
@@ -194,6 +198,7 @@ interface IRepositoryViewState {
    * Gates the tools hub's subtree manager entry.
    */
   readonly subtreeCount: number | null
+  readonly isGitHubAPIHidden: boolean
 }
 
 export class RepositoryView extends React.Component<
@@ -224,6 +229,7 @@ export class RepositoryView extends React.Component<
       isAccountSwitcherOpen: false,
       submoduleCount: null,
       subtreeCount: null,
+      isGitHubAPIHidden: isGitHubAPITabHidden(props.repository.hash),
     }
   }
 
@@ -305,7 +311,7 @@ export class RepositoryView extends React.Component<
     )
   }
 
-  private showsGitHubAPI() {
+  private canUseGitHubAPI() {
     if (this.props.repository.gitHubRepository === null) {
       return false
     }
@@ -314,6 +320,10 @@ export class RepositoryView extends React.Component<
       this.props.repository
     )
     return account === null || account.provider === 'github'
+  }
+
+  private showsGitHubAPI() {
+    return this.canUseGitHubAPI() && !this.state.isGitHubAPIHidden
   }
 
   private getVisibleRepositorySections() {
@@ -341,6 +351,28 @@ export class RepositoryView extends React.Component<
       return RepositorySectionTab.Changes
     }
     return section
+  }
+
+  private onHideGitHubAPI = () => {
+    setGitHubAPITabHidden(this.props.repository.hash, true)
+    this.setState({ isGitHubAPIHidden: true }, () => {
+      if (this.props.state.selectedSection === RepositorySectionTab.GitHubAPI) {
+        this.props.dispatcher.changeRepositorySection(
+          this.props.repository,
+          RepositorySectionTab.RepositoryTools
+        )
+      }
+    })
+  }
+
+  private onShowGitHubAPI = () => {
+    setGitHubAPITabHidden(this.props.repository.hash, false)
+    this.setState({ isGitHubAPIHidden: false }, () => {
+      this.props.dispatcher.changeRepositorySection(
+        this.props.repository,
+        RepositorySectionTab.GitHubAPI
+      )
+    })
   }
 
   public setFocusHistoryNeeded(): void {
@@ -1107,6 +1139,9 @@ export class RepositoryView extends React.Component<
           repository={this.props.repository}
           accounts={this.props.accounts}
           functionRegistry={this.props.dispatcher}
+          surface="functions"
+          autoCreateFunctions={true}
+          onHide={this.onHideGitHubAPI}
         />
       )
     } else if (selectedSection === RepositorySectionTab.Triage) {
@@ -1136,6 +1171,17 @@ export class RepositoryView extends React.Component<
             repository: this.props.repository,
             accounts: this.props.accounts,
           }}
+          githubAPIFunctions={
+            this.canUseGitHubAPI()
+              ? {
+                  repository: this.props.repository,
+                  accounts: this.props.accounts,
+                  functionRegistry: this.props.dispatcher,
+                  autoCreateFunctions: true,
+                  onShowAPI: this.onShowGitHubAPI,
+                }
+              : undefined
+          }
           cheapLfs={{
             repository: this.props.repository,
             accounts: this.props.accounts,
@@ -1186,7 +1232,11 @@ export class RepositoryView extends React.Component<
 
   public componentDidUpdate(prevProps: IRepositoryViewProps): void {
     if (prevProps.repository.hash !== this.props.repository.hash) {
-      this.setState({ submoduleCount: null, subtreeCount: null })
+      this.setState({
+        submoduleCount: null,
+        subtreeCount: null,
+        isGitHubAPIHidden: isGitHubAPITabHidden(this.props.repository.hash),
+      })
       this.loadSubmoduleCount()
       this.loadSubtreeCount()
     }

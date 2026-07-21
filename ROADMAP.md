@@ -11,6 +11,18 @@ This file is the compact public source of truth; implementation details and
 historical test receipts stay in [`PLAN.md`](PLAN.md) and
 [`HANDOFF.md`](HANDOFF.md).
 
+## M25 — Repository-bound API functions — **Implementation complete; verification pending**
+
+- Eligible GitHub repositories automatically receive a curated set of
+  repository, issue, pull-request, release, and workflow read functions.
+- Saved functions appear as runnable buttons in the API surface and in
+  **Repository tools → API functions**; the raw REST/GraphQL catalog is now an
+  advanced custom-function surface.
+- The API rail item can be hidden per repository and restored from Repository
+  tools. Mutations remain behind the existing exact-request review boundary.
+- The feature guide is
+  [`docs/features/integrations/github-api-functions.md`](docs/features/integrations/github-api-functions.md).
+
 ## Platform support
 
 Desktop Material is Windows-only. The supported product gates are Windows

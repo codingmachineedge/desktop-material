@@ -130,6 +130,33 @@ const repository = new Repository(
 )
 
 describe('GitHub API Explorer app functions', () => {
+  it('auto-adds the safe built-in functions for a repository', async () => {
+    const registry = new FunctionRegistry()
+    render(
+      <GitHubAPIExplorer
+        repository={repository}
+        accounts={[account]}
+        functionRegistry={registry}
+        surface="functions"
+        autoCreateFunctions={true}
+      />
+    )
+
+    await waitFor(() => assert.equal(registry.functions.length, 5))
+    assert.deepEqual(registry.functions.map(value => value.name).sort(), [
+      'list_issues',
+      'list_pull_requests',
+      'list_releases',
+      'list_workflows',
+      'repository_details',
+    ])
+    assert.equal(screen.queryByText('Search operations'), null)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Add or edit an API function' })
+    )
+    assert.ok(screen.getByText('Search operations'))
+  })
+
   it('refreshes immediately when a restored profile publishes a new catalog', async () => {
     const registry = new FunctionRegistry()
     render(

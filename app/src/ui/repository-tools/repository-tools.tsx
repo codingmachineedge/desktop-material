@@ -58,6 +58,10 @@ import {
 } from '../lib/filter-list-mode'
 import { t } from '../../lib/i18n'
 import { GitHubProjectsWorkspace } from '../github-projects'
+import {
+  GitHubAPIExplorer,
+  IGitHubAPIFunctionRegistry,
+} from '../github-api-explorer'
 
 const MaxOutputBytes = 4 * 1024 * 1024
 type RepositoryToolResultID =
@@ -133,6 +137,7 @@ type RepositoryToolsHubToolID =
   | 'custom-git-presets'
   | 'tag-lifecycle'
   | 'github-projects'
+  | 'github-api-functions'
   | 'submodule-manager'
   | 'subtree-manager'
   | 'cheap-lfs'
@@ -381,6 +386,15 @@ function getGitHubProjectsHubEntry(): IRepositoryToolsHubEntry {
   }
 }
 
+const GitHubAPIFunctionsHubEntry: IRepositoryToolsHubEntry = {
+  id: 'github-api-functions',
+  title: 'API functions',
+  description:
+    'Run repository-bound GitHub API functions as reviewed buttons instead of searching a raw endpoint catalog.',
+  category: 'Search & inspect',
+  icon: octicons.codeSquare,
+}
+
 const RepositoryToolsHubCategories: ReadonlyArray<RepositoryToolsHubCategoryFilter> =
   ['All', ...HubCategoryOrder]
 
@@ -470,6 +484,15 @@ export interface IRepositoryToolsProps {
   readonly githubProjects?: {
     readonly repository: Repository
     readonly accounts: ReadonlyArray<Account>
+  }
+
+  /** Repository-bound GitHub API functions shown in the tools hub. */
+  readonly githubAPIFunctions?: {
+    readonly repository: Repository
+    readonly accounts: ReadonlyArray<Account>
+    readonly functionRegistry: IGitHubAPIFunctionRegistry
+    readonly autoCreateFunctions?: boolean
+    readonly onShowAPI: () => void
   }
 }
 
@@ -812,13 +835,15 @@ export class RepositoryTools extends React.Component<
       isSubmoduleRepository(this.props.repository) ||
       this.props.githubProjects === undefined ||
       this.props.githubProjects.repository.gitHubRepository === null
+    const githubAPIFunctionsHidden = this.props.githubAPIFunctions === undefined
 
     if (
       submodulesHidden &&
       subtreesHidden &&
       cheapLfsHidden &&
       tagLifecycleHidden &&
-      githubProjectsHidden
+      githubProjectsHidden &&
+      githubAPIFunctionsHidden
     ) {
       return RepositoryToolsHubEntries
     }
@@ -830,6 +855,7 @@ export class RepositoryTools extends React.Component<
       ...(cheapLfsHidden ? [] : [CheapLfsHubEntry]),
       ...(tagLifecycleHidden ? [] : [TagLifecycleHubEntry]),
       ...(githubProjectsHidden ? [] : [getGitHubProjectsHubEntry()]),
+      ...(githubAPIFunctionsHidden ? [] : [GitHubAPIFunctionsHubEntry]),
     ].sort(compareHubEntries)
   }
 
@@ -1613,6 +1639,32 @@ export class RepositoryTools extends React.Component<
     )
   }
 
+  private renderGitHubAPIFunctions() {
+    const functions = this.props.githubAPIFunctions
+    if (functions === undefined) {
+      return null
+    }
+    return (
+      <section
+        className="repository-tools-category repository-tools-api-functions"
+        aria-labelledby="repository-tools-api-functions-title"
+      >
+        {this.renderCategoryHeader(
+          'Search & inspect',
+          'repository-tools-api-functions-title'
+        )}
+        <GitHubAPIExplorer
+          repository={functions.repository}
+          accounts={functions.accounts}
+          functionRegistry={functions.functionRegistry}
+          surface="functions"
+          autoCreateFunctions={functions.autoCreateFunctions}
+          onShow={functions.onShowAPI}
+        />
+      </section>
+    )
+  }
+
   private renderExport() {
     return (
       <section
@@ -2277,6 +2329,7 @@ export class RepositoryTools extends React.Component<
         {selected === 'cheap-lfs' && this.renderCheapLfs()}
         {selected === 'tag-lifecycle' && this.renderTagLifecycle()}
         {selected === 'github-projects' && this.renderGitHubProjects()}
+        {selected === 'github-api-functions' && this.renderGitHubAPIFunctions()}
         {selected === 'export-artifacts' && this.renderExport()}
         <div
           className="repository-tools-panel"
@@ -2305,7 +2358,9 @@ export class RepositoryTools extends React.Component<
         {this.renderConfirmation()}
         {this.renderArchiveConfirmation()}
         {this.renderNoteConfirmation()}
-        {selected !== 'github-projects' && this.renderResults()}
+        {selected !== 'github-projects' &&
+          selected !== 'github-api-functions' &&
+          this.renderResults()}
       </section>
     )
   }

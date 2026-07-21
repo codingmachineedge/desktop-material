@@ -112,6 +112,15 @@
   }
 }
 
+.github-api-explorer-header-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .github-api-explorer-account {
   max-width: min(420px, 48vw);
   color: var(--md-sys-color-on-surface-variant);
@@ -143,6 +152,25 @@
   min-height: 0;
   grid-template-columns: minmax(260px, 0.38fr) minmax(0, 1fr);
   gap: 14px;
+}
+
+.github-api-explorer-advanced {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px dashed var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container-low);
+
+  p {
+    flex: 1 1 260px;
+    margin: 0;
+    font-size: 11px;
+  }
 }
 
 .github-api-explorer-catalog,
@@ -656,6 +684,12 @@
       opacity: 0.62;
     }
   }
+
+  button:first-child {
+    color: var(--md-sys-color-on-primary-container);
+    border-color: var(--md-sys-color-primary);
+    background: var(--md-sys-color-primary-container);
+  }
 }
 
 .github-api-functions-unavailable {
@@ -843,6 +877,11 @@
     width: 100%;
     max-width: 100%;
     text-align: left;
+  }
+
+  .github-api-explorer-header-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .github-api-explorer-filters,
