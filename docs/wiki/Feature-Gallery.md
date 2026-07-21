@@ -159,7 +159,8 @@ Git creates the branch commit. New uploads use raw bytes, retain one asset when
 it fits the release limit, and use ordered raw ranges when it does not. The
 composer names hashing, release preparation, accepted-byte upload progress, and
 verification separately, then reserves **Committing to _branch_** for the small
-pointer commit. Its adjacent **Manual upload** action can stop a stalled
+pointer commit. Electron sends each part in memory-bounded chunked mode rather
+than buffering the full request. Its adjacent **Manual upload** action can stop a stalled
 automatic transfer, open one temporary folder containing every remaining
 single-asset file, and resume only after newly detected browser uploads and all
 local sources pass SHA-256 verification.

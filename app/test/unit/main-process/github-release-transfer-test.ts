@@ -358,7 +358,7 @@ describe('main-process GitHub release transfer', () => {
     })
   })
 
-  it('streams through callback-only Electron writes without waiting for drain', async () => {
+  it('uses chunked Electron streaming without buffering or waiting for drain', async () => {
     await withDirectory(async directory => {
       const source = join(directory, 'large-upload.bin')
       const sourceBytes = Buffer.alloc(256 * 1024, 0x61)
@@ -371,11 +371,14 @@ describe('main-process GitHub release transfer', () => {
         ) => void
         end: () => void
         abort: () => void
+        chunkedEncoding: boolean
       }
+      request.chunkedEncoding = false
       const written = new Array<Buffer>()
       let pendingWrites = 0
       let maximumPendingWrites = 0
       request.write = (chunk, _encoding, callback) => {
+        assert.equal(request.chunkedEncoding, true)
         // Electron returns void and has no Writable `drain` contract.
         pendingWrites++
         maximumPendingWrites = Math.max(maximumPendingWrites, pendingWrites)
@@ -403,8 +406,12 @@ describe('main-process GitHub release transfer', () => {
       }
 
       const accepted = new Array<number>()
+      let constructorHeaders: Headers | undefined
       const upload = createElectronGitHubReleaseUploadFetcher(
-        () => request as unknown as ClientRequest,
+        options => {
+          constructorHeaders = new Headers(options.headers as HeadersInit)
+          return request as unknown as ClientRequest
+        },
         () => ({} as Session)
       )
       let timeout: NodeJS.Timeout | undefined
@@ -412,7 +419,11 @@ describe('main-process GitHub release transfer', () => {
         const response = await Promise.race([
           upload(
             'https://uploads.github.com/example',
-            { 'Content-Length': String(sourceBytes.byteLength) },
+            {
+              Authorization: 'Bearer test-token',
+              'Content-Length': String(sourceBytes.byteLength),
+              'Content-Type': 'application/octet-stream',
+            },
             { path: source, offset: 0, length: sourceBytes.byteLength },
             new AbortController().signal,
             bytes => accepted.push(bytes)
@@ -433,6 +444,16 @@ describe('main-process GitHub release transfer', () => {
       }
       assert.deepEqual(Buffer.concat(written), sourceBytes)
       assert.equal(maximumPendingWrites, 1)
+      assert.equal(request.chunkedEncoding, true)
+      assert.equal(constructorHeaders?.get('Content-Length'), null)
+      assert.equal(
+        constructorHeaders?.get('Authorization'),
+        'Bearer test-token'
+      )
+      assert.equal(
+        constructorHeaders?.get('Content-Type'),
+        'application/octet-stream'
+      )
       assert.ok(accepted.length > 1)
       assert.equal(accepted.at(-1), sourceBytes.byteLength)
     })

@@ -29,7 +29,11 @@ default for compatibility:
 Automatic pinning reports separate hashing, release preparation, upload, and
 verification phases, streams accepted-byte progress, pins files sequentially,
 reloads status, and stages the pointer rather than the original binary. The
-first pin failure aborts the commit.
+first pin failure aborts the commit. The Electron transport removes the
+fixed-length header at its final request boundary and enables chunked encoding
+before writing, preventing Electron from retaining an entire multi-gigabyte
+asset in process memory. Exact source-range checks still reject files that grow
+or shrink after validation.
 
 While an automatic upload is active, **Manual upload** switches the same commit
 operation to a browser-assisted handoff. Desktop Material stops the current
@@ -130,4 +134,7 @@ preference/account gating, failure aborts, and status reload before commit.
 `commit-message-test.tsx`, `cheap-lfs-test.tsx`, and
 `build-run-cheap-lfs-settings-test.tsx` cover the localized manual/cancel
 controls, reviewed panel actions, inventory, cancellation, progress, and
-persisted preferences.
+persisted preferences. `github-release-transfer-test.ts` additionally proves
+chunked mode is enabled before the first Electron write, `Content-Length` is
+removed only at that boundary, required headers remain, and source chunks are
+advanced one at a time.

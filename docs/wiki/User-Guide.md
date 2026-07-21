@@ -777,6 +777,9 @@ file is split into ordered raw ranges. Downloads verify each range and the compl
 replacing the pointer. Existing compressed cheap-LFS pointers remain readable for backward
 compatibility.
 
+Automatic assets are sent with Electron's memory-bounded chunked request mode. Even a multi-gigabyte
+part is read incrementally instead of being retained as one in-process request body.
+
 The prepared folder is flat because GitHub Release assets cannot contain subfolders. Cheap LFS still
 remembers every original repository-relative path: files in nested folders return to those exact
 paths, and duplicate basenames receive distinct hash-suffixed asset names.

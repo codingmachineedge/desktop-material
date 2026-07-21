@@ -754,10 +754,19 @@ export const createElectronGitHubReleaseUploadFetcher =
         rejectPromise(abortError())
         return
       }
+      // Electron buffers the complete request body in memory unless chunked
+      // encoding is enabled. A Content-Length header disables that streaming
+      // mode, so keep the exact range length for validation/progress below but
+      // do not forward the header to ClientRequest.
+      const streamingHeaders = Object.fromEntries(
+        Object.entries(headers).filter(
+          ([name]) => name.toLowerCase() !== 'content-length'
+        )
+      )
       const request = requestFactory({
         url,
         method: 'POST',
-        headers,
+        headers: streamingHeaders,
         session: sessionProvider(),
         redirect: 'manual',
         credentials: 'omit',
@@ -765,6 +774,9 @@ export const createElectronGitHubReleaseUploadFetcher =
         referrerPolicy: 'no-referrer',
         cache: 'no-store',
       })
+      // This must be set before the first write. Otherwise Electron retains all
+      // chunks internally and multi-gigabyte Cheap LFS uploads exhaust memory.
+      request.chunkedEncoding = true
       // Re-read the validated range from disk so the body is streamed, never
       // buffered — a ~2 GiB part must not be materialized in memory.
       const body = createReadStream(source.path, {
@@ -832,8 +844,8 @@ export const createElectronGitHubReleaseUploadFetcher =
         // cannot deadlock or read the entire file ahead of the request.
         body.pause()
         const nextUploadedBytes = uploadedBytes + chunk.byteLength
-        // A file that grew after validation would overrun the declared
-        // Content-Length; fail closed rather than send a corrupt body.
+        // A file that grew after validation would overrun the validated range;
+        // fail closed rather than send a corrupt body.
         if (nextUploadedBytes > source.length) {
           failSource()
           return
@@ -851,7 +863,8 @@ export const createElectronGitHubReleaseUploadFetcher =
         if (settled) {
           return
         }
-        // A file that shrank after validation would under-run Content-Length.
+        // A file that shrank after validation would under-run the expected
+        // source range.
         if (uploadedBytes !== source.length) {
           failSource()
           return

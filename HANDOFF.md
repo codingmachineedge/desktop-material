@@ -28,6 +28,16 @@ rehashed before any pointer is written, and the original commit resumes
 automatically. Explicit cancel is distinct from account/repository aborts.
 Multipart files remain on the automatic ranged uploader by design.
 
+A later live multi-gigabyte attempt exposed a separate 1%/out-of-memory failure:
+Electron buffers a `ClientRequest` body internally when chunked encoding is not
+enabled. The upload adapter now removes the conflicting `Content-Length` only at
+the Electron boundary and enables `chunkedEncoding` before the first write. The
+validated byte range still bounds every read and progress value, while Electron
+can release streamed chunks instead of retaining the complete asset in process
+memory. The focused transfer suite proves the flag is already active on the
+first write, the length header is absent, authentication/type headers survive,
+only one source chunk is in flight, and the exact range reaches the request.
+
 Local acceptance passed **104/104 focused tests** across the transfer pump,
 cheap-LFS operations/automation/manual flow, GitHub Release parsing/API/store,
 asset download, and commit UI. TypeScript no-emit, scoped ESLint, scoped
