@@ -105,15 +105,15 @@ describe('shell chrome v2 style contracts', () => {
     )
     assert.match(strip, /dispatcher\s*\n?\s*\.undoLastSettingsChange\(\)/)
     assert.match(strip, /dispatcher\s*\n?\s*\.redoLastSettingsChange\(\)/)
-    assert.match(strip, /aria-label="Undo last settings change"/)
-    assert.match(strip, /aria-label="Redo settings change"/)
+    assert.match(strip, /aria-label=\{t\('tabs\.undoSettingsChange'\)\}/)
+    assert.match(strip, /aria-label=\{t\('tabs\.redoSettingsChange'\)\}/)
     assert.match(
       strip,
       /setNotificationCentreOpen\(\s*!this\.props\.isNotificationCentreOpen\s*\)/
     )
     assert.match(
       style,
-      /\.repository-tab-undo,\s*\n\.repository-tab-redo\s*\{[\s\S]*?width: 32px;[\s\S]*?height: 32px;[\s\S]*?border-radius: 10px;[\s\S]*?&:active\s*\{[\s\S]*?transform: scale\(0\.82\);/
+      /\.repository-tab-undo,\s*\n\.repository-tab-redo,?[\s\S]*?\{[\s\S]*?width: 32px;[\s\S]*?height: 32px;[\s\S]*?border-radius: 10px;[\s\S]*?&:active\s*\{[\s\S]*?transform: scale\(0\.82\);/
     )
   })
 
