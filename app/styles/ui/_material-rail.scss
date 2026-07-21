@@ -133,10 +133,17 @@
     font-weight: 700;
   }
 
-  // Rail destination icons — 22px per design §5 (Octicons; no FILL axis).
+  // Rail destination icons — 22px per design §5. Core v2 destinations use
+  // typed Material Symbols; extension-only destinations retain Octicons.
   .rail-icon {
+    display: grid;
     height: 22px;
+    place-items: center;
     width: 22px;
+
+    .material-symbol {
+      transition: font-variation-settings 260ms var(--emph);
+    }
   }
 
   // Changed-file count badge, anchored to the Changes pill.

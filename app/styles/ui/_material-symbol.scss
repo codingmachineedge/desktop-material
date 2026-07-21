@@ -1,0 +1,23 @@
+// Typed renderer for the locally bundled Material Symbols Rounded subset.
+// The stable one-em box prevents ligature text metrics from shifting controls
+// while the official variable axes remain available through inline settings.
+.material-symbol {
+  align-items: center;
+  direction: ltr;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: 'Material Symbols Rounded';
+  font-feature-settings: 'liga';
+  font-style: normal;
+  font-weight: normal;
+  height: 1em;
+  justify-content: center;
+  letter-spacing: normal;
+  line-height: 1;
+  overflow: hidden;
+  text-rendering: optimizeLegibility;
+  text-transform: none;
+  user-select: none;
+  white-space: nowrap;
+  width: 1em;
+}

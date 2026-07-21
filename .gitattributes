@@ -1,4 +1,6 @@
 /app/test/fixtures/** -text
 /app/static/win32/github.sh eol=lf
+/app/static/common/licenses/fonts/*.txt text eol=lf -whitespace
+/.codex/verification/design_reference_supplied_images.json text eol=lf
 
 .github/workflows/*.lock.yml linguist-generated=true merge=ours

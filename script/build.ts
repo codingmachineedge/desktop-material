@@ -43,7 +43,9 @@ import {
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
+  realpathSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -65,69 +67,75 @@ const entitlementsPath = `${projectRoot}/script/entitlements${entitlementsSuffix
 const extendInfoPath = `${projectRoot}/script/info.plist`
 const outRoot = path.join(projectRoot, 'out')
 
-console.log(`Building for ${getChannel()}…`)
+if (require.main === module) {
+  console.log(`Building for ${getChannel()}…`)
 
-console.log('Removing old distribution…')
-rmSync(getDistRoot(), { recursive: true, force: true })
+  console.log('Removing old distribution…')
+  rmSync(getDistRoot(), { recursive: true, force: true })
 
-console.log('Copying dependencies…')
-copyDependencies()
+  console.log('Copying dependencies…')
+  copyDependencies()
 
-console.log('Packaging emoji…')
-copyEmoji()
+  console.log('Packaging emoji…')
+  copyEmoji()
 
-console.log('Copying static resources…')
-copyStaticResources()
+  console.log('Copying static resources…')
+  copyStaticResources()
 
-console.log('Parsing license metadata…')
-generateLicenseMetadata(outRoot)
+  console.log('Parsing license metadata…')
+  generateLicenseMetadata(outRoot)
 
-moveAnalysisFiles()
+  moveAnalysisFiles()
 
-if (isGitHubActions() && process.platform === 'darwin' && isPublishableBuild) {
-  console.log('Setting up keychain…')
-  cp.execSync(path.join(__dirname, 'setup-macos-keychain'))
-}
+  if (
+    isGitHubActions() &&
+    process.platform === 'darwin' &&
+    isPublishableBuild
+  ) {
+    console.log('Setting up keychain…')
+    cp.execSync(path.join(__dirname, 'setup-macos-keychain'))
+  }
 
-verifyInjectedSassVariables(outRoot)
-  .catch(err => {
-    console.error(
-      'Error verifying the Sass variables in the rendered app. This is fatal for a published build.'
-    )
-
-    if (!isDevelopmentBuild) {
-      process.exit(1)
-    }
-  })
-  .then(() => {
-    console.log('Updating our licenses dump…')
-    return updateLicenseDump(projectRoot, outRoot).catch(err => {
+  verifyInjectedSassVariables(outRoot)
+    .catch(err => {
       console.error(
-        'Error updating the license dump. This is fatal for a published build.'
+        'Error verifying the Sass variables in the rendered app. This is fatal for a published build.'
       )
-      console.error(err)
 
       if (!isDevelopmentBuild) {
         process.exit(1)
       }
     })
-  })
-  .then(() => {
-    if (shouldSkipPackaging) {
-      console.log('Skipping packaging…')
-      return [outRoot]
-    }
+    .then(() => {
+      console.log('Updating our licenses dump…')
+      return updateLicenseDump(projectRoot, outRoot).catch(err => {
+        console.error(
+          'Error updating the license dump. This is fatal for a published build.'
+        )
+        console.error(err)
 
-    console.log('Packaging…')
-    return packageApp()
-  })
-  .catch(err => {
-    console.error(err)
-    process.exit(1)
-  })
-  .then(appPaths => {
-    console.log(`Built to ${appPaths}`)
-  })
+        if (!isDevelopmentBuild) {
+          process.exit(1)
+        }
+      })
+    })
+    .then(() => {
+      if (shouldSkipPackaging) {
+        console.log('Skipping packaging…')
+        return [outRoot]
+      }
+
+      console.log('Packaging…')
+      return packageApp()
+    })
+    .catch(err => {
+      console.error(err)
+      process.exit(1)
+    })
+    .then(appPaths => {
+      console.log(`Built to ${appPaths}`)
+    })
+}
 
 function packageApp() {
   // not sure if this is needed anywhere, so I'm just going to inline it here
@@ -241,9 +249,26 @@ function packageApp() {
   })
 }
 
-function removeAndCopy(source: string, destination: string) {
+export function removeAndCopy(source: string, destination: string) {
   rmSync(destination, { recursive: true, force: true })
-  cpSync(source, destination, { recursive: true, verbatimSymlinks: true })
+  // Materialize a linked source root (notably a worktree's gemoji junction)
+  // without following links nested inside dependency/resource trees.
+  const resolvedSource = realpathSync.native(source)
+  cpSync(resolvedSource, destination, {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: sourcePath => {
+      if (
+        path.relative(resolvedSource, sourcePath) !== '' &&
+        lstatSync(sourcePath).isSymbolicLink()
+      ) {
+        throw new Error(
+          `Refusing to copy nested symbolic link from build input: ${sourcePath}`
+        )
+      }
+      return true
+    },
+  })
 }
 
 function copyEmoji() {

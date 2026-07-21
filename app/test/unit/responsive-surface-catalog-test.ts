@@ -95,7 +95,12 @@ const expectedNestedSurfaceIds = [
   'preferences.copilot.providers',
   'preferences.git.author',
   'preferences.git.default-branch',
+  'preferences.git.global-ignore',
   'preferences.git.hooks',
+  'repository.account-switcher',
+  'repository.actions.workflow-catalog',
+  'repository.actions.workflow-dispatch',
+  'repository.actions.workflow-manager',
   'repository.api.functions',
   'repository.api.graphql',
   'repository.api.rest',
@@ -340,6 +345,7 @@ describe('responsive surface smoke catalog', () => {
       'application',
       'popup.FileHistory',
       'notification-centre',
+      'repository',
     ])
     for (const surface of catalog.nestedSurfaces) {
       sourceReference(surface.source)
@@ -362,8 +368,55 @@ describe('responsive surface smoke catalog', () => {
     assert.deepEqual([...direct.keys()].sort(), [
       'appearance.anchored-element-editor',
       'appearance.element-history',
+      'repository.account-switcher',
+      'repository.actions.workflow-catalog',
+      'repository.actions.workflow-dispatch',
+      'repository.actions.workflow-manager',
       'repository.api.functions',
     ])
+    assert.deepEqual(direct.get('repository.account-switcher'), {
+      id: 'repository.account-switcher',
+      parentId: 'repository',
+      kind: 'dialog',
+      source:
+        'app/src/ui/account-switcher/account-switcher.tsx#AccountSwitcher',
+      label: 'Account switcher',
+      risk: 'stateful',
+      ownerSelector: '#repository',
+      selector: '.account-switcher',
+    })
+    assert.deepEqual(direct.get('repository.actions.workflow-manager'), {
+      id: 'repository.actions.workflow-manager',
+      parentId: 'repository.Actions',
+      kind: 'panel',
+      source: 'app/src/ui/actions/workflow-manager.tsx#WorkflowManager',
+      label: 'Workflow manager',
+      risk: 'stateful',
+      ownerSelector: '.actions-view',
+      selector: '.actions-workflow-management',
+    })
+    assert.deepEqual(direct.get('repository.actions.workflow-catalog'), {
+      id: 'repository.actions.workflow-catalog',
+      parentId: 'repository.actions.workflow-manager',
+      kind: 'dialog',
+      source:
+        'app/src/ui/actions/workflow-catalog-dialog.tsx#WorkflowCatalogDialog',
+      label: 'Workflow catalog',
+      risk: 'stateful',
+      ownerSelector: '.actions-view',
+      selector: '.workflow-catalog-dialog',
+    })
+    assert.deepEqual(direct.get('repository.actions.workflow-dispatch'), {
+      id: 'repository.actions.workflow-dispatch',
+      parentId: 'repository.Actions',
+      kind: 'dialog',
+      source:
+        'app/src/ui/actions/workflow-dispatch-dialog.tsx#WorkflowDispatchDialog',
+      label: 'Run workflow',
+      risk: 'external',
+      ownerSelector: '.actions-view',
+      selector: '.workflow-dispatch-dialog',
+    })
     assert.equal(
       direct.get('repository.api.functions')?.ownerSelector,
       '.github-api-explorer'
@@ -440,12 +493,12 @@ describe('responsive surface smoke catalog', () => {
         0
       ) + catalog.nestedSurfaces.length
     assert.equal(metadata.size, catalogCount)
-    assert.equal(metadata.size, 80)
+    assert.equal(metadata.size, 85)
     assert.equal(
       [...metadata.keys()].filter(id => id !== 'popup.batch-clone-recovery')
         .length,
-      79,
-      'The 79 product surfaces remain cataloged beside the recovery popup.'
+      84,
+      'The 84 product surfaces remain cataloged beside the recovery popup.'
     )
 
     const baseline = verifier.decorateLedger(metadataRows(metadata), metadata)

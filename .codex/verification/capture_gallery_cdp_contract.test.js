@@ -1,6 +1,7 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const test = require('node:test')
@@ -23,6 +24,277 @@ function sceneSource(name) {
   const next = source.indexOf("\nscene('", start + 1)
   return source.slice(start, next === -1 ? source.length : next)
 }
+
+test('gallery theme and language arguments accept only reviewed values', () => {
+  for (const options of [
+    [],
+    ['--theme', 'dark'],
+    ['--language-mode', 'cantonese'],
+    ['--theme', 'light', '--language-mode', 'bilingual'],
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [driverPath, '--list', 'true', ...options],
+      { encoding: 'utf8', windowsHide: true }
+    )
+    assert.equal(
+      result.status,
+      0,
+      `reviewed presentation arguments failed: ${result.stderr}`
+    )
+    assert.match(result.stdout, /^welcome$/m)
+  }
+
+  for (const [option, value, expected] of [
+    ['--theme', 'system', /expected light\|dark/],
+    ['--language-mode', 'french', /expected english\|cantonese\|bilingual/],
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [driverPath, '--list', 'true', option, value],
+      { encoding: 'utf8', windowsHide: true }
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, expected)
+  }
+})
+
+test('gallery presentation state is seeded, observed, and receipted fail closed', () => {
+  assert.deepEqual(frozenStringArray('CaptureThemes'), ['light', 'dark'])
+  assert.deepEqual(frozenStringArray('CaptureLanguageModes'), [
+    'english',
+    'cantonese',
+    'bilingual',
+  ])
+  assert.match(
+    source,
+    /requestedCaptureOption\(\s*'theme',\s*CaptureThemes,\s*'light'\s*\)/
+  )
+  assert.match(
+    source,
+    /requestedCaptureOption\(\s*'language-mode',\s*CaptureLanguageModes,\s*'english'\s*\)/
+  )
+  for (const contract of [
+    "localStorage.getItem('theme')",
+    "localStorage.getItem('language-mode-v1')",
+    "document.body.getAttribute('data-dm-language-mode')",
+    "document.documentElement.getAttribute('data-language-mode')",
+    'validateAppearanceLanguageSurface()',
+    'LanguageSurfaceExpectations',
+    'select[name="languageMode"]',
+    'receipt?.value === requestedLanguageMode',
+    'receipt?.labelCount === 1',
+    'receipt?.ariaLabel === null',
+    'receipt?.ariaLabelledBy === null',
+    'receipt?.visible === true',
+    'appearanceLanguageSurface?.value === requestedLanguageMode',
+    'LANGUAGE_SURFACE',
+    'Capture presentation state diverged during',
+    'PRESENTATION_STATE',
+    'SEED_STATE',
+    'SCENE_STATE',
+    'CAPTURE_STATE',
+  ]) {
+    assert.ok(
+      source.includes(contract),
+      `missing presentation contract: ${contract}`
+    )
+  }
+
+  const seedStart = source.indexOf('async function seedProfile()')
+  const seedEnd = source.indexOf('async function ensureRepository(', seedStart)
+  const seed = source.slice(seedStart, seedEnd)
+  assert.ok(seed.includes("'theme': ${JSON.stringify(requestedTheme)}"))
+  assert.ok(
+    seed.includes(
+      "'language-mode-v1': ${JSON.stringify(requestedLanguageMode)}"
+    )
+  )
+  assert.ok(seed.includes('assertRequestedPresentationState('))
+  assert.ok(seed.includes("'seeded profile'"))
+
+  const captureStart = source.indexOf('async function capture(')
+  const captureEnd = source.indexOf('/** Emit a menu event', captureStart)
+  const capture = source.slice(captureStart, captureEnd)
+  const stateGate = capture.indexOf('await assertRequestedPresentationState(')
+  const privacyGate = capture.indexOf('await assertCapturePrivacy(name)')
+  const screenshot = capture.indexOf("client.send('Page.captureScreenshot'")
+  assert.ok(
+    stateGate >= 0 && stateGate < privacyGate && privacyGate < screenshot
+  )
+
+  const loopStart = source.indexOf('for (const name of names)')
+  const loopEnd = source.indexOf('if (canonical)', loopStart)
+  const sceneLoop = source.slice(loopStart, loopEnd)
+  const reset = sceneLoop.indexOf('await resetSceneState(name)')
+  const resetGate = sceneLoop.indexOf(
+    'await assertRequestedPresentationState(`reset before scene ${name}`,'
+  )
+  const run = sceneLoop.indexOf('await run()')
+  const completionGate = sceneLoop.indexOf(
+    'const scenePresentationReceipt = await assertRequestedPresentationState('
+  )
+  assert.ok(
+    reset >= 0 && reset < resetGate && resetGate < run && run < completionGate
+  )
+})
+
+test('canonical Appearance verification waits for the welcome transition', () => {
+  const scenes = frozenStringArray('CanonicalGalleryScenes')
+  assert.deepEqual(scenes.slice(0, 3), ['welcome', 'complete-welcome', 'seed'])
+
+  const mainStart = source.indexOf('async function main()')
+  const main = source.slice(mainStart)
+  const sceneLoop = main.indexOf('for (const name of names)')
+  const sceneRun = main.indexOf('await run()', sceneLoop)
+  const deferredGate = main.indexOf(
+    "if (canonical && name === 'complete-welcome')",
+    sceneRun
+  )
+  const canonicalReceipt = main.indexOf(
+    'Canonical gallery did not validate the Appearance language surface.',
+    deferredGate
+  )
+
+  assert.ok(sceneLoop >= 0)
+  assert.ok(sceneRun > sceneLoop)
+  assert.ok(deferredGate > sceneRun)
+  assert.ok(canonicalReceipt > deferredGate)
+  assert.match(
+    source,
+    /requireAppearanceSurface = appearanceLanguageSurfaceReceipt !== null/
+  )
+  assert.match(
+    main,
+    /reset before scene \$\{name\}`,[\s\S]*requireAppearanceSurface: appearanceLanguageValidated/
+  )
+  assert.match(
+    main,
+    /completed scene \$\{name\}`,[\s\S]*requireAppearanceSurface: appearanceLanguageValidated/
+  )
+  assert.match(main, /validated Appearance language surface after welcome/)
+
+  const validationStart = source.indexOf(
+    'async function validateAppearanceLanguageSurface()'
+  )
+  const validationEnd = source.indexOf(
+    'async function setViewport(',
+    validationStart
+  )
+  const validation = source.slice(validationStart, validationEnd)
+  const semanticClose = validation.indexOf(
+    "await clickSelector('#preferences .preferences-close-button')"
+  )
+  const closedGate = validation.indexOf(
+    "document.querySelector('#preferences') === null",
+    semanticClose
+  )
+  assert.ok(semanticClose >= 0 && closedGate > semanticClose)
+  assert.ok(!validation.includes('await pressEscape()'))
+})
+
+test('every renderer reload is fenced by the appearance coordinator', () => {
+  const pageReloads =
+    source.match(
+      /await client\.send\('Page\.reload', \{ ignoreCache: true \}\)/g
+    ) ?? []
+  const locationReloads =
+    source.match(/await evaluate\('window\.location\.reload\(\), true'\)/g) ??
+    []
+  assert.equal(pageReloads.length, 2)
+  assert.equal(locationReloads.length, 1)
+  assert.equal(pageReloads.length + locationReloads.length, 3)
+
+  const helperStart = source.indexOf(
+    'async function waitForElementAppearanceCoordinatorReady(context)'
+  )
+  const helperEnd = source.indexOf(
+    'function expectedDocumentLanguage(',
+    helperStart
+  )
+  assert.ok(helperStart >= 0 && helperEnd > helperStart)
+  const helper = source.slice(helperStart, helperEnd)
+  for (const contract of [
+    "key.startsWith('__reactFiber$')",
+    "key.startsWith('__reactInternalInstance$')",
+    'fiber.stateNode?.props?.dispatcher',
+    "typeof dispatcher?.isElementAppearanceCoordinatorReady === 'function'",
+    'dispatcher.isElementAppearanceCoordinatorReady() === true',
+  ]) {
+    assert.ok(helper.includes(contract), `readiness helper misses ${contract}`)
+  }
+  assert.ok(!helper.includes('document.body.textContent'))
+  assert.ok(!helper.includes('sleep('))
+
+  const applyStart = source.indexOf(
+    'async function applyRequestedPresentationState(context)'
+  )
+  const applyEnd = source.indexOf(
+    'async function validateAppearanceLanguageSurface()',
+    applyStart
+  )
+  const apply = source.slice(applyStart, applyEnd)
+  const applyPre = apply.indexOf('`${context} before renderer reload`')
+  const applyReload = apply.indexOf(
+    "await client.send('Page.reload', { ignoreCache: true })"
+  )
+  const applyTimeOrigin = apply.indexOf(
+    'performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}',
+    applyReload
+  )
+  const applyPost = apply.indexOf('`${context} after renderer reload`')
+  assert.ok(
+    applyPre >= 0 &&
+      applyPre < applyReload &&
+      applyReload < applyTimeOrigin &&
+      applyTimeOrigin < applyPost
+  )
+
+  const seedStart = source.indexOf('async function seedProfile()')
+  const seedEnd = source.indexOf('async function ensureRepository(', seedStart)
+  const seed = source.slice(seedStart, seedEnd)
+  const seedPre = seed.indexOf("'seedProfile before renderer reload'")
+  const seedReload = seed.indexOf(
+    "await client.send('Page.reload', { ignoreCache: true })"
+  )
+  const seedTimeOrigin = seed.indexOf(
+    'performance.timeOrigin > ${JSON.stringify(beforeSeedReloadTimeOrigin)}',
+    seedReload
+  )
+  const seedPost = seed.indexOf("'seedProfile after renderer reload'")
+  assert.ok(
+    seedPre >= 0 &&
+      seedPre < seedReload &&
+      seedReload < seedTimeOrigin &&
+      seedTimeOrigin < seedPost
+  )
+
+  const identity = sceneSource('app-identity')
+  const identityPre = identity.indexOf("'app-identity before renderer reload'")
+  const identityReload = identity.indexOf(
+    "await evaluate('window.location.reload(), true')"
+  )
+  const identityTimeOrigin = identity.indexOf(
+    'performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}',
+    identityReload
+  )
+  const identityPost = identity.indexOf("'app-identity after renderer reload'")
+  assert.ok(
+    identityPre >= 0 &&
+      identityPre < identityReload &&
+      identityReload < identityTimeOrigin &&
+      identityTimeOrigin < identityPost
+  )
+
+  const anchored = sceneSource('anchored-appearance')
+  const anchoredPre = anchored.indexOf(
+    "'anchored-appearance before repository toolbar context menu'"
+  )
+  const anchoredAction = anchored.indexOf(
+    "contextMenuSelector('#desktop-app-toolbar')"
+  )
+  assert.ok(anchoredPre >= 0 && anchoredPre < anchoredAction)
+})
 
 test('every requested scene resets before its runner executes', () => {
   const loopStart = source.indexOf('for (const name of names)')
@@ -98,6 +370,46 @@ test('every capture suppresses unrelated Undo chrome and incidental focus paint'
       capture.includes(dimensionsContract),
       `capture misses dimension gate: ${dimensionsContract}`
     )
+  }
+})
+
+test('every capture waits fail closed for all bundled design fonts', () => {
+  const prepareStart = source.indexOf(
+    'async function waitForBundledCaptureFonts('
+  )
+  const captureEnd = source.indexOf('\n/** Emit a menu event', prepareStart)
+  assert.notEqual(prepareStart, -1)
+  assert.notEqual(captureEnd, -1)
+  const block = source.slice(prepareStart, captureEnd)
+
+  assert.ok(!block.includes("typeof FontFaceSet === 'undefined'"))
+  assert.ok(!block.includes('instanceof FontFaceSet'))
+  for (const contract of [
+    'const fonts = document.fonts',
+    '!fonts',
+    "typeof fonts.load !== 'function'",
+    "typeof fonts.check !== 'function'",
+    "typeof fonts.ready?.then !== 'function'",
+    'fonts.load',
+    'fonts.check',
+    'await fonts.ready',
+    "receipt?.status !== 'loaded'",
+    'receipt?.faces?.length !== BundledCaptureFonts.length',
+    'face.count < 1',
+    'face.check !== true',
+    "status !== 'loaded'",
+    'const fontReceipt = await prepareCaptureSurface(name)',
+    'fonts: fontReceipt',
+  ]) {
+    assert.ok(block.includes(contract), `font gate misses ${contract}`)
+  }
+  for (const family of [
+    'Roboto',
+    'Roboto Mono',
+    'Roboto Serif',
+    'Material Symbols Rounded',
+  ]) {
+    assert.ok(source.includes(`family: '${family}'`), `missing ${family}`)
   }
 })
 
@@ -263,7 +575,7 @@ test('settings captures select distinct settled Preferences tabs', () => {
   assert.ok(!helper.includes('await sleep(900)'))
   assert.ok(
     helper.indexOf('stable selected ${tabLabel} settings tab') <
-      helper.indexOf('await capture(name)'),
+      helper.indexOf('await capture(name, captureOptions)'),
     'the exact stable tab gate must pass before capture'
   )
 })
@@ -517,7 +829,7 @@ test('capture-only tooltip suppression is removed before disconnect', () => {
   assert.ok(cleanup < close)
 })
 
-test('canonical mode owns the exact 68-image wiki catalog', () => {
+test('canonical mode keeps 68 planned captures distinct from 66 published images', () => {
   const scenes = frozenStringArray('CanonicalGalleryScenes')
   const outputs = frozenStringArray('CanonicalGalleryOutputs')
   const gallery = fs.readFileSync(
@@ -528,9 +840,27 @@ test('canonical mode owns the exact 68-image wiki catalog', () => {
     ...gallery.matchAll(/^\| `([^`]+)\.png` \| [^|]+ \|$/gm),
   ].map(([, name]) => name)
 
+  const independentlyVerifiedOutputs = ['material-ollama-model-manager']
+  const deferredM22Outputs = [
+    'material-repository-folder-detection',
+    'material-repository-submodule-management',
+    'material-cheap-lfs-preparing',
+  ]
+  const expectedCatalog = [
+    ...outputs.filter(output => !deferredM22Outputs.includes(output)),
+    ...independentlyVerifiedOutputs,
+  ]
+
   assert.equal(outputs.length, 68)
   assert.equal(new Set(outputs).size, 68)
-  assert.deepEqual([...outputs].sort(), [...catalog].sort())
+  assert.equal(catalog.length, 66)
+  assert.equal(new Set(catalog).size, 66)
+  assert.deepEqual([...expectedCatalog].sort(), [...catalog].sort())
+  assert.ok(!outputs.includes('material-ollama-model-manager'))
+  for (const deferred of deferredM22Outputs) {
+    assert.ok(outputs.includes(deferred), deferred)
+    assert.ok(!catalog.includes(deferred), deferred)
+  }
   for (const sceneName of scenes) {
     assert.ok(source.includes(`scene('${sceneName}'`), sceneName)
   }
@@ -542,6 +872,137 @@ test('canonical mode owns the exact 68-image wiki catalog', () => {
     assert.ok(scenes.includes(required), required)
   }
   assert.ok(source.includes("process.stdout.write('CANONICAL 68/68"))
+})
+
+test('audit-design mode owns a separate exact five-surface catalog', () => {
+  const scenes = frozenStringArray('AuditDesignScenes')
+  const outputs = frozenStringArray('AuditDesignOutputs')
+  assert.deepEqual(scenes, [
+    'account-switcher',
+    'workflow-manager',
+    'workflow-catalog',
+    'workflow-dispatch',
+    'clone-dialog-design',
+  ])
+  assert.deepEqual(outputs, [
+    'material-design-account-switcher',
+    'material-design-workflow-manager',
+    'material-design-workflow-catalog',
+    'material-design-workflow-dispatch',
+    'material-design-clone-dialog',
+  ])
+  assert.equal(new Set(scenes).size, 5)
+  assert.equal(new Set(outputs).size, 5)
+  for (const sceneName of scenes) {
+    assert.ok(source.includes(`scene('${sceneName}'`), sceneName)
+  }
+  for (const contract of [
+    "const auditDesign = auditDesignValue === 'true'",
+    '? [...AuditDesignScenes]',
+    "fail('Use either --canonical true or --audit-design true, not both.')",
+    "fail('Use either --audit-design true or --scenes, not both.')",
+    "fail('--audit-design true requires an owned provider --run-root.')",
+    'await seedProfile()',
+    'const expected = [...AuditDesignOutputs].sort()',
+    "process.stdout.write('AUDIT_DESIGN 5/5 exact output set",
+  ]) {
+    assert.ok(source.includes(contract), `audit mode misses ${contract}`)
+  }
+
+  const result = spawnSync(process.execPath, [driverPath, '--list', 'true'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  assert.equal(result.status, 0, result.stderr)
+  const listed = result.stdout.trim().split(/\r?\n/)
+  for (const sceneName of scenes) {
+    assert.ok(listed.includes(sceneName), `--list misses ${sceneName}`)
+  }
+})
+
+test('audit-design scenes are semantic, contained, private, and non-destructive', () => {
+  const expected = new Map([
+    ['account-switcher', 'material-design-account-switcher'],
+    ['workflow-manager', 'material-design-workflow-manager'],
+    ['workflow-catalog', 'material-design-workflow-catalog'],
+    ['workflow-dispatch', 'material-design-workflow-dispatch'],
+    ['clone-dialog-design', 'material-design-clone-dialog'],
+  ])
+
+  for (const [sceneName, captureName] of expected) {
+    const scene = sceneSource(sceneName)
+    for (const contract of [
+      `capture('${captureName}')`,
+      'assertNoProviderMutations(mutationsBefore',
+      'semantic or containment check failed',
+      'receipt.contained !== true',
+      `assertNoSceneLeaks('${sceneName}`,
+    ]) {
+      assert.ok(scene.includes(contract), `${sceneName} misses ${contract}`)
+    }
+    assert.ok(
+      scene.includes('receipt.inViewport !== true') ||
+        scene.includes('receipt.inOwner !== true'),
+      `${sceneName} misses a viewport/owner containment gate`
+    )
+  }
+
+  const mutationHelperStart = source.indexOf(
+    'function countProviderMutations()'
+  )
+  const mutationHelperEnd = source.indexOf(
+    'function ensureDirectFixtureProviderRemote()',
+    mutationHelperStart
+  )
+  const mutationHelpers = source.slice(mutationHelperStart, mutationHelperEnd)
+  for (const contract of [
+    "new Set(['POST', 'PUT', 'PATCH', 'DELETE'])",
+    'Audit design scenes require the owned provider request log.',
+    'after !== before',
+    'state-changing provider requests',
+    'NONDESTRUCTIVE',
+  ]) {
+    assert.ok(
+      mutationHelpers.includes(contract),
+      `provider mutation gate misses ${contract}`
+    )
+  }
+
+  const catalog = sceneSource('workflow-catalog')
+  assert.ok(catalog.includes('receipt.cardCount !== 8'))
+  assert.ok(
+    catalog.includes(
+      "JSON.stringify(['Automation', 'CI', 'Deploy', 'Release', 'Security'])"
+    )
+  )
+  assert.ok(!catalog.includes("clickEnabledSelector('.workflow-template-use"))
+  assert.ok(!catalog.includes("clickText('Use workflow'"))
+
+  const dispatch = sceneSource('workflow-dispatch')
+  assert.ok(dispatch.includes('receipt.workflowCount !== 1'))
+  assert.ok(dispatch.includes('receipt.runEnabled !== true'))
+  assert.ok(
+    !dispatch.includes("clickEnabledSelector('.workflow-dispatch-run-button")
+  )
+
+  const manager = sceneSource('workflow-manager')
+  assert.ok(manager.includes("receipt.heading !== 'Workflows · 1 active'"))
+  assert.ok(!manager.includes("clickEnabledSelector('.actions-workflow-switch"))
+
+  const account = sceneSource('account-switcher')
+  assert.ok(account.includes('receipt.rowCount !== 1'))
+  assert.ok(!account.includes("clickText('Add another account'"))
+
+  const clone = sceneSource('clone-dialog-design')
+  assert.ok(clone.includes("receipt.selectedTab !== 'GitHub Enterprise'"))
+  assert.ok(clone.includes('receipt.modal !== null'))
+  assert.ok(!clone.includes("clickText('Clone'"))
+
+  const captureStart = source.indexOf('async function capture(')
+  const captureEnd = source.indexOf('/** Emit a menu event', captureStart)
+  const capture = source.slice(captureStart, captureEnd)
+  assert.ok(capture.includes('await assertCapturePrivacy(name)'))
+  assert.ok(capture.includes('await prepareCaptureSurface(name)'))
 })
 
 test('capture candidates cannot overwrite tracked screenshots directly', () => {
@@ -760,7 +1221,11 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
   const seedStart = source.indexOf('async function seedProfile()')
   const seedEnd = source.indexOf('async function ensureRepository(', seedStart)
   const seed = source.slice(seedStart, seedEnd)
-  assert.ok(seed.includes("'language-mode-v1': 'english'"))
+  assert.ok(
+    seed.includes(
+      "'language-mode-v1': ${JSON.stringify(requestedLanguageMode)}"
+    )
+  )
   assert.ok(seed.includes("localStorage.removeItem('autoSwitchTheme')"))
   assert.ok(seed.includes("localStorage.getItem('copilot-byok-providers')"))
   assert.ok(seed.includes("localStorage.setItem('copilot-byok-providers'"))
@@ -795,8 +1260,8 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
     'window.innerWidth === 1452 && window.innerHeight === 1001',
     'document.querySelector(\'[data-verification="ollama-notice"]\') === null',
     'finally {',
-    "setThemeThroughToggle('system')",
-    "setThemeThroughToggle('light')",
+    "{ expectedTheme: 'dark' }",
+    'setThemeThroughToggle(requestedTheme)',
     'await restoreCaptureViewport()',
     'post-scroll stable Ollama capture surface',
   ]) {
@@ -804,6 +1269,14 @@ test('Ollama evidence uses an owned loopback fixture and a full reversible UI ex
   }
   assert.ok(
     source.includes('\'button.theme-toggle-button[aria-label="Toggle theme"]\'')
+  )
+  assert.ok(
+    source.includes("button?.querySelector('.sr-only')"),
+    'theme settling must read the status label, not Material Symbol ligature text'
+  )
+  assert.ok(
+    source.includes("?.querySelector('.sr-only')"),
+    'theme transition waits must read the status label'
   )
   for (const model of [
     'material-chat:7b',

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Dispatcher } from '../dispatcher'
 import * as octicons from '../octicons/octicons.generated'
-import { OcticonSymbol, syncClockwise } from '../octicons'
+import { OcticonSymbol } from '../octicons'
 import {
   isRepositoryWithGitHubRepository,
   Repository,
@@ -32,6 +32,7 @@ import { Emoji } from '../../lib/emoji'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
 import { BranchSortOrder } from '../../models/branch-sort-order'
 import { CIStatus } from '../branches/ci-status'
+import { MaterialSymbolName } from '../lib/material-symbol'
 
 interface IBranchDropdownProps {
   readonly dispatcher: Dispatcher
@@ -141,7 +142,8 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
 
     const tipKind = tip.kind
 
-    let icon: OcticonSymbol = octicons.gitBranch
+    let icon: OcticonSymbol | undefined
+    let materialSymbol: MaterialSymbolName | undefined = 'alt_route'
     let iconClassName: string | undefined = undefined
     let title: string
     let description = __DARWIN__ ? 'Current Branch' : 'Current branch'
@@ -151,6 +153,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
 
     if (this.props.currentPullRequest) {
       icon = octicons.gitPullRequest
+      materialSymbol = undefined
     }
 
     if (tip.kind === TipState.Unknown) {
@@ -166,6 +169,7 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
       title = `On ${tip.currentSha.substring(0, 7)}`
       tooltip = 'Currently on a detached HEAD'
       icon = octicons.gitCommit
+      materialSymbol = undefined
       description = 'Detached HEAD'
     } else if (tip.kind === TipState.Valid) {
       title = tooltip = tip.branch.name
@@ -186,13 +190,15 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
 
       tooltip = `Checking out ${checkoutProgress.target}`
       progressValue = checkoutProgress.value
-      icon = syncClockwise
+      icon = undefined
+      materialSymbol = 'progress_activity'
       iconClassName = 'spin'
       canOpen = false
     } else if (conflictState !== null && isRebaseConflictState(conflictState)) {
       title = conflictState.targetBranch
       description = 'Rebasing branch'
       icon = octicons.gitBranch
+      materialSymbol = undefined
       canOpen = false
       disabled = true
       tooltip = `Rebasing ${conflictState.targetBranch}`
@@ -210,6 +216,8 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
           <ToolbarDropdown
             className="branch-button"
             icon={icon}
+            materialSymbol={materialSymbol}
+            materialSymbolSize={19}
             iconClassName={iconClassName}
             title={title}
             description={description}
@@ -256,6 +264,8 @@ export class BranchDropdown extends React.Component<IBranchDropdownProps> {
           <ToolbarDropdown
             className="branch-button"
             icon={icon}
+            materialSymbol={materialSymbol}
+            materialSymbolSize={19}
             iconClassName={iconClassName}
             title={title}
             description={description}

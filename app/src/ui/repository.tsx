@@ -70,6 +70,7 @@ import {
   isGitHubAPITabHidden,
   setGitHubAPITabHidden,
 } from '../lib/github-api-tab-visibility'
+import { MaterialSymbol } from './lib/material-symbol'
 
 interface IRepositoryViewProps {
   readonly repository: Repository
@@ -428,7 +429,13 @@ export class RepositoryView extends React.Component<
       >
         <span className="rail-item" id="changes-tab">
           <span className="rail-pill">
-            <Octicon symbol={octicons.fileDiff} className="rail-icon" />
+            <span className="rail-icon">
+              <MaterialSymbol
+                name="difference"
+                size={22}
+                fill={selectedSection === RepositorySectionTab.Changes ? 1 : 0}
+              />
+            </span>
             {this.renderChangesBadge()}
           </span>
           <span className="rail-label">Changes</span>
@@ -436,14 +443,28 @@ export class RepositoryView extends React.Component<
 
         <span className="rail-item" id="history-tab">
           <span className="rail-pill">
-            <Octicon symbol={octicons.history} className="rail-icon" />
+            <span className="rail-icon">
+              <MaterialSymbol
+                name="history"
+                size={22}
+                fill={selectedSection === RepositorySectionTab.History ? 1 : 0}
+              />
+            </span>
           </span>
           <span className="rail-label">History</span>
         </span>
         {this.supportsGitHubActions() && (
           <span className="rail-item" id="actions-tab" data-dm-feature={true}>
             <span className="rail-pill">
-              <Octicon symbol={octicons.workflow} className="rail-icon" />
+              <span className="rail-icon">
+                <MaterialSymbol
+                  name="rocket_launch"
+                  size={22}
+                  fill={
+                    selectedSection === RepositorySectionTab.Actions ? 1 : 0
+                  }
+                />
+              </span>
             </span>
             <span className="rail-label">Actions</span>
           </span>
@@ -615,7 +636,9 @@ export class RepositoryView extends React.Component<
           aria-label="Branches"
         >
           <span className="rail-pill">
-            <Octicon symbol={octicons.gitBranch} className="rail-icon" />
+            <span className="rail-icon">
+              <MaterialSymbol name="alt_route" size={22} />
+            </span>
           </span>
           <span className="rail-label">Branches</span>
         </button>
@@ -626,7 +649,9 @@ export class RepositoryView extends React.Component<
           onClick={this.onShowPreferences}
           aria-label="Settings"
         >
-          <Octicon symbol={octicons.gear} className="rail-icon" />
+          <span className="rail-icon">
+            <MaterialSymbol name="settings" size={22} />
+          </span>
         </button>
         <button
           type="button"

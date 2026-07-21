@@ -5,6 +5,7 @@ import { Repository } from '../../src/models/repository'
 import { getDotComAPIEndpoint } from '../../src/lib/api'
 import {
   getAccountForRepository,
+  getRepositoryCredentialAccountKey,
   getRepositoryOwnerAccountToPromote,
 } from '../../src/lib/get-account-for-repository'
 import { gitHubRepoFixture } from '../helpers/github-repo-builder'
@@ -77,6 +78,49 @@ describe('getAccountForRepository', () => {
     assert.equal(
       getAccountForRepository([firstAccount, secondAccount], repository),
       firstAccount
+    )
+  })
+})
+
+describe('getRepositoryCredentialAccountKey', () => {
+  it('preserves an explicit binding when that account is signed out', () => {
+    const missingAccountKey = getAccountKey(secondAccount)
+    const repository = new Repository(
+      '/desktop',
+      1,
+      gitHubRepository,
+      false,
+      null,
+      {},
+      false,
+      undefined,
+      missingAccountKey
+    )
+
+    assert.equal(
+      getRepositoryCredentialAccountKey([firstAccount], repository),
+      missingAccountKey
+    )
+  })
+
+  it('uses endpoint fallback only for an unbound repository', () => {
+    const repository = new Repository('/desktop', 1, gitHubRepository, false)
+
+    assert.equal(
+      getRepositoryCredentialAccountKey(
+        [firstAccount, secondAccount],
+        repository
+      ),
+      getAccountKey(firstAccount)
+    )
+  })
+
+  it('does not force credentials for a local-only repository', () => {
+    const repository = new Repository('/local', 2, null, false)
+
+    assert.equal(
+      getRepositoryCredentialAccountKey([firstAccount], repository),
+      undefined
     )
   })
 })

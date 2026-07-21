@@ -43,24 +43,55 @@ describe('shell chrome v2 style contracts', () => {
     )
   })
 
-  it('cycles Light → Dark → System through the theme dispatcher', () => {
+  it('toggles explicit Light and Dark themes through the dispatcher', () => {
     const component = read('app/src/ui/toolbar/theme-toggle-button.tsx')
     const app = read('app/src/ui/app.tsx')
+    const appearance = read('app/src/ui/preferences/appearance.tsx')
 
     assert.match(
       component,
-      /dispatcher\.setSelectedTheme\(nextTheme\(this\.props\.selectedTheme\)\)/
+      /const theme = nextTheme\([\s\S]*?this\.props\.selectedTheme,[\s\S]*?this\.props\.currentTheme[\s\S]*?dispatcher\.setSelectedTheme\(theme\)/
     )
     assert.match(
       component,
-      /case ApplicationTheme\.Light:[\s\S]*?return ApplicationTheme\.Dark[\s\S]*?case ApplicationTheme\.Dark:[\s\S]*?return ApplicationTheme\.System/
+      /theme === ApplicationTheme\.System[\s\S]*?\? currentTheme[\s\S]*?: theme/
     )
+    assert.match(component, /currentTheme: ApplicableTheme/)
+    assert.match(
+      component,
+      /return appliedTheme === ApplicationTheme\.Light[\s\S]*?\? ApplicationTheme\.Dark[\s\S]*?: ApplicationTheme\.Light/
+    )
+    assert.doesNotMatch(component, /return ApplicationTheme\.System/)
     assert.match(component, /aria-label="Toggle theme"/)
-    assert.match(component, /octicons\.sun[\s\S]*?octicons\.moon/)
+    assert.match(
+      component,
+      /theme === ApplicationTheme\.Dark \? 'light_mode' : 'dark_mode'/
+    )
+    assert.match(
+      component,
+      /selectedTheme === ApplicationTheme\.System[\s\S]*?currentTheme[\s\S]*?<MaterialSymbol name=\{symbolForTheme\(appliedTheme\)\}/
+    )
+    assert.match(
+      appearance,
+      /supportsSystemThemeChanges\(\) \? \[ApplicationTheme\.System\] : \[\]/
+    )
     // Rendered as the final item of the #desktop-app-toolbar composition.
     assert.match(
       app,
-      /id="build-run"[\s\S]*?<ToolbarItem\s+id="theme-toggle"[\s\S]*?<ThemeToggleButton[\s\S]*?selectedTheme=\{this\.state\.selectedTheme\}[\s\S]*?<\/Toolbar>/
+      /id="build-run"[\s\S]*?<ToolbarItem\s+id="theme-toggle"[\s\S]*?<ThemeToggleButton[\s\S]*?selectedTheme=\{this\.state\.selectedTheme\}[\s\S]*?currentTheme=\{this\.state\.currentTheme\}[\s\S]*?<\/Toolbar>/
+    )
+  })
+
+  it('uses the v2 Material scrollbar geometry and outline roles on Windows', () => {
+    const scroll = read('app/styles/ui/_scroll.scss')
+
+    assert.match(
+      scroll,
+      /@include win32-context[\s\S]*?var\(--md-sys-color-outline\) 45%[\s\S]*?border-width: 3px/
+    )
+    assert.match(
+      scroll,
+      /&:hover,[\s\S]*?&:active[\s\S]*?border-width: 2px[\s\S]*?var\(--md-sys-color-outline\) 75%/
     )
   })
 

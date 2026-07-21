@@ -30,6 +30,7 @@ import { formatDate } from '../../lib/format-date'
 import { CommitGraph } from './commit-graph'
 import { ICommitGraphRow } from './commit-graph-model'
 import { Button } from '../lib/button'
+import { MaterialSymbol } from '../lib/material-symbol'
 
 interface ICommitProps {
   readonly gitHubRepository: GitHubRepository | null
@@ -288,7 +289,7 @@ function renderRelativeTime(date: Date, preferAbsoluteDates: boolean) {
   )
 }
 
-function renderCommitListItemTags(tags: ReadonlyArray<string>) {
+export function renderCommitListItemTags(tags: ReadonlyArray<string>) {
   if (tags.length === 0) {
     return null
   }
@@ -296,7 +297,8 @@ function renderCommitListItemTags(tags: ReadonlyArray<string>) {
   return (
     <span className="tag-indicator">
       <span className="tag-name" key={firstTag}>
-        {firstTag}
+        <MaterialSymbol name="sell" size={13} />
+        <span className="tag-label">{firstTag}</span>
       </span>
       {tags.length > 1 && (
         <span key={tags.length} className="tag-indicator-more" />

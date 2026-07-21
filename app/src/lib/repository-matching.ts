@@ -3,7 +3,7 @@ import * as Path from 'path'
 
 import { Account, getAccountKey } from '../models/account'
 import { IRemote } from '../models/remote'
-import { getHTMLURL } from './api'
+import { getHTMLURL, IAPIFullRepository } from './api'
 import { parseRemote, parseRepositoryIdentifier } from './remote-parsing'
 import { caseInsensitiveEquals } from './compare'
 import { GitHubRepository } from '../models/github-repository'
@@ -23,6 +23,22 @@ export interface IMatchedGitHubRepository {
 
   /** The account matching the repository remote */
   readonly account: Account
+}
+
+export interface IResolvedGitHubRepositoryMatch
+  extends IMatchedGitHubRepository {
+  /** API metadata fetched with the selected identity, or null while offline. */
+  readonly apiRepository: IAPIFullRepository | null
+}
+
+export type RepositoryAccountLookup = (
+  account: Account,
+  owner: string,
+  name: string
+) => Promise<IAPIFullRepository | null>
+
+type IAccessibleGitHubRepositoryMatch = IResolvedGitHubRepositoryMatch & {
+  readonly apiRepository: IAPIFullRepository
 }
 
 interface IRepositoryAuthority {
@@ -138,6 +154,66 @@ export function matchGitHubRepository(
   }
 
   return null
+}
+
+/**
+ * Resolve the best signed-in identity for a repository remote.
+ *
+ * Explicit bindings are authoritative and never fall through to another
+ * account. For an unbound repository, all same-origin accounts are probed and
+ * a write-capable identity is preferred over one that can only read the
+ * repository. This matters for public organization repositories, which every
+ * account may be able to read even though only one account can push.
+ *
+ * If every API lookup fails, the first authority match is returned with null
+ * metadata so callers retain the existing offline skeleton behavior without
+ * persisting an unverified account binding.
+ */
+export async function resolveGitHubRepositoryMatch(
+  accounts: ReadonlyArray<Account>,
+  remote: string,
+  accountKey: string | null,
+  lookup: RepositoryAccountLookup
+): Promise<IResolvedGitHubRepositoryMatch | null> {
+  const candidateAccounts =
+    accountKey === null
+      ? accounts
+      : accounts.filter(account => getAccountKey(account) === accountKey)
+  const matches = candidateAccounts
+    .map(account => matchGitHubRepository([account], remote))
+    .filter((match): match is IMatchedGitHubRepository => match !== null)
+
+  if (matches.length === 0) {
+    return null
+  }
+
+  const resolved = await Promise.all(
+    matches.map(async match => {
+      try {
+        const apiRepository = await lookup(
+          match.account,
+          match.owner,
+          match.name
+        )
+        return apiRepository === null ? null : { ...match, apiRepository }
+      } catch {
+        return null
+      }
+    })
+  )
+
+  const accessibleMatches = resolved.filter(
+    (match): match is IAccessibleGitHubRepositoryMatch => match !== null
+  )
+  const writeMatch = accessibleMatches.find(
+    match =>
+      match.apiRepository.permissions?.admin === true ||
+      match.apiRepository.permissions?.push === true
+  )
+
+  return (
+    writeMatch ?? accessibleMatches[0] ?? { ...matches[0], apiRepository: null }
+  )
 }
 
 /**

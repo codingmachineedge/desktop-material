@@ -113,6 +113,11 @@ export const tabFontOptions: ReadonlyArray<ITabFontOption> = [
     stack: `'Roboto Slab', Georgia, serif`,
   },
   {
+    family: 'Roboto Serif',
+    label: 'Roboto Serif',
+    stack: `'Roboto Serif', Georgia, serif`,
+  },
+  {
     family: 'Consolas',
     label: 'Consolas',
     stack: `Consolas, 'Courier New', monospace`,

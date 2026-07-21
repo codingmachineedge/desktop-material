@@ -2,12 +2,14 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   matchGitHubRepository,
+  resolveGitHubRepositoryMatch,
   urlMatchesRemote,
   urlMatchesCloneURL,
   urlsMatch,
 } from '../../src/lib/repository-matching'
 import { Account, getAccountKey } from '../../src/models/account'
 import { GitHubRepository } from '../../src/models/github-repository'
+import { IAPIFullRepository } from '../../src/lib/api'
 import { gitHubRepoFixture } from '../helpers/github-repo-builder'
 
 describe('repository-matching', () => {
@@ -304,6 +306,118 @@ describe('repository-matching', () => {
         ),
         null
       )
+    })
+
+    it('prefers a write-capable identity for an unbound organization repository', async () => {
+      const personal = new Account(
+        'personal',
+        'https://api.github.com',
+        'personal-token',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+      const organization = new Account(
+        'organization',
+        'https://api.github.com',
+        'organization-token',
+        [],
+        '',
+        2,
+        '',
+        'free'
+      )
+      const lookups: string[] = []
+
+      const match = await resolveGitHubRepositoryMatch(
+        [personal, organization],
+        'https://github.com/example-org/material.git',
+        null,
+        async account => {
+          lookups.push(getAccountKey(account))
+          return {
+            permissions: {
+              admin: false,
+              push: account === organization,
+              pull: true,
+            },
+          } as IAPIFullRepository
+        }
+      )
+
+      assert.deepStrictEqual(lookups, [
+        getAccountKey(personal),
+        getAccountKey(organization),
+      ])
+      assert.equal(match?.account, organization)
+      assert.equal(match?.apiRepository?.permissions?.push, true)
+    })
+
+    it('keeps an explicit binding authoritative when its API lookup fails', async () => {
+      const first = new Account(
+        'first',
+        'https://api.github.com',
+        'first-token',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+      const selected = new Account(
+        'selected',
+        'https://api.github.com',
+        'selected-token',
+        [],
+        '',
+        2,
+        '',
+        'free'
+      )
+      const lookups: string[] = []
+
+      const match = await resolveGitHubRepositoryMatch(
+        [first, selected],
+        'https://github.com/example-org/material.git',
+        getAccountKey(selected),
+        async account => {
+          lookups.push(getAccountKey(account))
+          return null
+        }
+      )
+
+      assert.deepStrictEqual(lookups, [getAccountKey(selected)])
+      assert.equal(match?.account, selected)
+      assert.equal(match?.apiRepository, null)
+    })
+
+    it('does not fall back when an explicit account is signed out', async () => {
+      const first = new Account(
+        'first',
+        'https://api.github.com',
+        'first-token',
+        [],
+        '',
+        1,
+        '',
+        'free'
+      )
+      let lookupCount = 0
+
+      const match = await resolveGitHubRepositoryMatch(
+        [first],
+        'https://github.com/example-org/material.git',
+        'https://api.github.com#2',
+        async () => {
+          lookupCount++
+          return null
+        }
+      )
+
+      assert.equal(match, null)
+      assert.equal(lookupCount, 0)
     })
   })
 

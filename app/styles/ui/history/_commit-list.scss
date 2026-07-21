@@ -311,12 +311,11 @@
     gap: var(--spacing-half);
   }
 
-  // Radius-999 tonal tag chip (leading `sell` glyph from the prototype is
-  // omitted — the app renders Octicon SVGs, not the Material Symbols font, and
-  // the tag DOM carries no icon node to style).
+  // Radius-999 tonal tag chip with the prototype's leading `sell` glyph.
   .tag-indicator .tag-name {
-    display: inline-flex;
     align-items: center;
+    display: inline-flex;
+    gap: 4px;
     height: 22px;
     padding: 0 9px;
     border-radius: 999px;
@@ -325,6 +324,17 @@
     font-size: 11px;
     font-weight: 600;
     box-shadow: none;
+
+    .material-symbol {
+      flex: none;
+    }
+
+    .tag-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   .tag-indicator .tag-indicator-more {

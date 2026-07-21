@@ -5,9 +5,7 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import * as React from 'react'
-import { Octicon, OcticonSymbol } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
-import { assertNever } from '../../lib/fatal-error'
+import { OcticonSymbol } from '../octicons'
 import { ToolbarButton, ToolbarButtonStyle } from './button'
 import { rectEquals } from '../lib/rect'
 import classNames from 'classnames'
@@ -17,6 +15,7 @@ import { TooltipTarget } from '../lib/tooltip'
 import { AriaHasPopupType } from '../lib/aria-types'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
 import { getViewportSafeFoldoutLeft } from './dropdown-geometry'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 
 export type DropdownState = 'open' | 'closed'
 
@@ -51,6 +50,12 @@ export interface IToolbarDropdownProps {
 
   /** An optional symbol to be displayed next to the button text */
   readonly icon?: OcticonSymbol
+
+  /** A bundled Material Symbol to display instead of an Octicon. */
+  readonly materialSymbol?: MaterialSymbolName
+
+  /** Font size for a bundled Material Symbol. Defaults to 20px. */
+  readonly materialSymbolSize?: number
 
   /**
    * The state for of the drop down button.
@@ -270,26 +275,17 @@ export class ToolbarDropdown extends React.Component<
     return this.props.dropdownState === 'open'
   }
 
-  private dropdownIcon(state: DropdownState): OcticonSymbol {
-    // @TODO: Remake triangle octicon in a 12px version,
-    // right now it's scaled badly on normal dpi monitors.
-    if (state === 'open') {
-      return octicons.triangleUp
-    } else if (state === 'closed') {
-      return octicons.triangleDown
-    } else {
-      return assertNever(state, `Unknown dropdown state ${state}`)
-    }
-  }
-
   private renderDropdownArrow(): JSX.Element | null {
     if (this.props.showDisclosureArrow === false) {
       return null
     }
 
-    const state = this.props.dropdownState
     const dropdownIcon = (
-      <Octicon symbol={this.dropdownIcon(state)} className="dropdownArrow" />
+      <MaterialSymbol
+        name="keyboard_arrow_down"
+        size={20}
+        className="dropdownArrow"
+      />
     )
 
     return this.props.dropdownStyle === ToolbarDropdownStyle.MultiOption ? (
@@ -504,6 +500,8 @@ export class ToolbarDropdown extends React.Component<
           className={this.props.buttonClassName}
           ref={this.innerButton}
           icon={this.props.icon}
+          materialSymbol={this.props.materialSymbol}
+          materialSymbolSize={this.props.materialSymbolSize}
           title={this.props.title}
           description={this.props.description}
           tooltip={this.props.tooltip}

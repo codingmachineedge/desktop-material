@@ -11,18 +11,18 @@ const appStoreSource = readFileSync(
 describe('repository account state preservation source contract', () => {
   it('rekeys account-bound state before returning the new identity', () => {
     const start = appStoreSource.indexOf(
-      'public async _updateRepositoryAccount('
+      'private async persistRepositoryAccountBinding('
     )
     const end = appStoreSource.indexOf('\n  /**', start + 1)
-    const updateRepositoryAccount = appStoreSource.slice(start, end)
+    const persistRepositoryAccountBinding = appStoreSource.slice(start, end)
 
-    const updateIndex = updateRepositoryAccount.indexOf(
+    const updateIndex = persistRepositoryAccountBinding.indexOf(
       'await this.repositoriesStore.updateRepositoryAccount('
     )
-    const rekeyIndex = updateRepositoryAccount.indexOf(
+    const rekeyIndex = persistRepositoryAccountBinding.indexOf(
       'this.repositoryStateCache.rekeyStateForAccountBinding('
     )
-    const returnIndex = updateRepositoryAccount.indexOf(
+    const returnIndex = persistRepositoryAccountBinding.indexOf(
       'return updatedRepository'
     )
 
@@ -30,6 +30,26 @@ describe('repository account state preservation source contract', () => {
     assert.notEqual(rekeyIndex, -1)
     assert.ok(updateIndex < rekeyIndex)
     assert.ok(rekeyIndex < returnIndex)
-    assert.equal(updateRepositoryAccount.includes('transferState('), false)
+    assert.equal(
+      persistRepositoryAccountBinding.includes('transferState('),
+      false
+    )
+  })
+
+  it('refreshes metadata under an explicitly rebound identity', () => {
+    const start = appStoreSource.indexOf(
+      'public async _updateRepositoryAccount('
+    )
+    const end = appStoreSource.indexOf('\n  /**', start + 1)
+    const updateRepositoryAccount = appStoreSource.slice(start, end)
+
+    assert.match(
+      updateRepositoryAccount,
+      /persistRepositoryAccountBinding\(\s*repository,\s*accountKey\s*\)/
+    )
+    assert.match(
+      updateRepositoryAccount,
+      /repositoryWithRefreshedGitHubRepository\(\s*updatedRepository,\s*false\s*\)/
+    )
   })
 })

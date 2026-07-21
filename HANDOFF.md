@@ -46,6 +46,23 @@ buttons in both the API surface and **Repository tools → API functions**.
 - The checked-in Pages source is aligned with the functions-first wording and
   does not claim a new screenshot or remote Pages deployment.
 
+## 2026-07-20 — organization repository Git authentication routing
+
+- Repository-bound HTTPS Git operations now preserve the exact stable account
+  key through interactive and scheduled fetch/pull/push, post-push refresh,
+  refspec fetch, and remote-HEAD lookup. The credential selector is metadata
+  only: no token is written to a command line, environment variable, or log.
+- A missing explicit binding fails closed instead of silently selecting another
+  GitHub.com identity. Legacy unbound remotes probe same-origin signed-in
+  accounts, select a verified write-capable identity before a read-only one,
+  and persist the successful choice. Rebinding refreshes repository metadata
+  and permissions under the selected identity; unrelated Repository Settings
+  saves do not bind the first same-host account.
+- Local verification: 73 focused tests across 17 suites, TypeScript,
+  Prettier, and targeted ESLint passed. The exact production build for
+  `f21c6255bb` passed through the fixed MCP service; visual acceptance and
+  gallery capture remain deferred in the separate-worktree UI-audit handoff.
+
 ## 2026-07-20 M24 — guided sparse checkout accepted locally
 
 This is the implementation and local-acceptance receipt for the user-directed

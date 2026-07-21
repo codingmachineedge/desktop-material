@@ -26,16 +26,21 @@ const getOrigin = (url: string): string | null => {
  * Return the signed-in accounts eligible for a Pull All retry.
  *
  * The first same-origin account is excluded because the regular credential
- * helper already used it for the unforced first attempt. Remaining identities
- * retain account-store order, except that a repository-bound identity is tried
- * first. Stable account keys are deduplicated and empty credentials are not
- * useful retry candidates.
+ * helper already used it for the unforced first attempt. A repository-bound
+ * identity never reaches this fallback: explicit bindings are authoritative
+ * and must not silently switch to another account. Remaining identities retain
+ * account-store order. Stable account keys are deduplicated and empty
+ * credentials are not useful retry candidates.
  */
 export function getPullAllFallbackAccountKeys(
   remoteUrl: string,
   accounts: ReadonlyArray<Account>,
   repositoryAccountKey: string | null
 ): ReadonlyArray<string> {
+  if (repositoryAccountKey !== null) {
+    return []
+  }
+
   const remoteOrigin = getOrigin(remoteUrl)
   if (remoteOrigin === null || !remoteOrigin.startsWith('https://')) {
     return []
@@ -62,17 +67,7 @@ export function getPullAllFallbackAccountKeys(
 
   const fallbackKeys = sameOriginAccounts.slice(1).map(getAccountKey)
 
-  if (
-    repositoryAccountKey === null ||
-    !fallbackKeys.includes(repositoryAccountKey)
-  ) {
-    return fallbackKeys
-  }
-
-  return [
-    repositoryAccountKey,
-    ...fallbackKeys.filter(key => key !== repositoryAccountKey),
-  ]
+  return fallbackKeys
 }
 
 /** Whether Pull All may safely try another OAuth account for this failure. */
@@ -100,6 +95,8 @@ export function isPullAllHTTPSAuthenticationFailure(
 
 export interface IPullAllAccountFallbackResult {
   readonly usedFallbackAccount: boolean
+  /** Stable identity used by a successful forced retry, when applicable. */
+  readonly accountKey?: string
 }
 
 /**
@@ -112,6 +109,14 @@ export async function pullWithAccountFallback(
   repositoryAccountKey: string | null,
   operation: (forcedAccountKey?: string) => Promise<void>
 ): Promise<IPullAllAccountFallbackResult> {
+  // A user-selected identity is a security boundary. Force it for the initial
+  // operation and let the credential helper report a missing or unauthorized
+  // account rather than trying another same-host identity.
+  if (repositoryAccountKey !== null) {
+    await operation(repositoryAccountKey)
+    return { usedFallbackAccount: false, accountKey: repositoryAccountKey }
+  }
+
   try {
     await operation()
     return { usedFallbackAccount: false }
@@ -128,7 +133,7 @@ export async function pullWithAccountFallback(
     )) {
       try {
         await operation(accountKey)
-        return { usedFallbackAccount: true }
+        return { usedFallbackAccount: true, accountKey }
       } catch (retryError) {
         if (!isPullAllHTTPSAuthenticationFailure(retryError, remoteUrl)) {
           throw retryError

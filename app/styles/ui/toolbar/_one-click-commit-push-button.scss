@@ -5,7 +5,18 @@
     border-radius: var(--md-sys-shape-corner-large);
     color: var(--md-sys-color-on-secondary-container);
     background: var(--md-sys-color-secondary-container);
+    gap: 10px;
+    padding: 0 18px 0 16px;
     transition: background-color 260ms var(--emph), border-radius 320ms var(--spring);
+
+    .icon {
+      background: transparent;
+      border-radius: 0;
+      color: currentColor;
+      height: 21px;
+      padding: 0;
+      width: 21px;
+    }
 
     &:hover:not(:disabled) {
       border-radius: 999px;
@@ -43,9 +54,7 @@
   animation: dmPop calc(560ms * var(--mdur, 1)) var(--spring-fast) backwards;
   animation-delay: 280ms;
 
-  .octicon {
-    width: 20px;
-    height: 20px;
+  .material-symbol {
     transition: transform 500ms var(--spring);
   }
 

@@ -8,6 +8,7 @@ import { createObservableRef } from '../lib/observable-ref'
 import { Tooltip, TooltipDirection, TooltipTarget } from '../lib/tooltip'
 import { AriaHasPopupType } from '../lib/aria-types'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 
 /** The button style. */
 export enum ToolbarButtonStyle {
@@ -30,6 +31,12 @@ export interface IToolbarButtonProps {
 
   /** An optional symbol to be displayed next to the button text */
   readonly icon?: OcticonSymbol
+
+  /** A bundled Material Symbol to display instead of an Octicon. */
+  readonly materialSymbol?: MaterialSymbolName
+
+  /** Font size for a bundled Material Symbol. Defaults to 20px. */
+  readonly materialSymbolSize?: number
 
   /** The class name for the icon element. */
   readonly iconClassName?: string
@@ -183,7 +190,14 @@ export class ToolbarButton extends React.Component<IToolbarButtonProps, {}> {
       (typeof this.props.description === 'string'
         ? this.props.description
         : undefined)
-    const icon = this.props.icon ? (
+    const icon = this.props.materialSymbol ? (
+      <span className={classNames('icon', this.props.iconClassName)}>
+        <MaterialSymbol
+          name={this.props.materialSymbol}
+          size={this.props.materialSymbolSize ?? 20}
+        />
+      </span>
+    ) : this.props.icon ? (
       <Octicon
         symbol={this.props.icon}
         className={classNames('icon', this.props.iconClassName)}

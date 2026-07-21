@@ -431,7 +431,14 @@ export async function refusedWorkflowUpdate(
 }
 
 const samlReauthErrorMessageRe =
-  /`([^']+)' organization has enabled or enforced SAML SSO.*?you must re-authorize/s
+  /[`'"]([^`'"]+)[`'"] organization has enabled or enforced SAML SSO.*?you must re-authorize/s
+
+/** Extract the organization named in GitHub's SAML reauthorization message. */
+export function getSAMLReauthOrganizationName(
+  remoteMessage: string
+): string | null {
+  return samlReauthErrorMessageRe.exec(remoteMessage)?.[1] ?? null
+}
 
 /**
  * Attempts to detect whether an error is the result of a failed push
@@ -448,7 +455,10 @@ export async function samlReauthRequired(error: Error, dispatcher: Dispatcher) {
     return error
   }
 
-  if (!isAuthFailureError(gitError.result.gitError)) {
+  if (
+    !isAuthFailureError(gitError.result.gitError) &&
+    gitError.result.gitError !== DugiteError.HTTPSRepositoryNotFound
+  ) {
     return error
   }
 
@@ -463,13 +473,12 @@ export async function samlReauthRequired(error: Error, dispatcher: Dispatcher) {
   }
 
   const remoteMessage = getRemoteMessage(coerceToString(gitError.result.stderr))
-  const match = samlReauthErrorMessageRe.exec(remoteMessage)
+  const organizationName = getSAMLReauthOrganizationName(remoteMessage)
 
-  if (!match) {
+  if (organizationName === null) {
     return error
   }
 
-  const organizationName = match[1]
   const endpoint = repository.gitHubRepository.endpoint
 
   dispatcher.showPopup({

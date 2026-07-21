@@ -3,7 +3,6 @@ import { Repository } from '../../models/repository'
 import { OneClickCommitPushPhase } from '../../lib/app-state'
 import { Dispatcher } from '../dispatcher'
 import { ToolbarButton, ToolbarButtonStyle } from './button'
-import * as octicons from '../octicons/octicons.generated'
 
 interface IOneClickCommitPushButtonProps {
   readonly repository: Repository
@@ -36,7 +35,9 @@ export class OneClickCommitPushButton extends React.Component<IOneClickCommitPus
           this.props.disabledReason ??
           'Generate a message, commit every change, and push'
         }
-        icon={octicons.gitCommit}
+        materialSymbol={phase === null ? 'auto_awesome' : 'progress_activity'}
+        materialSymbolSize={21}
+        iconClassName={phase === null ? undefined : 'spin'}
         style={ToolbarButtonStyle.Subtitle}
         disabled={phase !== null || this.props.disabledReason !== null}
         onClick={this.onClick}

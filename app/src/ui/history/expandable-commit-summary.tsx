@@ -20,6 +20,7 @@ import { Avatar } from '../lib/avatar'
 import { CopyButton } from '../copy-button'
 import { Account } from '../../models/account'
 import { Emoji } from '../../lib/emoji'
+import { MaterialSymbol } from '../lib/material-symbol'
 
 interface IExpandableCommitSummaryProps {
   readonly repository: Repository
@@ -600,7 +601,7 @@ export class ExpandableCommitSummary extends React.Component<
 
     return (
       <div className="ecs-meta-item tags selectable">
-        <Octicon symbol={octicons.tag} />
+        <MaterialSymbol name="sell" size={16} />
         <span>{tags.join(', ')}</span>
       </div>
     )

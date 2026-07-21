@@ -126,6 +126,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 
 **Multi-account**
 - Multiple accounts including multiple identities per host; per-account tabs, repos, and settings
+- Repository-bound HTTPS Git fetch, pull, push, post-push refresh, scheduled sync, refspec fetch, and remote-HEAD discovery use the exact selected account. Legacy unbound organization repositories prefer a verified write-capable same-host identity, while a missing explicit binding fails closed instead of silently using another account
 - GitHub browser sign-in requests the bounded feature scopes used by the app: repository/user access, workflow-file updates, notifications, and read-only organization membership. Unrelated destructive and administrative OAuth scopes are intentionally excluded
 - Browse complete GitHub organization repository lists, filter cloning by organization, and choose an organization when publishing
 - Add GitLab accounts, including self-hosted endpoints, with a personal access token; add Bitbucket accounts with an app password, then browse and clone their repositories from the provider tab

@@ -40,7 +40,7 @@ describe('Pull All account fallback', () => {
     assert.doesNotMatch(PullAllFallbackSuccessDetail, /user-\d|login|@/i)
   })
 
-  it('orders, deduplicates, and filters fallback accounts', () => {
+  it('does not offer fallback accounts for an explicit binding', () => {
     const first = account(1)
     const second = account(2)
     const bound = account(3)
@@ -53,7 +53,7 @@ describe('Pull All account fallback', () => {
         [first, second, bound, second, empty, otherHost],
         getAccountKey(bound)
       ),
-      [getAccountKey(bound), getAccountKey(second)]
+      []
     )
   })
 
@@ -151,7 +151,7 @@ describe('Pull All account fallback', () => {
     assert.deepStrictEqual(result, { usedFallbackAccount: false })
   })
 
-  it('prefers the bound fallback and succeeds without exposing a login', async () => {
+  it('forces the bound identity without exposing a login', async () => {
     const first = account(1)
     const second = account(2)
     const bound = account(3)
@@ -163,14 +163,36 @@ describe('Pull All account fallback', () => {
       getAccountKey(bound),
       async key => {
         attempts.push(key)
-        if (key === undefined) {
-          throw gitError(DugiteError.HTTPSRepositoryNotFound)
-        }
       }
     )
 
-    assert.deepStrictEqual(attempts, [undefined, getAccountKey(bound)])
-    assert.deepStrictEqual(result, { usedFallbackAccount: true })
+    assert.deepStrictEqual(attempts, [getAccountKey(bound)])
+    assert.deepStrictEqual(result, {
+      usedFallbackAccount: false,
+      accountKey: getAccountKey(bound),
+    })
+  })
+
+  it('does not silently retry a different identity after a bound failure', async () => {
+    const first = account(1)
+    const bound = account(2)
+    const attempts: Array<string | undefined> = []
+    const failure = gitError(DugiteError.HTTPSRepositoryNotFound)
+
+    await assert.rejects(
+      pullWithAccountFallback(
+        'https://github.com/owner/repository.git',
+        [first, bound],
+        getAccountKey(bound),
+        async key => {
+          attempts.push(key)
+          throw failure
+        }
+      ),
+      error => error === failure
+    )
+
+    assert.deepStrictEqual(attempts, [getAccountKey(bound)])
   })
 
   it('exhausts authentication failures in stable order', async () => {
@@ -252,7 +274,7 @@ describe('Pull All account fallback', () => {
     assert.deepStrictEqual(attempts, [undefined])
   })
 
-  it('keeps concurrent repository fallback attempts isolated', async () => {
+  it('keeps concurrent bound repository operations isolated', async () => {
     const first = account(1)
     const second = account(2)
     const third = account(3)
@@ -268,20 +290,11 @@ describe('Pull All account fallback', () => {
           current.push(key)
           attempts.set(name, current)
           await Promise.resolve()
-          if (key === undefined) {
-            throw gitError(DugiteError.HTTPSAuthenticationFailed)
-          }
         }
       )
 
     await Promise.all([run('second', second), run('third', third)])
-    assert.deepStrictEqual(attempts.get('second'), [
-      undefined,
-      getAccountKey(second),
-    ])
-    assert.deepStrictEqual(attempts.get('third'), [
-      undefined,
-      getAccountKey(third),
-    ])
+    assert.deepStrictEqual(attempts.get('second'), [getAccountKey(second)])
+    assert.deepStrictEqual(attempts.get('third'), [getAccountKey(third)])
   })
 })

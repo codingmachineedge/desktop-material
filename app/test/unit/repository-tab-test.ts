@@ -8,6 +8,7 @@ import {
   tabTitleStyleToCss,
   tabFrameStyleToCss,
   tabFontStack,
+  tabFontOptions,
   MinTabFontSize,
   MaxTabFontSize,
   MinTabCharacterSpacing,
@@ -214,6 +215,23 @@ describe('isValidFontFamily', () => {
 })
 
 describe('tabFontStack', () => {
+  it('offers bundled Roboto Serif without changing persisted Roboto Slab', () => {
+    assert.deepEqual(
+      tabFontOptions
+        .filter(option =>
+          ['Roboto Serif', 'Roboto Slab', 'Roboto Mono'].includes(option.family)
+        )
+        .map(option => option.family),
+      ['Roboto Slab', 'Roboto Serif', 'Roboto Mono']
+    )
+    assert.equal(tabFontStack('Roboto Serif'), `'Roboto Serif', Georgia, serif`)
+    assert.equal(tabFontStack('Roboto Slab'), `'Roboto Slab', Georgia, serif`)
+    assert.equal(
+      tabFontStack('Roboto Mono'),
+      `'Roboto Mono', Consolas, monospace`
+    )
+  })
+
   it('quotes an unknown but valid family with a generic fallback', () => {
     assert.equal(tabFontStack('My Font'), `'My Font', sans-serif`)
   })

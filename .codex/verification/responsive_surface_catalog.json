@@ -160,6 +160,46 @@
   },
   "nestedSurfaces": [
     {
+      "id": "repository.account-switcher",
+      "parentId": "repository",
+      "kind": "dialog",
+      "source": "app/src/ui/account-switcher/account-switcher.tsx#AccountSwitcher",
+      "label": "Account switcher",
+      "risk": "stateful",
+      "ownerSelector": "#repository",
+      "selector": ".account-switcher"
+    },
+    {
+      "id": "repository.actions.workflow-manager",
+      "parentId": "repository.Actions",
+      "kind": "panel",
+      "source": "app/src/ui/actions/workflow-manager.tsx#WorkflowManager",
+      "label": "Workflow manager",
+      "risk": "stateful",
+      "ownerSelector": ".actions-view",
+      "selector": ".actions-workflow-management"
+    },
+    {
+      "id": "repository.actions.workflow-catalog",
+      "parentId": "repository.actions.workflow-manager",
+      "kind": "dialog",
+      "source": "app/src/ui/actions/workflow-catalog-dialog.tsx#WorkflowCatalogDialog",
+      "label": "Workflow catalog",
+      "risk": "stateful",
+      "ownerSelector": ".actions-view",
+      "selector": ".workflow-catalog-dialog"
+    },
+    {
+      "id": "repository.actions.workflow-dispatch",
+      "parentId": "repository.Actions",
+      "kind": "dialog",
+      "source": "app/src/ui/actions/workflow-dispatch-dialog.tsx#WorkflowDispatchDialog",
+      "label": "Run workflow",
+      "risk": "external",
+      "ownerSelector": ".actions-view",
+      "selector": ".workflow-dispatch-dialog"
+    },
+    {
       "id": "popup.batch-clone-recovery",
       "parentId": "application",
       "kind": "dialog",
@@ -189,6 +229,14 @@
       "kind": "tab",
       "source": "app/src/ui/preferences/git.tsx",
       "label": "Hooks",
+      "risk": "safe"
+    },
+    {
+      "id": "preferences.git.global-ignore",
+      "parentId": "preferences.Git",
+      "kind": "tab",
+      "source": "app/src/ui/preferences/git.tsx",
+      "label": "Global ignore",
       "risk": "safe"
     },
     {

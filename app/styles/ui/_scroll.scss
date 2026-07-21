@@ -32,7 +32,7 @@
     cursor: pointer;
 
     &-thumb {
-      background-color: var(--scroll-bar-thumb-background-color);
+      background-color: color-mix(in srgb, var(--md-sys-color-outline) 45%, transparent);
       border-radius: var(--win32-scroll-bar-size);
 
       // This little hack allows us to have a slim scroll bar
@@ -46,14 +46,14 @@
 
       // ...and when it's pressed we'll up the contrast
       &:active {
-        background-color: var(--scroll-bar-thumb-background-color-active);
+        background-color: color-mix(in srgb, var(--md-sys-color-outline) 75%, transparent);
       }
 
-      // When someone hovers over, or presses the bar we'll expand it to 8px
+      // Match the design's six-pixel visible thumb on hover/press.
       &:hover,
       &:active {
-        border-width: 1px;
-        background-color: var(--scroll-bar-thumb-background-color-active);
+        border-width: 2px;
+        background-color: color-mix(in srgb, var(--md-sys-color-outline) 75%, transparent);
         cursor: pointer;
       }
     }

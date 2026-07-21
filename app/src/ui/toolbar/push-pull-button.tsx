@@ -8,12 +8,7 @@ import { FetchType } from '../../models/fetch'
 import { Resizable } from '../resizable'
 
 import { Dispatcher } from '../dispatcher'
-import {
-  Octicon,
-  OcticonSymbol,
-  OcticonSymbolVariant,
-  syncClockwise,
-} from '../octicons'
+import { Octicon, OcticonSymbol, OcticonSymbolVariant } from '../octicons'
 import * as octicons from '../octicons/octicons.generated'
 import { RelativeTime } from '../relative-time'
 
@@ -31,6 +26,7 @@ import { PushPullButtonDropDown } from './push-pull-button-dropdown'
 import { AriaLiveContainer } from '../accessibility/aria-live-container'
 import { enableResizingToolbarButtons } from '../../lib/feature-flag'
 import { formatCompactNumber } from '../../lib/format-number'
+import { MaterialSymbol } from '../lib/material-symbol'
 
 export const DropdownItemClassName = 'push-pull-dropdown-item'
 
@@ -157,7 +153,7 @@ function renderAheadBehind(aheadBehind: IAheadBehind, numTagsToPush: number) {
     content.push(
       <span key="ahead">
         {formatCompactNumber(ahead + numTagsToPush)}
-        <Octicon symbol={octicons.arrowUp} />
+        <MaterialSymbol name="arrow_upward" size={12} />
       </span>
     )
   }
@@ -544,7 +540,8 @@ export class PushPullButton extends React.Component<
         title={progress.title}
         description={progress.description || 'Hang on…'}
         progressValue={progress.value}
-        icon={syncClockwise}
+        materialSymbol="progress_activity"
+        materialSymbolSize={22}
         iconClassName={networkActionInProgress ? 'spin' : ''}
         tooltip={progress.description}
         disabled={true}
@@ -558,7 +555,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultButtonProps('publish')}
         title="Publish repository"
         description="Publish this repository to GitHub"
-        icon={octicons.upload}
+        materialSymbol="arrow_upward"
+        materialSymbolSize={22}
         onClick={onClick}
       />
     )
@@ -574,7 +572,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultButtonProps('detached')}
         title="Publish branch"
         description={description}
-        icon={octicons.upload}
+        materialSymbol="arrow_upward"
+        materialSymbolSize={22}
         disabled={true}
       />
     )
@@ -602,7 +601,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultDropdownProps('publish')}
         title="Publish branch"
         description={description}
-        icon={octicons.upload}
+        materialSymbol="arrow_upward"
+        materialSymbolSize={22}
         onClick={onClick}
         className={className}
         dropdownContentRenderer={this.getDropdownContentRenderer([
@@ -623,7 +623,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultButtonProps('fetch')}
         title={title}
         description={renderLastFetched(lastFetched)}
-        icon={syncClockwise}
+        materialSymbol="sync"
+        materialSymbolSize={22}
         onClick={onClick}
       />
     )
@@ -657,7 +658,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultDropdownProps(state)}
         title={title}
         description={renderLastFetched(lastFetched)}
-        icon={octicons.arrowDown}
+        materialSymbol="sync"
+        materialSymbolSize={22}
         onClick={onClick}
         dropdownContentRenderer={this.getDropdownContentRenderer(
           dropdownItemTypes
@@ -682,7 +684,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultDropdownProps('push')}
         title={`Push ${remoteName}`}
         description={renderLastFetched(lastFetched)}
-        icon={octicons.arrowUp}
+        materialSymbol="arrow_upward"
+        materialSymbolSize={22}
         onClick={onClick}
         dropdownContentRenderer={this.getDropdownContentRenderer([
           DropdownItemType.Fetch,
@@ -705,7 +708,8 @@ export class PushPullButton extends React.Component<
         {...this.defaultDropdownProps('force-push')}
         title={`Force push ${remoteName}`}
         description={renderLastFetched(lastFetched)}
-        icon={forcePushIcon}
+        materialSymbol="arrow_upward"
+        materialSymbolSize={22}
         onClick={onClick}
         dropdownContentRenderer={this.getDropdownContentRenderer([
           DropdownItemType.Fetch,

@@ -77,6 +77,13 @@ export const renderer = merge({}, commonConfig, {
         test: /\.cmd$/,
         type: 'asset/resource',
       },
+      {
+        test: /\.woff2$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: 'fonts/[name][ext]',
+        },
+      },
     ],
   },
   plugins: [

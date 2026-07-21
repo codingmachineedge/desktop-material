@@ -1,0 +1,382 @@
+{
+  "schemaVersion": 1,
+  "retrievedAtUtc": "2026-07-20T20:29:20Z",
+  "acquisition": {
+    "method": "Official Google Fonts CSS v2 responses and their fonts.gstatic.com WOFF2 URLs",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "documentation": [
+      "https://developers.google.com/fonts/docs/css2",
+      "https://developers.google.com/fonts/docs/material_symbols"
+    ],
+    "transformations": "None. WOFF2 binaries are the byte-for-byte official responses; no local or community subsetting was performed."
+  },
+  "unicodeRanges": {
+    "latin": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+  },
+  "licenses": [
+    {
+      "id": "roboto-ofl-1.1",
+      "spdx": "OFL-1.1",
+      "upstreamUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/OFL.txt",
+      "upstreamResponse": {
+        "status": 200,
+        "contentType": "text/plain; charset=utf-8",
+        "bytes": 4394,
+        "sha256": "061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41",
+        "etag": "\"7f057347b87f7f046a6110990ab9faa471ceb736c47810cd909c2fd77627baf6\"",
+        "responseDate": "2026-07-20T20:29:20Z"
+      },
+      "checkedInPath": "app/static/common/licenses/fonts/Roboto-OFL-1.1.txt",
+      "checkedInBytes": 4394,
+      "checkedInSha256": "061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41"
+    },
+    {
+      "id": "roboto-mono-ofl-1.1",
+      "spdx": "OFL-1.1",
+      "upstreamUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/OFL.txt",
+      "upstreamResponse": {
+        "status": 200,
+        "contentType": "text/plain; charset=utf-8",
+        "bytes": 4395,
+        "sha256": "50ab8dd54680d3473f649c9db86fece88434d097c7834475c1c72d2f8c429215",
+        "etag": "\"f822014cebcf2b074eb267dfae386cf4ea0b3410cf60667585134f82e09c80a0\"",
+        "responseDate": "2026-07-20T20:29:20Z"
+      },
+      "checkedInPath": "app/static/common/licenses/fonts/Roboto-Mono-OFL-1.1.txt",
+      "checkedInBytes": 4395,
+      "checkedInSha256": "50ab8dd54680d3473f649c9db86fece88434d097c7834475c1c72d2f8c429215"
+    },
+    {
+      "id": "roboto-serif-ofl-1.1",
+      "spdx": "OFL-1.1",
+      "upstreamUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/robotoserif/OFL.txt",
+      "upstreamResponse": {
+        "status": 200,
+        "contentType": "text/plain; charset=utf-8",
+        "bytes": 4489,
+        "sha256": "34dbfbb43e0b4fdeef445d77b9ac0b988e5ad7a9bbf16808c97b66c66d51f553",
+        "etag": "\"62f8fa9d342cf514db08ac7472670183e77fd18927b616fabc8b9d8c443ab01f\"",
+        "responseDate": "2026-07-20T20:29:20Z"
+      },
+      "checkedInPath": "app/static/common/licenses/fonts/Roboto-Serif-OFL-1.1.txt",
+      "checkedInBytes": 4396,
+      "checkedInSha256": "807add8aba3b132ed3bc40938f1ed4b79f615dcda41d1ca19e8c794b8fd87f81",
+      "normalization": "Repository text normalization converts upstream CRLF line endings to LF; content is unchanged."
+    },
+    {
+      "id": "material-symbols-apache-2.0",
+      "spdx": "Apache-2.0",
+      "upstreamUrl": "https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE",
+      "upstreamResponse": {
+        "status": 200,
+        "contentType": "text/plain; charset=utf-8",
+        "bytes": 11357,
+        "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+        "etag": "\"d5566fd272a807854f4bda1c1ba4d81a9c4325dfeec669b7db401aab63e91b94\"",
+        "responseDate": "2026-07-20T20:29:20Z"
+      },
+      "checkedInPath": "app/static/common/licenses/fonts/Material-Symbols-Apache-2.0.txt",
+      "checkedInBytes": 11358,
+      "checkedInSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "normalization": "A final LF was added for repository text-file consistency; content is unchanged."
+    }
+  ],
+  "assets": [
+    {
+      "id": "roboto-latin-normal-400-700",
+      "family": "Roboto",
+      "style": "normal",
+      "declaredWeightRange": [400, 700],
+      "binaryFvarWeightRange": [100, 900],
+      "subset": "latin",
+      "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+      "relativePath": "app/styles/fonts/roboto-latin-normal-400-700.woff2",
+      "bytes": 43136,
+      "sha256": "1404ca348bd75ef836f4dd8b6f2cc719458642d1237c368296b2fc652dca47dc",
+      "cssRequest": {
+        "url": "https://fonts.googleapis.com/css2?family=Roboto:wght@400..700&display=swap",
+        "status": 200,
+        "contentType": "text/css; charset=utf-8",
+        "bytes": 5621,
+        "sha256": "cece49c70e844f379e05726bdf6957bd50e7d07c5a673a160eda172d86256446",
+        "responseDate": "2026-07-20T20:29:10Z",
+        "lastModified": "2026-07-20T20:29:10Z",
+        "cacheControl": "private, max-age=86400, stale-while-revalidate=604800"
+      },
+      "source": {
+        "url": "https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
+        "status": 200,
+        "contentType": "font/woff2",
+        "contentLength": 43136,
+        "sha256": "1404ca348bd75ef836f4dd8b6f2cc719458642d1237c368296b2fc652dca47dc",
+        "responseDate": "2026-07-13T22:09:22Z",
+        "lastModified": "2026-02-18T19:51:37Z",
+        "cacheControl": "public, max-age=31536000"
+      },
+      "licenseId": "roboto-ofl-1.1"
+    },
+    {
+      "id": "roboto-mono-latin-normal-400-500",
+      "family": "Roboto Mono",
+      "style": "normal",
+      "declaredWeightRange": [400, 500],
+      "binaryFvarWeightRange": [100, 700],
+      "subset": "latin",
+      "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+      "relativePath": "app/styles/fonts/roboto-mono-latin-normal-400-500.woff2",
+      "bytes": 32796,
+      "sha256": "b81cd55177300649be8f95b3b747d721ce607e8ed2856e25bd0c630cfd631faf",
+      "cssRequest": {
+        "url": "https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400..500&display=swap",
+        "status": 200,
+        "contentType": "text/css; charset=utf-8",
+        "bytes": 2245,
+        "sha256": "b3801073b79b01c83eb2dc392f1507fd86d6b51d86b3022a5f623dfdaad7479b",
+        "responseDate": "2026-07-20T20:29:10Z",
+        "lastModified": "2026-07-20T20:29:10Z",
+        "cacheControl": "private, max-age=86400, stale-while-revalidate=604800"
+      },
+      "source": {
+        "url": "https://fonts.gstatic.com/s/robotomono/v31/L0x5DF4xlVMF-BfR8bXMIjhLq38.woff2",
+        "status": 200,
+        "contentType": "font/woff2",
+        "contentLength": 32796,
+        "sha256": "b81cd55177300649be8f95b3b747d721ce607e8ed2856e25bd0c630cfd631faf",
+        "responseDate": "2026-07-15T19:23:51Z",
+        "lastModified": "2025-09-10T16:42:52Z",
+        "cacheControl": "public, max-age=31536000"
+      },
+      "licenseId": "roboto-mono-ofl-1.1"
+    },
+    {
+      "id": "roboto-serif-latin-normal-400-600",
+      "family": "Roboto Serif",
+      "style": "normal",
+      "declaredWeightRange": [400, 600],
+      "binaryFvarWeightRange": [100, 900],
+      "subset": "latin",
+      "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+      "relativePath": "app/styles/fonts/roboto-serif-latin-normal-400-600.woff2",
+      "bytes": 66104,
+      "sha256": "a32deb82e55d4bcb083e09dbb4da3198011ce0e9f919877179e8c2bca23a9042",
+      "cssRequest": {
+        "url": "https://fonts.googleapis.com/css2?family=Roboto+Serif:ital,wght@0,400..600;1,400..600&display=swap",
+        "status": 200,
+        "contentType": "text/css; charset=utf-8",
+        "bytes": 4627,
+        "sha256": "4924b137c9295c617acd744a0452b83e43428662b8a24d1fbc6c9aa018345483",
+        "responseDate": "2026-07-20T20:29:10Z",
+        "lastModified": "2026-07-20T20:29:10Z",
+        "cacheControl": "private, max-age=86400, stale-while-revalidate=604800"
+      },
+      "source": {
+        "url": "https://fonts.gstatic.com/s/robotoserif/v17/R70mjywflP6FLr3gZx7K8UyuXDs9zVwDmXCb8lxYgmuii32UGoVldX6UgfjL4-3sMM_kB_qXSEX5KSh0.woff2",
+        "status": 200,
+        "contentType": "font/woff2",
+        "contentLength": 66104,
+        "sha256": "a32deb82e55d4bcb083e09dbb4da3198011ce0e9f919877179e8c2bca23a9042",
+        "responseDate": "2026-07-14T05:20:55Z",
+        "lastModified": "2025-09-09T17:49:43Z",
+        "cacheControl": "public, max-age=31536000"
+      },
+      "licenseId": "roboto-serif-ofl-1.1"
+    },
+    {
+      "id": "roboto-serif-latin-italic-400-600",
+      "family": "Roboto Serif",
+      "style": "italic",
+      "declaredWeightRange": [400, 600],
+      "binaryFvarWeightRange": [100, 900],
+      "subset": "latin",
+      "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+      "relativePath": "app/styles/fonts/roboto-serif-latin-italic-400-600.woff2",
+      "bytes": 72952,
+      "sha256": "14dd8073dcd6e0ce9034ddb9976a29e9d29d3526aff60aa2867b66887c4299fd",
+      "cssRequest": {
+        "url": "https://fonts.googleapis.com/css2?family=Roboto+Serif:ital,wght@0,400..600;1,400..600&display=swap",
+        "status": 200,
+        "contentType": "text/css; charset=utf-8",
+        "bytes": 4627,
+        "sha256": "4924b137c9295c617acd744a0452b83e43428662b8a24d1fbc6c9aa018345483",
+        "responseDate": "2026-07-20T20:29:10Z",
+        "lastModified": "2026-07-20T20:29:10Z",
+        "cacheControl": "private, max-age=86400, stale-while-revalidate=604800"
+      },
+      "source": {
+        "url": "https://fonts.gstatic.com/s/robotoserif/v17/R70kjywflP6FLr3gZx7K8UyEVQnyR1E7VN-f51xYuGCQepOvB0KLc2v0wKKB0Q4MSZxyqf2CgAchbBh23OY.woff2",
+        "status": 200,
+        "contentType": "font/woff2",
+        "contentLength": 72952,
+        "sha256": "14dd8073dcd6e0ce9034ddb9976a29e9d29d3526aff60aa2867b66887c4299fd",
+        "responseDate": "2026-07-19T21:36:13Z",
+        "lastModified": "2025-09-09T17:38:48Z",
+        "cacheControl": "public, max-age=31536000"
+      },
+      "licenseId": "roboto-serif-ofl-1.1"
+    },
+    {
+      "id": "material-symbols-rounded-prototype-98",
+      "family": "Material Symbols Rounded",
+      "style": "normal",
+      "declaredWeightRange": [100, 700],
+      "relativePath": "app/styles/fonts/material-symbols-rounded-prototype-98.woff2",
+      "bytes": 85756,
+      "sha256": "e834a2ac93cbdfbdbcf64c144196dfb2cfdb2f605cd5a9700c03f59d68e0674e",
+      "requestedAxes": {
+        "opsz": [20, 48],
+        "wght": [100, 700],
+        "FILL": [0, 1],
+        "GRAD": [0, 0]
+      },
+      "retainedVariableAxes": {
+        "FILL": {
+          "min": 0,
+          "default": 0,
+          "max": 1
+        },
+        "opsz": {
+          "min": 20,
+          "default": 24,
+          "max": 48
+        },
+        "wght": {
+          "min": 100,
+          "default": 400,
+          "max": 700
+        }
+      },
+      "fixedAxes": {
+        "GRAD": 0
+      },
+      "requestedIconNameCount": 98,
+      "requestedIconNames": [
+        "account_circle",
+        "account_tree",
+        "add",
+        "alt_route",
+        "alternate_email",
+        "anchor",
+        "arrow_upward",
+        "auto_awesome",
+        "autoplay",
+        "backspace",
+        "bolt",
+        "book_2",
+        "build",
+        "build_circle",
+        "call_split",
+        "cancel",
+        "category",
+        "check",
+        "check_circle",
+        "circle",
+        "close",
+        "cloud_done",
+        "cloud_download",
+        "code",
+        "commit",
+        "content_copy",
+        "crop_square",
+        "dark_mode",
+        "database",
+        "delete",
+        "deployed_code",
+        "difference",
+        "do_not_disturb_on",
+        "edit",
+        "error",
+        "expand_more",
+        "extension",
+        "filter_list",
+        "flag",
+        "fork_right",
+        "format_align_center",
+        "format_align_left",
+        "format_align_right",
+        "format_bold",
+        "format_italic",
+        "format_underlined",
+        "group_add",
+        "handyman",
+        "history",
+        "join_inner",
+        "key",
+        "keyboard_arrow_down",
+        "library_add_check",
+        "light_mode",
+        "live_help",
+        "lock",
+        "low_priority",
+        "manage_history",
+        "mark_email_read",
+        "menu_book",
+        "merge",
+        "monitoring",
+        "notifications",
+        "notifications_off",
+        "open_in_new",
+        "package_2",
+        "palette",
+        "person_add",
+        "play_arrow",
+        "progress_activity",
+        "public",
+        "redo",
+        "remove",
+        "repeat",
+        "replay",
+        "rocket_launch",
+        "schedule",
+        "school",
+        "search",
+        "search_off",
+        "security",
+        "sell",
+        "settings",
+        "stacks",
+        "star",
+        "sync",
+        "sync_problem",
+        "task_alt",
+        "terminal",
+        "text_format",
+        "tune",
+        "undo",
+        "unfold_more",
+        "visibility",
+        "warning",
+        "waving_hand",
+        "zoom_in",
+        "zoom_out"
+      ],
+      "officialSubsetInspection": {
+        "tool": "fontTools 4.60.2 (read-only inspection)",
+        "glyphCount": 179,
+        "cmapEntryCount": 177,
+        "ligatureNameCountIncludingOfficialAliases": 138,
+        "note": "The CSS API query contains only the 98 requested prototype names. Google retains official alias ligatures that map to the same requested glyph set; the binary was not post-processed."
+      },
+      "cssRequest": {
+        "url": "https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0&icon_names=account_circle,account_tree,add,alt_route,alternate_email,anchor,arrow_upward,auto_awesome,autoplay,backspace,bolt,book_2,build,build_circle,call_split,cancel,category,check,check_circle,circle,close,cloud_done,cloud_download,code,commit,content_copy,crop_square,dark_mode,database,delete,deployed_code,difference,do_not_disturb_on,edit,error,expand_more,extension,filter_list,flag,fork_right,format_align_center,format_align_left,format_align_right,format_bold,format_italic,format_underlined,group_add,handyman,history,join_inner,key,keyboard_arrow_down,library_add_check,light_mode,live_help,lock,low_priority,manage_history,mark_email_read,menu_book,merge,monitoring,notifications,notifications_off,open_in_new,package_2,palette,person_add,play_arrow,progress_activity,public,redo,remove,repeat,replay,rocket_launch,schedule,school,search,search_off,security,sell,settings,stacks,star,sync,sync_problem,task_alt,terminal,text_format,tune,undo,unfold_more,visibility,warning,waving_hand,zoom_in,zoom_out&display=swap",
+        "status": 200,
+        "contentType": "text/css; charset=utf-8",
+        "bytes": 845,
+        "sha256": "9e37612034ab77688ae37df1192052334373c0e40c566e70609d15d3bce8e38f",
+        "responseDate": "2026-07-20T20:39:18Z",
+        "lastModified": "2026-07-20T20:39:18Z",
+        "cacheControl": "private, max-age=86400, stale-while-revalidate=604800"
+      },
+      "source": {
+        "url": "https://fonts.gstatic.com/l/font?kit=sykd-zNym6YjUruM-QrEh7-nyTnjDwKNJ_190FjpZIvLgyidOK7BDB_QddXuk4ohGFS8nJhvng270XWn7k0en0Lu3gXa2JvHcum6qa9-k7BpmD08nSud8owXysfrVFxwZRESsSAyv1XmGT5SLdoyU_vsVQ1-JaC9CqKg3WqXmuVAxM5PofKn8v6utLCcUkykk_LkOLzPNYMku6vdfcKGT4XCdQhgF-VTHSPSepoOkv5Gq6LLqs9ICFmqDA&skey=70ddea8fe54d532e&v=v362",
+        "status": 200,
+        "contentType": "font/woff2",
+        "contentLength": 85756,
+        "sha256": "e834a2ac93cbdfbdbcf64c144196dfb2cfdb2f605cd5a9700c03f59d68e0674e",
+        "responseDate": "2026-07-20T20:26:39Z",
+        "lastModified": "2026-07-13T22:49:12Z",
+        "cacheControl": "public, max-age=86400"
+      },
+      "licenseId": "material-symbols-apache-2.0"
+    }
+  ]
+}

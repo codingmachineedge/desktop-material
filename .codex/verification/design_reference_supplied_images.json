@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "archiveSha256": "cdec91773d202a076d8d700491f13eb065618dc986fa4f67d6909b02b61d8f86",
+  "fileContract": {
+    "extension": ".png",
+    "detectedEncoding": "jpeg",
+    "container": "jfif",
+    "signatureHex": "ffd8ffe000104a4649460001",
+    "discrepancy": "png-extension-with-jpeg-jfif-bytes"
+  },
+  "images": [
+    {
+      "file": "workspace-changes-light.png",
+      "bytes": 34575,
+      "sha256": "0ce1aa9e30d79f03438d8a38adb2aa9d09b4b80dcdcba4c5451ec32e2d4238c4",
+      "width": 924,
+      "height": 540,
+      "route": "workspace-changes-light",
+      "provenance": "reachable-v2-registration"
+    },
+    {
+      "file": "workspace-dark.png",
+      "bytes": 36051,
+      "sha256": "01cfc8c587d01cf1defe7ded7a726a1de7834a20aa5b597e23ba6733e27fda79",
+      "width": 924,
+      "height": 540,
+      "route": "workspace-dark",
+      "provenance": "reachable-v2-registration"
+    },
+    {
+      "file": "tab-text-style.png",
+      "bytes": 33654,
+      "sha256": "476d3de8deeae141a95df0b5c829147134ce08fe537c93fb5bc75f6f3a9d26a4",
+      "width": 924,
+      "height": 540,
+      "route": "tab-text-style",
+      "provenance": "reachable-v2-registration"
+    },
+    {
+      "file": "regex-builder.png",
+      "bytes": 25594,
+      "sha256": "9a1fa18c8c64e21d004b93e0cdda2c24e3c37e96410e2f67ee141299f7ac6140",
+      "width": 924,
+      "height": 540,
+      "route": "regex-builder",
+      "provenance": "reachable-v2-registration"
+    },
+    {
+      "file": "settings-history-manager.png",
+      "bytes": 30924,
+      "sha256": "b1cdc22f1f4b273da42d3c4ae2c2c3a698a4d558fbb7f55973d43460e0a74eed",
+      "width": 924,
+      "height": 540,
+      "route": "settings-history-manager",
+      "provenance": "reachable-v2-registration"
+    },
+    {
+      "file": "settings-accounts-dark.png",
+      "bytes": 26568,
+      "sha256": "8dc197f225d15edda929d4dc75599015a0b156290de5c8e7bacc12d4729590cc",
+      "width": 924,
+      "height": 540,
+      "route": "settings-accounts-dark",
+      "provenance": "reachable-v2-registration"
+    },
+    {
+      "file": "07-clone.png",
+      "bytes": 31708,
+      "sha256": "9ba0b4030efc90cb3b0f05503bbe1acc93439846720d0e54bb8427705522f03a",
+      "width": 924,
+      "height": 540,
+      "route": "clone-dialog-v2",
+      "provenance": "legacy-inline-sheet-not-route-reproducible-from-v2"
+    }
+  ]
+}

@@ -237,6 +237,7 @@ import {
   getAccountForCommitMessageGeneration,
   getAccountForCopilotConflictResolution,
   getAccountForRepository,
+  getRepositoryCredentialAccountKey,
   getRepositoryOwnerAccountToPromote,
 } from '../get-account-for-repository'
 import { getForkRepositoryEligibility } from '../fork-repository'
@@ -369,9 +370,9 @@ import { inferLastPushForRepository } from '../infer-last-push-for-repository'
 import { updateMenuState } from '../menu-update'
 import { merge } from '../merge'
 import {
-  IMatchedGitHubRepository,
-  matchGitHubRepository,
   matchExistingRepository,
+  IResolvedGitHubRepositoryMatch,
+  resolveGitHubRepositoryMatch,
   urlMatchesRemote,
   urlMatchesCloneURL,
   urlsMatch,
@@ -3193,6 +3194,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   private async performScheduledPush(repository: Repository): Promise<void> {
+    const resolvedRepository =
+      await this.repositoryWithRefreshedGitHubRepository(repository)
+    return this.performScheduledPushWithResolvedRepository(resolvedRepository)
+  }
+
+  private async performScheduledPushWithResolvedRepository(
+    repository: Repository
+  ): Promise<void> {
     const state = this.repositoryStateCache.get(repository)
     const remote = state.remote
     const tip = state.branchesState.tip
@@ -3206,6 +3215,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const pushedBranchName = tip.branch.upstreamWithoutRemote ?? tip.branch.name
     const safeRemote: IRemote = { name: remoteName, url: remote.url }
     const gitStore = this.gitStoreCache.get(repository)
+    const accountKey = getRepositoryCredentialAccountKey(
+      this.accounts,
+      repository
+    )
 
     await this.withPushPullFetch(repository, async () => {
       await pushRepo(
@@ -3214,7 +3227,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
         tip.branch.name,
         tip.branch.upstreamWithoutRemote,
         gitStore.tagsToPush,
-        { onHookFailure: async () => 'abort' }
+        { onHookFailure: async () => 'abort', accountKey }
       )
       gitStore.clearTagsToPush()
       await this._refreshRepository(repository)
@@ -3223,6 +3236,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   private async performScheduledPull(repository: Repository): Promise<void> {
+    const resolvedRepository =
+      await this.repositoryWithRefreshedGitHubRepository(repository)
+    return this.performScheduledPullWithResolvedRepository(resolvedRepository)
+  }
+
+  private async performScheduledPullWithResolvedRepository(
+    repository: Repository
+  ): Promise<void> {
     const state = this.repositoryStateCache.get(repository)
     const remote = state.remote
     if (remote === null) {
@@ -3232,16 +3253,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
       throw new Error('Another network operation is already in progress.')
     }
 
+    const accountKey = getRepositoryCredentialAccountKey(
+      this.accounts,
+      repository
+    )
+
     await this.withPushPullFetch(repository, async () => {
       // This path deliberately bypasses performFailableOperation: scheduler
       // failures are logged and posted to the notification centre, never
       // promoted to an interrupting error dialog.
-      await pullRepo(repository, remote)
-      await updateRemoteHEAD(repository, remote, false).catch(error =>
-        log.error(
-          'Failed updating remote HEAD after automatic pull',
-          error instanceof Error ? error : new Error(String(error))
-        )
+      await pullRepo(repository, remote, { accountKey })
+      await updateRemoteHEAD(repository, remote, false, accountKey).catch(
+        error =>
+          log.error(
+            'Failed updating remote HEAD after automatic pull',
+            error instanceof Error ? error : new Error(String(error))
+          )
       )
       await this._refreshRepository(repository)
     })
@@ -5532,10 +5559,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.withRefreshedGitHubRepository(repo, async repo => {
       const isBackgroundTask = true
       const gitStore = this.gitStoreCache.get(repo)
+      const accountKey = getRepositoryCredentialAccountKey(this.accounts, repo)
 
       await this.withPushPullFetch(repo, () =>
-        gitStore.fetch(isBackgroundTask, progress =>
-          this.updatePushPullFetchProgress(repo, progress)
+        gitStore.fetch(
+          isBackgroundTask,
+          progress => this.updatePushPullFetchProgress(repo, progress),
+          accountKey
         )
       )
       this.updatePushPullFetchProgress(repo, null)
@@ -6558,7 +6588,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
    * @returns repository model (hopefully with fresh `gitHubRepository` info)
    */
   private async repositoryWithRefreshedGitHubRepository(
-    repository: Repository
+    repository: Repository,
+    persistResolvedAccount = true
   ): Promise<Repository> {
     if (isSubmoduleRepository(repository)) {
       return repository
@@ -6574,10 +6605,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
       return repository
     }
 
-    const { account, owner, name } = match
+    const { account, apiRepository: apiRepo } = match
     const { endpoint } = account
-    const api = API.fromAccount(account)
-    const apiRepo = await api.fetchRepository(owner, name)
 
     if (apiRepo === null) {
       // If the request fails, we want to preserve the existing GitHub
@@ -6596,8 +6625,18 @@ export class AppStore extends TypedBaseStore<IAppState> {
       await updateRemoteUrl(gitStore, repository.gitHubRepository, apiRepo)
     }
 
+    const accountBoundRepository =
+      persistResolvedAccount && repository.accountKey === null
+        ? await this.persistRepositoryAccountBinding(
+            repository,
+            getAccountKey(account)
+          )
+        : repository
     const ghRepo = await repoStore.upsertGitHubRepository(endpoint, apiRepo)
-    const freshRepo = await repoStore.setGitHubRepository(repository, ghRepo)
+    const freshRepo = await repoStore.setGitHubRepository(
+      accountBoundRepository,
+      ghRepo
+    )
 
     await this.refreshBranchProtectionState(freshRepo)
     return freshRepo
@@ -6674,10 +6713,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     const { owner, name } = repository.gitHubRepository
 
-    const account = getAccountForEndpoint(
-      this.accounts,
-      repository.gitHubRepository.endpoint
-    )
+    const account = getAccountForRepository(this.accounts, repository)
 
     if (account === null) {
       return
@@ -6695,7 +6731,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
   private async matchGitHubRepository(
     repository: Repository
-  ): Promise<IMatchedGitHubRepository | null> {
+  ): Promise<IResolvedGitHubRepositoryMatch | null> {
     const gitStore = this.gitStoreCache.get(repository)
 
     if (!gitStore.defaultRemote) {
@@ -6703,9 +6739,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
     }
 
     const remote = gitStore.defaultRemote
-    return remote !== null
-      ? matchGitHubRepository(this.accounts, remote.url, repository.accountKey)
-      : null
+    return remote === null
+      ? null
+      : resolveGitHubRepositoryMatch(
+          this.accounts,
+          remote.url,
+          repository.accountKey,
+          (account, owner, name) =>
+            API.fromAccount(account).fetchRepository(owner, name)
+        )
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
@@ -7977,14 +8019,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       const gitStore = this.gitStoreCache.get(repository)
-      const repositoryAccount = getAccountForRepository(
-        this.accounts,
-        repository
-      )
       const accountKey =
-        repositoryAccount === null
-          ? undefined
-          : getAccountKey(repositoryAccount)
+        options?.accountKey ??
+        getRepositoryCredentialAccountKey(this.accounts, repository)
       await gitStore.performFailableOperation(
         async () => {
           let aborted = false
@@ -7997,8 +8034,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
               gitStore.tagsToPush,
               {
                 onHookFailure: this.onHookFailure(() => (aborted = true)),
-                accountKey,
                 ...options,
+                accountKey,
               },
               progress => {
                 this.updatePushPullFetchProgress(repository, {
@@ -8017,12 +8054,17 @@ export class AppStore extends TypedBaseStore<IAppState> {
           gitStore.clearTagsToPush()
 
           await this.withTemporaryRepositoryMutationGuard(repository, () =>
-            gitStore.fetchRemotes([safeRemote], false, fetchProgress => {
-              this.updatePushPullFetchProgress(repository, {
-                ...fetchProgress,
-                value: pushWeight + fetchProgress.value * fetchWeight,
-              })
-            })
+            gitStore.fetchRemotes(
+              [safeRemote],
+              false,
+              fetchProgress => {
+                this.updatePushPullFetchProgress(repository, {
+                  ...fetchProgress,
+                  value: pushWeight + fetchProgress.value * fetchWeight,
+                })
+              },
+              accountKey
+            )
           )
 
           const refreshTitle = __DARWIN__
@@ -8485,8 +8527,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
       )
       usedFallbackAccount = result.usedFallbackAccount
       reportProgress(`Updating ${remote.name} remote HEAD metadata.`)
-      await updateRemoteHEAD(repository, remote, false).catch(error =>
-        log.error('Failed updating remote HEAD after Pull all', error)
+      const accountKey =
+        result.accountKey ??
+        getRepositoryCredentialAccountKey(this.accounts, repository)
+      await updateRemoteHEAD(repository, remote, false, accountKey).catch(
+        error => log.error('Failed updating remote HEAD after Pull all', error)
       )
       reportProgress('Refreshing the final repository state.')
       await this._refreshRepository(repository)
@@ -8693,6 +8738,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
             this.statsStore.increment('pullWithDefaultSettingCount')
           }
 
+          const accountKey = getRepositoryCredentialAccountKey(
+            this.accounts,
+            repository
+          )
           let aborted = false
           const pullSucceeded = await gitStore
             .performFailableOperation(
@@ -8701,6 +8750,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
                   repository,
                   () =>
                     pullRepo(repository, remote, {
+                      accountKey,
                       progressCallback: progress => {
                         this.updatePushPullFetchProgress(repository, {
                           ...progress,
@@ -8740,7 +8790,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
             // entire pull operation if it fails.
             try {
               await this.withTemporaryRepositoryMutationGuard(repository, () =>
-                updateRemoteHEAD(repository, remote, false)
+                updateRemoteHEAD(repository, remote, false, accountKey)
               )
             } catch (e) {
               if (!this.isTemporaryRepositoryActive(repository)) {
@@ -8849,14 +8899,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
         await this.performPush(repository, {
           branch: gitStore.defaultBranch,
           forceWithLease: false,
+          accountKey: getAccountKey(account),
         })
       }
-      await this.performPush(repository)
+      await this.performPush(repository, { accountKey: getAccountKey(account) })
     }
 
     await gitStore.refreshDefaultBranch()
 
-    return this.repositoryWithRefreshedGitHubRepository(repository)
+    return this._updateRepositoryAccount(repository, getAccountKey(account))
   }
 
   /** This shouldn't be called directly. See `Dispatcher`. */
@@ -9332,8 +9383,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<void> {
     return this.withRefreshedGitHubRepository(repository, async repository => {
       const gitStore = this.gitStoreCache.get(repository)
+      const accountKey = getRepositoryCredentialAccountKey(
+        this.accounts,
+        repository
+      )
       await this.withTemporaryRepositoryMutationGuard(repository, () =>
-        gitStore.fetchRefspec(refspec)
+        gitStore.fetchRefspec(refspec, accountKey)
       )
 
       return this._refreshRepository(repository)
@@ -9384,6 +9439,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
   ): Promise<void> {
     await this.withPushPullFetch(repository, async () => {
       const gitStore = this.gitStoreCache.get(repository)
+      const accountKey = getRepositoryCredentialAccountKey(
+        this.accounts,
+        repository
+      )
 
       try {
         const fetchWeight = 0.9
@@ -9399,11 +9458,16 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
         if (remotes === undefined) {
           await this.withTemporaryRepositoryMutationGuard(repository, () =>
-            gitStore.fetch(isBackgroundTask, progressCallback)
+            gitStore.fetch(isBackgroundTask, progressCallback, accountKey)
           )
         } else {
           await this.withTemporaryRepositoryMutationGuard(repository, () =>
-            gitStore.fetchRemotes(remotes, isBackgroundTask, progressCallback)
+            gitStore.fetchRemotes(
+              remotes,
+              isBackgroundTask,
+              progressCallback,
+              accountKey
+            )
           )
         }
 
@@ -12366,8 +12430,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
   }
 
-  /** This shouldn't be called directly. See `Dispatcher`. */
-  public async _updateRepositoryAccount(
+  private async persistRepositoryAccountBinding(
     repository: Repository,
     accountKey: string | null
   ): Promise<Repository> {
@@ -12386,6 +12449,26 @@ export class AppStore extends TypedBaseStore<IAppState> {
     )
 
     return updatedRepository
+  }
+
+  /** This shouldn't be called directly. See `Dispatcher`. */
+  public async _updateRepositoryAccount(
+    repository: Repository,
+    accountKey: string | null
+  ): Promise<Repository> {
+    const updatedRepository = await this.persistRepositoryAccountBinding(
+      repository,
+      accountKey
+    )
+
+    // Refresh repository metadata under the newly selected identity so
+    // permissions and organization access are not left over from the previous
+    // account. Suppress automatic binding here so an explicit request to
+    // restore endpoint-based selection remains observable to the caller.
+    return this.repositoryWithRefreshedGitHubRepository(
+      updatedRepository,
+      false
+    )
   }
 
   /**

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://desktop-material.invalid/schemas/design-reference-asset-manifest-v1.json",
+  "title": "Desktop Material design-reference asset manifest",
+  "description": "Fail-closed cache contract for capture_design_reference_cdp.js. The runtime filename is asset-manifest.json inside the --assets directory; this schema contains no fetched bytes, URLs beyond the public design dependencies, or machine-local paths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "source", "localFiles", "resources"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path to the selected immutable v2 HTML inside its owned source root."
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "localFiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "kind"],
+        "properties": {
+          "path": {
+            "const": "support.js"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "kind": {
+            "const": "runtime"
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "path",
+          "sha256",
+          "contentType",
+          "kind",
+          "fontFamilies"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Relative, hash-checked cache path inside --assets."
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "contentType": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+(?:;\\s*charset=[A-Za-z0-9-]+)?$"
+          },
+          "kind": {
+            "enum": ["script", "stylesheet", "font"]
+          },
+          "fontFamilies": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "Roboto",
+                "Roboto Mono",
+                "Roboto Serif",
+                "Material Symbols Rounded"
+              ]
+            },
+            "description": "Empty for scripts/stylesheets; one or more declared families for each font resource."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    }
+  }
+}

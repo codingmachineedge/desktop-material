@@ -94,7 +94,7 @@ import {
   ThemeToggleButton,
 } from './toolbar'
 import { canAutoCommitPush } from '../lib/automation/automation-guards'
-import { iconForRepository, Octicon, OcticonSymbol } from './octicons'
+import { Octicon } from './octicons'
 import * as octicons from './octicons/octicons.generated'
 import {
   showCertificateTrustDialog,
@@ -5588,17 +5588,13 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     const repository = selection ? selection.repository : null
 
-    let icon: OcticonSymbol
     let title: string
     if (repository) {
       const alias = repository instanceof Repository ? repository.alias : null
-      icon = iconForRepository(repository)
       title = alias ?? repository.name
     } else if (this.state.repositories.length > 0) {
-      icon = octicons.repo
       title = __DARWIN__ ? 'Select a Repository' : 'Select a repository'
     } else {
-      icon = octicons.repo
       title = __DARWIN__ ? 'No Repositories' : 'No repositories'
     }
 
@@ -5629,7 +5625,8 @@ export class App extends React.Component<IAppProps, IAppState> {
     return (
       <ToolbarDropdown
         ref={this.repositoryDropdownRef}
-        icon={icon}
+        materialSymbol="book_2"
+        materialSymbolSize={19}
         title={title}
         description={__DARWIN__ ? 'Current Repository' : 'Current repository'}
         tooltip={tooltip}
@@ -6086,6 +6083,7 @@ export class App extends React.Component<IAppProps, IAppState> {
           <ThemeToggleButton
             dispatcher={this.props.dispatcher}
             selectedTheme={this.state.selectedTheme}
+            currentTheme={this.state.currentTheme}
           />
         </ToolbarItem>
       </Toolbar>

@@ -1163,7 +1163,8 @@ export class GitStore extends BaseStore {
    */
   public async fetch(
     backgroundTask: boolean,
-    progressCallback?: (fetchProgress: IFetchProgress) => void
+    progressCallback?: (fetchProgress: IFetchProgress) => void,
+    accountKey?: string
   ): Promise<void> {
     // Use a map as a simple way of getting a unique set of remotes.
     // Note that maps iterate in insertion order so the order in which
@@ -1189,7 +1190,8 @@ export class GitStore extends BaseStore {
       await this.fetchRemotes(
         [...remotes.values()],
         backgroundTask,
-        progressCallback
+        progressCallback,
+        accountKey
       )
     }
 
@@ -1228,7 +1230,8 @@ export class GitStore extends BaseStore {
   public async fetchRemotes(
     remotes: ReadonlyArray<IRemote>,
     backgroundTask: boolean,
-    progressCallback?: (fetchProgress: IFetchProgress) => void
+    progressCallback?: (fetchProgress: IFetchProgress) => void,
+    accountKey?: string
   ): Promise<void> {
     if (!remotes.length) {
       return
@@ -1240,14 +1243,19 @@ export class GitStore extends BaseStore {
       const remote = remotes[i]
       const startProgressValue = i * weight
 
-      await this.fetchRemote(remote, backgroundTask, progress => {
-        if (progress && progressCallback) {
-          progressCallback({
-            ...progress,
-            value: startProgressValue + progress.value * weight,
-          })
-        }
-      })
+      await this.fetchRemote(
+        remote,
+        backgroundTask,
+        progress => {
+          if (progress && progressCallback) {
+            progressCallback({
+              ...progress,
+              value: startProgressValue + progress.value * weight,
+            })
+          }
+        },
+        accountKey
+      )
     }
   }
 
@@ -1263,7 +1271,8 @@ export class GitStore extends BaseStore {
   public async fetchRemote(
     remote: IRemote,
     backgroundTask: boolean,
-    progressCallback?: (fetchProgress: IFetchProgress) => void
+    progressCallback?: (fetchProgress: IFetchProgress) => void,
+    accountKey?: string
   ): Promise<void> {
     const repo = this.repository
     const retryAction: RetryAction = {
@@ -1272,7 +1281,13 @@ export class GitStore extends BaseStore {
     }
     const fetchSucceeded = await this.performFailableOperation(
       async () => {
-        await fetchRepo(repo, remote, progressCallback, backgroundTask)
+        await fetchRepo(
+          repo,
+          remote,
+          progressCallback,
+          backgroundTask,
+          accountKey
+        )
         return true
       },
       { backgroundTask, retryAction }
@@ -1287,8 +1302,8 @@ export class GitStore extends BaseStore {
       // Updating the local HEAD symref isn't critical so we don't want
       // to show an error message to the user and have them retry the
       // entire pull operation if it fails.
-      await updateRemoteHEAD(repo, remote, backgroundTask).catch(e =>
-        log.error('Failed updating remote HEAD', e)
+      await updateRemoteHEAD(repo, remote, backgroundTask, accountKey).catch(
+        e => log.error('Failed updating remote HEAD', e)
       )
     }
   }
@@ -1301,13 +1316,16 @@ export class GitStore extends BaseStore {
    *                  part of this action. Refer to git-scm for more
    *                  information on refspecs: https://www.git-scm.com/book/tr/v2/Git-Internals-The-Refspec
    */
-  public async fetchRefspec(refspec: string): Promise<void> {
+  public async fetchRefspec(
+    refspec: string,
+    accountKey?: string
+  ): Promise<void> {
     // TODO: we should favour origin here
     const remotes = await getRemotes(this.repository)
 
     for (const remote of remotes) {
       await this.performFailableOperation(() =>
-        fetchRefspec(this.repository, remote, refspec)
+        fetchRefspec(this.repository, remote, refspec, accountKey)
       )
     }
   }

@@ -250,6 +250,13 @@ you to re-authenticate or authorize SSO instead of claiming the repository is un
 the account in Repository Settings propagates to Provider Triage immediately; an existing valid
 explicit binding is never silently replaced.
 
+The same repository account controls HTTPS Git network work: normal and scheduled **Fetch**,
+**Pull**, **Push**, the post-push refresh, pull-request refspec fetches, and remote default-branch
+lookup. A saved account that is unavailable fails safely rather than falling back to another
+GitHub.com identity. For an older unassigned repository, Desktop Material verifies same-host
+accounts against the remote and prefers an account that can push before a read-only account, then
+saves that verified choice for later operations.
+
 ---
 
 ## Local Ollama model management

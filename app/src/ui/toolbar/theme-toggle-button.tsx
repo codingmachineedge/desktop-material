@@ -1,39 +1,33 @@
 import * as React from 'react'
-import { Octicon } from '../octicons'
-import * as octicons from '../octicons/octicons.generated'
 import { Dispatcher } from '../dispatcher'
-import { ApplicationTheme } from '../lib/application-theme'
+import { ApplicableTheme, ApplicationTheme } from '../lib/application-theme'
+import { MaterialSymbol, MaterialSymbolName } from '../lib/material-symbol'
 
 interface IThemeToggleButtonProps {
   readonly dispatcher: Dispatcher
   readonly selectedTheme: ApplicationTheme
+  readonly currentTheme: ApplicableTheme
 }
 
 /**
- * The v2 prototype app-bar theme control cycles Light → Dark → System on
- * every activation instead of opening a menu.
+ * The v2 prototype app-bar theme control toggles between explicit Light and
+ * Dark themes. If Preferences currently follows the system theme, resolve the
+ * applied theme before choosing its opposite.
  */
-function nextTheme(theme: ApplicationTheme): ApplicationTheme {
-  switch (theme) {
-    case ApplicationTheme.Light:
-      return ApplicationTheme.Dark
-    case ApplicationTheme.Dark:
-      return ApplicationTheme.System
-    default:
-      return ApplicationTheme.Light
-  }
+function nextTheme(
+  theme: ApplicationTheme,
+  currentTheme: ApplicableTheme
+): ApplicableTheme {
+  const appliedTheme = theme === ApplicationTheme.System ? currentTheme : theme
+
+  return appliedTheme === ApplicationTheme.Light
+    ? ApplicationTheme.Dark
+    : ApplicationTheme.Light
 }
 
-/** Octicon stand-ins for the prototype's light/dark/auto Material Symbols. */
-function symbolForTheme(theme: ApplicationTheme) {
-  switch (theme) {
-    case ApplicationTheme.Light:
-      return octicons.sun
-    case ApplicationTheme.Dark:
-      return octicons.moon
-    default:
-      return octicons.deviceDesktop
-  }
+/** The v2 glyph advertises the theme the button will apply, not the current one. */
+function symbolForTheme(theme: ApplicableTheme): MaterialSymbolName {
+  return theme === ApplicationTheme.Dark ? 'light_mode' : 'dark_mode'
 }
 
 function nameForTheme(theme: ApplicationTheme): string {
@@ -55,11 +49,14 @@ function nameForTheme(theme: ApplicationTheme): string {
  */
 export class ThemeToggleButton extends React.Component<IThemeToggleButtonProps> {
   private onClick = () => {
-    this.props.dispatcher.setSelectedTheme(nextTheme(this.props.selectedTheme))
+    const theme = nextTheme(this.props.selectedTheme, this.props.currentTheme)
+    this.props.dispatcher.setSelectedTheme(theme)
   }
 
   public render() {
-    const { selectedTheme } = this.props
+    const { selectedTheme, currentTheme } = this.props
+    const appliedTheme =
+      selectedTheme === ApplicationTheme.System ? currentTheme : selectedTheme
     return (
       <button
         type="button"
@@ -67,7 +64,7 @@ export class ThemeToggleButton extends React.Component<IThemeToggleButtonProps> 
         aria-label="Toggle theme"
         onClick={this.onClick}
       >
-        <Octicon symbol={symbolForTheme(selectedTheme)} />
+        <MaterialSymbol name={symbolForTheme(appliedTheme)} size={22} />
         <span className="sr-only" aria-live="polite">
           {`${nameForTheme(selectedTheme)} theme`}
         </span>

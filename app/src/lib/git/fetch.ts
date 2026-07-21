@@ -40,11 +40,14 @@ export async function fetch(
   repository: Repository,
   remote: IRemote,
   progressCallback?: (progress: IFetchProgress) => void,
-  isBackgroundTask = false
+  isBackgroundTask = false,
+  /** Stable account identity to force for this fetch. Never a token. */
+  accountKey?: string
 ): Promise<void> {
   let opts: IGitStringExecutionOptions = {
     successExitCodes: new Set([0]),
     env: await envForRemoteOperation(remote.url),
+    credentialAccountKey: accountKey,
   }
 
   if (progressCallback) {
@@ -92,11 +95,14 @@ export async function fetch(
 export async function fetchRefspec(
   repository: Repository,
   remote: IRemote,
-  refspec: string
+  refspec: string,
+  /** Stable account identity to force for this fetch. Never a token. */
+  accountKey?: string
 ): Promise<void> {
   await git(['fetch', remote.name, refspec], repository.path, 'fetchRefspec', {
     successExitCodes: new Set([0, 128]),
     env: await envForRemoteOperation(remote.url),
+    credentialAccountKey: accountKey,
   })
 }
 

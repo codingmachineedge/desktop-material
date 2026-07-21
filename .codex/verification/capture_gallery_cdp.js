@@ -17,6 +17,8 @@
  *     --scenes seed,dump --out %TEMP%\desktop-material-p0-ui-...\captures\gallery
  *   node ... --fixture-path C:\DesktopMaterialEvidence\fixture \
  *     --scenes seed,repository-tools
+ *   node ... --canonical true --theme dark --language-mode bilingual
+ *   node ... --audit-design true --theme light --language-mode english
  *   node ... --probe "expression"
  *   node ... --list
  */
@@ -49,6 +51,31 @@ function parseArguments(argv) {
 }
 
 const args = parseArguments(process.argv.slice(2))
+const CaptureThemes = Object.freeze(['light', 'dark'])
+const CaptureLanguageModes = Object.freeze([
+  'english',
+  'cantonese',
+  'bilingual',
+])
+
+function requestedCaptureOption(name, supported, fallback) {
+  const value = args.get(name) ?? fallback
+  if (!supported.includes(value)) {
+    fail(
+      `Unsupported --${name} value ${JSON.stringify(
+        value
+      )}; expected ${supported.join('|')}.`
+    )
+  }
+  return value
+}
+
+const requestedTheme = requestedCaptureOption('theme', CaptureThemes, 'light')
+const requestedLanguageMode = requestedCaptureOption(
+  'language-mode',
+  CaptureLanguageModes,
+  'english'
+)
 const port = Number(args.get('port') ?? '9337')
 const requestedOutDir = args.get('out')
 const outDir =
@@ -666,6 +693,27 @@ const CanonicalGalleryOutputs = Object.freeze([
 ])
 
 /**
+ * Audit-only v2 surfaces that are intentionally outside the frozen 68-image
+ * documentation gallery. Each runner is also directly addressable through
+ * --scenes for targeted multi-viewport inspection.
+ */
+const AuditDesignScenes = Object.freeze([
+  'account-switcher',
+  'workflow-manager',
+  'workflow-catalog',
+  'workflow-dispatch',
+  'clone-dialog-design',
+])
+
+const AuditDesignOutputs = Object.freeze([
+  'material-design-account-switcher',
+  'material-design-workflow-manager',
+  'material-design-workflow-catalog',
+  'material-design-workflow-dispatch',
+  'material-design-clone-dialog',
+])
+
+/**
  * Privacy-safe profile state used only while capturing the restored app
  * identity workspace. The scene restores the profile's prior identity after
  * the evidence frame so later canonical scenes keep their own clean baseline.
@@ -714,6 +762,55 @@ const SceneSurfaceSelector = [
 ].join(', ')
 const SceneErrorSelector = '.error-notice-stack .error-notice'
 const SceneTooltipSelector = '.tooltip, [role="tooltip"]'
+const BundledCaptureFonts = Object.freeze([
+  { family: 'Roboto', descriptor: '14px "Roboto"', sample: 'Desktop Material' },
+  {
+    family: 'Roboto Mono',
+    descriptor: '14px "Roboto Mono"',
+    sample: '0123456789abcdef',
+  },
+  {
+    family: 'Roboto Serif',
+    descriptor: '14px "Roboto Serif"',
+    sample: 'Desktop Material',
+  },
+  {
+    family: 'Material Symbols Rounded',
+    descriptor: '20px "Material Symbols Rounded"',
+    sample: 'settings dark_mode keyboard_arrow_down',
+  },
+])
+const LanguageSurfaceExpectations = Object.freeze({
+  english: Object.freeze({
+    heading: 'Language',
+    label: 'Language',
+    description:
+      'Choose English, playful Hong Kong Cantonese, or a compact bilingual view.',
+    options: Object.freeze([
+      'English',
+      'Playful Hong Kong Cantonese',
+      'Bilingual',
+    ]),
+  }),
+  cantonese: Object.freeze({
+    heading: '語言',
+    label: '語言',
+    description: '揀英文、玩味港式廣東話，或者慳位雙語模式。',
+    options: Object.freeze(['英文', '玩味港式廣東話', '雙語']),
+  }),
+  bilingual: Object.freeze({
+    heading: 'Language · 語言',
+    label: 'Language · 語言',
+    description:
+      'Choose English, playful Hong Kong Cantonese, or a compact bilingual view. · 揀英文、玩味港式廣東話，或者慳位雙語模式。',
+    options: Object.freeze([
+      'English · 英文',
+      'Playful Hong Kong Cantonese · 玩味港式廣東話',
+      'Bilingual · 雙語',
+    ]),
+  }),
+})
+let appearanceLanguageSurfaceReceipt = null
 
 function getJSON(target) {
   return new Promise((resolve, reject) => {
@@ -921,6 +1018,264 @@ async function waitFor(expression, label, timeout = 20000) {
   fail(`Timed out waiting for ${label}.`)
 }
 
+async function waitForElementAppearanceCoordinatorReady(context) {
+  await waitFor(
+    `(() => {
+      const root = document.querySelector('#desktop-app-container')
+      const node = root?.querySelector('*')
+      const fiberKey = node && Object.keys(node).find(key =>
+        key.startsWith('__reactFiber$') ||
+        key.startsWith('__reactInternalInstance$')
+      )
+      let fiber = fiberKey ? node[fiberKey] : null
+      for (let depth = 0; fiber && depth < 120; depth++, fiber = fiber.return) {
+        const dispatcher = fiber.stateNode?.props?.dispatcher
+        if (
+          typeof dispatcher?.isElementAppearanceCoordinatorReady === 'function'
+        ) {
+          return dispatcher.isElementAppearanceCoordinatorReady() === true
+        }
+      }
+      return false
+    })()`,
+    `${context} element appearance coordinator`,
+    60000
+  )
+}
+
+function expectedDocumentLanguage(languageMode) {
+  return languageMode === 'cantonese' ? 'zh-HK' : 'en'
+}
+
+async function readPresentationState() {
+  return await evaluate(`(() => {
+    const themeClasses = [...document.body.classList]
+      .filter(value => value.startsWith('theme-'))
+      .sort()
+    const observedTheme = themeClasses.length === 1 &&
+      (themeClasses[0] === 'theme-light' || themeClasses[0] === 'theme-dark')
+      ? themeClasses[0].slice('theme-'.length)
+      : null
+    return {
+      observedTheme,
+      persistedTheme: localStorage.getItem('theme'),
+      themeClasses,
+      autoSwitchTheme: localStorage.getItem('autoSwitchTheme'),
+      observedLanguageMode:
+        document.body.getAttribute('data-dm-language-mode'),
+      persistedLanguageMode: localStorage.getItem('language-mode-v1'),
+      rootLanguageMode:
+        document.documentElement.getAttribute('data-language-mode'),
+      documentLanguage: document.documentElement.lang,
+    }
+  })()`)
+}
+
+async function assertRequestedPresentationState(
+  context,
+  {
+    expectedTheme = requestedTheme,
+    requireAppearanceSurface = appearanceLanguageSurfaceReceipt !== null,
+  } = {}
+) {
+  if (!CaptureThemes.includes(expectedTheme)) {
+    fail(`Unsupported expected capture theme: ${expectedTheme}`)
+  }
+  const observed = await readPresentationState()
+  const receipt = {
+    context,
+    requestedTheme,
+    expectedTheme,
+    observedTheme: observed?.observedTheme ?? null,
+    persistedTheme: observed?.persistedTheme ?? null,
+    themeClasses: observed?.themeClasses ?? [],
+    autoSwitchTheme: observed?.autoSwitchTheme ?? null,
+    requestedLanguageMode,
+    observedLanguageMode: observed?.observedLanguageMode ?? null,
+    persistedLanguageMode: observed?.persistedLanguageMode ?? null,
+    rootLanguageMode: observed?.rootLanguageMode ?? null,
+    documentLanguage: observed?.documentLanguage ?? null,
+    appearanceLanguageSurface: appearanceLanguageSurfaceReceipt,
+  }
+  const valid =
+    receipt.observedTheme === expectedTheme &&
+    receipt.persistedTheme === expectedTheme &&
+    receipt.themeClasses.length === 1 &&
+    receipt.autoSwitchTheme === null &&
+    receipt.observedLanguageMode === requestedLanguageMode &&
+    receipt.persistedLanguageMode === requestedLanguageMode &&
+    receipt.rootLanguageMode === requestedLanguageMode &&
+    receipt.documentLanguage ===
+      expectedDocumentLanguage(requestedLanguageMode) &&
+    (!requireAppearanceSurface ||
+      receipt.appearanceLanguageSurface?.value === requestedLanguageMode)
+  if (!valid) {
+    fail(
+      `Capture presentation state diverged during ${context}: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  return receipt
+}
+
+async function applyRequestedPresentationState(context) {
+  const changed = await evaluate(`(() => {
+    let changed = false
+    if (localStorage.getItem('autoSwitchTheme') !== null) {
+      localStorage.removeItem('autoSwitchTheme')
+      changed = true
+    }
+    const requested = {
+      theme: ${JSON.stringify(requestedTheme)},
+      languageMode: ${JSON.stringify(requestedLanguageMode)},
+    }
+    for (const [key, value] of [
+      ['theme', requested.theme],
+      ['language-mode-v1', requested.languageMode],
+    ]) {
+      if (localStorage.getItem(key) !== value) {
+        localStorage.setItem(key, value)
+        changed = true
+      }
+    }
+    return changed
+  })()`)
+  if (changed) {
+    await waitForElementAppearanceCoordinatorReady(
+      `${context} before renderer reload`
+    )
+    const beforeReloadTimeOrigin = await evaluate('performance.timeOrigin')
+    await client.send('Page.reload', { ignoreCache: true })
+    await sleep(4500)
+    await client.send('Runtime.enable')
+    await waitFor(
+      `performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}`,
+      `${context} renderer reload`,
+      25000
+    )
+    await waitForElementAppearanceCoordinatorReady(
+      `${context} after renderer reload`
+    )
+  }
+  await waitFor(
+    `(() => {
+      const expectedTheme = ${JSON.stringify(requestedTheme)}
+      const expectedLanguageMode = ${JSON.stringify(requestedLanguageMode)}
+      return localStorage.getItem('theme') === expectedTheme &&
+        document.body.classList.contains('theme-' + expectedTheme) &&
+        localStorage.getItem('language-mode-v1') === expectedLanguageMode &&
+        document.body.getAttribute('data-dm-language-mode') === expectedLanguageMode &&
+        document.documentElement.getAttribute('data-language-mode') === expectedLanguageMode &&
+        document.documentElement.lang === ${JSON.stringify(
+          expectedDocumentLanguage(requestedLanguageMode)
+        )}
+    })()`,
+    context,
+    25000
+  )
+  return await assertRequestedPresentationState(context, {
+    requireAppearanceSurface: false,
+  })
+}
+
+async function validateAppearanceLanguageSurface() {
+  await menuEvent('show-preferences')
+  await waitFor(
+    `document.querySelector('#preferences') !== null`,
+    'Appearance language verification dialog'
+  )
+  await clickText('Appearance', { within: '#preferences' })
+  await waitFor(
+    `document.querySelector('#preferences select[name="languageMode"]') !== null`,
+    'Appearance language selector'
+  )
+  const expected = LanguageSurfaceExpectations[requestedLanguageMode]
+  const receipt = await evaluate(`(() => {
+    const dialog = document.querySelector('#preferences')
+    const section = dialog?.querySelector('.appearance-language-navigation')
+    const heading = section?.querySelector('h2')
+    const select = section?.querySelector('select[name="languageMode"]')
+    const label = select instanceof HTMLSelectElement ? select.labels?.[0] : null
+    const description = section?.querySelector('.appearance-customization-caption')
+    const visible = element => {
+      if (!(element instanceof HTMLElement)) return false
+      const style = getComputedStyle(element)
+      const bounds = element.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' &&
+        Number(style.opacity || 1) !== 0 && bounds.width > 0 && bounds.height > 0
+    }
+    const text = element => element?.textContent?.trim() ?? null
+    return {
+      value: select instanceof HTMLSelectElement ? select.value : null,
+      heading: text(heading),
+      label: text(label),
+      description: text(description),
+      options:
+        select instanceof HTMLSelectElement
+          ? [...select.options].map(option => option.textContent?.trim() ?? '')
+          : [],
+      selectedOption:
+        select instanceof HTMLSelectElement
+          ? select.selectedOptions[0]?.textContent?.trim() ?? null
+          : null,
+      labelCount:
+        select instanceof HTMLSelectElement ? select.labels?.length ?? 0 : 0,
+      ariaLabel:
+        select instanceof HTMLSelectElement
+          ? select.getAttribute('aria-label')
+          : null,
+      ariaLabelledBy:
+        select instanceof HTMLSelectElement
+          ? select.getAttribute('aria-labelledby')
+          : null,
+      visible:
+        visible(dialog) && visible(section) && visible(heading) &&
+        visible(select) && visible(label) && visible(description),
+    }
+  })()`)
+  const selectedIndex = CaptureLanguageModes.indexOf(requestedLanguageMode)
+  const exact =
+    receipt?.value === requestedLanguageMode &&
+    receipt?.heading === expected.heading &&
+    receipt?.label === expected.label &&
+    receipt?.description === expected.description &&
+    JSON.stringify(receipt?.options) === JSON.stringify(expected.options) &&
+    receipt?.selectedOption === expected.options[selectedIndex] &&
+    receipt?.labelCount === 1 &&
+    receipt?.ariaLabel === null &&
+    receipt?.ariaLabelledBy === null &&
+    receipt?.visible === true
+  if (!exact) {
+    fail(
+      `Appearance language surface diverged: ${JSON.stringify({
+        requestedLanguageMode,
+        expected,
+        observed: receipt,
+      })}`
+    )
+  }
+  appearanceLanguageSurfaceReceipt = {
+    value: receipt.value,
+    heading: receipt.heading,
+    label: receipt.label,
+    description: receipt.description,
+    options: receipt.options,
+    selectedOption: receipt.selectedOption,
+    labelCount: receipt.labelCount,
+    visible: receipt.visible,
+  }
+  process.stdout.write(
+    `LANGUAGE_SURFACE ${JSON.stringify(appearanceLanguageSurfaceReceipt)}\n`
+  )
+  await clickSelector('#preferences .preferences-close-button')
+  await waitFor(
+    `document.querySelector('#preferences') === null`,
+    'Appearance language verification dialog closure'
+  )
+  return appearanceLanguageSurfaceReceipt
+}
+
 async function setViewport(width = DefaultWidth, height = DefaultHeight) {
   await client.send('Emulation.setDeviceMetricsOverride', {
     width,
@@ -1005,7 +1360,53 @@ function pngDimensions(file) {
 }
 
 /** Remove unrelated transient chrome and focus paint from documentation frames. */
+async function waitForBundledCaptureFonts(name) {
+  const receipt = await evaluate(`(async () => {
+    const fonts = document.fonts
+    if (
+      !fonts ||
+      typeof fonts.load !== 'function' ||
+      typeof fonts.check !== 'function' ||
+      typeof fonts.ready?.then !== 'function'
+    ) {
+      return { status: null, faces: [], error: 'FontFaceSet unavailable' }
+    }
+    const requested = ${JSON.stringify(BundledCaptureFonts)}
+    const faces = []
+    for (const font of requested) {
+      const loaded = await fonts.load(font.descriptor, font.sample)
+      faces.push({
+        family: font.family,
+        count: loaded.length,
+        statuses: loaded.map(face => face.status),
+        check: fonts.check(font.descriptor, font.sample),
+      })
+    }
+    await fonts.ready
+    return { status: fonts.status, faces, error: null }
+  })()`)
+  if (
+    receipt?.status !== 'loaded' ||
+    receipt?.error !== null ||
+    receipt?.faces?.length !== BundledCaptureFonts.length ||
+    receipt.faces.some(
+      face =>
+        face.count < 1 ||
+        face.check !== true ||
+        face.statuses.some(status => status !== 'loaded')
+    )
+  ) {
+    fail(
+      `Capture ${name} could not settle bundled fonts: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  return receipt
+}
+
 async function prepareCaptureSurface(name) {
+  const fontReceipt = await waitForBundledCaptureFonts(name)
   const receipt = await evaluate(`(() => {
     const undo = document.querySelector('#undo-commit')
     if (undo instanceof HTMLElement) {
@@ -1037,9 +1438,10 @@ async function prepareCaptureSurface(name) {
       )}`
     )
   }
+  return fontReceipt
 }
 
-async function capture(name) {
+async function capture(name, { expectedTheme = requestedTheme } = {}) {
   if (outDir === null) {
     fail('Capture scenes require an explicit disposable --out directory.')
   }
@@ -1058,7 +1460,11 @@ async function capture(name) {
   ) {
     fail('Capture candidates must be reviewed in Temp before promotion.')
   }
-  await prepareCaptureSurface(name)
+  const fontReceipt = await prepareCaptureSurface(name)
+  const presentationReceipt = await assertRequestedPresentationState(
+    `capture ${name}`,
+    { expectedTheme }
+  )
   await assertCapturePrivacy(name)
   fs.mkdirSync(outDir, { recursive: true })
   const shot = await client.send('Page.captureScreenshot', { format: 'png' })
@@ -1089,6 +1495,13 @@ async function capture(name) {
   const size = fs.statSync(file).size
   process.stdout.write(
     `CAPTURED ${name}.png ${size}b ${dimensions.width}x${dimensions.height}\n`
+  )
+  process.stdout.write(
+    `CAPTURE_STATE ${JSON.stringify({
+      capture: name,
+      fonts: fontReceipt,
+      ...presentationReceipt,
+    })}\n`
   )
   if (size < 20000) {
     process.stdout.write(`WARN ${name}.png is suspiciously small\n`)
@@ -1210,47 +1623,47 @@ const ThemeToggleSelector =
   'button.theme-toggle-button[aria-label="Toggle theme"]'
 
 async function setThemeThroughToggle(theme) {
-  if (!['light', 'dark', 'system'].includes(theme)) {
+  if (!CaptureThemes.includes(theme)) {
     fail(`Unsupported capture theme: ${theme}`)
   }
   const expectedLabel = `${theme[0].toUpperCase()}${theme.slice(1)} theme`
-  const expectedBodyClass =
-    theme === 'dark' ? 'theme-dark' : theme === 'light' ? 'theme-light' : null
+  const expectedBodyClass = `theme-${theme}`
 
   for (let attempt = 0; attempt <= 3; attempt++) {
     const selected = await evaluate(`(() => {
       const button = document.querySelector(${JSON.stringify(
         ThemeToggleSelector
       )})
+      const status = button?.querySelector('.sr-only')
       return button instanceof HTMLButtonElement &&
-        button.textContent.trim() === ${JSON.stringify(expectedLabel)} &&
+        status?.textContent?.trim() === ${JSON.stringify(expectedLabel)} &&
         localStorage.getItem('theme') === ${JSON.stringify(theme)}
     })()`)
     if (selected) {
-      if (expectedBodyClass !== null) {
-        await waitFor(
-          `document.body.classList.contains(${JSON.stringify(
-            expectedBodyClass
-          )})`,
-          `applied ${theme} capture theme`
-        )
-      }
+      await waitFor(
+        `document.body.classList.contains(${JSON.stringify(
+          expectedBodyClass
+        )})`,
+        `applied ${theme} capture theme`
+      )
       return
     }
     if (attempt === 3) {
       break
     }
 
-    const previousLabel = await evaluate(
-      `document.querySelector(${JSON.stringify(
-        ThemeToggleSelector
-      )})?.textContent?.trim() ?? null`
-    )
+    const previousLabel = await evaluate(`document
+      .querySelector(${JSON.stringify(ThemeToggleSelector)})
+      ?.querySelector('.sr-only')
+      ?.textContent
+      ?.trim() ?? null`)
     await clickEnabledSelector(ThemeToggleSelector)
     await waitFor(
-      `document.querySelector(${JSON.stringify(
-        ThemeToggleSelector
-      )})?.textContent?.trim() !== ${JSON.stringify(previousLabel)}`,
+      `document
+        .querySelector(${JSON.stringify(ThemeToggleSelector)})
+        ?.querySelector('.sr-only')
+        ?.textContent
+        ?.trim() !== ${JSON.stringify(previousLabel)}`,
       `theme toggle transition toward ${theme}`
     )
   }
@@ -1507,6 +1920,28 @@ function countProviderRequests(method, pathPattern) {
     .length
 }
 
+/** Count state-changing fixture-provider calls without logging request data. */
+function countProviderMutations() {
+  if (providerRequestLog === null || !fs.existsSync(providerRequestLog)) {
+    fail('Audit design scenes require the owned provider request log.')
+  }
+  const mutationMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+  return fs
+    .readFileSync(providerRequestLog, 'utf8')
+    .split(/\r?\n/)
+    .filter(line => line.trim() !== '')
+    .map(line => JSON.parse(line))
+    .filter(entry => mutationMethods.has(entry.method)).length
+}
+
+function assertNoProviderMutations(before, context) {
+  const after = countProviderMutations()
+  if (after !== before) {
+    fail(`${context} sent ${after - before} state-changing provider requests.`)
+  }
+  process.stdout.write(`NONDESTRUCTIVE ${context} providerMutations=0\n`)
+}
+
 function ensureDirectFixtureProviderRemote() {
   if (ready === null || fixturePath === null) {
     return false
@@ -1607,8 +2042,8 @@ async function seedProfile() {
     }
     const expected = {
       'has-shown-welcome-flow': '1',
-      'theme': 'light',
-      'language-mode-v1': 'english',
+      'theme': ${JSON.stringify(requestedTheme)},
+      'language-mode-v1': ${JSON.stringify(requestedLanguageMode)},
       'zoom-auto-fit-enabled': '1',
       'stats-opt-out': '1',
       'has-sent-stats-opt-in-ping': '1'
@@ -1652,6 +2087,9 @@ async function seedProfile() {
 
   const changed = providerRemoteChanged || profileChanged
   if (changed) {
+    await waitForElementAppearanceCoordinatorReady(
+      'seedProfile before renderer reload'
+    )
     const beforeSeedReloadTimeOrigin = await evaluate('performance.timeOrigin')
     await client.send('Page.reload', { ignoreCache: true })
     await sleep(4500)
@@ -1660,6 +2098,9 @@ async function seedProfile() {
       `performance.timeOrigin > ${JSON.stringify(beforeSeedReloadTimeOrigin)}`,
       'seeded profile renderer reload',
       25000
+    )
+    await waitForElementAppearanceCoordinatorReady(
+      'seedProfile after renderer reload'
     )
   }
   if (
@@ -1748,6 +2189,10 @@ async function seedProfile() {
       )
     }
   }
+  const presentationReceipt = await assertRequestedPresentationState(
+    'seeded profile'
+  )
+  process.stdout.write(`SEED_STATE ${JSON.stringify(presentationReceipt)}\n`)
   process.stdout.write(`SEEDED changed=${changed}\n`)
 }
 
@@ -2334,7 +2779,12 @@ scene('settings', async () => {
 })
 
 /** Open Settings on a named tab and capture. */
-async function captureSettingsTab(tabLabel, name, beforeCapture = null) {
+async function captureSettingsTab(
+  tabLabel,
+  name,
+  beforeCapture = null,
+  captureOptions = {}
+) {
   await ensureRepository()
   await menuEvent('show-preferences')
   await waitFor(
@@ -2379,7 +2829,7 @@ async function captureSettingsTab(tabLabel, name, beforeCapture = null) {
     await beforeCapture()
   }
   await parkPointer()
-  await capture(name)
+  await capture(name, captureOptions)
   await closeAllDialogs()
 }
 
@@ -2390,6 +2840,9 @@ scene('settings-agent-access', async () => {
 scene('anchored-appearance', async () => {
   await ensureRepository()
   await menuEvent('show-changes')
+  await waitForElementAppearanceCoordinatorReady(
+    'anchored-appearance before repository toolbar context menu'
+  )
   await contextMenuSelector('#desktop-app-toolbar')
   await waitForPrivacySafeAnchoredEditor(
     'repository toolbar owner appearance editor'
@@ -2406,6 +2859,67 @@ scene('anchored-appearance', async () => {
 
 scene('settings-accounts', async () => {
   await captureSettingsTab('Accounts', 'material-provider-accounts')
+})
+
+scene('account-switcher', async () => {
+  const mutationsBefore = countProviderMutations()
+  await ensureRepository()
+  await clickEnabledSelector('button[aria-label="Switch account"]')
+  await waitFor(
+    `document.querySelector('.account-switcher[role="dialog"]') !== null`,
+    'account-switcher design surface'
+  )
+  const receipt = await evaluate(`(() => {
+    const surface = document.querySelector('.account-switcher[role="dialog"]')
+    const trigger = document.querySelector('button[aria-label="Switch account"]')
+    const rows = [...document.querySelectorAll('.account-switcher-row')]
+    const active = rows.filter(row => row.getAttribute('aria-current') === 'true')
+    const add = document.querySelector('.account-switcher-add')
+    if (!(surface instanceof HTMLElement)) return null
+    const bounds = surface.getBoundingClientRect()
+    return {
+      heading: document.querySelector('#account-switcher-header')?.textContent?.trim() ?? '',
+      rowCount: rows.length,
+      activeCount: active.length,
+      accountText: rows.map(row => row.textContent?.trim() ?? ''),
+      addLabel: add?.textContent?.trim() ?? '',
+      triggerExpanded: trigger?.getAttribute('aria-expanded'),
+      inViewport:
+        bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= -0.5 && bounds.top >= -0.5 &&
+        bounds.right <= window.innerWidth + 0.5 &&
+        bounds.bottom <= window.innerHeight + 0.5,
+      contained:
+        surface.scrollWidth <= surface.clientWidth + 1 &&
+        surface.scrollHeight <= surface.clientHeight + 1,
+    }
+  })()`)
+  if (
+    receipt === null ||
+    !receipt.heading.startsWith('Accounts · ') ||
+    receipt.rowCount !== 1 ||
+    receipt.activeCount !== 1 ||
+    !receipt.accountText[0]?.includes('@material-verifier-p0') ||
+    receipt.addLabel !== 'Add another account' ||
+    receipt.triggerExpanded !== 'true' ||
+    receipt.inViewport !== true ||
+    receipt.contained !== true
+  ) {
+    fail(
+      `Account-switcher semantic or containment check failed: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  await parkPointer()
+  await capture('material-design-account-switcher')
+  assertNoProviderMutations(mutationsBefore, 'account-switcher scene')
+  await pressEscape(1)
+  await waitFor(
+    `document.querySelector('.account-switcher') === null && document.querySelector('button[aria-label="Switch account"]')?.getAttribute('aria-expanded') === 'false'`,
+    'account-switcher cleanup'
+  )
+  await assertNoSceneLeaks('account-switcher cleanup')
 })
 
 scene('ollama-manager', async () => {
@@ -2788,17 +3302,12 @@ scene('ollama-manager', async () => {
           'post-scroll stable Ollama capture surface'
         )
         await parkPointer()
-      }
+      },
+      { expectedTheme: 'dark' }
     )
   } finally {
     await closeAllDialogs().catch(() => undefined)
-    const dark = await evaluate(
-      `document.body.classList.contains('theme-dark')`
-    ).catch(() => false)
-    if (dark) {
-      await setThemeThroughToggle('system')
-      await setThemeThroughToggle('light')
-    }
+    await setThemeThroughToggle(requestedTheme)
     await restoreCaptureViewport()
   }
 })
@@ -3196,6 +3705,231 @@ scene('api-app-functions', async () => {
   await sleep(900)
   await parkPointer()
   await capture('material-api-app-functions')
+})
+
+async function openAuditActionsRuns() {
+  await captureSection('Actions', null, 3500)
+  const activeTab = await evaluate(`(() => {
+    const selected = [...document.querySelectorAll('.actions-tab-bar [role="tab"]')]
+      .find(tab => tab.getAttribute('aria-selected') === 'true')
+    return selected?.textContent?.trim() ?? null
+  })()`)
+  if (activeTab !== 'Runs') {
+    await clickText('Runs', { within: '.actions-view' })
+  }
+  await waitFor(
+    `document.querySelector('.actions-run-workflow-button:not(:disabled)') !== null && document.querySelector('.actions-view .actions-banner.error') === null`,
+    'settled Actions runs surface with an enabled workflow',
+    30000
+  )
+}
+
+async function openAuditWorkflowManager() {
+  await openAuditActionsRuns()
+  await clickEnabledSelector('button[aria-label="Manage workflows"]')
+  await waitFor(
+    `document.querySelectorAll('.actions-workflow-management .actions-workflow-row').length === 1 && document.querySelector('.actions-workflow-management [role="alert"]') === null`,
+    'deterministic workflow manager inventory',
+    30000
+  )
+}
+
+async function closeAuditWorkflowManager() {
+  const open = await evaluate(
+    `document.querySelector('.actions-workflow-management') !== null`
+  )
+  if (open) {
+    await clickEnabledSelector('button[aria-label="Manage workflows"]')
+    await waitFor(
+      `document.querySelector('.actions-workflow-management') === null`,
+      'workflow manager cleanup'
+    )
+  }
+}
+
+scene('workflow-manager', async () => {
+  const mutationsBefore = countProviderMutations()
+  await openAuditWorkflowManager()
+  const receipt = await evaluate(`(() => {
+    const manager = document.querySelector('.actions-workflow-management')
+    const view = document.querySelector('.actions-view')
+    const rows = [...document.querySelectorAll('.actions-workflow-row')]
+    const switches = [...document.querySelectorAll('.actions-workflow-switch')]
+    if (!(manager instanceof HTMLElement) || !(view instanceof HTMLElement)) return null
+    const bounds = manager.getBoundingClientRect()
+    const owner = view.getBoundingClientRect()
+    return {
+      heading: document.querySelector('.actions-workflow-management-title')?.textContent?.trim() ?? '',
+      rowCount: rows.length,
+      switchCount: switches.length,
+      activeSwitchCount: switches.filter(control => control.getAttribute('aria-checked') === 'true').length,
+      hasFilter: document.querySelector('input[aria-label="Filter workflows"]') !== null,
+      hasNewWorkflow: document.querySelector('.actions-new-workflow-button')?.textContent?.trim() === 'New workflow',
+      triggerExpanded: document.querySelector('button[aria-label="Manage workflows"]')?.getAttribute('aria-expanded'),
+      inOwner:
+        bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= owner.left - 0.5 && bounds.top >= owner.top - 0.5 &&
+        bounds.right <= owner.right + 0.5 && bounds.bottom <= owner.bottom + 0.5,
+      contained: manager.scrollWidth <= manager.clientWidth + 1,
+    }
+  })()`)
+  if (
+    receipt === null ||
+    receipt.heading !== 'Workflows · 1 active' ||
+    receipt.rowCount !== 1 ||
+    receipt.switchCount !== 1 ||
+    receipt.activeSwitchCount !== 1 ||
+    receipt.hasFilter !== true ||
+    receipt.hasNewWorkflow !== true ||
+    receipt.triggerExpanded !== 'true' ||
+    receipt.inOwner !== true ||
+    receipt.contained !== true
+  ) {
+    fail(
+      `Workflow-manager semantic or containment check failed: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  await parkPointer()
+  await capture('material-design-workflow-manager')
+  assertNoProviderMutations(mutationsBefore, 'workflow-manager scene')
+  await closeAuditWorkflowManager()
+  await assertNoSceneLeaks('workflow-manager cleanup')
+})
+
+scene('workflow-catalog', async () => {
+  const mutationsBefore = countProviderMutations()
+  await openAuditWorkflowManager()
+  await clickEnabledSelector('.actions-new-workflow-button')
+  await waitFor(
+    `document.querySelectorAll('.workflow-catalog-dialog .workflow-template-card').length === 8 && document.querySelector('.workflow-catalog-dialog [role="alert"]') === null`,
+    'deterministic workflow catalog inventory',
+    30000
+  )
+  await clickEnabledSelector('.workflow-catalog-search .actions-search-toggle')
+  await waitFor(
+    `document.querySelectorAll('.workflow-catalog-dialog [aria-label="Template categories"] .actions-filter-chip').length === 5`,
+    'workflow catalog category filters'
+  )
+  const receipt = await evaluate(`(() => {
+    const dialog = document.querySelector('.workflow-catalog-dialog[role="dialog"]')
+    const cards = [...document.querySelectorAll('.workflow-template-card')]
+    const categories = [...document.querySelectorAll('[aria-label="Template categories"] .actions-filter-chip')]
+      .map(button => button.textContent?.trim() ?? '')
+      .sort()
+    if (!(dialog instanceof HTMLElement)) return null
+    const bounds = dialog.getBoundingClientRect()
+    return {
+      title: document.querySelector('#workflow-catalog-title')?.textContent?.trim() ?? '',
+      ariaModal: dialog.getAttribute('aria-modal'),
+      cardCount: cards.length,
+      categories,
+      actionCount:
+        document.querySelectorAll('.workflow-template-use').length +
+        document.querySelectorAll('.workflow-template-added').length,
+      hasSearch: document.querySelector('input[aria-label="Search workflow templates"]') !== null,
+      busyCount: document.querySelectorAll('.workflow-template-use:disabled').length,
+      inViewport:
+        bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= -0.5 && bounds.top >= -0.5 &&
+        bounds.right <= window.innerWidth + 0.5 &&
+        bounds.bottom <= window.innerHeight + 0.5,
+      contained: dialog.scrollWidth <= dialog.clientWidth + 1,
+    }
+  })()`)
+  if (
+    receipt === null ||
+    receipt.title !== 'New workflow' ||
+    receipt.ariaModal !== 'true' ||
+    receipt.cardCount !== 8 ||
+    JSON.stringify(receipt.categories) !==
+      JSON.stringify(['Automation', 'CI', 'Deploy', 'Release', 'Security']) ||
+    receipt.actionCount !== 8 ||
+    receipt.hasSearch !== true ||
+    receipt.busyCount !== 0 ||
+    receipt.inViewport !== true ||
+    receipt.contained !== true
+  ) {
+    fail(
+      `Workflow-catalog semantic or containment check failed: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  await parkPointer()
+  await capture('material-design-workflow-catalog')
+  assertNoProviderMutations(mutationsBefore, 'workflow-catalog scene')
+  await pressEscape(1)
+  await waitFor(
+    `document.querySelector('.workflow-catalog-dialog') === null`,
+    'workflow catalog cleanup'
+  )
+  await closeAuditWorkflowManager()
+  await assertNoSceneLeaks('workflow-catalog cleanup')
+})
+
+scene('workflow-dispatch', async () => {
+  const mutationsBefore = countProviderMutations()
+  await openAuditActionsRuns()
+  await clickEnabledSelector('.actions-run-workflow-button')
+  await waitFor(
+    `document.querySelector('.workflow-dispatch-dialog[role="dialog"]') !== null && document.querySelector('.workflow-dispatch-dialog .actions-loading') === null && document.querySelector('.workflow-dispatch-dialog [role="alert"]') === null`,
+    'settled workflow dispatch design surface',
+    30000
+  )
+  const receipt = await evaluate(`(() => {
+    const dialog = document.querySelector('.workflow-dispatch-dialog[role="dialog"]')
+    const workflowChips = [...document.querySelectorAll('.workflow-dispatch-chip[aria-label^="Workflow:"]')]
+    const refChips = [...document.querySelectorAll('.workflow-dispatch-chip[aria-label^="Run on ref:"]')]
+    const run = document.querySelector('.workflow-dispatch-run-button')
+    if (!(dialog instanceof HTMLElement)) return null
+    const bounds = dialog.getBoundingClientRect()
+    return {
+      title: document.querySelector('#workflow-dispatch-title')?.textContent?.trim() ?? '',
+      ariaModal: dialog.getAttribute('aria-modal'),
+      workflowCount: workflowChips.length,
+      selectedWorkflowCount: workflowChips.filter(button => button.getAttribute('aria-pressed') === 'true').length,
+      refCount: refChips.length,
+      selectedRefCount: refChips.filter(button => button.getAttribute('aria-pressed') === 'true').length,
+      runLabel: run?.textContent?.trim() ?? '',
+      runEnabled: run instanceof HTMLButtonElement && !run.disabled,
+      inViewport:
+        bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= -0.5 && bounds.top >= -0.5 &&
+        bounds.right <= window.innerWidth + 0.5 &&
+        bounds.bottom <= window.innerHeight + 0.5,
+      contained: dialog.scrollWidth <= dialog.clientWidth + 1,
+    }
+  })()`)
+  if (
+    receipt === null ||
+    receipt.title !== 'Run workflow' ||
+    receipt.ariaModal !== 'true' ||
+    receipt.workflowCount !== 1 ||
+    receipt.selectedWorkflowCount !== 1 ||
+    receipt.refCount < 1 ||
+    receipt.selectedRefCount !== 1 ||
+    receipt.runLabel !== 'Run workflow' ||
+    receipt.runEnabled !== true ||
+    receipt.inViewport !== true ||
+    receipt.contained !== true
+  ) {
+    fail(
+      `Workflow-dispatch semantic or containment check failed: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  await parkPointer()
+  await capture('material-design-workflow-dispatch')
+  assertNoProviderMutations(mutationsBefore, 'workflow-dispatch scene')
+  await pressEscape(1)
+  await waitFor(
+    `document.querySelector('.workflow-dispatch-dialog') === null`,
+    'workflow dispatch cleanup'
+  )
+  await assertNoSceneLeaks('workflow-dispatch cleanup')
 })
 
 scene('actions-runs', async () => {
@@ -3626,9 +4360,20 @@ scene('app-identity', async () => {
     )
   }
   const beforeReloadTimeOrigin = armedReloadProof.timeOrigin
+  await waitForElementAppearanceCoordinatorReady(
+    'app-identity before renderer reload'
+  )
   await evaluate('window.location.reload(), true')
   await sleep(2500)
   await client.send('Runtime.enable')
+  await waitFor(
+    `performance.timeOrigin > ${JSON.stringify(beforeReloadTimeOrigin)}`,
+    'app-identity renderer reload',
+    25000
+  )
+  await waitForElementAppearanceCoordinatorReady(
+    'app-identity after renderer reload'
+  )
   await waitFor(
     `document.querySelector('nav.repository-rail') !== null &&
       document.querySelector('#desktop-app-title-bar .app-brand') !== null`,
@@ -4695,6 +5440,86 @@ scene('pull-request-open', async () => {
   await closeAllDialogs()
 })
 
+scene('clone-dialog-design', async () => {
+  const mutationsBefore = countProviderMutations()
+  await ensureRepository()
+  await menuEvent('clone-repository')
+  await waitFor(
+    `document.querySelector('dialog.clone-repository[open]') !== null`,
+    'clone-dialog design surface'
+  )
+  await clickText('GitHub Enterprise', {
+    within: 'dialog.clone-repository',
+  })
+  await waitFor(
+    `document.querySelector('dialog.clone-repository .clone-github-repository-content') !== null && document.querySelector('dialog.clone-repository .no-items.loading') === null && document.querySelector('dialog.clone-repository [role="alert"]') === null`,
+    'settled account-scoped clone-dialog design state',
+    30000
+  )
+  await maskVisibleValue(
+    'dialog.clone-repository input[placeholder="repository path"]',
+    'C:\\Synthetic\\Repository Fleet'
+  )
+  const receipt = await evaluate(`(() => {
+    const dialog = document.querySelector('dialog.clone-repository[open]')
+    const selectedTab = [...document.querySelectorAll('dialog.clone-repository [role="tab"]')]
+      .find(tab => tab.getAttribute('aria-selected') === 'true')
+    const visibility = [...document.querySelectorAll('[aria-label="Filter repositories by visibility"] .org-filter-chip')]
+    const path = document.querySelector('dialog.clone-repository input[placeholder="repository path"]')
+    if (!(dialog instanceof HTMLDialogElement)) return null
+    const bounds = dialog.getBoundingClientRect()
+    return {
+      title: document.querySelector('.clone-dialog-title')?.textContent?.trim() ?? '',
+      selectedTab: selectedTab?.textContent?.trim() ?? '',
+      tabCount: document.querySelectorAll('dialog.clone-repository [role="tab"]').length,
+      visibilityCount: visibility.length,
+      selectedVisibilityCount: visibility.filter(button => button.getAttribute('aria-pressed') === 'true').length,
+      hasFilter: document.querySelector('[data-search-surface-id="clone-repositories"]') !== null,
+      hasListState:
+        document.querySelector('.clone-repository-list-item, .clone-github-repo .no-items') !== null,
+      hasFooter: document.querySelector('dialog.clone-repository .dialog-footer') !== null,
+      maskedPath: path instanceof HTMLInputElement ? path.value : null,
+      modal: dialog.getAttribute('data-modal'),
+      inViewport:
+        bounds.width > 0 && bounds.height > 0 &&
+        bounds.left >= -0.5 && bounds.top >= -0.5 &&
+        bounds.right <= window.innerWidth + 0.5 &&
+        bounds.bottom <= window.innerHeight + 0.5,
+      contained: dialog.scrollWidth <= dialog.clientWidth + 1,
+    }
+  })()`)
+  if (
+    receipt === null ||
+    receipt.title !== 'Clone repositories' ||
+    receipt.selectedTab !== 'GitHub Enterprise' ||
+    receipt.tabCount !== 4 ||
+    receipt.visibilityCount !== 4 ||
+    receipt.selectedVisibilityCount !== 1 ||
+    receipt.hasFilter !== true ||
+    receipt.hasListState !== true ||
+    receipt.hasFooter !== true ||
+    receipt.maskedPath !== 'C:\\Synthetic\\Repository Fleet' ||
+    receipt.modal !== null ||
+    receipt.inViewport !== true ||
+    receipt.contained !== true
+  ) {
+    fail(
+      `Clone-dialog semantic or containment check failed: ${JSON.stringify(
+        receipt
+      )}`
+    )
+  }
+  await parkPointer()
+  await capture('material-design-clone-dialog')
+  assertNoProviderMutations(mutationsBefore, 'clone-dialog-design scene')
+  await closeAllDialogs()
+  await waitFor(
+    `document.querySelector('dialog.clone-repository') === null`,
+    'clone-dialog design cleanup'
+  )
+  await assertNoSceneLeaks('clone-dialog-design cleanup')
+})
+
 scene('shallow-clone-dialog', async () => {
   await ensureRepository()
   await menuEvent('clone-repository')
@@ -5753,7 +6578,7 @@ scene('advanced-workflows', async () => {
     )
   if (
     receipt === null ||
-    receipt.language !== 'english' ||
+    receipt.language !== requestedLanguageMode ||
     JSON.stringify(receipt.headings) !==
       JSON.stringify(['Local tags (3)', 'Remote-only tags (1) on origin']) ||
     JSON.stringify(receipt.localNames) !==
@@ -5923,11 +6748,28 @@ async function main() {
     }
 
     const canonical = args.get('canonical') === 'true'
+    const auditDesignValue = args.get('audit-design')
+    if (
+      auditDesignValue !== undefined &&
+      auditDesignValue !== 'true' &&
+      auditDesignValue !== 'false'
+    ) {
+      fail('The --audit-design option accepts only true or false.')
+    }
+    const auditDesign = auditDesignValue === 'true'
     if (canonical && args.has('scenes')) {
       fail('Use either --canonical true or --scenes, not both.')
     }
+    if (canonical && auditDesign) {
+      fail('Use either --canonical true or --audit-design true, not both.')
+    }
+    if (auditDesign && args.has('scenes')) {
+      fail('Use either --audit-design true or --scenes, not both.')
+    }
     const names = canonical
       ? [...CanonicalGalleryScenes]
+      : auditDesign
+      ? [...AuditDesignScenes]
       : (args.get('scenes') ?? '')
           .split(',')
           .map(value => value.trim())
@@ -5937,6 +6779,31 @@ async function main() {
       assertOwnedDisposableFixture()
     }
 
+    let appearanceLanguageValidated = false
+    if (names.length > 0) {
+      const initialPresentationReceipt = await applyRequestedPresentationState(
+        'initial requested presentation'
+      )
+      process.stdout.write(
+        `PRESENTATION_STATE ${JSON.stringify(initialPresentationReceipt)}\n`
+      )
+
+      if (!canonical) {
+        await validateAppearanceLanguageSurface()
+        appearanceLanguageValidated = true
+        await assertRequestedPresentationState(
+          'validated Appearance language surface'
+        )
+      }
+    }
+
+    if (auditDesign) {
+      if (ready === null || providerRequestLog === null) {
+        fail('--audit-design true requires an owned provider --run-root.')
+      }
+      await seedProfile()
+    }
+
     for (const name of names) {
       const run = scenes.get(name)
       if (run === undefined) {
@@ -5944,10 +6811,37 @@ async function main() {
       }
       process.stdout.write(`SCENE ${name}\n`)
       await resetSceneState(name)
+      await assertRequestedPresentationState(`reset before scene ${name}`, {
+        requireAppearanceSurface: appearanceLanguageValidated,
+      })
       await run()
+
+      if (canonical && name === 'complete-welcome') {
+        await validateAppearanceLanguageSurface()
+        appearanceLanguageValidated = true
+        await assertRequestedPresentationState(
+          'validated Appearance language surface after welcome'
+        )
+      }
+
+      const scenePresentationReceipt = await assertRequestedPresentationState(
+        `completed scene ${name}`,
+        { requireAppearanceSurface: appearanceLanguageValidated }
+      )
+      process.stdout.write(
+        `SCENE_STATE ${JSON.stringify({
+          scene: name,
+          ...scenePresentationReceipt,
+        })}\n`
+      )
     }
 
     if (canonical) {
+      if (!appearanceLanguageValidated) {
+        fail(
+          'Canonical gallery did not validate the Appearance language surface.'
+        )
+      }
       const expected = [...CanonicalGalleryOutputs].sort()
       const actual = [...capturedNames].sort()
       if (
@@ -5961,6 +6855,21 @@ async function main() {
         )
       }
       process.stdout.write('CANONICAL 68/68 exact output set\n')
+    }
+    if (auditDesign) {
+      const expected = [...AuditDesignOutputs].sort()
+      const actual = [...capturedNames].sort()
+      if (
+        capturedNames.length !== new Set(capturedNames).size ||
+        JSON.stringify(actual) !== JSON.stringify(expected)
+      ) {
+        fail(
+          `Audit design gallery did not produce the exact 5-output set: ${JSON.stringify(
+            { expected, actual }
+          )}`
+        )
+      }
+      process.stdout.write('AUDIT_DESIGN 5/5 exact output set\n')
     }
   } finally {
     // This style is capture-only state. Leaving it installed breaks normal
