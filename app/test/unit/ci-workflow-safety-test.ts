@@ -87,11 +87,11 @@ describe('CI workflow safety', () => {
     )
     assert.match(installerWorkflow, /DISPATCH_REF: \$\{\{ github\.ref \}\}/)
     assert.match(installerWorkflow, /DISPATCH_REF" != "refs\/heads\/main"/)
-    assert.match(installerWorkflow, /git\/ref\/heads\/main/)
+    assert.match(installerWorkflow, /publish="\$ci_can_publish"/)
     assert.match(installerWorkflow, /git ls-remote origin refs\/heads\/main/)
     assert.match(
       installerWorkflow,
-      /Release target \$RELEASE_TARGET_SHA became stale while building/
+      /Publishing superseded commit \$RELEASE_TARGET_SHA as an immutable non-latest Release/
     )
     assert.doesNotMatch(installerWorkflow, /softprops\/action-gh-release/)
     assert.equal(
@@ -111,7 +111,7 @@ describe('CI workflow safety', () => {
     )
     assert.match(
       installerWorkflow,
-      /Verify required release assets[\s\S]*?Preserve express installer payload[\s\S]*?Generate bounded exact-SHA release notes[\s\S]*?Preserve exact release notes[\s\S]*?Revalidate current main before publishing[\s\S]*?Revalidate immutable release tag before publishing[\s\S]*?Publish GitHub release/
+      /Verify required release assets[\s\S]*?Preserve express installer payload[\s\S]*?Generate bounded exact-SHA release notes[\s\S]*?Preserve exact release notes[\s\S]*?Classify release freshness without blocking publication[\s\S]*?Revalidate immutable release tag before publishing[\s\S]*?Publish GitHub release/
     )
     assert.match(
       installerWorkflow,
@@ -124,14 +124,15 @@ describe('CI workflow safety', () => {
     )
     assert.match(
       installerWorkflow,
-      /no longer current main; preserving its exact installer artifact without publishing/
-    )
-    assert.match(
-      installerWorkflow,
       /block_reason: \$\{\{ steps\.target\.outputs\.block_reason \}\}/
     )
     assert.match(installerWorkflow, /block_reason=ci-failed/)
-    assert.match(installerWorkflow, /block_reason=stale/)
+    assert.doesNotMatch(installerWorkflow, /block_reason=stale/)
+    assert.doesNotMatch(installerWorkflow, /Record stale non-publishing result/)
+    assert.doesNotMatch(installerWorkflow, /became stale while building/)
+    assert.match(installerWorkflow, /latest_args=\(--latest=false\)/)
+    assert.match(installerWorkflow, /latest_args=\(--latest\)/)
+    assert.match(installerWorkflow, /"\$\{latest_args\[@\]\}"/)
 
     const upstreamFailureStep = installerWorkflow.match(
       /- name: Preserve the upstream CI failure result([\s\S]*?)(?=\n      - name:|\n  publish:)/
@@ -143,16 +144,6 @@ describe('CI workflow safety', () => {
     )
     assert.match(upstreamFailureStep?.[1] ?? '', /exit 1/)
 
-    const staleResultStep = installerWorkflow.match(
-      /- name: Record stale non-publishing result([\s\S]*?)(?=\n      - name:|\n  publish:)/
-    )
-    assert.notEqual(staleResultStep, null)
-    assert.match(
-      staleResultStep?.[1] ?? '',
-      /if: needs\.prepare\.outputs\.block_reason == 'stale'/
-    )
-    assert.match(staleResultStep?.[1] ?? '', /publication was skipped normally/)
-    assert.doesNotMatch(staleResultStep?.[1] ?? '', /exit 1/)
     assert.doesNotMatch(installerWorkflow, /^\s+body: \|/m)
   })
 
@@ -232,7 +223,7 @@ describe('CI workflow safety', () => {
 
   it('fails closed unless the immutable tag query proves no match', () => {
     assert.equal(
-      installerWorkflow.match(/status=\$\?/g)?.length,
+      installerWorkflow.match(/^\s+status=\$\?$/gm)?.length,
       2,
       'tag absence must be checked before the build and again before publish'
     )

@@ -51,7 +51,6 @@ jobs:
           CI_REPOSITORY:
             ${{ github.event.workflow_run.head_repository.full_name }}
           CI_SHA: ${{ github.event.workflow_run.head_sha }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "$EVENT_NAME" = "workflow_run" ]; then
             if [ "$CI_EVENT" != "push" ] || \
@@ -83,25 +82,9 @@ jobs:
             echo "Release target is not an exact commit SHA." >&2
             exit 1
           fi
-          remote_main=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
-          if [[ ! "$remote_main" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Unable to resolve the current origin/main commit." >&2
-            exit 1
-          fi
-          if [ "$remote_main" != "$target" ]; then
-            if [ "$EVENT_NAME" = "workflow_run" ]; then
-              publish=false
-              if [ -z "$block_reason" ]; then
-                block_reason=stale
-              fi
-              echo "Release target $target is no longer current main; preserving its exact installer artifact without publishing."
-            else
-              echo "Release target $target is stale; origin/main is $remote_main." >&2
-              exit 1
-            fi
-          else
-            publish="$ci_can_publish"
-          fi
+          # Every exact successful main build gets its own immutable Release,
+          # even when a newer main commit arrives while jobs overlap.
+          publish="$ci_can_publish"
           echo "sha=$target" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "block_reason=$block_reason" >> "$GITHUB_OUTPUT"
@@ -330,17 +313,6 @@ jobs:
         run: |
           echo "Installer recovery artifacts were preserved, but this run cannot publish because its upstream CI failed." >&2
           exit 1
-      - name: Record stale non-publishing result
-        if: needs.prepare.outputs.block_reason == 'stale'
-        shell: bash
-        run: |
-          echo "::notice::A newer main commit superseded this exact installer build. Recovery artifacts were preserved; Release publication was skipped normally."
-          {
-            echo "## Superseded installer build"
-            echo
-            echo "A newer main commit arrived while this exact build was running."
-            echo "Its installer and release-note artifacts were preserved, and publication was skipped without treating expected overlap as a failure."
-          } >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     name: Publish GitHub release
@@ -377,18 +349,24 @@ jobs:
           name:
             express-release-notes-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-payload
-      - name: Revalidate current main before publishing
+      - name: Classify release freshness without blocking publication
+        id: freshness
         shell: bash
         run: |
+          set +e
           remote_main=$(git ls-remote origin refs/heads/main | awk 'NR == 1 { print $1 }')
-          if [[ ! "$remote_main" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Unable to resolve the current origin/main commit." >&2
-            exit 1
+          lookup_status=$?
+          set -e
+          latest=false
+          if [ "$lookup_status" -eq 0 ] && [[ "$remote_main" =~ ^[0-9a-f]{40}$ ]] && \
+             [ "$remote_main" = "$RELEASE_TARGET_SHA" ]; then
+            latest=true
+          elif [ "$lookup_status" -eq 0 ] && [[ "$remote_main" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::notice::Publishing superseded commit $RELEASE_TARGET_SHA as an immutable non-latest Release; current main is $remote_main."
+          else
+            echo "::warning::Could not classify current main, so this immutable Release will not replace the Latest marker."
           fi
-          if [ "$remote_main" != "$RELEASE_TARGET_SHA" ]; then
-            echo "Release target $RELEASE_TARGET_SHA became stale while building; origin/main is $remote_main." >&2
-            exit 1
-          fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
       - name: Revalidate immutable release tag before publishing
         shell: bash
         run: |
@@ -428,13 +406,19 @@ jobs:
           done
       - name: Publish GitHub release
         shell: bash
+        env:
+          RELEASE_IS_LATEST: ${{ steps.freshness.outputs.latest }}
         run: |
+          latest_args=(--latest=false)
+          if [ "$RELEASE_IS_LATEST" = "true" ]; then
+            latest_args=(--latest)
+          fi
           gh release create "$RELEASE_TAG" release-payload/installers/* \
             --repo "$GITHUB_REPOSITORY" \
             --target "$RELEASE_TARGET_SHA" \
             --title "Desktop Material $RELEASE_VERSION" \
             --notes-file release-payload/release-notes.md \
-            --latest
+            "${latest_args[@]}"
       - name: Verify published release target
         shell: bash
         run: |
