@@ -95,6 +95,8 @@ active profile's style, label, and explicit language mode.
 | `material-provider-triage.png` | Account- and repository-bound provider triage |
 | `material-repository-tools.png` | Named Repository Tools administration hub |
 | `material-repository-tools-scroll.png` | Short-height Repository Tools scrolled to its reachable final results surface |
+| `material-repository-folder-detection.png` | Repository folder detection during add and open |
+| `material-repository-submodule-management.png` | Repository submodule management and reviewed update actions |
 | `material-workspace-changes.png` | Material Changes workspace and commit flow |
 | `material-history.png` | Core History browsing and selected-commit inspection |
 | `material-history-context-actions.png` | Selection-aware History commit More/right-click actions and button hint |
@@ -219,6 +221,10 @@ path; it never force-pushes automatically.
 ![Advanced tag lifecycle workspace with local-only, pushed, and remote-only states](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/advanced-workflows.png)
 
 ![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
+
+![Repository folder detection during add and open](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-folder-detection.png)
+
+![Repository submodule management and reviewed update actions](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-submodule-management.png)
 
 ![Short Repository Tools workspace scrolled to its reachable final results surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools-scroll.png)
 

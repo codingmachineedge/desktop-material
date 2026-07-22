@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Search · Desktop Material Docs</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #faf9fd;
+        --surface: #ffffff;
+        --text: #1c1b1f;
+        --muted: #5f5c66;
+        --accent: #6750a4;
+        --border: #e3e0ea;
+        --code-bg: #f2eff7;
+        --mark: #ffd8a8;
+        --mark-text: #3a2600;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141218;
+          --surface: #1d1a22;
+          --text: #e6e1e9;
+          --muted: #a9a3b2;
+          --accent: #cfbcff;
+          --border: #322f38;
+          --code-bg: #24212b;
+          --mark: #5c4200;
+          --mark-text: #ffe6b0;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.6 'Segoe UI', system-ui, -apple-system, sans-serif;
+      }
+      header.site {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 0.6rem 1rem;
+        display: grid;
+        gap: 0.5rem;
+      }
+      .site-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1.25rem;
+        align-items: baseline;
+      }
+      .site-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+      }
+      header.site strong {
+        font-size: 1.05rem;
+      }
+      header.site a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      header.site a:hover {
+        text-decoration: underline;
+      }
+      main {
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: 1.75rem 1.25rem 4rem;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.9rem;
+      }
+      .search-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      input[type='search'],
+      input[type='text'],
+      select {
+        padding: 0.6rem 0.85rem;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        min-width: 0;
+      }
+      input[type='search'] {
+        flex: 1 1 16rem;
+      }
+      button {
+        padding: 0.6rem 1.1rem;
+        border: 0;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--surface);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: var(--code-bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      :where(a, button, input, select, summary):focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem 1.1rem;
+        margin: 0.75rem 0 0;
+        color: var(--muted);
+      }
+      .options label {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      details.builder {
+        margin: 1.1rem 0 0;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 0.4rem 0.9rem;
+      }
+      details.builder summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 0.45rem 0;
+      }
+      .builder-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+        gap: 0.75rem;
+        padding: 0.5rem 0 0.9rem;
+      }
+      .builder-field {
+        display: grid;
+        gap: 0.3rem;
+      }
+      .builder-field span {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .builder-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding-bottom: 0.9rem;
+      }
+      .snippets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        padding-bottom: 0.9rem;
+      }
+      .snippets button {
+        background: var(--code-bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+      .pattern-preview {
+        font-family: 'Cascadia Mono', Consolas, monospace;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.55rem 0.75rem;
+        overflow-x: auto;
+        white-space: pre;
+      }
+      .status {
+        margin: 1.25rem 0 0.5rem;
+        color: var(--muted);
+      }
+      .status[data-kind='error'] {
+        color: #b3261e;
+      }
+      @media (prefers-color-scheme: dark) {
+        .status[data-kind='error'] {
+          color: #f2b8b5;
+        }
+      }
+      ol.results {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.9rem;
+      }
+      ol.results li {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 0.9rem 1rem;
+      }
+      ol.results h2 {
+        margin: 0 0 0.15rem;
+        font-size: 1.05rem;
+      }
+      ol.results h2 a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      ol.results .path {
+        margin: 0 0 0.5rem;
+        color: var(--muted);
+        font-size: 0.82rem;
+        word-break: break-word;
+      }
+      ol.results .excerpt {
+        margin: 0.3rem 0 0;
+        font-size: 0.94rem;
+        overflow-wrap: anywhere;
+      }
+      mark {
+        background: var(--mark);
+        color: var(--mark-text);
+        border-radius: 3px;
+        padding: 0 0.12em;
+      }
+      @media (max-width: 600px) {
+        body {
+          font-size: 15px;
+        }
+        main {
+          padding: 1.25rem 0.9rem 3rem;
+        }
+        h1 {
+          font-size: 1.55rem;
+        }
+        .search-row button {
+          flex: 1 1 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="site-bar">
+        <strong><a href="../index.html">Desktop Material</a></strong>
+        <nav class="site-nav" aria-label="Documentation navigation">
+          <a href="index.html">Documentation home</a>
+          <a href="search.html">Search</a>
+          <a href="https://github.com/codingmachineedge/desktop-material"
+            >Source on GitHub</a
+          >
+        </nav>
+      </div>
+    </header>
+    <main>
+      <h1>Search the documentation</h1>
+      <p>
+        Search every published documentation page. Plain text matches anywhere
+        in a page; enable <strong>Regular expression</strong> to use a pattern,
+        or build one below without writing it by hand.
+      </p>
+
+      <form id="search-form" role="search">
+        <div class="search-row">
+          <label class="visually-hidden" for="query">Search query</label>
+          <input
+            id="query"
+            type="search"
+            name="q"
+            placeholder="Search the documentation…"
+            autocomplete="off"
+            autofocus
+          />
+          <button type="submit">Search</button>
+        </div>
+        <div class="options">
+          <label>
+            <input type="checkbox" id="opt-regex" />
+            Regular expression
+          </label>
+          <label>
+            <input type="checkbox" id="opt-case" />
+            Match case
+          </label>
+          <label>
+            <input type="checkbox" id="opt-word" />
+            Whole word
+          </label>
+        </div>
+      </form>
+
+      <details class="builder" id="builder">
+        <summary>Regex builder</summary>
+        <div class="builder-grid">
+          <label class="builder-field">
+            <span>Match type</span>
+            <select id="builder-kind">
+              <option value="contains">Contains text</option>
+              <option value="starts">Starts with</option>
+              <option value="ends">Ends with</option>
+              <option value="exact">Exact word</option>
+              <option value="any">Any of (comma separated)</option>
+              <option value="all">
+                All of, in any order (comma separated)
+              </option>
+            </select>
+          </label>
+          <label class="builder-field">
+            <span>Text</span>
+            <input
+              type="text"
+              id="builder-text"
+              placeholder="pull request, cheap lfs"
+            />
+          </label>
+          <label class="builder-field">
+            <span>Repeat / quantifier</span>
+            <select id="builder-quantifier">
+              <option value="">Exactly once</option>
+              <option value="?">Optional (0 or 1)</option>
+              <option value="*">Any number (0 or more)</option>
+              <option value="+">At least one</option>
+            </select>
+          </label>
+        </div>
+        <div class="snippets" id="snippets">
+          <button type="button" data-pattern="\d+">Number</button>
+          <button type="button" data-pattern="[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+">
+            Email
+          </button>
+          <button type="button" data-pattern="https?://\S+">URL</button>
+          <button type="button" data-pattern="\b[0-9a-f]{7,40}\b">
+            Git SHA
+          </button>
+          <button type="button" data-pattern="\bv?\d+\.\d+\.\d+\b">
+            Version
+          </button>
+          <button type="button" data-pattern="^#{1,6}\s.*$">Heading</button>
+        </div>
+        <p class="pattern-preview" id="pattern-preview" aria-live="polite">
+          (no pattern yet)
+        </p>
+        <div class="builder-actions">
+          <button type="button" id="builder-apply">Use this pattern</button>
+          <button type="button" class="secondary" id="builder-clear">
+            Clear
+          </button>
+        </div>
+      </details>
+
+      <p class="status" id="status" role="status">Loading the search index…</p>
+      <ol class="results" id="results"></ol>
+    </main>
+
+    <script>
+      ;(function () {
+        var indexData = null
+        var indexError = null
+        var form = document.getElementById('search-form')
+        var queryInput = document.getElementById('query')
+        var optRegex = document.getElementById('opt-regex')
+        var optCase = document.getElementById('opt-case')
+        var optWord = document.getElementById('opt-word')
+        var statusEl = document.getElementById('status')
+        var resultsEl = document.getElementById('results')
+        var MaxResults = 60
+        var MaxMatchesPerPage = 3
+        var ExcerptRadius = 90
+
+        function setStatus(message, kind) {
+          statusEl.textContent = message
+          if (kind) {
+            statusEl.setAttribute('data-kind', kind)
+          } else {
+            statusEl.removeAttribute('data-kind')
+          }
+        }
+
+        function escapeRegex(value) {
+          return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        }
+
+        // ---- Regex builder -------------------------------------------------
+        var builderKind = document.getElementById('builder-kind')
+        var builderText = document.getElementById('builder-text')
+        var builderQuantifier = document.getElementById('builder-quantifier')
+        var patternPreview = document.getElementById('pattern-preview')
+
+        function buildPattern() {
+          var raw = builderText.value.trim()
+          if (raw === '') {
+            return ''
+          }
+          var kind = builderKind.value
+          var quantifier = builderQuantifier.value
+          var parts = raw
+            .split(',')
+            .map(function (value) {
+              return value.trim()
+            })
+            .filter(function (value) {
+              return value.length > 0
+            })
+          var group = function (value) {
+            var escaped = escapeRegex(value)
+            return quantifier === ''
+              ? escaped
+              : '(?:' + escaped + ')' + quantifier
+          }
+
+          if (kind === 'any') {
+            return '(?:' + parts.map(group).join('|') + ')'
+          }
+          if (kind === 'all') {
+            return (
+              parts
+                .map(function (value) {
+                  return '(?=[\\s\\S]*' + escapeRegex(value) + ')'
+                })
+                .join('') + '[\\s\\S]*'
+            )
+          }
+          var single = group(parts[0])
+          if (kind === 'starts') {
+            return '\\b' + single
+          }
+          if (kind === 'ends') {
+            return single + '\\b'
+          }
+          if (kind === 'exact') {
+            return '\\b' + single + '\\b'
+          }
+          return single
+        }
+
+        function refreshPreview() {
+          var pattern = buildPattern()
+          patternPreview.textContent =
+            pattern === '' ? '(no pattern yet)' : pattern
+        }
+
+        ;[builderKind, builderText, builderQuantifier].forEach(function (el) {
+          el.addEventListener('input', refreshPreview)
+          el.addEventListener('change', refreshPreview)
+        })
+
+        document
+          .getElementById('snippets')
+          .addEventListener('click', function (event) {
+            var button = event.target.closest('button[data-pattern]')
+            if (!button) {
+              return
+            }
+            optRegex.checked = true
+            queryInput.value = button.getAttribute('data-pattern')
+            patternPreview.textContent = queryInput.value
+            runSearch()
+          })
+
+        document
+          .getElementById('builder-apply')
+          .addEventListener('click', function () {
+            var pattern = buildPattern()
+            if (pattern === '') {
+              setStatus('Enter text for the regex builder first.', 'error')
+              return
+            }
+            optRegex.checked = true
+            queryInput.value = pattern
+            runSearch()
+          })
+
+        document
+          .getElementById('builder-clear')
+          .addEventListener('click', function () {
+            builderText.value = ''
+            builderKind.value = 'contains'
+            builderQuantifier.value = ''
+            refreshPreview()
+          })
+
+        // ---- Search --------------------------------------------------------
+        function compilePattern(query) {
+          var source
+          if (optRegex.checked) {
+            source = query
+          } else {
+            source = escapeRegex(query)
+          }
+          if (optWord.checked) {
+            source = '\\b(?:' + source + ')\\b'
+          }
+          return new RegExp(source, optCase.checked ? 'g' : 'gi')
+        }
+
+        function excerptFor(text, start, end) {
+          var from = Math.max(0, start - ExcerptRadius)
+          var to = Math.min(text.length, end + ExcerptRadius)
+          return {
+            before: (from > 0 ? '…' : '') + text.slice(from, start),
+            match: text.slice(start, end),
+            after: text.slice(end, to) + (to < text.length ? '…' : ''),
+          }
+        }
+
+        function renderResults(matches, total) {
+          resultsEl.textContent = ''
+          matches.forEach(function (entry) {
+            var item = document.createElement('li')
+            var heading = document.createElement('h2')
+            var link = document.createElement('a')
+            link.href = entry.page.url
+            link.textContent = entry.page.title
+            heading.appendChild(link)
+            item.appendChild(heading)
+
+            var path = document.createElement('p')
+            path.className = 'path'
+            path.textContent = entry.page.path
+            item.appendChild(path)
+
+            entry.excerpts.forEach(function (excerpt) {
+              var paragraph = document.createElement('p')
+              paragraph.className = 'excerpt'
+              paragraph.appendChild(document.createTextNode(excerpt.before))
+              var mark = document.createElement('mark')
+              mark.textContent = excerpt.match
+              paragraph.appendChild(mark)
+              paragraph.appendChild(document.createTextNode(excerpt.after))
+              item.appendChild(paragraph)
+            })
+            resultsEl.appendChild(item)
+          })
+
+          if (matches.length === 0) {
+            setStatus('No documentation page matched that search.')
+          } else {
+            setStatus(
+              'Found ' +
+                total +
+                ' match' +
+                (total === 1 ? '' : 'es') +
+                ' across ' +
+                matches.length +
+                ' page' +
+                (matches.length === 1 ? '' : 's') +
+                '.'
+            )
+          }
+        }
+
+        function runSearch() {
+          var query = queryInput.value.trim()
+          resultsEl.textContent = ''
+          if (query === '') {
+            setStatus('Enter a search term to begin.')
+            return
+          }
+          if (indexError !== null) {
+            setStatus(indexError, 'error')
+            return
+          }
+          if (indexData === null) {
+            setStatus('Still loading the search index…')
+            return
+          }
+
+          var pattern
+          try {
+            pattern = compilePattern(query)
+          } catch (error) {
+            setStatus(
+              'That regular expression is not valid: ' + error.message,
+              'error'
+            )
+            return
+          }
+
+          var matches = []
+          var total = 0
+          for (var i = 0; i < indexData.length; i++) {
+            var page = indexData[i]
+            pattern.lastIndex = 0
+            var excerpts = []
+            var found
+            var guard = 0
+            while ((found = pattern.exec(page.text)) !== null && guard < 500) {
+              guard++
+              total++
+              if (excerpts.length < MaxMatchesPerPage) {
+                excerpts.push(
+                  excerptFor(
+                    page.text,
+                    found.index,
+                    found.index + (found[0].length || 1)
+                  )
+                )
+              }
+              // A zero-length match would loop forever without this nudge.
+              if (found[0].length === 0) {
+                pattern.lastIndex++
+              }
+            }
+            if (excerpts.length > 0) {
+              matches.push({ page: page, excerpts: excerpts })
+            }
+            if (matches.length >= MaxResults) {
+              break
+            }
+          }
+          renderResults(matches, total)
+
+          var params = new URLSearchParams()
+          params.set('q', query)
+          if (optRegex.checked) params.set('regex', '1')
+          if (optCase.checked) params.set('case', '1')
+          if (optWord.checked) params.set('word', '1')
+          history.replaceState(null, '', '?' + params.toString())
+        }
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault()
+          runSearch()
+        })
+        ;[optRegex, optCase, optWord].forEach(function (option) {
+          option.addEventListener('change', function () {
+            if (queryInput.value.trim() !== '') {
+              runSearch()
+            }
+          })
+        })
+
+        var params = new URLSearchParams(location.search)
+        if (params.get('q')) queryInput.value = params.get('q')
+        optRegex.checked = params.get('regex') === '1'
+        optCase.checked = params.get('case') === '1'
+        optWord.checked = params.get('word') === '1'
+        refreshPreview()
+
+        fetch('search-index.json')
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('HTTP ' + response.status)
+            }
+            return response.json()
+          })
+          .then(function (data) {
+            indexData = data.pages || []
+            setStatus(
+              'Ready to search ' + indexData.length + ' documentation pages.'
+            )
+            if (queryInput.value.trim() !== '') {
+              runSearch()
+            }
+          })
+          .catch(function (error) {
+            indexError =
+              'The search index could not be loaded (' +
+              error.message +
+              '). Open this page from the published site rather than a local file.'
+            setStatus(indexError, 'error')
+          })
+      })()
+    </script>
+  </body>
+</html>

@@ -165,6 +165,9 @@
         <path d="M12 3v18M6 6h12M4 21h16" />
         <path d="m6 6-4 7h8L6 6ZM18 6l-4 7h8l-4-7Z" />
       </symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
     </svg>
     <a class="skip-link" href="#top">Skip to main content</a>
     <!-- ================= Top app bar ================= -->
@@ -178,11 +181,12 @@
           </span>
         </a>
         <nav class="appbar-actions" aria-label="Primary navigation">
-          <div class="nav-links">
+          <div class="nav-links" id="primary-nav-links">
             <a href="#install">Install</a>
             <a href="#features">Features</a>
             <a href="#screenshots">Screenshots</a>
             <a href="docs/">Docs</a>
+            <a href="docs/search.html">Search</a>
             <a href="https://github.com/codingmachineedge/desktop-material"
               >GitHub</a
             >
@@ -196,6 +200,19 @@
           >
             <svg class="material-icon" aria-hidden="true" focusable="false">
               <use id="theme-icon" href="#icon-dark-mode"></use>
+            </svg>
+          </button>
+          <button
+            class="icon-btn nav-toggle"
+            id="nav-toggle"
+            type="button"
+            aria-label="Show navigation menu"
+            aria-expanded="false"
+            aria-controls="primary-nav-links"
+            title="Menu"
+          >
+            <svg class="material-icon" aria-hidden="true" focusable="false">
+              <use href="#icon-menu"></use>
             </svg>
           </button>
         </nav>
@@ -1901,6 +1918,42 @@
 
             <figure class="shot">
               <a
+                href="docs/assets/screenshots/material-repository-folder-detection.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-repository-folder-detection.png"
+                  alt="Repository folder detection while adding and opening a repository"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Folder detection
+                <span class="tag">Add · open</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/material-repository-submodule-management.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/material-repository-submodule-management.png"
+                  alt="Repository submodule management with reviewed update actions"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Submodule management
+                <span class="tag">Reviewed updates</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
                 href="docs/assets/screenshots/material-gitignore-manager.png"
                 target="_blank"
                 rel="noopener"
@@ -2320,6 +2373,40 @@
             localStorage.setItem('dm-theme', next)
           } catch (e) {}
           sync(next)
+        })
+      })()
+    </script>
+
+    <!-- ================= Mobile navigation ================= -->
+    <script>
+      ;(function () {
+        var toggle = document.getElementById('nav-toggle')
+        var links = document.getElementById('primary-nav-links')
+        if (!toggle || !links) {
+          return
+        }
+
+        function setOpen(open) {
+          links.classList.toggle('nav-links--open', open)
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+          toggle.setAttribute(
+            'aria-label',
+            open ? 'Hide navigation menu' : 'Show navigation menu'
+          )
+        }
+
+        toggle.addEventListener('click', function () {
+          setOpen(!links.classList.contains('nav-links--open'))
+        })
+        links.addEventListener('click', function (event) {
+          if (event.target.closest('a')) {
+            setOpen(false)
+          }
+        })
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            setOpen(false)
+          }
         })
       })()
     </script>

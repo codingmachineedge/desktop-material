@@ -150,7 +150,7 @@ describe('Pages accessibility contracts', () => {
     ]
       .map(([, file]) => `docs/assets/screenshots/${file}`)
       .sort()
-    assert.equal(expectedSources.length, 67)
+    assert.equal(expectedSources.length, 69)
     assert.equal(figures.length, expectedSources.length)
 
     const actualSources = new Array<string>()

@@ -1,5 +1,46 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-22 mobile Pages, documentation search, and regenerated gallery
+
+The published Pages site is now usable on a phone. The top app bar previously
+hid every navigation link below 760px, leaving Install/Features/Screenshots/
+Docs unreachable; a hamburger control now discloses the same links as a
+stacked sheet with 48px targets, and a 480px breakpoint collapses the feature,
+footer, and principle grids to one column without page-level sideways
+scrolling. The rendered documentation template gained a sticky, wrapping
+header, a search field, and a compact type scale.
+
+`site/docs-search.html` publishes as `docs/search.html` and searches every
+rendered page from a `search-index.json` built by `site/build-search-index.js`
+during the Pages workflow (137 pages locally). Search accepts plain text or a
+regular expression with match-case and whole-word options, highlights up to
+three excerpts per page, guards zero-length matches, reports invalid patterns
+instead of throwing, and mirrors state into the URL. A regex builder composes
+contains/starts/ends/exact/any-of/all-of patterns with an optional quantifier
+plus six ready-made snippets, previews the pattern, and applies it to the
+query. The builder was exercised in a browser: `(?:cheap lfs|pull request)`
+and `\b(?:timeout)+\b` both compile.
+
+Screenshot regeneration ran against a fresh production build on an isolated
+profile with the deterministic loopback GitHub provider and Ollama fixtures.
+52 distinct canonical captures were promoted (50 replacements plus the new
+`material-repository-folder-detection` and
+`material-repository-submodule-management`, both added to the Feature-Gallery
+catalog, the Pages gallery, and their two count assertions, now 69). Two
+captures were withheld because they were byte-identical to another surface
+(`material-api-app-functions` matched the API explorer;
+`material-notification-bulk-actions` matched the notification centre), so the
+previously published images for those two remain in place rather than
+publishing a duplicate as a distinct feature. Thirteen further canonical
+scenes could not be made deterministic in this run and their existing images
+are unchanged: error-notice, app-identity, history-power-tools, remote-manager,
+logo-studio, submodule-context, rebase-review, pull-request-compose,
+pull-request-open, pull-all, history-deepen, history-deepening, merge-all, and
+cheap-lfs-preparing. They need the additional submodule/shallow-clone/remote
+fixtures rather than the base P0 fixture, and `material-pull-preview` and
+`material-ollama-model-manager` are outside the canonical set. No scene is
+reported as renewed unless its file actually changed.
+
 ## 2026-07-22 Cheap LFS 1.5 GiB parts, no upload timeouts, Pages-hosted docs
 
 Cheap LFS release uploads kept failing near the 2 GiB asset ceiling, so

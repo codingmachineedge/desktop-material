@@ -36,13 +36,25 @@
         font: 16px/1.65 'Segoe UI', system-ui, -apple-system, sans-serif;
       }
       header.site {
+        position: sticky;
+        top: 0;
+        z-index: 5;
         border-bottom: 1px solid var(--border);
         background: var(--surface);
-        padding: 0.75rem 1.25rem;
+        padding: 0.6rem 1rem;
+        display: grid;
+        gap: 0.5rem;
+      }
+      .site-bar {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem 1.25rem;
+        gap: 0.4rem 1.25rem;
         align-items: baseline;
+      }
+      .site-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
       }
       header.site strong {
         font-size: 1.05rem;
@@ -53,6 +65,43 @@
       }
       header.site a:hover {
         text-decoration: underline;
+      }
+      .site-search {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .site-search input {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+      }
+      .site-search button {
+        padding: 0.55rem 1.1rem;
+        border: 0;
+        border-radius: 999px;
+        background: var(--accent);
+        color: var(--surface);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .site-search input:focus-visible,
+      .site-search button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
       }
       main {
         max-width: 52rem;
@@ -118,15 +167,52 @@
         border-top: 1px solid var(--border);
         margin: 2rem 0;
       }
+      @media (max-width: 600px) {
+        body {
+          font-size: 15px;
+        }
+        main {
+          padding: 1.25rem 0.9rem 3rem;
+        }
+        h1 {
+          font-size: 1.55rem;
+        }
+        .site-search button {
+          padding-inline: 0.9rem;
+        }
+      }
     </style>
   </head>
   <body>
     <header class="site">
-      <strong><a href="$docsroot$../index.html">Desktop Material</a></strong>
-      <a href="$docsroot$index.html">Documentation home</a>
-      <a href="https://github.com/codingmachineedge/desktop-material"
-        >Source on GitHub</a
+      <div class="site-bar">
+        <strong><a href="$docsroot$../index.html">Desktop Material</a></strong>
+        <nav class="site-nav" aria-label="Documentation navigation">
+          <a href="$docsroot$index.html">Documentation home</a>
+          <a href="$docsroot$search.html">Search</a>
+          <a href="https://github.com/codingmachineedge/desktop-material"
+            >Source on GitHub</a
+          >
+        </nav>
+      </div>
+      <form
+        class="site-search"
+        role="search"
+        action="$docsroot$search.html"
+        method="get"
       >
+        <label class="visually-hidden" for="docs-search-input"
+          >Search the documentation</label
+        >
+        <input
+          id="docs-search-input"
+          type="search"
+          name="q"
+          placeholder="Search the documentation…"
+          autocomplete="off"
+        />
+        <button type="submit">Search</button>
+      </form>
     </header>
     <main>$body$</main>
   </body>

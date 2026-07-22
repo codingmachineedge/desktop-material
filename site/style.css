@@ -856,6 +856,11 @@ h2.section-title {
   color: var(--md-sys-color-on-secondary-container);
 }
 
+/* The hamburger only exists at the compact breakpoint below. */
+.nav-toggle {
+  display: none;
+}
+
 .icon-btn:hover {
   background: color-mix(
     in srgb,
@@ -1160,9 +1165,7 @@ h1.hero-title {
 .install-copy-button {
   flex: none;
   align-self: center;
-  transition:
-    background-color 200ms ease,
-    transform 200ms ease;
+  transition: background-color 200ms ease, transform 200ms ease;
 }
 
 .install-copy-button.copied {
@@ -1451,11 +1454,39 @@ footer {
   .appbar-inner {
     min-height: 64px;
     border-radius: 22px;
+    flex-wrap: wrap;
   }
 
-  .brand-copy small,
+  .brand-copy small {
+    display: none;
+  }
+
+  .nav-toggle {
+    display: grid;
+    place-items: center;
+  }
+
+  /* Collapsed by default; the hamburger reveals the same links as a stacked
+     sheet so no destination is unreachable on a phone. */
   .nav-links {
     display: none;
+    order: 3;
+    flex-basis: 100%;
+    grid-auto-flow: row;
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 22px;
+  }
+
+  .nav-links--open {
+    display: grid;
+  }
+
+  .nav-links a {
+    min-height: 48px;
+    justify-content: start;
+    padding: 0 18px;
+    font-size: 1rem;
   }
 
   .hero-surface {
@@ -1492,6 +1523,31 @@ footer {
 
   .material-principles li {
     padding-inline: 0;
+  }
+}
+
+/* Small phones: keep every grid single-column and never scroll the page
+   sideways. Wide content scrolls inside its own container instead. */
+@media (max-width: 480px) {
+  .wrap {
+    padding-inline: 14px;
+  }
+
+  .feature-grid,
+  .footer-grid,
+  .footer-links,
+  .material-principles {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-copy strong {
+    font-size: 0.95rem;
+  }
+
+  pre,
+  table {
+    max-width: 100%;
+    overflow-x: auto;
   }
 }
 

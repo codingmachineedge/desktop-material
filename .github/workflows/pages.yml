@@ -38,9 +38,10 @@ jobs:
         run: |
           mkdir -p _site
           cp -r site/* _site/
-          rm -f _site/docs-template.html _site/md-links.lua
+          rm -f _site/docs-template.html _site/md-links.lua _site/docs-search.html
           mkdir -p _site/docs/assets/screenshots
           cp -r docs/assets/screenshots/* _site/docs/assets/screenshots/
+          cp site/docs-search.html _site/docs/search.html
 
       # The Docs button serves the complete rendered documentation set from
       # GitHub Pages itself rather than redirecting to github.com.
@@ -89,6 +90,13 @@ jobs:
               --output "_site/${src%.md}.html"
           done
           test -f _site/docs/index.html
+
+      - name: Build documentation search index
+        run: |
+          node site/build-search-index.js _site
+          rm -f _site/build-search-index.js
+          test -s _site/docs/search-index.json
+          test -f _site/docs/search.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
