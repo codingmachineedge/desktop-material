@@ -107,6 +107,7 @@ describe('pull preview source and style contracts', () => {
       narrow,
       /\.pull-preview-columns\s*\{\s*grid-template-columns: minmax\(0, 1fr\);/
     )
+    assert.match(narrow, /\.pull-preview-list-scroll\s*\{\s*max-height: 220px;/)
     assert.match(
       narrow,
       /\.dialog-footer \.button-group\s*\{[\s\S]*?flex-wrap: wrap;[\s\S]*?button\s*\{[\s\S]*?flex: 1 1 100%;/

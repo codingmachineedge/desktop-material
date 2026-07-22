@@ -1608,8 +1608,21 @@ export class CommitMessage extends React.Component<
     switch (progress.phase) {
       case 'preparing':
         return t('cheapLfs.progress.preparing', variables)
-      case 'hashing':
-        return t('cheapLfs.progress.hashing', variables)
+      case 'hashing': {
+        const percentage =
+          progress.totalBytes <= 0
+            ? 0
+            : Math.min(
+                100,
+                Math.floor(
+                  (progress.transferredBytes / progress.totalBytes) * 100
+                )
+              )
+        return t('cheapLfs.progress.hashing', {
+          ...variables,
+          percentage: percentage.toString(),
+        })
+      }
       case 'release':
         return t('cheapLfs.progress.release', variables)
       case 'uploading': {

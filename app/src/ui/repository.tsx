@@ -73,6 +73,7 @@ import {
 } from '../lib/github-api-tab-visibility'
 import { MaterialSymbol } from './lib/material-symbol'
 import { t } from '../lib/i18n'
+import { confirmAndCancelCheapLfsTransfer } from './changes/cheap-lfs-cancel-confirmation'
 
 interface IRepositoryViewProps {
   readonly repository: Repository
@@ -760,7 +761,9 @@ export class RepositoryView extends React.Component<
   }
 
   private onCancelCheapLfsCommit = () => {
-    this.props.dispatcher.cancelCheapLfsCommit(this.props.repository)
+    confirmAndCancelCheapLfsTransfer(() =>
+      this.props.dispatcher.cancelCheapLfsCommit(this.props.repository)
+    )
   }
 
   private renderChangesSidebar(): JSX.Element {

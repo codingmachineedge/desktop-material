@@ -337,8 +337,10 @@ describe('autoPinLargeFilesForCommit', () => {
       {
         statSize: async () => 200,
         readPointerText: async () => 'not a pointer\n',
-        pin: async (target, _signal, onProgress) => {
+        pin: async (target, _signal, onProgress, onStage, onHashProgress) => {
           assert.equal(progress.at(-1)?.phase, 'preparing')
+          onStage?.('hashing')
+          onHashProgress?.(100)
           onProgress({
             operationId: 'upload',
             direction: 'upload',
@@ -360,6 +362,22 @@ describe('autoPinLargeFilesForCommit', () => {
         totalFiles: 1,
         currentPath: 'windows.iso',
         transferredBytes: 0,
+        totalBytes: 200,
+      },
+      {
+        phase: 'hashing',
+        completedFiles: 0,
+        totalFiles: 1,
+        currentPath: 'windows.iso',
+        transferredBytes: 0,
+        totalBytes: 200,
+      },
+      {
+        phase: 'hashing',
+        completedFiles: 0,
+        totalFiles: 1,
+        currentPath: 'windows.iso',
+        transferredBytes: 100,
         totalBytes: 200,
       },
       {

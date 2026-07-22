@@ -4,7 +4,9 @@ import { exec } from 'dugite'
 
 import { Branch, BranchType } from '../../src/models/branch'
 import { Repository } from '../../src/models/repository'
+import { WorkingDirectoryStatus } from '../../src/models/status'
 import { TipState } from '../../src/models/tip'
+import { IStatusResult } from '../../src/lib/git'
 import { getPullPreview, IPullPreview } from '../../src/lib/git/pull-preview'
 import { createPullStrategyPlan } from '../../src/lib/git/pull-strategy'
 import { IPreparedPullPreview } from '../../src/lib/pull-preview'
@@ -30,6 +32,16 @@ const reviewedPreview: IPullPreview = {
   changedFiles: [],
   changedFileCount: 0,
   changedFilesTruncated: false,
+}
+
+const cleanStatus: IStatusResult = {
+  exists: true,
+  mergeHeadFound: false,
+  squashMsgFound: false,
+  rebaseInternalState: null,
+  isCherryPickingHeadFound: false,
+  workingDirectory: WorkingDirectoryStatus.fromFiles([]),
+  doConflictedFilesExist: false,
 }
 
 function prepare(preview: IPullPreview): IPreparedPullPreview {
@@ -114,6 +126,10 @@ function createPreparationStore(
   Reflect.set(store, '_refreshRepository', async () => {
     events.push('refresh')
   })
+  Reflect.set(store, 'loadPullPreviewStatus', async () => {
+    events.push('fresh-status')
+    return cleanStatus
+  })
   Reflect.set(store, 'gitStoreCache', {
     get: () => {
       events.push('read-state')
@@ -146,6 +162,7 @@ describe('pull preview app-store safety', () => {
     Reflect.set(store, '_refreshRepository', async () => {
       refreshes++
     })
+    Reflect.set(store, 'loadPullPreviewStatus', async () => cleanStatus)
 
     await assert.rejects(
       store._pullReviewed(repository, prepare(reviewedPreview)),
@@ -255,6 +272,7 @@ describe('pull preview app-store safety', () => {
     Reflect.set(store, '_refreshRepository', async () => {
       refreshes++
     })
+    Reflect.set(store, 'loadPullPreviewStatus', async () => cleanStatus)
     Reflect.set(store, 'repositoryStateCache', {
       get: () => ({
         branchesState: { tip: { kind: TipState.Valid, branch } },
@@ -302,8 +320,9 @@ describe('pull preview app-store safety', () => {
     const prepared = await store._preparePullPreview(repository)
 
     assert.equal(prepared.result.kind, 'ready')
-    assert.deepEqual(events.slice(0, 3), [
+    assert.deepEqual(events.slice(0, 4), [
       'refresh',
+      'fresh-status',
       'read-state',
       'fetch:origin',
     ])
@@ -345,5 +364,53 @@ describe('pull preview app-store safety', () => {
       (error: unknown) =>
         error instanceof PullPreviewError && error.code === 'stale-preview'
     )
+  })
+
+  it('rejects a failed final status read instead of trusting cached clean state', async t => {
+    const { repository, localOid } = await setupTrackedPreviewRepository(t)
+    const events = new Array<string>()
+    const store = createPreparationStore(repository, localOid, events)
+    let statusReads = 0
+    Reflect.set(store, 'loadPullPreviewStatus', async () => {
+      statusReads++
+      return statusReads === 1 ? cleanStatus : null
+    })
+    Reflect.set(store, 'performPullPreviewFetch', async () => {
+      events.push('fetch:origin')
+    })
+
+    await assert.rejects(
+      store._preparePullPreview(repository),
+      (error: unknown) =>
+        error instanceof PullPreviewError && error.code === 'stale-preview'
+    )
+    assert.equal(events.includes('fetch:origin'), true)
+    assert.equal(statusReads, 2)
+  })
+
+  it('does not enter reviewed pull mutation after a failed fresh status gate', async () => {
+    const repository = new Repository('C:/reviewed-pull', 1, null, false)
+    const store = Object.create(AppStore.prototype) as AppStore
+    let mutationCalls = 0
+
+    setRefreshedRepositoryWrapper(store)
+    Reflect.set(
+      store,
+      'withPushPullFetch',
+      async (_repository: Repository, action: () => Promise<void>) => action()
+    )
+    Reflect.set(store, '_refreshRepository', async () => undefined)
+    Reflect.set(store, 'loadPullPreviewStatus', async () => null)
+    Reflect.set(store, 'gitStoreCache', { get: () => ({}) })
+    Reflect.set(store, 'withTemporaryRepositoryMutationGuard', async () => {
+      mutationCalls++
+    })
+
+    await assert.rejects(
+      store._pullReviewed(repository, prepare(reviewedPreview)),
+      (error: unknown) =>
+        error instanceof PullPreviewError && error.code === 'stale-preview'
+    )
+    assert.equal(mutationCalls, 0)
   })
 })

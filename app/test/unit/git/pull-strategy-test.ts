@@ -314,6 +314,11 @@ describe('git/pull-strategy', () => {
     assert.deepEqual(plan, {
       rebase: 'merges',
       ff: 'no-ff',
+      configurationSnapshot: {
+        branchRebase: null,
+        pullRebase: 'merges',
+        pullFF: 'false',
+      },
       ahead: 2,
       behind: 3,
       outcome: 'rebase-merges',
@@ -324,24 +329,82 @@ describe('git/pull-strategy', () => {
     assert.equal(
       pullStrategyPlansEqual(
         plan,
-        createPullStrategyPlan({ rebase: 'merges', ff: 'no-ff' }, 2, 3)
+        createPullStrategyPlan(
+          { rebase: 'merges', ff: 'no-ff' },
+          2,
+          3,
+          plan.configurationSnapshot
+        )
       ),
       true
     )
     assert.equal(
       pullStrategyPlansEqual(
         plan,
-        createPullStrategyPlan({ rebase: 'true', ff: 'no-ff' }, 2, 3)
+        createPullStrategyPlan(
+          { rebase: 'true', ff: 'no-ff' },
+          2,
+          3,
+          plan.configurationSnapshot
+        )
       ),
       false
     )
     assert.equal(
       pullStrategyPlansEqual(
         plan,
-        createPullStrategyPlan({ rebase: 'merges', ff: 'no-ff' }, 1, 3)
+        createPullStrategyPlan(
+          { rebase: 'merges', ff: 'no-ff' },
+          1,
+          3,
+          plan.configurationSnapshot
+        )
       ),
       false
     )
+    assert.equal(
+      pullStrategyPlansEqual(plan, {
+        ...plan,
+        strategyArguments: ['--no-rebase', '--ff-only'],
+      }),
+      false
+    )
+  })
+
+  it('invalidates an exact raw configuration change even when semantics stay equal', async t => {
+    const repository = await setupEmptyRepository(t)
+    await setConfig(repository, 'branch.master.rebase', 'false')
+    await setConfig(repository, 'pull.rebase', 'true')
+    await setConfig(repository, 'pull.ff', 'false')
+
+    const reviewed = await getPullStrategyPlan(
+      repository,
+      'refs/heads/master',
+      0,
+      2
+    )
+    assert.deepEqual(reviewed.configurationSnapshot, {
+      branchRebase: 'false',
+      pullRebase: 'true',
+      pullFF: 'false',
+    })
+    assert.equal(reviewed.outcome, 'merge')
+
+    // Both edits preserve the normalized merge plan: branch rebase still
+    // overrides pull.rebase, and "no" is another false boolean spelling.
+    await setConfig(repository, 'pull.rebase', 'merges')
+    await setConfig(repository, 'pull.ff', 'no')
+    const current = await getPullStrategyPlan(
+      repository,
+      'refs/heads/master',
+      0,
+      2
+    )
+
+    assert.equal(current.outcome, 'merge')
+    assert.equal(current.rebase, reviewed.rebase)
+    assert.equal(current.ff, reviewed.ff)
+    assert.equal(pullStrategyPlansEqual(reviewed, current), false)
   })
 
   it('rejects invalid topology and exposes frozen arguments independently', () => {

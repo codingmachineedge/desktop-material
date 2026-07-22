@@ -9,7 +9,7 @@ import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
-import { afterEach, beforeEach, describe, it } from 'node:test'
+import { afterEach, beforeEach, describe, it, mock } from 'node:test'
 import type { ClientRequest, Session } from 'electron'
 import {
   cancelAllGitHubReleaseTransfers,
@@ -18,6 +18,7 @@ import {
   createGitHubCliReleaseUploadFallback,
   handleGitHubReleaseAssetDownload,
   handleGitHubReleaseAssetUpload,
+  GitHubReleaseUploadStreamChunkBytes,
   IGitHubReleaseTransferDependencies,
   IGitHubReleaseTransferSender,
   updateGitHubReleaseTransferAccounts,
@@ -124,6 +125,10 @@ async function withDirectory(run: (directory: string) => Promise<void>) {
 describe('main-process GitHub release transfer', () => {
   beforeEach(() => updateGitHubReleaseTransferAccounts([account]))
   afterEach(() => updateGitHubReleaseTransferAccounts([]))
+
+  it('keeps disk-to-upload chunks bounded at one MiB', () => {
+    assert.equal(GitHubReleaseUploadStreamChunkBytes, 1024 * 1024)
+  })
 
   it('downloads the exact account-bound asset and atomically verifies it', async () => {
     await withDirectory(async directory => {
@@ -393,6 +398,139 @@ describe('main-process GitHub release transfer', () => {
     })
   })
 
+  it('uses a prepared Cheap LFS digest without a redundant pre-upload hash', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'prepared.bin')
+      await writeFile(source, bytes)
+      let cliCalls = 0
+      let nativeCalls = 0
+
+      const result = await handleGitHubReleaseAssetUpload(
+        new TestSender(33),
+        uploadRequest(source, { expectedDigest: digest }),
+        {
+          fetch: async () => new Response(null, { status: 204 }),
+          upload: async () => {
+            nativeCalls++
+            throw new Error('preferred CLI must remain the only upload pass')
+          },
+          preferCliUpload: true,
+          cliUpload: async request => {
+            cliCalls++
+            assert.equal(request.source.digest, digest)
+            assert.equal(request.source.digestVerified, false)
+            return {
+              asset: parseGitHubReleaseAsset(uploadedAsset()),
+              localDigest: digest,
+            }
+          },
+        }
+      )
+
+      assert.equal(result.ok, true)
+      assert.equal(cliCalls, 1)
+      assert.equal(nativeCalls, 0)
+    })
+  })
+
+  it('rejects a prepared digest unless the live upload bytes match it', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'changed-after-preparation.bin')
+      await writeFile(source, bytes)
+      const staleDigest = `sha256:${'f'.repeat(64)}`
+      const cleanup = new Array<string>()
+
+      const result = await handleGitHubReleaseAssetUpload(
+        new TestSender(34),
+        uploadRequest(source, { expectedDigest: staleDigest }),
+        {
+          fetch: async (url, init) => {
+            if (init.method === 'DELETE') {
+              cleanup.push(url)
+            }
+            return new Response(null, { status: 204 })
+          },
+          upload: async () => {
+            throw new Error('preferred CLI must remain the only upload pass')
+          },
+          preferCliUpload: true,
+          cliUpload: async () => ({
+            asset: parseGitHubReleaseAsset(uploadedAsset()),
+            localDigest: digest,
+          }),
+        }
+      )
+
+      assert.deepEqual(result, {
+        ok: false,
+        reason: 'source',
+        status: null,
+      })
+      assert.deepEqual(cleanup, [
+        'https://api.github.com/repos/desktop/material/releases/assets/19',
+      ])
+    })
+  })
+
+  it('rejects malformed prepared digests before opening a transport', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'invalid-digest.bin')
+      await writeFile(source, bytes)
+      let transports = 0
+      const result = await handleGitHubReleaseAssetUpload(
+        new TestSender(35),
+        uploadRequest(source, { expectedDigest: 'sha256:not-a-digest' }),
+        {
+          fetch: async () => new Response(null),
+          upload: async () => {
+            transports++
+            return new Response(null)
+          },
+          cliUpload: async () => {
+            transports++
+            throw new Error('unexpected CLI')
+          },
+          preferCliUpload: true,
+        }
+      )
+
+      assert.deepEqual(result, {
+        ok: false,
+        reason: 'invalid-request',
+        status: null,
+      })
+      assert.equal(transports, 0)
+    })
+  })
+
+  it('never sends a prepared digest through the unverifiable native fallback', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'prepared-without-cli.bin')
+      await writeFile(source, bytes)
+      let nativeCalls = 0
+
+      const result = await handleGitHubReleaseAssetUpload(
+        new TestSender(36),
+        uploadRequest(source, { expectedDigest: digest }),
+        {
+          fetch: async () => new Response(null),
+          upload: async () => {
+            nativeCalls++
+            return new Response(JSON.stringify(uploadedAsset()))
+          },
+          preferCliUpload: true,
+        }
+      )
+
+      assert.deepEqual(result, {
+        ok: false,
+        reason: 'cli-unavailable',
+        status: null,
+      })
+      assert.equal(nativeCalls, 0)
+    })
+  })
+
   it('surfaces intermediate upload bytes accepted by the transfer request', async () => {
     await withDirectory(async directory => {
       const source = join(directory, 'desktop.exe')
@@ -426,7 +564,10 @@ describe('main-process GitHub release transfer', () => {
   it('uses chunked Electron streaming without polling the native Mojo pipe', async () => {
     await withDirectory(async directory => {
       const source = join(directory, 'large-upload.bin')
-      const sourceBytes = Buffer.alloc(256 * 1024, 0x61)
+      const sourceBytes = Buffer.alloc(
+        GitHubReleaseUploadStreamChunkBytes * 2 + 17,
+        0x61
+      )
       await writeFile(source, sourceBytes)
       const request = new EventEmitter() as EventEmitter & {
         write: (
@@ -653,6 +794,7 @@ describe('main-process GitHub release transfer', () => {
             offset: 3,
             length: bytes.byteLength,
             digest,
+            digestVerified: false,
           },
           name: 'desktop.exe',
           label: 'Windows installer',
@@ -693,6 +835,11 @@ describe('main-process GitHub release transfer', () => {
       assert.equal(invocation?.options.shell, false)
       assert.equal(invocation?.options.windowsHide, true)
       assert.equal(invocation?.options.env?.GH_TOKEN, account.token)
+      assert.equal(invocation?.options.env?.GH_HOST, 'github.com')
+      assert.equal(
+        invocation?.options.env?.GH_REPO,
+        'github.com/desktop/material'
+      )
       assert.equal(invocation?.options.env?.GITHUB_TOKEN, undefined)
       assert.equal(invocation?.options.env?.DEBUG, undefined)
       assert.notEqual(invocation?.options.env?.GH_CONFIG_DIR, undefined)
@@ -801,10 +948,12 @@ describe('main-process GitHub release transfer', () => {
         fetch: async () => {
           fetches++
           return new Response(
-            JSON.stringify(fetches === 1 ? [] : [uploadedAsset()]),
+            JSON.stringify(fetches < 3 ? [] : [uploadedAsset()]),
             { status: 200 }
           )
         },
+        assetDetectionAttempts: 2,
+        assetDetectionIntervalMs: 1,
         resolveExecutable: () => 'C:\\Program Files\\GitHub CLI\\gh.exe',
         killTree: async () => true,
         spawn: () => {
@@ -856,7 +1005,107 @@ describe('main-process GitHub release transfer', () => {
 
       assert.equal(result.asset.id, 19)
       assert.equal(result.localDigest, digest)
-      assert.equal(fetches, 2)
+      assert.equal(fetches, 3)
+    })
+  })
+
+  it('restarts once after a partial CLI failure only when no asset exists', async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'clean-retry.bin')
+      await writeFile(source, bytes)
+      let spawns = 0
+      const logError = mock.method(log, 'error')
+      try {
+        const fallback = createGitHubCliReleaseUploadFallback({
+          fetch: async () => new Response('[]', { status: 200 }),
+          resolveExecutable: () => 'C:\\Program Files\\GitHub CLI\\gh.exe',
+          assetDetectionAttempts: 1,
+          maximumAttempts: 2,
+          spawn: () => {
+            spawns++
+            const attempt = spawns
+            const stdin = new PassThrough()
+            const stdout = new PassThrough()
+            const stderr = new PassThrough()
+            const child = new EventEmitter() as EventEmitter & {
+              stdin: PassThrough
+              stdout: PassThrough
+              stderr: PassThrough
+              pid: number
+              kill: () => boolean
+            }
+            child.stdin = stdin
+            child.stdout = stdout
+            child.stderr = stderr
+            child.pid = 4300 + attempt
+            child.kill = () => true
+            stdin.resume()
+            stdin.once('finish', () => {
+              if (attempt === 1) {
+                stderr.end(
+                  `token=${account.token}\nProxy-Authorization: Basic ZGlzdGluY3QtcHJveHktc2VjcmV0\nproxy https://proxy-user:proxy-password@proxy.example/upload?signature=query-secret\nupstream closed after partial upload`
+                )
+                stdout.end()
+                setImmediate(() => child.emit('close', 1, null))
+              } else {
+                stderr.end()
+                stdout.end(JSON.stringify(uploadedAsset()))
+                setImmediate(() => child.emit('close', 0, null))
+              }
+            })
+            return child as unknown as ChildProcessWithoutNullStreams
+          },
+        })
+        const progress = new Array<number>()
+
+        const result = await fallback(
+          {
+            endpoint: new URL(account.endpoint),
+            uploadURL:
+              'https://uploads.github.com/repos/desktop/material/releases/7/assets?name=desktop.exe',
+            token: account.token,
+            owner: 'desktop',
+            repository: 'material',
+            releaseId: 7,
+            source: {
+              path: source,
+              offset: 0,
+              length: bytes.byteLength,
+              digest,
+            },
+            name: 'desktop.exe',
+            label: 'Windows installer',
+          },
+          new AbortController().signal,
+          uploaded => progress.push(uploaded)
+        )
+
+        assert.equal(result.asset.id, 19)
+        assert.equal(spawns, 2)
+        assert.deepEqual(progress, [bytes.byteLength, 0, bytes.byteLength])
+        const diagnostics = logError.mock.calls.map(call =>
+          String(call.arguments[0])
+        )
+        assert.ok(
+          diagnostics.some(message =>
+            message.includes('upstream closed after partial upload')
+          )
+        )
+        assert.equal(
+          diagnostics.some(message => message.includes(account.token)),
+          false
+        )
+        assert.equal(
+          diagnostics.some(message =>
+            /ZGlzdGluY3QtcHJveHktc2VjcmV0|proxy-user|proxy-password|query-secret|\r|\n/.test(
+              message
+            )
+          ),
+          false
+        )
+      } finally {
+        logError.mock.restore()
+      }
     })
   })
 
@@ -985,6 +1234,7 @@ describe('main-process GitHub release transfer', () => {
         resolveExecutable: () => 'C:\\Program Files\\GitHub CLI\\gh.exe',
         stallTimeoutMs: 10,
         maximumRuntimeMs: 100,
+        maximumAttempts: 1,
         assetDetectionAttempts: 1,
         reconciliationTimeoutMs: 100,
         killTree: async () => {

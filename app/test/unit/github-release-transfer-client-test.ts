@@ -144,12 +144,17 @@ describe('GitHub release transfer renderer client', () => {
       'C:\\Build\\desktop.exe',
       'desktop.exe',
       'Windows installer',
-      new AbortController().signal
+      new AbortController().signal,
+      undefined,
+      { offset: 0, length: 4 },
+      `sha256:${'a'.repeat(64)}`
     )
     assert.equal(result.asset.id, 19)
     assert.equal(requests[0].channel, 'upload-release-asset')
     assert.equal(requests[0].request.sourcePath, 'C:\\Build\\desktop.exe')
     assert.equal(requests[0].request.name, 'desktop.exe')
     assert.equal(requests[0].request.label, 'Windows installer')
+    assert.deepEqual(requests[0].request.range, { offset: 0, length: 4 })
+    assert.equal(requests[0].request.expectedDigest, `sha256:${'a'.repeat(64)}`)
   })
 })

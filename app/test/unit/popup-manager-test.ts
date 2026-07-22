@@ -296,26 +296,30 @@ describe('PopupManager', () => {
       }
     })
 
-    it('retargets a pull preview to the latest repository', () => {
+    it('does not retarget an open exact-snapshot pull preview', () => {
       const popupManager = new PopupManager()
       const firstRepository = { id: 1 } as never
       const secondRepository = { id: 2 } as never
+      const removalReasons: string[] = []
       const first = popupManager.addPopup({
         type: PopupType.PullPreview,
         repository: firstRepository,
       })
-      const replacement = popupManager.addPopup({
+      const duplicate = popupManager.addPopup({
         type: PopupType.PullPreview,
         repository: secondRepository,
+        onRemoved: reason => removalReasons.push(reason),
       })
 
-      assert.equal(replacement.id, first.id)
+      assert.equal(duplicate.id, undefined)
       const previews = popupManager.getPopupsOfType(PopupType.PullPreview)
       assert.equal(previews.length, 1)
       assert.equal(previews[0].type, PopupType.PullPreview)
       if (previews[0].type === PopupType.PullPreview) {
-        assert.equal(previews[0].repository, secondRepository)
+        assert.equal(previews[0].repository, firstRepository)
       }
+      assert.equal(popupManager.currentPopup?.id, first.id)
+      assert.deepEqual(removalReasons, ['removed'])
     })
 
     it('retargets an existing sign-in popup without declining the replacement', () => {

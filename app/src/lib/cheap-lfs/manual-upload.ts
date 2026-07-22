@@ -5,9 +5,10 @@ import {
   mkdir,
   mkdtemp,
   open,
+  readdir,
   rmdir,
+  stat,
   statfs,
-  symlink,
   unlink,
 } from 'fs/promises'
 import { tmpdir } from 'os'
@@ -82,6 +83,22 @@ async function captureOwnedPath(
   }
 }
 
+async function captureOpenedFilePath(
+  path: string,
+  file: Awaited<ReturnType<typeof open>>
+): Promise<IOwnedPathIdentity> {
+  const value = await file.stat()
+  return {
+    path,
+    kind: 'entry',
+    device: value.dev,
+    inode: value.ino,
+    birthtimeMs: value.birthtimeMs,
+    isDirectory: value.isDirectory(),
+    isSymbolicLink: false,
+  }
+}
+
 async function stillOwnsPath(identity: IOwnedPathIdentity): Promise<boolean> {
   try {
     const current = await lstat(identity.path)
@@ -110,11 +127,25 @@ async function removeOwnedPath(identity: IOwnedPathIdentity): Promise<void> {
 
 async function writeExclusiveText(path: string, text: string): Promise<void> {
   const file = await open(path, 'wx')
+  let identity: IOwnedPathIdentity | undefined
+  let failure: unknown
   try {
+    identity = await captureOpenedFilePath(path, file)
     await file.writeFile(text, 'utf8')
     await file.sync()
-  } finally {
+  } catch (error) {
+    failure = error
+  }
+  try {
     await file.close()
+  } catch (error) {
+    failure ??= error
+  }
+  if (failure !== undefined) {
+    if (identity !== undefined) {
+      await removeOwnedPath(identity)
+    }
+    throw failure
   }
 }
 
@@ -140,8 +171,14 @@ async function copyRangeWithBoundedBuffer(
   }
   const source = await open(sourcePath, 'r')
   let destination: Awaited<ReturnType<typeof open>> | undefined
+  let destinationIdentity: IOwnedPathIdentity | undefined
+  let failure: unknown
   try {
     destination = await open(destinationPath, 'wx')
+    destinationIdentity = await captureOpenedFilePath(
+      destinationPath,
+      destination
+    )
     const buffer = Buffer.allocUnsafe(
       Math.min(ManualUploadCopyBufferBytes, Math.max(1, rangeBytes))
     )
@@ -202,17 +239,27 @@ async function copyRangeWithBoundedBuffer(
     await destination.sync()
     reportProgress(rangeBytes, true)
   } catch (error) {
-    await destination?.close().catch(() => undefined)
-    destination = undefined
-    await unlink(destinationPath).catch(() => undefined)
-    throw error
-  } finally {
-    await destination?.close().catch(() => undefined)
+    failure = error
+  }
+  try {
+    await destination?.close()
+  } catch (error) {
+    failure ??= error
+  }
+  try {
     await source.close()
+  } catch (error) {
+    failure ??= error
+  }
+  if (failure !== undefined) {
+    if (destinationIdentity !== undefined) {
+      await removeOwnedPath(destinationIdentity)
+    }
+    throw failure
   }
 }
 
-export type CheapLfsManualHandoffMethod = 'symlink' | 'hardlink' | 'copy'
+export type CheapLfsManualHandoffMethod = 'hardlink' | 'copy'
 
 export interface ICheapLfsManualHandoffAsset {
   readonly name: string
@@ -228,13 +275,103 @@ export interface ICheapLfsManualHandoff {
 }
 
 export interface ICheapLfsManualHandoffLinker {
-  readonly symlink: (source: string, destination: string) => Promise<void>
   readonly hardlink: (source: string, destination: string) => Promise<void>
 }
 
 const defaultHandoffLinker: ICheapLfsManualHandoffLinker = {
-  symlink: (source, destination) => symlink(source, destination, 'file'),
   hardlink: (source, destination) => link(source, destination),
+}
+
+interface IStagedRegularFile {
+  readonly device: number
+  readonly inode: number
+  readonly birthtimeMs: number
+  readonly links: number
+  readonly sizeInBytes: number
+}
+
+/**
+ * Browser drag/drop must see a real regular file. On Windows a file symlink is
+ * presented by Explorer as a zero-byte `.symlink` shell item, which causes the
+ * release editor to upload an empty helper rather than the target bytes.
+ */
+async function inspectStagedRegularFile(
+  path: string,
+  expectedSizeInBytes: number
+): Promise<IStagedRegularFile> {
+  const [entry, target] = await Promise.all([lstat(path), stat(path)])
+  if (
+    expectedSizeInBytes <= 0 ||
+    entry.isSymbolicLink() ||
+    !entry.isFile() ||
+    !target.isFile() ||
+    entry.dev !== target.dev ||
+    entry.ino !== target.ino ||
+    entry.size === 0 ||
+    target.size === 0 ||
+    entry.size !== expectedSizeInBytes ||
+    target.size !== expectedSizeInBytes
+  ) {
+    throw new Error(
+      'Cheap LFS refused a linked, empty, or size-mismatched manual upload file.'
+    )
+  }
+  return {
+    device: entry.dev,
+    inode: entry.ino,
+    birthtimeMs: entry.birthtimeMs,
+    links: entry.nlink,
+    sizeInBytes: entry.size,
+  }
+}
+
+async function removeRejectedStagedPath(
+  path: string,
+  owned: Array<IOwnedPathIdentity>,
+  captured: IOwnedPathIdentity
+): Promise<void> {
+  if (!owned.includes(captured)) {
+    owned.push(captured)
+  }
+  await removeOwnedPath(captured)
+  const remaining = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') {
+      return undefined
+    }
+    throw error
+  })
+  if (remaining !== undefined) {
+    throw new Error(
+      'The manual Cheap LFS staging path changed and was left untouched.'
+    )
+  }
+}
+
+async function reinspectManualHandoff(
+  uploadDirectoryPath: string,
+  assets: ReadonlyArray<ICheapLfsManualHandoffAsset>,
+  expectedSizes: ReadonlyMap<string, number>
+): Promise<void> {
+  const expectedNames = assets.map(asset => asset.name).sort()
+  const actualNames = (await readdir(uploadDirectoryPath)).sort()
+  if (
+    actualNames.length !== expectedNames.length ||
+    actualNames.some((name, index) => name !== expectedNames[index])
+  ) {
+    throw new Error(
+      'Cheap LFS found an unexpected helper or missing file in the manual upload folder.'
+    )
+  }
+  for (const asset of assets) {
+    if (basename(asset.path) !== asset.name) {
+      throw new Error('Cheap LFS produced an unsafe manual upload filename.')
+    }
+    const expectedSize = expectedSizes.get(asset.name)
+    if (expectedSize === undefined) {
+      throw new Error('Cheap LFS lost a manual upload file size.')
+    }
+    await inspectStagedRegularFile(asset.path, expectedSize)
+  }
 }
 
 /**
@@ -256,14 +393,25 @@ export async function createCheapLfsManualHandoff(
   ) {
     throw new Error('Cheap LFS produced an unsafe manual asset name.')
   }
+  const missingAssets = plan.files.flatMap(file =>
+    file.assets.filter(asset => asset.reusableAsset === undefined)
+  )
+  if (missingAssets.some(asset => asset.sizeInBytes <= 0)) {
+    throw new Error('Cheap LFS refused to prepare an empty manual upload file.')
+  }
   const totalBytes = plan.files.reduce((sum, file) => sum + file.sizeInBytes, 0)
-  const stagedWorstCaseBytes = plan.files.reduce(
-    (sum, file) => sum + BigInt(file.sizeInBytes),
+  const stagedWorstCaseBytes = missingAssets.reduce(
+    (sum, asset) => sum + BigInt(asset.sizeInBytes),
     0n
   )
-  const largestVerificationBytes = plan.files.reduce(
-    (largest, file) =>
-      Math.max(largest, ...file.assets.map(asset => asset.sizeInBytes)),
+  const assetsNeedingDownloadVerification = plan.files.flatMap(file =>
+    file.assets.filter(
+      asset =>
+        asset.reusableAsset === undefined || asset.reusableAsset.digest === null
+    )
+  )
+  const largestVerificationBytes = assetsNeedingDownloadVerification.reduce(
+    (largest, asset) => Math.max(largest, asset.sizeInBytes),
     0
   )
   const requiredTemporaryBytes =
@@ -290,11 +438,24 @@ export async function createCheapLfsManualHandoff(
   const uploadDirectoryPath = join(rootPath, 'upload-these-files')
   try {
     await mkdir(uploadDirectoryPath)
-    owned.push(await captureOwnedPath(uploadDirectoryPath, 'directory'))
+    const uploadDirectoryIdentity = await captureOwnedPath(
+      uploadDirectoryPath,
+      'directory'
+    )
+    owned.push(uploadDirectoryIdentity)
     const assets = new Array<ICheapLfsManualHandoffAsset>()
+    const expectedSizes = new Map(
+      missingAssets.map(asset => [asset.assetName, asset.sizeInBytes] as const)
+    )
     let completedBytes = 0
     for (const file of plan.files) {
-      let preparedFileBytes = 0
+      const reusedFileBytes = file.assets.reduce(
+        (sum, asset) =>
+          sum + (asset.reusableAsset === undefined ? 0 : asset.sizeInBytes),
+        0
+      )
+      let preparedFileBytes = reusedFileBytes
+      let preparedMissingBytes = 0
       const reportFileProgress = (processedBytes: number) => {
         preparedFileBytes = processedBytes
         onProgress?.({
@@ -303,24 +464,62 @@ export async function createCheapLfsManualHandoff(
           currentPath: file.trackedRelativePath,
         })
       }
-      reportFileProgress(0)
+      reportFileProgress(reusedFileBytes)
       for (const asset of file.assets) {
+        if (asset.reusableAsset !== undefined) {
+          continue
+        }
         throwIfAborted(signal)
         const assetPath = join(uploadDirectoryPath, asset.assetName)
         let method: CheapLfsManualHandoffMethod
+        let hardlinkIdentity: IOwnedPathIdentity | undefined
         const isWholeSource =
           file.assets.length === 1 &&
           asset.offset === 0 &&
           asset.sizeInBytes === file.sizeInBytes
         if (isWholeSource) {
-          try {
-            await linker.symlink(file.absoluteFilePath, assetPath)
-            method = 'symlink'
-          } catch {
+          const sourceBefore = await lstat(file.absoluteFilePath)
+          const canHardlink =
+            sourceBefore.dev === uploadDirectoryIdentity.device &&
+            sourceBefore.isFile() &&
+            !sourceBefore.isSymbolicLink() &&
+            sourceBefore.size === file.sizeInBytes
+          if (canHardlink) {
             try {
               await linker.hardlink(file.absoluteFilePath, assetPath)
+              hardlinkIdentity = await captureOwnedPath(assetPath, 'entry')
+              owned.push(hardlinkIdentity)
+              const [destination, sourceAfter] = await Promise.all([
+                inspectStagedRegularFile(assetPath, asset.sizeInBytes),
+                lstat(file.absoluteFilePath),
+              ])
+              if (
+                sourceAfter.isSymbolicLink() ||
+                !sourceAfter.isFile() ||
+                sourceAfter.dev !== sourceBefore.dev ||
+                sourceAfter.ino !== sourceBefore.ino ||
+                sourceAfter.birthtimeMs !== sourceBefore.birthtimeMs ||
+                sourceAfter.size !== file.sizeInBytes ||
+                destination.device !== sourceAfter.dev ||
+                destination.inode !== sourceAfter.ino ||
+                destination.birthtimeMs !== sourceAfter.birthtimeMs ||
+                destination.links < 2 ||
+                sourceAfter.nlink < 2
+              ) {
+                throw new Error(
+                  'Cheap LFS could not verify the manual upload hard link.'
+                )
+              }
               method = 'hardlink'
             } catch {
+              if (hardlinkIdentity !== undefined) {
+                await removeRejectedStagedPath(
+                  assetPath,
+                  owned,
+                  hardlinkIdentity
+                )
+                hardlinkIdentity = undefined
+              }
               await copyRangeWithBoundedBuffer(
                 file.absoluteFilePath,
                 assetPath,
@@ -328,10 +527,27 @@ export async function createCheapLfsManualHandoff(
                 asset.offset,
                 asset.sizeInBytes,
                 signal,
-                copiedBytes => reportFileProgress(asset.offset + copiedBytes)
+                copiedBytes =>
+                  reportFileProgress(
+                    reusedFileBytes + preparedMissingBytes + copiedBytes
+                  )
               )
               method = 'copy'
             }
+          } else {
+            await copyRangeWithBoundedBuffer(
+              file.absoluteFilePath,
+              assetPath,
+              file.sizeInBytes,
+              asset.offset,
+              asset.sizeInBytes,
+              signal,
+              copiedBytes =>
+                reportFileProgress(
+                  reusedFileBytes + preparedMissingBytes + copiedBytes
+                )
+            )
+            method = 'copy'
           }
         } else {
           await copyRangeWithBoundedBuffer(
@@ -341,12 +557,20 @@ export async function createCheapLfsManualHandoff(
             asset.offset,
             asset.sizeInBytes,
             signal,
-            copiedBytes => reportFileProgress(asset.offset + copiedBytes)
+            copiedBytes =>
+              reportFileProgress(
+                reusedFileBytes + preparedMissingBytes + copiedBytes
+              )
           )
           method = 'copy'
         }
-        owned.push(await captureOwnedPath(assetPath, 'entry'))
+        if (hardlinkIdentity === undefined) {
+          owned.push(await captureOwnedPath(assetPath, 'entry'))
+        }
+        await inspectStagedRegularFile(assetPath, asset.sizeInBytes)
         assets.push({ name: asset.assetName, path: assetPath, method })
+        preparedMissingBytes += asset.sizeInBytes
+        reportFileProgress(reusedFileBytes + preparedMissingBytes)
       }
       if (preparedFileBytes !== file.sizeInBytes) {
         reportFileProgress(file.sizeInBytes)
@@ -369,13 +593,14 @@ export async function createCheapLfsManualHandoff(
               assets: file.assets.map(asset => {
                 const handoff = assets.find(
                   candidate => candidate.name === asset.assetName
-                )!
+                )
                 return {
                   assetName: asset.assetName,
                   offset: asset.offset,
                   sizeInBytes: asset.sizeInBytes,
                   sha256: asset.sha256,
-                  handoffMethod: handoff.method,
+                  handoffMethod: handoff?.method ?? 'existing-release-asset',
+                  existingAssetId: asset.reusableAsset?.id,
                 }
               }),
             }
@@ -386,6 +611,10 @@ export async function createCheapLfsManualHandoff(
       )}\n`
     )
     owned.push(await captureOwnedPath(manifestPath, 'entry'))
+    // This is the last gate before the caller may open Explorer and the
+    // provider page. Re-read every path so a link, empty file, stale size, or
+    // unexpected helper can never reach browser drag/drop.
+    await reinspectManualHandoff(uploadDirectoryPath, assets, expectedSizes)
     return {
       rootPath,
       uploadDirectoryPath,
@@ -477,12 +706,11 @@ async function listAllAssets(
   )
 }
 
-async function waitForNewAssets(
+async function detectManualUploadAssets(
   releases: ICheapLfsManualReleasesGateway,
   repository: Repository,
   plan: ICheapLfsManualPinPlan,
-  signal: AbortSignal,
-  policy: ICheapLfsManualUploadPolicy
+  signal: AbortSignal
 ): Promise<ReadonlyMap<string, IGitHubReleaseAsset>> {
   const expectedAssets = plan.files.flatMap(file => file.assets)
   const expectedByName = new Map(
@@ -491,39 +719,88 @@ async function waitForNewAssets(
   if (expectedByName.size !== expectedAssets.length) {
     throw new Error('Cheap LFS produced duplicate manual upload asset names.')
   }
-  for (let attempt = 0; attempt < policy.maximumPollAttempts; attempt++) {
-    throwIfAborted(signal)
-    const assets = await listAllAssets(
-      releases,
-      repository,
-      plan.release.id,
-      signal
-    )
-    const detected = new Map<string, IGitHubReleaseAsset>()
-    for (const asset of assets) {
-      if (
-        !isUploadedGitHubReleaseAsset(asset) ||
-        plan.preexistingAssetIds.has(asset.id)
-      ) {
-        continue
-      }
-      const expected = expectedByName.get(asset.name)
-      if (expected === undefined) {
-        continue
-      }
-      if (detected.has(asset.name)) {
+  const assets = await listAllAssets(
+    releases,
+    repository,
+    plan.release.id,
+    signal
+  )
+  const detected = new Map<string, IGitHubReleaseAsset>()
+  for (const asset of assets) {
+    const expected = expectedByName.get(asset.name)
+    if (expected === undefined) {
+      continue
+    }
+    const reusable = expected.reusableAsset
+    if (reusable !== undefined) {
+      if (asset.id !== reusable.id) {
         throw new Error(
-          `GitHub returned multiple new assets named “${asset.name}”.`
+          `The reusable manual upload asset “${asset.name}” was replaced. Retry to build a fresh plan.`
         )
       }
-      if (asset.sizeInBytes !== expected.sizeInBytes) {
+      if (
+        !isUploadedGitHubReleaseAsset(asset) ||
+        asset.sizeInBytes !== expected.sizeInBytes ||
+        (asset.digest !== null && asset.digest !== `sha256:${expected.sha256}`)
+      ) {
         throw new Error(
-          `The manually uploaded “${asset.name}” asset has the wrong byte size.`
+          `The reusable manual upload asset “${asset.name}” changed. Wait for it to finish or delete it before retrying.`
         )
       }
       detected.set(asset.name, asset)
+      continue
     }
-    if (detected.size === expectedAssets.length) {
+    if (
+      !isUploadedGitHubReleaseAsset(asset) ||
+      plan.preexistingAssetIds.has(asset.id)
+    ) {
+      continue
+    }
+    if (detected.has(asset.name)) {
+      throw new Error(
+        `GitHub returned multiple new assets named “${asset.name}”.`
+      )
+    }
+    if (asset.sizeInBytes !== expected.sizeInBytes) {
+      throw new Error(
+        `The manually uploaded “${asset.name}” asset has the wrong byte size.`
+      )
+    }
+    detected.set(asset.name, asset)
+  }
+  for (const expected of expectedAssets) {
+    if (
+      expected.reusableAsset !== undefined &&
+      !detected.has(expected.assetName)
+    ) {
+      throw new Error(
+        `The reusable manual upload asset “${expected.assetName}” no longer exists. Retry to build a fresh plan.`
+      )
+    }
+  }
+  return detected
+}
+
+async function waitForNewAssets(
+  releases: ICheapLfsManualReleasesGateway,
+  repository: Repository,
+  plan: ICheapLfsManualPinPlan,
+  signal: AbortSignal,
+  policy: ICheapLfsManualUploadPolicy
+): Promise<ReadonlyMap<string, IGitHubReleaseAsset>> {
+  const expectedAssetCount = plan.files.reduce(
+    (count, file) => count + file.assets.length,
+    0
+  )
+  for (let attempt = 0; attempt < policy.maximumPollAttempts; attempt++) {
+    throwIfAborted(signal)
+    const detected = await detectManualUploadAssets(
+      releases,
+      repository,
+      plan,
+      signal
+    )
+    if (detected.size === expectedAssetCount) {
       return detected
     }
     if (attempt + 1 < policy.maximumPollAttempts) {
@@ -656,9 +933,31 @@ export async function manualPinFilesToRelease(
       })
   )
   try {
-    await hooks.onReady(handoff, plan)
-    hooks.onStage?.('manual-waiting')
-    const assets = await waitForNewAssets(
+    // A provider digest is sufficient proof for an exact-size preexisting
+    // asset. Older providers can omit it; verify those bytes locally before
+    // omitting the asset from the browser handoff.
+    for (const file of plan.files) {
+      for (const expectedAsset of file.assets) {
+        const reusableAsset = expectedAsset.reusableAsset
+        if (reusableAsset !== undefined && reusableAsset.digest === null) {
+          await verifyDownloadedAsset(
+            releases,
+            repository,
+            plan.release.id,
+            expectedAsset,
+            reusableAsset,
+            handoff.rootPath,
+            signal,
+            fs
+          )
+        }
+      }
+    }
+    if (handoff.assets.length > 0) {
+      await hooks.onReady(handoff, plan)
+      hooks.onStage?.('manual-waiting')
+    }
+    let assets = await waitForNewAssets(
       releases,
       repository,
       plan,
@@ -668,6 +967,9 @@ export async function manualPinFilesToRelease(
     hooks.onStage?.('manual-verifying')
     for (const file of plan.files) {
       for (const expectedAsset of file.assets) {
+        if (expectedAsset.reusableAsset !== undefined) {
+          continue
+        }
         await verifyDownloadedAsset(
           releases,
           repository,
@@ -693,6 +995,37 @@ export async function manualPinFilesToRelease(
         )
       }
     }
+    throwIfAborted(signal)
+    const finalAssets = await detectManualUploadAssets(
+      releases,
+      repository,
+      plan,
+      signal
+    )
+    if (finalAssets.size !== assets.size) {
+      throw new Error(
+        'The manual Cheap LFS release assets changed before pointer creation.'
+      )
+    }
+    for (const file of plan.files) {
+      for (const expected of file.assets) {
+        const before = assets.get(expected.assetName)
+        const current = finalAssets.get(expected.assetName)
+        if (
+          before === undefined ||
+          current === undefined ||
+          current.id !== before.id ||
+          current.sizeInBytes !== expected.sizeInBytes ||
+          (current.digest !== null &&
+            current.digest !== `sha256:${expected.sha256}`)
+        ) {
+          throw new Error(
+            `The manual Cheap LFS asset “${expected.assetName}” changed before pointer creation.`
+          )
+        }
+      }
+    }
+    assets = finalAssets
     throwIfAborted(signal)
     hooks.onStage?.('manual-detected')
     // Cancellation is fenced immediately before the mutation phase. Once the

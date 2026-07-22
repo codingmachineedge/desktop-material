@@ -20,6 +20,7 @@ import {
   parseGitHubReleaseList,
 } from '../../src/lib/github-releases'
 import { APIError } from '../../src/lib/http'
+import { GitHubReleaseTransferError } from '../../src/lib/github-release-transfer'
 
 const selected = new Account(
   'selected',
@@ -176,6 +177,31 @@ async function storeWith(
 }
 
 describe('GitHub Releases store', () => {
+  it('returns incomplete assets without bricking the release inventory', async () => {
+    const starter: IGitHubReleaseAsset = {
+      ...asset,
+      state: 'starter',
+      sizeInBytes: 0,
+      digest: null,
+    }
+    const store = await storeWith(
+      new FakeAccountsStore([selected]),
+      dependencies(() =>
+        fakeAPI({
+          fetchReleaseAssets: async () => ({
+            assets: [starter],
+            page: 1,
+            nextPage: null,
+            capped: false,
+          }),
+        })
+      )
+    )
+
+    const result = await store.listAssets(repository, release.id)
+    assert.deepEqual(result.assets, [starter])
+  })
+
   it('routes every request through the repository-selected account', async () => {
     const accountsStore = new FakeAccountsStore([other, selected])
     const accountKeys = new Array<string>()
@@ -528,6 +554,19 @@ describe('GitHub Releases store', () => {
     assert.ok(error instanceof GitHubReleasesError)
     assert.equal((error as GitHubReleasesError).kind, 'permission')
     assert.equal(error.message.includes('private-provider-detail'), false)
+  })
+
+  it('preserves actionable app-authored transfer failure messages', () => {
+    const transfer = new GitHubReleaseTransferError(
+      'incomplete-asset',
+      null,
+      'Delete the Processing asset in Releases, then retry.'
+    )
+    const error = githubReleasesError(transfer, 'upload')
+
+    assert.ok(error instanceof GitHubReleasesError)
+    assert.equal((error as GitHubReleasesError).kind, 'conflict')
+    assert.equal(error.message, transfer.message)
   })
 
   it('logs the underlying cause when it replaces one with a bounded message', () => {

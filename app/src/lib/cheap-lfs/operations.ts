@@ -73,6 +73,8 @@ const CheapLfsMaximumReleaseBuckets = 1000
 const CheapLfsSniffBytes = 4096
 /** Keep streamed preprocessing from flooding the renderer/store update path. */
 const CheapLfsProgressReportIntervalMs = 250
+/** Reduce per-2-GiB hash callbacks while keeping each in-memory chunk bounded. */
+export const CheapLfsStreamChunkBytes = 1024 * 1024
 /** Directories skipped by the pointer-listing walk. */
 const CheapLfsSkipDirectories = new Set([
   '.git',
@@ -139,7 +141,8 @@ export interface ICheapLfsReleasesGateway {
     label: string | null,
     signal: AbortSignal,
     onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void,
-    range?: IGitHubReleaseAssetUploadRange
+    range?: IGitHubReleaseAssetUploadRange,
+    expectedDigest?: string
   ): Promise<{
     readonly asset: IGitHubReleaseAsset
     readonly bytes: number
@@ -257,7 +260,9 @@ export function hashFileSha256(
     }
     const hash = createHash('sha256')
     let sizeInBytes = 0
-    const stream = createReadStream(path)
+    const stream = createReadStream(path, {
+      highWaterMark: CheapLfsStreamChunkBytes,
+    })
     const onAbort = () =>
       stream.destroy(abortError('Cheap LFS hashing canceled.'))
     signal?.addEventListener('abort', onAbort, { once: true })
@@ -295,6 +300,7 @@ function hashFileRange(
     const stream = createReadStream(path, {
       start: offset,
       end: offset + length - 1,
+      highWaterMark: CheapLfsStreamChunkBytes,
     })
     const onAbort = () =>
       stream.destroy(abortError('Cheap LFS hashing canceled.'))
@@ -1049,7 +1055,8 @@ export async function pinFileToRelease(
   signal?: AbortSignal,
   onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void,
   fs: ICheapLfsFileSystem = defaultCheapLfsFileSystem,
-  onStage?: (stage: CheapLfsPinStage) => void
+  onStage?: (stage: CheapLfsPinStage) => void,
+  onHashProgress?: (processedBytes: number) => void
 ): Promise<ICheapLfsPinResult> {
   const trackedRelativePath = validateCheapLfsTrackedPath(
     options.trackedRelativePath
@@ -1072,7 +1079,8 @@ export async function pinFileToRelease(
   const hashed = await fs.hashFileParts(
     options.absoluteFilePath,
     CHEAP_LFS_PART_SIZE_BYTES,
-    signal
+    signal,
+    onHashProgress
   )
   onStage?.('release')
   const bucket = await allocateCheapLfsReleaseBucket(
@@ -1129,7 +1137,9 @@ export async function pinFileToRelease(
         assetName,
         null,
         signal ?? new AbortController().signal,
-        aggregateProgress(onProgress, 0, hashed.sizeInBytes, part.length)
+        aggregateProgress(onProgress, 0, hashed.sizeInBytes, part.length),
+        undefined,
+        `sha256:${part.sha256}`
       )
       // Record ownership before validating the response. A digest or byte-count
       // mismatch still means GitHub accepted an asset that this attempt owns.
@@ -1224,7 +1234,8 @@ export async function pinFileToRelease(
           hashed.sizeInBytes,
           part.length
         ),
-        { offset: part.offset, length: part.length }
+        { offset: part.offset, length: part.length },
+        `sha256:${part.sha256}`
       )
       // Record ownership before validating the response. A digest or byte-count
       // mismatch still means GitHub accepted an asset that this attempt owns.
@@ -1272,6 +1283,8 @@ export interface ICheapLfsManualAssetPlan {
   readonly offset: number
   readonly sizeInBytes: number
   readonly sha256: string
+  /** Exact preexisting provider object that this retry may safely reuse. */
+  readonly reusableAsset?: IGitHubReleaseAsset
 }
 
 /** One source file, its browser-upload assets, and its eventual pointer. */
@@ -1291,6 +1304,23 @@ export interface ICheapLfsManualPinPlan {
   readonly release: IGitHubRelease
   readonly files: ReadonlyArray<ICheapLfsManualFilePlan>
   readonly preexistingAssetIds: ReadonlySet<number>
+}
+
+interface ICheapLfsManualHashedFile {
+  readonly options: ICheapLfsPinOptions
+  readonly trackedRelativePath: string
+  readonly baseName: string
+  readonly hashed: {
+    readonly sha256: string
+    readonly sizeInBytes: number
+    readonly parts: ReadonlyArray<ICheapLfsHashedPart>
+  }
+}
+
+interface ICheapLfsResolvedManualFileAssets {
+  readonly file: ICheapLfsManualHashedFile
+  readonly assetName: string
+  readonly assets: ReadonlyArray<ICheapLfsManualAssetPlan>
 }
 
 async function listAllCheapLfsReleaseAssets(
@@ -1399,6 +1429,156 @@ function mergeCheapLfsReleaseAssetSnapshots(
   return [...byId.values()]
 }
 
+function manualAssetCandidateBaseName(
+  baseName: string,
+  sha256: string,
+  partCount: number,
+  candidateIndex: number
+): string {
+  if (candidateIndex === 0) {
+    return baseName
+  }
+  const suffix =
+    candidateIndex === 1
+      ? sha256.slice(0, 7)
+      : `${sha256.slice(0, 7)}-${candidateIndex}`
+  if (partCount === 1) {
+    return insertAssetNameHash(baseName, suffix)
+  }
+  const width = Math.max(3, String(partCount).length)
+  return appendAssetNameSuffix(
+    baseName,
+    `-${suffix}`,
+    255 - `.part${'0'.repeat(width)}`.length
+  )
+}
+
+/**
+ * Resolve one deterministic manual asset family. Exact uploaded objects from a
+ * prior browser attempt may occupy their own planned names when their size and
+ * provider digest match. A digest-less exact-size object remains a candidate,
+ * but manual-upload.ts must download and hash it before browser handoff.
+ */
+function resolveCheapLfsManualFileAssets(
+  hashedFiles: ReadonlyArray<ICheapLfsManualHashedFile>,
+  existingAssets: ReadonlyArray<IGitHubReleaseAsset>
+): ReadonlyArray<ICheapLfsResolvedManualFileAssets> {
+  const existingByName = new Map<string, Array<IGitHubReleaseAsset>>()
+  for (const asset of existingAssets) {
+    const key = manualAssetNameCollisionKey(asset.name)
+    const matches = existingByName.get(key) ?? []
+    matches.push(asset)
+    existingByName.set(key, matches)
+  }
+  const reservedNames = new Set<string>()
+  const resolved = new Array<ICheapLfsResolvedManualFileAssets>()
+  for (const file of hashedFiles) {
+    const partCount = file.hashed.parts.length
+    let selected:
+      | {
+          readonly assetName: string
+          readonly assets: ReadonlyArray<ICheapLfsManualAssetPlan>
+        }
+      | undefined
+    const maximumCandidates = existingAssets.length + reservedNames.size + 2
+    for (
+      let candidateIndex = 0;
+      candidateIndex < maximumCandidates;
+      candidateIndex++
+    ) {
+      const assetName = manualAssetCandidateBaseName(
+        file.baseName,
+        file.hashed.sha256,
+        partCount,
+        candidateIndex
+      )
+      const candidateAssets = file.hashed.parts.map((part, index) => ({
+        assetName:
+          partCount > 1
+            ? partAssetName(assetName, index, partCount)
+            : assetName,
+        offset: part.offset,
+        sizeInBytes: part.length,
+        sha256: part.sha256,
+      }))
+      if (
+        candidateAssets.some(asset =>
+          reservedNames.has(manualAssetNameCollisionKey(asset.assetName))
+        )
+      ) {
+        continue
+      }
+
+      let incompatible = false
+      const reusableByName = new Map<string, IGitHubReleaseAsset>()
+      for (const candidate of candidateAssets) {
+        const matches =
+          existingByName.get(
+            manualAssetNameCollisionKey(candidate.assetName)
+          ) ?? []
+        if (matches.length === 0) {
+          continue
+        }
+        const exactMatches = matches.filter(
+          asset => asset.name === candidate.assetName
+        )
+        const incomplete = exactMatches.find(
+          asset => !isUploadedGitHubReleaseAsset(asset)
+        )
+        if (incomplete !== undefined) {
+          throw new Error(
+            `The release has an incomplete asset named “${candidate.assetName}”. Wait for GitHub to finish it or delete it in the Release editor before retrying manual Cheap LFS.`
+          )
+        }
+        if (matches.length !== 1 || exactMatches.length !== 1) {
+          incompatible = true
+          break
+        }
+        const existing = exactMatches[0]
+        const expectedDigest = `sha256:${candidate.sha256}`
+        if (
+          existing.sizeInBytes !== candidate.sizeInBytes ||
+          (existing.digest !== null && existing.digest !== expectedDigest)
+        ) {
+          incompatible = true
+          break
+        }
+        reusableByName.set(candidate.assetName, existing)
+      }
+      if (incompatible) {
+        continue
+      }
+
+      const assets = candidateAssets.map(asset => ({
+        ...asset,
+        reusableAsset: reusableByName.get(asset.assetName),
+      }))
+      for (const asset of assets) {
+        reservedNames.add(manualAssetNameCollisionKey(asset.assetName))
+      }
+      selected = { assetName, assets }
+      break
+    }
+    if (selected === undefined) {
+      throw new Error('Cheap LFS could not choose unique manual asset names.')
+    }
+    resolved.push({ file, ...selected })
+  }
+  return resolved
+}
+
+function countMissingCheapLfsManualAssets(
+  hashedFiles: ReadonlyArray<ICheapLfsManualHashedFile>,
+  existingAssets: ReadonlyArray<IGitHubReleaseAsset>
+): number {
+  return resolveCheapLfsManualFileAssets(hashedFiles, existingAssets).reduce(
+    (count, file) =>
+      count +
+      file.assets.filter(asset => asset.reusableAsset === undefined).length,
+    0
+  )
+}
+
 /**
  * Choose the latest contiguous release bucket with enough room for one atomic
  * cheap-LFS object group. Exponential and binary exact-tag probes avoid paging
@@ -1415,7 +1595,10 @@ async function allocateCheapLfsReleaseBucket(
     releaseTag: string,
     releaseName: string
   ) => Promise<IGitHubRelease>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  requiredAssetCountForInventory?: (
+    assets: ReadonlyArray<IGitHubReleaseAsset>
+  ) => number
 ): Promise<ICheapLfsReleaseBucket> {
   if (
     !Number.isSafeInteger(requiredAssetCount) ||
@@ -1425,6 +1608,18 @@ async function allocateCheapLfsReleaseBucket(
     throw new Error(
       `One cheap LFS object group must use between 1 and ${GitHubReleaseAssetMaximumCount} release assets.`
     )
+  }
+  const requiredFor = (assets: ReadonlyArray<IGitHubReleaseAsset>): number => {
+    const required =
+      requiredAssetCountForInventory?.(assets) ?? requiredAssetCount
+    if (
+      !Number.isSafeInteger(required) ||
+      required < 0 ||
+      required > requiredAssetCount
+    ) {
+      throw new Error('Cheap LFS produced an invalid resumable asset count.')
+    }
+    return required
   }
 
   const releaseCache = new Map<number, IGitHubRelease | null>()
@@ -1467,7 +1662,7 @@ async function allocateCheapLfsReleaseBucket(
     )
     if (
       firstAssets.length <=
-      GitHubReleaseAssetMaximumCount - requiredAssetCount
+      GitHubReleaseAssetMaximumCount - requiredFor(firstAssets)
     ) {
       return {
         release: firstRelease,
@@ -1542,7 +1737,7 @@ async function allocateCheapLfsReleaseBucket(
       signal
     )
     const assets = mergeCheapLfsReleaseAssetSnapshots(release, listedAssets)
-    if (assets.length <= GitHubReleaseAssetMaximumCount - requiredAssetCount) {
+    if (assets.length <= GitHubReleaseAssetMaximumCount - requiredFor(assets)) {
       return { release, releaseTag, assets, index }
     }
   }
@@ -1620,12 +1815,7 @@ export async function planCheapLfsManualUpload(
     })
   }
 
-  const hashedFiles = new Array<{
-    readonly options: ICheapLfsPinOptions
-    readonly trackedRelativePath: string
-    readonly baseName: string
-    readonly hashed: Awaited<ReturnType<ICheapLfsFileSystem['hashFileParts']>>
-  }>()
+  const hashedFiles = new Array<ICheapLfsManualHashedFile>()
   const totalHashBytes = preflightFiles.reduce(
     (sum, file) => sum + file.sourceSize,
     0
@@ -1717,39 +1907,14 @@ export async function planCheapLfsManualUpload(
         },
         signal
       ),
-    signal
+    signal,
+    assets => countMissingCheapLfsManualAssets(hashedFiles, assets)
   )
   const { release, releaseTag, assets: allAssets } = bucket
   const preexistingAssetIds = new Set(allAssets.map(asset => asset.id))
-  const reservedNames = new Set(allAssets.map(asset => asset.name))
-  const files = hashedFiles.map(file => {
+  const resolvedFiles = resolveCheapLfsManualFileAssets(hashedFiles, allAssets)
+  const files = resolvedFiles.map(({ file, assetName, assets }) => {
     const multipart = file.hashed.parts.length > 1
-    const assetName = multipart
-      ? dedupeMultiPartBaseName(
-          file.baseName,
-          allAssets,
-          file.hashed.sha256,
-          file.hashed.parts.length,
-          reservedNames
-        )
-      : dedupeAssetName(
-          file.baseName,
-          allAssets,
-          file.hashed.sha256,
-          reservedNames
-        )
-    const assets: ReadonlyArray<ICheapLfsManualAssetPlan> =
-      file.hashed.parts.map((part, index) => ({
-        assetName: multipart
-          ? partAssetName(assetName, index, file.hashed.parts.length)
-          : assetName,
-        offset: part.offset,
-        sizeInBytes: part.length,
-        sha256: part.sha256,
-      }))
-    for (const asset of assets) {
-      reservedNames.add(asset.assetName)
-    }
     preflightProjectedPointer(
       file.hashed.sizeInBytes,
       releaseTag,
@@ -2296,7 +2461,8 @@ export interface ICheapLfsAutoPinDependencies {
     target: ICheapLfsAutoPinTarget,
     signal: AbortSignal | undefined,
     onProgress: (progress: IGitHubReleaseTransferProgressEvent) => void,
-    onStage?: (stage: CheapLfsAutoPinPhase) => void
+    onStage?: (stage: CheapLfsAutoPinPhase) => void,
+    onHashProgress?: (processedBytes: number) => void
   ) => Promise<ICheapLfsPinResult>
 }
 
@@ -2401,7 +2567,8 @@ export async function autoPinLargeFilesForCommit(
       target,
       signal,
       progress => emit('uploading', progress.transferredBytes),
-      stage => emit(stage)
+      stage => emit(stage),
+      processedBytes => emit('hashing', processedBytes)
     )
     const pinnedFile = {
       relativePath: target.relativePath,

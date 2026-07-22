@@ -135,7 +135,8 @@ export async function uploadGitHubReleaseAssetThroughMainProcess(
   label: string | null,
   signal: AbortSignal,
   onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void,
-  range?: IGitHubReleaseAssetUploadRange
+  range?: IGitHubReleaseAssetUploadRange,
+  expectedDigest?: string
 ) {
   const request: IGitHubReleaseAssetUploadRequest = {
     operationId: operationId(),
@@ -148,6 +149,7 @@ export async function uploadGitHubReleaseAssetThroughMainProcess(
     name,
     label,
     ...(range !== undefined ? { range } : {}),
+    ...(expectedDigest !== undefined ? { expectedDigest } : {}),
   }
   return await invokeTransfer<{
     readonly ok: true

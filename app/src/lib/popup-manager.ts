@@ -99,7 +99,6 @@ export class PopupManager {
       if (
         popupToAdd.type === PopupType.BranchRules ||
         popupToAdd.type === PopupType.SparseCheckout ||
-        popupToAdd.type === PopupType.PullPreview ||
         popupToAdd.type === PopupType.SignIn
       ) {
         const popup = { ...popupToAdd, id: existingPopup[0].id }

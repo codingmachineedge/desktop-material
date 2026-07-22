@@ -33,6 +33,7 @@ import {
 } from '../../../src/lib/github-releases'
 import {
   createCheapLfsMaterializeCache,
+  CheapLfsStreamChunkBytes,
   defaultCheapLfsFileSystem,
   hashFilePartsSha256,
   ICheapLfsFileSystem,
@@ -388,6 +389,11 @@ function inMemoryReleaseGateway(
 }
 
 describe('cheap LFS operations', () => {
+  it('keeps hash streams bounded at one MiB per read', () => {
+    assert.equal(CheapLfsStreamChunkBytes, 1024 * 1024)
+    assert.ok(CheapLfsStreamChunkBytes < CHEAP_LFS_PART_SIZE_BYTES)
+  })
+
   it('throttles streamed hash progress while always reporting completion', async () => {
     await withTempRepository(async dir => {
       const sourcePath = join(dir, 'progress.bin')
@@ -809,6 +815,7 @@ describe('cheap LFS operations', () => {
         sourcePath: string
         name: string
         range: { offset: number; length: number } | undefined
+        expectedDigest: string | undefined
       }>()
       const store = await storeWith(
         dependencies(
@@ -827,9 +834,10 @@ describe('cheap LFS operations', () => {
               _label,
               _signal,
               _onProgress,
-              range
+              range,
+              expectedDigest
             ) => {
-              uploads.push({ sourcePath, name, range })
+              uploads.push({ sourcePath, name, range, expectedDigest })
               return {
                 ok: true,
                 asset: { ...asset, name, sizeInBytes: range?.length ?? 0 },
@@ -886,6 +894,10 @@ describe('cheap LFS operations', () => {
         ]
       )
       assert.ok(uploads.every(u => u.sourcePath === filePath))
+      assert.deepEqual(
+        uploads.map(u => u.expectedDigest),
+        partShas.map(sha => `sha256:${sha}`)
+      )
 
       // The pointer records every part; the sizes sum to the whole.
       assert.equal(result.pointer.sha256, wholeSha)

@@ -47,7 +47,58 @@ change OpenCode behavior. On the exact failing source plus this repair, the
 full CI-equivalent `yarn lint` command passes Prettier, the
 ESLint/Prettier-compatibility check, and repository-wide ESLint. Remote CI and
 installer publication remain pending until this commit reaches `main`.
+## 2026-07-21 final pull-preview, Cheap LFS, and stale-overlap CI checkpoint
 
+Reviewed pull previews now gate execution on fresh repository status, retain an
+atomic raw strategy/configuration snapshot, and parse changed-file output as a
+bounded stream. A busy sentinel and phase-locked modal prevent refresh, close,
+or footer actions from racing an active pull; accessible state and the footer
+remain synchronized with the exact phase. The privacy-safe reviewed
+pull-preview screenshot was accepted at 960×660.
+
+Cheap LFS cancellation now opens an explicit confirmation instead of stopping
+the operation immediately. The GitHub CLI fallback streams the exact source,
+uses 1 MiB chunks to reduce renderer progress traffic, verifies the streamed
+digest, bounds retry, and reconciles the Release inventory before retrying so
+an ambiguous prior upload is never duplicated or deleted. Authentication,
+proxy authentication, cookies, and Basic credentials are redacted from bounded
+CLI diagnostics.
+
+The manual browser handoff now stages only regular, nonempty files. It uses a
+verified same-volume hardlink when possible and otherwise a bounded copy; it
+never exposes a symlink that Explorer or GitHub can interpret as an empty
+`.symlink` file. Multipart files remain actual regular parts. Existing uploads
+with the exact expected size and digest count toward progress and capacity, so
+a partial manual upload can resume with only missing objects. Digestless legacy
+assets receive bounded download/hash verification before reuse. Every reuse is
+revalidated against a fresh complete Release inventory, followed by a final
+inventory fence before any pointer is published.
+
+The pre-integration Cheap LFS gate passed **189/189**, with the manual staging
+and partial-resume subset passing **23/23**. After rebasing onto the final remote
+baseline, the expanded Cheap LFS/Release selection passed **207/207** and the
+pull-preview selection passed **81/81**. Root TypeScript, configured targeted
+ESLint, targeted Prettier, feature-document markdownlint, and
+`git diff --check` are green on the merged tree.
+
+Express Installer hotfixes `98bd712f2f` and `484ebc0210` separate stale overlap
+from genuine CI failure without dropping a successful Release. Every successful
+exact target publishes its own immutable Release even after newer commits
+overtake it. Creation is always non-latest; only a freshly revalidated current
+`main` target is promoted, and a mid-promotion branch advance triggers verified
+demotion. The flow deliberately avoids GitHub's lossy shared concurrency queue.
+A real failed upstream CI still preserves the artifact while the workflow
+remains failed. The focused workflow contract passes **8/8**.
+
+Release
+[`v3.6.3-beta3-s000000000201`][release-s201]
+was already published from `fa4806971c` with all six required assets. That is
+the verified installer-release baseline, not a claim that the later hardening
+batch has published. The user explicitly requested that completion not wait on
+future CI, and explicitly skipped the GitHub Projects board; neither is a
+remaining acceptance gate for this batch.
+
+[release-s201]: https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-s000000000201
 ## 2026-07-21 printenvz Windows install-stage repair
 
 The install stage failed building `vendor/printenvz` with

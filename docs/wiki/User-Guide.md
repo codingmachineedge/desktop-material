@@ -745,6 +745,10 @@ route, and lists up to 25 incoming commits and 100 incoming changed files. The
 file list describes the upstream side from the merge base, so local-only files
 do not appear as incoming. Overflow counts keep larger pulls explicit.
 
+The initial fetch has no safe cancellation path, so the modal cannot be closed
+with a button, Escape, or the backdrop while loading. **Cancel** appears after
+preparation finishes and dismisses only the displayed review.
+
 **Pull reviewed commit** is available only for a completely clean worktree.
 After confirmation, Desktop Material refreshes state and revalidates the local
 branch, upstream ref, and both full OIDs. It integrates the exact reviewed
@@ -847,14 +851,19 @@ of leaving the panel indefinitely at 0% or 1%; choose the manual flow below if i
 
 For explicit recovery, choose **Manual upload** beside the progress controls. Desktop Material
 stops that attempt and places all remaining files into one temporary **upload-these-files** folder.
-Whole-file assets use symlinks, hardlinks, or copies; files above the Release limit become ordered
-`.partNNN` range copies made with a bounded buffer. The commit button shows live preparation
+Whole-file assets use verified same-volume hardlinks or bounded copies; the browser folder never
+contains symlinks or zero-byte helpers. Files above the Release limit become ordered `.partNNN`
+range copies made with a bounded buffer. Every staged file is rechecked as a regular file with its
+exact expected size before Explorer opens it. The commit button shows live preparation
 percentage while the app hashes and stages those bytes. It checks the temporary volume before the
 worst-case handoff copy and reports insufficient space instead of filling the disk. It opens the exact selected
 Release edit/upload page first, then puts that folder in front: select all prepared files, drag them
 onto GitHub's asset drop zone, and let the browser finish the upload (then choose its save/update
-action if shown). The app detects only new exact-name assets, downloads and hashes all of them,
-rechecks every source, writes the pointers, and resumes the same commit automatically. Older GitHub
+action if shown). A retry verifies and reuses exact prior parts, starts progress with their completed
+bytes, and stages only missing names; digest-less prior parts receive a bounded download/hash check.
+Incomplete `starter` objects remain blocking and the Release editor can be used to wait for or delete
+them. The app freshly fences every exact asset ID before pointer writes, rechecks every source, writes
+the pointers, and resumes the same commit automatically. Older GitHub
 Enterprise versions safely fall back to the repository Releases listing. **Cancel** stops either
 path until the verified pointer commit begins; that short final mutation phase finishes as one
 reviewed operation. The app waits for and verifies every multipart asset before writing the pointer. New uploads

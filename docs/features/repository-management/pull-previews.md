@@ -11,6 +11,11 @@ for **Pull reviewed commit** before changing the worktree.
   bound account, refreshes repository status, and only then reads the
   remote-tracking ref. A failed fetch stops the workflow; it never presents an
   older tracking ref as though it were freshly fetched.
+- Git's current fetch path cannot be cancelled safely. While that initial fetch
+  is pending, the review is deliberately non-dismissible: it shows no Cancel
+  action, and the title-bar close action, Escape key, and backdrop cannot close
+  it. Once preparation finishes, **Cancel** dismisses only the displayed
+  review. It never claims to cancel Git work that is still running.
 - The read-only summary captures the full current-branch ref and object ID,
   the full upstream ref and object ID, and their merge base. It shows shortened
   IDs, ahead/behind counts, the effective fast-forward, merge, rebase,
@@ -27,6 +32,9 @@ for **Pull reviewed commit** before changing the worktree.
   pull configuration into explicit Git arguments while retaining hooks and
   submodule recursion. The modal review stays open while Git starts and runs,
   preventing an in-app branch switch from changing the accepted destination.
+  If application teardown unexpectedly removes the renderer before a confirmed
+  pull rejects, the rejection is forwarded to the standard app error handler
+  instead of disappearing with the dialog.
 - There is no new preference or per-repository switch. The workflow uses the
   checked-out branch's configured upstream, current remote and account binding,
   existing Git pull configuration, and the persisted app language mode.
@@ -57,9 +65,9 @@ OID, upstream ref, or upstream OID changes after review, the prepared snapshot
 is cleared and the pull is rejected as stale until a fresh review succeeds.
 Invalid `pull.ff`, `pull.rebase`, or branch-specific rebase configuration also
 fails closed. A divergent branch configured for fast-forward-only pulls is
-shown but cannot be confirmed. Pull or hook failures likewise clear the accepted snapshot; the reviewed path
-does not expose the ordinary retry action because that retry could fetch and
-integrate a newer, unreviewed remote tip.
+shown but cannot be confirmed. Pull or hook failures likewise clear the
+accepted snapshot; the reviewed path does not expose the ordinary retry action
+because that retry could fetch and integrate a newer, unreviewed remote tip.
 
 ## Security considerations
 
@@ -74,6 +82,10 @@ tokens and credentials are never included in the review model or UI. The final
 operation validates the object ID again and pulls from the local object store,
 which closes the network race between review and integration.
 
+Only one pull-preview popup may own the review boundary at a time. A duplicate
+request cannot retarget the open modal to another repository or replace its
+captured snapshot.
+
 ## Verification
 
 Automated Git coverage proves that previewing does not change `HEAD`, the
@@ -82,10 +94,13 @@ bounded correctly; local-only files are excluded; missing/detached/invalid
 states fail closed; and changed ref identities are detected. Exact-pull
 coverage advances the remote after review and proves that only the reviewed
 OID is integrated. Renderer coverage checks the clean-worktree gate, stale
-snapshot invalidation and refresh, duplicate-submit suppression, modal
-mutation locking, strategy configuration, and all three language modes.
+snapshot invalidation and refresh, duplicate-submit suppression, the locked
+initial-fetch and confirmed-pull phases, detached-error forwarding, the real
+responsive footer group, named keyboard-scroll regions, and all three language
+modes. Popup-manager and app-registration contracts verify that the exact
+snapshot remains modal and cannot be retargeted.
 
-The planned privacy-safe acceptance capture is
-`docs/assets/screenshots/material-pull-preview.png`:
-
-![Reviewed ordinary Git pull with exact branch identities, incoming commits, changed files, and a clean-worktree confirmation gate](../../assets/screenshots/material-pull-preview.png)
+The publish manifest reserves
+`docs/assets/screenshots/material-pull-preview.png` for a future privacy-safe,
+exact-source headless acceptance capture. The asset has not yet been accepted,
+so published documentation intentionally does not link or render it.

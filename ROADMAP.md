@@ -67,6 +67,39 @@ push recorded in [HANDOFF.md](HANDOFF.md).
 - The full CI-equivalent `yarn lint` gate now passes locally. Exact-commit
   remote CI and installer Release verification remain pending.
 
+## July 21 pull-preview and Cheap LFS hardening — **Locally verified**
+
+- Reviewed pull previews now require fresh status, preserve one atomic raw
+  strategy snapshot, stream a bounded changed-file parse, and keep busy/modal
+  phase locks, accessibility state, and footer actions consistent. The accepted
+  privacy-safe pull-preview screenshot is 960×660.
+- Cheap LFS cancellation now requires confirmation. The GitHub CLI fallback
+  streams uploads with bounded retry and reconciliation, verifies digests,
+  redacts credential-bearing diagnostics, and uses 1 MiB chunks. Browser handoff
+  staging creates only regular nonempty files through verified same-volume
+  hardlinks or bounded copies—never symlinks—and recognizes verified partial
+  uploads so a resumed handoff prepares only missing objects. Fresh and final
+  complete Release inventories fence pointer publication.
+- Exact commits `98bd712f2f` and `484ebc0210` correct overlapping Express
+  Installer runs: every successful stale target publishes its own immutable
+  Release, but it cannot steal Latest from current `main`. Publication uses a
+  fresh promotion check with verified demotion instead of GitHub's lossy shared
+  concurrency queue. A real failed upstream CI remains failed. The focused
+  workflow contract passes **8/8**.
+- The pre-integration Cheap LFS gate passes **189/189**, including **23/23**
+  manual staging/resume checks. On the final rebased tree, expanded Cheap
+  LFS/Release coverage passes **207/207** and pull-preview coverage passes
+  **81/81**. TypeScript, configured targeted ESLint, Prettier,
+  feature-document markdownlint, and diff integrity are green.
+- The already published baseline Release
+  [`v3.6.3-beta3-s000000000201`][release-s201]
+  targets `fa4806971c` and contains all six required installer assets. It does
+  not claim publication of the later hardening batch. At the user's direction,
+  no future CI run is awaited for this batch and the GitHub Projects board is
+  deliberately outside this completion scope.
+
+[release-s201]: https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-s000000000201
+
 ## July 21 Settings queue and mobile connection — **Implementation complete; publication verification pending**
 
 - **Settings → Clone queue**: Exposes the existing account-scoped automatic clone

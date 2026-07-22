@@ -42,6 +42,13 @@ export interface IGitHubReleaseAssetUploadRequest
   readonly name: string
   readonly label: string | null
   readonly range?: IGitHubReleaseAssetUploadRange
+  /**
+   * Optional digest prepared by Cheap LFS's existing streamed hash pass. The
+   * main process still hashes the bytes consumed by the upload and rejects a
+   * mismatch; this only avoids hashing the same multi-gigabyte range once more
+   * before the preferred CLI transport starts.
+   */
+  readonly expectedDigest?: string
 }
 
 export interface IGitHubReleaseTransferProgressEvent {

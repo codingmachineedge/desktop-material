@@ -5,7 +5,9 @@ import {
   AppFileStatusKind,
   FileChange,
 } from '../../models/status'
-import { git, isMaxBufferExceededError } from './core'
+import { git } from './core'
+import { createGitProcessAbortHandler } from './process-abort'
+import { spawnGit } from './spawn'
 import { createForEachRefParser, createLogParser } from './git-delimiter-parser'
 
 export const DefaultPullPreviewCommitLimit = 25
@@ -164,46 +166,82 @@ function statusForNameStatus(
   }
 }
 
-function parseChangedFiles(
-  stdout: Buffer,
-  limit: number,
-  allowIncompleteRecord = false
-): ReadonlyArray<FileChange> {
-  const fields = stdout.toString('utf8').split('\0')
-  const completeFieldCount = fields.length - 1
-  const files = new Array<FileChange>()
+class BoundedChangedFileParser {
+  private readonly files = new Array<FileChange>()
+  private pending = Buffer.alloc(0)
+  private rawStatus: string | null = null
+  private oldPath: string | null = null
 
-  // A complete -z name-status stream ends in a NUL. A maxBuffer cutoff can
-  // leave one partial record at the end, which is deliberately ignored.
-  for (let i = 0; i < completeFieldCount && files.length < limit; ) {
-    const rawStatus = fields[i++]
-    const code = rawStatus[0]
+  public constructor(private readonly limit: number) {}
 
-    if (code === 'R' || code === 'C') {
-      if (i + 1 >= completeFieldCount) {
-        if (allowIncompleteRecord) {
-          break
-        }
-        throw new Error('Incomplete renamed or copied pull-preview path')
+  public get result(): ReadonlyArray<FileChange> {
+    return this.files
+  }
+
+  /** Consume one bounded chunk and report when enough complete records exist. */
+  public push(chunk: Buffer): boolean {
+    const combined =
+      this.pending.length === 0
+        ? chunk
+        : Buffer.concat(
+            [this.pending, chunk],
+            this.pending.length + chunk.length
+          )
+    let start = 0
+
+    while (this.files.length < this.limit) {
+      const end = combined.indexOf(0, start)
+      if (end === -1) {
+        break
       }
-      const oldPath = fields[i++]
-      const path = fields[i++]
+      this.acceptField(combined.subarray(start, end).toString('utf8'))
+      start = end + 1
+    }
 
-      files.push(new FileChange(path, statusForNameStatus(rawStatus, oldPath)))
-    } else {
-      if (i >= completeFieldCount) {
-        if (allowIncompleteRecord) {
-          break
-        }
-        throw new Error('Incomplete pull-preview path')
-      }
-      const path = fields[i++]
+    this.pending =
+      this.files.length >= this.limit
+        ? Buffer.alloc(0)
+        : Buffer.from(combined.subarray(start))
+    return this.files.length >= this.limit
+  }
 
-      files.push(new FileChange(path, statusForNameStatus(rawStatus)))
+  public finish(): void {
+    if (
+      this.pending.length !== 0 ||
+      this.rawStatus !== null ||
+      this.oldPath !== null
+    ) {
+      throw new Error('Incomplete pull-preview changed-file output')
     }
   }
 
-  return files
+  private acceptField(field: string): void {
+    if (this.rawStatus === null) {
+      if (field.length === 0) {
+        throw new Error('Pull-preview changed-file status is empty')
+      }
+      this.rawStatus = field
+      return
+    }
+
+    const rawStatus = this.rawStatus
+    const code = rawStatus[0]
+
+    if (code === 'R' || code === 'C') {
+      if (this.oldPath === null) {
+        this.oldPath = field
+        return
+      }
+      this.files.push(
+        new FileChange(field, statusForNameStatus(rawStatus, this.oldPath))
+      )
+    } else {
+      this.files.push(new FileChange(field, statusForNameStatus(rawStatus)))
+    }
+
+    this.rawStatus = null
+    this.oldPath = null
+  }
 }
 
 function parseChangedFileCount(stdout: string): number {
@@ -275,36 +313,112 @@ async function getChangedFiles(
     return []
   }
 
-  let stdout: Buffer
-  let incomplete = false
-  try {
-    const result = await git(
-      [
-        'diff',
-        '--name-status',
-        '-z',
-        ...changedFileDiffArgs(mergeBaseOid, upstreamOid),
-      ],
-      repository.path,
-      'getPullPreviewChangedFiles',
-      {
-        encoding: 'buffer',
-        maxBuffer: changedFileOutputLimit(limit),
-      }
-    )
-    stdout = result.stdout
-  } catch (error) {
-    if (!isMaxBufferExceededError(error)) {
-      throw error
-    }
+  const parser = new BoundedChangedFileParser(limit)
+  const outputLimit = changedFileOutputLimit(limit)
+  const stopController = new AbortController()
+  const abortHandler = createGitProcessAbortHandler(stopController.signal)
+  const child = await spawnGit(
+    [
+      'diff',
+      '--name-status',
+      '-z',
+      ...changedFileDiffArgs(mergeBaseOid, upstreamOid),
+    ],
+    repository.path,
+    'getPullPreviewChangedFiles',
+    { env: { TERM: 'dumb' } }
+  )
+  abortHandler.processCallback(undefined)(child)
 
-    stdout = Buffer.isBuffer(error.stdout)
-      ? error.stdout
-      : Buffer.from(error.stdout)
-    incomplete = true
+  let bytesRead = 0
+  let stoppedEarly = false
+  let parseFailure: unknown
+  let stderr = ''
+
+  const stop = () => {
+    if (stoppedEarly) {
+      return
+    }
+    stoppedEarly = true
+    child.stdout.pause()
+    stopController.abort()
   }
 
-  return parseChangedFiles(stdout, limit, incomplete)
+  const completed = new Promise<void>((resolve, reject) => {
+    child.stderr.on('data', (chunk: Buffer) => {
+      if (stderr.length < PullPreviewShortStatOutputBytes) {
+        stderr += chunk
+          .subarray(0, PullPreviewShortStatOutputBytes - stderr.length)
+          .toString('utf8')
+      }
+    })
+    child.stdout.on('data', (chunk: Buffer) => {
+      if (stoppedEarly) {
+        return
+      }
+
+      try {
+        const remaining = outputLimit - bytesRead
+        const accepted = chunk.subarray(0, Math.max(0, remaining))
+        bytesRead += accepted.length
+        const reachedEntryLimit = parser.push(accepted)
+        if (reachedEntryLimit || accepted.length < chunk.length) {
+          stop()
+        }
+      } catch (error) {
+        parseFailure = error
+        stop()
+      }
+    })
+    child.once('error', reject)
+    child.once('close', code => {
+      if (parseFailure !== undefined) {
+        reject(parseFailure)
+        return
+      }
+      if (stoppedEarly) {
+        resolve()
+        return
+      }
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Unable to inspect pull-preview changed files (Git exit ${String(
+              code
+            )}): ${stderr.trim()}`
+          )
+        )
+        return
+      }
+
+      try {
+        parser.finish()
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    })
+  })
+
+  let failure: unknown
+  try {
+    await completed
+  } catch (error) {
+    failure = error
+  }
+
+  if (stoppedEarly) {
+    try {
+      await abortHandler.waitForTermination()
+    } catch (error) {
+      failure ??= error
+    }
+  }
+  if (failure !== undefined) {
+    throw failure
+  }
+
+  return parser.result
 }
 
 async function getIncomingCommits(

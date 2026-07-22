@@ -293,6 +293,7 @@ import {
   createCommit,
   getAuthorIdentity,
   getChangedFiles,
+  getStatus,
   getCommitDiff,
   getMergeBase,
   getRemotes,
@@ -413,7 +414,11 @@ import {
   PullStrategyError,
   pullStrategyPlansEqual,
 } from '../git/pull-strategy'
-import { IPreparedPullPreview, PullPreviewError } from '../pull-preview'
+import {
+  IPreparedPullPreview,
+  PullPreviewError,
+  PullPreviewWorktreeState,
+} from '../pull-preview'
 import { shouldRetryPushWithGitHubCLICredentials } from '../gh-cli'
 import { updateMenuState } from '../menu-update'
 import { merge } from '../merge'
@@ -8766,6 +8771,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
       // review. Refresh them before capturing the preflight identity instead
       // of trusting whichever repository state happened to be cached.
       await this._refreshRepository(repository)
+      await this.getFreshPullPreviewWorktreeState(repository)
 
       const gitStore = this.gitStoreCache.get(repository)
       const tip = gitStore.tip
@@ -8841,13 +8847,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
         }
       }
 
-      const state = this.repositoryStateCache.get(repository)
-      const workingDirectory = state.changesState.workingDirectory
-      const worktreeState = hasConflictedFiles(workingDirectory)
-        ? 'conflicted'
-        : workingDirectory.files.length > 0
-        ? 'dirty'
-        : 'clean'
+      // The refresh surface reports ordinary errors through GitStore and can
+      // leave its previous cache intact. Gate the review on the exact status
+      // object returned by a new disk read so cached "clean" state can never
+      // enable a pull after a failed refresh.
+      const worktreeState = await this.getFreshPullPreviewWorktreeState(
+        repository
+      )
 
       return {
         result,
@@ -8855,6 +8861,40 @@ export class AppStore extends TypedBaseStore<IAppState> {
         worktreeState,
       }
     })
+  }
+
+  /** Return only a worktree classification proven by a fresh status read. */
+  private async getFreshPullPreviewWorktreeState(
+    repository: Repository
+  ): Promise<PullPreviewWorktreeState> {
+    let status: IStatusResult | null
+    try {
+      status = await this.loadPullPreviewStatus(repository)
+    } catch (error) {
+      log.error('Failed to load fresh status for a pull preview', error)
+      throw new PullPreviewError('stale-preview')
+    }
+
+    if (status === null || !status.exists) {
+      throw new PullPreviewError('stale-preview')
+    }
+
+    const workingDirectory = status.workingDirectory
+    return hasConflictedFiles(workingDirectory)
+      ? 'conflicted'
+      : workingDirectory.files.length > 0
+      ? 'dirty'
+      : 'clean'
+  }
+
+  /**
+   * Keep the safety read independent from renderer caches and diff loading.
+   * This seam also makes a failed-status regression directly testable.
+   */
+  private loadPullPreviewStatus(
+    repository: Repository
+  ): Promise<IStatusResult> {
+    return getStatus(repository, true, true)
   }
 
   /**
@@ -9224,7 +9264,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
     const reviewedPreview =
       reviewedPull?.result.kind === 'ready' ? reviewedPull.result : undefined
     const reviewedPlan = reviewedPull?.integrationPlan ?? undefined
-    let operationStarted = false
+    let pullExecutionStarted = false
 
     try {
       if (
@@ -9235,11 +9275,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
       }
 
       await this.withPushPullFetch(repository, async () => {
-        operationStarted = true
         const gitStore = this.gitStoreCache.get(repository)
+        let freshWorktreeState: PullPreviewWorktreeState | null = null
 
         if (reviewedPreview !== undefined) {
           await this._refreshRepository(repository)
+          freshWorktreeState = await this.getFreshPullPreviewWorktreeState(
+            repository
+          )
         }
 
         const state = this.repositoryStateCache.get(repository)
@@ -9278,11 +9321,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
               throw new PullPreviewError('no-incoming-commits')
             }
 
-            const workingDirectory = state.changesState.workingDirectory
-            if (hasConflictedFiles(workingDirectory)) {
+            if (freshWorktreeState === 'conflicted') {
               throw new PullPreviewError('conflicted-worktree')
             }
-            if (workingDirectory.files.length > 0) {
+            if (freshWorktreeState !== 'clean') {
               throw new PullPreviewError('dirty-worktree')
             }
 
@@ -9390,6 +9432,15 @@ export class AppStore extends TypedBaseStore<IAppState> {
                       if (!pullStrategyPlansEqual(currentPlan, reviewedPlan)) {
                         throw new PullPreviewError('stale-preview')
                       }
+
+                      const lastBoundaryWorktreeState =
+                        await this.getFreshPullPreviewWorktreeState(repository)
+                      if (lastBoundaryWorktreeState === 'conflicted') {
+                        throw new PullPreviewError('conflicted-worktree')
+                      }
+                      if (lastBoundaryWorktreeState !== 'clean') {
+                        throw new PullPreviewError('dirty-worktree')
+                      }
                     },
               progressCallback: (progress: IPullProgress) => {
                 this.updatePushPullFetchProgress(repository, {
@@ -9416,15 +9467,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
                 }),
             }
             const runPull = async () => {
-              await this.withTemporaryRepositoryMutationGuard(repository, () =>
-                reviewedPreview === undefined
-                  ? pullRepo(repository, remote, pullOptions)
-                  : pullToCommit(
-                      repository,
-                      remote,
-                      reviewedPreview.upstreamOid,
-                      pullOptions
-                    )
+              await this.withTemporaryRepositoryMutationGuard(
+                repository,
+                () => {
+                  // Set the sentinel at the exact mutation boundary. A busy
+                  // scheduler or skipped callback must never resolve as a
+                  // successful reviewed pull and dismiss its dialog.
+                  pullExecutionStarted = true
+                  return reviewedPreview === undefined
+                    ? pullRepo(repository, remote, pullOptions)
+                    : pullToCommit(
+                        repository,
+                        remote,
+                        reviewedPreview.upstreamOid,
+                        pullOptions
+                      )
+                }
               )
               return true
             }
@@ -9515,7 +9573,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
         }
       })
 
-      if (reviewedPreview !== undefined && !operationStarted) {
+      if (reviewedPreview !== undefined && !pullExecutionStarted) {
         throw new PullPreviewError('busy')
       }
     } catch (error) {
@@ -12548,7 +12606,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
         },
         signal: AbortSignal | undefined,
         onProgress: (progress: IGitHubReleaseTransferProgressEvent) => void,
-        onStage?: (stage: ICheapLfsAutoPinProgress['phase']) => void
+        onStage?: (stage: ICheapLfsAutoPinProgress['phase']) => void,
+        onHashProgress?: (processedBytes: number) => void
       ) =>
         pinFileToRelease(
           this.githubReleasesStore,
@@ -12562,7 +12621,8 @@ export class AppStore extends TypedBaseStore<IAppState> {
           signal,
           onProgress,
           defaultCheapLfsFileSystem,
-          stage => onStage?.(stage)
+          stage => onStage?.(stage),
+          onHashProgress
         ),
     }
     let controller = new AbortController()

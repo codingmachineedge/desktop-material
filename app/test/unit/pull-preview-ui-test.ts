@@ -110,11 +110,13 @@ function createDispatcher(
   pull: (
     repository: Repository,
     prepared: IPreparedPullPreview
-  ) => Promise<void> = async () => undefined
+  ) => Promise<void> = async () => undefined,
+  postError: (error: Error) => Promise<void> = async () => undefined
 ): Dispatcher {
   return {
     preparePullPreview: prepare,
     pullReviewed: pull,
+    postError,
   } as unknown as Dispatcher
 }
 
@@ -134,14 +136,17 @@ function renderDialog(
 interface IDeferred<T> {
   readonly promise: Promise<T>
   readonly resolve: (value: T) => void
+  readonly reject: (error: unknown) => void
 }
 
 function deferred<T>(): IDeferred<T> {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>(onResolve => {
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((onResolve, onReject) => {
     resolve = onResolve
+    reject = onReject
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 describe('PullPreviewDialog', () => {
@@ -176,36 +181,58 @@ describe('PullPreviewDialog', () => {
     assert.ok(screen.getByText('origin/main'))
 
     const oidElements = Array.from(
-      view.container.querySelectorAll('code[role="term"][aria-label]')
+      view.container.querySelectorAll('code[aria-hidden="true"]')
     )
     assert.deepEqual(
       oidElements.map(element => ({
         text: element.textContent,
         tooltipTarget: element.getAttribute('data-tooltip-target'),
-        accessibleName: element.getAttribute('aria-label'),
+        accessibleText: element.nextElementSibling?.textContent,
       })),
       [
         {
           text: '11111111',
           tooltipTarget: 'true',
-          accessibleName: '1'.repeat(40),
+          accessibleText: '1'.repeat(40),
         },
         {
           text: '22222222',
           tooltipTarget: 'true',
-          accessibleName: '2'.repeat(40),
+          accessibleText: '2'.repeat(40),
         },
         {
           text: '22222222',
           tooltipTarget: 'true',
-          accessibleName: '2'.repeat(40),
+          accessibleText: '2'.repeat(40),
         },
         {
           text: '33333333',
           tooltipTarget: 'true',
-          accessibleName: '3'.repeat(40),
+          accessibleText: '3'.repeat(40),
         },
       ]
+    )
+    assert.ok(
+      screen.getByRole('region', { name: 'Incoming commits' }),
+      'incoming commits should retain list semantics inside a named scroll region'
+    )
+    assert.ok(
+      screen.getByRole('region', { name: 'Incoming changed files' }),
+      'changed files should retain list semantics inside a named scroll region'
+    )
+
+    const buttonGroup = view.container.querySelector(
+      '.dialog-footer > .button-group'
+    )
+    assert.ok(
+      buttonGroup,
+      'responsive footer styles require a real button group'
+    )
+    assert.deepEqual(
+      Array.from(buttonGroup.querySelectorAll('button')).map(
+        button => button.textContent
+      ),
+      ['Cancel', 'Refresh preview', 'Pull reviewed commit']
     )
 
     const currentOidTarget = oidElements[0]
@@ -230,6 +257,34 @@ describe('PullPreviewDialog', () => {
     assert.strictEqual(pulls[0].repository, repository)
     assert.strictEqual(pulls[0].prepared, prepared)
     await waitFor(() => assert.strictEqual(dismissed, 1))
+  })
+
+  it('locks the uncancellable initial fetch until the review is ready', async () => {
+    const preparation = deferred<IPreparedPullPreview>()
+    let dismissed = 0
+    const view = renderDialog(
+      createDispatcher(async () => preparation.promise),
+      () => dismissed++
+    )
+
+    assert.ok(
+      await screen.findByText(
+        'Fetching the latest upstream state without changing your worktree…'
+      )
+    )
+    assert.strictEqual(
+      view.container.querySelector('.dialog-header button.close'),
+      null
+    )
+    assert.strictEqual(view.container.querySelector('.dialog-footer'), null)
+    assert.strictEqual(screen.queryByRole('button', { name: 'Cancel' }), null)
+
+    preparation.resolve(createPrepared())
+    assert.ok(await screen.findByText('Finish reviewed pull'))
+    assert.ok(view.container.querySelector('.dialog-header button.close'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    assert.strictEqual(dismissed, 1)
   })
 
   it('disables confirmation for dirty and conflicted worktrees', async () => {
@@ -368,6 +423,31 @@ describe('PullPreviewDialog', () => {
 
     completion.resolve(undefined)
     await waitFor(() => assert.strictEqual(dismissed, 1))
+  })
+
+  it('surfaces a confirmed pull failure after an unexpected unmount', async () => {
+    const completion = deferred<void>()
+    const errors = new Array<Error>()
+    const failure = new PullPreviewError('pull-failed')
+    const view = renderDialog(
+      createDispatcher(
+        async () => createPrepared(),
+        async () => completion.promise,
+        async error => {
+          errors.push(error)
+        }
+      )
+    )
+
+    assert.ok(await screen.findByText('Finish reviewed pull'))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Pull reviewed commit' })
+    )
+    assert.ok(await screen.findByText('Pulling reviewed commit…'))
+    view.unmount()
+
+    completion.reject(failure)
+    await waitFor(() => assert.deepEqual(errors, [failure]))
   })
 
   it('renders English, playful Cantonese, and bilingual review controls', async () => {

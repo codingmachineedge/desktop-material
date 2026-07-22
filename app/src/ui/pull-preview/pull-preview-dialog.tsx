@@ -1,4 +1,4 @@
-/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- bounded review lists need keyboard scrolling */
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- bounded review regions need keyboard scrolling */
 import * as React from 'react'
 
 import {
@@ -52,9 +52,10 @@ class PullPreviewOid extends React.Component<IPullPreviewOidProps> {
     const { oid } = this.props
     return (
       <>
-        <code ref={this.elementRef} role="term" aria-label={oid}>
+        <code ref={this.elementRef} aria-hidden="true">
           {shortOid(oid)}
         </code>
+        <span className="sr-only">{oid}</span>
         <Tooltip target={this.elementRef} className="sha-hint">
           {oid}
         </Tooltip>
@@ -200,6 +201,10 @@ export class PullPreviewDialog extends React.Component<
           prepared: null,
           errorKey: this.errorKey(error),
         })
+      } else {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error))
+        void this.props.dispatcher.postError(normalizedError)
       }
     }
   }
@@ -349,18 +354,25 @@ export class PullPreviewDialog extends React.Component<
           </div>
         ) : (
           <div className="pull-preview-columns">
-            <section aria-labelledby="pull-preview-commits-title">
+            <section>
               <h2 id="pull-preview-commits-title">
                 {this.localize('pullPreview.incomingCommits')}
               </h2>
-              <ol className="pull-preview-list" tabIndex={0}>
-                {result.incomingCommits.map(commit => (
-                  <li key={commit.sha}>
-                    <PullPreviewOid oid={commit.sha} />
-                    <span>{commit.summary}</span>
-                  </li>
-                ))}
-              </ol>
+              <div
+                className="pull-preview-list-scroll"
+                role="region"
+                aria-labelledby="pull-preview-commits-title"
+                tabIndex={0}
+              >
+                <ol className="pull-preview-list">
+                  {result.incomingCommits.map(commit => (
+                    <li key={commit.sha}>
+                      <PullPreviewOid oid={commit.sha} />
+                      <span>{commit.summary}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
               {result.incomingCommitsTruncated && moreCommits > 0 ? (
                 <p className="pull-preview-more">
                   {this.localize('pullPreview.moreCommits', {
@@ -370,7 +382,7 @@ export class PullPreviewDialog extends React.Component<
               ) : null}
             </section>
 
-            <section aria-labelledby="pull-preview-files-title">
+            <section>
               <h2 id="pull-preview-files-title">
                 {this.localize('pullPreview.changedFiles')}
               </h2>
@@ -379,30 +391,37 @@ export class PullPreviewDialog extends React.Component<
                   {this.localize('pullPreview.noChangedFiles')}
                 </p>
               ) : (
-                <ul className="pull-preview-list" tabIndex={0}>
-                  {result.changedFiles.map(file => {
-                    const path =
-                      file.status.kind === AppFileStatusKind.Renamed ||
-                      file.status.kind === AppFileStatusKind.Copied
-                        ? `${file.status.oldPath} → ${file.path}`
-                        : file.path
-                    return (
-                      <li key={file.id}>
-                        <span
-                          className={`pull-preview-file-status ${file.status.kind.toLowerCase()}`}
-                        >
-                          {this.localize(fileStatusKey(file))}
-                        </span>
-                        <TooltippedContent
-                          tooltip={path}
-                          onlyWhenOverflowed={true}
-                        >
-                          {path}
-                        </TooltippedContent>
-                      </li>
-                    )
-                  })}
-                </ul>
+                <div
+                  className="pull-preview-list-scroll"
+                  role="region"
+                  aria-labelledby="pull-preview-files-title"
+                  tabIndex={0}
+                >
+                  <ul className="pull-preview-list">
+                    {result.changedFiles.map(file => {
+                      const path =
+                        file.status.kind === AppFileStatusKind.Renamed ||
+                        file.status.kind === AppFileStatusKind.Copied
+                          ? `${file.status.oldPath} → ${file.path}`
+                          : file.path
+                      return (
+                        <li key={file.id}>
+                          <span
+                            className={`pull-preview-file-status ${file.status.kind.toLowerCase()}`}
+                          >
+                            {this.localize(fileStatusKey(file))}
+                          </span>
+                          <TooltippedContent
+                            tooltip={path}
+                            onlyWhenOverflowed={true}
+                          >
+                            {path}
+                          </TooltippedContent>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
               )}
               {result.changedFilesTruncated && moreFiles > 0 ? (
                 <p className="pull-preview-more">
@@ -452,7 +471,7 @@ export class PullPreviewDialog extends React.Component<
         id="pull-preview"
         title={this.localize('pullPreview.title')}
         loading={busy}
-        dismissDisabled={this.state.phase === 'pulling'}
+        dismissDisabled={busy}
         onDismissed={this.props.onDismissed}
         onSubmit={this.onPull}
       >
@@ -468,28 +487,29 @@ export class PullPreviewDialog extends React.Component<
             </>
           )}
         </DialogContent>
-        <DialogFooter>
-          {this.state.phase !== 'pulling' ? (
-            <Button onClick={this.props.onDismissed}>
-              {this.localize('pullPreview.cancel')}
-            </Button>
-          ) : null}
-          {this.state.phase !== 'pulling' ? (
-            <Button
-              onClick={this.loadPreview}
-              disabled={this.state.phase === 'loading'}
-            >
-              {this.localize('pullPreview.refresh')}
-            </Button>
-          ) : null}
-          <Button type="submit" disabled={!this.canPull()}>
-            {this.localize(
-              this.state.phase === 'pulling'
-                ? 'pullPreview.pulling'
-                : 'pullPreview.pull'
-            )}
-          </Button>
-        </DialogFooter>
+        {this.state.phase === 'loading' ? null : (
+          <DialogFooter>
+            <div className="button-group">
+              {this.state.phase === 'review' ? (
+                <>
+                  <Button onClick={this.props.onDismissed}>
+                    {this.localize('pullPreview.cancel')}
+                  </Button>
+                  <Button onClick={this.loadPreview}>
+                    {this.localize('pullPreview.refresh')}
+                  </Button>
+                </>
+              ) : null}
+              <Button type="submit" disabled={!this.canPull()}>
+                {this.localize(
+                  this.state.phase === 'pulling'
+                    ? 'pullPreview.pulling'
+                    : 'pullPreview.pull'
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        )}
       </Dialog>
     )
   }

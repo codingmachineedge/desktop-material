@@ -333,7 +333,11 @@ describe('CommitMessage', () => {
         )
       ).getButtonText()
 
-    assert.equal(textFor('hashing'), 'Hashing 2 large files for cheap LFS')
+    assert.equal(textFor('hashing'), 'Hashing 2 large files for cheap LFS (0%)')
+    assert.equal(
+      textFor('hashing', 101),
+      'Hashing 2 large files for cheap LFS (50%)'
+    )
     assert.equal(
       textFor('release'),
       'Preparing the GitHub Release for 2 large files'

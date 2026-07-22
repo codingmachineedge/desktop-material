@@ -114,6 +114,21 @@ export function githubReleasesError(
       status ?? 'none'
     }, error: ${errorName}): ${errorMessage}`
   )
+  if (error instanceof GitHubReleaseTransferError && status === null) {
+    const kind: GitHubReleasesErrorKind =
+      error.reason === 'incomplete-asset'
+        ? 'conflict'
+        : error.reason === 'network' ||
+          error.reason === 'stalled' ||
+          error.reason === 'cli-unavailable' ||
+          error.reason === 'cli-failed'
+        ? 'service'
+        : 'invalid-response'
+    // Transfer messages are app-authored, bounded, and localized. Preserve
+    // their actionable reason instead of flattening every status-less failure
+    // into the generic "could not upload safely" toast.
+    return new GitHubReleasesError(kind, error.message)
+  }
   if (status === 401) {
     return new GitHubReleasesError(
       'authentication',
@@ -767,7 +782,8 @@ export class GitHubReleasesStore {
     label: string | null,
     signal: AbortSignal,
     onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void,
-    range?: IGitHubReleaseAssetUploadRange
+    range?: IGitHubReleaseAssetUploadRange,
+    expectedDigest?: string
   ) {
     return this.run(
       repository,
@@ -790,7 +806,8 @@ export class GitHubReleasesStore {
           label,
           requestSignal,
           onProgress,
-          range
+          range,
+          expectedDigest
         )
       }
     )

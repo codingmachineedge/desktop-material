@@ -1306,6 +1306,7 @@ export type TranslationKey =
   | 'cheapLfs.managerIntro'
   | 'cheapLfs.manualUpload'
   | 'cheapLfs.cancel'
+  | 'cheapLfs.cancelConfirmation'
   | 'cheapLfs.progress.amendSuffix'
   | 'cheapLfs.progress.preparing'
   | 'cheapLfs.progress.hashing'
@@ -2866,11 +2867,11 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'githubReleaseTransfer.stalled':
     'The release asset upload stopped making network progress. Retry it or use Manual upload.',
   'githubReleaseTransfer.cliUnavailable':
-    'The release asset upload stalled and GitHub CLI is unavailable. Retry it or use Manual upload.',
+    'GitHub CLI is unavailable for the verified release asset upload. Install GitHub CLI and retry, or use Manual upload.',
   'githubReleaseTransfer.cliFailed':
-    'The release asset upload stalled and GitHub CLI could not finish the fallback. Retry it or use Manual upload.',
+    'GitHub CLI could not finish the release asset upload after two safe attempts. Retry it or use Manual upload.',
   'githubReleaseTransfer.incompleteAsset':
-    'This release has an incomplete asset with the same name. Remove it on the release page, then retry.',
+    'This release has an incomplete asset with the same name. In Releases, choose Delete for the Processing asset, then retry.',
   'buildRun.sendToOpencode': 'Send to opencode',
   'buildRun.sendIntro':
     'opencode is an AI coding agent. Type a request and it will work in this repository, running entirely on your machine.',
@@ -2943,9 +2944,12 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'Find, pin, search, and restore repository large files here. You do not need to browse GitHub Releases or decode asset names.',
   'cheapLfs.manualUpload': 'Manual upload',
   'cheapLfs.cancel': 'Cancel',
+  'cheapLfs.cancelConfirmation':
+    'Cancel this Cheap LFS transfer?\n\nThe upload or manual handoff will stop. Files already converted to pointers in the worktree or uploaded to the GitHub Release may remain, but no commit will be created.',
   'cheapLfs.progress.amendSuffix': ' before amending',
   'cheapLfs.progress.preparing': 'Preparing {files} for cheap LFS{amend}',
-  'cheapLfs.progress.hashing': 'Hashing {files} for cheap LFS{amend}',
+  'cheapLfs.progress.hashing':
+    'Hashing {files} for cheap LFS ({percentage}%){amend}',
   'cheapLfs.progress.release':
     'Preparing the GitHub Release for {files}{amend}',
   'cheapLfs.progress.uploadStarting':
@@ -4372,11 +4376,11 @@ export const cantoneseTranslations: Readonly<
   'githubReleaseTransfer.stalled':
     'Release 資產上載停止咗網絡進度。請重試，或者使用手動上載。',
   'githubReleaseTransfer.cliUnavailable':
-    'Release 資產上載停咗，而且搵唔到 GitHub CLI。請重試，或者使用手動上載。',
+    '搵唔到 GitHub CLI，所以未能用已驗證嘅方式上載 Release 資產。請安裝 GitHub CLI 再試，或者使用手動上載。',
   'githubReleaseTransfer.cliFailed':
-    'Release 資產上載停咗，而 GitHub CLI 後備上載亦未能完成。請重試，或者使用手動上載。',
+    'GitHub CLI 安全重試兩次之後，仍然未能完成 Release 資產上載。請再試一次，或者使用手動上載。',
   'githubReleaseTransfer.incompleteAsset':
-    '呢個 release 有一個同名但未完成嘅資產。請喺 release 頁面移除佢，然後重試。',
+    '呢個 Release 有一個同名但未完成嘅資產。請去 Releases，喺顯示「處理中」嘅資產撳「刪除」，跟住再試。',
   'buildRun.sendToOpencode': '傳去 opencode',
   'buildRun.sendIntro':
     'opencode 係個 AI 寫程式助手。你打低想做乜，佢就會喺呢個 repo 度做，全部喺你部機度行。',
@@ -4442,9 +4446,12 @@ export const cantoneseTranslations: Readonly<
     '喺呢度就可以搵、釘選、搜尋同還原 repo 嘅大檔案，唔使自己走入 GitHub Releases 猜資產檔名。',
   'cheapLfs.manualUpload': '手動上載',
   'cheapLfs.cancel': '取消',
+  'cheapLfs.cancelConfirmation':
+    '確定取消今次 Cheap LFS 傳輸？\n\n上載或者手動交接會即刻停止。工作目錄入面已經轉成 pointer 嘅檔案，或者已經上載去 GitHub Release 嘅資產可能會保留，但唔會建立 commit。',
   'cheapLfs.progress.amendSuffix': '，跟住先改上一個 commit',
   'cheapLfs.progress.preparing': '幫 {files} 準備 cheap LFS{amend}',
-  'cheapLfs.progress.hashing': '幫 {files} 計緊雜湊，準備放入 cheap LFS{amend}',
+  'cheapLfs.progress.hashing':
+    '幫 {files} 計緊雜湊，準備放入 cheap LFS（{percentage}%）{amend}',
   'cheapLfs.progress.release': '幫 {files} 準備緊 GitHub Release{amend}',
   'cheapLfs.progress.uploadStarting':
     '準備開始上載 {files} 去 cheap LFS{amend}',

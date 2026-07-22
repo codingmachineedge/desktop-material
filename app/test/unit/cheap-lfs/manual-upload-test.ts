@@ -1,13 +1,14 @@
 import assert from 'node:assert'
 import { createHash } from 'node:crypto'
 import {
-  link,
   lstat,
   mkdir,
   mkdtemp,
   readFile,
   readdir,
   rm,
+  stat,
+  symlink,
   unlink,
   writeFile,
 } from 'node:fs/promises'
@@ -142,6 +143,42 @@ function gateway(
       throw new Error('download not configured')
     },
     ...overrides,
+  }
+}
+
+function singleFileManualPlan(
+  sourcePath: string,
+  bytes: Buffer
+): ICheapLfsManualPinPlan {
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  return {
+    release,
+    preexistingAssetIds: new Set(),
+    files: [
+      {
+        absoluteFilePath: sourcePath,
+        trackedRelativePath: 'asset.bin',
+        pointer: {
+          version: 'https://desktop.github.com/cheap-lfs/v1',
+          releaseTag: 'assets',
+          assetName: 'asset.bin',
+          sizeInBytes: bytes.byteLength,
+          sha256,
+        },
+        pointerText: 'unused',
+        assetName: 'asset.bin',
+        sizeInBytes: bytes.byteLength,
+        sha256,
+        assets: [
+          {
+            assetName: 'asset.bin',
+            offset: 0,
+            sizeInBytes: bytes.byteLength,
+            sha256,
+          },
+        ],
+      },
+    ],
   }
 }
 
@@ -440,6 +477,289 @@ describe('manual cheap LFS upload', () => {
         pointer?.parts?.map(part => part.name),
         ['large.lib.part001', 'large.lib.part002']
       )
+    })
+  })
+
+  it('retries a partial multipart upload by staging only missing parts', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const sourcePath = join(directory, 'retry.bin')
+      const sourceBytes = Buffer.from('abcdef')
+      const firstBytes = sourceBytes.subarray(0, 3)
+      const secondBytes = sourceBytes.subarray(3)
+      const digest = (bytes: Buffer) =>
+        createHash('sha256').update(bytes).digest('hex')
+      await writeFile(sourcePath, sourceBytes)
+      const remoteAssets = new Array<IGitHubReleaseAsset>()
+      const remoteBytes = new Map<string, Buffer>()
+      const downloadedNames = new Array<string>()
+      const releases = gateway({
+        listAssets: async () => ({
+          assets: [...remoteAssets],
+          page: 1,
+          nextPage: null,
+          capped: false,
+        }),
+        downloadAsset: async (_repository, _releaseId, remote, destination) => {
+          downloadedNames.push(remote.name)
+          const bytes = remoteBytes.get(remote.name)
+          assert.ok(bytes)
+          await writeFile(destination, bytes)
+          return { path: destination, bytes: bytes.byteLength }
+        },
+      })
+      const multipartFileSystem = {
+        ...defaultCheapLfsFileSystem,
+        hashFileParts: async (
+          _path: string,
+          _partSize: number,
+          _signal?: AbortSignal,
+          onProgress?: (processedBytes: number) => void
+        ) => {
+          onProgress?.(0)
+          onProgress?.(sourceBytes.byteLength)
+          return {
+            sha256: digest(sourceBytes),
+            sizeInBytes: sourceBytes.byteLength,
+            parts: [
+              { offset: 0, length: 3, sha256: digest(firstBytes) },
+              { offset: 3, length: 3, sha256: digest(secondBytes) },
+            ],
+          }
+        },
+      }
+      const options = [
+        {
+          absoluteFilePath: sourcePath,
+          trackedRelativePath: 'retry.bin',
+          releaseTag: 'assets',
+        },
+      ]
+      let firstAssetName = ''
+      let secondAssetName = ''
+
+      await assert.rejects(
+        manualPinFilesToRelease(
+          releases,
+          repository,
+          selected,
+          options,
+          new AbortController().signal,
+          {
+            onReady: async (handoff, plan) => {
+              assert.deepEqual(
+                handoff.assets.map(item => item.name),
+                ['retry.bin.part001', 'retry.bin.part002']
+              )
+              firstAssetName = plan.files[0].assets[0].assetName
+              secondAssetName = plan.files[0].assets[1].assetName
+              remoteBytes.set(firstAssetName, firstBytes)
+              remoteAssets.push(
+                asset(501, firstAssetName, firstBytes.byteLength)
+              )
+            },
+          },
+          multipartFileSystem,
+          { maximumPollAttempts: 1, pollIntervalMs: 0 }
+        ),
+        /Timed out/
+      )
+      assert.deepEqual(await readFile(sourcePath), sourceBytes)
+      assert.deepEqual(
+        remoteAssets.map(item => item.name),
+        [firstAssetName]
+      )
+
+      const progress = new Array<number>()
+      const result = await manualPinFilesToRelease(
+        releases,
+        repository,
+        selected,
+        options,
+        new AbortController().signal,
+        {
+          onPreparationProgress: value => progress.push(value.processedBytes),
+          onReady: async (handoff, plan) => {
+            assert.deepEqual(downloadedNames, [firstAssetName])
+            assert.equal(
+              plan.files[0].assets[0].reusableAsset?.id,
+              remoteAssets[0].id
+            )
+            assert.equal(plan.files[0].assets[1].reusableAsset, undefined)
+            assert.deepEqual(
+              handoff.assets.map(item => item.name),
+              [secondAssetName]
+            )
+            assert.equal(
+              (await stat(handoff.assets[0].path)).size,
+              secondBytes.byteLength
+            )
+            remoteBytes.set(secondAssetName, secondBytes)
+            remoteAssets.push(
+              asset(502, secondAssetName, secondBytes.byteLength)
+            )
+          },
+        },
+        multipartFileSystem,
+        { maximumPollAttempts: 1, pollIntervalMs: 0 }
+      )
+
+      assert.equal(result.length, 1)
+      assert.ok(progress.indexOf(9) > progress.indexOf(6))
+      assert.equal(progress.at(-1), 12)
+      assert.deepEqual(downloadedNames, [firstAssetName, secondAssetName])
+      const pointer = parseCheapLfsPointer(await readFile(sourcePath, 'utf8'))
+      assert.deepEqual(
+        pointer?.parts?.map(part => part.name),
+        [firstAssetName, secondAssetName]
+      )
+    })
+  })
+
+  it('blocks an incomplete preexisting asset instead of counting its bytes', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const sourcePath = join(directory, 'processing.bin')
+      const sourceBytes = Buffer.from('still processing')
+      await writeFile(sourcePath, sourceBytes)
+      const processing = {
+        ...asset(601, 'processing.bin', sourceBytes.byteLength),
+        state: 'starter' as const,
+      }
+      let opened = false
+
+      await assert.rejects(
+        manualPinFilesToRelease(
+          gateway({
+            listAssets: async () => ({
+              assets: [processing],
+              page: 1,
+              nextPage: null,
+              capped: false,
+            }),
+          }),
+          repository,
+          selected,
+          [
+            {
+              absoluteFilePath: sourcePath,
+              trackedRelativePath: 'processing.bin',
+              releaseTag: 'assets',
+            },
+          ],
+          new AbortController().signal,
+          { onReady: async () => void (opened = true) },
+          undefined,
+          { maximumPollAttempts: 1, pollIntervalMs: 0 }
+        ),
+        /incomplete asset.*Wait.*delete.*Release editor/i
+      )
+      assert.equal(opened, false)
+      assert.deepEqual(await readFile(sourcePath), sourceBytes)
+    })
+  })
+
+  it('freshly revalidates a reusable asset before it can count', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const sourcePath = join(directory, 'reusable.bin')
+      const sourceBytes = Buffer.from('reusable release bytes')
+      const sha256 = createHash('sha256').update(sourceBytes).digest('hex')
+      await writeFile(sourcePath, sourceBytes)
+      const reusable = asset(
+        701,
+        'reusable.bin',
+        sourceBytes.byteLength,
+        `sha256:${sha256}`
+      )
+      let inventoryCalls = 0
+      let opened = false
+
+      await assert.rejects(
+        manualPinFilesToRelease(
+          gateway({
+            listAssets: async () => ({
+              assets: inventoryCalls++ === 0 ? [reusable] : [],
+              page: 1,
+              nextPage: null,
+              capped: false,
+            }),
+          }),
+          repository,
+          selected,
+          [
+            {
+              absoluteFilePath: sourcePath,
+              trackedRelativePath: 'reusable.bin',
+              releaseTag: 'assets',
+            },
+          ],
+          new AbortController().signal,
+          { onReady: async () => void (opened = true) },
+          undefined,
+          { maximumPollAttempts: 1, pollIntervalMs: 0 }
+        ),
+        /reusable manual upload asset.*no longer exists/i
+      )
+      assert.equal(inventoryCalls, 2)
+      assert.equal(opened, false)
+      assert.deepEqual(await readFile(sourcePath), sourceBytes)
+    })
+  })
+
+  it('fences a replaced upload id immediately before pointer writes', async () => {
+    await withTempRepository(async (directory, repository) => {
+      const sourcePath = join(directory, 'fenced.bin')
+      const sourceBytes = Buffer.from('final inventory fence')
+      await writeFile(sourcePath, sourceBytes)
+      let inventoryCalls = 0
+      let uploaded: IGitHubReleaseAsset | undefined
+      const releases = gateway({
+        listAssets: async () => {
+          inventoryCalls++
+          return {
+            assets:
+              uploaded === undefined
+                ? []
+                : [
+                    inventoryCalls < 3
+                      ? uploaded
+                      : { ...uploaded, id: uploaded.id + 1 },
+                  ],
+            page: 1,
+            nextPage: null,
+            capped: false,
+          }
+        },
+        downloadAsset: async (_repository, _releaseId, _asset, destination) => {
+          await writeFile(destination, sourceBytes)
+          return { path: destination, bytes: sourceBytes.byteLength }
+        },
+      })
+
+      await assert.rejects(
+        manualPinFilesToRelease(
+          releases,
+          repository,
+          selected,
+          [
+            {
+              absoluteFilePath: sourcePath,
+              trackedRelativePath: 'fenced.bin',
+              releaseTag: 'assets',
+            },
+          ],
+          new AbortController().signal,
+          {
+            onReady: async (_handoff, plan) => {
+              const expected = plan.files[0].assets[0]
+              uploaded = asset(801, expected.assetName, expected.sizeInBytes)
+            },
+          },
+          undefined,
+          { maximumPollAttempts: 1, pollIntervalMs: 0 }
+        ),
+        /changed before pointer creation/i
+      )
+      assert.equal(inventoryCalls, 3)
+      assert.deepEqual(await readFile(sourcePath), sourceBytes)
     })
   })
 
@@ -973,7 +1293,9 @@ describe('manual cheap LFS upload', () => {
         { maximumPollAttempts: 2, pollIntervalMs: 0 }
       )
 
-      assert.equal(postOpenPolls, 2)
+      // Two rendezvous polls observe starter -> uploaded; the final safety
+      // fence reads the complete inventory once more before pointer mutation.
+      assert.equal(postOpenPolls, 3)
       assert.equal(result[0].result.pointer.releaseTag, 'assets')
     })
   })
@@ -1066,72 +1388,117 @@ describe('manual cheap LFS upload', () => {
     })
   })
 
-  it('falls back from symlink to hardlink and then to a bounded copy', async () => {
+  it('uses a real hardlink even when this host can create file symlinks', async t => {
     await withTempRepository(async directory => {
       const sourcePath = join(directory, 'asset.bin')
-      const bytes = Buffer.from('handoff bytes')
+      const symlinkProbe = join(directory, 'symlink-probe.bin')
+      const bytes = Buffer.from('browser upload bytes')
       await writeFile(sourcePath, bytes)
-      const sha256 = createHash('sha256').update(bytes).digest('hex')
-      const plan: ICheapLfsManualPinPlan = {
-        release,
-        preexistingAssetIds: new Set(),
-        files: [
-          {
-            absoluteFilePath: sourcePath,
-            trackedRelativePath: 'asset.bin',
-            pointer: {
-              version: 'https://desktop.github.com/cheap-lfs/v1',
-              releaseTag: 'assets',
-              assetName: 'asset.bin',
-              sizeInBytes: bytes.byteLength,
-              sha256,
-            },
-            pointerText: 'unused',
-            assetName: 'asset.bin',
-            sizeInBytes: bytes.byteLength,
-            sha256,
-            assets: [
-              {
-                assetName: 'asset.bin',
-                offset: 0,
-                sizeInBytes: bytes.byteLength,
-                sha256,
-              },
-            ],
-          },
-        ],
+      try {
+        await symlink(sourcePath, symlinkProbe, 'file')
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code === 'EPERM' || code === 'EACCES') {
+          return t.skip('This host cannot create a file symlink.')
+        }
+        throw error
       }
-      const signal = new AbortController().signal
-      const hardlinked = await createCheapLfsManualHandoff(plan, signal, {
-        symlink: async () => {
-          throw new Error('symlink unavailable')
-        },
-        hardlink: (source, destination) => link(source, destination),
-      })
-      assert.equal(hardlinked.assets[0].method, 'hardlink')
-      assert.deepEqual(await readFile(hardlinked.assets[0].path), bytes)
-      await hardlinked.cleanup()
+      assert.equal((await lstat(symlinkProbe)).isSymbolicLink(), true)
 
-      const copied = await createCheapLfsManualHandoff(plan, signal, {
-        symlink: async () => {
-          throw new Error('symlink unavailable')
-        },
-        hardlink: async () => {
-          throw new Error('cross-volume')
-        },
-      })
-      assert.equal(copied.assets[0].method, 'copy')
-      assert.deepEqual(await readFile(copied.assets[0].path), bytes)
-      await copied.cleanup()
+      const handoff = await createCheapLfsManualHandoff(
+        singleFileManualPlan(sourcePath, bytes),
+        new AbortController().signal
+      )
+      try {
+        assert.equal(handoff.assets[0].method, 'hardlink')
+        assert.deepEqual(await readdir(handoff.uploadDirectoryPath), [
+          'asset.bin',
+        ])
+        const [entry, followed] = await Promise.all([
+          lstat(handoff.assets[0].path),
+          stat(handoff.assets[0].path),
+        ])
+        assert.equal(entry.isSymbolicLink(), false)
+        assert.equal(entry.isFile(), true)
+        assert.equal(entry.size, bytes.byteLength)
+        assert.equal(followed.size, bytes.byteLength)
+        assert.ok(entry.size > 0)
+        assert.deepEqual(await readFile(handoff.assets[0].path), bytes)
+      } finally {
+        await handoff.cleanup()
+      }
+    })
+  })
 
-      const guarded = await createCheapLfsManualHandoff(plan, signal, {
-        symlink: async () => {
-          throw new Error('symlink unavailable')
-        },
-        hardlink: async () => {
-          throw new Error('cross-volume')
-        },
-      })
+  it('falls back from a failed hardlink to one bounded regular-file copy', async () => {
+    await withTempRepository(async directory => {
+      const sourcePath = join(directory, 'asset.bin')
+      const bytes = Buffer.from('handoff copy bytes')
+      await writeFile(sourcePath, bytes)
+      const plan = singleFileManualPlan(sourcePath, bytes)
+      let hardlinkAttempts = 0
+      const copied = await createCheapLfsManualHandoff(
+        plan,
+        new AbortController().signal,
+        {
+          hardlink: async () => {
+            hardlinkAttempts++
+            throw new Error('cross-volume')
+          },
+        }
+      )
+      try {
+        assert.equal(hardlinkAttempts, 1)
+        assert.equal(copied.assets[0].method, 'copy')
+        assert.equal(copied.assets[0].name, 'asset.bin')
+        assert.deepEqual(await readdir(copied.uploadDirectoryPath), [
+          'asset.bin',
+        ])
+        const [entry, followed] = await Promise.all([
+          lstat(copied.assets[0].path),
+          stat(copied.assets[0].path),
+        ])
+        assert.equal(entry.isSymbolicLink(), false)
+        assert.equal(entry.isFile(), true)
+        assert.equal(entry.size, bytes.byteLength)
+        assert.equal(followed.size, bytes.byteLength)
+        assert.ok(entry.size > 0)
+        assert.deepEqual(await readFile(copied.assets[0].path), bytes)
+      } finally {
+        await copied.cleanup()
+      }
+
+      const noEmptyHelper = await createCheapLfsManualHandoff(
+        plan,
+        new AbortController().signal,
+        {
+          hardlink: async (_source, destination) => {
+            await writeFile(destination, Buffer.alloc(0))
+          },
+        }
+      )
+      try {
+        assert.equal(noEmptyHelper.assets[0].method, 'copy')
+        assert.deepEqual(await readdir(noEmptyHelper.uploadDirectoryPath), [
+          'asset.bin',
+        ])
+        assert.equal(
+          (await stat(noEmptyHelper.assets[0].path)).size,
+          bytes.byteLength
+        )
+      } finally {
+        await noEmptyHelper.cleanup()
+      }
+
+      const guarded = await createCheapLfsManualHandoff(
+        plan,
+        new AbortController().signal,
+        {
+          hardlink: async () => {
+            throw new Error('cross-volume')
+          },
+        }
+      )
       const replacementPath = guarded.assets[0].path
       await unlink(replacementPath)
       await writeFile(replacementPath, 'replacement owned by another actor')
@@ -1168,13 +1535,13 @@ describe('manual cheap LFS upload', () => {
             {
               assetName: 'not-opened.bin.part001',
               offset: 0,
-              sizeInBytes: 1,
+              sizeInBytes: enormousBytes / 2,
               sha256: 'b'.repeat(64),
             },
             {
               assetName: 'not-opened.bin.part002',
-              offset: 1,
-              sizeInBytes: 1,
+              offset: enormousBytes / 2,
+              sizeInBytes: enormousBytes / 2,
               sha256: 'c'.repeat(64),
             },
           ],

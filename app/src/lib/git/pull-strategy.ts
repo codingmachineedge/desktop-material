@@ -1,5 +1,5 @@
 import { Repository } from '../../models/repository'
-import { getBooleanConfigValue, getConfigValue } from './config'
+import { git, isMaxBufferExceededError } from './core'
 
 /** The normalized values understood by Git's pull rebase parser. */
 export type PullRebaseMode = 'false' | 'true' | 'merges' | 'interactive'
@@ -43,8 +43,29 @@ export interface IPullStrategyConfiguration {
   readonly ff: PullFFMode
 }
 
+/**
+ * The exact effective raw values read together for a reviewed pull.
+ *
+ * Retaining values which are currently shadowed is intentional. A change to
+ * any of Git's three strategy inputs invalidates the review, even when the
+ * normalized outcome happens to remain the same.
+ */
+export interface IPullStrategyConfigurationSnapshot {
+  readonly branchRebase: string | null
+  readonly pullRebase: string | null
+  readonly pullFF: string | null
+}
+
+const EmptyPullStrategyConfigurationSnapshot: IPullStrategyConfigurationSnapshot =
+  {
+    branchRebase: null,
+    pullRebase: null,
+    pullFF: null,
+  }
+
 /** A configuration snapshot resolved against one ahead/behind topology. */
 export interface IPullStrategyPlan extends IPullStrategyConfiguration {
+  readonly configurationSnapshot: IPullStrategyConfigurationSnapshot
   readonly ahead: number
   readonly behind: number
   readonly outcome: PullStrategyOutcome | null
@@ -54,45 +75,36 @@ export interface IPullStrategyPlan extends IPullStrategyConfiguration {
   readonly strategyArguments: ReadonlyArray<string>
 }
 
-async function readConfigValue(
-  repository: Repository,
-  key: string
-): Promise<string | null> {
-  try {
-    return await getConfigValue(repository, key)
-  } catch {
-    throw new PullStrategyError('invalid-config', key)
+const PullStrategyConfigurationOutputLimit = 64 * 1024
+
+function parseBooleanConfigValue(key: string, value: string): boolean {
+  const normalized = value.toLocaleLowerCase('en-US')
+  if (normalized === 'true' || normalized === 'yes' || normalized === 'on') {
+    return true
   }
+  if (
+    normalized.length === 0 ||
+    normalized === 'false' ||
+    normalized === 'no' ||
+    normalized === 'off'
+  ) {
+    return false
+  }
+
+  // Git accepts signed decimal integers as booleans. Avoid parsing the value
+  // into a JavaScript number so an arbitrarily large (but output-bounded)
+  // integer cannot lose precision.
+  if (/^[+-]?\d+$/.test(normalized)) {
+    return /[1-9]/.test(normalized)
+  }
+
+  throw new PullStrategyError('invalid-config', key, value)
 }
 
-async function readBooleanConfigValue(
-  repository: Repository,
+function readRebaseMode(
   key: string,
-  rawValue: string
-): Promise<boolean> {
-  try {
-    const value = await getBooleanConfigValue(repository, key)
-
-    // The value disappeared between the raw and typed reads. Treat the
-    // snapshot as invalid instead of silently choosing a different default.
-    if (value === null) {
-      throw new PullStrategyError('invalid-config', key, rawValue)
-    }
-
-    return value
-  } catch (error) {
-    if (error instanceof PullStrategyError) {
-      throw error
-    }
-    throw new PullStrategyError('invalid-config', key, rawValue)
-  }
-}
-
-async function readRebaseMode(
-  repository: Repository,
-  key: string
-): Promise<PullRebaseMode | null> {
-  const value = await readConfigValue(repository, key)
+  value: string | null
+): PullRebaseMode | null {
   if (value === null) {
     return null
   }
@@ -106,14 +118,11 @@ async function readRebaseMode(
     return 'interactive'
   }
 
-  return (await readBooleanConfigValue(repository, key, value))
-    ? 'true'
-    : 'false'
+  return parseBooleanConfigValue(key, value) ? 'true' : 'false'
 }
 
-async function readFFMode(repository: Repository): Promise<PullFFMode> {
+function readFFMode(value: string | null): PullFFMode {
   const key = 'pull.ff'
-  const value = await readConfigValue(repository, key)
 
   // Desktop deliberately supplies --ff when pull.ff is absent, preserving its
   // established merge-on-divergence behavior across bundled Git versions.
@@ -124,7 +133,7 @@ async function readFFMode(repository: Repository): Promise<PullFFMode> {
     return 'ff-only'
   }
 
-  return (await readBooleanConfigValue(repository, key, value)) ? 'ff' : 'no-ff'
+  return parseBooleanConfigValue(key, value) ? 'ff' : 'no-ff'
 }
 
 function branchNameFromRef(currentBranchRef: string): string {
@@ -141,6 +150,99 @@ function branchNameFromRef(currentBranchRef: string): string {
   return branchName
 }
 
+function escapeExtendedRegularExpression(value: string): string {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+}
+
+function lastConfigValue(
+  values: ReadonlyMap<string, ReadonlyArray<string>>,
+  key: string
+): string | null {
+  const candidates = values.get(key)
+  return candidates === undefined || candidates.length === 0
+    ? null
+    : candidates[candidates.length - 1]
+}
+
+/** Read all relevant raw values in one Git process to avoid a torn snapshot. */
+async function getPullStrategyConfigurationSnapshot(
+  repository: Repository,
+  currentBranchRef: string
+): Promise<IPullStrategyConfigurationSnapshot> {
+  const branchName = branchNameFromRef(currentBranchRef)
+  const branchRebaseKey = `branch.${branchName}.rebase`
+  const pattern = `^(${escapeExtendedRegularExpression(
+    branchRebaseKey
+  )}|pull\\.rebase|pull\\.ff)$`
+
+  try {
+    const result = await git(
+      ['config', '--null', '--get-regexp', pattern],
+      repository.path,
+      'getPullStrategyConfigurationSnapshot',
+      {
+        successExitCodes: new Set([0, 1]),
+        maxBuffer: PullStrategyConfigurationOutputLimit,
+      }
+    )
+    const values = new Map<string, Array<string>>()
+
+    if (result.exitCode === 0) {
+      for (const record of result.stdout.split('\0')) {
+        if (record.length === 0) {
+          continue
+        }
+        const separator = record.indexOf('\n')
+        if (separator <= 0) {
+          throw new PullStrategyError('invalid-config')
+        }
+
+        const key = record.slice(0, separator)
+        const value = record.slice(separator + 1)
+        if (
+          key !== branchRebaseKey &&
+          key !== 'pull.rebase' &&
+          key !== 'pull.ff'
+        ) {
+          throw new PullStrategyError('invalid-config', key, value)
+        }
+        const entries = values.get(key) ?? []
+        entries.push(value)
+        values.set(key, entries)
+      }
+    }
+
+    return {
+      branchRebase: lastConfigValue(values, branchRebaseKey),
+      pullRebase: lastConfigValue(values, 'pull.rebase'),
+      pullFF: lastConfigValue(values, 'pull.ff'),
+    }
+  } catch (error) {
+    if (error instanceof PullStrategyError) {
+      throw error
+    }
+    if (isMaxBufferExceededError(error)) {
+      throw new PullStrategyError('invalid-config')
+    }
+    throw new PullStrategyError('invalid-config')
+  }
+}
+
+function configurationFromSnapshot(
+  snapshot: IPullStrategyConfigurationSnapshot,
+  currentBranchRef: string
+): IPullStrategyConfiguration {
+  const branchRebaseKey = `branch.${branchNameFromRef(currentBranchRef)}.rebase`
+  const branchRebase = readRebaseMode(branchRebaseKey, snapshot.branchRebase)
+  const rebase =
+    branchRebase ??
+    readRebaseMode('pull.rebase', snapshot.pullRebase) ??
+    'false'
+  const ff = readFFMode(snapshot.pullFF)
+
+  return { rebase, ff }
+}
+
 /**
  * Resolve Git's effective pull configuration for the reviewed local branch.
  *
@@ -151,14 +253,11 @@ export async function getPullStrategyConfiguration(
   repository: Repository,
   currentBranchRef: string
 ): Promise<IPullStrategyConfiguration> {
-  const branchName = branchNameFromRef(currentBranchRef)
-  const branchRebaseKey = `branch.${branchName}.rebase`
-  const branchRebase = await readRebaseMode(repository, branchRebaseKey)
-  const rebase =
-    branchRebase ?? (await readRebaseMode(repository, 'pull.rebase')) ?? 'false'
-  const ff = await readFFMode(repository)
-
-  return { rebase, ff }
+  const snapshot = await getPullStrategyConfigurationSnapshot(
+    repository,
+    currentBranchRef
+  )
+  return configurationFromSnapshot(snapshot, currentBranchRef)
 }
 
 /**
@@ -233,13 +332,15 @@ function getOutcome(
 export function createPullStrategyPlan(
   configuration: IPullStrategyConfiguration,
   ahead: number,
-  behind: number
+  behind: number,
+  configurationSnapshot: IPullStrategyConfigurationSnapshot = EmptyPullStrategyConfigurationSnapshot
 ): IPullStrategyPlan {
   assertTopology(ahead, behind)
 
   const outcome = getOutcome(configuration, ahead, behind)
   return {
     ...configuration,
+    configurationSnapshot,
     ahead,
     behind,
     outcome,
@@ -255,11 +356,41 @@ export async function getPullStrategyPlan(
   ahead: number,
   behind: number
 ): Promise<IPullStrategyPlan> {
-  const configuration = await getPullStrategyConfiguration(
+  const configurationSnapshot = await getPullStrategyConfigurationSnapshot(
     repository,
     currentBranchRef
   )
-  return createPullStrategyPlan(configuration, ahead, behind)
+  const configuration = configurationFromSnapshot(
+    configurationSnapshot,
+    currentBranchRef
+  )
+  return createPullStrategyPlan(
+    configuration,
+    ahead,
+    behind,
+    configurationSnapshot
+  )
+}
+
+function pullStrategySnapshotsEqual(
+  left: IPullStrategyConfigurationSnapshot,
+  right: IPullStrategyConfigurationSnapshot
+): boolean {
+  return (
+    left.branchRebase === right.branchRebase &&
+    left.pullRebase === right.pullRebase &&
+    left.pullFF === right.pullFF
+  )
+}
+
+function pullStrategyArgumentsEqual(
+  left: ReadonlyArray<string>,
+  right: ReadonlyArray<string>
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((argument, index) => argument === right[index])
+  )
 }
 
 /** Compare the complete semantic identity of two resolved strategy plans. */
@@ -270,9 +401,14 @@ export function pullStrategyPlansEqual(
   return (
     left.rebase === right.rebase &&
     left.ff === right.ff &&
+    pullStrategySnapshotsEqual(
+      left.configurationSnapshot,
+      right.configurationSnapshot
+    ) &&
     left.ahead === right.ahead &&
     left.behind === right.behind &&
     left.outcome === right.outcome &&
-    left.canIntegrate === right.canIntegrate
+    left.canIntegrate === right.canIntegrate &&
+    pullStrategyArgumentsEqual(left.strategyArguments, right.strategyArguments)
   )
 }

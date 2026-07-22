@@ -53,23 +53,46 @@ Before a CLI upload, Desktop Material scans the selected Release's complete boun
 inventory once—up to ten 100-asset pages. If it finds one exact-name asset,
 it polls only that immutable asset ID. An already completed exact-size,
 exact-label, exact-digest object is reused; a persistent `starter` or other
-incomplete asset fails closed. The inventory is not repeatedly reloaded for
-each poll.
+incomplete asset remains visible as **Processing**, still consumes one of the
+1,000 slots, and fails closed. The user can delete that exact incomplete asset
+from Releases before retrying; it is never downloaded or treated as completed
+Cheap LFS data.
 
 When no prior object exists, Desktop Material launches only the real-path
 `GitHub CLI\gh.exe` below a validated `Program Files` root and invokes a fixed
 `gh api` upload. The exact validated file range is streamed to standard input,
-hashed locally, and reported through bounded progress. The selected host and
-upload URL are fixed by the account-bound request. The token is supplied only
-through an isolated child environment, never an argument; inherited GitHub CLI
-credentials and debug settings are removed, an empty temporary CLI config is
-used, and the directory is deleted afterward. The process has bounded output,
-inactivity and total-runtime limits, runs without a shell, and is terminated and
-awaited on cancel. A failed CLI request receives one more bounded reconciliation
-because GitHub may have accepted the bytes before returning an error.
+hashed locally, and reported through bounded progress. Hashing and upload use
+bounded 1 MiB disk chunks, cutting the per-2-GiB callback/write count from
+roughly 32,768 default 64-KiB chunks to about 2,048 without buffering the file.
+The selected host and
+upload URL, `GH_HOST`, and `GH_REPO` context are fixed by the account-bound
+request. The token is supplied only through an isolated child environment,
+never an argument; inherited GitHub CLI credentials and debug settings are
+removed, an empty temporary CLI config is used, and the directory is deleted
+afterward. The process has bounded output, inactivity and total-runtime limits,
+runs without a shell, and is terminated and awaited on cancel. A failed CLI
+request polls briefly for a delayed completed asset. If and only if no
+same-name object exists, the app performs one clean byte-zero restart; the
+GitHub upload API has no resume primitive. A `starter` is never guessed to be
+owned or deleted automatically. Bounded, credential-redacted CLI diagnostics
+go to Log History while the visible error retains the actionable failure
+reason.
 
-If that trusted CLI cannot be resolved, the app retains a compatibility
-Electron transport. It removes the fixed-length header at the final request
+Cheap LFS passes the part digest from its required pointer-preparation hash to
+the main process. The preferred CLI path then hashes the bytes it actually
+consumes and must match that prepared digest, avoiding a redundant full-range
+read before upload without trusting renderer data. Generic Release uploads and
+the native compatibility path retain their independent pre-upload hash. A
+prepared Cheap LFS digest is never sent through the native path because that
+transport cannot prove a digest over the chunks it consumed; when the trusted
+CLI is unavailable, the app directs the user to install it or use Manual
+upload. Cheap LFS also retains its final whole-source verification before
+replacing user bytes with a pointer, so a modification during or after transfer
+cannot be silently lost.
+
+For Release uploads that do not carry a prepared Cheap LFS digest, if that
+trusted CLI cannot be resolved, the app retains a compatibility Electron
+transport. It removes the fixed-length header at the final request
 boundary and enables chunked encoding before writing, so it does not retain an
 entire multi-gigabyte asset in process memory. Its watchdog aborts two minutes
 without forward network progress. The manual browser handoff below is the
@@ -78,25 +101,31 @@ recommended recovery if this compatibility path cannot complete safely.
 While an automatic upload is active, **Manual upload** switches the same commit
 operation to a browser-assisted handoff. Desktop Material stops the current
 automatic attempt, plans every remaining file, splits sources above the Release
-limit into ordered `.partNNN` assets, creates one random temporary folder
-containing the exact asset names, opens
+limit into ordered `.partNNN` assets, and creates one random temporary folder
+containing the exact missing asset names. A retry keeps an exact-name,
+exact-size prior upload when its provider digest matches; providers without a
+digest receive one bounded download-and-hash check before that asset is omitted
+from staging. The app opens
 the exact validated release editor and then that folder in front for drag and
 drop, and waits for the user to upload and save all files to the selected
 `assets` bucket. Older GitHub Enterprise responses without a usable release web URL
-fall back to the validated repository Releases listing. File symlinks are
-preferred; the app falls back to hardlinks and then streamed copies when the
-host or volume cannot create a link. Multipart ranges cannot be linked, so they
-are copied with one bounded 1 MiB buffer per active range. **Cancel** stops
+fall back to the validated repository Releases listing. Whole-file assets use
+verified same-volume hardlinks, then bounded streamed copies if a hardlink is
+unavailable. The browser folder never contains symlinks: every staged path is
+re-read with `lstat`, `stat`, and its expected nonzero size before Explorer can
+open it. Multipart ranges are real files copied with one bounded 1 MiB buffer
+per active range. **Cancel** stops
 either phase until the verified pointer commit begins and removes only the
 operation-owned handoff entries. The browser rendezvous backs polling off to a
 30-second interval and remains cancelable for roughly six hours, so a slow
 multi-gigabyte upload does not expire after ten minutes.
 
 Hashing and handoff staging report byte progress across both passes, so a
-multi-gigabyte source advances visibly instead of remaining at 0%. Before any
-handoff starts, the app requires enough free temporary-disk space for the
-worst-case copy fallback of every source, the largest verification download,
-and a safety reserve.
+multi-gigabyte source advances visibly instead of remaining at 0%. Resumed
+assets begin the staging pass as completed bytes. Before any handoff starts,
+the app requires enough free temporary-disk space for the worst-case copy
+fallback of every missing asset, the largest still-required verification
+download, and a safety reserve.
 An insufficient volume fails clearly instead of filling the disk mid-copy.
 
 GitHub Release assets have no folder hierarchy, so the handoff directory is
@@ -105,8 +134,10 @@ maps every prepared asset back to its original repository-relative path, and
 same-named files from different folders receive collision-safe hash suffixes.
 Reservation uses Windows' case-insensitive comparison, so `Foo.bin` and
 `foo.bin` cannot collide in the flat folder.
-The app waits for every new part, verifies each downloaded part and then the
-whole source, and writes each pointer at its exact original path.
+The app waits for every new or safely reused part, verifies each required
+download and then the whole source, and writes each pointer at its exact
+original path. A timeout or cancellation leaves a valid uploaded subset on the
+Release so the next manual attempt can stage only the missing names.
 
 ## Persistence
 
@@ -155,7 +186,7 @@ what stayed as pointers. In an automatic pin batch, an earlier file may already
 have become a valid pointer when a later pin fails, but the commit is aborted
 and repository status is refreshed so no half-pinned selection is committed.
 
-The manual handoff waits for a bounded ten-minute window and scans every
+The manual handoff waits for a bounded roughly six-hour window and scans every
 bounded Release-asset page. A timeout, cancel, changed source, missing or
 duplicate expected name, wrong size or digest, download mismatch, or
 pointer-write failure aborts the commit. Cancellation is fenced immediately
@@ -166,6 +197,17 @@ the commit is aborted and status is refreshed. Files pinned before the switch
 remain valid pointers. Assets that the user uploaded in the browser are left on
 the Release for explicit review; the app never treats them as attempt-owned
 assets that it may delete automatically.
+An exact-name `starter` or other incomplete preexisting object still consumes
+Release capacity but never counts as completed upload progress; the error asks
+the user to wait for it or delete it in the Release editor before retrying.
+
+The visible **Cancel** action asks for confirmation before it signals any
+active automatic upload or manual handoff. Declining the prompt does not touch
+the transfer controller, cancel request, or commit state. Confirming signals
+cancellation exactly once and explains that worktree files already converted
+to pointers or assets already accepted by GitHub may remain even though the app
+will not create the commit. The confirmation is available in English, playful
+Hong Kong-style Cantonese, and bilingual mode.
 
 ## Security considerations
 
@@ -191,10 +233,14 @@ stops accepting new Release transfers, aborts all active native or CLI work,
 and waits for their teardown through the owned-process shutdown barrier.
 
 Manual mode snapshots every pre-existing asset ID through all ten bounded pages
-before opening the handoff. It accepts only a new exact-name and exact-size
-asset, downloads and hashes every detected asset, then re-hashes every source
-before writing any pointer. Cross-file asset names are reserved as one batch,
-including duplicate basenames from different subfolders.
+before opening the handoff. It accepts a new exact-name and exact-size asset or
+an explicitly planned reusable ID with the expected size and digest. A reusable
+asset without a provider digest is downloaded and hashed before it can count.
+The complete paginated inventory is freshly checked when assets count and again
+immediately before pointer writes, fencing deletion, replacement, state, size,
+and digest changes. New browser assets are downloaded and hashed, then every
+source is re-hashed before any pointer is written. Cross-file asset names are
+reserved as one batch, including duplicate basenames from different subfolders.
 The release URL is supplied by GitHub, checked against the account-bound
 provider origin and repository path, and converted only from its validated
 `/releases/tag/<slug>` route to `/releases/edit/<slug>`; no token is placed in
@@ -213,7 +259,8 @@ per-part and whole-file verification, paginated inventory reuse, and atomic
 materialization.
 `cheap-lfs/manual-upload-test.ts` covers whole-batch handoff names, atomic
 bucket rollover, Windows case-insensitive reservation, live preparation
-progress, free-space preflight, symlink/hardlink/copy fallbacks, pagination and
+progress, free-space preflight, verified hardlink/copy staging, zero-byte and
+symlink rejection, resumable multipart subsets, stale-ID fences, pagination,
 pre-existing-asset exclusion, cancel-safe cleanup, remote and source hash
 verification, and provider-bound Releases URLs. Release model/API and transfer
 tests prove a complete 1,000-record exact response remains bounded, incomplete
@@ -223,10 +270,12 @@ is unchanged. `cheap-lfs/automation-test.ts`,
 `cheap-lfs/commit-status-refresh-test.ts` cover the 100-MiB commit gate, every
 routed commit entry point, phase and byte progress, manual switching,
 preference/account gating, failure aborts, and status reload before commit.
-`commit-message-test.tsx`, `cheap-lfs-test.tsx`, and
+`cheap-lfs/cancel-confirmation-test.ts`, `commit-message-test.tsx`,
+`cheap-lfs-test.tsx`, and
 `build-run-cheap-lfs-settings-test.tsx` cover the localized manual/cancel
-controls, reviewed panel actions, inventory, cancellation, progress, and
-persisted preferences. `github-release-transfer-test.ts` additionally proves
+controls and confirmation fence, reviewed panel actions, inventory,
+cancellation, progress, and persisted preferences.
+`github-release-transfer-test.ts` additionally proves
 chunked mode is enabled before the first Electron write, `Content-Length` is
 removed only at that boundary, required headers remain, source chunks are
 advanced one at a time, native network-progress sampling and stall
@@ -234,7 +283,9 @@ cancellation, trusted CLI resolution, sanitized token/config isolation,
 exact-range stdin streaming and digest, GitHub.com/GHE host mapping, bounded
 output/process teardown, one complete 1,000-asset scan followed by ID polling,
 late completion reconciliation, fail-closed persistent `starter` handling,
-automatic stall/411/502 fallback, 100%-only-after-acceptance progress, and
+one no-object clean retry, prepared-digest live verification, redacted CLI
+diagnostics, automatic stall/411/502 fallback,
+100%-only-after-acceptance progress, and
 application-quit teardown. The latest transfer and localization checkpoint
 passed 34/34 tests (21 transfer and 13 localization), plus root TypeScript
 no-emit and focused lint, format, and diff checks. The combined changed-surface

@@ -78,7 +78,11 @@ interface IGitHubReleaseCliUploadRequest {
   readonly owner: string
   readonly repository: string
   readonly releaseId: number
-  readonly source: IReleaseUploadSource & { readonly digest: string }
+  readonly source: IReleaseUploadSource & {
+    readonly digest: string
+    /** False when Cheap LFS supplied the digest for verification in-stream. */
+    readonly digestVerified?: boolean
+  }
   readonly name: string
   readonly label: string | null
 }
@@ -115,6 +119,8 @@ export interface IGitHubCliReleaseUploadFallbackDependencies {
   readonly assetDetectionAttempts?: number
   readonly assetDetectionIntervalMs?: number
   readonly reconciliationTimeoutMs?: number
+  /** Total clean CLI attempts, including the first one. */
+  readonly maximumAttempts?: number
 }
 
 export interface IGitHubReleaseTransferDependencies {
@@ -140,7 +146,9 @@ export interface IGitHubReleaseTransferSender {
 class ReleaseTransferFailure extends Error {
   public constructor(
     public readonly reason: GitHubReleaseTransferFailureReason,
-    public readonly status: number | null = null
+    public readonly status: number | null = null,
+    /** Main-process-only, bounded and credential-redacted diagnostic text. */
+    public readonly diagnostic: string | null = null
   ) {
     super(reason)
     this.name = 'ReleaseTransferFailure'
@@ -167,6 +175,8 @@ let transferSession: Electron.Session | null = null
 
 /** Abort a request that reports no actual network upload progress for 2 min. */
 export const GitHubReleaseUploadStallTimeoutMs = 2 * 60 * 1000
+/** Bound upload memory while avoiding tens of thousands of 64-KiB writes. */
+export const GitHubReleaseUploadStreamChunkBytes = 1024 * 1024
 
 interface IGitHubReleaseUploadWatchdogOptions {
   readonly stallTimeoutMs?: number
@@ -501,6 +511,51 @@ const GitHubCliUploadMaximumOutputBytes = 2 * 1024 * 1024
 const GitHubCliReconciliationTimeoutMs = 30 * 1000
 const GitHubCliAssetDetectionAttempts = 10
 const GitHubCliAssetDetectionIntervalMs = 500
+const GitHubCliUploadMaximumAttempts = 2
+const GitHubCliDiagnosticMaximumCharacters = 1024
+
+/** Keep a useful gh failure reason without ever retaining credentials. */
+function boundedGitHubCliDiagnostic(
+  chunks: ReadonlyArray<Buffer>,
+  token: string
+): string | null {
+  let message = Buffer.concat(chunks).toString('utf8')
+  if (token.length > 0) {
+    message = message.split(token).join('[redacted]')
+  }
+  message = message
+    // Header values may contain an auth scheme plus a separate credential, or
+    // multiple cookie pairs. Redact through the line boundary before flattening
+    // newlines so a second token can never survive into Log History.
+    .replace(
+      /\b(proxy-authorization|authorization|cookie|set-cookie)\s*[:=][^\r\n]*/gi,
+      '$1: [redacted]'
+    )
+    .replace(
+      /\b(password|token)\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|\S+)/gi,
+      '$1: [redacted]'
+    )
+    .replace(/https?:\/\/[^\s]+/gi, value => {
+      try {
+        const url = new URL(value)
+        // CLI/proxy diagnostics may include credentials in userinfo or signed
+        // query parameters. Keep only the useful host/path classification.
+        return `${url.protocol}//${url.host}${url.pathname}${
+          url.search.length > 0 ? '?[redacted]' : ''
+        }${url.hash.length > 0 ? '#[redacted]' : ''}`
+      } catch {
+        return '[redacted-url]'
+      }
+    })
+    .replace(/\b(?:gh[pousr]_|github_pat_)[a-z0-9_]+/gi, '[redacted]')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  return message.length === 0
+    ? null
+    : message.slice(0, GitHubCliDiagnosticMaximumCharacters)
+}
 
 function githubCliMaximumRuntime(length: number): number {
   const projected = Math.ceil(
@@ -529,7 +584,9 @@ function githubCliEnvironment(
   endpoint: URL,
   token: string,
   configPath: string,
-  inheritedEnvironment: NodeJS.ProcessEnv
+  inheritedEnvironment: NodeJS.ProcessEnv,
+  owner: string,
+  repository: string
 ): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {}
   for (const [key, value] of Object.entries(inheritedEnvironment)) {
@@ -550,6 +607,10 @@ function githubCliEnvironment(
   environment.DO_NOT_TRACK = '1'
   environment.NO_COLOR = '1'
   environment.CLICOLOR = '0'
+  // Pin the exact repository as well as the host. Neither the user's current
+  // directory nor an inherited gh profile may redirect this upload.
+  environment.GH_HOST = host
+  environment.GH_REPO = `${host}/${owner}/${repository}`
   if (host === 'github.com' || host.endsWith('.ghe.com')) {
     environment.GH_TOKEN = token
   } else {
@@ -709,7 +770,8 @@ async function reconcileStalledUpload(
   signal: AbortSignal,
   detectionAttempts: number,
   detectionIntervalMs: number,
-  reconciliationTimeoutMs: number
+  reconciliationTimeoutMs: number,
+  waitForAppearance: boolean = false
 ): Promise<IGitHubReleaseAsset | null> {
   throwIfAborted(signal)
   const controller = new AbortController()
@@ -717,11 +779,21 @@ async function reconcileStalledUpload(
   const timeout = setTimeout(() => controller.abort(), reconciliationTimeoutMs)
   signal.addEventListener('abort', onAbort, { once: true })
   try {
-    let asset = await findExistingStalledUpload(
-      fetcher,
-      request,
-      controller.signal
-    )
+    let asset: IGitHubReleaseAsset | null = null
+    for (let attempt = 0; attempt < detectionAttempts; attempt++) {
+      asset = await findExistingStalledUpload(
+        fetcher,
+        request,
+        controller.signal
+      )
+      if (asset !== null) {
+        break
+      }
+      if (!waitForAppearance || attempt + 1 === detectionAttempts) {
+        return null
+      }
+      await waitForCliAssetPoll(controller.signal, detectionIntervalMs)
+    }
     if (asset === null) {
       return null
     }
@@ -902,6 +974,7 @@ async function streamSourceToGitHubCli(
   const stream = createReadStream(source.path, {
     start: source.offset,
     end: source.offset + source.length - 1,
+    highWaterMark: GitHubReleaseUploadStreamChunkBytes,
   })
   setSourceStream(stream)
   const cancel = () => stream.destroy(abortError())
@@ -965,6 +1038,7 @@ async function runGitHubCliUpload(
   let stderrLength = 0
   let outputOverflow = false
   const stdout = new Array<Buffer>()
+  const stderr = new Array<Buffer>()
   let activityTimer: NodeJS.Timeout | undefined
   let runtimeTimer: NodeJS.Timeout | undefined
   let rejectActivity: ((error: Error) => void) | undefined
@@ -1021,6 +1095,10 @@ async function runGitHubCliUpload(
     }
   })
   child.stderr.on('data', (value: Buffer) => {
+    const remaining = dependencies.maximumOutputBytes - stderrLength
+    if (remaining > 0) {
+      stderr.push(Buffer.from(value.subarray(0, remaining)))
+    }
     stderrLength += value.byteLength
     if (stderrLength > dependencies.maximumOutputBytes) {
       outputOverflow = true
@@ -1075,6 +1153,15 @@ async function runGitHubCliUpload(
       throw error
     }
     if (error instanceof ReleaseTransferFailure) {
+      if (error.reason === 'cli-failed' && error.diagnostic === null) {
+        const diagnostic = boundedGitHubCliDiagnostic(stderr, request.token)
+        if (diagnostic !== null) {
+          log.error(
+            `[github-release-transfer] GitHub CLI upload failed: ${diagnostic}`
+          )
+        }
+        throw new ReleaseTransferFailure(error.reason, error.status, diagnostic)
+      }
       throw error
     }
     throw new ReleaseTransferFailure('cli-failed')
@@ -1116,6 +1203,33 @@ export const createGitHubCliReleaseUploadFallback =
       reconciliationTimeoutMs:
         providedDependencies.reconciliationTimeoutMs ??
         GitHubCliReconciliationTimeoutMs,
+      maximumAttempts:
+        Number.isSafeInteger(providedDependencies.maximumAttempts) &&
+        providedDependencies.maximumAttempts! >= 1 &&
+        providedDependencies.maximumAttempts! <= GitHubCliUploadMaximumAttempts
+          ? providedDependencies.maximumAttempts!
+          : GitHubCliUploadMaximumAttempts,
+    }
+    let verifiedRecoveryDigest: Promise<string> | null = null
+    const localDigestForRecovery = async (): Promise<string> => {
+      if (request.source.digestVerified !== false) {
+        return request.source.digest
+      }
+      verifiedRecoveryDigest ??= readUploadSource(
+        request.source.path,
+        {
+          offset: request.source.offset,
+          length: request.source.length,
+        },
+        undefined,
+        signal
+      ).then(source => {
+        if (source.digest !== request.source.digest) {
+          throw new ReleaseTransferFailure('source')
+        }
+        return source.digest
+      })
+      return await verifiedRecoveryDigest
     }
     const existing = await reconcileStalledUpload(
       fetcher,
@@ -1126,8 +1240,9 @@ export const createGitHubCliReleaseUploadFallback =
       dependencies.reconciliationTimeoutMs
     )
     if (existing !== null) {
+      const localDigest = await localDigestForRecovery()
       onProgress?.(request.source.length)
-      return { asset: existing, localDigest: request.source.digest }
+      return { asset: existing, localDigest }
     }
     const root = await mkdtemp(join(tmpdir(), 'desktop-material-gh-lfs-'))
     const configPath = join(root, 'gh-config')
@@ -1146,73 +1261,88 @@ export const createGitHubCliReleaseUploadFallback =
         }
         throw new ReleaseTransferFailure('cli-unavailable')
       }
-      try {
-        const result = await runGitHubCliUpload(
-          executable,
-          [
-            'api',
-            request.uploadURL,
-            '--hostname',
-            host,
-            '--method',
-            'POST',
-            '--header',
-            'Accept: application/vnd.github+json',
-            '--header',
-            'Content-Type: application/octet-stream',
-            '--header',
-            `Content-Length: ${request.source.length}`,
-            '--input',
-            '-',
-          ],
-          {
-            cwd: root,
-            env: githubCliEnvironment(
-              request.endpoint,
-              request.token,
-              configPath,
-              environment
-            ),
-            shell: false,
-            windowsHide: true,
-          },
-          request,
-          signal,
-          onProgress,
-          dependencies
-        )
-        let asset: IGitHubReleaseAsset
-        try {
-          asset = parseGitHubReleaseAsset(
-            JSON.parse(result.body.toString('utf8')) as unknown
-          )
-        } catch {
-          throw new ReleaseTransferFailure('cli-failed')
+      let lastFailure: ReleaseTransferFailure | null = null
+      for (let attempt = 0; attempt < dependencies.maximumAttempts; attempt++) {
+        if (attempt > 0) {
+          // The upload API has no resume primitive. A retry is a clean restart
+          // from byte zero, and only happens after reconciliation proved that
+          // no same-name provider object exists.
+          onProgress?.(0)
         }
-        return { asset, localDigest: result.localDigest }
-      } catch (error) {
-        if (
-          error instanceof ReleaseTransferFailure &&
-          error.reason === 'cli-failed'
-        ) {
+        try {
+          const result = await runGitHubCliUpload(
+            executable,
+            [
+              'api',
+              request.uploadURL,
+              '--hostname',
+              host,
+              '--method',
+              'POST',
+              '--header',
+              'Accept: application/vnd.github+json',
+              '--header',
+              'Content-Type: application/octet-stream',
+              '--header',
+              `Content-Length: ${request.source.length}`,
+              '--input',
+              '-',
+            ],
+            {
+              cwd: root,
+              env: githubCliEnvironment(
+                request.endpoint,
+                request.token,
+                configPath,
+                environment,
+                request.owner,
+                request.repository
+              ),
+              shell: false,
+              windowsHide: true,
+            },
+            request,
+            signal,
+            onProgress,
+            dependencies
+          )
+          let asset: IGitHubReleaseAsset
+          try {
+            asset = parseGitHubReleaseAsset(
+              JSON.parse(result.body.toString('utf8')) as unknown
+            )
+          } catch {
+            throw new ReleaseTransferFailure('cli-failed')
+          }
+          return { asset, localDigest: result.localDigest }
+        } catch (error) {
+          if (
+            !(error instanceof ReleaseTransferFailure) ||
+            error.reason !== 'cli-failed'
+          ) {
+            throw error
+          }
+          lastFailure = error
           const completed = await reconcileStalledUpload(
             fetcher,
             request,
             signal,
             dependencies.assetDetectionAttempts,
             dependencies.assetDetectionIntervalMs,
-            dependencies.reconciliationTimeoutMs
+            dependencies.reconciliationTimeoutMs,
+            true
           )
           if (completed !== null) {
+            const localDigest = await localDigestForRecovery()
             onProgress?.(request.source.length)
             return {
               asset: completed,
-              localDigest: request.source.digest,
+              localDigest,
             }
           }
         }
-        throw error
       }
+      throw lastFailure ?? new ReleaseTransferFailure('cli-failed')
     } finally {
       await rm(root, { recursive: true, force: true, maxRetries: 3 }).catch(
         () => undefined
@@ -1282,11 +1412,27 @@ function validateUploadRange(
   return { offset, length }
 }
 
+function validateExpectedUploadDigest(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (typeof value !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(value)) {
+    throw new ReleaseTransferFailure('invalid-request')
+  }
+  return value
+}
+
 async function readUploadSource(
   sourcePath: unknown,
   range: unknown,
+  expectedDigestValue: unknown,
   signal: AbortSignal
-): Promise<IReleaseUploadSource & { readonly digest: string }> {
+): Promise<
+  IReleaseUploadSource & {
+    readonly digest: string
+    readonly digestVerified: boolean
+  }
+> {
   if (
     typeof sourcePath !== 'string' ||
     sourcePath.length === 0 ||
@@ -1309,6 +1455,7 @@ async function readUploadSource(
   // cap applies to the part length, not the whole file, so a split file's
   // individual parts pass even though the file itself is larger than the cap.
   const { offset, length } = validateUploadRange(range, before.size)
+  const expectedDigest = validateExpectedUploadDigest(expectedDigestValue)
   if (length > GitHubReleaseAssetMaximumUploadBytes) {
     throw new ReleaseTransferFailure('too-large')
   }
@@ -1328,6 +1475,19 @@ async function readUploadSource(
     ) {
       throw new ReleaseTransferFailure('source')
     }
+    if (expectedDigest !== null) {
+      // Cheap LFS has already streamed this exact range to prepare its pointer.
+      // The preferred CLI upload hashes the bytes it consumes and the caller
+      // compares that live digest below, so do not add a redundant pre-upload
+      // multi-gigabyte read here.
+      return {
+        path,
+        offset,
+        length,
+        digest: expectedDigest,
+        digestVerified: false,
+      }
+    }
     // Stream only the [offset, offset + length) range through the hash so a
     // multi-gigabyte part is never read into memory to compute its digest.
     const hash = createHash('sha256')
@@ -1337,6 +1497,7 @@ async function readUploadSource(
       autoClose: false,
       start: offset,
       end: offset + length - 1,
+      highWaterMark: GitHubReleaseUploadStreamChunkBytes,
     })
     const cancel = () => stream.destroy(abortError())
     signal.addEventListener('abort', cancel, { once: true })
@@ -1364,6 +1525,7 @@ async function readUploadSource(
       offset,
       length,
       digest: `sha256:${hash.digest('hex')}`,
+      digestVerified: true,
     }
   } finally {
     await handle.close().catch(() => undefined)
@@ -1476,6 +1638,7 @@ export async function handleGitHubReleaseAssetUpload(
     const source = await readUploadSource(
       request.sourcePath,
       request.range,
+      request.expectedDigest,
       active.controller.signal
     )
     sendProgress(
@@ -1509,6 +1672,21 @@ export async function handleGitHubReleaseAssetUpload(
     let lastProgressAt = 0
     let lastProgressBytes = 0
     const reportUploadedBytes = (uploadedBytes: number) => {
+      if (uploadedBytes === 0) {
+        lastProgressAt = 0
+        lastProgressBytes = 0
+        sendProgress(
+          sender,
+          {
+            operationId: request.operationId,
+            direction: 'upload',
+            transferredBytes: 0,
+            totalBytes: source.length,
+          },
+          active!
+        )
+        return
+      }
       // The transport accepting the final byte is not proof that GitHub
       // accepted the asset. Reserve 100% for a parsed/reconciled response.
       if (uploadedBytes >= source.length) {
@@ -1596,6 +1774,13 @@ export async function handleGitHubReleaseAssetUpload(
       }
     }
     if (asset === undefined) {
+      if (!source.digestVerified) {
+        // The Electron compatibility transport cannot report a digest of the
+        // bytes it actually consumed. Never treat a renderer-supplied prepared
+        // digest as verified through that path; Cheap LFS can use the verified
+        // CLI stream or its browser-assisted Manual upload instead.
+        throw new ReleaseTransferFailure('cli-unavailable')
+      }
       try {
         response = await dependencies.upload(
           url.toString(),
@@ -1784,6 +1969,7 @@ export const createElectronGitHubReleaseUploadFetcher =
       const body = createReadStream(source.path, {
         start: source.offset,
         end: source.offset + source.length - 1,
+        highWaterMark: GitHubReleaseUploadStreamChunkBytes,
       })
       let uploadedBytes = 0
       let reportedBytes = 0

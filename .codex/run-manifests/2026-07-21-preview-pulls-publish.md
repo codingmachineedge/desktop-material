@@ -7,7 +7,9 @@
   after a fetch, names the exact local and upstream branches, summarizes the
   frozen Git integration plan and ahead/behind counts, lists a bounded set of
   incoming commits and changed paths, and requires an explicit modal Pull
-  confirmation that remains blocking while Git runs.
+  confirmation that remains blocking while Git runs. The uncancellable initial
+  fetch and the confirmed pull both lock the close button, Escape key, backdrop,
+  and footer dismissal; Cancel appears only for a prepared review.
   Up-to-date, detached/untracked, fetch-error, stale-context, and unsafe dirty
   states stay non-destructive. English, playful Hong Kong-style Cantonese, and
   compact bilingual copy remain readable at narrow widths.
@@ -21,7 +23,7 @@
   remote, two working repositories, one isolated Electron user-data directory,
   and a cleanup ledger.
 - Screenshot: light theme, client-only, stable nonblank reviewed-pull dialog at
-  1440×960; candidate target
+  960×660, published as
   `docs/assets/screenshots/material-pull-preview.png`.
 - Documentation allowlist: this manifest, the categorized repository-management
   feature guide/index, `README.md`, `PLAN.md`, `ROADMAP.md`, `HANDOFF.md`,
