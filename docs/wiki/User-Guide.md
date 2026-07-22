@@ -733,8 +733,10 @@ horizontally when preserving columns is necessary.
 
 ### Preview an ordinary pull
 
-Choose the primary **Pull _remote_** action in the toolbar, or **Pull** from the
-application menu, when the current branch has incoming work. Desktop Material
+Right-click the primary **Pull _remote_** button in the toolbar, or choose
+**Pull** from the application menu, when the current branch has incoming work.
+A plain left click on the toolbar button pulls immediately without opening the
+review. For the reviewed path, Desktop Material
 fetches the configured remote first; if that fetch fails, the review stops
 instead of displaying an older remote-tracking ref as fresh data.
 

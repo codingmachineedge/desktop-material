@@ -1,5 +1,17 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-21 pull preview moved to right click on the toolbar Pull button
+
+A plain left click on the toolbar **Pull _remote_** button now performs the
+pull directly via the dispatcher; the reviewed pull-preview dialog opens only
+from a right click on that button (wired solely to the pull-state button) or
+from the application-menu **Pull** action, which is unchanged. The
+pull-preview contract test was updated to pin the new routing, and the
+feature doc, docs index, wiki User Guide, and Feature Gallery now describe the
+click/right-click split. Verified locally with the pull-preview contract suite
+(5 passing tests), repository-wide TypeScript no-emit, and Prettier on changed
+files. Remote CI and release publication occur after push.
+
 ## 2026-07-21 reviewed pull previews
 
 Ordinary pulls now open a reviewed Material dialog before mutating the current

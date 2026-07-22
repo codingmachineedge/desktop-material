@@ -21,18 +21,39 @@ function between(source: string, start: string, end: string): string {
 }
 
 describe('pull preview source and style contracts', () => {
-  it('routes toolbar and app-menu pulls through the preview popup', () => {
+  it('pulls directly on toolbar click and previews on right click and app-menu pull', () => {
     const toolbar = read('app/src/ui/toolbar/push-pull-button.tsx')
     const toolbarPull = between(
       toolbar,
       '  private pull = () => {',
+      '\n  private onPullButtonContextMenu'
+    )
+    assert.match(toolbarPull, /dispatcher\.pull\(this\.props\.repository\)/)
+    assert.doesNotMatch(toolbarPull, /showPopup/)
+
+    const toolbarPreview = between(
+      toolbar,
+      '  private onPullButtonContextMenu = (',
       '\n  private fetch = () => {'
     )
+    assert.match(toolbarPreview, /event\.preventDefault\(\)/)
     assert.match(
-      toolbarPull,
+      toolbarPreview,
       /dispatcher\.showPopup\(\{\s*type: PopupType\.PullPreview,\s*repository: this\.props\.repository,\s*\}\)/
     )
-    assert.doesNotMatch(toolbarPull, /dispatcher\.pull\(/)
+    assert.doesNotMatch(toolbarPreview, /dispatcher\.pull\(/)
+
+    // The preview context menu is wired to the pull-state button only.
+    const contextMenuBindings = toolbar.match(
+      /onContextMenu=\{this\.onPullButtonContextMenu\}/g
+    )
+    assert.equal(contextMenuBindings?.length, 1)
+    const pullButton = between(
+      toolbar,
+      '  private pullButton(',
+      '\n  private pushButton('
+    )
+    assert.match(pullButton, /onContextMenu=\{this\.onPullButtonContextMenu\}/)
 
     const app = read('app/src/ui/app.tsx')
     assert.match(app, /case 'pull':\s*return this\.pull\(\)/)

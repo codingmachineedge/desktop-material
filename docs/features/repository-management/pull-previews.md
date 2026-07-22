@@ -1,9 +1,12 @@
 # Reviewed ordinary Git pull previews
 
-The primary toolbar and application-menu **Pull** actions are a review boundary
-for an ordinary, single-repository Git pull. Desktop Material fetches first,
-summarizes the exact current branch and configured upstream snapshot, and waits
-for **Pull reviewed commit** before changing the worktree.
+The application-menu **Pull** action and a right click on the toolbar
+**Pull _remote_** button are a review boundary for an ordinary,
+single-repository Git pull. Desktop Material fetches first, summarizes the
+exact current branch and configured upstream snapshot, and waits for
+**Pull reviewed commit** before changing the worktree. A plain left click on
+the toolbar **Pull _remote_** button performs the pull directly without
+opening the review.
 
 ## Behavior and configuration
 
@@ -40,8 +43,9 @@ for **Pull reviewed commit** before changing the worktree.
   existing Git pull configuration, and the persisted app language mode.
   English, playful Hong Kong-style Cantonese, and bilingual mode localize the
   title, review labels, warnings, errors, and actions.
-- The visible review applies only to ordinary manual Pull from the toolbar or
-  application menu. Scheduled **Automatically pull** runs and explicitly
+- The visible review applies only to the application-menu Pull action and a
+  right click on the toolbar Pull button; a left click on that button pulls
+  immediately. Scheduled **Automatically pull** runs and explicitly
   noninteractive local-agent pull commands keep their direct automation path
   and existing safety checks; Pull All and reviewed batch sync retain their own
   batch review and result surfaces.

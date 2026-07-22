@@ -384,6 +384,18 @@ export class PushPullButton extends React.Component<
 
   private pull = () => {
     this.closeDropdown()
+    this.props.dispatcher.pull(this.props.repository)
+  }
+
+  /**
+   * Opens the pull preview popup. Only reachable via right-clicking the
+   * button while it offers a pull (i.e. shows "Pull <remote>").
+   */
+  private onPullButtonContextMenu = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    event.preventDefault()
+    this.closeDropdown()
     this.props.dispatcher.showPopup({
       type: PopupType.PullPreview,
       repository: this.props.repository,
@@ -671,6 +683,7 @@ export class PushPullButton extends React.Component<
         materialSymbol="sync"
         materialSymbolSize={22}
         onClick={onClick}
+        onContextMenu={this.onPullButtonContextMenu}
         dropdownContentRenderer={this.getDropdownContentRenderer(
           dropdownItemTypes
         )}

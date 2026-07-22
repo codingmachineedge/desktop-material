@@ -50,7 +50,8 @@ running. The behavior, failure, persistence, and security boundaries are
 documented in [Clone queue settings](features/repository-management/clone-queue-settings.md)
 and the [Local Agent HTTP API](features/agent-api/local-agent-http-api.md).
 
-The ordinary manual toolbar and application-menu Pull actions now fetch before
+The application-menu Pull action and a right click on the toolbar Pull button
+now fetch before
 showing a bounded review of the exact local/upstream identities, incoming
 commits, changed files, and configured integration route. Confirmation requires
 a clean worktree and integrates only the full reviewed upstream object ID; a

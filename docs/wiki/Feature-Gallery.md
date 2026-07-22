@@ -139,7 +139,8 @@ customization/history context use the same profile/repository ownership model.
 
 ## Clone, pull, and working-tree scope
 
-The ordinary toolbar and application-menu Pull actions fetch before opening a
+The application-menu Pull action and a right click on the toolbar Pull button
+fetch before opening a
 bounded review of the exact local/upstream identities, incoming commits,
 changed files, and integration route. Dirty or conflicted worktrees cannot
 confirm. The final preflight rejects a stale identity and integrates only the
