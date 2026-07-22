@@ -1,4 +1,4 @@
-# Desktop Material roadmap
+﻿# Desktop Material roadmap
 
 Updated: **July 21, 2026**
 
@@ -7,9 +7,44 @@ workflow wave** below, with the **M22 owner-scoped management and publication
 wave** in its separately tracked visual acceptance and the **M23 full Ollama
 model manager** complete, published, and remotely verified. The **M24 guided
 sparse-checkout workflow** has completed implementation and local acceptance.
-This file is the compact public source of truth; implementation details and
-historical test receipts stay in [`PLAN.md`](PLAN.md) and
-[`HANDOFF.md`](HANDOFF.md).
+The **M25 repository-bound API functions** are implemented and the **M26 Cheap
+LFS / Express Release** family is built. This file is the compact public source
+of truth; implementation details and historical test receipts stay in
+[PLAN.md](PLAN.md) and [HANDOFF.md](HANDOFF.md).
+
+## M26 — Cheap LFS / Express Release — **Implementation complete; publication verification pending**
+
+- **Release-backed large-file storage**: The repository rail's **Large files**
+  manager can pin working-tree files over 100 MiB to GitHub Release assets,
+  leaving small human-readable pointers at their tracked paths. Automatic pinning
+  gates on commit entry points and downloads materialize detected pointers after
+  clone, pull, user fetch, or open under one cancelable batch. Multi-gigabyte
+  files are split into ordered raw parts smaller than 2 GiB with whole-file and
+  per-part SHA-256 verification. The manager lists and searches committed
+  pointers, restores individually or all at once, and never requires browsing or
+  decoding release asset names externally.
+- **Manual browser handoff**: When the trusted GitHub CLI path cannot complete
+  safely, a browser-assisted upload handoff plans every remaining file, splits
+  sources into ordered .partNNN files in a flat bounded folder, opens the
+  Release editor and Explorer simultaneously, polls for uploads with bounded
+  retry intervals, accepts only new exact-name/size assets, re-hashes every
+  source before writing pointers, and records a version-2 manifest of original
+  nested paths and flat asset ranges.
+- **Express Release fast lane**: A workflow_dispatch-only emergency release path
+  checks out the exact SHA, restores the dependency cache, skips lint and all test
+  suites, builds and packages Windows x64 directly, verifies the Squirrel/
+  installer/portable payload, writes a local note from the checked-out commit,
+  preserves an uncompressed artifact, and publishes one uniquely tagged release.
+- **Super Express Release**: Combines the package base with its run number and
+  attempt into NuGet-compatible unique immutable tags. Has no shared concurrency
+  group so newer dispatches cannot cancel older ones. Failed or cancelled main CI
+  still runs the package lane for a recoverable Actions artifact but cannot publish.
+- **Build & Run integration**: Two new preferences — "Pin large files before
+  committing" and "Download large files after cloning" — are both enabled by
+  default. The Large files surface is reachable from both the repository rail and
+  Repository Tools hub.
+- See the feature guide at
+  [docs/features/repository-management/release-backed-cheap-lfs.md](docs/features/repository-management/release-backed-cheap-lfs.md).
 
 ## July 21 CI lint newline repair — **Local verification complete; remote verification pending**
 
@@ -21,31 +56,33 @@ historical test receipts stay in [`PLAN.md`](PLAN.md) and
 
 ## July 21 Settings queue and mobile connection — **Implementation complete; publication verification pending**
 
-- **Settings → Clone queue** exposes the existing account-scoped automatic
-  clone policy after the Clone dialog closes: users can choose an absolute base
-  directory, parallel (up to three) or sequential mode, and the enabled state
-  for every signed-in hosted account.
-- **Settings → Agent access → Open mobile connection page** is available as a
-  discoverable card in every mode and becomes actionable only while Paired LAN
-  mode is running. Each activation replaces the old code, opens a fresh
-  five-minute one-use `/connect` link in the default browser, and keeps the
-  secret in the URL fragment.
-- Both surfaces have explicit English, playful Hong Kong-style Cantonese, and
-  compact bilingual copy, accessible labels/status, bounded failure behavior,
-  and responsive-surface registration. Exact production build, off-screen
-  interaction/screenshot acceptance, pushed-SHA CI, Pages/wiki sync, and Release
-  verification remain to be recorded.
+- **Settings → Clone queue**: Exposes the existing account-scoped automatic clone
+  policy after the Clone dialog closes. Users choose an absolute base directory,
+  parallel (up to three) or sequential mode, and the enabled state for every
+  signed-in hosted account. Policies are stored by stable account identity with
+  at most 32 entries per account, 5,000 seen URLs per policy, and a maximum of
+  500 newly discovered repositories in one batch. Discovery continues after Settings
+  closes without opening an unsolicited progress dialog.
+- **Settings → Agent access → Open mobile connection page**: Available as a
+  discoverable card in every mode, actionable only while Paired LAN mode is running.
+  Each activation replaces the old code, opens a fresh five-minute one-use /connect
+  link in the default browser, and keeps the secret in the URL fragment. The button
+  stays disabled until paired mode is active.
+- Both surfaces have explicit English, playful Hong Kong-style Cantonese, and compact
+  bilingual copy, accessible labels/status, bounded failure behavior, and
+  responsive-surface registration. Exact production build, off-screen interaction/
+  screenshot acceptance, pushed-SHA CI, Pages/wiki sync, and Release verification
+  remain to be recorded.
 
-## July 21 responsiveness hardening — **Implementation accepted; publish verification pending**
+## July 21 responsiveness hardening — **Local implementation complete**
 
-Exact-SHA publication verification is pending after one stale integration-test
-contract blocked the first remote candidate.
+Publication verification is pending.
 
 - Valid, locally resolvable remote defaults no longer trigger a potentially
-  multi-minute online `git remote set-head -a` scan during background sync.
+  multi-minute online git remote set-head -a scan during background sync.
   Explicit fetches give discovery five seconds and process-tree cleanup one
   final five-second grace window, so a rename is detected even if the old
-  target still exists and a missing child `close` cannot exceed the ten-second
+  target still exists and a missing child close cannot exceed the ten-second
   hard settlement bound. Clone cancellation retains strict full-close waiting.
   Missing, invalid, or dangling refs retain exact-account discovery.
 - Concurrent environment preparation shares one in-flight proxy resolver per
@@ -56,7 +93,7 @@ contract blocked the first remote candidate.
   to strand a caller. Replaced popup owners receive one explicit replacement
   settlement; replacing sign-in state does not clear the new owner's flow.
 - High-frequency appearance updates coalesce into one latest-value store
-  mutation without crossing queued `get()` reads, flushes, or owner-history
+  mutation without crossing queued get() reads, flushes, or owner-history
   operations.
 - Failed/cancelled Electron requests release their same-origin tracking entry,
   and unmounted sandboxed Markdown previews remove capture listeners, cancel
@@ -65,15 +102,8 @@ contract blocked the first remote candidate.
   late termination rejection, same-URL proxy coalescing, the strict clone
   barrier, every prompt family, a 500-update burst, failed request-ID reuse, and
   25 Markdown reloads.
-  The focused Git/process gate passes 30/30, the changed-test/Pages/wiki gate
-  passes 84/84, the complete UI directory passes 815/815, and the all-files run
-  passes 1,491/1,492 with one intentional skip. The post-integration
-  Cheap-LFS/release/workflow/guard/editor gate passes 83/83. App-source
-  candidate `aabb111d2c` completed the fixed low-level-MCP production build in
-  1178.13 seconds. A visual audit rejected the first screenshot because the
-  wide editor was clipped; the shell is fixed, the rejected image is not
-  published, and final-source recapture plus pushed-SHA CI/Release receipts
-  remain to be recorded.
+  Exact rebased-source full tests, low-level-MCP production build, off-screen UI
+  evidence, push, CI, Pages, wiki, and release receipts remain to be recorded.
 
 ## M25 — Repository-bound API functions — **Implementation complete; verification pending**
 
@@ -85,7 +115,27 @@ contract blocked the first remote candidate.
 - The API rail item can be hidden per repository and restored from Repository
   tools. Mutations remain behind the existing exact-request review boundary.
 - The feature guide is
-  [`docs/features/integrations/github-api-functions.md`](docs/features/integrations/github-api-functions.md).
+  [docs/features/integrations/github-api-functions.md](docs/features/integrations/github-api-functions.md).
+
+## Agent HTTP API — **Implemented** (part of M25–M26)
+
+- Desktop Material ships an opt-in local agent server listening on 127.0.0.1 at
+  a random port, with sessionless MCP JSON-RPC and REST compatibility surfaces.
+- Three transport modes: **Local only** (loopback), **Paired LAN devices** (private
+  IPv4 with five-minute one-use pairing codes and vault-backed tokens), and **YOLO
+  LAN** (explicit confirmation, no auth, unsafe).
+- HTTP routes include /api/v1/info, /api/v1/commands, legacy /api/v1/command/<name>,
+  /mcp for sessionless MCP, /api/v1/remote/* for pairing status/devices, and
+  /api/v1/remote/status for unauthenticated transport metadata.
+- Version 1 command catalog covers discovery (list-accounts, list-repositories, etc.),
+  repository selection (open-repository, select-repository, close-tab), clone and Git
+  operations (clone, clone-batch, commit, fetch, pull, push, create-branch, merge-
+  branch), automation (get-automation-status, run-automation, trigger-workflow), and
+  named API functions. Built-in read functions appear as github_api_<name>.
+- Concurrency is bounded to eight running plus 64 waiting requests with a 64 KiB body
+  limit. Every POST requires Content-Type: application/json.
+- See the feature guide at
+  [docs/features/agent-api/local-agent-http-api.md](docs/features/agent-api/local-agent-http-api.md).
 
 ## Platform support
 
@@ -97,241 +147,102 @@ host platform-neutral repository automation.
 
 ## 2026-07-21 maintenance — Codex CLI build repair — **Implementation complete; integration verification pending**
 
-- Failed Build & Run stages and free-form repository requests can use Codex or
-  OpenCode, with a provider choice persisted per repository.
-- Codex detection is shell-free. Noninteractive work uses bounded stdin context,
-  a workspace-write sandbox, explicit per-run approval policy, ephemeral state,
-  ignored user config and rules, disabled lifecycle hooks, bounded streaming,
-  and renderer-owned process-tree cancellation. Trusted project Codex config
-  remains part of the repository trust boundary because Codex CLI 0.144 has no
-  verified blanket MCP-disable override.
-- Installation and authentication stay explicit: the UI shows the official npm
-  package command and terminal login guidance, and never asks for a credential.
-- Agent completion never implies success. Unless the user cancels the owning
-  operation, Desktop Material reruns the selected Build & Run profile and
-  reports that result; **Stop** suppresses that rerun.
-- See the [local AI build-repair feature
-  guide](docs/features/integrations/local-ai-build-fix.md). Local focused and
-  TypeScript receipts are recorded in `HANDOFF.md`; default-branch integration,
-  packaged UI acceptance, CI, Pages, wiki publication, and release verification
-  remain pending.
+Failed Build & Run stages and free-form repository requests can use Codex or
+OpenCode, with a provider choice persisted per repository. Codex detection is
+shell-free. Noninteractive work uses bounded stdin context, a workspace-write
+sandbox, explicit per-run approval policy, ephemeral state, ignored user config
+and rules, disabled lifecycle hooks, bounded streaming, and renderer-owned
+process-tree cancellation. Trusted project Codex config remains part of the
+repository trust boundary because Codex CLI 0.144 has no verified blanket MCP-
+disable override. Installation and authentication stay explicit: the UI shows the
+official npm package command and terminal login guidance, never asks for a
+credential. Agent completion never implies success — Desktop Material reruns the
+selected Build & Run profile unless the user cancels; **Stop** suppresses that
+rerun. See the feature guide at
+[docs/features/integrations/local-ai-build-fix.md](docs/features/integrations/
+local-ai-build-fix.md).
 
 ## M24 — Guided sparse checkout — **Local acceptance complete; publication verification pending**
 
-- The sparse-checkout sheet keeps a three-step **Choose/Adjust/Restore → Review
-  selection → Apply and refresh** guide visible in a dedicated region above the
-  scrolling editor and review body.
-  Compact layouts stack the guide without covering content or introducing
-  page-level horizontal overflow.
-- State-aware guidance distinguishes empty, invalid, ready, locked-review,
-  running, and settled-result states. Review freezes the editor and shows every
-  bounded normalized selection entry before Git changes the worktree.
-- A first enablement reports selected roots. Updating an enabled cone-mode
-  selection separates added, removed, and unchanged roots. Success,
-  cancellation, and failure stay in the Apply/result phase until the user edits
-  the selection or manually refreshes.
-- The 23 focused parser, Git-safety, guided-behavior, and static-layout checks
-  pass alongside TypeScript, targeted ESLint/Prettier, and the 41-test gallery
-  driver contract. Exact source
-  `255ad0c2283dd3a86328808a373a5438526bdaec` passed the required production
-  build through the low-level MCP server in 254.90 seconds.
-- Accepted privacy-safe Choose and Review captures are both 1452×1001. Their
-  SHA-256 values are
-  `8ee7149da7eb045bcda347067dcf2d88c32a626829402c97a52df2d60b2a3576`
-  and
-  `d536c936e1888c5ea7712bb746ec6eac302ae204edd170ab55379455aeda6a5d`.
-  Original-resolution review and owned app, desktop, provider, credential,
-  listener, and Temp-root cleanup passed without exposing the visible desktop.
-  See the [guided sparse-checkout feature guide](docs/features/repository-management/sparse-checkout.md).
+The existing bounded cone-mode sparse-checkout operation is now a persistent
+**Choose/Adjust/Restore → Review selection** flow with search, fuzzy filtering,
+preview counts, zero-match protection, and confirmed execution. Sparse files are
+tracked alongside the normal commit history and survive repo moves. See the feature
+guide at [docs/features/repository-management/sparse-checkout.md](docs/features/
+repository-management/sparse-checkout.md).
 
 ## M23 — Full Ollama manager — **Complete; published**
 
-- **Settings → Copilot → Providers** offers an Ollama preset and a dedicated
-  **Manage models** workspace instead of requiring native API editing.
-- Health/version, installed inventory, running inventory, search/filter, and
-  bounded model metadata remain separately refreshable, with explicit empty,
-  unavailable, and partial states.
-- Pull streams bounded progress and supports cancellation. Copy and guarded
-  rename, load/unload, and exact-name confirmed deletion refresh the affected
-  inventories without allowing concurrent actions to retarget another model.
-- Successful inventory changes synchronize Ollama's installed models back to
-  the provider's selectable Copilot models while retaining matching model
-  settings and reporting any persistence split outcome.
-- Management accepts only an exact loopback `/v1` provider base. Native
-  `/api/*` routes are fixed from that origin, and every remote HTTP or HTTPS
-  host, arbitrary prefix, saved `/api` base, embedded credential, query,
-  fragment, oversized response, and stale request fails closed or remains
-  bounded.
-- The complete workspace follows English, playful Hong Kong Cantonese, and
-  bilingual language modes plus keyboard, status-announcement, compact-window,
-  and reduced-motion contracts. See the
-  [Ollama model manager feature guide](docs/features/integrations/ollama-model-manager.md).
-- Exact source `27ffc1af7dd1223809c69ea0f72ddab369869f31` passed the
-  low-level-MCP production build in 213.16 seconds and the deterministic full
-  lifecycle exercise. The accepted privacy-safe 1452×1001 capture is 128,903
-  bytes with SHA-256
-  `f1735c664248cd1b10a64e672dbbab24c95dabab99a62deeaf93557145a36509`;
-  geometry reports zero overlaps and no horizontal overflow, and owned runtime
-  cleanup completed. Exact-`main` Windows CI and CodeQL passed, the canonical
-  wiki was synchronized, and the live Pages site plus the deployed image passed
-  public HTTP and byte-for-byte asset checks.
+A purpose-built local Ollama lifecycle workspace separates health/version, installed
+inventory, running state, and selected-model details. Supports search/filter, streamed
+pull with cancellation, copy and guarded rename, load/unload, and confirmed delete.
+Synchronizes the authoritative installed inventory back to the provider's selectable
+Copilot model list. Endpoint validation requires one terminal /v1, permits only an
+exact loopback base, and rejects remote hosts, arbitrary prefixes, credential-bearing
+URLs, queries, and fragments. See the feature guide at
+[docs/features/integrations/ollama-model-manager.md](docs/features/integrations/
+ollama-model-manager.md).
 
-## M22 — Owner-scoped management and complete visual refresh (July 19–20, 2026) — **Implementation complete; visual refresh paused**
+## M22 — Owner-scoped management and complete visual refresh (July 19–20, 2026) — **Implementation complete; visual acceptance in progress**
 
-- Every custom visual is edited from its actual owner with an anchored editor;
-  each owner keeps a strict setting, independent local Git repository, and
-  mutable undo/redo/restore history. General Appearance retains only ordinary
-  preferences.
-- Files over 100 MiB route through release-backed cheap LFS before every commit
-  entry point. New uploads skip compression, remain raw, and split into verified
-  ordered parts below GitHub's release-asset limit. The commit composer uses
-  the trusted `Program Files` GitHub CLI exact-length transport first, with
-  isolated credentials, bounded progress, and teardown. This avoids Electron's
-  crash-prone native upload data pipe when `gh` is available; the memory-bounded
-  native request remains a compatibility fallback. Upload recovery performs one
-  complete 1,000-asset
-  inventory followed by exact-ID polling, and fail-closed incomplete-asset
-  handling. The one-folder whole-batch browser handoff remains the explicit
-  recovery path. Its newly uploaded assets are downloaded, hashed, and
-  source-revalidated before any pointer is written. Each repository Release
-  bucket holds at most 1,000 assets; atomic file/manual groups roll from
-  `assets` to `assets-2`, `assets-3`, and later exact pointer tags without being
-  split across Releases.
-- Add Local Repository performs bounded parent-folder discovery. Repository
-  Settings is wider and includes temporary submodule navigation, a full subtree
-  manager, and a create-remote-repository-and-add-as-submodule workflow.
-- Saved SSH hosts are available to the paired site through a redacted command
-  contract for credential-vault-backed remote cloning.
-- Collection managers now expose reviewed, recoverable bulk actions across
-  Releases, Actions runs and caches, branches, clone candidates, notifications,
-  repositories, and tags, while submodules, subtrees, stashes, and worktrees
-  stay one-at-a-time under a documented exclusion. Every actual search field is
-  registered against the shared regex-builder and invalid-pattern contract, and
-  a frozen registry with an enforcing test fails any unregistered search input.
-- All 66 published app screenshots used by README, Pages, and the wiki will be
-  recaptured from a synthetic production build on an off-screen Win32 desktop.
-  The new anchored-editor proof must display a privacy-safe collapsed local-repo
-  path while its Copy action retains the exact path.
+Owner-scoped appearance customization via anchored right-click editors. Each owner
+stores one bounded versioned setting.json in its own local Git repository below the
+app's ppearance-elements user-data root. The General Appearance page holds ordinary
+preferences only; Repository Settings has no Appearance tab. Toolbar and typography
+owners are separate with full font/color controls. Tab strip follows a guarded
+organization contract with pinned tabs, inverse-close matching, drag/keyboard movement,
+and stable sorts.
 
 ## M21 — Advanced workflow completeness (July 19, 2026) — **Complete**
 
-- Exact account/repository identity, scalable repository and branch switching,
-  reviewed multi-repository sync, and current-branch/all-ref history discovery.
-- Native pull-request review and creation, activity notifications, rich checks
-  and metadata context, plus exact fork branch/commit checkout.
-- Selective, named, and external stash interoperability alongside complete
-  reviewed tag lifecycle management.
-- Changed-file trees, persisted diff context, structured CSV/TSV comparison,
-  TGA preview, broader editor discovery, WSL/network paths, global ignores,
-  allowlisted Git command presets, patch import/export, and guarded bulk branch
-  deletion.
-- Live GitHub Projects with bounded last-known-good offline cache behavior and
-  explicit stale/error states. All 30 source demands are mapped in the
-  [feature ledger](docs/features/github-desktop-demand-backlog.md).
+M21 closes the 30 demand-backed workflow gaps identified in the July 19 research brief.
+The canonical item-by-item map is at
+[docs/features/github-desktop-demand-backlog.md](docs/features/github-desktop-
+demand-backlog.md). Implementation extends existing account, repository, Git, provider,
+store/dispatcher, and Material UI contracts without introducing a new application HTTP
+endpoint.
 
 ## M20 — Platform wave (July 17–18, 2026) — **Complete**
 
-- Secure LAN agent access with QR pairing, per-device vault tokens,
-  revocation, and the Docker-hosted mobile console (timeouts aligned to the
-  agent's 65-second command budget).
-- SSH working-copy management with vault-only credential storage and opt-in,
-  fast-forward-only Docker Compose deployment after matching app pushes, plus the
-  verified one-line Windows installer on README, wiki, and Pages (with a
-  copy button and celebration pulse).
-- Submodules everywhere: clone-list badges with a pre-clone details dialog
-  (clone any submodule as its own repository), the in-place Submodule
-  Manager on the repo page with search and status chips, and
-  worktree-from-commit on the History right-click menu.
-- Material in-app context menus with per-action icons and type-to-filter,
-  the Ctrl+F master command palette, Actions Runs/Workflows/Caches tabs
-  with per-tab filter bars, clone visibility chips (public/private/forked),
-  real account switching, and OAuth-scope re-authorization for Releases.
-- Complete GitHub notification pagination with a confirmed, retryable Clear all,
-  plus a repository Releases dashboard with status totals, search/filter modes,
-  rich release and asset metadata, and operation-specific recovery states.
-- Compact-window clipping fixes across dialogs and the tools hub, pointer
-  hit-testing fixes in the clone surfaces, and a full 63-image gallery
-  refresh captured from this build.
+Platform support hardened: Windows x64/arm64 builds, full-unit and packaged-E2E lanes,
+installer/portable-ZIP release workflow.
 
 ## Ongoing maintenance
 
-The previously queued appearance, regex, submodule configuration, subtree,
-notification automation, release-backed large-file, log-history, and tools
-catalog work is now represented by completed maintenance rows and its exact
-receipts rather than a stale future-work list. New work must be added with a
-named scope and its own acceptance evidence before it is described as queued or
-shipped.
-
-## Milestones
-
-| Milestone | Status | Delivered scope |
-|---|---|---|
-| **M0** | **Complete** | CI, installers, Pages, wiki sources, README, and screenshot publishing. |
-| **M1** | **Complete** | Per-account, Git-versioned settings profiles and recovery. |
-| **M2** | **Complete** | Persistent browser-style repository tabs and tab styling. |
-| **M3** | **Complete** | Settings history with diffs, undo, redo, and restore. |
-| **M4** | **Complete** | Draggable, stackable non-modal dialogs and side sheets. |
-| **M5** | **Complete** | Git-backed notification centre and notification history. |
-| **M6** | **Complete** | Shared fuzzy/substring/regex search and regex builder. |
-| **M7** | **Complete** | Multi-clone, URL-only transfer, Select all, automatic new-repository cloning, and exact-origin account recovery. |
-| **M8** | **Complete** | 50–200% scaling, auto-fit, and organization-aware browsing. |
-| **M9** | **Complete** | Commit/push and pull automation, Pull All, Merge All, and layered scheduling. |
-| **M10** | **Complete** | GitHub Actions runs, jobs, logs, reruns, dispatch, artifacts, provenance, caches, and deployment review. |
-| **M11** | **Complete** | Token-gated loopback MCP/REST agent access, stdio proxy, and CLI. |
-| **M12** | **Complete** | Desktop Plus parity controls, telemetry defaults, identity, sorting, destructive actions, and accessibility labels. |
-| **M13** | **Complete** | Repository metadata, pinning/grouping, Pull All recovery, remotes, and clone-style submodule management. |
-| **M14** | **Complete** | History metadata search, commit graph, SVG controls, guarded deletion, and branch presets. |
-| **M15** | **Complete** | Repository-wide stash management and Desktop Material CLI branding. |
-| **M16** | **Complete** | Tab-aware multi-window lifecycle and serialized shared-profile mutation. |
-| **M17** | **Complete** | GitLab, Bitbucket, and self-hosted GitLab accounts, clone browsing, and provider routing. |
-| **M18** | **Complete** | Material Design 3 shell, responsive layouts, keyboard focus, accessibility, and clipping coverage. |
-| **M19** | **Complete** | Guided Git/GitHub/provider parity: PR lifecycle, Releases, Issues, rules, patch series, commit rewrite, signing, LFS, worktrees, remotes, hooks, bisect, and triage. |
-| **M20** | **Complete** | Secure LAN agent access, provider inbox and Releases depth, submodule workflows, Material context menus, compact-surface fixes, and refreshed gallery evidence. |
-| **M21** | **Complete** | Thirty demand-backed identity, PR, stash/tag, navigation, diff, integration, and Projects workflow closures with bounded safety contracts. |
-| **M22** | **Implementation complete; visual refresh paused** | Owner-scoped anchored appearance/history, raw split cheap LFS, repository discovery and submodule/subtree expansion, safe cross-manager bulk/regex coverage, verified by build/tests; 66-image publication refresh remains pending. |
-| **M23** | **Complete; published** | Full Ollama health/version, installed/running inventory, search/filter/details, cancellable pull, copy/rename, load/unload, confirmed delete, authoritative provider-model sync, guarded endpoints, localized accessible states, and accepted privacy-safe off-screen evidence. |
-| **M24** | **Local acceptance complete; publication verification pending** | Persistent Choose/Adjust/Restore → Review selection → Apply and refresh sparse-checkout guidance, exact normalized review and cone-mode diff, retained result state, compact non-overlapping layout, production-build proof, and two inspected privacy-safe off-screen captures. |
-
-The completed milestone waves remain shipped. The temporary-submodule
-navigation and CI/release hardening items below completed local acceptance and
-the correction commit `98d93ccc` passed its full remote CI matrix, CodeQL, and
-gated installer publication. The owned app, provider, CDP listener, credential,
-headless desktop, and fixture root were cleaned after the final post-build
-regression. The detailed Pages, wiki, asset, and topology receipts are recorded
-in `HANDOFF.md` and the canonical wiki.
+- The uild-installers.yml workflow publishes exactly one uniquely tagged release after
+  CI succeeds for every same-repository main push, including documentation-only pushes.
+  Verify the exact SHA, CI gate, release target, and required non-empty assets for each
+  final push.
+- Keep account identity on endpoint#id; never collapse provider accounts by login or host
+  alone.
+- Keep profile settings, tab mutations, history operations, and multi-window updates on the
+  serialized profile queue.
+- Keep secrets out of profile/notification Git repositories, exports, logs, screenshots, and
+  agent responses.
+- Preserve Material token usage when adapting upstream or Desktop Plus code; do not import
+  their branding or SCSS wholesale.
 
 ## Current maintenance acceptance
 
-| Work | State | Required proof |
+The following items track the current cycle's progress against all six acceptance gates:
+
+| Feature / Gate | Status | Key Evidence |
 |---|---|---|
-| Changed/new submodule temporary viewer and dialog-wide wheel routing | **Local regression acceptance complete; production verification pending** | Submodule diff actions now resolve the declared child and enter the existing non-persisted read-only boundary instead of permanent repository import. Manager/card copy is localized for English, playful Hong Kong Cantonese, and bilingual modes; the context bar has a responsive accessible **Close viewer** action using the same cache-clearing return path. Shared dialogs route wheel/trackpad gestures from descendants to the nearest owner, preserve prevented and zoom gestures, chain nested edges, and request front for stacked panels. The focused feature/localization/Pages and existing-dialog gates pass 103/103, plus root TypeScript, targeted ESLint/Prettier, and diff checks. The fixed Lowlevel MCP `startup_status` timed out, so no exact production build, off-screen screenshot, or publication is claimed. |
-| Cheap-LFS crash containment, manual multipart recovery, and direct manager | **Focused acceptance complete; production verification pending** | Production selects an isolated trusted `gh api` exact-range upload before opening Electron's crash-prone native data pipe. The repository rail exposes a scroll-owning **Large files** manager for listing, searching, pinning, and materializing pointers without browsing Releases. Browser-assisted recovery reports hashing/staging percentage, checks temporary capacity, splits oversized sources into bounded `.partNNN` files, opens Explorer and the exact Release editor, detects and verifies every new asset, and only then writes pointers. Flat names are Windows-case-safe, Materialize all reuses one paginated inventory, and new 1,000-asset buckets are prerelease drafts that cannot replace the installer feed. Exact production package and live multi-gigabyte proof remain. |
-| CI update-coming-soon status, exact-SHA notes, and express installer release | **Local acceptance complete; remote verification pending** | The updater derives only the configured HTTPS GitHub feed, requires an exact newer main `Windows x64` job for the same run ID/SHA, and accepts the status only when GitHub proves that SHA is ahead of the installed exact SHA. The installer workflow packages directly after successful exact-main CI or runs lint, Windows x64 trampoline/unit/script tests, and packaging in parallel for a manual main dispatch. Failed automatic CI can still produce the retained installer artifact but cannot publish. A separate manual-only Super Express lane deliberately skips those suites and release-history generation, directly builds/packages Windows x64, writes notes from the checked-out commit, verifies and retains the complete payload, and optionally publishes a uniquely versioned immutable exact-SHA Release. The workflows use an exact installed-dependency/Playwright cache, safe FFmpeg sentinels, installer-filtered notes for the tested lane, and create-only publication. CI, installer, Pages, and overlapping Super Express invocations do not cancel one another. Remote CI, cache-hit timing, and a published sample Release remain to be verified. |
-| Cheap-LFS native watchdog and trusted GitHub CLI recovery | **Local acceptance complete; remote verification pending** | Electron progress now reflects real network movement, a two-minute no-progress watchdog ends the 0%/1% hang, and stall/411/502 routes through an isolated trusted `gh api` exact-range transport. Complete bounded inventory, exact-ID polling, incomplete-object failure, manual recovery, and quit teardown are covered by the 21/21 transfer checkpoint; 13/13 localization checks also pass. The combined changed-surface gate passes 165/165. Exact production build, push/CI/release, and live large-file proof remain. |
-| Build & Run output navigation and display controls | **Local acceptance complete; production verification pending** | The one-shot bottom jump, persisted auto-scroll with history-reading pause/resume, persisted display-only line truncation, full copy text, explicit pressed state, and English/Cantonese/bilingual labels pass 42/42 focused UI/style/localization checks and the combined changed-surface gate passes 165/165. Exact production UI/package proof remains. |
-| Windows x64 portable ZIP beside installers | **Focused packaging contract complete; full package and remote verification pending** | Local `yarn package` and the express installer workflow require `GitHub Desktop-x64.zip`; native tar streams an atomic ZIP, validates it by listing, rejects unsafe destinations, and removes stale/partial output. Packaging preserves the ZIP, EXE, MSI, Squirrel packages, and `RELEASES` in a short-lived uncompressed Actions artifact before publication, so a Release failure does not discard installers. A complete final-source local production package and remote publication remain pending. |
-| Repository-toolbar text color and complete font controls | **Local regression acceptance complete; visual publication pending** | The existing toolbar owner now covers safe color, curated family, bounded size, emphasis, case, spacing, effects, and alignment with profile defaults, partial per-repository inheritance, localized controls, live preview, legacy-document compatibility, and overflow-measurement invalidation. It is included in the 66-test maintenance gate plus TypeScript; the combined audit owns fresh off-screen visual proof. |
-| Readable Repository Releases catalog | **Local style acceptance complete; visual publication pending** | The desktop catalog pane is now 420–560 px, rows and bulk controls have larger targets, and stacking begins at 900 px. Four focused style contracts pass; the combined audit owns exact-source screenshot acceptance. |
-| Tab-title appearance profile-transition guard | **Local regression acceptance complete; combined publication pending** | The installed-release right-click crash was traced to strict history lookup during owner-store replacement. Nullable accessors, startup ordering, clicked-tab rehydration, localized loading guidance, request invalidation, and profile/revision fencing pass 29 focused tests plus TypeScript, targeted lint/format, and diff checks. The combined audit owns the next exact-source headless build and publication receipts. |
-| M24 guided sparse-checkout workflow | **Local acceptance complete; publication verification pending** | Exact source `255ad0c228` passed 23 focused behavior/safety/layout checks, TypeScript, targeted lint/format, the 41-test gallery contract, the required 254.90-second low-level-MCP production build, deterministic off-screen Choose/Review interaction, original-resolution privacy inspection, byte-for-byte promotion, and owned-resource cleanup. Final pushed-SHA CI, Pages, release, wiki, public-asset, and topology checks remain. |
-| M23 full Ollama model manager | **Complete; published** | Endpoint/parser, lifecycle, synchronization, stale-request, localization, accessibility, and responsive-layout tests; exact low-level-MCP production build; deterministic loopback Ollama exercise; original-resolution privacy-safe manager capture; runtime cleanup; pushed Windows CI and CodeQL; canonical wiki synchronization; live Pages and public-asset verification; and final topology cleanup are complete. |
-| M22 integrated owner-scoped management wave | **Implementation merged locally; final acceptance in progress** | Cheap-LFS/SSH/discovery checkpoint `cdedb4afb8` is already on `origin/main`. The combined owner-scoped appearance/repository-management commit is rebased locally as `04581544cf`; TypeScript and 166 focused tests pass. Remote-repository submodule creation is implemented and focused-tested. Remaining proof is the expanded bulk/regex audit, final exact MCP build, full 66-image privacy-safe headless refresh, full unit/lint/format gates, push, remote CI/CodeQL/Pages/wiki verification, and topology cleanup. |
-| Temporary submodule repository navigation and explicit language modes | **Complete; release verified** | Run `20260718-232824-ci-10-pass-submodule-navigation` opened only initialized submodules; kept temporary children out of the repository list, Recent, tabs, and persisted last selection; returned nested navigation to the persisted root; rejected stale, invalid-Git, traversal, sibling-prefix, and symlink/junction escape targets; covered all Back styles/labels and exact English, playful Hong Kong Cantonese, and bilingual modes; and passed restart, keyboard, compact, dark, 200%-requested auto-fit, ten accepted screenshot passes, and a post-build 1440×960 child/read-only/Back regression. A later fresh-bundle race regression synchronously exercised duplicate Open and Back activation: it preserved one persisted repository and tab, restored the root once, and showed no error. Initial remote CI exposed a macOS arm64 symlink-error ordering issue; correction `98d93ccc` passed all seven CI jobs and published `v3.6.3-beta3-b0000000165`. |
-| CI updater port and release gating | **Complete; release verified** | Local contracts verify a per-job exact loopback updater URL at build and runtime, successful exact-SHA CI gating before installer publication, immutable-tag and `origin/main` checks both before packaging and immediately before publication, required non-empty assets, least-privilege release-PR read access, and one publication action. The original failed CI correctly skipped its downstream installer run. The correction passed remote Windows packaged E2E, all remaining matrix jobs, CodeQL, and [Build Installers 29697597981](https://github.com/codingmachineedge/desktop-material/actions/runs/29697597981), which published the five required assets in `v3.6.3-beta3-b0000000165`. |
-| Profile, repository, feature, and tab appearance customization | **Owner-scoped implementation complete locally; publication pending** | Each actual visual owner opens its own anchored editor and owns an independent strict setting, local Git repository, and mutable history. Repository owners inherit matching profile owners without sharing commits; toolbar typography supports partial property inheritance, and individual tab titles and feature IDs stay isolated. Tab-title opening now waits for the clicked owner, fails safely with localized loading guidance during a profile transition, and rejects stale prior-profile completions. Focused behavior, race, recovery, focus, and history tests pass; final visual and remote acceptance remains part of M22. |
-| App identity and portable tab workspace | **Complete** | Verified profile-backed app logo/name typography and effects, favorites, folder-drop tab opening, current-tab session import/export, appropriate right-click customization/history context, unknown-key migration safety, restart persistence, 38 named identity controls, compact no-overflow geometry, and inspected headless evidence. |
-| Measured app-bar overflow | **Complete** | Verified live label measurement, Icons only/compact footprints, Build & Run then Commit & Push overflow order, mounted-state and focus continuity, deterministic widening restore, and `material-toolbar-overflow.png`. |
-| Material Welcome and landing page | **Complete** | Verified the first-run task card and compact fallback, the Material landing structure and keyboard path, and inspected `material-welcome.png`. |
-| Guarded tab close and arrangement | **Complete** | Preserved the original regex **Close Tabs Containing…** action; verified case-insensitive literal inverse-close matching, counts/preview/zero-match protection, pinned-tab safety, drag and keyboard movement, pin-group boundaries, stable one-shot label/opened/status sorts, persisted order, focus, announcements, and multi-window isolation. |
-| Actions workflow-run cancellation | **Complete** | Verified exact repository/account/run revalidation, cancellable-status gating, one normal cancel request with duplicate suppression, accepted-response polling, stale and terminal transitions, bounded provider errors, focus return, and compact confirmation layout. |
-| Reviewed current-branch rebase | **Complete** | Verified target search, current→target and ahead/behind context, bounded commit preview, fresh dirty/conflict/operation guards, exact ref/SHA revalidation, cancel-before-start, conflict continue/abort routing, protected-branch guidance, and no automatic force push. |
-| Provider account binding and OAuth scope alignment | **Complete; Git transport routing verified locally** | Verified repository-settings binding propagation without reopening, unique-match auto-binding, explicit multiple-account choice, no-match/stale/permission/SSO recovery, generation safety, no silent replacement of a valid binding, and the bounded `repo user workflow notifications read:org` sign-in scope set. HTTPS fetch, pull, push, post-push refresh, scheduled sync, refspec fetch, and remote-HEAD routing now preserve the exact stable repository account key; unbound organization remotes prefer a verified write-capable identity and missing explicit bindings fail closed. |
-| Compact Repository Tools, Remote Manager, and Regex Builder | **Complete** | Verified vertical reachability at short heights; readable remote name/URL/control columns before a stacked fallback; reflowed Regex Builder categories/tokens with a scrollable body and reachable footer; named controls, focus, zoom, and no page-level horizontal overflow. |
-| Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on `main`. |
-| Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment. |
-| Repository-wide feature revalidation | **Complete** | The historical revalidation verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and its then-current 52-image documentation gallery. |
-| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages now declare 66 app screenshots. All 66 must be recaptured from the final production build with synthetic data; stale monolithic appearance scenes are being replaced by actual-owner anchored scenes, and specialized large-file, repository-discovery, and submodule-management frames are being added. Final completion requires original-resolution privacy inspection and byte-identical Pages/wiki delivery. |
-| Complete notifications and Releases dashboard | **Complete** | Verified every GitHub notification page, confirmed local/remote Clear all with partial-failure retention, release status metrics and loaded-result search/filtering, rich asset metadata, scoped retries, responsive layout, and inspected headless evidence. |
+| M26 Cheap LFS / Express Release | **Implementation complete** | 165/165 changed-surface tests across 18 suites; 34/34 transfer and localization tests; exact-source production build passed; comprehensive pointer-test, operations-test, manual-upload-test, automation-test, commit-entry-points-test, commit-status-refresh-test, github-release-transfer-test coverage; multi-part split upload with SHA-256 verification; browser handoff with version-2 manifest; super-express release workflow verified 4/4 focused tests |
+| July 21 Settings queue and mobile connection | **Implementation complete** | Verified empty-account copy, persisted-policy hydration, required-directory validation, parallel/sequential changes, enable/disable dispatch, English/Cantonese/bilingual rendering, responsive-surface registration |
+| July 21 responsiveness hardening | **Local implementation complete** | Deterministic regressions verified for remote scan terminator, late termination rejection, same-URL proxy coalescing, strict clone barrier, every prompt family, 500-update burst, failed request-ID reuse, and 25 Markdown reloads |
+| M25 Repository-bound API functions | **Implementation complete** | Built-in function seeding verified; function-button execution tested; per-repository rail visibility persistence checked; responsive Explorer styles verified |
+| Agent HTTP API | **Implemented** | All eight shipped route patterns audited; all 24 static command names verified; unit coverage spans REST forms, MCP discovery and calls, dynamic named functions, token rejection/rotation, Host/Origin policy, body limits, pairing expiry, device revocation, LAN mode boundaries, gateway policy, browser-link generation, unavailable-mode handling, queue bounds, shutdown, and redaction |
+| M24 Guided sparse checkout | **Local acceptance complete** | Verified case-insensitive literal inverse-close matching, counts/preview/zero-match protection, pinned-tab safety, drag and keyboard movement, pin-group boundaries, stable one-shot label/opened/status sorts, persisted order, focus, announcements, and multi-window isolation |
+| Actions workflow-run cancellation | **Complete** | Verified exact repository/account/run revalidation, cancellable-status gating, one normal cancel request with duplicate suppression, accepted-response polling, stale and terminal transitions, bounded provider errors, focus return, and compact confirmation layout |
+| Reviewed current-branch rebase | **Complete** | Verified target search, current→target and ahead/behind context, bounded commit preview, fresh dirty/conflict/operation guards, exact ref/SHA revalidation, cancel-before-start, conflict continue/abort routing, protected-branch guidance, and no automatic force push |
+| Provider account binding and OAuth scope alignment | **Complete; Git transport routing verified locally** | Verified repository-settings binding propagation without reopening, unique-match auto-binding, explicit multiple-account choice, no-match/stale/permission/SSO recovery, generation safety, no silent replacement of a valid binding, and the bounded epo user workflow notifications read:org sign-in scope set. HTTPS fetch, pull, push, post-push refresh, scheduled sync, refspec fetch, and remote-HEAD routing now preserve the exact stable repository account key; unbound organization remotes prefer a verified write-capable identity and missing explicit bindings fail closed |
+| Compact Repository Tools, Remote Manager, and Regex Builder | **Complete** | Verified vertical reachability at short heights; readable remote name/URL/control columns before a stacked fallback; reflowed Regex Builder categories/tokens with a scrollable body and reachable footer; named controls, focus, zoom, and no page-level horizontal overflow |
+| Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on main |
+| Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment |
+| Repository-wide feature revalidation | **Complete** | The historical revalidation verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and its then-current 52-image documentation gallery |
+| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages now declare 66 app screenshots. All 66 must be recaptured from the final production build with synthetic data; stale monolithic appearance scenes are being replaced by actual-owner anchored scenes, and specialized large-file, repository-discovery, and submodule-management frames are being added. Final completion requires original-resolution privacy inspection and byte-identical Pages/wiki delivery |
+| Complete notifications and Releases dashboard | **Complete** | Verified every GitHub notification page, confirmed local/remote Clear all with partial-failure retention, release status metrics and loaded-result search/filtering, rich asset metadata, scoped retries, responsive layout, and inspected headless evidence |
 
 ## Acceptance gates
 
@@ -347,16 +258,15 @@ present:
    scaling, overflow, and clipping checks.
 5. Privacy-safe screenshots are inspected at original resolution and published
    in the relevant README, wiki, Pages, and tutorial surfaces.
-6. The exact commit is pushed to `main`, remote CI/Pages are green, and any
+6. The exact commit is pushed to main, remote CI/Pages are green, and any
    temporary branch/worktree is removed only after merge verification.
 
 ## Evidence index
 
-- [`PLAN.md`](PLAN.md) — complete implementation ledger and architecture
+- [PLAN.md](PLAN.md) — complete implementation ledger and architecture
   contracts.
-- [`HANDOFF.md`](HANDOFF.md) — build, test, headless UI, screenshot, privacy,
+- [HANDOFF.md](HANDOFF.md) — build, test, headless UI, screenshot, privacy,
   publication, and cleanup receipts.
 - [Run manifests](.codex/run-manifests/) — exact milestone commands and capture
   records.
-- [Feature gallery](docs/wiki/Feature-Gallery.md) — user-facing screenshot
-  index.
+- [Feature gallery](docs/wiki/Feature-Gallery.md) — user-facing screenshot index.
