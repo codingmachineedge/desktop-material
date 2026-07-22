@@ -19,13 +19,13 @@ focuses on what Desktop Material adds on top.
 The numbered roadmap now extends through M27. M0–M21 and M23 have published
 receipts; M22 keeps its separate visual refresh, and the acceptance/publication
 state for M24–M27 is recorded in the repository's `ROADMAP.md` and `HANDOFF.md`.
-The latest published baseline is `7edca120c5`, whose CI, code-scanning, and
-installer workflows passed before release `v3.6.3-beta3-b0000040881` published
-all six required assets. The current tab-group, command-palette, Alt-key, and
-release-gate continuation is not covered by those receipts. Its exact unpackaged
-production build and isolated off-screen group/palette interaction passed
-locally, and the two accepted synthetic-only screenshots are documented below.
-A commit and push, remote CI/Pages/wiki, and a Release remain pending.
+The latest fully published baseline is `7edca120c5`, whose CI, code-scanning,
+and installer workflows passed before release `v3.6.3-beta3-b0000040881`
+published all six required assets. The tab-group, command-palette, Alt-key,
+release-gate, and Cheap LFS UI continuation is pushed at implementation
+checkpoint `58be6fe595`; its exact production build and isolated off-screen
+interaction passed locally. Exact final remote CI/Pages/wiki and Release
+verification remains pending.
 
 The temporary-submodule changeset completed its local ten-pass, final post-build
 child/Back, and fresh-bundle duplicate Open/Back race inspections, including
@@ -34,7 +34,7 @@ remote CI caught a macOS error-ordering defect without publishing; correction
 `98d93ccc` passed its full remote CI gate and published
 `v3.6.3-beta3-b0000000165`. Exact publication receipts are in `HANDOFF.md`.
 
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 71-scene visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 72-scene visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)

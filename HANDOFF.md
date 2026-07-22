@@ -1,44 +1,56 @@
 # Desktop Material — Active parity handoff
 
-## 2026-07-22 live Cheap LFS public/private GitHub backend acceptance
+## 2026-07-22 live Cheap LFS public/private GitHub and UI acceptance
 
-Live Cheap LFS protocol acceptance completed on the configured `DingDingChae`
-GitHub CLI account. Both purpose-built repositories are retained on `main`:
+Live Cheap LFS protocol, history, and Desktop Material UI acceptance completed
+through the configured `DingDingChae` account. Both purpose-built repositories
+are retained on pushed `main` commits:
 
 - Public:
   [`DingDingChae/desktop-material-cheap-lfs-public-20260722-153308`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308),
-  commit `0ca7df318fa741cae31fd6ade7d7133e2be76133`, release `358270369`,
-  asset `486345586` (`payload-public.bin`).
+  commit `a7c90eff6a4d7963577125e3204a1b9af28da756`, release `358270369`,
+  UI asset `486477022` (`payload-public-30e1495.bin`).
 - Private: `DingDingChae/desktop-material-cheap-lfs-private-20260722-153308`,
-  commit `c2f2cbd5a8ebcd877c86f4d0a8e356290e001125`, release `358270368`,
-  asset `486345587` (`payload-private.bin`).
+  commit `e56519d4742c63bb2c9f5f1e917de3fca7379fdd`, release `358270368`,
+  UI asset `486479377` (`payload-private-30e1495.bin`).
 
-Each release is a draft prerelease tagged `assets-test-20260722-153308`. Both
-assets are in `uploaded` state at 1,048,576 bytes with digest
+Both releases remain draft prereleases tagged `assets-test-20260722-153308`.
+The original backend assets and the two UI-created assets are all uploaded at
+1,048,576 bytes with digest
 `sha256:30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58`.
-Authenticated `gh release download` reproduced the exact size and digest, and
-`fc /b` reported no differences from either source. Unauthenticated draft-asset
-URLs returned HTTP 404 for both repositories, including the public repository.
+The public UI explicitly materialized and re-pinned its payload; the private UI
+materialized on open in a fresh profile and passed the same native-picker,
+review, upload, and pointer-replacement sequence.
 
-Each commit contains a canonical five-line `desktop-material/cheap-lfs/v1`
-pointer. The LF Git blobs are 193 bytes public and 194 bytes private; Windows
-fresh-clone CRLF copies are 198 and 199 bytes. `git lfs ls-files` returned no
-entries. This proves a normal clone keeps the Cheap LFS pointer rather than
-silently invoking Git LFS.
+The first live UI attempt exposed two defects: GitHub's exact draft-tag route
+can return 404, and an absent asset label can arrive as either `null` or `""`.
+The store now performs a bounded release-inventory fallback, while the provider
+model normalizes both no-label spellings. The focused Release-store and
+transfer/model gates pass 17/17 and 41/41, TypeScript passes, and all five
+production Webpack targets plus staging completed in 296.8 seconds.
 
-Credentials remained inside the existing GitHub CLI configuration: no token
-was exported, printed, copied to a repository, or duplicated into Desktop
-Material's keychain. This receipt therefore accepts the live GitHub
-repository/release/pointer/download backend in public and private modes; it
-does **not** claim an account-bound Desktop Material GUI upload/materialize E2E.
+Fresh public/private clones resolved to the exact UI commits above, retained
+their earlier deterministic-pointer commits as parents, and were clean. Their
+canonical five-line Git blobs are 201 and 202 bytes; Windows CRLF copies are
+206 and 207 bytes. `git lfs ls-files` returned no entries, proving the test is
+real Cheap LFS history rather than Git LFS metadata.
 
-Both repositories include the generated Cheap LFS logo. The public raw asset
-returned HTTP 200, while the private contents API reported its authenticated
-size. The canonical documentation copy at
-`docs/assets/cheap-lfs-logo.png` is 1254×1254, 1,091,778 bytes, SHA-256
+The user explicitly authorized a temporary bridge from the logged-in GitHub
+CLI account to Desktop Material's development secure store. The token was not
+printed, logged, placed in an argument/URL, written to source, captured, or
+committed. After both isolated UI runs, the exact credential entry was deleted
+and re-read as absent; the app PIDs, CDP ports, and off-screen desktops were
+also closed.
+
+Both repositories include the generated Cheap LFS logo. The canonical
+documentation copy at `docs/assets/cheap-lfs-logo.png` is 1254×1254,
+1,091,778 bytes, SHA-256
 `34b2e68ad1e95f45cac08e3c2ee5d9981a35611d30b0deb7282a5c7fe0682a2f`.
-The Large files UI now says larger sources use 1.5 GiB parts, and a focused
-test pins that wording. Full evidence is in the
+The accepted UI capture at
+`docs/assets/screenshots/cheap-lfs-ui-acceptance.png` is 1200×752, 79,404
+bytes, SHA-256
+`8f53ed803dc7415ca86e4399040201afbbd627718a48e4a453e637099fa03684`.
+Full evidence is in the
 [dated verification record](docs/verification/cheap-lfs-github-public-private-2026-07-22.md).
 
 ## 2026-07-22 command palette rows, tab groups, Alt reliability, and release gates
@@ -114,10 +126,12 @@ returned five Ollama matches.
 | `docs/assets/screenshots/material-tab-groups.png` | 1000×687 | 94,467 | `fd857137f71b79fbef65225e4469f2d2e3d95ecb6701e4847b84da11ad2875b8` |
 | `docs/assets/screenshots/material-command-palette-appearance.png` | 1000×687 | 99,234 | `ac4db2aa3696d2e1987c0c93573ccf48f86c61111e42fcabf0cec54db3b87a7d` |
 
-README, Pages, the User Guide, and the 71-scene Guided Feature Gallery now
-reference both inspected synthetic-only captures. The continuation still has
-no commit or remote SHA; push, CI/code scanning, Pages/wiki publication, and
-installer Release receipts remain required.
+README, Pages, the User Guide, and the 72-scene Guided Feature Gallery now
+reference the two inspected synthetic-only captures plus the separately
+accepted live Cheap LFS UI frame. Implementation checkpoint
+`58be6fe5953477b015a134c414a8cf82363ecc75` is pushed on `main`; exact final
+CI/code scanning, Pages/wiki publication, and installer Release receipts remain
+required.
 
 ## 2026-07-22 mobile Pages, documentation search, and regenerated gallery
 

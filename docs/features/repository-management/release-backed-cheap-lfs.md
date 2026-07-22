@@ -5,6 +5,14 @@
 The generated mark above is documentation artwork. It is not embedded in the
 pointer format and is not required by the transfer protocol.
 
+![Cheap LFS manager after a live private-repository UI pin](../../assets/screenshots/cheap-lfs-ui-acceptance.png)
+
+The inspected acceptance frame above comes from the production bundle running
+on an off-screen Win32 desktop. The same dated exercise materialized and
+re-pinned deterministic 1 MiB payloads through the Large files UI in retained
+public and private GitHub repositories; see the
+[public/private UI receipt](../../verification/cheap-lfs-github-public-private-2026-07-22.md).
+
 The repository rail's **Large files** manager can pin a working-tree file to
 one or more GitHub Release assets and leave a small, human-readable pointer at
 its tracked path. It is intentionally not Git LFS: a client without Desktop
@@ -88,6 +96,12 @@ GitHub upload API has no resume primitive. A `starter` is never guessed to be
 owned or deleted automatically. Bounded, credential-redacted CLI diagnostics
 go to Log History while the visible error retains the actionable failure
 reason.
+
+GitHub may spell an absent Release-asset label as either `null` or an empty
+string across upload and inventory responses. The bounded provider parser
+normalizes both to one unlabeled value before exact response verification, so a
+correctly uploaded, digest-matched Cheap LFS asset is not rejected solely for
+that representational difference.
 
 Cheap LFS passes the part digest from its required pointer-preparation hash to
 the main process. The preferred CLI path then hashes the bytes it actually
@@ -262,28 +276,28 @@ deleted.
 
 ## Verification
 
-### Live GitHub protocol acceptance — 2026-07-22
+### Live GitHub and Desktop Material UI acceptance — 2026-07-22
 
 Live acceptance used one retained public repository and one retained private
-repository on the authenticated `DingDingChae` account. Each `main` commit
-contains a canonical five-line `desktop-material/cheap-lfs/v1` pointer to a
-1,048,576-byte uploaded asset in a draft prerelease. Fresh clones retained the
-pointer text and reported no `git lfs ls-files` entries; authenticated
-`gh release download` materialized the exact byte count and SHA-256 in both
-visibility modes. Unauthenticated draft-asset URLs returned HTTP 404 in both
-cases, including the public repository, while the public raw logo remained
-publicly readable.
+repository on the authenticated `DingDingChae` account. The production app
+materialized and re-pinned deterministic 1,048,576-byte payloads through the
+Large files panel and native Windows picker. The resulting five-line pointers
+are pushed on each repository's `main` branch at public commit
+`a7c90eff6a4d7963577125e3204a1b9af28da756` and private commit
+`e56519d4742c63bb2c9f5f1e917de3fca7379fdd`.
 
-Credentials remained inside the configured GitHub CLI. No token was exported
-or copied into Desktop Material's keychain, so this proves the live GitHub
-repository/release/pointer/download protocol rather than the app's
-account-bound GUI transport. The detailed IDs, commits, pointer line-ending
-sizes, hashes, and authorization observations are in the detailed record:
+Fresh clones resolved to those exact UI commits, retained the pointer text, and
+reported no `git lfs ls-files` entries. All original and UI-created Release
+assets report the expected size and SHA-256. The user explicitly authorized a
+temporary bridge from the logged-in GitHub CLI account into Desktop Material's
+development secure store; the token was never printed, logged, captured, or
+committed, and the exact entry was deleted and verified absent after the runs.
+Detailed asset IDs, pointer line-ending sizes, hashes, screenshot evidence, and
+cleanup observations are in the record:
 
-- [Cheap LFS public/private GitHub acceptance — 2026-07-22](../../verification/cheap-lfs-github-public-private-2026-07-22.md)
+- [Cheap LFS public/private GitHub and UI acceptance — 2026-07-22](../../verification/cheap-lfs-github-public-private-2026-07-22.md)
 
-The focused Large files UI test also pins the factual 1.5 GiB-part copy. A GUI
-pin/materialize exercise remains the final live end-to-end gap.
+The focused Large files UI test also pins the factual 1.5 GiB-part copy.
 
 `cheap-lfs/pointer-test.ts` covers canonical single/multipart pointers, legacy
 deflated compatibility, size limits, part totals, path normalization, and the

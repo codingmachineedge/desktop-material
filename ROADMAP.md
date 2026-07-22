@@ -5,14 +5,15 @@ Updated: **July 22, 2026**
 Desktop Material's numbered roadmap now extends through **M27**. M0–M21 and the
 M23 Ollama manager have published receipts; M22 retains its separately tracked
 visual refresh, and the exact acceptance/publication state for M24–M27 is listed
-below. The July 22 tab-group, command-palette, Alt-key, and release-gate
-continuation is implemented and locally accepted in the current worktree but is
-not yet published.
+below. The July 22 tab-group, command-palette, Alt-key, release-gate, and Cheap
+LFS UI continuation is implemented, locally accepted, and pushed to `main`;
+final remote pipeline and documentation-surface verification is still in
+progress.
 This file is the compact public source of truth; implementation details and
 historical test receipts stay in [PLAN.md](PLAN.md) and
 [HANDOFF.md](HANDOFF.md).
 
-## July 22 tab groups, command palette, and input/release reliability — **Local acceptance complete; publication pending**
+## July 22 tab groups, command palette, and input/release reliability — **Implementation pushed; publication verification pending**
 
 - Named/color-coded group chips now show member counts and real expanded state;
   collapsing hides member tabs and the chip restores them by mouse, Enter, or
@@ -42,8 +43,9 @@ historical test receipts stay in [PLAN.md](PLAN.md) and
   continuation's exact unpackaged production build passed through the fixed MCP
   endpoint, and off-screen interaction accepted the restart-restored collapsible
   group chip plus the fully visible rich-row palette editor. Two inspected
-  1000×687 captures now appear in README, Pages, and wiki sources. An exact
-  commit, push, remote CI/Pages/wiki, and Release verification remain pending.
+  1000×687 captures now appear in README, Pages, and wiki sources. Implementation
+  checkpoint `58be6fe5953477b015a134c414a8cf82363ecc75` is pushed on `main`;
+  exact final CI/Pages/wiki and Release verification remain pending.
 
 ## M27 — Reviewed pull previews — **Implementation and local acceptance complete**
 
@@ -58,7 +60,7 @@ lint/format checks, the production build, and an isolated off-screen Win32 pull
 exercise passed; remote CI, Pages, and release verification follow the `main`
 push recorded in [HANDOFF.md](HANDOFF.md).
 
-## M26 — Cheap LFS / Express Release — **Backend accepted; GUI E2E pending**
+## M26 — Cheap LFS / Express Release — **Live public/private UI accepted; publication verification pending**
 
 - **Release-backed large-file storage**: The repository rail's **Large files**
   manager can pin working-tree files over 100 MiB to GitHub Release assets,
@@ -91,13 +93,14 @@ push recorded in [HANDOFF.md](HANDOFF.md).
   committing" and "Download large files after cloning" — are both enabled by
   default. The Large files surface is reachable from both the repository rail and
   Repository Tools hub.
-- **Live GitHub backend acceptance**: Retained public and private test
-  repositories each contain a canonical five-line pointer, a draft-prerelease
-  1 MiB asset, and the generated Cheap LFS logo. Fresh clones retained the
-  pointer instead of a Git LFS object, and authenticated downloads reproduced
-  the exact bytes and SHA-256. Credentials stayed inside configured GitHub CLI,
-  so this accepts the live protocol/backend path, not Desktop Material's
-  account-bound GUI transport. See the
+- **Live GitHub and Desktop Material UI acceptance**: Retained public and
+  private test repositories each contain pushed UI-created five-line pointers,
+  draft-prerelease 1 MiB assets, and the generated Cheap LFS logo. Fresh clones
+  resolved to the exact UI commits and retained pointers instead of Git LFS
+  objects. The production app materialized and re-pinned both payloads through
+  the Large files UI and native picker using an explicitly authorized temporary
+  secure-store bridge that was deleted and verified absent after the runs. See
+  the
   [dated receipt](docs/verification/cheap-lfs-github-public-private-2026-07-22.md).
 - See the feature guide at
   [docs/features/repository-management/release-backed-cheap-lfs.md](docs/features/repository-management/release-backed-cheap-lfs.md).
@@ -317,8 +320,8 @@ The following items track the current cycle's progress against all six acceptanc
 
 | Feature / Gate | Status | Key Evidence |
 |---|---|---|
-| July 22 tab groups, palette, Alt, and release gates | **Local acceptance complete; publication pending** | Source contracts cover persistence, pin-boundary safety, portable-export stripping, three language modes, rich palette rows/appearance, deterministic bare-Alt sequencing, Super Express test-before-build, and release-PR `main` targeting. The exact unpackaged production build passed through fixed MCP; off-screen interaction accepted group persistence/collapse/expansion and a fully visible palette editor with five Ollama matches; two inspected 1000×687 captures are tracked. Exact commit, push, remote CI/Pages/wiki, and Release evidence remain pending. |
-| M26 Cheap LFS / Express Release | **Implementation complete; live backend accepted** | Public/private live GitHub repositories retained canonical pointers through fresh clones and reproduced exact 1 MiB release assets through authenticated downloads; this is backend/protocol evidence, not GUI E2E. Also: 165/165 changed-surface tests across 18 suites; 34/34 transfer and localization tests; exact-source production build passed; comprehensive pointer, operation, manual-upload, automation, commit-entry-point, status-refresh, and release-transfer coverage; 1.5 GiB multipart planning with SHA-256 verification; browser handoff with version-2 manifest; Super Express workflow verified 4/4 focused tests. |
+| July 22 tab groups, palette, Alt, and release gates | **Implementation pushed; publication verification pending** | Source contracts cover persistence, pin-boundary safety, portable-export stripping, three language modes, rich palette rows/appearance, deterministic bare-Alt sequencing, Super Express test-before-build, and release-PR `main` targeting. The exact production build passed through fixed MCP; off-screen interaction accepted group persistence/collapse/expansion and a fully visible palette editor with five Ollama matches; two inspected 1000×687 captures are tracked. Implementation checkpoint `58be6fe595` is pushed; exact final remote CI/Pages/wiki and Release evidence remain pending. |
+| M26 Cheap LFS / Express Release | **Implementation complete; live public/private UI accepted** | Retained public/private repositories contain pushed UI-created pointers and exact 1 MiB draft-release assets. The production Large files UI materialized and re-pinned both payloads through the native picker; fresh clones resolved to the UI commits with no Git LFS objects. The temporary authorized secure-store bridge was deleted and verified absent. Also: focused Release store and model/transfer gates pass 17/17 and 41/41; all five production Webpack targets and staging passed; comprehensive pointer, operation, manual-upload, automation, commit-entry-point, status-refresh, and release-transfer coverage remains in place. |
 | July 21 Settings queue and mobile connection | **Implementation complete** | Verified empty-account copy, persisted-policy hydration, required-directory validation, parallel/sequential changes, enable/disable dispatch, English/Cantonese/bilingual rendering, responsive-surface registration |
 | July 21 responsiveness hardening | **Local implementation complete** | Deterministic regressions verified for remote scan terminator, late termination rejection, same-URL proxy coalescing, strict clone barrier, every prompt family, 500-update burst, failed request-ID reuse, and 25 Markdown reloads |
 | M25 Repository-bound API functions | **Implementation complete** | Built-in function seeding verified; function-button execution tested; per-repository rail visibility persistence checked; responsive Explorer styles verified |
@@ -331,7 +334,7 @@ The following items track the current cycle's progress against all six acceptanc
 | Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on main |
 | Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment |
 | Repository-wide feature revalidation | **Complete** | The historical revalidation verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and its then-current 52-image documentation gallery |
-| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages now catalog 71 named visual scenes. Existing images remain in place unless a new deterministic capture passes original-resolution privacy inspection; the July 22 continuation adds accepted group-chip and rich-palette screenshots. Final completion still requires byte-identical Pages/wiki delivery. |
+| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages now catalog 72 named visual scenes. Existing images remain in place unless a new deterministic capture passes original-resolution privacy inspection; the July 22 continuation adds accepted group-chip, rich-palette, and live Cheap LFS UI screenshots. Final completion still requires byte-identical Pages/wiki delivery. |
 | Complete notifications and Releases dashboard | **Complete** | Verified every GitHub notification page, confirmed local/remote Clear all with partial-failure retention, release status metrics and loaded-result search/filtering, rich asset metadata, scoped retries, responsive layout, and inspected headless evidence |
 
 ## Acceptance gates
