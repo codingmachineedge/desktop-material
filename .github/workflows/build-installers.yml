@@ -36,6 +36,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       publish: ${{ steps.target.outputs.publish }}
+      block_reason: ${{ steps.target.outputs.block_reason }}
     steps:
       - name: Require a successful main CI or a main dispatch
         id: target
@@ -62,8 +63,10 @@ jobs:
             target="$CI_SHA"
             if [ "$CI_CONCLUSION" = "success" ]; then
               ci_can_publish=true
+              block_reason=
             else
               ci_can_publish=false
+              block_reason=ci-failed
               echo "CI concluded '$CI_CONCLUSION'; packaging an artifact but blocking Release publication."
             fi
           else
@@ -73,6 +76,7 @@ jobs:
             fi
             target="$DISPATCH_SHA"
             ci_can_publish=true
+            block_reason=
           fi
 
           if [[ ! "$target" =~ ^[0-9a-f]{40}$ ]]; then
@@ -87,6 +91,9 @@ jobs:
           if [ "$remote_main" != "$target" ]; then
             if [ "$EVENT_NAME" = "workflow_run" ]; then
               publish=false
+              if [ -z "$block_reason" ]; then
+                block_reason=stale
+              fi
               echo "Release target $target is no longer current main; preserving its exact installer artifact without publishing."
             else
               echo "Release target $target is stale; origin/main is $remote_main." >&2
@@ -97,6 +104,7 @@ jobs:
           fi
           echo "sha=$target" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "block_reason=$block_reason" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v7
         with:
@@ -317,11 +325,22 @@ jobs:
           if-no-files-found: error
           retention-days: 3
       - name: Preserve the upstream CI failure result
-        if: needs.prepare.outputs.publish != 'true'
+        if: needs.prepare.outputs.block_reason == 'ci-failed'
         shell: bash
         run: |
-          echo "Installer recovery artifacts were preserved, but this run cannot publish because its CI failed or its source is no longer current main." >&2
+          echo "Installer recovery artifacts were preserved, but this run cannot publish because its upstream CI failed." >&2
           exit 1
+      - name: Record stale non-publishing result
+        if: needs.prepare.outputs.block_reason == 'stale'
+        shell: bash
+        run: |
+          echo "::notice::A newer main commit superseded this exact installer build. Recovery artifacts were preserved; Release publication was skipped normally."
+          {
+            echo "## Superseded installer build"
+            echo
+            echo "A newer main commit arrived while this exact build was running."
+            echo "Its installer and release-note artifacts were preserved, and publication was skipped without treating expected overlap as a failure."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     name: Publish GitHub release

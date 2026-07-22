@@ -128,8 +128,31 @@ describe('CI workflow safety', () => {
     )
     assert.match(
       installerWorkflow,
-      /Preserve the upstream CI failure result[\s\S]*?exit 1/
+      /block_reason: \$\{\{ steps\.target\.outputs\.block_reason \}\}/
     )
+    assert.match(installerWorkflow, /block_reason=ci-failed/)
+    assert.match(installerWorkflow, /block_reason=stale/)
+
+    const upstreamFailureStep = installerWorkflow.match(
+      /- name: Preserve the upstream CI failure result([\s\S]*?)(?=\n      - name:|\n  publish:)/
+    )
+    assert.notEqual(upstreamFailureStep, null)
+    assert.match(
+      upstreamFailureStep?.[1] ?? '',
+      /if: needs\.prepare\.outputs\.block_reason == 'ci-failed'/
+    )
+    assert.match(upstreamFailureStep?.[1] ?? '', /exit 1/)
+
+    const staleResultStep = installerWorkflow.match(
+      /- name: Record stale non-publishing result([\s\S]*?)(?=\n      - name:|\n  publish:)/
+    )
+    assert.notEqual(staleResultStep, null)
+    assert.match(
+      staleResultStep?.[1] ?? '',
+      /if: needs\.prepare\.outputs\.block_reason == 'stale'/
+    )
+    assert.match(staleResultStep?.[1] ?? '', /publication was skipped normally/)
+    assert.doesNotMatch(staleResultStep?.[1] ?? '', /exit 1/)
     assert.doesNotMatch(installerWorkflow, /^\s+body: \|/m)
   })
 
