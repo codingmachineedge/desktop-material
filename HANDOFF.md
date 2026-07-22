@@ -47,6 +47,7 @@ change OpenCode behavior. On the exact failing source plus this repair, the
 full CI-equivalent `yarn lint` command passes Prettier, the
 ESLint/Prettier-compatibility check, and repository-wide ESLint. Remote CI and
 installer publication remain pending until this commit reaches `main`.
+
 ## 2026-07-21 final pull-preview, Cheap LFS, and stale-overlap CI checkpoint
 
 Reviewed pull previews now gate execution on fresh repository status, retain an
@@ -99,6 +100,18 @@ future CI, and explicitly skipped the GitHub Projects board; neither is a
 remaining acceptance gate for this batch.
 
 [release-s201]: https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-s000000000201
+
+## 2026-07-21 final Git topology cleanup
+
+Feature tip `5c0fec2381` was verified byte-for-byte as the remote `main` tip
+before cleanup. Every remaining local and remote topic-branch tip was proven an
+ancestor of that pushed default branch. Eight merged local topic branches and
+four merged remote topic branches were then deleted without force; the two
+temporary CI worktrees had already been removed after their own remote proofs.
+`git worktree prune` leaves only the clean `main` checkout, the stash list is
+empty, all initialized submodules are at their recorded commits, and local
+`main` has zero divergence from `origin/main` at this checkpoint.
+
 ## 2026-07-21 printenvz Windows install-stage repair
 
 The install stage failed building `vendor/printenvz` with
