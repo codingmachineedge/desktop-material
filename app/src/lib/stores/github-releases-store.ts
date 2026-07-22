@@ -578,13 +578,47 @@ export class GitHubReleasesStore {
     tag: string,
     signal?: AbortSignal
   ): Promise<IGitHubRelease | null> {
-    return this.run(repository, 'list', signal, (context, requestSignal) =>
-      context.api.fetchReleaseByTag(
-        context.repository.owner.login,
-        context.repository.name,
-        tag,
-        requestSignal
-      )
+    return this.run(
+      repository,
+      'list',
+      signal,
+      async (context, requestSignal) => {
+        const exact = await context.api.fetchReleaseByTag(
+          context.repository.owner.login,
+          context.repository.name,
+          tag,
+          requestSignal
+        )
+        if (exact !== null) {
+          return exact
+        }
+
+        // GitHub's exact tag route returns 404 for unpublished drafts, even to
+        // an authenticated repository owner. The regular releases inventory
+        // includes those drafts, so scan its already-bounded pagination before
+        // concluding that the tag is absent. Cheap LFS creates drafts by design;
+        // without this fallback neither its freshly uploaded assets nor existing
+        // draft-backed pointers can be reused or materialized through the UI.
+        let page = 1
+        while (true) {
+          const inventory = await context.api.fetchReleases(
+            context.repository.owner.login,
+            context.repository.name,
+            page,
+            requestSignal
+          )
+          const draft = inventory.releases.find(
+            candidate => candidate.tagName === tag
+          )
+          if (draft !== undefined) {
+            return draft
+          }
+          if (inventory.nextPage === null) {
+            return null
+          }
+          page = inventory.nextPage
+        }
+      }
     )
   }
 

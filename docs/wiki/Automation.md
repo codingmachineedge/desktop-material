@@ -1,8 +1,8 @@
 # Automation
 
-![Automation moving from a scheduled trigger through repository checks to a bounded action and audit trail](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/automation-safety-gates.svg)
+![Automation moving from a scheduled trigger through repository checks to a bounded action and audit trail](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/diagrams/automation-safety-gates.svg)
 
-![A conceptual automation pipeline with trigger, safety gate, decision, controlled actions, and history](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/automation-pipeline.png)
+![A conceptual automation pipeline with trigger, safety gate, decision, controlled actions, and history](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/concepts/automation-pipeline.png)
 
 Desktop Material can run parts of the Git workflow for you on a schedule or on demand: **auto commit
 & push**, **auto pull**, and **merge-all branches/worktrees**. Automation is designed to be

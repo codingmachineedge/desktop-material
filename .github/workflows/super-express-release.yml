@@ -1,7 +1,7 @@
 name: Super Express Release
 
-# Manual emergency lane. It intentionally omits lint, unit, script, and E2E
-# suites, but still requires a successful production build, package creation,
+# Manual emergency lane. It omits lint and E2E, but still requires the complete
+# unit and script test suites, a successful production build, package creation,
 # and exact asset checks before publishing an immutable release.
 on:
   workflow_dispatch:
@@ -56,6 +56,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           arch: x64
+
+      - name: Run unit tests
+        run: yarn test:unit
+
+      - name: Run script tests
+        run: yarn test:script
 
       - name: Create a unique package version
         id: version

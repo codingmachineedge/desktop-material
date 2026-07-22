@@ -94,6 +94,10 @@ function normalizeEntry(value: unknown): ITabSessionEntry | null {
   delete source.titleStyle
   delete source.isPinned
   delete source.isFavorite
+  // Group definitions are profile-local and are not part of the portable
+  // version-1 session format. Keeping only a tab's groupId would create a
+  // dangling membership when the session is opened in another profile.
+  delete source.groupId
   delete source.openedAt
 
   const entry: ITabSessionEntry = {

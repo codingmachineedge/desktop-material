@@ -29,7 +29,7 @@ function New-MockRelease {
       name                 = $name
       size                 = 123456
       digest               = $digest
-      browser_download_url = "https://github.com/codingmachineedge/desktop-material/releases/download/v1.2.3/$name"
+      browser_download_url = "https://github.com/Ding-Ding-Projects/desktop-material/releases/download/v1.2.3/$name"
     }
   }
 
@@ -58,7 +58,7 @@ function Invoke-RestMethod {
     [int]$TimeoutSec
   )
 
-  if ($Uri -cne 'https://api.github.com/repos/codingmachineedge/desktop-material/releases/latest') {
+  if ($Uri -cne 'https://api.github.com/repos/Ding-Ding-Projects/desktop-material/releases/latest') {
     throw "Unexpected API URL '$Uri'."
   }
 
@@ -67,7 +67,7 @@ function Invoke-RestMethod {
 
 $resolved = & $installerPath -ResolveOnly
 $expectedName = "GitHubDesktopSetup-$($resolved.Architecture).exe"
-if ($resolved.Repository -cne 'codingmachineedge/desktop-material') {
+if ($resolved.Repository -cne 'Ding-Ding-Projects/desktop-material') {
   throw "Unexpected repository '$($resolved.Repository)'."
 }
 if ($resolved.AssetName -cne $expectedName) {

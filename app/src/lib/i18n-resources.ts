@@ -73,6 +73,37 @@ export type TranslationKey =
   | 'tabs.redoSettingsChange'
   | 'tabs.settingsChangeUndone'
   | 'tabs.settingsChangeRedone'
+  | 'tabs.groupAddNew'
+  | 'tabs.groupMoveTo'
+  | 'tabs.groupRemoveFrom'
+  | 'tabs.groupExpand'
+  | 'tabs.groupCollapse'
+  | 'tabs.groupDelete'
+  | 'tabs.groupDialogTitle'
+  | 'tabs.groupDialogIntro'
+  | 'tabs.groupNameLabel'
+  | 'tabs.groupColorLabel'
+  | 'tabs.groupColorChoice'
+  | 'tabs.groupColorBlue'
+  | 'tabs.groupColorGreen'
+  | 'tabs.groupColorYellow'
+  | 'tabs.groupColorRed'
+  | 'tabs.groupColorPurple'
+  | 'tabs.groupColorGrey'
+  | 'tabs.groupCreateAction'
+  | 'tabs.groupCancelAction'
+  | 'tabs.groupChipExpanded'
+  | 'tabs.groupChipCollapsed'
+  | 'tabs.groupMemberLabel'
+  | 'tabs.groupCreatedStatus'
+  | 'tabs.groupMovedStatus'
+  | 'tabs.groupRemovedStatus'
+  | 'tabs.groupExpandedStatus'
+  | 'tabs.groupCollapsedStatus'
+  | 'tabs.groupDeletedStatus'
+  | 'tabs.groupActionFailed'
+  | 'tabs.tabPinnedSuffix'
+  | 'tabs.tabFavoriteSuffix'
   | 'language.english'
   | 'language.cantonese'
   | 'language.bilingual'
@@ -1230,6 +1261,31 @@ export type TranslationKey =
   | 'clone.orgReconnect'
   | 'clone.orgRestrictionNote'
   | 'clone.orgReviewAccess'
+  | 'commandPalette.title'
+  | 'commandPalette.searchPlaceholder'
+  | 'commandPalette.searchLabel'
+  | 'commandPalette.commands'
+  | 'commandPalette.noMatches'
+  | 'commandPalette.searchTerms'
+  | 'commandPalette.customizeAppearance'
+  | 'commandPalette.appearanceDialog'
+  | 'commandPalette.appearanceHeading'
+  | 'commandPalette.rowDensity'
+  | 'commandPalette.comfortable'
+  | 'commandPalette.comfortableDescription'
+  | 'commandPalette.compact'
+  | 'commandPalette.compactDescription'
+  | 'commandPalette.showInEachRow'
+  | 'commandPalette.icons'
+  | 'commandPalette.groupChips'
+  | 'commandPalette.keywordLine'
+  | 'commandPalette.resetDefaults'
+  | 'commandPalette.groupApp'
+  | 'commandPalette.groupBranch'
+  | 'commandPalette.groupChanges'
+  | 'commandPalette.groupEdit'
+  | 'commandPalette.groupNavigate'
+  | 'commandPalette.groupRepository'
   | 'palette.selectAll'
   | 'palette.toggleTheme'
   | 'palette.preferencesAccounts'
@@ -1240,6 +1296,9 @@ export type TranslationKey =
   | 'palette.preferencesNotifications'
   | 'palette.preferencesGit'
   | 'palette.preferencesAccessibility'
+  | 'palette.ollamaModelManager'
+  | 'palette.preferencesCopilot'
+  | 'palette.backgroundQueue'
   | 'palette.notificationHistory'
   | 'palette.notificationAutomations'
   | 'palette.copyRepoPath'
@@ -1407,6 +1466,40 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'tabs.redoSettingsChange': 'Redo settings change',
   'tabs.settingsChangeUndone': 'Settings change undone.',
   'tabs.settingsChangeRedone': 'Settings change redone.',
+  'tabs.groupAddNew': 'Add tab to new group…',
+  'tabs.groupMoveTo': 'Move to “{name}”',
+  'tabs.groupRemoveFrom': 'Remove from “{name}”',
+  'tabs.groupExpand': 'Expand “{name}”',
+  'tabs.groupCollapse': 'Collapse “{name}”',
+  'tabs.groupDelete': 'Delete group “{name}”',
+  'tabs.groupDialogTitle': 'New tab group',
+  'tabs.groupDialogIntro':
+    '“{tab}” becomes the first tab in this group. Grouping only organizes the strip; it never closes a tab.',
+  'tabs.groupNameLabel': 'Group name',
+  'tabs.groupColorLabel': 'Group color',
+  'tabs.groupColorChoice': '{color} group color',
+  'tabs.groupColorBlue': 'Blue',
+  'tabs.groupColorGreen': 'Green',
+  'tabs.groupColorYellow': 'Yellow',
+  'tabs.groupColorRed': 'Red',
+  'tabs.groupColorPurple': 'Purple',
+  'tabs.groupColorGrey': 'Grey',
+  'tabs.groupCreateAction': 'Create group',
+  'tabs.groupCancelAction': 'Cancel',
+  'tabs.groupChipExpanded':
+    '{name} group, {count} tabs, expanded. Collapse group.',
+  'tabs.groupChipCollapsed':
+    '{name} group, {count} tabs, collapsed. Expand group.',
+  'tabs.groupMemberLabel': '{tab}, {name} group',
+  'tabs.groupCreatedStatus': '{name} group created.',
+  'tabs.groupMovedStatus': '{tab} moved to {name}.',
+  'tabs.groupRemovedStatus': '{tab} removed from {name}.',
+  'tabs.groupExpandedStatus': '{name} group expanded.',
+  'tabs.groupCollapsedStatus': '{name} group collapsed.',
+  'tabs.groupDeletedStatus': '{name} group deleted. Its tabs stayed open.',
+  'tabs.groupActionFailed': 'Could not update the tab group. Try again.',
+  'tabs.tabPinnedSuffix': ', pinned',
+  'tabs.tabFavoriteSuffix': ', favorite',
   'language.english': 'English',
   'language.cantonese': 'Playful Hong Kong Cantonese',
   'language.bilingual': 'Bilingual',
@@ -2838,6 +2931,31 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'clone.orgRestrictionNote':
     'Organizations that restrict third-party access must approve this app before they appear here.',
   'clone.orgReviewAccess': 'Review OAuth app access',
+  'commandPalette.title': 'Command palette',
+  'commandPalette.searchPlaceholder': 'Search commands',
+  'commandPalette.searchLabel': 'Search command palette',
+  'commandPalette.commands': 'Commands',
+  'commandPalette.noMatches': 'No matching commands',
+  'commandPalette.searchTerms': 'Search terms: {terms}',
+  'commandPalette.customizeAppearance': 'Customize command palette appearance',
+  'commandPalette.appearanceDialog': 'Command palette appearance settings',
+  'commandPalette.appearanceHeading': 'Appearance',
+  'commandPalette.rowDensity': 'Row density',
+  'commandPalette.comfortable': 'Comfortable',
+  'commandPalette.comfortableDescription': 'More detail and spacing',
+  'commandPalette.compact': 'Compact',
+  'commandPalette.compactDescription': 'Show more commands at once',
+  'commandPalette.showInEachRow': 'Show in each row',
+  'commandPalette.icons': 'Icons',
+  'commandPalette.groupChips': 'Group chips',
+  'commandPalette.keywordLine': 'Keyword line',
+  'commandPalette.resetDefaults': 'Reset defaults',
+  'commandPalette.groupApp': 'App',
+  'commandPalette.groupBranch': 'Branch',
+  'commandPalette.groupChanges': 'Changes',
+  'commandPalette.groupEdit': 'Edit',
+  'commandPalette.groupNavigate': 'Navigate',
+  'commandPalette.groupRepository': 'Repository',
   'palette.selectAll': 'Select all',
   'palette.toggleTheme': 'Toggle light/dark theme',
   'palette.preferencesAccounts': 'Preferences: Accounts',
@@ -2848,6 +2966,9 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'palette.preferencesNotifications': 'Preferences: Notifications',
   'palette.preferencesGit': 'Preferences: Git',
   'palette.preferencesAccessibility': 'Preferences: Accessibility',
+  'palette.ollamaModelManager': 'Ollama model manager',
+  'palette.preferencesCopilot': 'Preferences: Copilot and AI providers',
+  'palette.backgroundQueue': 'Background action and API queue',
   'palette.notificationHistory': 'Open notification centre',
   'palette.notificationAutomations': 'Notification automations',
   'palette.copyRepoPath': 'Copy repository path',
@@ -3054,6 +3175,40 @@ export const cantoneseTranslations: Readonly<
   'tabs.redoSettingsChange': '重做設定改動',
   'tabs.settingsChangeUndone': '已復原設定改動。',
   'tabs.settingsChangeRedone': '已重做設定改動。',
+  'tabs.groupAddNew': '將分頁加入新群組…',
+  'tabs.groupMoveTo': '移去「{name}」',
+  'tabs.groupRemoveFrom': '從「{name}」移走',
+  'tabs.groupExpand': '展開「{name}」',
+  'tabs.groupCollapse': '收起「{name}」',
+  'tabs.groupDelete': '刪除群組「{name}」',
+  'tabs.groupDialogTitle': '新分頁群組',
+  'tabs.groupDialogIntro':
+    '「{tab}」會做呢個群組嘅第一個分頁。分組只係整理分頁列，絕對唔會閂分頁。',
+  'tabs.groupNameLabel': '群組名',
+  'tabs.groupColorLabel': '群組顏色',
+  'tabs.groupColorChoice': '{color}群組顏色',
+  'tabs.groupColorBlue': '藍色',
+  'tabs.groupColorGreen': '綠色',
+  'tabs.groupColorYellow': '黃色',
+  'tabs.groupColorRed': '紅色',
+  'tabs.groupColorPurple': '紫色',
+  'tabs.groupColorGrey': '灰色',
+  'tabs.groupCreateAction': '建立群組',
+  'tabs.groupCancelAction': '取消',
+  'tabs.groupChipExpanded':
+    '「{name}」群組，{count} 個分頁，已展開。收起群組。',
+  'tabs.groupChipCollapsed':
+    '「{name}」群組，{count} 個分頁，已收起。展開群組。',
+  'tabs.groupMemberLabel': '{tab}，「{name}」群組',
+  'tabs.groupCreatedStatus': '已建立「{name}」群組。',
+  'tabs.groupMovedStatus': '已將 {tab} 移去「{name}」。',
+  'tabs.groupRemovedStatus': '已將 {tab} 從「{name}」移走。',
+  'tabs.groupExpandedStatus': '已展開「{name}」群組。',
+  'tabs.groupCollapsedStatus': '已收起「{name}」群組。',
+  'tabs.groupDeletedStatus': '已刪除「{name}」群組，入面啲分頁仲開住。',
+  'tabs.groupActionFailed': '未能更新分頁群組，等陣再試。',
+  'tabs.tabPinnedSuffix': '，已置頂',
+  'tabs.tabFavoriteSuffix': '，最愛',
   'language.english': '英文',
   'language.cantonese': '玩味港式廣東話',
   'language.bilingual': '雙語',
@@ -4348,6 +4503,31 @@ export const cantoneseTranslations: Readonly<
   'clone.orgRestrictionNote':
     '有啲組織限制第三方存取，要批准咗呢個 app 先會喺度出現。',
   'clone.orgReviewAccess': '查看 OAuth app 存取權',
+  'commandPalette.title': '命令面板',
+  'commandPalette.searchPlaceholder': '搜尋指令',
+  'commandPalette.searchLabel': '搜尋命令面板',
+  'commandPalette.commands': '指令',
+  'commandPalette.noMatches': '搵唔到配對指令',
+  'commandPalette.searchTerms': '搜尋字詞：{terms}',
+  'commandPalette.customizeAppearance': '自訂命令面板外觀',
+  'commandPalette.appearanceDialog': '命令面板外觀設定',
+  'commandPalette.appearanceHeading': '外觀',
+  'commandPalette.rowDensity': '列距',
+  'commandPalette.comfortable': '舒適',
+  'commandPalette.comfortableDescription': '闊落啲，資料睇得齊啲',
+  'commandPalette.compact': '精簡',
+  'commandPalette.compactDescription': '慳位啲，一次睇多幾個指令',
+  'commandPalette.showInEachRow': '每列顯示',
+  'commandPalette.icons': '圖示',
+  'commandPalette.groupChips': '群組標籤',
+  'commandPalette.keywordLine': '關鍵字列',
+  'commandPalette.resetDefaults': '還原預設',
+  'commandPalette.groupApp': '應用程式',
+  'commandPalette.groupBranch': '分支',
+  'commandPalette.groupChanges': '變更',
+  'commandPalette.groupEdit': '編輯',
+  'commandPalette.groupNavigate': '導覽',
+  'commandPalette.groupRepository': '倉庫',
   'palette.selectAll': '全部揀晒',
   'palette.toggleTheme': '切換光暗主題',
   'palette.preferencesAccounts': '設定：帳戶',
@@ -4358,6 +4538,9 @@ export const cantoneseTranslations: Readonly<
   'palette.preferencesNotifications': '設定：通知',
   'palette.preferencesGit': '設定：Git',
   'palette.preferencesAccessibility': '設定：無障礙',
+  'palette.ollamaModelManager': 'Ollama 模型管理員',
+  'palette.preferencesCopilot': '設定：Copilot 同 AI 供應商',
+  'palette.backgroundQueue': '背景操作同 API 佇列',
   'palette.notificationHistory': '打開通知中心',
   'palette.notificationAutomations': '通知自動化',
   'palette.copyRepoPath': '複製倉庫路徑',

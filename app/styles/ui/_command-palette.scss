@@ -4,6 +4,11 @@
   // Roomier than a plain search sheet: rich rows with icons and secondary
   // text need horizontal room, and more of the list should be visible.
   width: min(760px, calc(100vw - 40px));
+  // Reserve enough vertical room for the anchored appearance editor. The
+  // dialog layer clips descendants at its rounded boundary, so a content-sized
+  // palette could otherwise hide the editor's final action when only a few
+  // commands match.
+  height: min(480px, calc(100vh - 54px));
 
   .command-palette-search {
     display: flex;
@@ -200,12 +205,15 @@
     right: 0;
     z-index: 10;
     width: 268px;
+    max-height: min(330px, calc(100vh - 210px));
     padding: 12px 14px 14px;
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: 16px;
     background: var(--md-sys-color-surface-container-high);
     box-shadow: var(--md-sys-elevation-2, 0 8px 24px rgb(0 0 0 / 22%));
     color: var(--md-sys-color-on-surface);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     text-align: left;
 
     h3 {

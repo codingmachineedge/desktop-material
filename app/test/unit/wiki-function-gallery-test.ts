@@ -6,11 +6,8 @@ import { join } from 'path'
 const root = process.cwd()
 const galleryPath = join(root, 'docs', 'wiki', 'Feature-Gallery.md')
 const screenshotDirectory = join(root, 'docs', 'assets', 'screenshots')
-const rawImagePrefix =
-  'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/'
 const canonicalRawImagePrefix =
   'https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/'
-const rawImagePrefixes = [rawImagePrefix, canonicalRawImagePrefix]
 
 describe('wiki function screenshot catalog', () => {
   it('assigns every tracked screenshot to exactly one named visual function', () => {
@@ -22,7 +19,7 @@ describe('wiki function screenshot catalog', () => {
       .filter(name => name.endsWith('.png'))
       .sort()
 
-    assert.equal(rows.length, 69)
+    assert.equal(rows.length, 71)
     assert.equal(new Set(rows.map(row => row.asset)).size, rows.length)
     assert.equal(new Set(rows.map(row => row.name)).size, rows.length)
     assert.deepEqual(rows.map(row => row.asset).sort(), assets)
@@ -41,10 +38,9 @@ describe('wiki function screenshot catalog', () => {
     ]
       .map(([, url]) => url)
       .map(url => {
-        const prefix = rawImagePrefixes.find(candidate =>
-          url.startsWith(candidate)
-        )
-        return prefix === undefined ? undefined : url.slice(prefix.length)
+        return url.startsWith(canonicalRawImagePrefix)
+          ? url.slice(canonicalRawImagePrefix.length)
+          : undefined
       })
       .filter((asset): asset is string => asset !== undefined)
 
@@ -69,7 +65,7 @@ describe('wiki function screenshot catalog', () => {
 const submodulesGuidePath = join(root, 'docs', 'wiki', 'Submodules.md')
 const illustrationDirectory = join(root, 'docs', 'assets', 'illustrations')
 const rawIllustrationPrefix =
-  'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/'
+  'https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/'
 
 describe('wiki submodules guide', () => {
   it('links the beginner submodule guide from the wiki home and user guide', () => {
@@ -101,6 +97,8 @@ describe('wiki submodules guide', () => {
 
   it('reuses the tracked Add Submodule screenshot', () => {
     const guide = readFileSync(submodulesGuidePath, 'utf8')
-    assert.ok(guide.includes(`${rawImagePrefix}add-submodule-dialog.png`))
+    assert.ok(
+      guide.includes(`${canonicalRawImagePrefix}add-submodule-dialog.png`)
+    )
   })
 })

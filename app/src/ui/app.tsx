@@ -33,6 +33,7 @@ import { t, translateForAccessibleName } from '../lib/i18n'
 import { RetryAction } from '../models/retry-actions'
 import { FetchType } from '../models/fetch'
 import { shouldRenderApplicationMenu } from './lib/features'
+import { ApplicationMenuAltKeyTracker } from './lib/application-menu-alt-key-tracker'
 import { matchExistingRepository } from '../lib/repository-matching'
 import { getVersion, getName } from './lib/app-proxy'
 import {
@@ -460,12 +461,8 @@ export class App extends React.Component<IAppProps, IAppState> {
       )
   )
 
-  /**
-   * Used on non-macOS platforms to support the Alt key behavior for
-   * the custom application menu. See the event handlers for window
-   * keyup and keydown.
-   */
-  private lastKeyPressed: string | null = null
+  private readonly applicationMenuAltKeyTracker =
+    new ApplicationMenuAltKeyTracker()
 
   private updateIntervalHandle?: number
 
@@ -2020,12 +2017,10 @@ export class App extends React.Component<IAppProps, IAppState> {
    * Alt key) is pressed.
    */
   private onWindowKeyDown = (event: KeyboardEvent) => {
-    // Record the key on every path, including the early returns below. The
-    // Alt key-up handler opens the menu only when Alt was also the last key
-    // pressed, so leaving this stale after a handled or modal key press makes
-    // the next Alt tap silently do nothing.
-    const previousKeyPressed = this.lastKeyPressed
-    this.lastKeyPressed = event.key
+    const isBareAltPress = this.applicationMenuAltKeyTracker.onKeyDown(
+      event,
+      this.isShowingModal
+    )
 
     if (event.defaultPrevented) {
       return
@@ -2039,7 +2034,7 @@ export class App extends React.Component<IAppProps, IAppState> {
       if (event.key === 'Shift' && event.altKey) {
         this.props.dispatcher.setAccessKeyHighlightState(false)
       } else if (event.key === 'Alt') {
-        if (event.shiftKey) {
+        if (!isBareAltPress) {
           return
         }
         // Immediately close the menu if open and the user hits Alt. This is
@@ -2090,12 +2085,6 @@ export class App extends React.Component<IAppProps, IAppState> {
         this.props.dispatcher.setAccessKeyHighlightState(false)
       }
     }
-
-    // Repeated Alt key-down events fire while the key is held. Treat the whole
-    // hold as one Alt press so the key-up handler still opens the menu.
-    if (event.key === 'Alt' && event.repeat) {
-      this.lastKeyPressed = previousKeyPressed === 'Alt' ? 'Alt' : event.key
-    }
   }
 
   /**
@@ -2104,15 +2093,16 @@ export class App extends React.Component<IAppProps, IAppState> {
    * See onWindowKeyDown for more information.
    */
   private onWindowKeyUp = (event: KeyboardEvent) => {
-    if (event.defaultPrevented) {
-      return
-    }
+    const shouldToggleMenu = this.applicationMenuAltKeyTracker.onKeyUp(
+      event,
+      this.isShowingModal
+    )
 
     if (shouldRenderApplicationMenu()) {
       if (event.key === 'Alt') {
         this.props.dispatcher.setAccessKeyHighlightState(false)
 
-        if (this.lastKeyPressed === 'Alt') {
+        if (shouldToggleMenu) {
           if (
             this.state.currentFoldout &&
             this.state.currentFoldout.type === FoldoutType.AppMenu

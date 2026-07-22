@@ -1,6 +1,6 @@
 # Regex guide — how search works in Desktop Material
 
-![A four-step regex workflow from choosing building blocks through applying a tested pattern](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/regex-builder-flow.svg)
+![A four-step regex workflow from choosing building blocks through applying a tested pattern](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/diagrams/regex-builder-flow.svg)
 
 Every search bar in Desktop Material (Changes, History, Branches, Repositories, Clone, Actions)
 has three power tools:

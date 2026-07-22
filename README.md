@@ -13,19 +13,30 @@ Desktop Material is an independent Material Design 3 (M3 Expressive) remake of [
   alt="Desktop Material workspace with a profile-customized app name and logo, a favorite repository tab, the Material navigation rail, and the Changes view"
 />
 
-![CI](https://github.com/codingmachineedge/desktop-material/actions/workflows/ci.yml/badge.svg?branch=main)
+![CI](https://github.com/Ding-Ding-Projects/desktop-material/actions/workflows/ci.yml/badge.svg?branch=main)
 
 ## Product scope
 
-The complete M0–M21 roadmap is shipped on `main`. M22 owner-scoped management
-keeps its separately tracked visual-publication acceptance, M23 adds the full
-Ollama model manager described below, and M24 makes sparse-checkout changes a
-persistent guided Choose/Adjust/Restore → Review selection → Apply and refresh
-workflow. M24 implementation,
-production-build, off-screen interaction, privacy, and cleanup acceptance are
-complete; its publication checks are tracked separately. The compact status
-summary is below; the implementation ledger is in [`PLAN.md`](PLAN.md), and
-detailed acceptance receipts are in [`HANDOFF.md`](HANDOFF.md).
+The numbered roadmap now extends through M27. M0–M21 and M23 have published
+receipts, M22 retains its separately tracked visual refresh, and the exact
+acceptance/publication state for M24–M27 is maintained in
+[`ROADMAP.md`](ROADMAP.md). The latest published baseline is `7edca120c5`:
+[CI `29895625564`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29895625564),
+[code scanning `29895625583`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29895625583),
+and [Build Installers `29896993449`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29896993449)
+passed before the exact-target Windows release
+[`v3.6.3-beta3-b0000040881`](https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-b0000040881)
+published with all six required assets.
+
+The current continuation adds persistent, visible/collapsible tab-group chips;
+localized command-palette rows and appearance controls; deterministic bare-Alt
+menu sequencing; and unit/script gates before Super Express packaging. It is
+not covered by those baseline receipts. The exact unpackaged production build
+and isolated off-screen group/palette interaction passed locally, and the two
+accepted synthetic-only captures appear below. An exact continuation commit,
+push, remote CI/Pages/wiki, and Release verification remain pending. The
+implementation ledger is in [`PLAN.md`](PLAN.md), with detailed evidence in
+[`HANDOFF.md`](HANDOFF.md).
 
 The M20 platform wave and earlier post-M19 adaptive customization maintenance
 release described below are shipped on `main`. Their exact production build,
@@ -126,9 +137,11 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 **Repository tabs**
 - Browser-like repository tabs, per-account and bound to repos, with inline rename
 - Per-tab title styling: right-click the actual title for bold/italic/underline, size, text color, background color, font family, and alignment, with curated palettes, recent colors, a custom picker, one-click return to default, and that tab's dedicated Git history. The clicked tab initializes before the editor opens; an in-progress profile transition gives localized retry guidance instead of escaping to the app crash boundary
-- Mark tabs as favorites, drag a repository folder onto the app to open or switch its tab, and export or import the current ordered tab session with pins, favorites, aliases, and per-tab appearance
+- Collect tabs into named, curated-color groups. A visible chip before the first member shows its name, count, active state, and expanded/collapsed state; mouse, Enter, or Space really hides/restores the member tabs. Group actions, dialog copy, announcements, and accessible names follow English, playful Hong Kong-style Cantonese, or bilingual mode
+- Group metadata persists across open/close and bulk-close operations, per-window reloads, profile history, and session imports. A group cannot cross the protected pinned/unpinned boundary. Deleting a group never closes its tabs
+- Mark tabs as favorites, drag a repository folder onto the app to open or switch its tab, and export or import the current ordered tab session with pins, favorites, aliases, and per-tab appearance. Portable exports intentionally omit profile-local group definitions and `groupId` memberships, while import preserves the destination profile's existing groups
 - Keep the original **Close Tabs Containing…** regex workflow, or use the guarded inverse **Close all tabs except those containing…** action. The inverse matches a case-insensitive literal substring across the visible label, repository alias/name, and local path; live counts and a bounded preview make the result reviewable, and an empty or zero-match query cannot confirm
-- Pin important tabs and arrange each pinned or unpinned group manually with drag-and-drop or named keyboard move actions. **Arrange tabs** also offers one-shot A→Z, Z→A, newest-opened, oldest-opened, repository-status, and favorites-first/last sorts; the chosen order persists without continuously reshuffling as repository status changes
+- Pin important tabs and arrange each pinned or unpinned group manually with drag-and-drop or named keyboard move actions. Moving a member outside its named group ungroups only that tab; one-shot A→Z, Z→A, newest-opened, oldest-opened, repository-status, and favorites-first/last sorts keep every remaining named group together as one stable block. The chosen order persists without continuously reshuffling as repository status changes
 - Use **Search tabs** to switch by name, alias, path, or clone URL, and narrow **Arrange tabs** with its literal multi-key filter without changing the all-tab scope of one-shot sorts
 
 **Multi-account**
@@ -179,6 +192,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 **Search everywhere, with a regex builder**
 - Every search bar gains fuzzy / substring / regex filter modes, a case toggle, and per-list filter chips
 - A full regex builder — anchors, character classes, quantifiers, groups, alternation, lookaround, all six flags, and a live tester — reachable from the search bars
+- The `Ctrl+F` command palette uses wider, richer rows with a leading icon, title, optional search-term line, and localized group chip. Its anchored **Customize appearance** editor persists comfortable/compact density and independent icon/group/keyword visibility; Escape closes only the editor and restores toggle focus
 
 **Repository safety and cleanup**
 - A context-menu option can permanently discard changes without sending files to the trash, including untracked files, for large cleanup operations where the regular discard flow would be slow
@@ -206,7 +220,7 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 - Browse GitHub Actions runs in the repository rail, filter by workflow/branch/event/status, re-run all or failed jobs, inspect jobs and steps, securely download and search logs, and dispatch workflows with inputs
 - Cancel only queued, running, waiting, or pending workflow runs from a Material confirmation that identifies the exact workflow/run, ref, actor, and commit when available. The app revalidates repository, account, run identity, and cancellable status before one normal cancellation request, prevents duplicate submission, then refreshes until GitHub reports a terminal state
 - Dispatch **Build Installers / Express Release** from `main` when a release is urgent: lint, Windows x64 trampoline/unit/script tests, and packaging run in parallel, exact installed dependencies are content-cached, the complete installer payload is retained as a workflow artifact before publication, and one create-only command publishes deterministic exact-commit notes without replacing an existing tag
-- Dispatch the separate **Super Express Release** workflow for an emergency build-only release: it skips lint, unit, script, E2E, and release-history generation, restores the same exact dependency cache, builds and packages Windows x64 directly, writes release notes from the checked-out commit, verifies every installer/feed asset, retains the complete payload, and publishes a uniquely versioned immutable Release for the exact dispatched `main` commit
+- Dispatch the separate **Super Express Release** workflow for an emergency fast lane: it runs the complete unit and script suites before building and packaging Windows x64, while skipping lint, E2E, and release-history generation. It restores the same exact dependency cache, writes notes from the checked-out commit, verifies every installer/feed asset, retains the complete payload, and publishes a uniquely versioned immutable Release for the exact dispatched `main` commit
 
 **Agent access and command line**
 - Enable an opt-in, token-gated local agent server from **Settings → Agent access**; it exposes MCP and REST on a random loopback-only port and never returns account credentials
@@ -262,10 +276,10 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
 
 ## Roadmap
 
-The complete M0–M21 status, M22 visual-publication acceptance, M23 Ollama model
-manager, completed maintenance work, and acceptance rules now live in
-[`ROADMAP.md`](ROADMAP.md). Detailed implementation and verification receipts
-remain in [`PLAN.md`](PLAN.md) and [`HANDOFF.md`](HANDOFF.md).
+The M0–M27 status, M22 visual-publication acceptance, current maintenance work,
+and acceptance rules live in [`ROADMAP.md`](ROADMAP.md). Detailed implementation
+and verification receipts remain in [`PLAN.md`](PLAN.md) and
+[`HANDOFF.md`](HANDOFF.md).
 
 ## Screenshots
 
@@ -287,6 +301,10 @@ automation, and account isolation. The diagrams are reproducible with
 | Word-style tab appearance | Arrange tabs | Actions cancellation | Reviewed rebase |
 | --- | --- | --- | --- |
 | <img src="docs/assets/screenshots/material-tab-appearance-word.png" alt="Word-style tab appearance editor with typography, alignment, and independent text and background palettes" width="320"><br><sub>Per-tab appearance</sub> | <img src="docs/assets/screenshots/material-tab-arrange.png" alt="Arrange tabs surface with pinned and manual movement controls plus one-shot label, opened-date, and repository-status sorts" width="320"><br><sub>Persistent tab order</sub> | <img src="docs/assets/screenshots/material-actions-cancel.png" alt="Material workflow-run cancellation review naming the exact run, ref, actor, and commit" width="320"><br><sub>Exact-run cancellation</sub> | <img src="docs/assets/screenshots/material-rebase-review.png" alt="Reviewed current-branch rebase showing current to target, ahead and behind counts, and a bounded commit preview" width="320"><br><sub>Rebase review</sub> |
+
+| Persistent tab groups | Rich command palette |
+| --- | --- |
+| <img src="docs/assets/screenshots/material-tab-groups.png" alt="Desktop Material workspace with a visible named tab-group chip and its repository member" width="520"><br><sub>Named chip · collapse/expand · restart persistence</sub> | <img src="docs/assets/screenshots/material-command-palette-appearance.png" alt="Command palette showing Ollama results beside the fully visible row appearance editor" width="520"><br><sub>Rich result rows · density and visibility controls</sub> |
 
 | Repository workflows | GitHub workflows | Accessibility and shell |
 | --- | --- | --- |
@@ -357,7 +375,7 @@ publication alone fails. Run this one line in Windows PowerShell 5.1 or
 PowerShell 7; it does not require an administrator shell:
 
 ```powershell
-Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
+Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
 ```
 
 The [tracked installer script](script/install-windows.ps1) asks GitHub for this
@@ -368,11 +386,11 @@ checks any Authenticode signature, runs the Squirrel installer silently with
 workflow publishes unsigned x64 builds, so the script reports that status and
 stops on ARM64 until an ARM64 asset is available. Review the script before
 running any remote command, or use the
-[latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest)
+[latest release page](https://github.com/Ding-Ding-Projects/desktop-material/releases/latest)
 for a manual installer or portable-ZIP download. Extract the ZIP before running
 the packaged executable. The focused archive/workflow contract is green; a
-complete local production package and the first remote publication containing
-this ZIP are still pending.
+published baseline already contains the required installer, feed, and portable
+ZIP assets. Publication of the current continuation remains pending.
 
 When GitHub Actions is actively building or packaging a newer exact commit but
 has not yet published its Release, the About updater reports **New update coming
@@ -395,8 +413,8 @@ yarn && yarn build:dev && yarn start
 
 ## Project site & docs
 
-- Project site: https://codingmachineedge.github.io/desktop-material/
-- Wiki: https://github.com/codingmachineedge/desktop-material/wiki
+- Project site: https://ding-ding-projects.github.io/desktop-material/
+- Wiki: https://github.com/Ding-Ding-Projects/desktop-material/wiki
 
 ## Credits & License
 

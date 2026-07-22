@@ -25,3 +25,5 @@ the implemented feature contracts.
   safe text, structured-data, and image inspection.
 - [Quality and reliability](quality-and-reliability/README.md) — cross-cutting
   responsiveness, lifecycle cleanup, failure recovery, and regression gates.
+- [Design system](design-system/README.md) — Material presentation controls,
+  including command-palette row appearance and responsive visual behavior.

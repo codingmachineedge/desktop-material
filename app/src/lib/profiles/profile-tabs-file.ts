@@ -1,6 +1,9 @@
 import {
   emptyProfileTabsState,
   IProfileTabsState,
+  ITabGroup,
+  normalizeTabGroupColor,
+  normalizeTabGroupName,
 } from '../../models/repository-tab'
 import { PrimaryWindowScope } from '../window-scope'
 
@@ -8,7 +11,57 @@ interface IProfileTabsFile {
   readonly version?: number
   readonly tabs?: unknown
   readonly activeTabId?: unknown
+  readonly groups?: unknown
   readonly windows?: unknown
+}
+
+/**
+ * Repair the untrusted optional group array without rewriting legacy files.
+ * Valid records keep every unknown key for forward compatibility, while known
+ * presentation fields are bounded before renderer/store code can consume them.
+ */
+function asTabGroups(value: unknown): ReadonlyArray<ITabGroup> | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const seen = new Set<string>()
+  const groups: ITabGroup[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      continue
+    }
+    const candidate = entry as Record<string, unknown>
+    const id = candidate.id
+    const name = normalizeTabGroupName(candidate.name)
+    if (
+      typeof id !== 'string' ||
+      id.length === 0 ||
+      id.length > 256 ||
+      /[\u0000-\u001f\u007f]/.test(id) ||
+      name === null ||
+      seen.has(id)
+    ) {
+      continue
+    }
+    seen.add(id)
+    const unknownFields = { ...candidate }
+    delete unknownFields.id
+    delete unknownFields.name
+    delete unknownFields.color
+    delete unknownFields.isCollapsed
+    groups.push({
+      ...unknownFields,
+      id,
+      name,
+      color: normalizeTabGroupColor(candidate.color),
+      ...(candidate.isCollapsed === true ? { isCollapsed: true } : {}),
+    })
+  }
+  return groups
 }
 
 function asTabsState(value: unknown): IProfileTabsState | null {
@@ -18,6 +71,7 @@ function asTabsState(value: unknown): IProfileTabsState | null {
   const candidate = value as {
     readonly tabs?: unknown
     readonly activeTabId?: unknown
+    readonly groups?: unknown
   }
   if (!Array.isArray(candidate.tabs)) {
     return null
@@ -29,9 +83,11 @@ function asTabsState(value: unknown): IProfileTabsState | null {
   ) {
     return null
   }
+  const groups = asTabGroups(candidate.groups)
   return {
     tabs: candidate.tabs,
     activeTabId: candidate.activeTabId ?? null,
+    ...(groups === undefined ? {} : { groups }),
   }
 }
 
@@ -88,6 +144,7 @@ export function mergeWindowTabsState(
     version,
     tabs: primary.tabs,
     activeTabId: primary.activeTabId,
+    ...(primary.groups === undefined ? {} : { groups: primary.groups }),
     windows: states,
   }
 }

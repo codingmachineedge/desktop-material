@@ -51,7 +51,9 @@ describe('CommandPalette filter modes', () => {
       </DialogStackContext.Provider>
     )
 
-    const input = screen.getByRole('textbox', { name: 'Search commands' })
+    const input = screen.getByRole('textbox', {
+      name: 'Search command palette',
+    })
     await waitFor(() => assert.equal(document.activeElement, input))
     assert.ok(screen.getByRole('button', { name: 'Open regex builder' }))
 
@@ -80,6 +82,60 @@ describe('CommandPalette filter modes', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     assert.deepEqual(executed, ['push'])
     assert.equal(dismissals, 1)
+  })
+
+  it('edits persisted row appearance and keeps Escape inside the palette', async () => {
+    localStorage.removeItem('language-mode-v1')
+    localStorage.removeItem('command-palette-appearance-v1')
+    let dismissals = 0
+
+    render(
+      <DialogStackContext.Provider value={{ isTopMost: true }}>
+        <CommandPalette
+          onExecute={() => undefined}
+          onDismissed={() => dismissals++}
+        />
+      </DialogStackContext.Provider>
+    )
+
+    const toggle = screen.getByRole('button', {
+      name: 'Customize command palette appearance',
+    })
+    fireEvent.click(toggle)
+    assert.ok(
+      screen.getByRole('dialog', {
+        name: 'Command palette appearance settings',
+      })
+    )
+
+    fireEvent.click(screen.getByRole('radio', { name: /Compact/ }))
+    const icons = screen.getByRole('checkbox', { name: 'Icons' })
+    fireEvent.click(icons)
+    assert.deepEqual(
+      JSON.parse(
+        localStorage.getItem('command-palette-appearance-v1') ?? 'null'
+      ),
+      {
+        density: 'compact',
+        showIcons: false,
+        showGroups: true,
+        showKeywords: true,
+      }
+    )
+
+    icons.focus()
+    fireEvent.keyDown(icons, { key: 'Escape' })
+    await waitFor(() =>
+      assert.equal(
+        screen.queryByRole('dialog', {
+          name: 'Command palette appearance settings',
+        }),
+        null
+      )
+    )
+    assert.ok(screen.getByRole('dialog', { name: 'Command palette' }))
+    assert.equal(dismissals, 0)
+    await waitFor(() => assert.equal(document.activeElement, toggle))
   })
 })
 

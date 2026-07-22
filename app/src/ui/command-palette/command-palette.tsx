@@ -7,7 +7,7 @@ import {
   IPaletteCommandContext,
   filterPaletteCommands,
 } from '../../lib/command-palette-catalog'
-import { t } from '../../lib/i18n'
+import { t, translateForAccessibleName } from '../../lib/i18n'
 import { FilterMode, matchWithMode } from '../../lib/fuzzy-find'
 import { isDesktopMaterialFeatureEntryPoint } from '../../lib/desktop-material-features'
 import { FilterModeControl } from '../lib/filter-mode-control'
@@ -37,6 +37,26 @@ function resolvePaletteTitle(command: IPaletteCommand): string {
   return command.titleKey !== undefined ? t(command.titleKey) : command.title
 }
 
+/** Localize the six stable catalog groups shown as row chips. */
+function resolvePaletteGroup(group: string): string {
+  switch (group) {
+    case 'App':
+      return t('commandPalette.groupApp')
+    case 'Branch':
+      return t('commandPalette.groupBranch')
+    case 'Changes':
+      return t('commandPalette.groupChanges')
+    case 'Edit':
+      return t('commandPalette.groupEdit')
+    case 'Navigate':
+      return t('commandPalette.groupNavigate')
+    case 'Repository':
+      return t('commandPalette.groupRepository')
+    default:
+      return group
+  }
+}
+
 /**
  * The keys a query is matched against: the (localized) title first (fuzzy
  * scoring's primary key), then group/keywords/event plus the English title
@@ -47,9 +67,9 @@ function getPaletteCommandKeys(
 ): ReadonlyArray<string> {
   return [
     resolvePaletteTitle(command),
-    `${command.title} ${command.group} ${command.keywords ?? ''} ${
-      command.event
-    }`,
+    `${command.title} ${command.group} ${resolvePaletteGroup(command.group)} ${
+      command.keywords ?? ''
+    } ${command.event}`,
   ]
 }
 
@@ -194,7 +214,7 @@ export class CommandPalette extends React.Component<
     return (
       <Dialog
         id="command-palette"
-        title="Command palette"
+        title={t('commandPalette.title')}
         onSubmit={this.props.onDismissed}
         onDismissed={this.props.onDismissed}
       >
@@ -208,8 +228,10 @@ export class CommandPalette extends React.Component<
               value={this.state.query}
               onChange={this.onQueryChanged}
               onKeyDown={this.onKeyDown}
-              placeholder="Type a command — push, clone, settings, worktree…"
-              aria-label="Search commands"
+              placeholder={t('commandPalette.searchPlaceholder')}
+              aria-label={translateForAccessibleName(
+                'commandPalette.searchLabel'
+              )}
               spellCheck={false}
             />
             <div className="command-palette-filter-modes">
@@ -219,7 +241,7 @@ export class CommandPalette extends React.Component<
                 caseSensitive={this.state.filterCaseSensitive}
                 onModeChange={this.onFilterModeChanged}
                 onCaseSensitiveChange={this.onFilterCaseSensitiveChanged}
-                regexBuilderTarget="Commands"
+                regexBuilderTarget={t('commandPalette.commands')}
                 getSampleItems={this.getFilterSampleItems}
                 filterText={this.state.query}
                 onRegexPatternApply={this.onRegexPatternApply}
@@ -236,10 +258,12 @@ export class CommandPalette extends React.Component<
               `density-${this.state.appearance.density}`
             )}
             role="listbox"
-            aria-label="Commands"
+            aria-label={translateForAccessibleName('commandPalette.commands')}
           >
             {matches.length === 0 ? (
-              <p className="command-palette-empty">No matching commands</p>
+              <p className="command-palette-empty">
+                {t('commandPalette.noMatches')}
+              </p>
             ) : (
               matches.map((command, index) => (
                 <button
@@ -283,13 +307,15 @@ export class CommandPalette extends React.Component<
                       this.state.appearance.density === 'comfortable' &&
                       command.keywords !== undefined && (
                         <span className="command-palette-keywords">
-                          {command.keywords}
+                          {t('commandPalette.searchTerms', {
+                            terms: command.keywords,
+                          })}
                         </span>
                       )}
                   </span>
                   {this.state.appearance.showGroups && (
                     <span className="command-palette-group">
-                      {command.group}
+                      {resolvePaletteGroup(command.group)}
                     </span>
                   )}
                 </button>

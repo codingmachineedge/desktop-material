@@ -5,7 +5,7 @@
 Installs the newest Desktop Material release for the current Windows architecture.
 
 .DESCRIPTION
-Queries the latest published release from codingmachineedge/desktop-material,
+Queries the latest published release from Ding-Ding-Projects/desktop-material,
 selects the exact per-user Squirrel installer for the native architecture,
 verifies GitHub's SHA-256 release-asset digest and any Authenticode signature,
 runs the installer silently, and removes the temporary download.
@@ -29,7 +29,7 @@ param(
   Set-StrictMode -Version 3.0
   $ErrorActionPreference = 'Stop'
 
-  $repository = 'codingmachineedge/desktop-material'
+  $repository = 'Ding-Ding-Projects/desktop-material'
   $apiUrl = "https://api.github.com/repos/$repository/releases/latest"
   $requestHeaders = @{
     Accept                   = 'application/vnd.github+json'

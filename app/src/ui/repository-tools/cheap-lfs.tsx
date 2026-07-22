@@ -789,7 +789,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
         </label>
         <p className="cheap-lfs-pin-help">
           Files up to 2 GiB upload as a single asset; larger files are split
-          automatically into 2 GiB parts, each stored as its own release asset
+          automatically into 1.5 GiB parts, each stored as its own release asset
           and recorded in the pointer. If the tag has no release yet, an
           unpublished draft is created for the assets.
         </p>

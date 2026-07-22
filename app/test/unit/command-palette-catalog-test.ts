@@ -48,12 +48,43 @@ const NewCommandEvents = [
   'palette:preferences-notifications',
   'palette:preferences-git',
   'palette:preferences-accessibility',
+  'palette:ollama-model-manager',
+  'palette:preferences-copilot',
+  'palette:background-queue',
   'palette:notification-history',
   'palette:notification-automations',
   'palette:copy-repo-path',
   'palette:copy-branch-name',
   'palette:copy-commit-sha',
 ]
+
+const CommandPaletteUiKeys = [
+  'commandPalette.title',
+  'commandPalette.searchPlaceholder',
+  'commandPalette.searchLabel',
+  'commandPalette.commands',
+  'commandPalette.noMatches',
+  'commandPalette.searchTerms',
+  'commandPalette.customizeAppearance',
+  'commandPalette.appearanceDialog',
+  'commandPalette.appearanceHeading',
+  'commandPalette.rowDensity',
+  'commandPalette.comfortable',
+  'commandPalette.comfortableDescription',
+  'commandPalette.compact',
+  'commandPalette.compactDescription',
+  'commandPalette.showInEachRow',
+  'commandPalette.icons',
+  'commandPalette.groupChips',
+  'commandPalette.keywordLine',
+  'commandPalette.resetDefaults',
+  'commandPalette.groupApp',
+  'commandPalette.groupBranch',
+  'commandPalette.groupChanges',
+  'commandPalette.groupEdit',
+  'commandPalette.groupNavigate',
+  'commandPalette.groupRepository',
+] as const
 
 describe('command palette catalog', () => {
   it('assigns every command a unique event and a titled group', () => {
@@ -149,6 +180,18 @@ describe('command palette catalog', () => {
       const bilingual = translate(command.titleKey, 'bilingual')
       assert.ok(bilingual.includes(english), command.event)
       assert.ok(bilingual.includes(cantonese), command.event)
+    }
+  })
+
+  it('localizes the visible row and appearance controls in all modes', () => {
+    for (const key of CommandPaletteUiKeys) {
+      const english = translate(key, 'english', { terms: 'push clone' })
+      const cantonese = translate(key, 'cantonese', { terms: 'push clone' })
+      const bilingual = translate(key, 'bilingual', { terms: 'push clone' })
+      assert.ok(english.trim().length > 0, `${key} has no English copy`)
+      assert.ok(cantonese.trim().length > 0, `${key} has no Cantonese copy`)
+      assert.ok(bilingual.includes(english), key)
+      assert.ok(bilingual.includes(cantonese), key)
     }
   })
 

@@ -210,6 +210,11 @@ describe('CheapLfs panel', () => {
       'Tracked file path'
     )) as HTMLInputElement
     assert.equal(trackedInput.value, 'big.psd')
+    assert.ok(
+      screen.getByText(
+        /larger files are split automatically into 1.5 GiB parts/
+      )
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Review pin' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Pin file' }))

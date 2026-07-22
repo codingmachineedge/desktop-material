@@ -17,6 +17,7 @@ import {
   IRepositoryTab,
   IProfileTabsState,
   ITabTitleStyle,
+  ITabGroup,
 } from '../../src/models/repository-tab'
 import { Repository, SubmoduleRepository } from '../../src/models/repository'
 import { ProfileStore } from '../../src/lib/stores/profile-store'
@@ -361,6 +362,319 @@ describe('RepositoryTabsStore', () => {
   })
 })
 
+describe('RepositoryTabsStore tab groups', () => {
+  function tab(
+    id: string,
+    options: {
+      readonly groupId?: string | null
+      readonly isPinned?: boolean
+      readonly repositoryId?: number
+    } = {}
+  ): IRepositoryTab {
+    return {
+      id,
+      repositoryId: options.repositoryId ?? id.charCodeAt(0),
+      repositoryPath: `C:\\work\\${id}`,
+      customLabel: null,
+      titleStyle: null,
+      ...(options.groupId === undefined ? {} : { groupId: options.groupId }),
+      ...(options.isPinned === undefined ? {} : { isPinned: options.isPinned }),
+    }
+  }
+
+  function cloneState(state: IProfileTabsState): IProfileTabsState {
+    return JSON.parse(JSON.stringify(state)) as IProfileTabsState
+  }
+
+  async function storeFor(initial: IProfileTabsState): Promise<{
+    readonly store: RepositoryTabsStore
+    readonly profileStore: ProfileStore
+    readonly writes: ReadonlyArray<IProfileTabsState>
+    readonly getPersisted: () => IProfileTabsState
+  }> {
+    let persisted = cloneState(initial)
+    const writes: IProfileTabsState[] = []
+    const profileStore = {
+      readTabs: () => Promise.resolve(cloneState(persisted)),
+      writeTabs: (state: IProfileTabsState) => {
+        persisted = cloneState(state)
+        writes.push(cloneState(state))
+        return Promise.resolve()
+      },
+    } as unknown as ProfileStore
+    const store = new RepositoryTabsStore(profileStore, 'group-window')
+    await store.initialize()
+    return {
+      store,
+      profileStore,
+      writes,
+      getPersisted: () => cloneState(persisted),
+    }
+  }
+
+  it('creates, moves, collapses, and deletes groups without closing tabs', async () => {
+    const { store, getPersisted } = await storeFor({
+      tabs: [tab('a'), tab('b'), tab('c')],
+      activeTabId: 'a',
+      groups: [],
+    })
+
+    const groupId = await store.createTabGroup('  Work   tree  ', 'green', [
+      'c',
+    ])
+    assert.ok(groupId !== null)
+    assert.deepEqual(store.getGroups(), [
+      { id: groupId, name: 'Work tree', color: 'green' },
+    ])
+    assert.equal(store.getState().tabs[2].groupId, groupId)
+
+    await store.setTabGroup('a', groupId)
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.id),
+      ['b', 'c', 'a']
+    )
+    assert.deepEqual(
+      store.getTabsInGroup(groupId).map(item => item.id),
+      ['c', 'a']
+    )
+
+    await store.setTabGroupCollapsed(groupId, true)
+    assert.equal(store.getGroups()[0].isCollapsed, true)
+    assert.deepEqual(getPersisted().groups, store.getGroups())
+
+    await store.deleteTabGroup(groupId)
+    assert.deepEqual(store.getGroups(), [])
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.groupId ?? null),
+      [null, null, null]
+    )
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.id),
+      ['b', 'c', 'a']
+    )
+
+    await store.reloadFromDisk()
+    assert.deepEqual(store.getGroups(), [])
+    assert.equal(store.getState().tabs.length, 3)
+  })
+
+  it('compacts interleaved members and ungroups only a member moved away', async () => {
+    const { store } = await storeFor({
+      tabs: [tab('a'), tab('x'), tab('b'), tab('y')],
+      activeTabId: 'a',
+      groups: [],
+    })
+
+    const groupId = await store.createTabGroup('Work', 'green', ['a', 'b'])
+    assert.ok(groupId !== null)
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.id),
+      ['a', 'b', 'x', 'y']
+    )
+
+    await store.moveTab('b', 0)
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.id),
+      ['b', 'a', 'x', 'y']
+    )
+    assert.deepEqual(
+      store.getTabsInGroup(groupId).map(item => item.id),
+      ['b', 'a']
+    )
+
+    await store.moveTab('b', 3)
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.id),
+      ['a', 'x', 'y', 'b']
+    )
+    assert.equal(
+      store.getState().tabs.find(item => item.id === 'b')?.groupId,
+      null
+    )
+    assert.deepEqual(
+      store.getTabsInGroup(groupId).map(item => item.id),
+      ['a']
+    )
+  })
+
+  it('preserves group metadata across open, single close, bulk close, and reload', async () => {
+    const group = {
+      id: 'work',
+      name: 'Work',
+      color: 'purple',
+      isCollapsed: true,
+      futureLayout: { density: 'compact' },
+    } as unknown as ITabGroup
+    const { store, profileStore, writes, getPersisted } = await storeFor({
+      tabs: [
+        tab('a', { groupId: group.id }),
+        tab('b', { groupId: group.id }),
+        tab('c'),
+      ],
+      activeTabId: 'a',
+      groups: [group],
+    })
+
+    await store.ensureTabForRepository(
+      new Repository('C:\\work\\new-repository', 999, null, false)
+    )
+    assert.deepEqual(store.getGroups(), [group])
+
+    await store.closeTab('a')
+    assert.deepEqual(store.getGroups(), [group])
+    assert.equal(store.getTabsInGroup(group.id)[0].id, 'b')
+
+    await store.closeTabsToRight('b')
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.id),
+      ['b']
+    )
+    assert.deepEqual(store.getGroups(), [group])
+    assert.ok(writes.length >= 3)
+    for (const write of writes) {
+      assert.deepEqual(write.groups, [group])
+    }
+
+    await store.reloadFromDisk()
+    assert.deepEqual(store.getState(), getPersisted())
+    assert.deepEqual(store.getGroups(), [group])
+
+    const reopened = new RepositoryTabsStore(profileStore, 'group-window')
+    await reopened.initialize()
+    assert.deepEqual(reopened.getState(), getPersisted())
+    assert.deepEqual(reopened.getGroups(), [group])
+  })
+
+  it('preserves declared groups but rejects dangling imported membership', async () => {
+    const group: ITabGroup = {
+      id: 'portable-group',
+      name: 'Portable',
+      color: 'yellow',
+      isCollapsed: true,
+    }
+    const beta = new Repository('C:\\work\\beta', 202, null, false)
+    const { store } = await storeFor({
+      tabs: [tab('a', { groupId: group.id })],
+      activeTabId: 'a',
+      groups: [group],
+    })
+    const session: ITabSessionFile = {
+      format: TabSessionFormat,
+      version: TabSessionVersion,
+      exportedAt: new Date(0).toISOString(),
+      activeRepositoryPath: beta.path,
+      tabs: [
+        {
+          repositoryPath: beta.path,
+          customLabel: null,
+          titleStyle: null,
+          groupId: group.id,
+        },
+      ],
+    }
+
+    await store.importTabSession(session, [beta], 'replace')
+
+    assert.deepEqual(store.getGroups(), [group])
+    assert.equal(store.getState().tabs.length, 1)
+    assert.equal(store.getState().tabs[0].repositoryId, beta.id)
+    assert.equal(store.getState().tabs[0].groupId, null)
+  })
+
+  it('rejects group moves that would cross the pinned boundary', async () => {
+    const pinnedGroup: ITabGroup = {
+      id: 'pinned-group',
+      name: 'Pinned',
+      color: 'blue',
+    }
+    const unpinnedGroup: ITabGroup = {
+      id: 'unpinned-group',
+      name: 'Unpinned',
+      color: 'grey',
+    }
+    const { store, writes } = await storeFor({
+      tabs: [
+        tab('p1', { groupId: pinnedGroup.id, isPinned: true }),
+        tab('p2', { isPinned: true }),
+        tab('u1', { groupId: unpinnedGroup.id }),
+        tab('u2'),
+      ],
+      activeTabId: 'p1',
+      groups: [pinnedGroup, unpinnedGroup],
+    })
+
+    await store.setTabGroup('p2', pinnedGroup.id)
+    assert.equal(store.getState().tabs[1].groupId, pinnedGroup.id)
+
+    const writesBeforeRejectedMoves = writes.length
+    await store.setTabGroup('u2', pinnedGroup.id)
+    await store.setTabGroup('p2', unpinnedGroup.id)
+
+    assert.equal(writes.length, writesBeforeRejectedMoves)
+    assert.equal(store.getState().tabs[1].groupId, pinnedGroup.id)
+    assert.equal(store.getState().tabs[3].groupId, undefined)
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.isPinned === true),
+      [true, true, false, false]
+    )
+
+    await store.setTabGroup('u2', unpinnedGroup.id)
+    assert.equal(store.getState().tabs[3].groupId, unpinnedGroup.id)
+    assert.deepEqual(
+      store.getState().tabs.map(item => item.isPinned === true),
+      [true, true, false, false]
+    )
+  })
+
+  it('keeps group creation and pin changes on one side of the pin boundary', async () => {
+    const { store } = await storeFor({
+      tabs: [
+        tab('p1', { isPinned: true }),
+        tab('p2', { isPinned: true }),
+        tab('u1'),
+      ],
+      activeTabId: 'p1',
+      groups: [],
+    })
+
+    const groupId = await store.createTabGroup('Pinned work', 'blue', [
+      'p1',
+      'u1',
+      'p2',
+    ])
+    assert.ok(groupId !== null)
+    assert.deepEqual(
+      store.getTabsInGroup(groupId).map(item => item.id),
+      ['p1', 'p2']
+    )
+    assert.equal(store.getState().tabs[2].groupId, undefined)
+
+    await store.setTabPinned('p2', false)
+    assert.equal(
+      store.getState().tabs.find(item => item.id === 'p1')?.groupId,
+      groupId
+    )
+    assert.equal(
+      store.getState().tabs.find(item => item.id === 'p2')?.groupId,
+      null
+    )
+    assert.equal(
+      store.getState().tabs.find(item => item.id === 'p2')?.isPinned,
+      false
+    )
+
+    await store.setTabPinned('p1', false)
+    assert.equal(
+      store.getState().tabs.find(item => item.id === 'p1')?.groupId,
+      groupId
+    )
+    assert.equal(
+      store.getState().tabs.find(item => item.id === 'p1')?.isPinned,
+      false
+    )
+  })
+})
+
 describe('RepositoryTabsStore range and match close', () => {
   function makeTab(
     id: string,
@@ -625,6 +939,7 @@ describe('RepositoryTabsStore pinning and arrangement', () => {
       readonly customLabel?: string | null
       readonly isPinned?: boolean
       readonly isFavorite?: boolean
+      readonly groupId?: string | null
       readonly openedAt?: number
       readonly repositoryId?: number
     } = {}
@@ -639,6 +954,7 @@ describe('RepositoryTabsStore pinning and arrangement', () => {
       ...(options.isFavorite === undefined
         ? {}
         : { isFavorite: options.isFavorite }),
+      ...(options.groupId === undefined ? {} : { groupId: options.groupId }),
       ...(options.openedAt === undefined ? {} : { openedAt: options.openedAt }),
     }
   }
@@ -748,6 +1064,54 @@ describe('RepositoryTabsStore pinning and arrangement', () => {
       'u-favorite',
       'u-normal',
     ])
+  })
+
+  it('keeps named groups atomic in every one-shot arrangement', async () => {
+    const groupId = 'atomic-group'
+    const makeTabs = () => [
+      tab('group-first', {
+        customLabel: 'Zulu',
+        groupId,
+        openedAt: 300,
+      }),
+      tab('middle', {
+        customLabel: 'Middle',
+        isFavorite: true,
+        openedAt: 200,
+      }),
+      tab('group-second', {
+        customLabel: 'Alpha',
+        groupId,
+        openedAt: 100,
+      }),
+    ]
+    const assertAtomic = (store: RepositoryTabsStore) => {
+      const arranged = ids(store)
+      const first = arranged.indexOf('group-first')
+      const second = arranged.indexOf('group-second')
+      assert.equal(Math.abs(first - second), 1)
+      assert.ok(first < second, 'group member order should remain stable')
+    }
+
+    const { store: favoriteStore } = await storeFor(makeTabs())
+    await favoriteStore.arrangeTabsByFavorite('favorites-first')
+    assertAtomic(favoriteStore)
+
+    const { store: labelStore } = await storeFor(makeTabs())
+    await labelStore.arrangeTabsByLabel('ascending')
+    assertAtomic(labelStore)
+
+    const { store: openedStore } = await storeFor(makeTabs())
+    await openedStore.arrangeTabsByOpenedAt('oldest')
+    assertAtomic(openedStore)
+
+    const { store: statusStore } = await storeFor(makeTabs())
+    await statusStore.arrangeTabsByRepositoryStatus(
+      'needs-attention-first',
+      candidate =>
+        candidate.id === 'group-second' ? 0 : candidate.id === 'middle' ? 1 : 3
+    )
+    assertAtomic(statusStore)
   })
 
   it('restricts manual moves to the tab pinned group', async () => {

@@ -20,7 +20,7 @@ const buildSHA = '2'.repeat(40)
 const ciRunID = 123456788
 const installerRunID = 123456789
 const updatesURL =
-  'https://github.com/codingmachineedge/desktop-material/releases/latest/download/'
+  'https://github.com/Ding-Ding-Projects/desktop-material/releases/latest/download/'
 
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {
@@ -61,18 +61,18 @@ function updateState(status: UpdateStatus): IUpdateState {
 describe('update coming soon', () => {
   it('derives only a safe GitHub repository from the configured release feed', () => {
     assert.deepEqual(getUpdateFeedRepository(updatesURL), {
-      owner: 'codingmachineedge',
+      owner: 'Ding-Ding-Projects',
       name: 'desktop-material',
     })
     assert.equal(
       getUpdateFeedRepository(
-        'https://example.test/codingmachineedge/desktop-material/releases/latest/download/'
+        'https://example.test/Ding-Ding-Projects/desktop-material/releases/latest/download/'
       ),
       null
     )
     assert.equal(
       getUpdateFeedRepository(
-        'http://github.com/codingmachineedge/desktop-material/releases/latest/download/'
+        'http://github.com/Ding-Ding-Projects/desktop-material/releases/latest/download/'
       ),
       null
     )

@@ -1,6 +1,6 @@
 # Developer Guide
 
-![The renderer state path from React UI through Dispatcher and AppStore to a fresh state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/renderer-state-flow.svg)
+![The renderer state path from React UI through Dispatcher and AppStore to a fresh state](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/diagrams/renderer-state-flow.svg)
 
 This page is for contributors. It describes how Desktop Material is put together and how to build and
 run it. Desktop Material is a fork of [desktop/desktop](https://github.com/desktop/desktop) (MIT),
@@ -73,7 +73,7 @@ wrapper here, called from an `AppStore` method.
 
 ## Per-account profile git repos
 
-![Two isolated account lanes connecting only to their matching repositories and remotes](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/account-isolation.png)
+![Two isolated account lanes connecting only to their matching repositories and remotes](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/concepts/account-isolation.png)
 
 Desktop Material stores each account's **settings, tabs, and notifications as their own local git
 repositories** under Electron's `userData` directory. This is what powers the fork's versioned

@@ -166,6 +166,15 @@ function nullableText(
   return value === null ? null : boundedText(value, label, maximumLength, true)
 }
 
+function nullableNonEmptyText(
+  value: unknown,
+  label: string,
+  maximumLength: number
+): string | null {
+  const text = nullableText(value, label, maximumLength)
+  return text === '' ? null : text
+}
+
 // Remove control characters that are unsafe in free-form multi-line text while
 // keeping tab, newline, and carriage return — release notes are markdown and
 // legitimately contain those. Written as a codepoint scan rather than a regex
@@ -254,7 +263,11 @@ function parseReleaseAsset(value: unknown): IGitHubReleaseAsset {
   return {
     id: positiveIdentifier(input.id, 'release asset id'),
     name,
-    label: nullableText(input.label, 'release asset label', 255),
+    // GitHub represents an absent release-asset label as either `null` or an
+    // empty string depending on the upload/read path. Treat both provider
+    // spellings as the same semantic value so an unlabeled upload is not
+    // rejected after its bytes and digest have already been verified.
+    label: nullableNonEmptyText(input.label, 'release asset label', 255),
     state,
     contentType: boundedText(
       input.content_type,

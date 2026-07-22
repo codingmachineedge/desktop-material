@@ -1,6 +1,7 @@
 import assert from 'node:assert'
-import { describe, it } from 'node:test'
+import { afterEach, beforeEach, describe, it } from 'node:test'
 import * as React from 'react'
+import * as electron from 'electron'
 
 import { ProfileStore } from '../../../src/lib/stores/profile-store'
 import { ElementAppearanceCoordinator } from '../../../src/lib/stores/element-appearance-coordinator'
@@ -20,6 +21,7 @@ import {
   CloseTabsExceptContainingPopover,
 } from '../../../src/ui/repository-tabs/close-tabs-containing-popover'
 import { RepositoryTabStrip } from '../../../src/ui/repository-tabs/repository-tab-strip'
+import { CreateTabGroupDialog } from '../../../src/ui/repository-tabs/create-tab-group-dialog'
 import { TabSearchPopover } from '../../../src/ui/repository-tabs/tab-search-popover'
 import {
   repositoryTabMatchKeys,
@@ -28,6 +30,7 @@ import {
 } from '../../../src/ui/repository-tabs/tab-action-helpers'
 import { Dispatcher } from '../../../src/ui/dispatcher'
 import { getAppearanceRepositoryDisplayPath } from '../../../src/ui/appearance/anchored-appearance-editor'
+import { LanguageModeChangedEvent } from '../../../src/lib/i18n'
 import {
   fireEvent,
   render,
@@ -35,6 +38,18 @@ import {
   waitFor,
   within,
 } from '../../helpers/ui/render'
+
+let previousIpcSend: typeof electron.ipcRenderer.send
+
+beforeEach(() => {
+  previousIpcSend = electron.ipcRenderer.send
+  electron.ipcRenderer.send = () => undefined
+})
+
+afterEach(() => {
+  electron.ipcRenderer.send = previousIpcSend
+  localStorage.removeItem('language-mode-v1')
+})
 
 function makeTab(
   id: string,
@@ -748,6 +763,267 @@ describe('RepositoryTab title appearance', () => {
       )
     )
     assert.equal(screen.queryByText('Tab appearance'), null)
+  })
+})
+
+describe('RepositoryTabStrip tab groups', () => {
+  function renderStrip(
+    store: RepositoryTabsStore,
+    repositories: ReadonlyArray<Repository>
+  ) {
+    const dispatcher = {
+      selectRepository: () => undefined,
+      showFoldout: () => undefined,
+      setNotificationCentreOpen: () => undefined,
+    } as unknown as Dispatcher
+    const stateManager = {
+      get: () => {
+        throw new Error('status cache should not be read by tab groups')
+      },
+    } as unknown as RepositoryStateCache
+
+    return render(
+      <RepositoryTabStrip
+        tabsStore={store}
+        repositories={repositories}
+        dispatcher={dispatcher}
+        repositoryStateManager={stateManager}
+        unreadNotificationCount={0}
+        isNotificationCentreOpen={false}
+      />
+    )
+  }
+
+  it('renders one colored chip before the first member and uses it as the selected collapsed tab', async () => {
+    const alpha = new Repository('/work/alpha', 1, null, false)
+    const beta = new Repository('/work/beta', 2, null, false)
+    const gamma = new Repository('/work/gamma', 3, null, false)
+    const store = await createStore(
+      [makeTab('alpha', alpha), makeTab('beta', beta), makeTab('gamma', gamma)],
+      'alpha'
+    )
+    const groupId = await store.createTabGroup('Work', 'purple', [
+      'alpha',
+      'beta',
+    ])
+    assert.notEqual(groupId, null)
+
+    renderStrip(store, [alpha, beta, gamma])
+
+    const chip = screen.getByRole('button', {
+      name: 'Work group, 2 tabs, expanded. Collapse group.',
+    })
+    assert.equal(chip.classList.contains('tab-group--purple'), true)
+    assert.equal(chip.classList.contains('active'), true)
+    assert.equal(
+      document.querySelectorAll('.repository-tab-group-chip').length,
+      1
+    )
+    assert.equal(chip.nextElementSibling?.getAttribute('data-tab-id'), 'alpha')
+    assert.ok(screen.getByRole('tab', { name: 'alpha, Work group' }))
+    assert.ok(screen.getByRole('tab', { name: 'beta, Work group' }))
+
+    chip.focus()
+    fireEvent.click(chip)
+
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('tab', {
+          name: 'Work group, 2 tabs, collapsed. Expand group.',
+        })
+      )
+    )
+    const collapsedChip = screen.getByRole('tab', {
+      name: 'Work group, 2 tabs, collapsed. Expand group.',
+    })
+    assert.equal(collapsedChip.getAttribute('aria-selected'), 'true')
+    assert.equal(screen.queryByRole('tab', { name: 'alpha, Work group' }), null)
+    assert.equal(screen.queryByRole('tab', { name: 'beta, Work group' }), null)
+    assert.ok(screen.getByRole('tab', { name: 'gamma' }))
+    await waitFor(() => assert.equal(document.activeElement, collapsedChip))
+
+    // A native button maps both Enter and Space to this click path.
+    fireEvent.click(collapsedChip)
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('button', {
+          name: 'Work group, 2 tabs, expanded. Collapse group.',
+        })
+      )
+    )
+    const expandedChip = screen.getByRole('button', {
+      name: 'Work group, 2 tabs, expanded. Collapse group.',
+    })
+    assert.equal(expandedChip.getAttribute('aria-current'), 'page')
+    assert.equal(
+      screen
+        .getByRole('tab', { name: 'alpha, Work group' })
+        .getAttribute('aria-selected'),
+      'true'
+    )
+    assert.ok(screen.getByRole('tab', { name: 'beta, Work group' }))
+    await waitFor(() => assert.equal(document.activeElement, expandedChip))
+  })
+
+  it('localizes every group menu action in bilingual mode', async () => {
+    localStorage.setItem('language-mode-v1', 'bilingual')
+    const alpha = new Repository('/work/alpha', 1, null, false)
+    const beta = new Repository('/work/beta', 2, null, false)
+    const gamma = new Repository('/work/gamma', 3, null, false)
+    const delta = new Repository('/work/delta', 4, null, false)
+    const store = await createStore(
+      [
+        makeTab('delta', delta, { isPinned: true }),
+        makeTab('alpha', alpha),
+        makeTab('beta', beta),
+        makeTab('gamma', gamma),
+      ],
+      'alpha'
+    )
+    await store.createTabGroup('Work', 'blue', ['alpha', 'beta'])
+    const laterGroupId = await store.createTabGroup('Later', 'green', ['gamma'])
+    assert.notEqual(laterGroupId, null)
+    await store.setTabGroupCollapsed(laterGroupId!, true)
+    await store.createTabGroup('Pinned', 'red', ['delta'])
+    renderStrip(store, [alpha, beta, gamma, delta])
+
+    const inactiveBeta = screen.getByRole('tab', { name: 'beta, Work group' })
+    inactiveBeta.focus()
+    fireEvent.contextMenu(inactiveBeta)
+    await waitFor(() =>
+      assert.ok(
+        screen.getByRole('menuitem', {
+          name: 'Add tab to new group… · 將分頁加入新群組…',
+        })
+      )
+    )
+
+    for (const name of [
+      'Add tab to new group… · 將分頁加入新群組…',
+      'Move to “Later” · 移去「Later」',
+      'Remove from “Work” · 從「Work」移走',
+      'Collapse “Work” · 收起「Work」',
+      'Delete group “Work” · 刪除群組「Work」',
+    ]) {
+      assert.ok(screen.getByRole('menuitem', { name }))
+    }
+    assert.equal(
+      screen.queryByRole('menuitem', {
+        name: 'Move to “Pinned” · 移去「Pinned」',
+      }),
+      null
+    )
+
+    fireEvent.click(
+      screen.getByRole('menuitem', {
+        name: 'Move to “Later” · 移去「Later」',
+      })
+    )
+    await waitFor(() =>
+      assert.equal(
+        store.getState().tabs.find(tab => tab.id === 'beta')?.groupId,
+        laterGroupId
+      )
+    )
+    assert.equal(screen.queryByRole('tab', { name: 'beta, Later group' }), null)
+    const destinationChip = screen.getByRole('tab', {
+      name: 'Later group, 2 tabs, collapsed. Expand group.',
+    })
+    await waitFor(() => assert.equal(document.activeElement, destinationChip))
+
+    const backdrops = document.querySelectorAll<HTMLElement>(
+      '.material-context-menu-backdrop'
+    )
+    for (const backdrop of backdrops) {
+      fireEvent.mouseDown(backdrop)
+    }
+  })
+
+  it('shows a localized failure status when a group mutation rejects', async () => {
+    localStorage.setItem('language-mode-v1', 'cantonese')
+    const alpha = new Repository('/work/alpha', 1, null, false)
+    const beta = new Repository('/work/beta', 2, null, false)
+    const store = await createStore([
+      makeTab('alpha', alpha, { isPinned: true, isFavorite: true }),
+      makeTab('beta', beta, { isPinned: true }),
+    ])
+    await store.createTabGroup('工作', 'red', ['alpha', 'beta'])
+    store.setTabGroupCollapsed = async () => {
+      throw new Error('disk unavailable')
+    }
+    renderStrip(store, [alpha, beta])
+
+    assert.ok(
+      screen.getByRole('tab', {
+        name: 'alpha，「工作」群組，已置頂，最愛',
+      })
+    )
+    const chip = screen.getByRole('button', {
+      name: '「工作」群組，2 個分頁，已展開。收起群組。',
+    })
+    chip.focus()
+    fireEvent.click(chip)
+
+    await waitFor(() =>
+      assert.match(
+        screen
+          .getAllByRole('status')
+          .map(status => status.textContent ?? '')
+          .join(' '),
+        /未能更新分頁群組，等陣再試。/
+      )
+    )
+    await waitFor(() => assert.equal(document.activeElement, chip))
+  })
+})
+
+describe('CreateTabGroupDialog localization', () => {
+  it('keeps bilingual copy visible, accessible names concise, and updates live to Cantonese', () => {
+    localStorage.setItem('language-mode-v1', 'bilingual')
+    let created: { readonly name: string; readonly color: string } | null = null
+    render(
+      <CreateTabGroupDialog
+        tabLabel="Alpha"
+        onCreate={(name, color) => (created = { name, color })}
+        onDismissed={() => undefined}
+      />
+    )
+
+    // jsdom does not implement HTMLDialogElement.show(), so expose the dialog
+    // exactly as Chromium does after Dialog.componentDidMount.
+    const dialog = document.querySelector('dialog#create-tab-group')
+    assert.notEqual(dialog, null)
+    dialog!.setAttribute('open', '')
+
+    assert.ok(screen.getByRole('dialog', { name: 'New tab group' }))
+    assert.ok(screen.getByText('New tab group · 新分頁群組'))
+    assert.match(
+      screen.getByText(/Alpha.*first tab.* · .*Alpha.*第一個分頁/)
+        .textContent ?? '',
+      /never closes a tab.*絕對唔會閂分頁/
+    )
+    assert.ok(screen.getByText('Group name · 群組名'))
+    assert.ok(screen.getByText('Group color · 群組顏色'))
+    assert.ok(screen.getByRole('group', { name: 'Group color' }))
+    assert.ok(screen.getByRole('button', { name: 'Blue group color' }))
+    assert.ok(screen.getByRole('button', { name: 'Create group' }))
+    assert.ok(screen.getByRole('button', { name: 'Cancel' }))
+
+    localStorage.setItem('language-mode-v1', 'cantonese')
+    fireEvent(
+      document,
+      new CustomEvent(LanguageModeChangedEvent, { detail: 'cantonese' })
+    )
+
+    assert.ok(screen.getByRole('dialog', { name: '新分頁群組' }))
+    const nameInput = screen.getByRole('textbox', { name: '群組名' })
+    const purple = screen.getByRole('button', { name: '紫色群組顏色' })
+    fireEvent.click(purple)
+    assert.equal(purple.getAttribute('aria-pressed'), 'true')
+    fireEvent.change(nameInput, { target: { value: '  團隊  ' } })
+    fireEvent.click(screen.getByRole('button', { name: '建立群組' }))
+
+    assert.deepEqual(created, { name: '團隊', color: 'purple' })
   })
 })
 

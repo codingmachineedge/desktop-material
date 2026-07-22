@@ -1,6 +1,6 @@
 # Submodules — little projects inside your project
 
-![The four known submodule states from declaration through an updated pinned checkout](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/submodule-state-path.svg)
+![The four known submodule states from declaration through an updated pinned checkout](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/diagrams/submodule-state-path.svg)
 
 This is the simplest page in the wiki. On purpose.
 
@@ -19,7 +19,7 @@ special: it has its own label and its own inventory list (its own name, its own 
 its own home on the internet). The big box does not own the small box's toys. It just
 gives the small box a place to sit.
 
-![A big toy box holding toys and a smaller labelled toy box](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-toybox.svg)
+![A big toy box holding toys and a smaller labelled toy box](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-toybox.svg)
 
 Why do people do this? So many big boxes can share one small box. If ten projects need
 the same robot kit, nobody has to copy it ten times. Each project just says: "the
@@ -33,7 +33,7 @@ Here is the one rule that explains almost everything about submodules:
 One exact, frozen version — like a bookmark stuck on one page (Git calls that exact
 version a *commit*).
 
-![The parent project's bookmark points at exactly version 3 on a shelf of versions](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-pointer.svg)
+![The parent project's bookmark points at exactly version 3 on a shelf of versions](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-pointer.svg)
 
 If the robot kit gets a shiny version 4 tomorrow, your project still uses version 3.
 That is a feature, not a bug: your project keeps working exactly the way you tested it.
@@ -54,7 +54,7 @@ Desktop Material warns you when a repository has boxes inside.
    box — its folder, its branch, and where it comes from. Nothing downloads yet.
    You are only peeking.
 
-![A clone list row with a number badge opening a submodule details card](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-clone-badge.svg)
+![A clone list row with a number badge opening a submodule details card](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-clone-badge.svg)
 
 If you clone the big repository normally, Desktop Material fetches the small boxes too
 (it clones *recursively* — meaning boxes inside boxes come along). So most of the time
@@ -71,7 +71,7 @@ In that same **Repository submodules** window, every listed submodule has a
 box as a normal, complete repository — its own folder, its own tab, its own history.
 It does not need its parent at all.
 
-![The small box lifted out of the big box, standing on its own shelf](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-own-box.svg)
+![The small box lifted out of the big box, standing on its own shelf](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-own-box.svg)
 
 Remember: a submodule *is* a real repository. Living inside another project was just
 one of its jobs.
@@ -88,7 +88,7 @@ boxes: the **Submodule manager**.
 2. Find the **Nested repositories** category and press **Open submodule manager**.
    (The same list also lives in **Repository settings → Submodules**.)
 
-![The Submodule Manager with search, status chips, and per-row buttons](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-manager.svg)
+![The Submodule Manager with search, status chips, and per-row buttons](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-manager.svg)
 
 What you see:
 
@@ -136,7 +136,7 @@ temporary viewer**, **Close viewer**, or **Back to parent** twice by accident, D
 Material treats it as one trip: it does not add another tab or saved repository
 entry.
 
-![An initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
+![An initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
 
 The button on a not-yet-downloaded row stays disabled and explains that the
 submodule must be cloned or initialized first. If an initial target moved,
@@ -171,7 +171,7 @@ cannot replace the root workspace.
 Every small box has an address tag: the internet URL it is fetched from. To edit it,
 press **Configure** on the submodule's row.
 
-![A luggage tag with the old address crossed out and a new one written in](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-config.svg)
+![A luggage tag with the old address crossed out and a new one written in](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-config.svg)
 
 The **Configure** window has a small set of clearly named fields:
 
@@ -209,7 +209,7 @@ Want to put another small box inside your project?
 4. Watch the progress. You can cancel while it runs. When it finishes, the new box
    appears in the managed list.
 
-![Clone-style Add Submodule review with a source, checkout path, and tracked branch](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
+![Clone-style Add Submodule review with a source, checkout path, and tracked branch](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
 
 ---
 
@@ -219,7 +219,7 @@ Submodules get confused in boring, predictable ways: a moved address, a half-fin
 download, contents that drifted from the bookmark. Desktop Material gives you three
 small helpers plus **Update**. In toy terms:
 
-![Three panels: the box arrives, gets its name tag, then is filled with the right toys](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-lifecycle.svg)
+![Three panels: the box arrives, gets its name tag, then is filled with the right toys](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-lifecycle.svg)
 
 - **Sync** — "the address on the master list changed; copy it onto the box's own tag."
   Use it when the submodule still fetches from an old URL.
@@ -246,7 +246,7 @@ Desktop Material's **Nested repositories** tools category has a sibling: the
 **Subtree manager** (it appears when your repository's history actually records
 subtrees). A **subtree** solves the same "share the toys" problem a different way.
 
-![A submodule stays a labelled box; a subtree pours the toys into the big box](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/illustrations/submodule-vs-subtree.svg)
+![A submodule stays a labelled box; a subtree pours the toys into the big box](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/illustrations/submodule-vs-subtree.svg)
 
 - A **submodule** borrows the whole box. The small box stays separate, keeps its own
   label and list, and your project only holds a bookmark to one exact version.

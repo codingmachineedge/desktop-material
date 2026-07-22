@@ -1,6 +1,6 @@
 # Agent API
 
-![The local agent request path through authentication, validation, exact repository resolution, and app safeguards](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/agent-request-path.svg)
+![The local agent request path through authentication, validation, exact repository resolution, and app safeguards](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/diagrams/agent-request-path.svg)
 
 Desktop Material ships a built-in **agent control surface** so an AI agent can drive the app
 programmatically. It is exposed as an **MCP server** with a **local HTTP + CLI fallback** for
@@ -23,7 +23,7 @@ environments where an MCP transport isn't convenient.
 The proxy and CLI read the restricted local connection file written by the running app. Use
 **Regenerate token** in Settings to invalidate existing clients immediately.
 
-![Agent access connection and token controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
+![Agent access connection and token controls](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
 
 ## What it exposes
 

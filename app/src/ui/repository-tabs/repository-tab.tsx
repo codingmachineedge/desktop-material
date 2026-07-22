@@ -25,6 +25,7 @@ import {
   repositoryLogoLoader,
 } from '../repository-logo/repository-logo-loader'
 import { Dispatcher } from '../dispatcher'
+import { translateForAccessibleName } from '../../lib/i18n'
 
 interface IRepositoryTabProps {
   readonly tab: IRepositoryTab
@@ -33,6 +34,8 @@ interface IRepositoryTabProps {
   readonly isDragging: boolean
   /** The group this tab belongs to, or null when it is ungrouped. */
   readonly group?: ITabGroup | null
+  /** Concise localized label naming both this tab and its declared group. */
+  readonly groupAccessibleLabel?: string
   readonly onSelect: (tab: IRepositoryTab) => void
   readonly onClose: (tab: IRepositoryTab) => void
   readonly onToggleFavorite: (tab: IRepositoryTab) => void
@@ -324,6 +327,10 @@ export class RepositoryTab extends React.Component<
       .filter(value => value !== null)
       .join(' ')
     const frameStyle = tabFrameStyleToCss(tab.titleStyle)
+    const accessibleLabel =
+      group === null
+        ? this.label
+        : this.props.groupAccessibleLabel ?? this.label
 
     if (this.state.isRenaming) {
       return (
@@ -356,8 +363,14 @@ export class RepositoryTab extends React.Component<
         data-context-menu-owner="repository-tab-commands"
         role="tab"
         aria-selected={isActive}
-        aria-label={`${this.label}${tab.isPinned === true ? ', pinned' : ''}${
-          tab.isFavorite === true ? ', favorite' : ''
+        aria-label={`${accessibleLabel}${
+          tab.isPinned === true
+            ? translateForAccessibleName('tabs.tabPinnedSuffix')
+            : ''
+        }${
+          tab.isFavorite === true
+            ? translateForAccessibleName('tabs.tabFavoriteSuffix')
+            : ''
         }`}
         tabIndex={isActive ? 0 : -1}
         draggable={true}

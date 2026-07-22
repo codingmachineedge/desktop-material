@@ -21,13 +21,20 @@ supported runtime; see [Windows-only platform support](features/integrations/win
   customization scopes, adaptive app-bar behavior, and entry surfaces
 - **[Feature documentation](features/README.md)** - categorized user workflows,
   persistence boundaries, failure modes, security notes, and acceptance targets
+- **[Tab groups](features/identity-and-workspace/tab-groups.md)** - named,
+  colored, collapsible repository-tab organization with profile persistence
+- **[Command palette appearance](features/design-system/command-palette-appearance.md)**
+  - localized row density, icons, group chips, and search-term presentation
+- **[Verification records](verification/README.md)** - reproducible local
+  acceptance evidence and links to exact publication receipts
 
 Appearance is now owner-scoped. Right-clicking an actual visual opens an editor
 beside it; every profile element, feature entry point, repository element, and
 tab title has its own strict setting, local Git repository, and mutable history.
 Ordinary language/theme/scale preferences stay in Settings, and Repository
-Settings no longer has a monolithic Appearance tab. The measured app bar moves Build & Run and then Commit & Push into
-**More** before clipping and restores those mounted actions as space returns.
+Settings no longer has a monolithic Appearance tab. The measured app bar moves
+Build & Run and then Commit & Push into **More** before clipping and restores
+those mounted actions as space returns.
 The pure Material Welcome and landing redesigns share the same token and surface
 language.
 

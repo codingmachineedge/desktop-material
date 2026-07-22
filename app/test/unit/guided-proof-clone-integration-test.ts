@@ -34,16 +34,20 @@ const tokenA = 'production-clone-proof-token-a'
 const tokenB = 'production-clone-proof-token-b'
 
 async function findOpenSSL(): Promise<string> {
-  const candidates = ['openssl']
+  const candidates = new Array<string>()
   if (process.platform === 'win32') {
     const { stdout } = await execFileAsync('git', ['--exec-path'], {
       env: createGuidedProofChildEnvironment(process.env),
       windowsHide: true,
     })
+    // Prefer Git for Windows' self-contained OpenSSL installation. Another
+    // PATH entry can report a version while its compiled-in OPENSSLDIR points
+    // at a missing build-machine drive, making certificate generation fail.
     candidates.push(
       resolve(stdout.trim(), '..', '..', '..', 'usr', 'bin', 'openssl.exe')
     )
   }
+  candidates.push('openssl')
   for (const candidate of candidates) {
     try {
       await execFileAsync(candidate, ['version'], {

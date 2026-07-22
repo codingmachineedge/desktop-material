@@ -269,6 +269,39 @@ describe('main-process GitHub release transfer', () => {
     })
   })
 
+  it("accepts GitHub's empty-string response for an unlabeled upload", async () => {
+    await withDirectory(async directory => {
+      const source = join(directory, 'unlabeled.bin')
+      await writeFile(source, bytes)
+      let cleanupCalls = 0
+      const result = await handleGitHubReleaseAssetUpload(
+        new TestSender(37),
+        uploadRequest(source, { label: undefined }),
+        {
+          fetch: async (_url, init) => {
+            if (init.method === 'DELETE') {
+              cleanupCalls++
+            }
+            return new Response(null, { status: 204 })
+          },
+          upload: async () =>
+            new Response(
+              JSON.stringify({
+                ...uploadedAsset(),
+                name: 'desktop.exe',
+                label: '',
+              }),
+              { status: 201 }
+            ),
+          redirects: noRedirects,
+        }
+      )
+
+      assert.equal(result.ok, true)
+      assert.equal(cleanupCalls, 0)
+    })
+  })
+
   it('refuses incomplete provider assets for uploads and downloads', async () => {
     await withDirectory(async directory => {
       const source = join(directory, 'desktop.exe')

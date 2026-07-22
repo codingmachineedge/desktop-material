@@ -64,6 +64,8 @@ Material is displaying or how a repository is represented in the application.
 - [Clone queue settings](clone-queue-settings.md) — configure each signed-in
   account's background-clone directory, parallel/sequential mode, and enabled
   state from Settings while retaining the existing bounded recovery journal.
+- [Patch-series import and export](patch-series.md) — preview, validate, export,
+  and apply portable patch sequences without silently changing unrelated work.
 
 ## API applicability
 

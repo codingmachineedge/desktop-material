@@ -5,6 +5,8 @@ built for scanning: each row carries an icon, the command title, an optional
 keyword line, and a group chip, and the reader controls how much of that is
 shown.
 
+![Command palette showing Ollama results beside the fully visible row appearance editor](../../assets/screenshots/material-command-palette-appearance.png)
+
 ## Behavior and configuration
 
 The palette is 760px wide (bounded by the viewport) and shows up to 520px of
@@ -16,9 +18,11 @@ Each row renders:
   otherwise its group's icon (Navigate, Repository, Branch, Changes, Edit,
   App), otherwise a neutral fallback so every row keeps the same alignment;
 - the **title**, localized when the command declares a translation key;
-- a **keyword line** carrying the command's search terms, which explains why a
-  fuzzy match hit and doubles as a one-line description;
-- a **group chip**.
+- a **keyword line** carrying the command's search terms, prefixed as search
+  terms in the current language so it explains why a fuzzy match hit and
+  doubles as a one-line description;
+- a localized **group chip** for Navigate, Repository, Branch, Changes, Edit,
+  or App.
 
 **Customize appearance** sits beside the filter-mode and regex controls in the
 search pill. It opens an editor anchored to its own button rather than a
@@ -34,6 +38,13 @@ every change applies immediately:
 
 The choice is stored in `localStorage` under `command-palette-appearance-v1`
 and applies to every later palette session.
+
+The palette title, search prompt, empty state, stable group labels, appearance
+editor, accessibility names, and the three discoverability entries below all
+follow the persisted English, playful Hong Kong-style Cantonese, or bilingual
+language mode. Search still folds the English fallback title, raw group, event,
+keywords, and localized group label into its secondary keys, so changing
+language does not make familiar commands undiscoverable.
 
 ## Discoverability entries
 
@@ -54,7 +65,9 @@ unreadable or unwritable `localStorage` is swallowed so the palette always
 opens and always runs commands.
 
 Closing the anchored editor with Escape does not also close the palette; the
-key is consumed by the editor while it is open.
+key is consumed by the editor while it is open and focus returns to the
+**Customize appearance** button. Clicking outside closes only the anchored
+editor.
 
 ## Security considerations
 
@@ -65,7 +78,8 @@ in a state where it could not otherwise run.
 
 ## Verification
 
-`command-palette-appearance-test.ts` covers the default when nothing is
-stored, a full round trip, field-by-field repair of a partial or invalid
-stored value, safe fallback when storage throws on both read and write, and
-icon resolution precedence (explicit symbol, then group, then fallback).
+`command-palette-appearance-test.ts`, `command-palette-catalog-test.ts`, and
+the command-palette surface tests cover storage defaults and repair, icon
+resolution precedence, localized discoverability titles, localized group
+search, density/toggle persistence, anchored-editor Escape containment, and
+focus restoration.

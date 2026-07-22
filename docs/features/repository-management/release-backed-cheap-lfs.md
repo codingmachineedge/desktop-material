@@ -1,5 +1,10 @@
 # Release-backed large-file storage
 
+![Cheap LFS logo](../../assets/cheap-lfs-logo.png)
+
+The generated mark above is documentation artwork. It is not embedded in the
+pointer format and is not required by the transfer protocol.
+
 The repository rail's **Large files** manager can pin a working-tree file to
 one or more GitHub Release assets and leave a small, human-readable pointer at
 its tracked path. It is intentionally not Git LFS: a client without Desktop
@@ -72,8 +77,9 @@ upload URL, `GH_HOST`, and `GH_REPO` context are fixed by the account-bound
 request. The token is supplied only through an isolated child environment,
 never an argument; inherited GitHub CLI credentials and debug settings are
 removed, an empty temporary CLI config is used, and the directory is deleted
-afterward. The process has bounded output, runs without a shell, and is terminated and
-awaited on cancel. Uploads run with no inactivity or total-runtime timeout:
+afterward. The process has bounded output, runs without a shell, and is
+terminated and awaited on cancel. Uploads run with no inactivity or
+total-runtime timeout:
 a slow connection can take as long as it needs, and a transfer ends only on
 completion, a transport failure, or explicit user cancellation. A failed CLI
 request polls briefly for a delayed completed asset. If and only if no
@@ -255,6 +261,29 @@ filesystem identities the operation created, so a replaced path is not
 deleted.
 
 ## Verification
+
+### Live GitHub protocol acceptance — 2026-07-22
+
+Live acceptance used one retained public repository and one retained private
+repository on the authenticated `DingDingChae` account. Each `main` commit
+contains a canonical five-line `desktop-material/cheap-lfs/v1` pointer to a
+1,048,576-byte uploaded asset in a draft prerelease. Fresh clones retained the
+pointer text and reported no `git lfs ls-files` entries; authenticated
+`gh release download` materialized the exact byte count and SHA-256 in both
+visibility modes. Unauthenticated draft-asset URLs returned HTTP 404 in both
+cases, including the public repository, while the public raw logo remained
+publicly readable.
+
+Credentials remained inside the configured GitHub CLI. No token was exported
+or copied into Desktop Material's keychain, so this proves the live GitHub
+repository/release/pointer/download protocol rather than the app's
+account-bound GUI transport. The detailed IDs, commits, pointer line-ending
+sizes, hashes, and authorization observations are in the detailed record:
+
+- [Cheap LFS public/private GitHub acceptance — 2026-07-22](../../verification/cheap-lfs-github-public-private-2026-07-22.md)
+
+The focused Large files UI test also pins the factual 1.5 GiB-part copy. A GUI
+pin/materialize exercise remains the final live end-to-end gap.
 
 `cheap-lfs/pointer-test.ts` covers canonical single/multipart pointers, legacy
 deflated compatibility, size limits, part totals, path normalization, and the

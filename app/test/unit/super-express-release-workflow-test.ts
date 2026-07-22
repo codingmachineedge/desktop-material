@@ -7,16 +7,30 @@ const workflow = readFileSync(
   join(process.cwd(), '.github/workflows/super-express-release.yml'),
   'utf8'
 )
+const releasePullRequestWorkflow = readFileSync(
+  join(process.cwd(), '.github/workflows/release-pr.yml'),
+  'utf8'
+)
 
 describe('Super Express Release workflow', () => {
-  it('is manual-only and goes straight to a bounded production package', () => {
+  it('is manual-only and tests before building a bounded production package', () => {
     assert.match(workflow, /on:\s*\n\s+workflow_dispatch:/)
     assert.doesNotMatch(workflow, /\n\s+(?:push|workflow_run):/)
     assert.match(workflow, /Require a main-branch manual dispatch/)
     assert.match(workflow, /ref: \$\{\{ env\.RELEASE_TARGET_SHA \}\}/)
+    assert.match(workflow, /run: yarn test:unit/)
+    assert.match(workflow, /run: yarn test:script/)
     assert.match(workflow, /yarn build:prod/)
     assert.match(workflow, /yarn package/)
-    assert.doesNotMatch(workflow, /run:\s*yarn (?:lint|test)/)
+    assert.ok(
+      workflow.indexOf('run: yarn test:unit') <
+        workflow.indexOf('run: yarn build:prod')
+    )
+    assert.ok(
+      workflow.indexOf('run: yarn test:script') <
+        workflow.indexOf('run: yarn build:prod')
+    )
+    assert.doesNotMatch(workflow, /run:\s*yarn lint/)
     assert.doesNotMatch(workflow, /validate-changelog/)
   })
 
@@ -30,5 +44,10 @@ describe('Super Express Release workflow', () => {
     assert.match(workflow, /--target "\$RELEASE_TARGET_SHA"/)
     assert.match(workflow, /git rev-parse 'FETCH_HEAD\^\{commit\}'/)
     assert.doesNotMatch(workflow, /cancel-in-progress:\s*true/)
+  })
+
+  it('targets release pull requests at the Windows product default branch', () => {
+    assert.match(releasePullRequestWorkflow, /--base main/)
+    assert.doesNotMatch(releasePullRequestWorkflow, /--base development/)
   })
 })

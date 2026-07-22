@@ -401,6 +401,7 @@ export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
   {
     event: 'palette:ollama-model-manager',
     title: 'Ollama model manager',
+    titleKey: 'palette.ollamaModelManager',
     group: 'App',
     materialSymbol: 'stacks',
     keywords:
@@ -409,6 +410,7 @@ export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
   {
     event: 'palette:preferences-copilot',
     title: 'Preferences: Copilot and AI providers',
+    titleKey: 'palette.preferencesCopilot',
     group: 'App',
     materialSymbol: 'auto_awesome',
     keywords: 'copilot ai provider ollama openai model byok endpoint chat',
@@ -416,6 +418,7 @@ export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
   {
     event: 'palette:background-queue',
     title: 'Background action and API queue',
+    titleKey: 'palette.backgroundQueue',
     group: 'App',
     materialSymbol: 'low_priority',
     keywords:

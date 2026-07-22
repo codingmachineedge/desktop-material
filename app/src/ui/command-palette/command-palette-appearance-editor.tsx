@@ -1,5 +1,6 @@
 import * as React from 'react'
 import classNames from 'classnames'
+import { t, translateForAccessibleName } from '../../lib/i18n'
 import { MaterialSymbol } from '../lib/material-symbol'
 import {
   CommandPaletteDensity,
@@ -27,6 +28,8 @@ export class CommandPaletteAppearanceEditor extends React.Component<
   ICommandPaletteAppearanceEditorState
 > {
   private containerRef = React.createRef<HTMLDivElement>()
+  private toggleRef = React.createRef<HTMLButtonElement>()
+  private readonly editorId = 'command-palette-appearance-editor'
 
   public constructor(props: ICommandPaletteAppearanceEditorProps) {
     super(props)
@@ -60,7 +63,7 @@ export class CommandPaletteAppearanceEditor extends React.Component<
     ) {
       event.stopPropagation()
       event.preventDefault()
-      this.setState({ open: false })
+      this.setState({ open: false }, () => this.toggleRef.current?.focus())
     }
   }
 
@@ -150,44 +153,51 @@ export class CommandPaletteAppearanceEditor extends React.Component<
     return (
       <div className="command-palette-appearance" ref={this.containerRef}>
         <button
+          ref={this.toggleRef}
           type="button"
           className={classNames('command-palette-appearance-toggle', { open })}
           aria-expanded={open}
           aria-haspopup="dialog"
-          aria-label="Customize command palette appearance"
+          aria-controls={this.editorId}
+          aria-label={translateForAccessibleName(
+            'commandPalette.customizeAppearance'
+          )}
           onClick={this.onToggle}
         >
           <MaterialSymbol name="tune" size={16} />
         </button>
         {open && (
           <div
+            id={this.editorId}
             className="command-palette-appearance-editor"
             role="dialog"
-            aria-label="Command palette appearance"
+            aria-label={translateForAccessibleName(
+              'commandPalette.appearanceDialog'
+            )}
           >
-            <h3>Appearance</h3>
+            <h3>{t('commandPalette.appearanceHeading')}</h3>
             <fieldset>
-              <legend>Row density</legend>
+              <legend>{t('commandPalette.rowDensity')}</legend>
               {this.renderDensityOption(
                 'comfortable',
-                'Comfortable',
-                'Roomier rows with a secondary line'
+                t('commandPalette.comfortable'),
+                t('commandPalette.comfortableDescription')
               )}
               {this.renderDensityOption(
                 'compact',
-                'Compact',
-                'Tighter rows, more commands visible'
+                t('commandPalette.compact'),
+                t('commandPalette.compactDescription')
               )}
             </fieldset>
             <fieldset>
-              <legend>Show in each row</legend>
+              <legend>{t('commandPalette.showInEachRow')}</legend>
               <label className="command-palette-appearance-check">
                 <input
                   type="checkbox"
                   checked={appearance.showIcons}
                   onChange={this.onShowIconsChanged}
                 />
-                <span>Icons</span>
+                <span>{t('commandPalette.icons')}</span>
               </label>
               <label className="command-palette-appearance-check">
                 <input
@@ -195,7 +205,7 @@ export class CommandPaletteAppearanceEditor extends React.Component<
                   checked={appearance.showGroups}
                   onChange={this.onShowGroupsChanged}
                 />
-                <span>Group chips</span>
+                <span>{t('commandPalette.groupChips')}</span>
               </label>
               <label className="command-palette-appearance-check">
                 <input
@@ -203,7 +213,7 @@ export class CommandPaletteAppearanceEditor extends React.Component<
                   checked={appearance.showKeywords}
                   onChange={this.onShowKeywordsChanged}
                 />
-                <span>Keyword line</span>
+                <span>{t('commandPalette.keywordLine')}</span>
               </label>
             </fieldset>
             <button
@@ -211,7 +221,7 @@ export class CommandPaletteAppearanceEditor extends React.Component<
               className="command-palette-appearance-reset"
               onClick={this.onReset}
             >
-              Reset to defaults
+              {t('commandPalette.resetDefaults')}
             </button>
           </div>
         )}

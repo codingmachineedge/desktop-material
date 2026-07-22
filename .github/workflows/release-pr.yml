@@ -45,7 +45,7 @@ jobs:
         run: |
           gh pr create \
             --head "${{ github.ref_name }}" \
-            --base development \
+            --base main \
             --title "$PR_TITLE" \
             --body "$PR_BODY" \
             --draft

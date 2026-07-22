@@ -1,10 +1,10 @@
 # User Guide
 
-![The everyday repository loop from inspecting changes through safe synchronization](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/diagrams/workspace-loop.svg)
+![The everyday repository loop from inspecting changes through safe synchronization](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/diagrams/workspace-loop.svg)
 
 The safest rhythm is simple: inspect, stage, commit, then synchronize. The tools below add power without changing that basic loop.
 
-![A conceptual safe Git workflow from working files to reviewed cloud synchronization](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/safe-git-workflow.png)
+![A conceptual safe Git workflow from working files to reviewed cloud synchronization](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/concepts/safe-git-workflow.png)
 
 A task-oriented tour of Desktop Material's features. It assumes you already know the basic GitHub
 Desktop workflow (clone, commit, push, branch, pull request) — that all still works. This guide
@@ -16,16 +16,16 @@ focuses on what Desktop Material adds on top.
 
 **Feature guide**
 
-The complete M0–M21 roadmap is published on `main`. M22 keeps its separate
-visual-publication acceptance, and this guide includes the M23 Ollama model
-manager. It also covers the verified adaptive maintenance set and M21 workflow
-closure: appearance and profile app identity, favorite/portable tabs, Material
-entry surfaces, guarded tab management, workflow-run
-cancellation, reviewed rebase, repository-account propagation, bounded OAuth scopes, compact
-surface corrections, temporary submodule navigation, and its explicit language and Back-control
-appearance modes, plus the repository-contextual GitHub API Explorer. Exact build, off-screen UI,
-publication, and cleanup receipts are recorded in the repository's `HANDOFF.md` only as each release
-is verified.
+The numbered roadmap now extends through M27. M0–M21 and M23 have published
+receipts; M22 keeps its separate visual refresh, and the acceptance/publication
+state for M24–M27 is recorded in the repository's `ROADMAP.md` and `HANDOFF.md`.
+The latest published baseline is `7edca120c5`, whose CI, code-scanning, and
+installer workflows passed before release `v3.6.3-beta3-b0000040881` published
+all six required assets. The current tab-group, command-palette, Alt-key, and
+release-gate continuation is not covered by those receipts. Its exact unpackaged
+production build and isolated off-screen group/palette interaction passed
+locally, and the two accepted synthetic-only screenshots are documented below.
+A commit and push, remote CI/Pages/wiki, and a Release remain pending.
 
 The temporary-submodule changeset completed its local ten-pass, final post-build
 child/Back, and fresh-bundle duplicate Open/Back race inspections, including
@@ -34,7 +34,7 @@ remote CI caught a macOS error-ordering defect without publishing; correction
 `98d93ccc` passed its full remote CI gate and published
 `v3.6.3-beta3-b0000000165`. Exact publication receipts are in `HANDOFF.md`.
 
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 67-function visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 71-scene visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
@@ -43,6 +43,7 @@ catalogued function or state owns one distinct screenshot rather than borrowing 
 - [Signing in](#signing-in)
 - [Local Ollama model management](#local-ollama-model-management)
 - [Repository tabs](#repository-tabs)
+- [Command palette](#command-palette)
 - [Appearance customization](#appearance-customization)
 - [Settings history](#settings-history)
 - [Non-modal dialogs](#non-modal-dialogs)
@@ -94,10 +95,10 @@ M21 adds progressively disclosed controls around the familiar Desktop flow:
   repository. A successful bounded load refreshes the local cache; while
   offline, the workspace labels and shows only the last-known-good snapshot.
 
-The complete [30-item feature ledger](https://github.com/codingmachineedge/desktop-material/blob/main/docs/features/github-desktop-demand-backlog.md)
+The complete [30-item feature ledger](https://github.com/Ding-Ding-Projects/desktop-material/blob/main/docs/features/github-desktop-demand-backlog.md)
 links to behavior, recovery, security, and test details for every workflow.
 
-![Advanced tag lifecycle workspace with local, pushed, and remote-only tags](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/advanced-workflows.png)
+![Advanced tag lifecycle workspace with local, pushed, and remote-only tags](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/advanced-workflows.png)
 
 ---
 
@@ -109,14 +110,14 @@ release job requires that portable ZIP beside the installer and update-feed
 assets. Open Windows PowerShell 5.1 or PowerShell 7 as your normal user and run:
 
 ```powershell
-Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
+Microsoft.PowerShell.Utility\Invoke-RestMethod 'https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/script/install-windows.ps1' | Microsoft.PowerShell.Utility\Invoke-Expression
 ```
 
 The command loads the
-[tracked installer script](https://github.com/codingmachineedge/desktop-material/blob/main/script/install-windows.ps1)
+[tracked installer script](https://github.com/Ding-Ding-Projects/desktop-material/blob/main/script/install-windows.ps1)
 from this repository. The script then:
 
-1. queries `codingmachineedge/desktop-material` for its newest non-draft,
+1. queries `Ding-Ding-Projects/desktop-material` for its newest non-draft,
    non-prerelease GitHub release;
 2. requires exactly one installer matching the native Windows architecture and
    validates that its HTTPS URL belongs to this repository;
@@ -129,11 +130,11 @@ The current automated workflow publishes unsigned x64 installers. The script
 warns about the missing signature after verifying the GitHub digest, and it
 stops rather than selecting a different package on ARM64 or 32-bit Windows. To
 inspect or download the asset yourself, use the
-[latest release page](https://github.com/codingmachineedge/desktop-material/releases/latest).
+[latest release page](https://github.com/Ding-Ding-Projects/desktop-material/releases/latest).
 When the portable ZIP is present, download and extract it before starting the
-packaged executable; it does not run the Squirrel installer. The focused ZIP
-contract is green, but the first complete local package and remote release
-containing this new asset are still pending.
+packaged executable; it does not run the Squirrel installer. The published
+baseline already contains the required installer, feed, and portable ZIP
+assets. Publication of the current continuation remains pending.
 
 While GitHub Actions is actively building a newer exact `main` commit, the
 About updater can show **New update coming soon** (or the selected Cantonese or
@@ -175,6 +176,10 @@ every day is made of a few pieces:
   inverse-surface undo banner.
 
 The whole shell has an **animated light/dark theme**. Everything below tells you how to drive it.
+On Windows, one uninterrupted bare Alt press toggles the application menu. A
+held key remains one press, while Alt plus another key, another modifier, a
+handled event, or a modal transition cancels that sequence cleanly so a stale
+release cannot affect the next Alt press.
 While an app update downloads, a thin indeterminate progress bar appears at the
 top of the workspace. Choose **Settings → Appearance → Update progress color**
 to inherit the accent or select blue, violet, teal, green, amber, or rose.
@@ -184,9 +189,9 @@ submodule-navigation copy use the explicit language mode saved under
 bilingual presentation. English is the fallback; the operating-system locale
 does not silently replace the saved choice.
 
-![Desktop Material workspace with a profile-customized app identity and favorite repository tab](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
+![Desktop Material workspace with a profile-customized app identity and favorite repository tab](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 
-![Narrow toolbar with Build and Run and Commit and Push available from More without clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
+![Narrow toolbar with Build and Run and Commit and Push available from More without clipping](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
 
 ---
 
@@ -198,7 +203,7 @@ one focused card, preserves keyboard focus and sign-in progress, and explains th
 local to the device. A tonal preview introduces the repository-focused workspace; at compact window
 sizes the preview steps away so the setup task remains unclipped.
 
-![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-welcome.png)
+![Material first-run welcome with a focused setup card and tonal workspace preview](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-welcome.png)
 
 ---
 
@@ -243,7 +248,7 @@ rather than a browser OAuth flow:
 > Bitbucket and hosted GitLab integrations follow the same pattern. Tokens are stored with your
 > platform credential store and are **never exposed** through the agent API.
 
-![GitLab and Bitbucket account controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-provider-accounts.png)
+![GitLab and Bitbucket account controls](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-provider-accounts.png)
 
 ### Browse organizations and publish into one
 
@@ -383,7 +388,31 @@ tell them apart at a glance.
 > that account's local settings repo. Open **Edit → Settings History…** or press `Ctrl+Alt+Z` if
 > you ever need to inspect, undo, redo, or restore an earlier state.
 
-![Word-style tab appearance editor with typography, alignment, and independent text and background palettes](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-appearance-word.png)
+![Word-style tab appearance editor with typography, alignment, and independent text and background palettes](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-tab-appearance-word.png)
+
+### Group tabs
+
+Right-click any repository tab and choose **Add tab to new group…** to name a
+group and choose one of six curated colors. The group appears as a visible chip
+before its first member, with its name, member count, color, active state, and a
+chevron. Select the chip—or focus it and press Enter/Space—to collapse its real
+member tabs and select it again to restore them.
+
+The same tab menu moves a tab into an existing group, removes it, expands or
+collapses the group, or deletes only the organizational label. Deleting a group
+never closes its repositories. Groups stay contiguous and cannot cross the
+protected pinned/unpinned boundary; pin or unpin the tab before moving it to a
+group on the other side. Names, membership, colors, collapse state, and future
+compatible metadata persist per profile/window across open, close, bulk-close,
+reload, history restore, and session import. All group copy and announcements
+follow English, playful Hong Kong-style Cantonese, or bilingual mode.
+
+Dragging or using a named move action within a group's run keeps membership;
+moving a member outside the run ungroups only that tab. One-shot label,
+opened-time, status, and favorite arrangements keep every named group together
+as a stable block.
+
+![Restart-restored named tab-group chip with its visible repository member](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-tab-groups.png)
 
 ### Close matching tabs safely
 
@@ -417,17 +446,44 @@ Use the strip's **Search tabs** button to find and switch to an open repository 
 alias, local path, or clone URL. **Arrange tabs** has a separate **Filter tabs** field for narrowing
 the manual-order rows; the one-shot sort buttons still apply to every open tab and say so explicitly.
 
-![Arrange tabs surface with pinned and manual movement controls plus one-shot label, opened-date, and repository-status sorts](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-arrange.png)
+![Arrange tabs surface with pinned and manual movement controls plus one-shot label, opened-date, and repository-status sorts](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-tab-arrange.png)
 
-![Runtime repository-tab search matching an active repository by name and path](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-tab-search.png)
+![Runtime repository-tab search matching an active repository by name and path](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-tab-search.png)
 
 ### Export or import the current tabs
 
 Choose **File → Export current tabs…** to save a portable JSON description of the open tab order,
 active tab, aliases, pins, favorites, and per-tab appearance. The file includes local repository
-paths but never account tokens or credentials. Choose **File → Import current tabs…** to validate a
-file, preview it, then replace the current tabs or merge with them; missing folders are skipped
-without destructively clearing a usable current session.
+paths but never account tokens or credentials. Profile-local group definitions
+and each tab's `groupId` are intentionally omitted, because membership without
+its destination profile's definition would dangle. Choose **File → Import
+current tabs…** to validate a file, preview it, then replace the current tabs or
+merge with them; missing folders are skipped without destructively clearing a
+usable current session, and the destination profile's existing groups remain
+intact.
+
+---
+
+## Command palette
+
+Press `Ctrl+F` to search every named app function. Each comfortable row shows a
+leading Material Symbol, localized title, optional search-term line, and a
+localized Navigate, Repository, Branch, Changes, Edit, or App chip. Compact
+density fits more commands by suppressing the secondary line.
+
+Use **Customize appearance** beside the filter and regex controls to choose
+comfortable or compact rows and independently show/hide icons, group chips,
+and the keyword line. Changes apply immediately and persist for later palette
+sessions; malformed stored values repair field by field. Escape closes only
+the anchored appearance editor and returns focus to its toggle, leaving the
+palette open.
+
+The palette shell, groups, appearance controls, accessibility names, and the
+Ollama model manager, Copilot/provider preferences, and background queue entries
+follow English, playful Hong Kong-style Cantonese, or bilingual mode. English
+fallback titles and localized group names both remain searchable.
+
+![Command palette showing Ollama results beside the fully visible row appearance editor](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-command-palette-appearance.png)
 
 ---
 
@@ -458,7 +514,7 @@ remains an ordering barrier, and separately awaited changes keep their original 
 The app identity editor covers the code-native logo and in-app name, geometry, color, typography,
 spacing, emphasis, and effects. It does not rename the signed executable or operating-system icon.
 
-![Profile-customized app identity restored in the Material workspace](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
+![Profile-customized app identity restored in the Material workspace](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-app-identity-workspace.png)
 
 ### Repository, logo, and tab owners
 
@@ -498,9 +554,9 @@ tab state remains separate. Desktop Material initializes the clicked title befor
 If an account/profile transition is still rebuilding that title owner, the editor stays closed and a
 localized status asks you to try again instead of taking down the app window.
 
-![Layered custom repository-logo studio with a live preview and safe vector controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
+![Layered custom repository-logo studio with a live preview and safe vector controls](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-repository-logo-studio.png)
 
-![Appearance editor anchored beside its actual owner with History, a dedicated local Git path, and burst-safe persistence](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-customization.png)
+![Appearance editor anchored beside its actual owner with History, a dedicated local Git path, and burst-safe persistence](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-customization.png)
 
 ---
 
@@ -517,7 +573,7 @@ appearance editor for that element's narrower Git repository.
 - Choose **Load more** when the timeline contains more entries than the first page.
 - Undo, redo, and restore all append audit commits, so the history itself is never rewritten.
 
-![Live Settings history side sheet](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/settings-history-manager.png)
+![Live Settings history side sheet](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/settings-history-manager.png)
 
 ---
 
@@ -537,11 +593,11 @@ interactive while a dialog is open.
 **Active** chip on the current section, and a pill footer. The **repository** and **branch** pickers
 open as MD3 **side sheets** rather than blocking modals.
 
-![Preferences as an MD3 dialog](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-settings.png)
+![Preferences as an MD3 dialog](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-settings.png)
 
-![Repository navigation side sheet](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repositories-sheet.png)
+![Repository navigation side sheet](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-repositories-sheet.png)
 
-![Branch navigation and status side sheet](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-branches-sheet.png)
+![Branch navigation and status side sheet](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-branches-sheet.png)
 
 ---
 
@@ -566,7 +622,7 @@ Changing the account clears repository selections from the previous identity bef
 account's list. If a provider refresh fails, use **Try again** in the same view; a stale repository
 cannot remain selected for cloning under the replacement account.
 
-![Block-based regex builder with live repository-name testing](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/regex-builder.png)
+![Block-based regex builder with live repository-name testing](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/regex-builder.png)
 
 On a compact or zoomed viewport, the builder stacks its category and building-block areas before
 cards clip. Its body scrolls vertically while the live tester and footer actions remain reachable;
@@ -660,9 +716,9 @@ the local Agent API as `github_api_<function-name>` tools. A write or destructiv
 through the API tab's visible mutation-review flow; an agent cannot bypass that confirmation.
 Credentials are neither accepted in a function template nor stored with one.
 
-![Named repository-bound API app functions with reviewed execution](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-api-app-functions.png)
+![Named repository-bound API app functions with reviewed execution](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-api-app-functions.png)
 
-![Repository-contextual GitHub API Explorer with a searchable operation catalog, REST request builder, and bounded redacted response](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-api-explorer.png)
+![Repository-contextual GitHub API Explorer with a searchable operation catalog, REST request builder, and bounded redacted response](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-github-api-explorer.png)
 
 ### Shallow clone
 
@@ -676,7 +732,7 @@ Open **File → Clone repository… → URL** when you need only recent history:
 The form explains that it fetches the current branch and recursive submodules. If you need older
 history later, use the named deepen-history action in **Repository tools**.
 
-![Shallow clone with a commit-depth control](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-shallow-clone.png)
+![Shallow clone with a commit-depth control](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-shallow-clone.png)
 
 ### Deepen shallow history
 
@@ -689,13 +745,13 @@ rechecks the marker when the fetch completes.
 The production fixture began with 3 visible commits and finished with all 15; the clean screenshot
 below shows the final state. The raw verification receipt is retained in the P0 run manifest.
 
-![Repository Tools showing full history after a verified deepen](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-deepening.png)
+![Repository Tools showing full history after a verified deepen](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-history-deepening.png)
 
 Repository Tools owns its vertical scroll region. At normal, minimum, short-height, and 150% zoom
 layouts, scrolling reaches the exact final results surface without moving the whole document or
 clipping controls below the viewport.
 
-![Short Repository Tools workspace scrolled to its reachable final results surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools-scroll.png)
+![Short Repository Tools workspace scrolled to its reachable final results surface](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-repository-tools-scroll.png)
 
 ### Sparse checkout
 
@@ -723,9 +779,9 @@ your intent. Reapply and disable have their own review confirmations; disabling 
 tracked working tree without changing commits or history. The verified disabled state below leaves
 all working-tree paths eligible to appear locally.
 
-![Guided sparse-checkout sheet in its disabled Choose state with the persistent three-step guide and directory editor](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
+![Guided sparse-checkout sheet in its disabled Choose state with the persistent three-step guide and directory editor](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-sparse-checkout.png)
 
-![Guided sparse-checkout sheet with Review active, the editor locked, and the exact normalized docs selection](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
+![Guided sparse-checkout sheet with Review active, the editor locked, and the exact normalized docs selection](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-sparse-checkout-safe.png)
 
 These forms wrap labels and stack actions as space narrows. Page-level sideways scrolling is not
 part of the workflow; only inherently spatial content such as code, diffs, and logs may scroll
@@ -765,11 +821,11 @@ language mode. It applies to ordinary manual pull actions only. Scheduled
 commands keep their direct automation paths and safety checks, while Pull All
 and batch sync retain their own review and result surfaces.
 
-![Reviewed ordinary Git pull with exact branch identities, incoming commits, changed files, and a clean-worktree confirmation gate](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-preview.png)
+![Reviewed ordinary Git pull with exact branch identities, incoming commits, changed files, and a clean-worktree confirmation gate](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-pull-preview.png)
 
 ### Rebase the current branch
 
-![Commit checkpoints moving in order onto a newer main-line history](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/safe-rebase.png)
+![Commit checkpoints moving in order onto a newer main-line history](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/concepts/safe-rebase.png)
 
 Open **Branch → Rebase current branch…**, then search for and select the target/base branch. The
 review shows the current→target relationship, ahead/behind context, and a bounded preview of commits
@@ -782,7 +838,7 @@ running. If Git reports conflicts after start, resolve them through the existing
 flow. Protected branches receive explicit guidance, and the app never force-pushes automatically;
 review any later force-with-lease decision separately.
 
-![Reviewed current-branch rebase showing current to target, ahead and behind counts, and a bounded commit preview](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-rebase-review.png)
+![Reviewed current-branch rebase showing current to target, ahead and behind counts, and a bounded commit preview](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-rebase-review.png)
 
 ### Create a pull request
 
@@ -798,7 +854,7 @@ Open **Branch → Create pull request** while the head branch is checked out:
 The app rejects ambiguous remote syntax and routes account problems to repository settings. The
 workflow does not expose `gh pr create`, editable arguments, or a raw REST request.
 
-![Native pull-request creation success with wrapped content](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-create-pull-request.png)
+![Native pull-request creation success with wrapped content](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-create-pull-request.png)
 
 ### Inspect effective branch rules
 
@@ -812,13 +868,13 @@ matches a legacy repository, **Open repository settings** opens the real reposit
 saving one records its stable `endpoint#id` identity. Unknown or partial policy evidence is stated
 instead of guessed.
 
-![Effective branch rules with long checks and policy details wrapped](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-effective-branch-rules.png)
+![Effective branch rules with long checks and policy details wrapped](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-effective-branch-rules.png)
 
 ---
 
 ## One-click commit & push
 
-![A short-lived feature branch passing review and merging into the stable line](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/short-lived-branch.png)
+![A short-lived feature branch passing review and merging into the stable line](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/concepts/short-lived-branch.png)
 
 For quick, low-ceremony commits, use **one-click commit & push**:
 
@@ -969,9 +1025,9 @@ keep local app events separate from GitHub inbox items:
 The account, filters, and empty state are part of the guided inbox workflow rather than a `gh`
 command or GitHub API search screen.
 
-![Filtered Local notifications selected for bulk triage](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-notification-bulk-actions.png)
+![Filtered Local notifications selected for bulk triage](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-notification-bulk-actions.png)
 
-![GitHub notification view with the no-signed-in-account state](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
+![GitHub notification view with the no-signed-in-account state](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-github-notifications.png)
 
 ### Error presentation
 
@@ -987,7 +1043,7 @@ When Git reports the affected repository's exact stale `.git/index.lock`, the no
 refuses recent, linked, non-file, or changed locks before atomically quarantining and removing the
 verified stale file. Retry the original Git operation after the notice closes.
 
-![Bottom-right Git lock error notice with Remove lock file recovery](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
+![Bottom-right Git lock error notice with Remove lock file recovery](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-error-notice.png)
 
 ---
 
@@ -1017,6 +1073,10 @@ The **Actions** panel brings CI into the app:
   confirmation. It is never inferred from a deployment decision.
 - Trigger manual workflows with the **`workflow_dispatch` dialog** — pick the workflow, ref, and
   inputs, and dispatch.
+- The repository's **Super Express Release** lane runs the complete unit and
+  script suites before its Windows x64 production build/package. It remains a
+  fast lane by skipping lint, E2E, and history-generated notes, and a release
+  pull request targets the Windows product's `main` default branch.
 - Select a run artifact to review its name, size, creation/expiry, workflow source, and GitHub digest.
   Choose **Load more artifacts** to append the next bounded page. A failed later page keeps the
   cards you already loaded and lets you retry that same page.
@@ -1026,25 +1086,25 @@ The **Actions** panel brings CI into the app:
   cryptographic verification: signer, signature, timestamp, source identity, and policy still need a
   future verification function.
 
-![Material workflow-run cancellation review naming the exact run, ref, actor, and commit](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-cancel.png)
+![Material workflow-run cancellation review naming the exact run, ref, actor, and commit](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-cancel.png)
 
-![Actions artifact with digest match and attestation-presence context](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifacts.png)
+![Actions artifact with digest match and attestation-presence context](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-artifacts.png)
 
-![Actions cache manager with usage totals, refs, wrapped keys, and delete controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-cache-manager.png)
+![Actions cache manager with usage totals, refs, wrapped keys, and delete controls](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-cache-manager.png)
 
-![Headless Actions run pagination with the page-two sentinel retained](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pagination-headless.png)
+![Headless Actions run pagination with the page-two sentinel retained](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-pagination-headless.png)
 
-![Headless Actions artifact inventory with bounded pagination](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifacts-headless.png)
+![Headless Actions artifact inventory with bounded pagination](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-artifacts-headless.png)
 
-![Headless Actions sentinel evidence with wrapped content and no clipping](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-sentinel-headless.png)
+![Headless Actions sentinel evidence with wrapped content and no clipping](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-sentinel-headless.png)
 
-![Actions workflow-run pagination with 51 filtered runs retained after Refresh](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pagination.png)
+![Actions workflow-run pagination with 51 filtered runs retained after Refresh](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-pagination.png)
 
-![Actions artifact page two with a deliberately long wrapping sentinel name](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-artifact-page-two.png)
+![Actions artifact page two with a deliberately long wrapping sentinel name](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-artifact-page-two.png)
 
-![Attempt-aware Actions job pagination with an exact recovered page-two job](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-jobs-pagination.png)
+![Attempt-aware Actions job pagination with an exact recovered page-two job](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-jobs-pagination.png)
 
-![Pending Actions deployment environments with long reviewer and protection details](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-pending-deployments.png)
+![Pending Actions deployment environments with long reviewer and protection details](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-pending-deployments.png)
 
 The historical M0–M19 production gates exercised 50→51 filtered runs, 30→31 artifacts, and current/historical 50→51
 job pages, including a deliberate later-page 503→200 retry. Exact job log/re-run, deployment review,
@@ -1059,7 +1119,7 @@ request filter tracks the original request and removes authentication, authoriza
 headers before any cross-origin hop. Download errors also omit signed URLs and query strings. The
 live Windows x64 proof below shows the resulting searchable, collapsible log viewer.
 
-![Windows x64 GitHub Actions job log loaded securely in the searchable in-app viewer](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-actions-job-log.png)
+![Windows x64 GitHub Actions job log loaded securely in the searchable in-app viewer](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-actions-job-log.png)
 
 ---
 
@@ -1085,7 +1145,7 @@ stacks above the detail pane instead of squeezing text.
   remain distinct. A failed release or asset request names the failed operation and retries that same
   scope without discarding already loaded data.
 
-![Releases dashboard with status summary, searchable catalog, selected metadata, and assets](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-github-releases.png)
+![Releases dashboard with status summary, searchable catalog, selected metadata, and assets](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-github-releases.png)
 
 ---
 
@@ -1114,17 +1174,17 @@ The Pages gallery also has a dedicated accessibility/clipping check at 960×660 
 passes with zero axe violations, matching document/body widths, and no horizontally outside
 elements.
 
-![Requested 200 percent UI scale auto-fitted to 96 percent at the minimum window size](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
+![Requested 200 percent UI scale auto-fitted to 96 percent at the minimum window size](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-scale-200-autofit.png)
 
-![Responsive regression proof at 1450 by 997 with toolbar and Changes controls fully contained and no horizontal overflow](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-responsive-overflow-fixed.png)
+![Responsive regression proof at 1450 by 997 with toolbar and Changes controls fully contained and no horizontal overflow](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-responsive-overflow-fixed.png)
 
-![Measured narrow toolbar with its complete More actions surface](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
+![Measured narrow toolbar with its complete More actions surface](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-toolbar-overflow.png)
 
 ---
 
 ## Automation and merge-all
 
-![Two conflicting file streams reconciled into one verified result](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/concepts/conflict-resolution.png)
+![Two conflicting file streams reconciled into one verified result](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/concepts/conflict-resolution.png)
 
 Open **Settings → Automation** to configure the two background schedules:
 
@@ -1144,9 +1204,9 @@ The Branches and Worktrees views also expose **Merge all branches** and **Merge 
 Confirm the target, follow each row's progress, and review any skipped or failed target. When
 Copilot conflict assistance is available, it participates inside the same guarded workflow.
 
-![Automation preferences with global and account overrides](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-automation.png)
+![Automation preferences with global and account overrides](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-automation.png)
 
-![Merge all branches with per-target progress](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-branch-merge-all.png)
+![Merge all branches with per-target progress](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-branch-merge-all.png)
 
 ---
 
@@ -1161,9 +1221,9 @@ provider actions. The row's named **More actions** button, the Context Menu key,
 open the same action set. Invoking an unselected commit targets only that row; invoking a member of
 the current multi-selection preserves the selection for eligible multi-commit actions.
 
-![History search and commit graph](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
+![History search and commit graph](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-history-power-tools.png)
 
-![History commit row with its named More actions control and hover hint](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-history-context-actions.png)
+![History commit row with its named More actions control and hover hint](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-history-context-actions.png)
 
 ---
 
@@ -1181,7 +1241,7 @@ all stash entries instead of treating only the newest one as available:
 Switching branches can still offer to stash local work, and the resulting entry appears in the same
 list.
 
-![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
+![Repository-wide stash manager with an exact selected entry](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-stash-manager.png)
 
 ---
 
@@ -1261,17 +1321,17 @@ selection fails closed, while credential requests from cross-origin submodules r
 account resolution. Successful fallback uses the neutral result **Pull completed using another
 signed-in account.**
 
-![Pull all completing with another signed-in account without exposing its identity](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
+![Pull all completing with another signed-in account without exposing its identity](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-pull-all-account-fallback.png)
 
-![Named Repository Tools administration hub](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
+![Named Repository Tools administration hub](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-repository-tools.png)
 
-![Reviewed named-remote administration](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
+![Reviewed named-remote administration](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-remote-manager.png)
 
-![Clone-style Add Submodule review with a synthetic URL, checkout path, and tracked branch](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
+![Clone-style Add Submodule review with a synthetic URL, checkout path, and tracked branch](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/add-submodule-dialog.png)
 
-![Initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
+![Initialized submodule opened temporarily with a context bar and Back control to the persisted root repository](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-submodule-context.png)
 
-![Reviewed gitignore template catalogue](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-gitignore-manager.png)
+![Reviewed gitignore template catalogue](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-gitignore-manager.png)
 
 ---
 
@@ -1282,7 +1342,7 @@ Worktree in New Window** as well. Each window maintains its own selected reposit
 tabs, and native/menu/CLI actions route to the correct window. Closing and reopening the app
 restores the persisted window tab state.
 
-![Open a repository or worktree in another window](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)
+![Open a repository or worktree in another window](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-multi-window-menu.png)
 
 ---
 
@@ -1315,7 +1375,7 @@ commit, fetch/pull/push, branch creation/merge, tab selection, automation status
 workflow dispatch, and the active profile's repository-bound named API read functions. It never
 returns provider credentials. See [Agent API](Agent-API) for command and security details.
 
-![Agent access connection and token controls](https://raw.githubusercontent.com/codingmachineedge/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
+![Agent access connection and token controls](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/material-agent-access.png)
 
 ---
 

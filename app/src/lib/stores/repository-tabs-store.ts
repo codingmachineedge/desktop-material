@@ -111,33 +111,86 @@ function tabMatchKeys(tab: IRepositoryTab): ReadonlyArray<string> {
     : [name, tab.repositoryPath]
 }
 
-/** Keep the pinned group before the unpinned group without disturbing ties. */
+interface IRepositoryTabBlock {
+  readonly tabs: IRepositoryTab[]
+  readonly index: number
+}
+
+/** Collect every declared group into one block at its first member's position. */
+function groupTabBlocks(
+  tabs: ReadonlyArray<IRepositoryTab>
+): IRepositoryTabBlock[] {
+  const blocks: IRepositoryTabBlock[] = []
+  const groupBlocks = new Map<string, IRepositoryTabBlock>()
+  for (const tab of tabs) {
+    const groupId = tab.groupId ?? null
+    if (groupId === null) {
+      blocks.push({ tabs: [tab], index: blocks.length })
+      continue
+    }
+
+    const existing = groupBlocks.get(groupId)
+    if (existing !== undefined) {
+      existing.tabs.push(tab)
+      continue
+    }
+
+    const block = { tabs: [tab], index: blocks.length }
+    groupBlocks.set(groupId, block)
+    blocks.push(block)
+  }
+  return blocks
+}
+
+/**
+ * Repair the two structural group invariants at every load/import/reorder:
+ * pinned tabs lead, and one named group is one contiguous pin-side block.
+ * For malformed cross-boundary input, the first member keeps the group while
+ * incompatible later members degrade safely to ungrouped tabs.
+ */
 function groupPinnedTabs(
   tabs: ReadonlyArray<IRepositoryTab>
 ): ReadonlyArray<IRepositoryTab> {
+  const groupPinKinds = new Map<string, boolean>()
+  const repaired = tabs.map(tab => {
+    const groupId = tab.groupId ?? null
+    if (groupId === null) {
+      return tab
+    }
+    const pinKind = tab.isPinned === true
+    const established = groupPinKinds.get(groupId)
+    if (established === undefined) {
+      groupPinKinds.set(groupId, pinKind)
+      return tab
+    }
+    return established === pinKind ? tab : { ...tab, groupId: null }
+  })
+
+  const compact = (partition: ReadonlyArray<IRepositoryTab>) =>
+    groupTabBlocks(partition).flatMap(block => block.tabs)
   return [
-    ...tabs.filter(tab => tab.isPinned === true),
-    ...tabs.filter(tab => tab.isPinned !== true),
+    ...compact(repaired.filter(tab => tab.isPinned === true)),
+    ...compact(repaired.filter(tab => tab.isPinned !== true)),
   ]
 }
 
-/** Sort each pin group independently so sorting never crosses its boundary. */
+/** Sort atomic tab-group blocks independently inside each pin partition. */
 function stableSortPinGroups(
   tabs: ReadonlyArray<IRepositoryTab>,
   compare: (left: IRepositoryTab, right: IRepositoryTab) => number
 ): ReadonlyArray<IRepositoryTab> {
-  const stableSort = (group: ReadonlyArray<IRepositoryTab>) =>
-    group
-      .map((tab, index) => ({ tab, index }))
+  const normalized = groupPinnedTabs(tabs)
+  const stableSort = (partition: ReadonlyArray<IRepositoryTab>) =>
+    groupTabBlocks(partition)
       .sort(
         (left, right) =>
-          compare(left.tab, right.tab) || left.index - right.index
+          compare(left.tabs[0], right.tabs[0]) || left.index - right.index
       )
-      .map(item => item.tab)
+      .flatMap(block => block.tabs)
 
   return [
-    ...stableSort(tabs.filter(tab => tab.isPinned === true)),
-    ...stableSort(tabs.filter(tab => tab.isPinned !== true)),
+    ...stableSort(normalized.filter(tab => tab.isPinned === true)),
+    ...stableSort(normalized.filter(tab => tab.isPinned !== true)),
   ]
 }
 
@@ -402,7 +455,11 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
       )
     }
     await this.persist(
-      { tabs: [...this.state.tabs, tab], activeTabId: tab.id },
+      {
+        ...this.state,
+        tabs: [...this.state.tabs, tab],
+        activeTabId: tab.id,
+      },
       `Open tab: ${repository.name}`
     )
   }
@@ -433,7 +490,7 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     }
 
     await this.persist(
-      { tabs, activeTabId },
+      { ...this.state, tabs, activeTabId },
       `Close tab: ${closed.customLabel ?? '#' + closed.repositoryId}`
     )
     this.tabStyleRevisions.delete(id)
@@ -519,7 +576,7 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
       activeTabId = this.pickNeighbor(oldTabs, survivors, activeTabId)
     }
 
-    await this.persist({ tabs, activeTabId }, description)
+    await this.persist({ ...this.state, tabs, activeTabId }, description)
     for (const id of closableIds) {
       this.tabStyleRevisions.delete(id)
     }
@@ -687,8 +744,24 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     if (clamped === from) {
       return
     }
-    tabs.splice(clamped, 0, moved)
-    await this.persist({ ...this.state, tabs }, `Reorder tabs`)
+
+    const groupId = moved.groupId ?? null
+    const remainingGroupIndexes = tabs.flatMap((tab, index) =>
+      groupId !== null && tab.groupId === groupId ? [index] : []
+    )
+    const staysWithGroup =
+      remainingGroupIndexes.length === 0 ||
+      (clamped >= Math.min(...remainingGroupIndexes) &&
+        clamped <= Math.max(...remainingGroupIndexes) + 1)
+    tabs.splice(
+      clamped,
+      0,
+      groupId !== null && !staysWithGroup ? { ...moved, groupId: null } : moved
+    )
+    await this.persist(
+      { ...this.state, tabs: groupPinnedTabs(tabs) },
+      `Reorder tabs`
+    )
   }
 
   /** Pin/unpin a tab and move it to the nearest edge of its new group. */
@@ -701,11 +774,27 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
 
     const tabs = [...this.state.tabs]
     tabs.splice(index, 1)
-    const moved = { ...current, isPinned }
+    const leavesGroupBehind =
+      current.groupId !== undefined &&
+      current.groupId !== null &&
+      this.state.tabs.some(
+        tab =>
+          tab.id !== id &&
+          tab.groupId === current.groupId &&
+          (tab.isPinned === true) !== isPinned
+      )
+    // Named groups never span the protected pin boundary. Moving the final or
+    // only member keeps its group; moving one member away from its peers makes
+    // that tab ungrouped rather than silently splitting the group in two.
+    const moved = {
+      ...current,
+      isPinned,
+      ...(leavesGroupBehind ? { groupId: null } : {}),
+    }
     const pinnedCount = tabs.filter(tab => tab.isPinned === true).length
     tabs.splice(pinnedCount, 0, moved)
     await this.persist(
-      { ...this.state, tabs },
+      { ...this.state, tabs: groupPinnedTabs(tabs) },
       isPinned ? 'Pin tab' : 'Unpin tab'
     )
   }
@@ -764,9 +853,27 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
       name: normalizedName,
       color: normalizeTabGroupColor(color),
     }
-    const members = new Set(tabIds)
-    const tabs = this.state.tabs.map(tab =>
-      members.has(tab.id) ? { ...tab, groupId: group.id } : tab
+    const requestedMembers = new Set(tabIds)
+    const firstMember = this.state.tabs.find(tab =>
+      requestedMembers.has(tab.id)
+    )
+    const memberPinKind = firstMember?.isPinned === true
+    // A caller may supply several ids, but a named group cannot cross the
+    // protected pin boundary. Keep the first existing member's pin kind and
+    // ignore incompatible ids; an empty request still creates an empty group.
+    const members = new Set(
+      this.state.tabs
+        .filter(
+          tab =>
+            requestedMembers.has(tab.id) &&
+            (tab.isPinned === true) === memberPinKind
+        )
+        .map(tab => tab.id)
+    )
+    const tabs = groupPinnedTabs(
+      this.state.tabs.map(tab =>
+        members.has(tab.id) ? { ...tab, groupId: group.id } : tab
+      )
     )
     await this.persist(
       { ...this.state, tabs, groups: [...this.getGroups(), group] },
@@ -852,6 +959,22 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
       return
     }
 
+    // A group cannot cross the protected pin boundary: inserting an unpinned
+    // tab beside pinned members (or vice versa) would break the invariant that
+    // every pinned tab precedes every unpinned tab. Empty groups accept either
+    // kind; after the first member, the group inherits that member's pin kind.
+    if (
+      target !== null &&
+      this.state.tabs.some(
+        tab =>
+          tab.id !== id &&
+          (tab.groupId ?? null) === target &&
+          (tab.isPinned === true) !== (current.isPinned === true)
+      )
+    ) {
+      return
+    }
+
     const tabs = [...this.state.tabs]
     tabs.splice(index, 1)
     const moved = { ...current, groupId: target }
@@ -870,7 +993,7 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
     tabs.splice(insertAt, 0, moved)
 
     await this.persist(
-      { ...this.state, tabs },
+      { ...this.state, tabs: groupPinnedTabs(tabs) },
       target === null ? 'Remove tab from group' : 'Add tab to group'
     )
   }
@@ -963,6 +1086,10 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
         repositoryPath: repository.path,
         customLabel: entry.customLabel,
         titleStyle: entry.titleStyle,
+        // Version-1 portable sessions carry no group definitions. Preserve an
+        // existing local membership during merge, but never import a dangling
+        // profile-local groupId onto a new/replaced tab.
+        groupId: existing?.groupId ?? null,
         isPinned: entry.isPinned === true,
         isFavorite: entry.isFavorite === true,
         openedAt: entry.openedAt ?? existing?.openedAt ?? this.now(),
@@ -994,7 +1121,11 @@ export class RepositoryTabsStore extends TypedBaseStore<IProfileTabsState> {
         ? this.state.activeTabId
         : tabs[0]?.id ?? null)
 
-    let nextState: IProfileTabsState = { tabs, activeTabId }
+    let nextState: IProfileTabsState = {
+      ...this.state,
+      tabs,
+      activeTabId,
+    }
     if (this.elementAppearanceCoordinator !== undefined) {
       // A portable import carries appearance as seed data for a new tab and as
       // an explicit edit for a matching tab. Each imported title still lands

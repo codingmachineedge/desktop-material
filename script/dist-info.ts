@@ -168,7 +168,7 @@ export function getUpdatesURL() {
   // Repository that publishes fork releases. Overridable so a downstream
   // re-fork doesn't have to patch source to retarget its own release feed.
   const repo =
-    process.env.DESKTOP_UPDATES_REPO ?? 'codingmachineedge/desktop-material'
+    process.env.DESKTOP_UPDATES_REPO ?? 'Ding-Ding-Projects/desktop-material'
   return `https://github.com/${repo}/releases/latest/download/`
 }
 

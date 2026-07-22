@@ -237,6 +237,62 @@ describe('GitHub Releases store', () => {
     assert.notEqual(requested?.signal, controller.signal)
   })
 
+  it('finds an unpublished draft by scanning the bounded release inventory', async () => {
+    const requestedPages = new Array<number>()
+    const otherRelease = { ...release, id: 8, tagName: 'other-draft' }
+    const store = await storeWith(
+      new FakeAccountsStore([selected]),
+      dependencies(() =>
+        fakeAPI({
+          // GitHub's exact tag endpoint reports draft tags as not found.
+          fetchReleaseByTag: async () => null,
+          fetchReleases: async (_owner, _name, page = 1) => {
+            requestedPages.push(page)
+            return page === 1
+              ? {
+                  releases: [otherRelease],
+                  page,
+                  nextPage: 2,
+                  capped: false,
+                }
+              : {
+                  releases: [release],
+                  page,
+                  nextPage: null,
+                  capped: false,
+                }
+          },
+        })
+      )
+    )
+
+    const result = await store.getReleaseByTag(repository, release.tagName)
+    assert.equal(result, release)
+    assert.deepEqual(requestedPages, [1, 2])
+  })
+
+  it('does not list releases when the exact tag endpoint succeeds', async () => {
+    let listed = false
+    const store = await storeWith(
+      new FakeAccountsStore([selected]),
+      dependencies(() =>
+        fakeAPI({
+          fetchReleaseByTag: async () => release,
+          fetchReleases: async () => {
+            listed = true
+            throw new Error('release inventory should not be requested')
+          },
+        })
+      )
+    )
+
+    assert.equal(
+      await store.getReleaseByTag(repository, release.tagName),
+      release
+    )
+    assert.equal(listed, false)
+  })
+
   it('cancels and rejects stale results when the selected account changes', async () => {
     const accountsStore = new FakeAccountsStore([selected])
     let resolveRequest:

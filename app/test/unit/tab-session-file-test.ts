@@ -20,6 +20,7 @@ describe('tab session files', () => {
           repositoryPath: 'C:\\work\\alpha',
           customLabel: 'Alpha workspace',
           titleStyle: { bold: true, futureTextEffect: 'rainbow' },
+          groupId: 'profile-local-group',
           isPinned: true,
           openedAt: 100,
           futureTabField: 'preserved',
@@ -40,7 +41,10 @@ describe('tab session files', () => {
       state,
       new Date('2026-07-16T12:00:00.000Z')
     )
-    assert.doesNotMatch(serialized, /runtime-one|runtime-two|repositoryId/)
+    assert.doesNotMatch(
+      serialized,
+      /runtime-one|runtime-two|repositoryId|profile-local-group|groupId/
+    )
     const parsed = parseTabSession(serialized)
 
     assert.ok(parsed)
@@ -51,6 +55,7 @@ describe('tab session files', () => {
     assert.equal(parsed.tabs[1].isFavorite, true)
     assert.equal(parsed.tabs[0].futureTabField, 'preserved')
     assert.equal(parsed.tabs[0].titleStyle?.futureTextEffect, 'rainbow')
+    assert.equal(parsed.tabs[0].groupId, undefined)
   })
 
   it('sanitizes unsafe known fields while preserving future data', () => {
@@ -69,6 +74,7 @@ describe('tab session files', () => {
             customLabel: '  Safe alias  ',
             isPinned: 'yes',
             isFavorite: true,
+            groupId: 'missing-group-definition',
             openedAt: -5,
             futureTabField: { mode: 'newer' },
             titleStyle: {
@@ -91,6 +97,7 @@ describe('tab session files', () => {
     assert.equal(parsed.tabs[0].customLabel, 'Safe alias')
     assert.equal(parsed.tabs[0].isPinned, undefined)
     assert.equal(parsed.tabs[0].isFavorite, true)
+    assert.equal(parsed.tabs[0].groupId, undefined)
     assert.equal(parsed.tabs[0].openedAt, undefined)
     assert.equal(parsed.tabs[0].id, undefined)
     assert.equal(parsed.tabs[0].repositoryId, undefined)

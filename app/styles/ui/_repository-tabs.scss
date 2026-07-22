@@ -1828,28 +1828,9 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 // geometry. Colors come from a closed, curated set (see TabGroupColors), never
 // from a persisted free-form string.
 // ---------------------------------------------------------------------------
-.repository-tab.grouped {
-  position: relative;
+.repository-tab.grouped,
+.repository-tab-group-chip {
   --dm-tab-group-color: var(--md-sys-color-primary);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 6px;
-    left: 6px;
-    height: 3px;
-    border-radius: 0 0 3px 3px;
-    background: var(--dm-tab-group-color);
-  }
-
-  &.active {
-    background: color-mix(in srgb, var(--dm-tab-group-color) 16%, var(--md-sys-color-surface-container-lowest));
-  }
-
-  &:hover:not(.active) {
-    background: color-mix(in srgb, var(--dm-tab-group-color) 10%, transparent);
-  }
 
   &.tab-group--blue {
     --dm-tab-group-color: #4285f4;
@@ -1876,6 +1857,138 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   }
 }
 
+.repository-tab.grouped {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 6px;
+    left: 6px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--dm-tab-group-color);
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--dm-tab-group-color) 16%, var(--md-sys-color-surface-container-lowest));
+  }
+
+  &:hover:not(.active) {
+    background: color-mix(in srgb, var(--dm-tab-group-color) 10%, transparent);
+  }
+}
+
+.repository-tab-group-chip {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  max-width: 190px;
+  min-height: 30px;
+  margin-bottom: 4px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--dm-tab-group-color) 48%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-tab-group-color) 12%, var(--md-sys-color-surface-container-lowest));
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  transition: background 160ms var(--emph), border-color 160ms var(--emph), transform 160ms var(--spring-fast);
+
+  &:hover {
+    background: color-mix(in srgb, var(--dm-tab-group-color) 20%, var(--md-sys-color-surface-container-lowest));
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+
+  &.active {
+    border-color: var(--dm-tab-group-color);
+    background: color-mix(in srgb, var(--dm-tab-group-color) 22%, var(--md-sys-color-surface-container-lowest));
+    box-shadow: var(--md-sys-elevation-level1);
+  }
+
+  .repository-tab-group-dot {
+    flex: 0 0 9px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--dm-tab-group-color);
+  }
+
+  .repository-tab-group-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .repository-tab-group-count {
+    display: grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--dm-tab-group-color) 18%, transparent);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .repository-tab-group-chevron {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+  }
+}
+
+@media (max-width: 700px) {
+  .repository-tab-group-chip {
+    max-width: 132px;
+    padding-inline: 7px;
+
+    .repository-tab-group-count {
+      display: none;
+    }
+  }
+}
+
+@media (forced-colors: active) {
+  .repository-tab-group-chip {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+
+    &.active {
+      border-width: 2px;
+      background: Highlight;
+      color: HighlightText;
+      box-shadow: none;
+    }
+
+    .repository-tab-group-dot {
+      border: 1px solid CanvasText;
+      forced-color-adjust: none;
+    }
+
+    .repository-tab-group-count {
+      border: 1px solid ButtonText;
+      background: ButtonFace;
+      color: ButtonText;
+    }
+  }
+}
+
 // The new-group dialog's color chooser.
 #create-tab-group {
   .tab-group-intro {
@@ -1886,7 +1999,17 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   .tab-group-colors {
     display: flex;
     gap: 10px;
+    margin-top: 8px;
+  }
+
+  .tab-group-colors-field {
     margin-top: 14px;
+  }
+
+  .tab-group-colors-label {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .tab-group-color {

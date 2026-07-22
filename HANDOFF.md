@@ -1,51 +1,123 @@
 # Desktop Material — Active parity handoff
 
-## 2026-07-22 command palette rows, tab groups, and Alt-menu reliability
+## 2026-07-22 live Cheap LFS public/private GitHub backend acceptance
 
-The command palette is wider (760px) and taller (520px of results), and each
-row now renders a leading Material Symbol (the command's own, else its
-group's, else a neutral fallback), the title, a keyword line that explains why
-a fuzzy match hit, and a group chip. A **Customize appearance** control sits
-beside the filter-mode/regex cluster and opens an editor anchored to its own
-button — not a separate dialog — so the list stays visible while row density
-(comfortable/compact) and the icon, group-chip, and keyword-line toggles are
-adjusted. The choice persists in `localStorage` and is repaired field by field
-when the stored value is partial or invalid; storage failures are swallowed so
-the palette always opens.
+Live Cheap LFS protocol acceptance completed on the configured `DingDingChae`
+GitHub CLI account. Both purpose-built repositories are retained on `main`:
 
-Three surfaces that were only reachable by knowing which settings tab hosts
-them are now named in the palette by what they do: **Ollama model manager**
-and **Preferences: Copilot and AI providers** (both open the Copilot providers
-tab that hosts the manager) and **Background action and API queue** (keywords
-include docker/api/job).
+- Public:
+  [`DingDingChae/desktop-material-cheap-lfs-public-20260722-153308`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308),
+  commit `0ca7df318fa741cae31fd6ade7d7133e2be76133`, release `358270369`,
+  asset `486345586` (`payload-public.bin`).
+- Private: `DingDingChae/desktop-material-cheap-lfs-private-20260722-153308`,
+  commit `c2f2cbd5a8ebcd877c86f4d0a8e356290e001125`, release `358270368`,
+  asset `486345587` (`payload-private.bin`).
 
-Tab groups landed as an organizational layer over the existing strip.
-`IProfileTabsState.groups` and `IRepositoryTab.groupId` are both optional, so
-profiles written before groups load without migration, and an unknown
-`groupId` degrades to ungrouped rather than being dropped. The tab context
-menu can start a new named/colored group, move a tab between groups, remove it
-from one, collapse/expand, and delete a group — deleting only removes the
-label and never closes a tab. Moving a tab lands it beside its new group's
-last member so a group reads as one contiguous run. Colors come from a closed
-curated set re-validated on read and render, so a hand-edited profile cannot
-inject CSS through a group.
+Each release is a draft prerelease tagged `assets-test-20260722-153308`. Both
+assets are in `uploaded` state at 1,048,576 bytes with digest
+`sha256:30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58`.
+Authenticated `gh release download` reproduced the exact size and digest, and
+`fc /b` reported no differences from either source. Unauthenticated draft-asset
+URLs returned HTTP 404 for both repositories, including the public repository.
 
-`onWindowKeyDown` now records `lastKeyPressed` on every path, including its
-`defaultPrevented` and modal early returns, and treats a held Alt (repeat
-events) as one press. Previously a handled or modal key press left that field
-stale, and because the Alt key-up handler opens the menu only when Alt was
-also the last key pressed, the next Alt tap silently did nothing. Note this is
-a defensible state fix reasoned from the code, not a confirmed reproduction of
-the reported Releases/Actions symptom: probing the running build over CDP,
-clicking File/Repository/Branch opened correctly on Changes, History, Actions
-and Releases alike, and synthetic Alt key events never opened the menu on any
-tab, so the exact reported path remains unverified end to end.
+Each commit contains a canonical five-line `desktop-material/cheap-lfs/v1`
+pointer. The LF Git blobs are 193 bytes public and 194 bytes private; Windows
+fresh-clone CRLF copies are 198 and 199 bytes. `git lfs ls-files` returned no
+entries. This proves a normal clone keeps the Cheap LFS pointer rather than
+silently invoking Git LFS.
 
-Verification: repository-wide TypeScript no-emit is clean; the new
-`tab-groups-test.ts` and `command-palette-appearance-test.ts` pass 9/9. Direct
-`eslint` invocation reports missing custom-rule definitions on both the
-changed files and a clean tree, so that tooling gap is pre-existing rather
-than introduced here.
+Credentials remained inside the existing GitHub CLI configuration: no token
+was exported, printed, copied to a repository, or duplicated into Desktop
+Material's keychain. This receipt therefore accepts the live GitHub
+repository/release/pointer/download backend in public and private modes; it
+does **not** claim an account-bound Desktop Material GUI upload/materialize E2E.
+
+Both repositories include the generated Cheap LFS logo. The public raw asset
+returned HTTP 200, while the private contents API reported its authenticated
+size. The canonical documentation copy at
+`docs/assets/cheap-lfs-logo.png` is 1254×1254, 1,091,778 bytes, SHA-256
+`34b2e68ad1e95f45cac08e3c2ee5d9981a35611d30b0deb7282a5c7fe0682a2f`.
+The Large files UI now says larger sources use 1.5 GiB parts, and a focused
+test pins that wording. Full evidence is in the
+[dated verification record](docs/verification/cheap-lfs-github-public-private-2026-07-22.md).
+
+## 2026-07-22 command palette rows, tab groups, Alt reliability, and release gates
+
+The published baseline at `7edca120c5` introduced rich command-palette rows,
+appearance controls, the first tab-group data/actions, and its accessibility
+follow-up. That exact SHA is on `origin/main`; [CI `29895625564`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29895625564)
+and [code scanning `29895625583`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29895625583)
+passed. [Build Installers `29896993449`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29896993449)
+published the non-draft, exact-target Windows release
+[`v3.6.3-beta3-b0000040881`](https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-b0000040881)
+with all six required non-empty installer/feed/portable assets. Those receipts
+prove only that baseline; they do not verify the continuation below.
+
+The current continuation makes tab groups real, visible strip controls. One
+named/color-coded chip appears before each group's first member with a count,
+chevron, accessible expanded state, and active-group marker. Clicking the chip
+or pressing Enter/Space hides or restores the member tabs; focus and a localized
+status announcement return to the chip when a mutation removes the focused tab
+from view. Group creation, context actions, color names, chip descriptions,
+success/failure announcements, and accessible names now follow English,
+playful Hong Kong-style Cantonese, or bilingual mode.
+
+Persistence now retains `groups` through open, single-close, bulk-close,
+session-import, per-window serialization, legacy-primary mirroring, reload, and
+unknown-field round trips. Malformed/duplicate group records are repaired at
+the profile boundary. A group can contain pinned tabs or unpinned tabs, never
+both: a cross-boundary move is a no-op, preserving the invariant that every
+pinned tab precedes every unpinned tab. Portable version-1 tab-session exports
+deliberately strip `groupId` and do not export profile-local group definitions;
+import preserves the destination profile's groups rather than creating dangling
+memberships.
+
+Group ordering is normalized as one contiguous block at load and after every
+structural mutation. Manual movement within the block keeps membership; moving
+a member outside the block ungroups only that tab. Label, opened-time,
+repository-status, and favorite arrangements sort whole blocks by their first
+member, and malformed cross-pin input degrades incompatible later members to
+ungrouped tabs rather than splitting one group across the boundary.
+
+The command palette keeps its 760px shell, 520px result area, leading icon,
+title, optional keyword line, and group chip. The title/search/empty state,
+stable group labels, row search-term prefix, anchored appearance editor, and
+the Ollama/Copilot/background-queue discoverability entries now follow all
+three language modes. Search retains English and localized keys. Escape closes
+only the appearance editor and restores its toggle focus; density and row-part
+choices remain persisted and safely repaired.
+
+Windows bare-Alt handling is now an isolated state machine: one uninterrupted
+bare press toggles once, held repeats remain part of that press, and Alt plus
+another key, Shift/Ctrl/Meta, prevented events, modal transitions, orphaned
+repeats, or out-of-order key-up events cannot leave stale state for a later
+toggle. Every Alt release consumes its pending sequence and clears the menu
+highlight path. This is covered as a deterministic keyboard-state contract;
+current end-to-end headless interaction evidence has not yet been recorded.
+
+The manual **Super Express Release** lane now runs the complete unit and script
+suites before its production build/package. It still skips lint, E2E, and the
+history-aware notes generator, and release pull requests target the Windows
+product's `main` default branch. The workflow contract checks test-before-build
+ordering and the `main` base.
+
+**Local continuation acceptance is complete; publication is pending.** The exact
+unpackaged production build passed through the fixed Lowlevel MCP endpoint in
+394.1 seconds with `client_ok: true`. An isolated off-screen run restored the
+named group after relaunch, collapsed it to a selected `role="tab"` chip,
+expanded it again, and confirmed the member was visible. The same run opened
+the fully contained command-palette appearance editor, kept Reset visible, and
+returned five Ollama matches.
+
+| Accepted local capture | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/material-tab-groups.png` | 1000×687 | 94,467 | `fd857137f71b79fbef65225e4469f2d2e3d95ecb6701e4847b84da11ad2875b8` |
+| `docs/assets/screenshots/material-command-palette-appearance.png` | 1000×687 | 99,234 | `ac4db2aa3696d2e1987c0c93573ccf48f86c61111e42fcabf0cec54db3b87a7d` |
+
+README, Pages, the User Guide, and the 71-scene Guided Feature Gallery now
+reference both inspected synthetic-only captures. The continuation still has
+no commit or remote SHA; push, CI/code scanning, Pages/wiki publication, and
+installer Release receipts remain required.
 
 ## 2026-07-22 mobile Pages, documentation search, and regenerated gallery
 
