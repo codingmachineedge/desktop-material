@@ -12,6 +12,19 @@ LFS / Express Release** family is built. This file is the compact public source
 of truth; implementation details and historical test receipts stay in
 [PLAN.md](PLAN.md) and [HANDOFF.md](HANDOFF.md).
 
+## M27 — Reviewed pull previews — **Implementation and local acceptance complete**
+
+Toolbar and application-menu pulls now fetch first and open a blocking review
+of the exact current/upstream refs and OIDs, ahead/behind topology, effective Git
+integration strategy, and bounded incoming commit/file summaries. Confirmation
+revalidates the frozen identity, strategy configuration, and clean worktree,
+then integrates the reviewed upstream commit without a second superproject
+fetch. Detached, dirty, conflicted, stale, failed-fetch, busy, and unsafe
+fast-forward-only states remain non-destructive. Focused tests, TypeScript,
+lint/format checks, the production build, and an isolated off-screen Win32 pull
+exercise passed; remote CI, Pages, and release verification follow the `main`
+push recorded in [HANDOFF.md](HANDOFF.md).
+
 ## M26 — Cheap LFS / Express Release — **Implementation complete; publication verification pending**
 
 - **Release-backed large-file storage**: The repository rail's **Large files**

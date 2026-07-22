@@ -38,3 +38,21 @@
   `c49a0f0b780ecf025503896d7a00ac20897859a3`; the unrelated untracked
   `.codex/run-manifests/2026-07-21-settings-queue-mobile-publish.md` is preserved.
 - Active GitHub account: `codingmachineedge`.
+
+## Result receipt
+
+- Exact implementation source: `b86b4618d358a2e9f7f2a0bed1e5ee7480b21c16`;
+  isolated publish replay: `9e17c47c71` on the then-current remote baseline.
+- Focused verification: 92 tests in 24 suites passed; TypeScript no-emit,
+  changed-source ESLint/Prettier, secret/diff checks, and the exact production
+  build passed.
+- Headless result: the prepared review showed `0 ahead`, `2 behind`, the
+  fast-forward strategy, two incoming commits, and three incoming paths. Pull
+  confirmation landed exact OID `c5543728717b5029acc9b80c901dd22f6fcdc343`
+  with a clean `+0/-0` checkout.
+- Accepted capture: client-only 960×660 PNG, 62,882 bytes, SHA-256
+  `cbbfc9876ded7366aca8532a7d685fed4a959453c1ccfd1845f4dc7fc408895`.
+  The smaller accepted frame records the stable rendered window after the
+  alternate-desktop resize helper could not address the off-screen HWND.
+- Cleanup: the exact validated app PID was stopped; the named desktop and owned
+  fixture root were removed and confirmed absent.

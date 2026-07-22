@@ -1,5 +1,41 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-21 reviewed pull previews
+
+Ordinary pulls now open a reviewed Material dialog before mutating the current
+repository. The implementation freezes the local/upstream refs and full OIDs,
+ahead/behind counts, effective `pull.rebase`/branch rebase/`pull.ff` plan, and
+bounded incoming commit/file summaries. Confirmation revalidates that identity,
+strategy, and a freshly read clean worktree, then integrates the exact reviewed
+OID. Unsafe, stale, detached, conflicted, dirty, failed-fetch, busy, and
+fast-forward-only-blocked states fail closed. The dialog is globally modal and
+non-dismissible while Git runs, with persisted English, playful Hong Kong-style
+Cantonese, and bilingual copy.
+
+Local verification on implementation source `b86b4618d3` passed 92 focused
+tests across 24 suites, TypeScript no-emit, changed-source ESLint/Prettier,
+`git diff --check`, and the exact production command
+`npx --no-install cross-env RELEASE_CHANNEL=development DESKTOP_SKIP_PACKAGE=1 yarn build:prod`
+through Lowlevel MCP (exit 0; 625.37 seconds). The fixed MCP checkout was
+`ed1427f69b20dcd66df1de2ae3c6ba6591e2e640`.
+
+The app was exercised on the uniquely named off-screen Win32 desktop
+`DesktopMaterialPullPreview-b86b4618` against a synthetic clean repository.
+The review showed local `6692f0306cb38b794ed44d910f32f554134aeff0`, upstream
+`c5543728717b5029acc9b80c901dd22f6fcdc343`, `0 ahead`, `2 behind`, a
+fast-forward plan, two incoming commits, and three changed paths. Confirming the
+dialog advanced HEAD to the exact upstream OID with `+0/-0` and no worktree
+changes. The inspected client-only screenshot is 960×660, 62,882 bytes, SHA-256
+`cbbfc9876ded7366aca8532a7d685fed4a959453c1ccfd1845f4dc7fc408895`, at
+`docs/assets/screenshots/material-pull-preview.png`; it is nonblank, unclipped,
+and contains synthetic data only. The validated Electron PID, hidden desktop,
+and containment-checked fixture root were removed and confirmed absent.
+
+The feature was replayed onto the latest remote baseline in an isolated publish
+worktree because another active task had unrelated edits in the shared checkout.
+Those edits were left untouched. Remote CI, Pages, installer/release, and live
+wiki synchronization are post-push verification items.
+
 ## 2026-07-21 CI lint newline repair
 
 GitHub CI run

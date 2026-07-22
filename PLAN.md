@@ -2,6 +2,19 @@
 
 ## Current status
 
+### July 21 reviewed pull preview
+
+Ordinary toolbar and menu pulls use a prepared-review workflow: fetch the exact
+configured upstream, capture refs/OIDs and Git strategy inputs, show bounded
+incoming commits and paths, and require explicit confirmation. Execution checks
+the same identity, strategy snapshot, and clean worktree immediately before
+running `git pull . <reviewed-oid>` with the frozen integration flags. The
+dialog is globally modal and cannot be dismissed during fetch or integration;
+the direct noninteractive automation path remains available. English, playful
+Hong Kong-style Cantonese, and compact bilingual copy share the same safety
+contract. Detailed verification and capture receipts are in `HANDOFF.md` and
+`.codex/run-manifests/2026-07-21-preview-pulls-publish.md`.
+
 Milestones **M0 through M21 are shipped on `main`**. M22 owner-scoped management
 remains in its separately tracked visual-publication acceptance, while the M23
 Ollama model manager is complete, published, and remotely verified. M24's guided
