@@ -44,6 +44,13 @@ export class CreateTabGroupDialog extends React.Component<
     this.props.onCreate(name, this.state.color)
   }
 
+  private onColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const color = event.currentTarget.dataset.color as TabGroupColor | undefined
+    if (color !== undefined) {
+      this.setState({ color })
+    }
+  }
+
   private renderColor(color: TabGroupColor) {
     const selected = this.state.color === color
     return (
@@ -55,7 +62,8 @@ export class CreateTabGroupDialog extends React.Component<
         })}
         aria-label={`${color} group color`}
         aria-pressed={selected}
-        onClick={() => this.setState({ color })}
+        data-color={color}
+        onClick={this.onColorClick}
       />
     )
   }

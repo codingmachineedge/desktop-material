@@ -35,10 +35,33 @@ export class CommandPaletteAppearanceEditor extends React.Component<
 
   public componentDidMount() {
     document.addEventListener('mousedown', this.onDocumentMouseDown, true)
+    document.addEventListener('keydown', this.onDocumentKeyDown, true)
   }
 
   public componentWillUnmount() {
     document.removeEventListener('mousedown', this.onDocumentMouseDown, true)
+    document.removeEventListener('keydown', this.onDocumentKeyDown, true)
+  }
+
+  /**
+   * Close on Escape while the editor owns focus, and stop that Escape from
+   * also dismissing the palette behind it. Bound at the document rather than
+   * on the panel so the panel stays a plain, non-interactive container.
+   */
+  private onDocumentKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !this.state.open) {
+      return
+    }
+    const container = this.containerRef.current
+    if (
+      container !== null &&
+      event.target instanceof Node &&
+      container.contains(event.target)
+    ) {
+      event.stopPropagation()
+      event.preventDefault()
+      this.setState({ open: false })
+    }
   }
 
   /** Dismiss when the pointer goes down anywhere outside the anchored editor. */
@@ -58,15 +81,6 @@ export class CommandPaletteAppearanceEditor extends React.Component<
 
   private onToggle = () => {
     this.setState(previous => ({ open: !previous.open }))
-  }
-
-  private onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Escape' && this.state.open) {
-      // Keep Escape from also closing the palette itself.
-      event.stopPropagation()
-      event.preventDefault()
-      this.setState({ open: false })
-    }
   }
 
   private onDensityChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,18 +148,13 @@ export class CommandPaletteAppearanceEditor extends React.Component<
     const { open } = this.state
 
     return (
-      <div
-        className="command-palette-appearance"
-        ref={this.containerRef}
-        onKeyDown={this.onKeyDown}
-      >
+      <div className="command-palette-appearance" ref={this.containerRef}>
         <button
           type="button"
           className={classNames('command-palette-appearance-toggle', { open })}
           aria-expanded={open}
           aria-haspopup="dialog"
           aria-label="Customize command palette appearance"
-          title="Customize appearance"
           onClick={this.onToggle}
         >
           <MaterialSymbol name="tune" size={16} />
