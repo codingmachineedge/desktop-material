@@ -94,7 +94,7 @@ jobs:
           ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
-      - name: Stamp deterministic monotonic release version
+      - name: Stamp cross-lane monotonic release version
         id: version
         shell: bash
         env:
@@ -106,9 +106,7 @@ jobs:
             exit 1
           fi
           base=$(node -p "require('./app/package.json').version")
-          count=$(git rev-list --count "$RELEASE_TARGET_SHA")
-          printf -v build '%010d' "$count"
-          version="${base}-b${build}"
+          version=$(node script/release-version.js create "$base" "$GITHUB_RUN_ID")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
@@ -410,51 +408,4 @@ jobs:
           fi
       - name: Promote only a still-current main release
         shell: bash
-        run: |
-          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .id)
-          if [[ ! "$release_id" =~ ^[0-9]+$ ]]; then
-            echo "Published Release did not return a numeric database ID." >&2
-            exit 1
-          fi
-
-          set +e
-          current_main=$(git ls-remote origin refs/heads/main | awk 'NR == 1 { print $1 }')
-          lookup_status=$?
-          set -e
-          if [ "$lookup_status" -ne 0 ] || [[ ! "$current_main" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::warning::Could not resolve current main; the immutable Release remains non-latest."
-            exit 0
-          fi
-          if [ "$current_main" != "$RELEASE_TARGET_SHA" ]; then
-            echo "::notice::Published superseded commit $RELEASE_TARGET_SHA without changing Latest; current main is $current_main."
-            exit 0
-          fi
-
-          gh api --method PATCH \
-            "repos/$GITHUB_REPOSITORY/releases/$release_id" \
-            -f make_latest=true >/dev/null
-
-          set +e
-          current_main_after=$(git ls-remote origin refs/heads/main | awk 'NR == 1 { print $1 }')
-          after_status=$?
-          set -e
-          if [ "$after_status" -ne 0 ] || \
-             [ "$current_main_after" != "$RELEASE_TARGET_SHA" ]; then
-            gh api --method PATCH \
-              "repos/$GITHUB_REPOSITORY/releases/$release_id" \
-              -f make_latest=false >/dev/null
-            latest_after_demotion=$(gh api \
-              "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
-            if [ "$latest_after_demotion" = "$RELEASE_TAG" ]; then
-              echo "Superseded Release still owns Latest after demotion." >&2
-              exit 1
-            fi
-            echo "::notice::Main advanced during Latest promotion; the Release remains published but was demoted from Latest."
-            exit 0
-          fi
-
-          latest_tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
-          if [ "$latest_tag" != "$RELEASE_TAG" ]; then
-            echo "Latest Release is $latest_tag, expected $RELEASE_TAG after promotion." >&2
-            exit 1
-          fi
+        run: bash .github/scripts/promote-current-release.sh

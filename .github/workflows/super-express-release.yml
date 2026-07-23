@@ -63,14 +63,12 @@ jobs:
       - name: Run script tests
         run: yarn test:script
 
-      - name: Create a unique package version
+      - name: Create a cross-lane monotonic package version
         id: version
         shell: bash
         run: |
           base=$(node -p "require('./app/package.json').version")
-          printf -v sequence '%010d' "$GITHUB_RUN_NUMBER"
-          printf -v attempt '%02d' "$GITHUB_RUN_ATTEMPT"
-          version="${base}-s${sequence}${attempt}"
+          version=$(node script/release-version.js create "$base" "$GITHUB_RUN_ID")
           tag="v${version}"
           RELEASE_VERSION="$version" node -e "const fs=require('fs');const f='./app/package.json';const p=require(f);p.version=process.env.RELEASE_VERSION;fs.writeFileSync(f, JSON.stringify(p, null, 2) + '\n')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -187,7 +185,7 @@ jobs:
             --target "$RELEASE_TARGET_SHA" \
             --title "Desktop Material $RELEASE_VERSION" \
             --notes-file release-payload/release-notes.md \
-            --latest
+            --latest=false
 
       - name: Verify published release target
         if: ${{ inputs.publish }}
@@ -205,3 +203,8 @@ jobs:
             echo "Published release unexpectedly remained a draft." >&2
             exit 1
           fi
+
+      - name: Promote only a still-current main release
+        if: ${{ inputs.publish }}
+        shell: bash
+        run: bash .github/scripts/promote-current-release.sh

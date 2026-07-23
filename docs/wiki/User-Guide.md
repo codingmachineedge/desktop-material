@@ -1105,6 +1105,10 @@ The **Actions** panel brings CI into the app:
   script suites before its Windows x64 production build/package. It remains a
   fast lane by skipping lint, E2E, and history-generated notes, and a release
   pull request targets the Windows product's `main` default branch.
+- Automatic and Super Express installers share one monotonic `z` package-version
+  namespace. Releases are immutable and initially non-latest; only the greatest
+  release for freshly revalidated current `main` is promoted to the Squirrel
+  update feed, so an older overlapping job cannot move **Latest** backward.
 - Select a run artifact to review its name, size, creation/expiry, workflow source, and GitHub digest.
   Choose **Load more artifacts** to append the next bounded page. A failed later page keeps the
   cards you already loaded and lets you retry that same page.

@@ -6,6 +6,8 @@ import {
   getWindowsFullNugetPackageName,
   getWindowsIdentifierName,
 } from '../../../script/dist-info'
+import { createReleaseVersion } from '../../../script/release-version'
+import { getVersion } from '../../package-info'
 
 const defaultMockUpdateURL = 'http://127.0.0.1:51789/update'
 
@@ -79,7 +81,11 @@ const MOCK_UPDATE_ORIGIN = mockUpdateEndpoint.origin
 export const MOCK_CONTROL_URL = mockUpdateEndpoint.controlURL
 
 const currentWindowsPackageName = getWindowsFullNugetPackageName()
-const nextWindowsPackageName = `${getWindowsIdentifierName()}-99.0.0-full.nupkg`
+export const MOCK_WINDOWS_UPDATE_VERSION = createReleaseVersion(
+  getVersion(),
+  '999999999999'
+)
+const nextWindowsPackageName = `${getWindowsIdentifierName()}-${MOCK_WINDOWS_UPDATE_VERSION}-full.nupkg`
 const fakeSha = '0123456789012345678901234567890123456789'
 const fakePackageSize = '999999999'
 

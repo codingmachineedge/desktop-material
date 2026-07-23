@@ -13,6 +13,10 @@ const installerWorkflow = readFileSync(
   join(root, '.github', 'workflows', 'build-installers.yml'),
   'utf8'
 )
+const releasePromotionScript = readFileSync(
+  join(root, '.github', 'scripts', 'promote-current-release.sh'),
+  'utf8'
+)
 const codeQLWorkflow = readFileSync(
   join(root, '.github', 'workflows', 'codeql.yml'),
   'utf8'
@@ -88,9 +92,16 @@ describe('CI workflow safety', () => {
     assert.match(installerWorkflow, /DISPATCH_REF: \$\{\{ github\.ref \}\}/)
     assert.match(installerWorkflow, /DISPATCH_REF" != "refs\/heads\/main"/)
     assert.match(installerWorkflow, /publish="\$ci_can_publish"/)
-    assert.match(installerWorkflow, /git ls-remote origin refs\/heads\/main/)
     assert.match(
       installerWorkflow,
+      /bash \.github\/scripts\/promote-current-release\.sh/
+    )
+    assert.match(
+      releasePromotionScript,
+      /git ls-remote origin refs\/heads\/main/
+    )
+    assert.match(
+      releasePromotionScript,
       /Published superseded commit \$RELEASE_TARGET_SHA without changing Latest/
     )
     assert.doesNotMatch(installerWorkflow, /softprops\/action-gh-release/)
@@ -136,10 +147,22 @@ describe('CI workflow safety', () => {
       /Publish GitHub release[\s\S]*?gh release create[\s\S]*?--latest=false/
     )
     assert.doesNotMatch(installerWorkflow, /^\s+--latest\s*$/m)
+    assert.match(releasePromotionScript, /select_highest_target_tag/)
+    assert.match(releasePromotionScript, /-f make_latest=true/)
+    assert.match(releasePromotionScript, /-f make_latest=false/)
     assert.match(
-      installerWorkflow,
-      /Promote only a still-current main release[\s\S]*?-f make_latest=true[\s\S]*?current_main_after=.*git ls-remote[\s\S]*?-f make_latest=false[\s\S]*?latest_after_demotion=[\s\S]*?releases\/latest[\s\S]*?releases\/latest/
+      releasePromotionScript,
+      /current_main_after=\$\(resolve_main\)/
     )
+    assert.match(
+      releasePromotionScript,
+      /reconciled_tag=\$\(select_highest_target_tag\)/
+    )
+    assert.match(
+      releasePromotionScript,
+      /current_main_final=\$\(resolve_main\)/
+    )
+    assert.match(releasePromotionScript, /releases\/latest/)
 
     const upstreamFailureStep = installerWorkflow.match(
       /- name: Preserve the upstream CI failure result([\s\S]*?)(?=\n      - name:|\n  publish:)/

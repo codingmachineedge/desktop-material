@@ -35,6 +35,14 @@ request is still running, the real updater event wins. A subsequent manual or
 four-hour periodic check uses the release feed normally and begins the existing
 download flow as soon as the release is published.
 
+Both release lanes stamp Squirrel packages through
+`script/release-version.js` as
+`<base>-z<12-digit-GitHub-run-ID>`. One shared namespace matters because NuGet
+compares the complete prerelease text before its numeric tail: the historical
+Super Express `s…` namespace sorted above every normal `b…` build and could make
+a newer release look like a downgrade. The `z…` migration sorts above both
+legacy lanes, while fixed-width run IDs retain chronological lexical ordering.
+
 ## Automated release notes
 
 `Build Installers / Express Release` checks out the exact
@@ -73,14 +81,20 @@ The same workflow has two deliberately different entry paths:
   Windows x64 trampoline/unit/script tests, and the Windows x64 build/package
   job run in parallel; publication waits for all three.
 
-The version is derived from the package version plus the zero-padded commit
-count reachable from the exact target. Re-running the same commit therefore
-selects the same immutable tag and fails closed instead of publishing duplicate
-assets. Immediately before publication, the workflow proves that the target is
-still `origin/main` and that the tag is still absent. One create-only
-`gh release create` command publishes the installer, MSI, Squirrel packages,
-`RELEASES`, portable ZIP, and generated notes. It never edits or replaces an
-existing Release.
+The version is derived from the package version plus the workflow's unique
+GitHub run ID in the shared fixed-width `z…` namespace. Re-running the same run
+therefore selects the same immutable tag and fails closed instead of replacing
+published assets. Immediately before publication, the workflow proves that the
+tag is still absent. One create-only `gh release create` command publishes the
+installer, MSI, Squirrel packages, `RELEASES`, portable ZIP, and generated
+notes. It never edits or replaces an existing Release.
+
+Every Release is created non-latest. The shared promotion helper first proves
+the source is still current `main`, then examines the newest 100 published
+Releases for that exact SHA and promotes the greatest valid package version.
+It rechecks both the same-SHA maximum and `main` after promotion, reconciling an
+overlapping higher release or demoting a newly stale candidate. Thus an older
+job can finish independently without moving the update feed backward.
 
 The packaging job uploads the verified installer directory as an uncompressed,
 three-day Actions artifact before release-note generation, then preserves the
@@ -114,13 +128,14 @@ concurrency group, including CodeQL, remain independently runnable.
 
 `.github/workflows/super-express-release.yml` is a separate, manual-only
 emergency lane. Dispatching it from `main` goes directly from the exact
-dependency cache to the Windows x64 production build and package. It does not
-run lint, unit, script, trampoline, or packaged E2E suites. The ordinary CI and
-tested Express Release paths remain the default release gates.
+dependency cache through the complete unit and script suites, then into the
+Windows x64 production build and package. It omits lint, trampoline, packaged
+E2E, and history-generated release notes. The ordinary CI and tested Express
+Release paths remain the default release gates.
 
 The direct lane still fails closed around the produced executable content. It
-requires the exact dispatched commit, creates a unique package/tag version from
-the workflow run number and attempt, rejects an existing tag, requires every
+requires the exact dispatched commit, uses the same validated run-ID package
+version as the automatic lane, rejects an existing tag, requires every
 installer, portable ZIP, Squirrel package, and `RELEASES` entry to be non-empty,
 and writes a local note from the exact checked-out commit subject/body. It does
 not inspect release history or invoke the TypeScript release-note generator, so
@@ -128,7 +143,8 @@ that optional metadata path cannot block an emergency package. It uploads the
 complete payload as an uncompressed seven-day Actions artifact before the
 optional create-only GitHub Release step. The `publish` dispatch checkbox
 defaults on but can be cleared to build a recovery artifact without creating a
-Release.
+Release. Published Super Express Releases use the same current-main and
+highest-same-SHA promotion helper as automatic Releases.
 
 No shared concurrency group is declared, so overlapping manual invocations can
 finish independently. Tags and Releases are immutable: a same-tag race has one
@@ -151,9 +167,13 @@ winner, and later attempts fail without replacing it.
   trigger, stale dispatch SHA, existing tag, or changed default-branch tip
   stops before publication.
 - Super Express Release must also be dispatched from `main`. It deliberately
-  omits the normal test suites, so use it only when the shorter build/package
-  path is the explicit operator choice. Clearing its `publish` input retains
-  artifacts without creating a Release.
+  omits lint, trampoline, packaged E2E, and history-note generation but retains
+  the complete unit and script suites. Use it only when that shorter
+  build/package path is the explicit operator choice. Clearing its `publish`
+  input retains artifacts without creating a Release.
+- Release run IDs must be positive decimal values of at most 12 digits. The
+  shared generator rejects a stable base without a prerelease channel, malformed
+  versions, and a NuGet special-version label over 20 characters.
 
 ## Failure modes and security
 
@@ -163,6 +183,13 @@ diverged results all fail closed to the ordinary no-update state. The probe
 reads at most 256 KiB per provider response and times out after ten seconds. It
 never grants an update or downloads executable content; only Squirrel's
 existing feed can do that.
+
+The historical normal `b…` and Super Express `s…` version namespaces were not
+cross-lane monotonic. A machine on `3.6.3-beta3-s000000000201`, for example,
+correctly treated later `3.6.3-beta3-b0000040887` as older and displayed the
+ordinary no-update state. The shared `z…` namespace is the migration floor for
+those installations. Package generation fails rather than emitting a version
+that cannot be ordered safely.
 
 Commit subjects and release metadata are untrusted. The generator invokes Git
 without a shell, validates tag refs and object IDs, bounds subprocess output,
@@ -183,7 +210,9 @@ An invalid dependency cache fails instead of silently installing into a mixed
 tree. Cache misses perform the normal bounded install retries and save only
 after a successful job. Release creation is intentionally non-idempotent: a
 same-tag race has one winner and every later contender fails without changing
-the winner.
+the winner. Latest promotion is a separate, source-revalidated operation; it
+selects the greatest valid same-source version and never overwrites Release
+assets or tags.
 
 ## Verification
 
@@ -196,7 +225,10 @@ limits, and first-release handling. The app and script TypeScript
 projects, targeted formatting/lint, workflow YAML, express-path gates,
 create-only publication, retained artifacts, and exact dependency-cache keys
 are also checked locally. The Super Express source contract additionally proves
-manual-only triggering, exact-SHA packaging, omitted test/lint commands,
-non-cancelling overlap, retained artifacts, immutable tag checks, and exact
-release targeting. Remote Actions and release publication remain required after
-integration.
+manual-only triggering, exact-SHA packaging, unit/script-before-build ordering,
+omitted lint/E2E/history paths, non-cancelling overlap, retained artifacts,
+immutable tag checks, and exact release targeting. Release-version tests cover
+the exact legacy `s…` versus `b…` failure, fixed-width `z…` ordering, rerun
+identity, malformed/overflow rejection, and out-of-order same-SHA selection.
+Remote Actions, release publication, and an installed Squirrel UI update remain
+required after integration.

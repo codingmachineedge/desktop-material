@@ -43,6 +43,10 @@ outside the packaged source tree.
 The automated release workflow publishes the x64 portable ZIP, setup
 executable, MSI, `RELEASES`, and both exact-name copies of the full NuGet
 package. It verifies that every required asset is non-empty before publication.
+Automatic and Super Express packages share the validated
+`<base>-z<12-digit-GitHub-run-ID>` version namespace so Squirrel can order
+Releases across both lanes. The leading `z` also migrates installations from the
+older incompatible `b…` and `s…` namespaces.
 Current public builds are unsigned; adding signing requires the existing Azure
 signing secret set and a reviewed workflow change.
 
@@ -50,9 +54,12 @@ signing secret set and a reviewed workflow change.
 
 `.github/workflows/build-installers.yml` runs only after the complete CI
 workflow succeeds for `main`. It checks out the exact CI SHA, proves that SHA is
-still current `origin/main`, requires a new unique release tag, builds and
-packages Windows x64, revalidates both the branch and tag, and publishes one
-non-draft release. A failed or stale CI head publishes nothing.
+an eligible `main` push, requires a new unique release tag, builds and packages
+Windows x64, revalidates the tag, and publishes one immutable non-draft Release.
+A successful target superseded during the build remains published but
+non-latest. The shared promotion helper only advances the update feed for
+current `main`, reconciles the greatest valid same-SHA version, and demotes a
+candidate if `main` changes during promotion. A failed CI publishes no Release.
 
 Linux runners used for lint, Pages, or CodeQL are infrastructure only. They do
 not produce Linux application packages. No macOS build, signing, packaging, or
@@ -61,7 +68,9 @@ E2E lane is part of the supported pipeline.
 ## Failure modes and verification
 
 Build, unit, script, package, archive-create/list, installed-E2E, missing-asset,
-stale-head, existing-tag, and remote-query failures stop release publication.
+invalid-version, existing-tag, and remote-query failures stop release
+publication. A stale post-build head preserves its immutable Release without
+promoting it to the updater feed.
 The tracked CI safety test enforces the Windows-only matrix, requires the x64
 portable ZIP as a non-empty release asset, and rejects macOS runners or Apple
 signing inputs in the application workflow. Portable-ZIP and CI focused checks

@@ -103,10 +103,14 @@ six-asset Windows x64 Release are verified for the `main` push recorded in
   Squirrel/installer/portable payload, writes a local note from the checked-out
   commit, preserves an uncompressed artifact, and publishes one uniquely tagged
   release.
-- **Super Express Release**: Combines the package base with its run number and
-  attempt into NuGet-compatible unique immutable tags. Has no shared concurrency
-  group so newer dispatches cannot cancel older ones. Failed or cancelled main CI
-  still runs the package lane for a recoverable Actions artifact but cannot publish.
+- **Cross-lane updater ordering**: Automatic and Super Express packages now use
+  one validated `z` plus 12-digit GitHub run-ID namespace. It sorts above the
+  legacy `b…`/`s…` lanes that stranded Super Express installations, keeps reruns
+  deterministic, and rejects unsafe NuGet labels. Both workflows create
+  immutable non-latest Releases, then revalidate current `main` and reconcile
+  the greatest same-SHA version before promotion. No shared concurrency group
+  cancels older work. Failed or cancelled main CI still retains a recoverable
+  package artifact but cannot publish.
 - **Build & Run integration**: Two new preferences — "Pin large files before
   committing" and "Download large files after cloning" — are both enabled by
   default. The Large files surface is reachable from both the repository rail and
