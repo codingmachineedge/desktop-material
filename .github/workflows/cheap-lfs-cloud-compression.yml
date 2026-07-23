@@ -30,4 +30,4 @@ jobs:
           sparse-checkout: .github
           sparse-checkout-cone-mode: true
       - name: Compress and adopt verified side assets
-        uses: Ding-Ding-Projects/desktop-material/.github/actions/cheap-lfs-cloud-compression@e59c46f3fc597929e938fb08185ad97d167aa754
+        uses: Ding-Ding-Projects/desktop-material/.github/actions/cheap-lfs-cloud-compression@42e2cbcc9826e681324a0a7189497b84e3aad6e8
