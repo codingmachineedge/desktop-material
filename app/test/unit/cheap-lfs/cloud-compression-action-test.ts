@@ -58,6 +58,7 @@ function json(response: ServerResponse, status: number, value: unknown) {
 interface IFixtureOptions {
   readonly failUpload?: boolean
   readonly ambiguousPush?: boolean
+  readonly draftOnly?: boolean
   readonly pointerPath?: string
 }
 
@@ -135,10 +136,30 @@ async function withFixture(
       request.method === 'GET' &&
       url.pathname === '/repos/owner/repo/releases/tags/assets'
     ) {
+      if (options.draftOnly === true) {
+        json(response, 404, { message: 'not found' })
+        return
+      }
       json(response, 200, {
         id: 7,
         upload_url: `http://127.0.0.1:${port}/upload{?name,label}`,
       })
+      return
+    }
+    if (
+      request.method === 'GET' &&
+      url.pathname === '/repos/owner/repo/releases'
+    ) {
+      assert.equal(url.searchParams.get('per_page'), '100')
+      assert.equal(url.searchParams.get('page'), '1')
+      json(response, 200, [
+        {
+          id: 7,
+          tag_name: 'assets',
+          draft: true,
+          upload_url: `http://127.0.0.1:${port}/upload{?name,label}`,
+        },
+      ])
       return
     }
     if (
@@ -280,6 +301,21 @@ describe('Cheap LFS cloud compression action', () => {
         /\[skip ci\]$/
       )
       assert.equal(git(fixture.workspace, ['status', '--porcelain']), '')
+    })
+  })
+
+  it('finds a draft release through the bounded inventory fallback', async () => {
+    const original = Buffer.from('draft release payload\n'.repeat(2048))
+    await withFixture(original, { draftOnly: true }, async fixture => {
+      const result = await fixture.runAction()
+      assert.equal(result.code, 0, result.stderr)
+      assert.match(result.stdout, /1 compressed, 0 kept raw, 0 failed safely/)
+      assert.equal(fixture.uploaded.length, 1)
+      assert.deepEqual(inflateRawSync(fixture.uploaded[0]), original)
+      assert.match(
+        await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+        /^part-deflate /m
+      )
     })
   })
 

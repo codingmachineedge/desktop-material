@@ -208,17 +208,18 @@ function rawObjects(entry) {
 }
 
 async function api(path, options = {}) {
+  const { allowNotFound = false, ...fetchOptions } = options
   const response = await fetch(apiUrl + path, {
-    ...options,
+    ...fetchOptions,
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: 'Bearer ' + token,
       'X-GitHub-Api-Version': API_VERSION,
       'User-Agent': 'desktop-material-cheap-lfs-cloud-compression',
-      ...options.headers,
+      ...fetchOptions.headers,
     },
   })
-  if (!response.ok) {
+  if (!response.ok && !(allowNotFound && response.status === 404)) {
     const message = (await response.text()).slice(0, 500)
     throw new Error('GitHub API ' + response.status + ': ' + message)
   }
@@ -227,9 +228,26 @@ async function api(path, options = {}) {
 
 async function releaseForTag(tag) {
   const response = await api(
-    '/repos/' + repository + '/releases/tags/' + encodeURIComponent(tag)
+    '/repos/' + repository + '/releases/tags/' + encodeURIComponent(tag),
+    { allowNotFound: true }
   )
-  return await response.json()
+  if (response.ok) return await response.json()
+
+  // GitHub's exact tag endpoint intentionally hides draft releases. Cheap LFS
+  // can point at drafts, so use the same bounded authenticated inventory
+  // fallback as the desktop app before declaring the object unavailable.
+  for (let page = 1; page <= 100; page++) {
+    const inventoryResponse = await api(
+      '/repos/' + repository + '/releases?per_page=100&page=' + page
+    )
+    const releases = await inventoryResponse.json()
+    const release = releases.find(candidate => candidate.tag_name === tag)
+    if (release !== undefined) return release
+    if (releases.length < 100) {
+      throw new Error('GitHub release tag was not found: ' + tag)
+    }
+  }
+  throw new Error('Repository has too many releases to inspect safely.')
 }
 
 async function allAssets(releaseId) {
