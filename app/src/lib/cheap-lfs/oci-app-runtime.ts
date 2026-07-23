@@ -167,10 +167,7 @@ function registryTarget(
   const ociPointers = storedPointers.filter(
     pointer => pointer.backend === 'oci'
   )
-  const existingRepositories = new Map<
-    CheapLfsRegistryProvider,
-    string
-  >()
+  const existingRepositories = new Map<CheapLfsRegistryProvider, string>()
   for (const pointer of ociPointers) {
     const registryRepository = getCheapLfsOciRegistryRepository(
       pointer.pointer.image
@@ -209,10 +206,7 @@ function registryTarget(
         ? reusedDockerHubNamespace ?? credentials?.username
         : undefined,
   })
-  if (
-    existing !== undefined &&
-    existing !== target.registryRepository
-  ) {
+  if (existing !== undefined && existing !== target.registryRepository) {
     throw fail(
       'Cheap LFS existing OCI pointers do not match the verified source repository target.'
     )
