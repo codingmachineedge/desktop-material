@@ -276,6 +276,10 @@ describe('GitHub Releases view', () => {
     await waitFor(() =>
       assert.ok(screen.getByRole('heading', { name: 'Desktop Material 1.0' }))
     )
+    assert.equal(
+      screen.queryByText(/Filtering \d+ of \d+ loaded releases/),
+      null
+    )
     const summary = screen.getByRole('region', {
       name: 'Loaded release summary',
     })
@@ -300,6 +304,12 @@ describe('GitHub Releases view', () => {
     assert.match(metadata.textContent ?? '', /Author@release-bot/)
     assert.match(metadata.textContent ?? '', /Loaded assets1 · 3 downloads/)
     assert.ok(screen.getByText('application/octet-stream'))
+    const timestamps = [...document.querySelectorAll('time')]
+    assert.ok(timestamps.length >= 6)
+    for (const timestamp of timestamps) {
+      assert.match(timestamp.textContent ?? '', /\b\d{2}:\d{2}\b/)
+      assert.ok(timestamp.getAttribute('datetime')?.endsWith('Z'))
+    }
     assert.equal(
       screen
         .getByRole('link', { name: 'Open release page' })
@@ -310,6 +320,7 @@ describe('GitHub Releases view', () => {
     fireEvent.change(screen.getByLabelText('Search loaded releases'), {
       target: { value: 'Preview' },
     })
+    assert.ok(screen.getByText('Filtering 1 of 3 loaded releases'))
     assert.ok(screen.getByRole('button', { name: /Material Preview/ }))
     assert.equal(
       screen.queryByRole('button', { name: /Stable Material/ }),
@@ -330,9 +341,14 @@ describe('GitHub Releases view', () => {
     fireEvent.change(screen.getByLabelText('Search loaded releases'), {
       target: { value: '' },
     })
+    assert.equal(
+      screen.queryByText(/Filtering \d+ of \d+ loaded releases/),
+      null
+    )
     fireEvent.change(screen.getByLabelText('Release status'), {
       target: { value: 'draft' },
     })
+    assert.ok(screen.getByText('Filtering 1 of 3 loaded releases'))
     assert.ok(screen.getByRole('button', { name: /Desktop Material 1.0/ }))
     assert.equal(
       screen.queryByRole('button', { name: /Material Preview/ }),
@@ -611,7 +627,27 @@ describe('GitHub Releases view', () => {
     await waitFor(() =>
       assert.ok(screen.getByLabelText('Select all visible releases'))
     )
-    fireEvent.click(screen.getByLabelText('Select all visible releases'))
+    assert.equal(
+      screen.queryByRole('button', { name: 'Publish drafts (1)' }),
+      null
+    )
+    assert.equal(
+      screen.queryByRole('button', { name: 'Delete selected (2)' }),
+      null
+    )
+    assert.equal(
+      screen.queryByRole('button', { name: 'Clear selection' }),
+      null
+    )
+    const selectAllVisible = screen.getByLabelText(
+      'Select all visible releases'
+    )
+    fireEvent.click(selectAllVisible)
+    assert.ok(screen.getByText('2 selected'))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
+    assert.equal(document.activeElement, selectAllVisible)
+    assert.ok(screen.getByText('0 selected'))
+    fireEvent.click(selectAllVisible)
     fireEvent.click(screen.getByRole('button', { name: 'Publish drafts (1)' }))
     assert.deepEqual(published, [])
     const publishDialog = screen.getByRole('alertdialog', {
@@ -640,6 +676,40 @@ describe('GitHub Releases view', () => {
       })
     )
     await waitFor(() => assert.deepEqual(deleted, [draft.id, stable.id]))
+  })
+
+  it('focuses an enabled fallback after clearing a filtered-out selection', async () => {
+    const store = fakeStore({
+      list: async () => ({
+        releases: [draft],
+        page: 1,
+        nextPage: null,
+        capped: false,
+      }),
+    })
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={store}
+      />
+    )
+
+    const releaseSelection = await screen.findByLabelText(
+      'Select release v1.0.0'
+    )
+    fireEvent.click(releaseSelection)
+    const search = screen.getByLabelText('Search loaded releases')
+    fireEvent.change(search, { target: { value: 'no matching release' } })
+
+    const selectAllVisible = screen.getByLabelText(
+      'Select all visible releases'
+    ) as HTMLInputElement
+    assert.equal(selectAllVisible.disabled, true)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
+
+    assert.equal(document.activeElement, search)
+    assert.ok(screen.getByText('0 selected'))
   })
 
   it('deletes an individual asset only after its destructive review', async () => {
@@ -680,6 +750,7 @@ describe('GitHub Releases view', () => {
     }>()
     const downloads = new Array<string>()
     const reveals = new Array<string>()
+    const opens = new Array<string>()
     const store = fakeStore({
       uploadAsset: async (
         _repository: Repository,
@@ -722,6 +793,10 @@ describe('GitHub Releases view', () => {
         revealDownload={async path => {
           reveals.push(path)
         }}
+        openDownload={async path => {
+          opens.push(path)
+          return ''
+        }}
       />
     )
     await waitFor(() =>
@@ -750,9 +825,89 @@ describe('GitHub Releases view', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Download' }))
     await waitFor(() => assert.equal(downloads.length, 1))
+    fireEvent.click(screen.getByRole('button', { name: 'Open file' }))
+    await waitFor(() => assert.equal(opens.length, 1))
+    assert.equal(opens[0], downloadAssetPath)
     fireEvent.click(screen.getByRole('button', { name: 'Show in folder' }))
     await waitFor(() => assert.equal(reveals.length, 1))
     assert.equal(reveals[0], downloadAssetPath)
+  })
+
+  it('reports an actionable error when Windows cannot open a download', async () => {
+    let openAttempts = 0
+    render(
+      <GitHubReleasesView
+        repository={repository}
+        accounts={[account]}
+        releasesStore={fakeStore()}
+        chooseDownloadDestination={async () => downloadAssetPath}
+        openDownload={async () =>
+          openAttempts++ === 0
+            ? 'No application is associated with this file type'
+            : ''
+        }
+      />
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Open file' }))
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Open file' }))
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert').textContent ?? ''
+      assert.match(
+        alert,
+        /Check that Windows has an app associated with this file type/
+      )
+      assert.match(alert, /No application is associated/)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Open file' }))
+    await waitFor(() => assert.equal(screen.queryByRole('alert'), null))
+  })
+
+  it('ignores a late Open file failure after the view is disposed', async () => {
+    let finishOpen: (result: string) => void = () => undefined
+    const component = new GitHubReleasesView({
+      repository,
+      accounts: [account],
+      releasesStore: fakeStore(),
+      openDownload: () =>
+        new Promise<string>(resolveOpen => {
+          finishOpen = resolveOpen
+        }),
+    }) as unknown as {
+      mounted: boolean
+      state: {
+        completedDownload: {
+          path: string
+          assetName: string
+          localDigest: string
+          matchesGitHubDigest: boolean | null
+        } | null
+        error: string | null
+      }
+      setState: (update: Record<string, unknown>) => void
+      openDownload: () => Promise<void>
+    }
+    Object.assign(component.state, {
+      completedDownload: {
+        path: downloadAssetPath,
+        assetName: asset.name,
+        localDigest: `sha256:${'b'.repeat(64)}`,
+        matchesGitHubDigest: true,
+      },
+    })
+    component.mounted = true
+    component.setState = update => Object.assign(component.state, update)
+
+    const opening = component.openDownload()
+    component.mounted = false
+    finishOpen('late Windows association failure')
+    await opening
+
+    assert.equal(component.state.error, null)
   })
 
   it('shows transfer progress and cancels an in-flight upload', async () => {

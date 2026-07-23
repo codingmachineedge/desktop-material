@@ -37,13 +37,13 @@ describe('compact shell style contracts', () => {
     )
   })
 
-  it('keeps Actions and the changed-file rows reachable in short panes', () => {
+  it('keeps Actions, Releases, and changed-file rows reachable in short panes', () => {
     const cards = read('app/styles/ui/_material-cards.scss')
     const changes = read('app/styles/ui/changes/_changes-list.scss')
 
     assert.match(
       cards,
-      /:not\(\.github-api-explorer\):not\(\.actions-view\)\s*\{[\s\S]*?overflow: hidden;/
+      /:not\(\.github-api-explorer\):not\(\.actions-view\):not\(\.github-releases-view\)\s*\{[\s\S]*?overflow: hidden;/
     )
     const actions = read('app/styles/ui/_actions-view.scss')
     assert.match(
@@ -66,6 +66,34 @@ describe('compact shell style contracts', () => {
     assert.match(
       commitMessage,
       /@container \(max-width: 220px\)[\s\S]*?\.cheap-lfs-terminal-active-detail,[\s\S]*?text-overflow: ellipsis;[\s\S]*?\.cheap-lfs-terminal-details\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;/
+    )
+    assert.match(
+      commitMessage,
+      /\.cheap-lfs-terminal-facts\s*\{[\s\S]*?flex-wrap: wrap;[\s\S]*?overflow-wrap: anywhere;/
+    )
+    assert.match(
+      commitMessage,
+      /\.cheap-lfs-terminal-recommendation\s*\{[\s\S]*?font-size: 10px;[\s\S]*?overflow-wrap: anywhere;/
+    )
+    assert.match(
+      commitMessage,
+      /\.cheap-lfs-mini-terminal-body\s*\{[\s\S]*?max-height: min\(180px, 32vh\);[\s\S]*?overflow-y: auto;[\s\S]*?overscroll-behavior: contain;/
+    )
+    assert.match(
+      commitMessage,
+      /\.cheap-lfs-terminal-recommendation\s*\{[\s\S]*?> summary[\s\S]*?> span[\s\S]*?-webkit-line-clamp: 2;[\s\S]*?&:focus-visible[\s\S]*?outline:/
+    )
+    assert.match(
+      commitMessage,
+      /&\[open\] > summary > span,[\s\S]*?> summary:focus-visible > span[\s\S]*?-webkit-line-clamp: unset;/
+    )
+    assert.match(
+      commitMessage,
+      /@container \(max-width: 220px\)[\s\S]*?\.cheap-lfs-terminal-facts\s*\{[\s\S]*?display: grid;/
+    )
+    assert.match(
+      commitMessage,
+      /@media \(max-height: 620px\)[\s\S]*?\.cheap-lfs-mini-terminal-header\s*\{[\s\S]*?display: none;[\s\S]*?\.cheap-lfs-mini-terminal-body\s*\{[\s\S]*?max-height: min\(132px, 28vh\);[\s\S]*?\.cheap-lfs-terminal-recommendation\s*\{[\s\S]*?> summary > span[\s\S]*?-webkit-line-clamp: 1;/
     )
   })
 

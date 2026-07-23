@@ -153,6 +153,9 @@
       .cheap-lfs-mini-terminal-body {
         display: grid;
         gap: 5px;
+        max-height: min(180px, 32vh);
+        overflow-y: auto;
+        overscroll-behavior: contain;
         padding: 7px 8px 8px;
       }
 
@@ -169,6 +172,22 @@
         font-weight: 600;
       }
 
+      .cheap-lfs-terminal-facts {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 3px 9px;
+        padding: 4px 6px;
+        border-radius: 7px;
+        background: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) 7%, transparent);
+        font-size: 10px;
+
+        > span {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+      }
+
       .cheap-lfs-terminal-prompt {
         color: var(--md-sys-color-primary);
       }
@@ -183,9 +202,38 @@
       }
 
       .cheap-lfs-terminal-path,
+      .cheap-lfs-terminal-recommendation,
       .cheap-lfs-terminal-active-detail,
       .cheap-lfs-terminal-details {
         opacity: 0.78;
+      }
+
+      .cheap-lfs-terminal-recommendation {
+        font-size: 10px;
+        overflow-wrap: anywhere;
+
+        > summary {
+          cursor: pointer;
+
+          > span {
+            display: -webkit-box;
+            overflow: hidden;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+          }
+
+          &:focus-visible {
+            border-radius: 3px;
+            outline: 1px solid currentColor;
+            outline-offset: 2px;
+          }
+        }
+
+        &[open] > summary > span,
+        > summary:hover > span,
+        > summary:focus-visible > span {
+          -webkit-line-clamp: unset;
+        }
       }
 
       .cheap-lfs-terminal-active-files {
@@ -282,6 +330,29 @@
           grid-column: 2;
           grid-row: 2;
           margin-left: 0;
+        }
+
+        .cheap-lfs-terminal-facts {
+          display: grid;
+          gap: 2px;
+        }
+      }
+
+      @media (max-height: 620px) {
+        .cheap-lfs-mini-terminal-header {
+          display: none;
+        }
+
+        .cheap-lfs-mini-terminal-body {
+          gap: 3px;
+          max-height: min(132px, 28vh);
+          padding: 5px 6px 6px;
+        }
+
+        .cheap-lfs-terminal-recommendation {
+          > summary > span {
+            -webkit-line-clamp: 1;
+          }
         }
       }
 

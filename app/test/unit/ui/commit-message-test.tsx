@@ -13,11 +13,18 @@ import {
   AppFileStatusKind,
   WorkingDirectoryFileChange,
 } from '../../../src/models/status'
-import { CommitMessage } from '../../../src/ui/changes/commit-message'
+import {
+  advanceCheapLfsTransferTiming,
+  CommitMessage,
+  type ICheapLfsTransferTimingSample,
+} from '../../../src/ui/changes/commit-message'
 import { Button } from '../../../src/ui/lib/button'
 import { translate } from '../../../src/lib/i18n'
-import type { CheapLfsAutoPinPhase } from '../../../src/lib/cheap-lfs/operations'
-import { render } from '../../helpers/ui/render'
+import type {
+  CheapLfsAutoPinPhase,
+  ICheapLfsAutoPinProgress,
+} from '../../../src/lib/cheap-lfs/operations'
+import { fireEvent, render } from '../../helpers/ui/render'
 
 const PreviewFeaturesEnv = 'GITHUB_DESKTOP_PREVIEW_FEATURES'
 const previousPreviewFeatures = process.env[PreviewFeaturesEnv]
@@ -50,6 +57,37 @@ type CommitMessageLifecycleTestInstance = CommitMessageTestInstance & {
     previousState: unknown
   ) => Promise<void>
   updateRepoRuleFailures: () => Promise<void>
+}
+
+type CheapLfsTimingTestInstance = CommitMessageTestInstance & {
+  props: CommitMessageProps
+  state: {
+    cheapLfsTransferTiming: ICheapLfsTransferTimingSample | null
+  }
+  setState: (
+    state:
+      | Partial<{
+          cheapLfsTransferTiming: ICheapLfsTransferTimingSample | null
+        }>
+      | ((state: {
+          cheapLfsTransferTiming: ICheapLfsTransferTimingSample | null
+        }) => Partial<{
+          cheapLfsTransferTiming: ICheapLfsTransferTimingSample | null
+        }> | null),
+    callback?: () => void
+  ) => void
+  componentWillReceiveProps: (nextProps: CommitMessageProps) => void
+  tickCheapLfsTiming: () => void
+}
+
+function installCheapLfsTimingSetState(component: CheapLfsTimingTestInstance) {
+  component.setState = update => {
+    const value =
+      typeof update === 'function' ? update(component.state) : update
+    if (value !== null) {
+      Object.assign(component.state, value)
+    }
+  }
 }
 
 function createAccount() {
@@ -434,6 +472,7 @@ describe('CommitMessage', () => {
               totalBytes: 400,
               selectedStorageProvider: 'release',
               recommendedStorageProvider: 'ghcr',
+              storageRecommendationReason: 'github-registry-large-batch',
               estimatedRegistryLayers: 4,
               activeFiles: [
                 {
@@ -489,7 +528,14 @@ describe('CommitMessage', () => {
     assert.match(rows[0].textContent ?? '', /Uploading/)
     assert.match(
       terminal.textContent ?? '',
-      /400 B selected · using GitHub published prerelease · recommended GHCR · one OCI image · estimated 4 OCI layers/
+      /Using GitHub published prerelease · recommended GHCR · one OCI image · estimated 4 OCI layers/
+    )
+    assert.match(terminal.textContent ?? '', /Workers: 3 active · 0 waiting/)
+    assert.match(terminal.textContent ?? '', /Observed 0s/)
+    assert.doesNotMatch(terminal.textContent ?? '', /ETA/)
+    assert.match(
+      terminal.textContent ?? '',
+      /large GitHub batch benefits from reusable GHCR layers/
     )
     assert.equal(progressBar?.getAttribute('aria-valuenow'), '37')
 
@@ -498,6 +544,332 @@ describe('CommitMessage', () => {
       getCommitProgressButtons(component).map(button => button.props.children),
       ['Manual upload', 'Cancel']
     )
+  })
+
+  it('reports renderer-observed throughput, ETA, and waiting work', () => {
+    const previousNow = Date.now
+    let now = 10_000
+    Date.now = () => now
+
+    try {
+      const initialProps = createProps({
+        isCommitting: true,
+        isGeneratingCommitMessage: false,
+        commitOperationPhase: {
+          kind: 'cheap-lfs',
+          progress: {
+            phase: 'uploading',
+            completedFiles: 0,
+            totalFiles: 3,
+            currentPath: 'images/alpha.iso',
+            transferredBytes: 0,
+            totalBytes: 400,
+            selectedStorageProvider: 'release',
+            activeFiles: [
+              {
+                relativePath: 'images/alpha.iso',
+                phase: 'uploading',
+                processedBytes: 0,
+                totalBytes: 200,
+              },
+            ],
+          },
+        },
+      })
+      const component = new CommitMessage(
+        initialProps
+      ) as unknown as CheapLfsTimingTestInstance
+      installCheapLfsTimingSetState(component)
+
+      assert.ok(component.renderCommitProgress())
+      now += 2_000
+      const progressedProps = createProps({
+        ...initialProps,
+        commitOperationPhase: {
+          kind: 'cheap-lfs',
+          progress: {
+            phase: 'uploading',
+            completedFiles: 0,
+            totalFiles: 3,
+            currentPath: 'images/alpha.iso',
+            transferredBytes: 200,
+            totalBytes: 400,
+            selectedStorageProvider: 'release',
+            activeFiles: [
+              {
+                relativePath: 'images/alpha.iso',
+                phase: 'uploading',
+                processedBytes: 200,
+                totalBytes: 200,
+              },
+            ],
+          },
+        },
+      })
+      component.componentWillReceiveProps(progressedProps)
+      component.props = progressedProps
+
+      const progress = component.renderCommitProgress()
+      assert.ok(progress)
+      const text = render(progress).container.textContent ?? ''
+      assert.match(text, /Workers: 1 active · 2 waiting/)
+      assert.match(text, /Observed 2s · 100 B\/s · ETA 2s/)
+      assert.match(text, /Destination GitHub published prerelease/)
+
+      const inactiveProps = createProps({
+        isCommitting: false,
+        commitOperationPhase: null,
+      })
+      component.componentWillReceiveProps(inactiveProps)
+      component.props = inactiveProps
+      assert.equal(component.renderCommitProgress(), null)
+      now += 5_000
+      const freshProps = createProps({
+        isCommitting: true,
+        isGeneratingCommitMessage: false,
+        commitOperationPhase: {
+          kind: 'cheap-lfs',
+          progress: {
+            phase: 'uploading',
+            completedFiles: 0,
+            totalFiles: 1,
+            currentPath: 'fresh.iso',
+            transferredBytes: 100,
+            totalBytes: 200,
+          },
+        },
+      })
+      component.componentWillReceiveProps(freshProps)
+      component.props = freshProps
+      const freshProgress = component.renderCommitProgress()
+      assert.ok(freshProgress)
+      assert.match(
+        render(freshProgress).container.textContent ?? '',
+        /Observed 0s · measuring speed · ETA pending/
+      )
+    } finally {
+      Date.now = previousNow
+    }
+  })
+
+  it('resets rate samples without losing the operation observation clock', () => {
+    const upload = (overrides: Partial<ICheapLfsAutoPinProgress> = {}) => ({
+      phase: 'uploading' as const,
+      completedFiles: 0,
+      totalFiles: 2,
+      currentPath: 'archive.bin',
+      transferredBytes: 0,
+      totalBytes: 1_000,
+      ...overrides,
+    })
+
+    const initial = advanceCheapLfsTransferTiming(null, 123, upload(), 1_000)
+    assert.ok(initial)
+    const advanced = advanceCheapLfsTransferTiming(
+      initial,
+      123,
+      upload({ transferredBytes: 400 }),
+      3_000
+    )
+    assert.ok(advanced)
+    assert.equal(advanced.operationStartedAt, 1_000)
+    assert.equal(advanced.rateStartedAt, 1_000)
+
+    const rollback = advanceCheapLfsTransferTiming(
+      advanced,
+      123,
+      upload({ transferredBytes: 100 }),
+      4_000
+    )
+    assert.ok(rollback)
+    assert.equal(rollback.operationStartedAt, 1_000)
+    assert.equal(rollback.rateStartedAt, 4_000)
+    assert.equal(rollback.rateInitialTransferredBytes, 100)
+
+    const completionRebound = advanceCheapLfsTransferTiming(
+      rollback,
+      123,
+      upload({ completedFiles: 1, transferredBytes: 500 }),
+      5_000
+    )
+    assert.ok(completionRebound)
+    assert.equal(completionRebound.operationStartedAt, 1_000)
+    assert.equal(completionRebound.rateStartedAt, 5_000)
+    assert.equal(completionRebound.rateInitialTransferredBytes, 500)
+
+    const changedOciTotal = advanceCheapLfsTransferTiming(
+      completionRebound,
+      123,
+      upload({
+        completedFiles: 1,
+        transferredBytes: 500,
+        totalBytes: 2_000,
+      }),
+      6_000
+    )
+    assert.ok(changedOciTotal)
+    assert.equal(changedOciTotal.operationStartedAt, 1_000)
+    assert.equal(changedOciTotal.rateStartedAt, 6_000)
+
+    const switchedRepository = advanceCheapLfsTransferTiming(
+      changedOciTotal,
+      456,
+      upload({ transferredBytes: 100, totalBytes: 2_000 }),
+      7_000
+    )
+    assert.ok(switchedRepository)
+    assert.equal(switchedRepository.operationStartedAt, 7_000)
+
+    assert.equal(
+      advanceCheapLfsTransferTiming(switchedRepository, 456, null, 8_000),
+      null
+    )
+    const restarted = advanceCheapLfsTransferTiming(
+      null,
+      456,
+      upload({ transferredBytes: 100, totalBytes: 2_000 }),
+      9_000
+    )
+    assert.equal(restarted?.operationStartedAt, 9_000)
+  })
+
+  it('contains invalid clocks and formats very slow upload rates honestly', () => {
+    const progress: ICheapLfsAutoPinProgress = {
+      phase: 'uploading',
+      completedFiles: 0,
+      totalFiles: 1,
+      currentPath: 'slow.bin',
+      transferredBytes: 0,
+      totalBytes: 10,
+    }
+    const initial = advanceCheapLfsTransferTiming(null, 123, progress, 10_000)
+    assert.ok(initial)
+    const invalid = advanceCheapLfsTransferTiming(
+      initial,
+      123,
+      { ...progress, transferredBytes: 1 },
+      Number.NaN
+    )
+    assert.equal(invalid?.lastObservedAt, 10_000)
+    assert.equal(invalid?.rateStartedAt, 10_000)
+    const backward = advanceCheapLfsTransferTiming(
+      invalid,
+      123,
+      { ...progress, transferredBytes: 1 },
+      9_000
+    )
+    assert.equal(backward?.lastObservedAt, 10_000)
+
+    const previousNow = Date.now
+    let now = 20_000
+    Date.now = () => now
+    try {
+      const initialProps = createProps({
+        isCommitting: true,
+        isGeneratingCommitMessage: false,
+        commitOperationPhase: { kind: 'cheap-lfs', progress },
+      })
+      const component = new CommitMessage(
+        initialProps
+      ) as unknown as CheapLfsTimingTestInstance
+      installCheapLfsTimingSetState(component)
+      now += 2_000
+      const nextProps = createProps({
+        ...initialProps,
+        commitOperationPhase: {
+          kind: 'cheap-lfs',
+          progress: { ...progress, transferredBytes: 1 },
+        },
+      })
+      component.componentWillReceiveProps(nextProps)
+      component.props = nextProps
+      const rendered = component.renderCommitProgress()
+      assert.ok(rendered)
+      assert.match(render(rendered).container.textContent ?? '', /<1 B\/s/)
+    } finally {
+      Date.now = previousNow
+    }
+  })
+
+  it('shows manual handoff work without bogus worker queues or rate estimates', () => {
+    const cases = [
+      {
+        phase: 'manual-waiting' as const,
+        completedFiles: 0,
+        expected: /Files awaiting your action: 3/,
+      },
+      {
+        phase: 'manual-verifying' as const,
+        completedFiles: 1,
+        expected: /Files left to verify: 2/,
+      },
+      {
+        phase: 'manual-detected' as const,
+        completedFiles: 3,
+        expected: /Manual upload verified/,
+      },
+    ]
+
+    for (const manual of cases) {
+      const component = toTestInstance(
+        new CommitMessage(
+          createProps({
+            isCommitting: true,
+            isGeneratingCommitMessage: false,
+            commitOperationPhase: {
+              kind: 'cheap-lfs',
+              progress: {
+                phase: manual.phase,
+                completedFiles: manual.completedFiles,
+                totalFiles: 3,
+                currentPath: 'manual-upload',
+                transferredBytes: 0,
+                totalBytes: 600,
+              },
+            },
+          })
+        )
+      )
+      const progress = component.renderCommitProgress()
+      assert.ok(progress)
+      const text = render(progress).container.textContent ?? ''
+      assert.match(text, manual.expected)
+      assert.match(text, /Observed 0s/)
+      assert.doesNotMatch(text, /Workers:|ETA|speed|Current file:/)
+    }
+  })
+
+  it('keeps renderer-observed elapsed time moving while progress stalls', () => {
+    const previousNow = Date.now
+    let now = 1_000
+    Date.now = () => now
+    try {
+      const component = new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitOperationPhase: {
+            kind: 'cheap-lfs',
+            progress: {
+              phase: 'manual-waiting',
+              completedFiles: 0,
+              totalFiles: 1,
+              currentPath: null,
+              transferredBytes: 0,
+              totalBytes: 600,
+            },
+          },
+        })
+      ) as unknown as CheapLfsTimingTestInstance
+      installCheapLfsTimingSetState(component)
+      now = 4_000
+      component.tickCheapLfsTiming()
+      const progress = component.renderCommitProgress()
+      assert.ok(progress)
+      assert.match(render(progress).container.textContent ?? '', /Observed 3s/)
+    } finally {
+      Date.now = previousNow
+    }
   })
 
   it('keeps nested provider recommendations compact and singular in bilingual mode', () => {
@@ -533,12 +905,14 @@ describe('CommitMessage', () => {
       }
 
       const text = render(progress).container.textContent ?? ''
-      assert.match(text, /2 GiB selected/)
-      assert.match(text, /已揀 2 GiB/)
       assert.equal(text.match(/GHCR · one OCI image/g)?.length, 1)
       assert.equal(text.match(/GHCR · 一個 OCI image/g)?.length, 1)
       assert.match(text, /estimated 1 OCI layer/)
       assert.doesNotMatch(text, /estimated 1 OCI layers/)
+      assert.match(text, /Workers: 1 active · 0 waiting/)
+      assert.match(text, /工作線：1 條做緊 · 0 個等緊/)
+      assert.match(text, /measuring speed/)
+      assert.match(text, /量度緊速度/)
     } finally {
       if (previousLanguageMode === null) {
         localStorage.removeItem('language-mode-v1')
@@ -546,6 +920,55 @@ describe('CommitMessage', () => {
         localStorage.setItem('language-mode-v1', previousLanguageMode)
       }
     }
+  })
+
+  it('exposes a keyboard-focusable storage recommendation disclosure', () => {
+    const component = toTestInstance(
+      new CommitMessage(
+        createProps({
+          isCommitting: true,
+          isGeneratingCommitMessage: false,
+          commitOperationPhase: {
+            kind: 'cheap-lfs',
+            progress: {
+              phase: 'uploading',
+              completedFiles: 0,
+              totalFiles: 2,
+              currentPath: 'archive.bin',
+              transferredBytes: 0,
+              totalBytes: 1024,
+              selectedStorageProvider: 'release',
+              recommendedStorageProvider: 'ghcr',
+              storageRecommendationReason: 'github-registry-large-batch',
+              estimatedRegistryLayers: 2,
+            },
+          },
+        })
+      )
+    )
+    const progress = component.renderCommitProgress()
+    if (progress === null) {
+      throw new Error('Expected Cheap LFS progress to render')
+    }
+
+    const view = render(progress)
+    const recommendation = view.container.querySelector<HTMLDetailsElement>(
+      'details.cheap-lfs-terminal-recommendation'
+    )
+    const disclosure = recommendation?.querySelector<HTMLElement>('summary')
+
+    assert.ok(recommendation)
+    assert.ok(disclosure)
+    assert.equal(disclosure.tabIndex, 0)
+    disclosure.focus()
+    assert.equal(document.activeElement, disclosure)
+    assert.equal(recommendation.open, false)
+    fireEvent.click(disclosure)
+    assert.equal(recommendation.open, true)
+    assert.match(
+      disclosure.textContent ?? '',
+      /large GitHub batch benefits from reusable GHCR layers/
+    )
   })
 
   it('keeps cancel available after switching to the manual handoff', () => {

@@ -121,6 +121,25 @@ interface ICheapLfsDisplayActiveFile {
   readonly percentage: number | null
 }
 
+export interface ICheapLfsTransferTimingSample {
+  readonly repositoryId: number
+  readonly operationStartedAt: number
+  readonly rateStartedAt: number
+  readonly rateInitialTransferredBytes: number
+  readonly lastObservedAt: number
+  readonly phase: CheapLfsAutoPinPhase
+  readonly completedFiles: number
+  readonly totalBytes: number
+  readonly totalFiles: number
+  readonly lastTransferredBytes: number
+}
+
+interface ICheapLfsDisplayTiming {
+  readonly elapsedMilliseconds: number
+  readonly bytesPerSecond: number | null
+  readonly etaMilliseconds: number | null
+}
+
 /** Keep untrusted progress values finite and inside the range the UI promises. */
 function boundedWholeNumber(value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
@@ -232,6 +251,33 @@ function normalizeCheapLfsDisplayProgress(
 
 function formatCheapLfsBytes(bytes: number): string {
   return bytes === 0 ? '0 B' : formatBytes(bytes, 1)
+}
+
+function formatCheapLfsDuration(milliseconds: number): string {
+  const totalSeconds = Number.isFinite(milliseconds)
+    ? Math.max(0, Math.floor(milliseconds / 1_000))
+    : 0
+  const seconds = totalSeconds % 60
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  if (totalMinutes === 0) {
+    return `${seconds}s`
+  }
+
+  const minutes = totalMinutes % 60
+  const hours = Math.floor(totalMinutes / 60)
+  return hours === 0
+    ? `${minutes}m ${seconds}s`
+    : `${hours}h ${minutes}m ${seconds}s`
+}
+
+function formatCheapLfsRate(bytesPerSecond: number): string | null {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) {
+    return null
+  }
+
+  return bytesPerSecond < 1
+    ? '<1 B/s'
+    : `${formatCheapLfsBytes(Math.max(1, Math.floor(bytesPerSecond)))}/s`
 }
 
 interface ICreateCommitOptions {
@@ -392,8 +438,78 @@ interface ICommitMessageProps {
   ) => void
 }
 
+function getCheapLfsTimingProgress(
+  props: ICommitMessageProps
+): ICheapLfsAutoPinProgress | null {
+  return props.isCommitting && props.commitOperationPhase?.kind === 'cheap-lfs'
+    ? props.commitOperationPhase.progress
+    : null
+}
+
+/**
+ * Advance the renderer-observed upload clock without mutating during render.
+ * Operation duration survives OCI phase/total changes, while rate and ETA use
+ * a narrower baseline that resets when the byte stream changes shape.
+ */
+export function advanceCheapLfsTransferTiming(
+  previous: ICheapLfsTransferTimingSample | null,
+  repositoryId: number,
+  progress: ICheapLfsAutoPinProgress | null,
+  now: number
+): ICheapLfsTransferTimingSample | null {
+  if (progress === null) {
+    return null
+  }
+
+  const display = normalizeCheapLfsDisplayProgress(progress)
+  const hasValidClock = Number.isFinite(now) && now >= 0
+  const safeNow = hasValidClock ? now : previous?.lastObservedAt ?? 0
+
+  if (previous === null || previous.repositoryId !== repositoryId) {
+    return {
+      repositoryId,
+      operationStartedAt: safeNow,
+      rateStartedAt: safeNow,
+      rateInitialTransferredBytes: display.transferredBytes,
+      lastObservedAt: safeNow,
+      phase: progress.phase,
+      completedFiles: display.completedFiles,
+      totalBytes: display.totalBytes,
+      totalFiles: display.totalFiles,
+      lastTransferredBytes: display.transferredBytes,
+    }
+  }
+
+  const clockRegressed = !hasValidClock || safeNow < previous.lastObservedAt
+  const observedAt = clockRegressed ? previous.lastObservedAt : safeNow
+  const resetRate =
+    clockRegressed ||
+    previous.phase !== progress.phase ||
+    previous.completedFiles !== display.completedFiles ||
+    previous.totalBytes !== display.totalBytes ||
+    previous.totalFiles !== display.totalFiles ||
+    display.transferredBytes < previous.lastTransferredBytes
+
+  return {
+    repositoryId,
+    operationStartedAt: previous.operationStartedAt,
+    rateStartedAt: resetRate ? observedAt : previous.rateStartedAt,
+    rateInitialTransferredBytes: resetRate
+      ? display.transferredBytes
+      : previous.rateInitialTransferredBytes,
+    lastObservedAt: observedAt,
+    phase: progress.phase,
+    completedFiles: display.completedFiles,
+    totalBytes: display.totalBytes,
+    totalFiles: display.totalFiles,
+    lastTransferredBytes: display.transferredBytes,
+  }
+}
+
 interface ICommitMessageState {
   readonly commitMessage: ICommitMessage
+
+  readonly cheapLfsTransferTiming: ICheapLfsTransferTimingSample | null
 
   readonly commitMessageAutocompletionProviders: ReadonlyArray<
     IAutocompletionProvider<any>
@@ -452,6 +568,7 @@ export class CommitMessage extends React.Component<
 
   private descriptionTextArea: HTMLTextAreaElement | null = null
   private descriptionTextAreaScrollDebounceId: number | null = null
+  private cheapLfsTimingIntervalId: number | null = null
 
   private coAuthorInputRef = React.createRef<AuthorInput>()
 
@@ -463,6 +580,12 @@ export class CommitMessage extends React.Component<
 
     this.state = {
       commitMessage: commitMessage ?? DefaultCommitMessage,
+      cheapLfsTransferTiming: advanceCheapLfsTransferTiming(
+        null,
+        props.repository.id,
+        getCheapLfsTimingProgress(props),
+        Date.now()
+      ),
       commitMessageAutocompletionProviders:
         findCommitMessageAutoCompleteProvider(props.autocompletionProviders),
       coAuthorAutocompletionProvider: findCoAuthorAutoCompleteProvider(
@@ -485,10 +608,15 @@ export class CommitMessage extends React.Component<
     const { props, state } = this
     props.onPersistCommitMessage?.(state.commitMessage)
     window.removeEventListener('keydown', this.onKeyDown)
+    if (this.cheapLfsTimingIntervalId !== null) {
+      window.clearInterval(this.cheapLfsTimingIntervalId)
+      this.cheapLfsTimingIntervalId = null
+    }
   }
 
   public async componentDidMount() {
     window.addEventListener('keydown', this.onKeyDown)
+    this.syncCheapLfsTimingInterval()
     await Promise.all([
       this.updateRepoRuleFailures(undefined, undefined, true),
       this.loadCommitAuthorOrigins(),
@@ -507,6 +635,18 @@ export class CommitMessage extends React.Component<
   public componentWillReceiveProps(nextProps: ICommitMessageProps) {
     const { commitMessage } = nextProps
 
+    this.setState(
+      {
+        cheapLfsTransferTiming: advanceCheapLfsTransferTiming(
+          this.state.cheapLfsTransferTiming,
+          nextProps.repository.id,
+          getCheapLfsTimingProgress(nextProps),
+          Date.now()
+        ),
+      },
+      this.syncCheapLfsTimingInterval
+    )
+
     if (!commitMessage || commitMessage === this.props.commitMessage) {
       return
     }
@@ -516,6 +656,36 @@ export class CommitMessage extends React.Component<
         commitMessage,
       })
     }
+  }
+
+  private syncCheapLfsTimingInterval = () => {
+    const needsTicker = this.state.cheapLfsTransferTiming !== null
+    if (needsTicker && this.cheapLfsTimingIntervalId === null) {
+      this.cheapLfsTimingIntervalId = window.setInterval(
+        this.tickCheapLfsTiming,
+        1_000
+      )
+    } else if (!needsTicker && this.cheapLfsTimingIntervalId !== null) {
+      window.clearInterval(this.cheapLfsTimingIntervalId)
+      this.cheapLfsTimingIntervalId = null
+    }
+  }
+
+  private tickCheapLfsTiming = () => {
+    const now = Date.now()
+    this.setState(state => {
+      const sample = state.cheapLfsTransferTiming
+      if (
+        sample === null ||
+        !Number.isFinite(now) ||
+        now <= sample.lastObservedAt
+      ) {
+        return null
+      }
+      return {
+        cheapLfsTransferTiming: { ...sample, lastObservedAt: now },
+      }
+    })
   }
 
   public async componentDidUpdate(
@@ -2105,10 +2275,89 @@ export class CommitMessage extends React.Component<
     }
   }
 
+  private getCheapLfsStorageReasonText(
+    reason: NonNullable<ICheapLfsAutoPinProgress['storageRecommendationReason']>
+  ): string {
+    switch (reason) {
+      case 'ordinary-git':
+        return t('cheapLfs.progress.terminalReasonOrdinaryGit')
+      case 'single-release-transfer':
+        return t('cheapLfs.progress.terminalReasonSingleRelease')
+      case 'github-registry-large-batch':
+        return t('cheapLfs.progress.terminalReasonGhcr')
+      case 'docker-hub-large-batch':
+        return t('cheapLfs.progress.terminalReasonDockerHub')
+      case 'release-registry-unavailable':
+        return t('cheapLfs.progress.terminalReasonReleaseFallback')
+      default:
+        return assertNever(
+          reason,
+          `Unknown Cheap LFS storage recommendation: ${reason}`
+        )
+    }
+  }
+
+  /** Derive renderer-observed timing without mutating component data. */
+  private getCheapLfsDisplayTiming(
+    display: ICheapLfsDisplayProgress,
+    phase: CheapLfsAutoPinPhase
+  ): ICheapLfsDisplayTiming {
+    const sample = this.state.cheapLfsTransferTiming
+    if (sample === null) {
+      return {
+        elapsedMilliseconds: 0,
+        bytesPerSecond: null,
+        etaMilliseconds: null,
+      }
+    }
+
+    const rawElapsed = sample.lastObservedAt - sample.operationStartedAt
+    const elapsedMilliseconds = Number.isFinite(rawElapsed)
+      ? Math.max(0, rawElapsed)
+      : 0
+    if (phase !== 'uploading' || sample.phase !== 'uploading') {
+      return {
+        elapsedMilliseconds,
+        bytesPerSecond: null,
+        etaMilliseconds: null,
+      }
+    }
+
+    const rateElapsedMilliseconds = Math.max(
+      0,
+      sample.lastObservedAt - sample.rateStartedAt
+    )
+    const observedBytes = Math.max(
+      0,
+      display.transferredBytes - sample.rateInitialTransferredBytes
+    )
+    const bytesPerSecond =
+      rateElapsedMilliseconds >= 1_000 && observedBytes > 0
+        ? observedBytes / (rateElapsedMilliseconds / 1_000)
+        : null
+    const remainingBytes = Math.max(
+      0,
+      display.totalBytes - display.transferredBytes
+    )
+    const calculatedEta =
+      remainingBytes === 0 && display.totalBytes > 0
+        ? 0
+        : bytesPerSecond === null
+        ? null
+        : (remainingBytes / bytesPerSecond) * 1_000
+    const etaMilliseconds =
+      calculatedEta !== null && Number.isFinite(calculatedEta)
+        ? calculatedEta
+        : null
+
+    return { elapsedMilliseconds, bytesPerSecond, etaMilliseconds }
+  }
+
   private renderCheapLfsTerminal(
     progress: ICheapLfsAutoPinProgress
   ): JSX.Element {
     const display = normalizeCheapLfsDisplayProgress(progress)
+    const timing = this.getCheapLfsDisplayTiming(display, progress.phase)
     const title = t('cheapLfs.progress.terminalTitle')
     const stage = this.getCheapLfsOperationText() ?? title
     const files = t('cheapLfs.progress.terminalFilesDetailed', {
@@ -2128,6 +2377,58 @@ export class CommitMessage extends React.Component<
       display.percentage === null
         ? `${files}; ${bytes}`
         : `${files}; ${bytes}; ${display.percentage}%`
+    const unsettledFiles = Math.max(
+      0,
+      display.totalFiles - display.completedFiles
+    )
+    const isManualStatusOnly =
+      progress.phase === 'manual-waiting' ||
+      progress.phase === 'manual-verifying' ||
+      progress.phase === 'manual-detected'
+    const visibleActiveFiles = isManualStatusOnly
+      ? 0
+      : display.activeFiles.length > 0
+      ? display.activeFiles.length
+      : display.currentPath !== null
+      ? 1
+      : 0
+    const activeFiles = Math.min(unsettledFiles, visibleActiveFiles)
+    const queuedFiles = Math.max(0, unsettledFiles - activeFiles)
+    const activity =
+      progress.phase === 'manual-waiting'
+        ? t('cheapLfs.progress.terminalAwaitingAction', {
+            count: unsettledFiles.toString(),
+          })
+        : progress.phase === 'manual-verifying'
+        ? t('cheapLfs.progress.terminalManualVerification', {
+            count: unsettledFiles.toString(),
+          })
+        : progress.phase === 'manual-detected'
+        ? t('cheapLfs.progress.terminalManualComplete')
+        : t('cheapLfs.progress.terminalActivity', {
+            active: activeFiles.toString(),
+            queued: queuedFiles.toString(),
+          })
+    const elapsed = formatCheapLfsDuration(timing.elapsedMilliseconds)
+    const rate =
+      timing.bytesPerSecond === null
+        ? null
+        : formatCheapLfsRate(timing.bytesPerSecond)
+    const eta =
+      timing.etaMilliseconds === null
+        ? null
+        : formatCheapLfsDuration(timing.etaMilliseconds)
+    const timingSummary =
+      progress.phase === 'uploading'
+        ? t('cheapLfs.progress.terminalTiming', {
+            elapsed,
+            rate:
+              rate ??
+              translatedVariable('cheapLfs.progress.terminalRatePending'),
+            eta:
+              eta ?? translatedVariable('cheapLfs.progress.terminalEtaPending'),
+          })
+        : t('cheapLfs.progress.terminalObservedElapsed', { elapsed })
     const hasRegistryRecommendation =
       display.selectedStorageProvider === 'ghcr' ||
       display.selectedStorageProvider === 'docker-hub' ||
@@ -2145,16 +2446,21 @@ export class CommitMessage extends React.Component<
             { count: display.estimatedRegistryLayers.toString() }
           )
     const storageRecommendation =
-      display.selectedStorageProvider === null ||
-      display.recommendedStorageProvider === null
+      display.selectedStorageProvider === null
         ? null
+        : display.recommendedStorageProvider === null
+        ? t('cheapLfs.progress.terminalStorageSelected', {
+            selected: this.getCheapLfsStorageProviderVariable(
+              display.selectedStorageProvider
+            ),
+            layers,
+          })
         : t(
             display.selectedStorageProvider ===
               display.recommendedStorageProvider
               ? 'cheapLfs.progress.terminalStorageMatched'
               : 'cheapLfs.progress.terminalStorage',
             {
-              total: formatCheapLfsBytes(display.totalBytes),
               selected: this.getCheapLfsStorageProviderVariable(
                 display.selectedStorageProvider
               ),
@@ -2163,6 +2469,12 @@ export class CommitMessage extends React.Component<
               ),
               layers,
             }
+          )
+    const storageReason =
+      progress.storageRecommendationReason === undefined
+        ? null
+        : this.getCheapLfsStorageReasonText(
+            progress.storageRecommendationReason
           )
 
     return (
@@ -2193,19 +2505,32 @@ export class CommitMessage extends React.Component<
             </span>
             <span className="cheap-lfs-terminal-stage">{stage}</span>
           </div>
+          <div className="cheap-lfs-terminal-facts">
+            <span>{activity}</span>
+            <span>{timingSummary}</span>
+          </div>
           {storageRecommendation !== null && (
             <div className="cheap-lfs-terminal-path">
               {storageRecommendation}
             </div>
           )}
-          {display.currentPath !== null && display.activeFiles.length === 0 && (
-            <div className="cheap-lfs-terminal-path">
-              {t('cheapLfs.progress.terminalCurrentFile', {
-                path: display.currentPath,
-              })}
-            </div>
+          {storageReason !== null && (
+            <details className="cheap-lfs-terminal-recommendation">
+              <summary>
+                <span>{storageReason}</span>
+              </summary>
+            </details>
           )}
-          {display.activeFiles.length > 0 && (
+          {!isManualStatusOnly &&
+            display.currentPath !== null &&
+            display.activeFiles.length === 0 && (
+              <div className="cheap-lfs-terminal-path">
+                {t('cheapLfs.progress.terminalCurrentFile', {
+                  path: display.currentPath,
+                })}
+              </div>
+            )}
+          {!isManualStatusOnly && display.activeFiles.length > 0 && (
             <div className="cheap-lfs-terminal-active-files" role="list">
               {display.activeFiles.map((file, index) => {
                 const phase = this.getCheapLfsTerminalPhaseText(file.phase)

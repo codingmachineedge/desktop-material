@@ -94,6 +94,23 @@ describe('recent UI internationalization', () => {
     }
   })
 
+  it('localizes the new compact Releases feedback and Open file action', () => {
+    const variables = { visible: '1', total: '3', detail: 'missing app' }
+    for (const key of [
+      'githubReleases.filterSummary',
+      'githubReleases.openFile',
+      'githubReleases.openFileError',
+    ] as const) {
+      const english = translate(key, 'english', variables)
+      const cantonese = translate(key, 'cantonese', variables)
+      assert.notEqual(english, cantonese)
+      assert.equal(
+        translate(key, 'bilingual', variables),
+        `${english} · ${cantonese}`
+      )
+    }
+  })
+
   it('localizes the direct Cheap LFS manager in all three modes', () => {
     for (const key of [
       'cheapLfs.managerRail',

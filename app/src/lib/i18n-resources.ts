@@ -1396,13 +1396,27 @@ export type TranslationKey =
   | 'cheapLfs.progress.terminalBytes'
   | 'cheapLfs.progress.terminalFileBytes'
   | 'cheapLfs.progress.terminalBytesPending'
+  | 'cheapLfs.progress.terminalActivity'
+  | 'cheapLfs.progress.terminalAwaitingAction'
+  | 'cheapLfs.progress.terminalManualVerification'
+  | 'cheapLfs.progress.terminalManualComplete'
+  | 'cheapLfs.progress.terminalObservedElapsed'
+  | 'cheapLfs.progress.terminalTiming'
+  | 'cheapLfs.progress.terminalRatePending'
+  | 'cheapLfs.progress.terminalEtaPending'
   | 'cheapLfs.progress.terminalProgressLabel'
+  | 'cheapLfs.progress.terminalStorageSelected'
   | 'cheapLfs.progress.terminalStorage'
   | 'cheapLfs.progress.terminalStorageMatched'
   | 'cheapLfs.progress.terminalLayer'
   | 'cheapLfs.progress.terminalLayers'
   | 'cheapLfs.progress.terminalProviderGit'
   | 'cheapLfs.progress.terminalProviderUnknown'
+  | 'cheapLfs.progress.terminalReasonOrdinaryGit'
+  | 'cheapLfs.progress.terminalReasonSingleRelease'
+  | 'cheapLfs.progress.terminalReasonGhcr'
+  | 'cheapLfs.progress.terminalReasonDockerHub'
+  | 'cheapLfs.progress.terminalReasonReleaseFallback'
   | 'cheapLfs.progress.terminalStagePreparing'
   | 'cheapLfs.progress.terminalStageHashing'
   | 'cheapLfs.progress.terminalStageRelease'
@@ -1423,6 +1437,9 @@ export type TranslationKey =
   | 'cheapLfs.settings.storageRelease'
   | 'cheapLfs.settings.storageGhcr'
   | 'cheapLfs.settings.storageDockerHub'
+  | 'githubReleases.filterSummary'
+  | 'githubReleases.openFile'
+  | 'githubReleases.openFileError'
   | 'cheapLfs.pinFailures.title'
   | 'cheapLfs.pinFailures.one'
   | 'cheapLfs.pinFailures.many'
@@ -3173,15 +3190,37 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     '{transferred} / {total} ({percentage}%)',
   'cheapLfs.progress.terminalBytesPending':
     'Batch data: waiting for byte progress',
+  'cheapLfs.progress.terminalActivity':
+    'Workers: {active} active · {queued} waiting',
+  'cheapLfs.progress.terminalAwaitingAction':
+    'Files awaiting your action: {count}',
+  'cheapLfs.progress.terminalManualVerification':
+    'Files left to verify: {count}',
+  'cheapLfs.progress.terminalManualComplete': 'Manual upload verified',
+  'cheapLfs.progress.terminalObservedElapsed': 'Observed {elapsed}',
+  'cheapLfs.progress.terminalTiming': 'Observed {elapsed} · {rate} · ETA {eta}',
+  'cheapLfs.progress.terminalRatePending': 'measuring speed',
+  'cheapLfs.progress.terminalEtaPending': 'pending',
   'cheapLfs.progress.terminalProgressLabel': 'Cheap LFS transfer progress',
+  'cheapLfs.progress.terminalStorageSelected': 'Destination {selected}{layers}',
   'cheapLfs.progress.terminalStorage':
-    '{total} selected · using {selected} · recommended {recommended}{layers}',
+    'Using {selected} · recommended {recommended}{layers}',
   'cheapLfs.progress.terminalStorageMatched':
-    '{total} selected · using {selected} · recommended for this batch{layers}',
+    'Using {selected} · recommended for this batch{layers}',
   'cheapLfs.progress.terminalLayer': ' · estimated 1 OCI layer',
   'cheapLfs.progress.terminalLayers': ' · estimated {count} OCI layers',
   'cheapLfs.progress.terminalProviderGit': 'Ordinary Git',
   'cheapLfs.progress.terminalProviderUnknown': 'Unknown storage',
+  'cheapLfs.progress.terminalReasonOrdinaryGit':
+    'Recommendation: this selected batch still fits ordinary Git.',
+  'cheapLfs.progress.terminalReasonSingleRelease':
+    'Recommendation: this batch fits one release-backed transfer.',
+  'cheapLfs.progress.terminalReasonGhcr':
+    'Recommendation: this large GitHub batch benefits from reusable GHCR layers.',
+  'cheapLfs.progress.terminalReasonDockerHub':
+    'Recommendation: this large batch benefits from reusable Docker Hub layers.',
+  'cheapLfs.progress.terminalReasonReleaseFallback':
+    'Recommendation: no registry is available, so release storage is the safe fallback.',
   'cheapLfs.progress.terminalStagePreparing': 'Preparing',
   'cheapLfs.progress.terminalStageHashing': 'Hashing',
   'cheapLfs.progress.terminalStageRelease': 'Preparing release',
@@ -3191,6 +3230,11 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'cheapLfs.progress.terminalStageManualWaiting': 'Waiting for manual upload',
   'cheapLfs.progress.terminalStageManualVerifying': 'Checking manual upload',
   'cheapLfs.progress.terminalStageManualDetected': 'Manual upload verified',
+  'githubReleases.filterSummary':
+    'Filtering {visible} of {total} loaded releases',
+  'githubReleases.openFile': 'Open file',
+  'githubReleases.openFileError':
+    'The downloaded release asset could not be opened. Check that Windows has an app associated with this file type, then try again. {detail}',
   'cheapLfs.settings.autoMaterialize': 'Download large files after cloning',
   'cheapLfs.settings.autoPin': 'Pin large files when committing',
   'cheapLfs.settings.autoPinHelp':
@@ -4816,15 +4860,36 @@ export const cantoneseTranslations: Readonly<
   'cheapLfs.progress.terminalFileBytes':
     '{transferred} / {total}（{percentage}%）',
   'cheapLfs.progress.terminalBytesPending': '成批數據：等緊第一批 bytes',
+  'cheapLfs.progress.terminalActivity':
+    '工作線：{active} 條做緊 · {queued} 個等緊',
+  'cheapLfs.progress.terminalAwaitingAction': '等緊你處理嘅檔案：{count}',
+  'cheapLfs.progress.terminalManualVerification': '仲要核實嘅檔案：{count}',
+  'cheapLfs.progress.terminalManualComplete': '手動上載已核實',
+  'cheapLfs.progress.terminalObservedElapsed': '已觀察 {elapsed}',
+  'cheapLfs.progress.terminalTiming':
+    '已觀察 {elapsed} · {rate} · 預計仲要 {eta}',
+  'cheapLfs.progress.terminalRatePending': '量度緊速度',
+  'cheapLfs.progress.terminalEtaPending': '等緊數據',
   'cheapLfs.progress.terminalProgressLabel': 'Cheap LFS 傳輸進度',
+  'cheapLfs.progress.terminalStorageSelected': '目的地 {selected}{layers}',
   'cheapLfs.progress.terminalStorage':
-    '已揀 {total} · 而家用 {selected} · 呢批建議用 {recommended}{layers}',
+    '而家用 {selected} · 呢批建議用 {recommended}{layers}',
   'cheapLfs.progress.terminalStorageMatched':
-    '已揀 {total} · 而家用 {selected} · 呢批檔案啱用{layers}',
+    '而家用 {selected} · 呢批檔案啱用{layers}',
   'cheapLfs.progress.terminalLayer': ' · 預計 1 個 OCI layer',
   'cheapLfs.progress.terminalLayers': ' · 預計 {count} 個 OCI layers',
   'cheapLfs.progress.terminalProviderGit': '普通 Git',
   'cheapLfs.progress.terminalProviderUnknown': '未知儲存位置',
+  'cheapLfs.progress.terminalReasonOrdinaryGit':
+    '建議原因：呢批已揀資料仲適合用普通 Git。',
+  'cheapLfs.progress.terminalReasonSingleRelease':
+    '建議原因：呢批資料放得入一次 Release-backed 傳輸。',
+  'cheapLfs.progress.terminalReasonGhcr':
+    '建議原因：呢批 GitHub 大量資料用可重用 GHCR layers 會更合適。',
+  'cheapLfs.progress.terminalReasonDockerHub':
+    '建議原因：呢批大量資料用可重用 Docker Hub layers 會更合適。',
+  'cheapLfs.progress.terminalReasonReleaseFallback':
+    '建議原因：而家未有可用 registry，所以穩陣噉用 Release 儲存做後備。',
   'cheapLfs.progress.terminalStagePreparing': '準備緊',
   'cheapLfs.progress.terminalStageHashing': '計緊 hash',
   'cheapLfs.progress.terminalStageRelease': '準備緊 Release',
@@ -4834,6 +4899,11 @@ export const cantoneseTranslations: Readonly<
   'cheapLfs.progress.terminalStageManualWaiting': '等緊你手動上載',
   'cheapLfs.progress.terminalStageManualVerifying': '檢查緊手動上載',
   'cheapLfs.progress.terminalStageManualDetected': '手動上載核實咗',
+  'githubReleases.filterSummary':
+    '篩選緊已載入 Release 入面嘅 {visible}/{total} 個',
+  'githubReleases.openFile': '開啟檔案',
+  'githubReleases.openFileError':
+    '開唔到下載咗嘅 Release 檔案。請檢查 Windows 有冇 app 可以開呢種檔案，跟住再試。{detail}',
   'cheapLfs.settings.autoMaterialize': 'Clone 完自動下載大檔案',
   'cheapLfs.settings.autoPin': 'Commit 嗰陣自動 pin 大檔案',
   'cheapLfs.settings.autoPinHelp':

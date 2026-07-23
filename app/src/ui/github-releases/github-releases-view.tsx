@@ -1,5 +1,7 @@
 import * as Path from 'path'
 import * as React from 'react'
+import { shell } from '../../lib/app-shell'
+import { t } from '../../lib/i18n'
 import { Account } from '../../models/account'
 import { Repository } from '../../models/repository'
 import {
@@ -118,6 +120,7 @@ interface IGitHubReleasesViewProps {
     asset: IGitHubReleaseAsset
   ) => Promise<string | null>
   readonly revealDownload?: (path: string) => Promise<void>
+  readonly openDownload?: (path: string) => Promise<string | void>
 }
 
 interface IGitHubReleasesViewState {
@@ -211,12 +214,23 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+function formatTimestamp(date: Date): string {
+  return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
   })
+}
+
+function ReleaseTimestamp(props: { readonly date: Date }) {
+  return (
+    <time dateTime={props.date.toISOString()}>
+      {formatTimestamp(props.date)}
+    </time>
+  )
 }
 
 function releaseStatus(
@@ -258,6 +272,9 @@ export class GitHubReleasesView extends React.Component<
   private generation = 0
   private operationController: AbortController | null = null
   private lastProgressAt = 0
+  private openDownloadRequest = 0
+  private selectAllVisibleRef = React.createRef<HTMLInputElement>()
+  private releaseSearchRef = React.createRef<HTMLInputElement>()
 
   public constructor(props: IGitHubReleasesViewProps) {
     super(props)
@@ -286,12 +303,14 @@ export class GitHubReleasesView extends React.Component<
   public componentWillUnmount() {
     this.mounted = false
     this.generation++
+    this.openDownloadRequest++
     this.operationController?.abort()
     this.operationController = null
   }
 
   private resetForProps() {
     this.generation++
+    this.openDownloadRequest++
     this.operationController?.abort()
     this.operationController = null
     const state = initialState(this.props)
@@ -581,7 +600,14 @@ export class GitHubReleasesView extends React.Component<
   }
 
   private clearReleaseSelection = () =>
-    this.setState({ selectedReleaseIds: new Set(), confirmation: null })
+    this.setState({ selectedReleaseIds: new Set(), confirmation: null }, () => {
+      const selectAllVisible = this.selectAllVisibleRef.current
+      if (selectAllVisible !== null && !selectAllVisible.disabled) {
+        selectAllVisible.focus()
+      } else {
+        this.releaseSearchRef.current?.focus()
+      }
+    })
 
   private selectedReleases(): ReadonlyArray<IGitHubRelease> {
     return this.state.releases.filter(release =>
@@ -1419,6 +1445,44 @@ export class GitHubReleasesView extends React.Component<
     }
   }
 
+  private openDownload = async () => {
+    const completed = this.state.completedDownload
+    if (completed === null) {
+      return
+    }
+    const generation = this.generation
+    const request = ++this.openDownloadRequest
+    const path = completed.path
+    this.setState({ error: null })
+    try {
+      const result = await (this.props.openDownload ?? shell.openPath)(path)
+      if (
+        !this.mounted ||
+        generation !== this.generation ||
+        request !== this.openDownloadRequest ||
+        this.state.completedDownload?.path !== path
+      ) {
+        return
+      }
+      if (typeof result === 'string' && result.trim().length > 0) {
+        throw new Error(result)
+      }
+    } catch (error) {
+      if (
+        !this.mounted ||
+        generation !== this.generation ||
+        request !== this.openDownloadRequest ||
+        this.state.completedDownload?.path !== path
+      ) {
+        return
+      }
+      const detail = errorMessage(error)
+      this.setState({
+        error: t('githubReleases.openFileError', { detail }),
+      })
+    }
+  }
+
   private renderAvailability() {
     const account = getGitHubReleasesAccount(
       this.props.repository,
@@ -1514,11 +1578,16 @@ export class GitHubReleasesView extends React.Component<
             {latestStable === null ? 'None loaded' : latestStable.tagName}
           </strong>
           <small>
-            {latestStable === null
-              ? 'No stable release is in the loaded results.'
-              : `${formatDate(
-                  latestStable.publishedAt ?? latestStable.createdAt
-                )} · newest stable in loaded results`}
+            {latestStable === null ? (
+              'No stable release is in the loaded results.'
+            ) : (
+              <>
+                <ReleaseTimestamp
+                  date={latestStable.publishedAt ?? latestStable.createdAt}
+                />{' '}
+                · newest stable in loaded results
+              </>
+            )}
           </small>
         </article>
       </section>
@@ -1570,6 +1639,7 @@ export class GitHubReleasesView extends React.Component<
                 </label>
                 <div className="github-releases-search-field">
                   <input
+                    ref={this.releaseSearchRef}
                     data-search-surface-id="github-releases-search"
                     id="github-releases-search"
                     type="search"
@@ -1605,16 +1675,19 @@ export class GitHubReleasesView extends React.Component<
                 </select>
               </label>
             </div>
-            <div className="github-releases-filter-summary">
-              <span>
-                Filtering the {this.state.releases.length} loaded releases
-              </span>
-              {hasFilters && (
+            {hasFilters && (
+              <div className="github-releases-filter-summary">
+                <span>
+                  {t('githubReleases.filterSummary', {
+                    visible: visibleReleases.length.toString(),
+                    total: this.state.releases.length.toString(),
+                  })}
+                </span>
                 <Button onClick={this.clearReleaseFilters}>
                   Clear filters
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
             {regexError !== null && (
               <p className="github-releases-filter-error" role="alert">
                 Invalid release search pattern: {regexError}
@@ -1628,41 +1701,53 @@ export class GitHubReleasesView extends React.Component<
             role="group"
             aria-label="Bulk release actions"
           >
-            <label>
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                disabled={
-                  visibleReleases.length === 0 || this.state.busy !== null
+            <div className="github-releases-bulk-selection">
+              <label>
+                <input
+                  ref={this.selectAllVisibleRef}
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  disabled={
+                    visibleReleases.length === 0 || this.state.busy !== null
+                  }
+                  onChange={this.toggleAllVisibleReleases}
+                  aria-label="Select all visible releases"
+                />
+                Select all visible
+              </label>
+              <span
+                className={
+                  selectedReleases.length === 0 ? 'sr-only' : undefined
                 }
-                onChange={this.toggleAllVisibleReleases}
-                aria-label="Select all visible releases"
-              />
-              Select all visible
-            </label>
-            <span aria-live="polite">{selectedReleases.length} selected</span>
-            <Button
-              disabled={selectedDraftCount === 0 || this.state.busy !== null}
-              onClick={this.confirmBulkPublish}
-            >
-              Publish drafts ({selectedDraftCount})
-            </Button>
-            <Button
-              disabled={
-                selectedReleases.length === 0 || this.state.busy !== null
-              }
-              onClick={this.confirmBulkDelete}
-            >
-              Delete selected ({selectedReleases.length})
-            </Button>
-            <Button
-              disabled={
-                selectedReleases.length === 0 || this.state.busy !== null
-              }
-              onClick={this.clearReleaseSelection}
-            >
-              Clear selection
-            </Button>
+                aria-live="polite"
+              >
+                {selectedReleases.length} selected
+              </span>
+            </div>
+            {selectedReleases.length > 0 && (
+              <div className="github-releases-bulk-actions">
+                <Button
+                  disabled={
+                    selectedDraftCount === 0 || this.state.busy !== null
+                  }
+                  onClick={this.confirmBulkPublish}
+                >
+                  Publish drafts ({selectedDraftCount})
+                </Button>
+                <Button
+                  disabled={this.state.busy !== null}
+                  onClick={this.confirmBulkDelete}
+                >
+                  Delete selected ({selectedReleases.length})
+                </Button>
+                <Button
+                  disabled={this.state.busy !== null}
+                  onClick={this.clearReleaseSelection}
+                >
+                  Clear selection
+                </Button>
+              </div>
+            )}
           </div>
         )}
         {initiallyLoading ? (
@@ -1741,7 +1826,7 @@ export class GitHubReleasesView extends React.Component<
                     </span>
                     <span className="github-release-row-date">
                       {release.draft ? 'Created' : 'Published'}{' '}
-                      {formatDate(date)}
+                      <ReleaseTimestamp date={date} />
                     </span>
                   </button>
                 </div>
@@ -2123,9 +2208,13 @@ export class GitHubReleasesView extends React.Component<
                   <dt>Downloads</dt>
                   <dd>{asset.downloadCount}</dd>
                   <dt>Uploaded</dt>
-                  <dd>{formatDate(asset.createdAt)}</dd>
+                  <dd>
+                    <ReleaseTimestamp date={asset.createdAt} />
+                  </dd>
                   <dt>Updated</dt>
-                  <dd>{formatDate(asset.updatedAt)}</dd>
+                  <dd>
+                    <ReleaseTimestamp date={asset.updatedAt} />
+                  </dd>
                   <dt>Digest</dt>
                   <dd className="digest">
                     {asset.digest ?? 'Not supplied by GitHub'}
@@ -2267,14 +2356,18 @@ export class GitHubReleasesView extends React.Component<
           </div>
           <div>
             <dt>Created</dt>
-            <dd>{formatDate(release.createdAt)}</dd>
+            <dd>
+              <ReleaseTimestamp date={release.createdAt} />
+            </dd>
           </div>
           <div>
             <dt>Published</dt>
             <dd>
-              {release.publishedAt === null
-                ? 'Not published'
-                : formatDate(release.publishedAt)}
+              {release.publishedAt === null ? (
+                'Not published'
+              ) : (
+                <ReleaseTimestamp date={release.publishedAt} />
+              )}
             </dd>
           </div>
           <div>
@@ -2346,7 +2439,12 @@ export class GitHubReleasesView extends React.Component<
               <strong>{this.state.completedDownload.assetName}</strong>
               <code>{this.state.completedDownload.localDigest}</code>
             </div>
-            <Button onClick={this.revealDownload}>Show in folder</Button>
+            <div className="github-release-download-actions">
+              <Button onClick={this.openDownload}>
+                {t('githubReleases.openFile')}
+              </Button>
+              <Button onClick={this.revealDownload}>Show in folder</Button>
+            </div>
           </div>
         )}
       </div>

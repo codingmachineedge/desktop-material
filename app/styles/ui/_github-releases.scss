@@ -14,6 +14,8 @@
   overflow: hidden;
   color: var(--md-sys-color-on-surface);
   background: var(--md-sys-color-surface);
+  container-name: github-releases-pane;
+  container-type: inline-size;
 
   h1,
   h2,
@@ -203,6 +205,8 @@
   flex-direction: column;
   padding: 16px;
   overflow: hidden;
+  container-name: github-releases-list;
+  container-type: inline-size;
 }
 
 .github-releases-panel-heading {
@@ -305,30 +309,60 @@
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: 6px 10px;
   align-items: center;
   margin-bottom: 12px;
-  padding: 10px 12px;
+  padding: 7px 9px;
   border-radius: 14px;
   background: var(--md-sys-color-surface-container-low);
+}
+
+.github-releases-bulk-selection,
+.github-releases-bulk-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.github-releases-bulk-selection {
+  flex: 1 1 150px;
 
   > label {
     display: inline-flex;
     gap: 8px;
     align-items: center;
+    min-height: 32px;
     font-size: 12px;
   }
 
   > span {
-    margin-right: auto;
     color: var(--md-sys-color-on-surface-variant);
-    font-size: 12px;
+    font-size: 11px;
   }
+}
+
+.github-releases-bulk-actions {
+  flex: 1 1 290px;
+  justify-content: flex-end;
 
   .button-component {
-    min-height: 36px;
-    flex: 1 1 140px;
+    min-height: 32px;
+    flex: 0 1 auto;
+    padding-inline: 11px;
+    font-size: 11px;
   }
+}
+
+.github-releases-bulk-selection input[type='checkbox'],
+.github-release-row-checkbox input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  padding: 0;
 }
 
 .github-releases-list-empty,
@@ -396,6 +430,8 @@
   gap: 8px;
   align-content: start;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .github-release-row-shell {
@@ -407,8 +443,8 @@
 
 .github-release-row-checkbox {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   border-radius: 8px;
 
@@ -880,6 +916,20 @@
   }
 }
 
+.github-release-download-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  justify-content: flex-end;
+
+  .button-component {
+    min-height: 32px;
+    padding-inline: 12px;
+  }
+}
+
 .github-releases-empty {
   padding: 24px;
   text-align: center;
@@ -989,8 +1039,263 @@
     padding: 14px;
   }
 
-  .github-releases-bulk-toolbar .button-component {
-    flex-basis: 100%;
+  .github-releases-bulk-actions .button-component {
+    flex: 1 1 120px;
+  }
+}
+
+@container github-releases-pane (max-width: 760px) {
+  .github-releases-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: 6px;
+    overflow-x: visible;
+  }
+
+  .github-release-metric,
+  .github-release-metric.latest {
+    min-width: 0;
+    min-height: 60px;
+    grid-column: auto;
+    padding: 7px 9px;
+  }
+
+  .github-release-metric.latest {
+    grid-column: span 2;
+  }
+}
+
+@container github-releases-list (max-width: 520px) {
+  .github-releases-panel-heading {
+    gap: 6px 10px;
+    margin-bottom: 6px;
+
+    h2,
+    h3 {
+      font-size: 16px;
+    }
+
+    .button-component {
+      min-height: 32px;
+      padding-inline: 12px;
+      font-size: 11px;
+    }
+  }
+
+  .github-releases-filter-area {
+    gap: 7px;
+    margin-bottom: 8px;
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  .github-releases-filter-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(96px, 112px);
+    gap: 6px;
+  }
+
+  .github-releases-search,
+  .github-releases-filter-area label {
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .github-releases-search-field {
+    flex-wrap: nowrap;
+    gap: 3px;
+
+    input {
+      min-height: 34px;
+      padding: 5px 7px;
+      font-size: 11px;
+    }
+
+    .filter-mode-control {
+      width: auto;
+      flex: 0 1 auto;
+    }
+
+    .filter-mode-control-cluster {
+      flex-wrap: nowrap;
+      gap: 2px;
+      justify-content: flex-end;
+    }
+
+    .filter-mode-button,
+    .filter-case-button {
+      height: 28px;
+      min-width: 28px;
+      padding-inline: 5px;
+    }
+
+    .filter-regex-builder-button {
+      height: 28px;
+      padding-inline: 6px;
+    }
+  }
+
+  .github-releases-status-filter select {
+    min-height: 34px;
+    padding: 5px 24px 5px 7px;
+    font-size: 11px;
+  }
+
+  .github-releases-filter-summary {
+    gap: 4px;
+
+    .button-component {
+      min-height: 30px;
+      padding-inline: 9px;
+      font-size: 10px;
+    }
+  }
+
+  .github-releases-bulk-toolbar {
+    gap: 5px 8px;
+    margin-bottom: 8px;
+    padding: 5px 7px;
+    border-radius: 11px;
+  }
+
+  .github-releases-bulk-selection {
+    > label {
+      min-height: 30px;
+      font-size: 11px;
+    }
+
+    > span {
+      font-size: 10px;
+    }
+  }
+
+  .github-releases-bulk-actions {
+    flex: 1 1 100%;
+    gap: 4px;
+    justify-content: flex-start;
+
+    .button-component {
+      min-height: 30px;
+      flex: 1 1 96px;
+      padding-inline: 8px;
+      font-size: 10px;
+    }
+  }
+
+  .github-releases-list {
+    gap: 5px;
+  }
+
+  .github-release-row-shell {
+    gap: 5px;
+  }
+
+  .github-release-row-checkbox {
+    width: 28px;
+    height: 28px;
+  }
+
+  .github-release-row {
+    min-height: 52px;
+    gap: 3px 6px;
+    padding: 7px 9px;
+  }
+
+  .github-release-row-title {
+    font-size: 13px;
+  }
+
+  .github-release-row-tag,
+  .github-release-row-state,
+  .github-release-row-date {
+    font-size: 10px;
+  }
+
+  .github-release-row-badges {
+    gap: 3px;
+  }
+
+  .github-release-row-state,
+  .github-release-latest-badge {
+    padding: 1px 5px;
+    font-size: 9px;
+  }
+
+  .github-releases-pagination {
+    gap: 5px;
+    margin-top: 6px;
+
+    .button-component {
+      min-height: 30px;
+      padding-inline: 10px;
+      font-size: 10px;
+    }
+
+    span {
+      font-size: 10px;
+    }
+  }
+}
+
+@media (max-height: 760px) {
+  .github-releases-view {
+    gap: 8px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .github-releases-header h1 {
+    font-size: 20px;
+  }
+
+  .github-releases-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+    gap: 6px;
+    overflow-x: visible;
+  }
+
+  .github-release-metric,
+  .github-release-metric.latest {
+    min-width: 0;
+    min-height: 52px;
+    grid-column: auto;
+    padding: 6px 8px;
+
+    > strong {
+      font-size: 16px;
+    }
+
+    > small {
+      display: none;
+    }
+  }
+
+  .github-release-metric.latest {
+    grid-column: span 2;
+  }
+
+  .github-releases-layout {
+    min-height: 350px;
+    flex-basis: 350px;
+  }
+
+  .github-releases-list-panel {
+    min-height: 350px;
+    padding: 10px;
+  }
+
+  .github-releases-filter-area {
+    gap: 6px;
+    margin-bottom: 7px;
+    padding: 7px;
+  }
+
+  .github-releases-bulk-toolbar {
+    margin-bottom: 7px;
+  }
+
+  .github-releases-list {
+    min-height: 128px;
   }
 }
 
