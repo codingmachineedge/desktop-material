@@ -20,6 +20,10 @@ import {
   ICheapLfsPointer,
   serializeCheapLfsPointer,
 } from '../../../src/lib/cheap-lfs/pointer'
+import type {
+  ICheapLfsTrackedFileProof,
+  ICheapLfsTrackedPathStore,
+} from '../../../src/lib/cheap-lfs/tracked-path-store'
 
 const selected = new Account(
   'selected',
@@ -294,6 +298,118 @@ describe('selectCheapLfsAutoPinTargets', () => {
       deps(new Map())
     )
     assert.equal(targets.length, 0)
+  })
+
+  it('stats every selection before proving only oversized destinations', async () => {
+    const events: string[] = []
+    const repo = repository('C:/secure-repo')
+    const trackedPaths = {
+      proveDestination: async (
+        repositoryPath: string,
+        relativePath: string
+      ) => {
+        events.push(`prove:${relativePath}`)
+        assert.equal(repositoryPath, repo.path)
+        assert.equal(relativePath, 'large.bin')
+        return {
+          repositoryRoot: repositoryPath,
+          relativePath,
+          absolutePath: `${repositoryPath}/${relativePath}`,
+          exists: true,
+          sizeInBytes: 220,
+          sha256: 'a'.repeat(64),
+        } as unknown as ICheapLfsTrackedFileProof
+      },
+      readText: async (proof: ICheapLfsTrackedFileProof) => {
+        events.push(`read:${proof.relativePath}`)
+        return 'not a pointer\n'
+      },
+    } as unknown as ICheapLfsTrackedPathStore
+
+    const targets = await selectCheapLfsAutoPinTargets(
+      repo,
+      ['small.bin', 'large.bin', 'exact.bin'],
+      threshold,
+      {
+        statSize: async absolutePath => {
+          const relativePath = ['small.bin', 'large.bin', 'exact.bin'].find(
+            path => absolutePath.endsWith(path)
+          )
+          assert.ok(relativePath !== undefined)
+          events.push(`stat:${relativePath}`)
+          return relativePath === 'large.bin'
+            ? 200
+            : relativePath === 'exact.bin'
+            ? threshold
+            : 20
+        },
+        readPointerText: async () => {
+          throw new Error('tracked paths must provide bounded pointer reads')
+        },
+        trackedPaths,
+      }
+    )
+
+    assert.deepEqual(events, [
+      'stat:small.bin',
+      'stat:large.bin',
+      'stat:exact.bin',
+      'prove:large.bin',
+      'read:large.bin',
+    ])
+    assert.equal(targets.length, 1)
+    assert.equal(targets[0].relativePath, 'large.bin')
+    assert.ok(targets[0].absolutePath.endsWith('large.bin'))
+    assert.equal(targets[0].sizeInBytes, 220)
+  })
+
+  it('requires an existing over-threshold tracked proof before selecting', async () => {
+    const repo = repository('C:/secure-repo')
+    const proved: string[] = []
+    const read: string[] = []
+    const trackedPaths = {
+      proveDestination: async (
+        repositoryPath: string,
+        relativePath: string
+      ) => {
+        assert.equal(repositoryPath, repo.path)
+        proved.push(relativePath)
+        const exists = relativePath !== 'absent.bin'
+        const sizeInBytes = relativePath === 'shrunk.bin' ? 80 : 240
+        return {
+          repositoryRoot: repositoryPath,
+          relativePath,
+          absolutePath: `${repositoryPath}/${relativePath}`,
+          exists,
+          sizeInBytes: exists ? sizeInBytes : 0,
+          sha256: exists ? 'b'.repeat(64) : null,
+        } as unknown as ICheapLfsTrackedFileProof
+      },
+      readText: async (proof: ICheapLfsTrackedFileProof) => {
+        read.push(proof.relativePath)
+        return 'not a pointer\n'
+      },
+    } as unknown as ICheapLfsTrackedPathStore
+
+    const targets = await selectCheapLfsAutoPinTargets(
+      repo,
+      ['absent.bin', 'shrunk.bin', 'large.bin'],
+      threshold,
+      {
+        statSize: async () => 200,
+        readPointerText: async () => {
+          throw new Error('tracked paths must provide bounded pointer reads')
+        },
+        trackedPaths,
+      }
+    )
+
+    assert.deepEqual(proved, ['absent.bin', 'shrunk.bin', 'large.bin'])
+    assert.deepEqual(read, ['large.bin'])
+    assert.deepEqual(
+      targets.map(target => [target.relativePath, target.sizeInBytes]),
+      [['large.bin', 240]]
+    )
   })
 })
 

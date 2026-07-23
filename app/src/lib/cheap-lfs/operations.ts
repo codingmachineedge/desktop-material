@@ -3212,6 +3212,7 @@ export async function selectCheapLfsAutoPinTargets(
   signal?: AbortSignal
 ): Promise<ReadonlyArray<ICheapLfsAutoPinTarget>> {
   const targets = new Array<ICheapLfsAutoPinTarget>()
+  const oversizedCandidates = new Array<ICheapLfsAutoPinTarget>()
   const seen = new Set<string>()
   const trackedPaths =
     deps.trackedPaths ??
@@ -3233,23 +3234,42 @@ export async function selectCheapLfsAutoPinTargets(
     }
     seen.add(validated.toLowerCase())
     const absolutePath = join(repository.path, validated)
-    let sizeInBytes: number
-    let trackedProof: ICheapLfsTrackedFileProof | undefined
     try {
-      if (trackedPaths !== undefined) {
-        trackedProof = await trackedPaths.proveDestination(
-          repository.path,
-          validated
-        )
-        if (!trackedProof.exists) {
-          continue
-        }
-        sizeInBytes = trackedProof.sizeInBytes
-      } else {
-        sizeInBytes = await deps.statSize(absolutePath)
+      const sizeInBytes = await deps.statSize(absolutePath)
+      if (sizeInBytes > thresholdBytes) {
+        oversizedCandidates.push({
+          relativePath: validated,
+          absolutePath,
+          sizeInBytes,
+        })
       }
     } catch {
       continue
+    }
+  }
+
+  // Proving a destination hashes its contents. Stat every selected path first
+  // so ordinary files never pay that cost while oversized files retain the
+  // exact tracked-path containment and identity proof used by pinning.
+  for (const candidate of oversizedCandidates) {
+    if (signal?.aborted) {
+      throw abortError('Cheap LFS commit upload was canceled.')
+    }
+    let sizeInBytes = candidate.sizeInBytes
+    let trackedProof: ICheapLfsTrackedFileProof | undefined
+    if (trackedPaths !== undefined) {
+      try {
+        trackedProof = await trackedPaths.proveDestination(
+          repository.path,
+          candidate.relativePath
+        )
+      } catch {
+        continue
+      }
+      if (!trackedProof.exists || trackedProof.sizeInBytes <= thresholdBytes) {
+        continue
+      }
+      sizeInBytes = trackedProof.sizeInBytes
     }
     if (sizeInBytes <= thresholdBytes) {
       continue
@@ -3265,7 +3285,7 @@ export async function selectCheapLfsAutoPinTargets(
                 CheapLfsMaximumAnyPointerTextBytes
               )
             : ''
-          : await deps.readPointerText(absolutePath)
+          : await deps.readPointerText(candidate.absolutePath)
       if (
         parseCheapLfsPointer(text) !== null ||
         parseCheapLfsGhcrPointer(text) !== null
@@ -3275,7 +3295,11 @@ export async function selectCheapLfsAutoPinTargets(
     } catch {
       // Unreadable as bounded text means it is certainly not a pointer; pin it.
     }
-    targets.push({ relativePath: validated, absolutePath, sizeInBytes })
+    targets.push({
+      relativePath: candidate.relativePath,
+      absolutePath: candidate.absolutePath,
+      sizeInBytes,
+    })
   }
   return targets
 }
