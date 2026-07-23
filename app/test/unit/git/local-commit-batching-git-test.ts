@@ -7,6 +7,7 @@ import { exec } from 'dugite'
 
 import {
   buildLocalCommitArgv,
+  buildLocalCommitBatchingExactPushArgv,
   buildLocalCommitExplicitStageArgv,
   buildLocalCommitRawDiffArgv,
   createLocalCommitBatchingGitSession,
@@ -16,6 +17,7 @@ import {
   parseLocalCommitLogZ,
   parseLocalCommitLsRemote,
   parseLocalCommitRawDiffZ,
+  pushLocalCommitBatchExactly,
 } from '../../../src/lib/git/local-commit-batching-git'
 import {
   handleLocalCommitPushBatching,
@@ -151,6 +153,85 @@ const runGitWithNativeHooks: LocalCommitBatchingGitRunner = async (
   )) as ILocalCommitBatchingGitResult
 
 describe('git/local-commit-batching-git', () => {
+  it('uses process-local cheap packing for only the exact batching push', async () => {
+    const repository = new Repository('C:\\batch-repository', -102, null, false)
+    const headSha = oid('a')
+    const onHookProgress = () => undefined
+    const onHookFailure = async () => 'abort' as const
+    const onTerminalOutputAvailable = () => undefined
+    const remoteEnvironment = { GIT_ASKPASS: 'batch-test-askpass' }
+    const calls = new Array<{
+      readonly args: ReadonlyArray<string>
+      readonly path: string
+      readonly name: string
+      readonly options?: Parameters<LocalCommitBatchingGitRunner>[3]
+    }>()
+
+    await pushLocalCommitBatchExactly(
+      {
+        repository,
+        remote: { name: 'origin', url: 'https://example.invalid/repo.git' },
+        headSha,
+        remoteBranch: 'refs/heads/main',
+        accountKey: 'batch-account',
+        hookOptions: {
+          onHookProgress,
+          onHookFailure,
+          onTerminalOutputAvailable,
+        },
+      },
+      {
+        runGit: async (args, path, name, options) => {
+          calls.push({ args: [...args], path, name, options })
+          return { stdout: '', stderr: '', exitCode: 0 }
+        },
+        remoteEnvironment: async url => {
+          assert.equal(url, 'https://example.invalid/repo.git')
+          return remoteEnvironment
+        },
+      }
+    )
+
+    assert.deepStrictEqual(
+      buildLocalCommitBatchingExactPushArgv(
+        'origin',
+        headSha,
+        'refs/heads/main'
+      ),
+      [
+        '-c',
+        'pack.window=0',
+        '-c',
+        'pack.compression=0',
+        'push',
+        'origin',
+        `${headSha}:refs/heads/main`,
+      ]
+    )
+    assert.equal(calls.length, 1)
+    assert.deepStrictEqual(calls[0], {
+      args: [
+        '-c',
+        'pack.window=0',
+        '-c',
+        'pack.compression=0',
+        'push',
+        'origin',
+        `${headSha}:refs/heads/main`,
+      ],
+      path: repository.path,
+      name: 'push',
+      options: {
+        env: remoteEnvironment,
+        credentialAccountKey: 'batch-account',
+        interceptHooks: ['pre-push'],
+        onHookProgress,
+        onHookFailure,
+        onTerminalOutputAvailable,
+      },
+    })
+  })
+
   it('parses bounded raw object, commit, and remote records', () => {
     const oldSha = oid('1')
     const newSha = oid('2')

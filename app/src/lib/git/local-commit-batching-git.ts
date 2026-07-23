@@ -24,7 +24,6 @@ import {
   IGitStringResult,
 } from './core'
 import { envForRemoteOperation } from './environment'
-import { push } from './push'
 
 export const MaximumLocalCommitBatchingCommits = 4_096
 export const MaximumLocalCommitBatchingPaths = 100_000
@@ -82,6 +81,11 @@ export interface ILocalCommitBatchingExactPushRequest {
 export type LocalCommitBatchingExactPush = (
   request: ILocalCommitBatchingExactPushRequest
 ) => Promise<void>
+
+export interface ILocalCommitBatchingExactPushDependencies {
+  readonly runGit: LocalCommitBatchingGitRunner
+  readonly remoteEnvironment: typeof envForRemoteOperation
+}
 
 export interface ILocalCommitBatchingGitDependencies {
   readonly runGit: LocalCommitBatchingGitRunner
@@ -230,6 +234,70 @@ function requireRemoteBranchRef(ref: string): void {
       'Automatic push batching received an unsafe remote branch ref.'
     )
   }
+}
+
+/**
+ * Keep the large-object batching transport cheap without mutating repository
+ * or user configuration. These `-c` values apply to this one Git process and
+ * must precede the `push` subcommand.
+ */
+export function buildLocalCommitBatchingExactPushArgv(
+  remoteName: string,
+  headSha: string,
+  remoteBranchRef: string
+): string[] {
+  if (
+    !RemoteNamePattern.test(remoteName) ||
+    remoteName === '.' ||
+    remoteName === '..'
+  ) {
+    adapterError(
+      'unsafe-state',
+      'Automatic push batching received an unsafe remote.'
+    )
+  }
+  requireObjectId(headSha, 'push tip')
+  requireRemoteBranchRef(remoteBranchRef)
+  return [
+    '-c',
+    'pack.window=0',
+    '-c',
+    'pack.compression=0',
+    'push',
+    remoteName,
+    `${headSha}:${remoteBranchRef}`,
+  ]
+}
+
+const defaultExactPushDependencies: ILocalCommitBatchingExactPushDependencies =
+  {
+    runGit: async (args, path, name, options) =>
+      (await git(args, path, name, options)) as IGitStringResult,
+    remoteEnvironment: envForRemoteOperation,
+  }
+
+/** Execute the exact, immutable batching refspec with process-local packing. */
+export async function pushLocalCommitBatchExactly(
+  request: ILocalCommitBatchingExactPushRequest,
+  dependencies: ILocalCommitBatchingExactPushDependencies = defaultExactPushDependencies
+): Promise<void> {
+  await dependencies.runGit(
+    buildLocalCommitBatchingExactPushArgv(
+      request.remote.name,
+      request.headSha,
+      request.remoteBranch
+    ),
+    request.repository.path,
+    'push',
+    {
+      env: await dependencies.remoteEnvironment(request.remote.url),
+      credentialAccountKey: request.accountKey,
+      interceptHooks: ['pre-push'],
+      onHookProgress: request.hookOptions?.onHookProgress,
+      onHookFailure: request.hookOptions?.onHookFailure,
+      onTerminalOutputAvailable: request.hookOptions?.onTerminalOutputAvailable,
+    }
+  )
 }
 
 /** Raw object IDs are retained; names never need shell quoting. */
@@ -467,22 +535,7 @@ async function defaultPathExists(path: string): Promise<boolean> {
 const defaultDependencies: ILocalCommitBatchingGitDependencies = {
   runGit: async (args, path, name, options) =>
     (await git(args, path, name, options)) as IGitStringResult,
-  pushExact: async request => {
-    await push(
-      request.repository,
-      request.remote,
-      request.headSha,
-      request.remoteBranch,
-      null,
-      {
-        accountKey: request.accountKey,
-        onHookProgress: request.hookOptions?.onHookProgress,
-        onHookFailure: request.hookOptions?.onHookFailure,
-        onTerminalOutputAvailable:
-          request.hookOptions?.onTerminalOutputAvailable,
-      }
-    )
-  },
+  pushExact: pushLocalCommitBatchExactly,
   remoteEnvironment: envForRemoteOperation,
   makeTemporaryDirectory: () =>
     mkdtemp(join(tmpdir(), 'desktop-material-commit-batch-')),
