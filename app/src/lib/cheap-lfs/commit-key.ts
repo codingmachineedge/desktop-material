@@ -46,21 +46,22 @@ export class CheapLfsCommitKeyError extends Error {
 
 async function readSelectedOciPointer(
   repositoryPath: string,
-  relativePathInput: string
+  relativePath: string,
+  cheapLfsEligible: boolean
 ): Promise<{
   readonly pointer: ICheapLfsGhcrPointer
   readonly contentSha256: string
 } | null> {
-  const relativePath = validateCheapLfsTrackedPath(relativePathInput)
-  if (relativePath === null) {
-    throw new Error(
-      'Cheap LFS cannot prove a private registry key for an unsafe selected path.'
-    )
-  }
-  const proof = await defaultCheapLfsTrackedPathStore.proveDestination(
-    repositoryPath,
-    relativePath
-  )
+  const proof = cheapLfsEligible
+    ? await defaultCheapLfsTrackedPathStore.proveDestination(
+        repositoryPath,
+        relativePath
+      )
+    : await defaultCheapLfsTrackedPathStore.proveManagedPath(
+        repositoryPath,
+        relativePath,
+        relativePath
+      )
   if (
     !proof.exists ||
     proof.sizeInBytes <= 0 ||
@@ -81,6 +82,49 @@ async function readSelectedOciPointer(
       }
 }
 
+interface ISelectedCommitPath {
+  readonly relativePath: string
+  readonly cheapLfsEligible: boolean
+}
+
+/**
+ * Selected Git files include control-plane paths such as `.github/*` and
+ * `.gitignore` which Cheap LFS deliberately refuses to track. Permit those
+ * exact spellings only for bounded pointer classification. The surrogate
+ * retains every character and descendant segment, so all other Windows/path
+ * safety rules still come from the canonical Cheap LFS validator; `.git`
+ * itself remains inaccessible.
+ */
+function validateSelectedCommitPath(
+  relativePathInput: string
+): ISelectedCommitPath | null {
+  const trackedPath = validateCheapLfsTrackedPath(relativePathInput)
+  if (trackedPath !== null) {
+    return { relativePath: trackedPath, cheapLfsEligible: true }
+  }
+  if (typeof relativePathInput !== 'string') {
+    return null
+  }
+  const normalized = relativePathInput.replace(/\\/g, '/')
+  const segments = normalized.split('/')
+  const firstSegment = segments[0]
+  if (
+    firstSegment === undefined ||
+    !/^\.git/i.test(firstSegment) ||
+    /^\.git$/i.test(firstSegment)
+  ) {
+    return null
+  }
+  const safetySurrogate = [
+    `selected-control-path${firstSegment}`,
+    ...segments.slice(1),
+  ].join('/')
+  if (validateCheapLfsTrackedPath(safetySurrogate) === null) {
+    return null
+  }
+  return { relativePath: normalized, cheapLfsEligible: false }
+}
+
 /**
  * Resolve the one canonical key file that every selected private OCI pointer
  * names. Legacy pointers without a key identity fail closed offline; callers
@@ -96,31 +140,42 @@ export async function resolveCheapLfsCommitKeyRequirement(
     readonly pointer: ICheapLfsGhcrPointer
     readonly contentSha256: string
   }>()
-  const selectedPathSpellings = new Map<string, string>()
+  const selectedPathSpellings = new Map<string, ISelectedCommitPath>()
   for (const relativePath of selectedRelativePaths) {
-    const validated = validateCheapLfsTrackedPath(relativePath)
+    const validated = validateSelectedCommitPath(relativePath)
     if (validated === null) {
       throw new CheapLfsCommitKeyError(
         'Cheap LFS cannot prove a private registry key for an unsafe selected path.',
         [relativePath]
       )
     }
-    const collisionKey = validated.toLowerCase()
+    const collisionKey = validated.relativePath.toLowerCase()
     const existingSpelling = selectedPathSpellings.get(collisionKey)
-    if (existingSpelling !== undefined && existingSpelling !== validated) {
+    if (
+      existingSpelling !== undefined &&
+      existingSpelling.relativePath !== validated.relativePath
+    ) {
       throw new CheapLfsCommitKeyError(
         'Cheap LFS refused selected paths whose Windows spellings collide case-insensitively.',
-        [existingSpelling, validated]
+        [existingSpelling.relativePath, validated.relativePath]
       )
     }
     selectedPathSpellings.set(collisionKey, validated)
   }
-  for (const relativePath of selectedPathSpellings.values()) {
+  for (const selectedPath of selectedPathSpellings.values()) {
+    const { relativePath, cheapLfsEligible } = selectedPath
     const selectedPointer = await readSelectedOciPointer(
       repositoryPath,
-      relativePath
+      relativePath,
+      cheapLfsEligible
     )
     if (selectedPointer !== null) {
+      if (!cheapLfsEligible) {
+        throw new CheapLfsCommitKeyError(
+          'Cheap LFS cannot prove a private registry key for an unsafe selected path.',
+          [relativePath]
+        )
+      }
       entries.push({ relativePath, ...selectedPointer })
     }
   }

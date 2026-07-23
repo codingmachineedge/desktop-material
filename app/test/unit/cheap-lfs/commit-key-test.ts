@@ -84,6 +84,78 @@ function publishRequest(request: ICheapLfsOciPublishRequest) {
 }
 
 describe('Cheap LFS private pointer commit key', () => {
+  it('commits an ordinary GitHub manifest and workflow together without treating metadata as pointers', async t => {
+    const repository = await setupEmptyRepository(t)
+    const githubDirectory = join(repository.path, '.github')
+    const workflowDirectory = join(githubDirectory, 'workflows')
+    await mkdir(workflowDirectory, { recursive: true })
+    const manifest =
+      JSON.stringify(
+        {
+          version: 1,
+          files: 8_305,
+          sizeInBytes: 14_809_588_162,
+          pointers: Array.from({ length: 64 }, (_, index) => ({
+            path: `build/object-${index.toString().padStart(2, '0')}.bin`,
+            blob: `sha256:${index.toString(16).padStart(64, '0')}`,
+            sha256: `${(index + 1).toString(16).padStart(64, '0')}`,
+            sizeInBytes: 300_000_000 + index,
+          })),
+        },
+        null,
+        2
+      ) + '\n'
+    assert.ok(Buffer.byteLength(manifest, 'utf8') > 15 * 1024)
+    await Promise.all([
+      writeFile(join(githubDirectory, 'bambu-build-manifest.json'), manifest),
+      writeFile(
+        join(workflowDirectory, 'cheap-lfs-cloud-compression.yml'),
+        'name: Cheap LFS cloud compression\n'
+      ),
+    ])
+    const selected = (await getStatusOrThrow(repository)).workingDirectory.files
+    assert.deepEqual(selected.map(file => file.path).sort(), [
+      '.github/bambu-build-manifest.json',
+      '.github/workflows/cheap-lfs-cloud-compression.yml',
+    ])
+
+    const requirement = await resolveCheapLfsCommitKeyRequirement(
+      repository.path,
+      selected.map(file => file.path),
+      'verified-public'
+    )
+    assert.equal(requirement, null)
+
+    await createCommit(repository, 'ordinary GitHub metadata', selected)
+    const changed = await exec(
+      ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', 'HEAD'],
+      repository.path
+    )
+    assert.deepEqual(changed.stdout.trim().split(/\r?\n/).sort(), [
+      '.github/bambu-build-manifest.json',
+      '.github/workflows/cheap-lfs-cloud-compression.yml',
+    ])
+  })
+
+  it('still rejects a real OCI pointer at a GitHub control-plane path', async t => {
+    const repository = await setupEmptyRepository(t)
+    const githubDirectory = join(repository.path, '.github')
+    await mkdir(githubDirectory)
+    await writeFile(
+      join(githubDirectory, 'private.ptr'),
+      privatePointerText(`sha256:${'d'.repeat(64)}`)
+    )
+
+    await assert.rejects(
+      resolveCheapLfsCommitKeyRequirement(
+        repository.path,
+        ['.github/private.ptr'],
+        'verified-private'
+      ),
+      /unsafe selected path/i
+    )
+  })
+
   it('does not create a key while validating a pointer whose key is missing', async t => {
     const repository = await setupEmptyRepository(t)
     const pointerPath = join(repository.path, 'missing-key.ptr')
