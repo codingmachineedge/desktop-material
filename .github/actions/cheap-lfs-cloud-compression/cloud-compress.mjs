@@ -603,8 +603,7 @@ async function adoptPointer(
   object,
   candidateName,
   storedSize,
-  tempRoot,
-  onPushAttempt
+  tempRoot
 ) {
   const currentCommit = git(['rev-parse', '--verify', 'HEAD'])
   git(['diff', '--quiet'])
@@ -710,10 +709,9 @@ async function adoptPointer(
     ],
     { quiet: true }
   )
-  // A push can update the remote and still fail locally when the response is
-  // lost. From this point onward the side asset must be retained so a remotely
-  // adopted pointer can always be materialized.
-  onPushAttempt()
+  // The verified side asset is already durable and no longer owned by this
+  // attempt. A push can update the remote and still fail locally when the
+  // response is lost, so it must remain available for reconciliation/reuse.
   try {
     git(['push', 'origin', nextCommit + ':refs/heads/' + refName])
   } catch (error) {
@@ -820,6 +818,10 @@ async function compressObject(entry, object) {
           'GitHub did not preserve the compressed release asset exactly.'
         )
       }
+      // A verified compressed asset is durable shared state. Relinquish
+      // deletion ownership before any pointer CAS/adoption so an older run can
+      // never delete an orphan already reused by a newer run.
+      uploadedAttemptId = null
     }
 
     const adoptedEntry = await adoptPointer(
@@ -827,12 +829,8 @@ async function compressObject(entry, object) {
       object,
       candidate.name,
       stored.bytes,
-      tempRoot,
-      () => {
-        uploadedAttemptId = null
-      }
+      tempRoot
     )
-    uploadedAttemptId = null
     return {
       kind: 'compressed',
       storedBytes: stored.bytes,
@@ -845,6 +843,48 @@ async function compressObject(entry, object) {
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
+}
+
+function advanceQueuedPointerEntries(entries, adoptedEntry) {
+  const currentCommit = git(['rev-parse', '--verify', 'HEAD'])
+  if (currentCommit !== adoptedEntry.commit) {
+    throw new Error('HEAD changed after a release object was adopted.')
+  }
+  const parentCommit = git(['rev-parse', '--verify', adoptedEntry.commit + '^'])
+  const currentTree = new Map(
+    treeEntriesAt(currentCommit).map(entry => [entry.path, entry])
+  )
+  const advanced = []
+  for (const [path, entry] of entries) {
+    if (entry.commit !== parentCommit) {
+      throw new Error(
+        'A queued pointer was not based on the adopted commit parent.'
+      )
+    }
+    const current = currentTree.get(path)
+    if (path === adoptedEntry.path) {
+      if (
+        current === undefined ||
+        current.mode !== adoptedEntry.mode ||
+        current.oid !== adoptedEntry.oid
+      ) {
+        throw new Error('The adopted pointer is not exact in the current tree.')
+      }
+      advanced.push([path, adoptedEntry])
+      continue
+    }
+    if (
+      current === undefined ||
+      current.mode !== entry.mode ||
+      current.oid !== entry.oid
+    ) {
+      throw new Error(
+        'A queued pointer changed while another release object was adopted.'
+      )
+    }
+    advanced.push([path, { ...entry, commit: adoptedEntry.commit }])
+  }
+  for (const [path, entry] of advanced) entries.set(path, entry)
 }
 
 async function summaryLine(text) {
@@ -889,7 +929,7 @@ async function main() {
     try {
       const result = await compressObject(entry, object)
       if (result.kind === 'compressed') {
-        entries.set(entry.path, result.entry)
+        advanceQueuedPointerEntries(entries, result.entry)
         compressed++
         const percent = ((1 - result.storedBytes / object.size) * 100).toFixed(
           1

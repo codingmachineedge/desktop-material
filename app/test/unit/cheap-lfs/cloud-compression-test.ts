@@ -167,6 +167,30 @@ describe('Cheap LFS cloud compression policy', () => {
     assert.match(publicCaller, /sparse-checkout-cone-mode: true/)
     assert.doesNotMatch(publicCaller, /fetch-depth: 0|filter:/)
   })
+
+  it('keeps the checked-in public caller synchronized with the exact rendered guard and pin', async () => {
+    const checkedInCaller = (
+      await readFile(
+        join(
+          process.cwd(),
+          ...CHEAP_LFS_CLOUD_COMPRESSION_WORKFLOW_PATH.split('/')
+        ),
+        'utf8'
+      )
+    ).replace(/\r\n/g, '\n')
+    const compactCaller = checkedInCaller.replace(/\s+/g, ' ')
+    assert.match(
+      compactCaller,
+      /github\.ref_type == 'branch' && github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) &&/
+    )
+    assert.doesNotMatch(checkedInCaller, /github\.ref_name/)
+    assert.match(
+      checkedInCaller,
+      new RegExp(
+        `uses: Ding-Ding-Projects/desktop-material/\\.github/actions/cheap-lfs-cloud-compression@${CHEAP_LFS_CLOUD_COMPRESSION_ACTION_SHA}`
+      )
+    )
+  })
 })
 
 describe('Cheap LFS managed cloud-compression workflow', () => {

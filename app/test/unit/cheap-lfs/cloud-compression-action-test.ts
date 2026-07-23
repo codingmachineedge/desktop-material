@@ -61,6 +61,7 @@ interface IFixtureOptions {
   readonly ambiguousPush?: boolean
   readonly draftOnly?: boolean
   readonly pointerPath?: string
+  readonly secondPointerPath?: string
   readonly companionFile?: { readonly path: string; readonly data: Buffer }
   readonly omittedOrdinaryFile?: {
     readonly path: string
@@ -127,6 +128,17 @@ async function withFixture(
   await mkdir(dirname(join(workspace, pointerPath)), { recursive: true })
   await writeFile(join(workspace, pointerPath), pointerText, 'utf8')
   const trackedPaths = [pointerPath]
+  if (options.secondPointerPath !== undefined) {
+    await mkdir(dirname(join(workspace, options.secondPointerPath)), {
+      recursive: true,
+    })
+    await writeFile(
+      join(workspace, options.secondPointerPath),
+      pointerText,
+      'utf8'
+    )
+    trackedPaths.push(options.secondPointerPath)
+  }
   if (options.companionFile !== undefined) {
     await mkdir(dirname(join(workspace, options.companionFile.path)), {
       recursive: true,
@@ -429,6 +441,46 @@ describe('Cheap LFS cloud compression action', () => {
     })
   })
 
+  it('adopts two distinct queued pointers sequentially after exact tree reproof', async () => {
+    const original = Buffer.from('two queued pointers\n'.repeat(4096))
+    const secondPointerPath = 'second/payload-copy.bin'
+    await withFixture(original, { secondPointerPath }, async fixture => {
+      const result = await fixture.runAction()
+      assert.equal(result.code, 0, result.stderr)
+      assert.match(result.stdout, /2 compressed, 0 kept raw, 0 failed safely/)
+      assert.equal(fixture.uploaded.length, 1)
+      assert.deepEqual(fixture.deleted, [])
+      assert.equal(git(fixture.workspace, ['rev-list', '--count', 'HEAD']), '3')
+      for (const path of [fixture.pointerPath, secondPointerPath]) {
+        assert.match(
+          await readFile(join(fixture.workspace, path), 'utf8'),
+          /^part-deflate /m
+        )
+      }
+      const changedPaths = [
+        ['HEAD^^', 'HEAD^'],
+        ['HEAD^', 'HEAD'],
+      ].map(([from, to]) =>
+        git(fixture.workspace, [
+          'diff-tree',
+          '--no-commit-id',
+          '--name-only',
+          '-r',
+          '-z',
+          from,
+          to,
+        ])
+          .split('\0')
+          .filter(Boolean)
+      )
+      assert.deepEqual(
+        changedPaths.flat().sort(),
+        [fixture.pointerPath, secondPointerPath].sort()
+      )
+      assert.ok(changedPaths.every(paths => paths.length === 1))
+    })
+  })
+
   it('finds a draft release through the bounded inventory fallback', async () => {
     const original = Buffer.from('draft release payload\n'.repeat(2048))
     await withFixture(original, { draftOnly: true }, async fixture => {
@@ -583,7 +635,7 @@ describe('Cheap LFS cloud compression action', () => {
     )
   })
 
-  it('rejects a stale pointer before committing and removes its unadopted side asset', async () => {
+  it('rejects a stale pointer while retaining its verified reusable side asset', async () => {
     const original = Buffer.from('stale pointer payload\n'.repeat(4096))
     await withFixture(
       original,
@@ -595,7 +647,7 @@ describe('Cheap LFS cloud compression action', () => {
           result.stderr,
           /Pointer changed while its release object was being compressed/
         )
-        assert.deepEqual(fixture.deleted, [2])
+        assert.deepEqual(fixture.deleted, [])
         assert.match(
           await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
           /^asset-name externally-changed\.bin$/m
@@ -627,7 +679,7 @@ describe('Cheap LFS cloud compression action', () => {
           result.stderr,
           /remote branch advanced while its release object was being compressed/i
         )
-        assert.deepEqual(fixture.deleted, [2])
+        assert.deepEqual(fixture.deleted, [])
         assert.equal(
           git(fixture.workspace, ['rev-list', '--count', 'HEAD']),
           '1'
@@ -645,6 +697,46 @@ describe('Cheap LFS cloud compression action', () => {
         assert.equal(
           await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
           fixture.pointerText
+        )
+      }
+    )
+  })
+
+  it('lets a newer run reuse an older run verified orphan after a CAS race', async () => {
+    const original = Buffer.from('overlapping run reuse payload\n'.repeat(4096))
+    await withFixture(
+      original,
+      { advanceRemoteAfterUpload: true },
+      async fixture => {
+        const olderRun = await fixture.runAction()
+        assert.equal(olderRun.code, 1)
+        assert.match(olderRun.stderr, /remote branch advanced/i)
+        assert.equal(fixture.uploaded.length, 1)
+        assert.deepEqual(fixture.deleted, [])
+
+        git(fixture.workspace, ['fetch', 'origin', 'main'])
+        git(fixture.workspace, ['reset', '--hard', 'origin/main'])
+        const newerRun = await fixture.runAction()
+        assert.equal(newerRun.code, 0, newerRun.stderr)
+        assert.match(
+          newerRun.stdout,
+          /1 compressed, 0 kept raw, 0 failed safely/
+        )
+        assert.equal(fixture.uploaded.length, 1)
+        assert.deepEqual(fixture.deleted, [])
+        assert.match(
+          await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+          /^part-deflate /m
+        )
+        assert.equal(
+          git(fixture.workspace, [
+            '--git-dir',
+            fixture.remote,
+            'rev-list',
+            '--count',
+            'main',
+          ]),
+          '3'
         )
       }
     )

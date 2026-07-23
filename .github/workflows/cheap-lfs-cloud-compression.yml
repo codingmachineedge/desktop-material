@@ -17,7 +17,8 @@ jobs:
   compress:
     name: Compress release objects one by one
     if: >-
-      github.ref_name == github.event.repository.default_branch &&
+      github.ref_type == 'branch' && github.ref == format('refs/heads/{0}',
+      github.event.repository.default_branch) &&
       (github.event.repository.private == false || false)
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -29,4 +30,4 @@ jobs:
           sparse-checkout: .github
           sparse-checkout-cone-mode: true
       - name: Compress and adopt verified side assets
-        uses: Ding-Ding-Projects/desktop-material/.github/actions/cheap-lfs-cloud-compression@ab3f4e1912392e8b32cf39834be1152444dd1f51
+        uses: Ding-Ding-Projects/desktop-material/.github/actions/cheap-lfs-cloud-compression@e59c46f3fc597929e938fb08185ad97d167aa754
