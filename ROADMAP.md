@@ -3,17 +3,17 @@
 Updated: **July 22, 2026**
 
 Desktop Material's numbered roadmap now extends through **M27**. M0–M21 and the
-M23 Ollama manager have published receipts; M22 retains its separately tracked
-visual refresh, and the exact acceptance/publication state for M24–M27 is listed
-below. The July 22 tab-group, command-palette, Alt-key, release-gate, and Cheap
-LFS UI continuation is implemented, locally accepted, and pushed to `main`;
-final remote pipeline and documentation-surface verification is still in
-progress.
+M23 Ollama manager have published receipts; M22's 73-scene visual refresh is
+published byte-identically, and the exact acceptance/publication state for
+M24–M27 is listed below. The July 22 tab-group, command-palette, Alt-key,
+release-gate, and Cheap LFS UI continuation is implemented, locally accepted,
+pushed to `main`, and verified through the exact-source CI, CodeQL, Pages, wiki,
+and installer-release pipelines.
 This file is the compact public source of truth; implementation details and
 historical test receipts stay in [PLAN.md](PLAN.md) and
 [HANDOFF.md](HANDOFF.md).
 
-## July 22 tab groups, command palette, and input/release reliability — **Implementation pushed; publication verification pending**
+## July 22 tab groups, command palette, and input/release reliability — **Implementation and publication verified**
 
 - Named/color-coded group chips now show member counts and real expanded state;
   collapsing hides member tabs and the chip restores them by mouse, Enter, or
@@ -43,11 +43,14 @@ historical test receipts stay in [PLAN.md](PLAN.md) and
   continuation's exact unpackaged production build passed through the fixed MCP
   endpoint, and off-screen interaction accepted the restart-restored collapsible
   group chip plus the fully visible rich-row palette editor. Two inspected
-  1000×687 captures now appear in README, Pages, and wiki sources. Implementation
-  checkpoint `58be6fe5953477b015a134c414a8cf82363ecc75` is pushed on `main`;
-  exact final CI/Pages/wiki and Release verification remain pending.
+  1000×687 captures now appear in README, Pages, and wiki sources. Final source
+  checkpoint `f7b4760a13894f0320f7b361f055f6fba40d913f` passed exact-source CI
+  `29972351158`, CodeQL `29972351173`, and Pages `29972351147`; wiki commit
+  `407cbf260c229e9f8e7fd86062afad83e5080f63` is synchronized, and installer run
+  `29973527338` published six-asset Release `v3.6.3-beta3-b0000040887` from the
+  exact tag.
 
-## M27 — Reviewed pull previews — **Implementation and local acceptance complete**
+## M27 — Reviewed pull previews — **Implementation, acceptance, and publication verified**
 
 Toolbar and application-menu pulls now fetch first and open a blocking review
 of the exact current/upstream refs and OIDs, ahead/behind topology, effective Git
@@ -57,10 +60,11 @@ then integrates the reviewed upstream commit without a second superproject
 fetch. Detached, dirty, conflicted, stale, failed-fetch, busy, and unsafe
 fast-forward-only states remain non-destructive. Focused tests, TypeScript,
 lint/format checks, the production build, and an isolated off-screen Win32 pull
-exercise passed; remote CI, Pages, and release verification follow the `main`
-push recorded in [HANDOFF.md](HANDOFF.md).
+exercise passed. Exact-source CI, CodeQL, Pages, synchronized wiki, and the
+six-asset Windows x64 Release are verified for the `main` push recorded in
+[HANDOFF.md](HANDOFF.md).
 
-## M26 — Cheap LFS / Express Release — **Live cloud Actions/UI accepted; publication verification pending**
+## M26 — Cheap LFS / Express Release — **Live cloud Actions/UI and source publication verified**
 
 - **Release-backed large-file storage**: The repository rail's **Large files**
   manager can pin working-tree files over 100 MiB to GitHub Release assets,
@@ -116,6 +120,11 @@ push recorded in [HANDOFF.md](HANDOFF.md).
   secure-store bridge that was deleted and verified absent after the runs. See
   the
   [dated receipt](docs/verification/cheap-lfs-github-public-private-2026-07-22.md).
+- **Source publication receipt**: Exact checkpoint `f7b4760a13894f0320f7b361f055f6fba40d913f`
+  passed CI, CodeQL, and Pages; the seven-page wiki is synchronized and the live
+  gallery serves all 73 figures. The downstream installer workflow published
+  latest Release `v3.6.3-beta3-b0000040887` from that exact tag with all six
+  required Windows x64 assets.
 - See the feature guide at
   [docs/features/repository-management/release-backed-cheap-lfs.md](docs/features/repository-management/release-backed-cheap-lfs.md).
 
@@ -334,8 +343,8 @@ The following items track the current cycle's progress against all six acceptanc
 
 | Feature / Gate | Status | Key Evidence |
 |---|---|---|
-| July 22 tab groups, palette, Alt, and release gates | **Implementation pushed; publication verification pending** | Source contracts cover persistence, pin-boundary safety, portable-export stripping, three language modes, rich palette rows/appearance, deterministic bare-Alt sequencing, Super Express test-before-build, and release-PR `main` targeting. The exact production build passed through fixed MCP; off-screen interaction accepted group persistence/collapse/expansion and a fully visible palette editor with five Ollama matches; two inspected 1000×687 captures are tracked. Implementation checkpoint `58be6fe595` is pushed; exact final remote CI/Pages/wiki and Release evidence remain pending. |
-| M26 Cheap LFS / Express Release | **Live public/private pin, cloud Actions, and local restore accepted; publication verification pending** | Retained public/private repositories contain pushed UI-created raw pointers and exact 1 MiB draft-release assets. Public automatic setup and private explicit opt-in produced successful Actions runs `29969707165` and `29969957449`; each bot commit adopted a verified 1,033-byte `part-deflate` asset while retaining raw history. Both compressed pointers restored through the production UI to SHA-256 `30e14955…`; failed public run `29967844734` left its raw pointer cloneable and UI-materializable. The new 960×660 bilingual acceptance frame is tracked. Temporary credentials, the headless desktop, and synchronized test clones are removed; exact source CI/Release, Pages/wiki publication, and final Git cleanup remain pending. |
+| July 22 tab groups, palette, Alt, and release gates | **Complete; source publication verified** | Source contracts cover persistence, pin-boundary safety, portable-export stripping, three language modes, rich palette rows/appearance, deterministic bare-Alt sequencing, Super Express test-before-build, and release-PR `main` targeting. The production build and off-screen acceptance passed; source `f7b4760a13` passed CI, CodeQL, Pages, synchronized wiki publication, and exact-tag six-asset Release verification. |
+| M26 Cheap LFS / Express Release | **Complete; live public/private UI and source publication verified** | Retained public/private repositories contain pushed UI-created raw pointers and exact 1 MiB draft-release assets. Public automatic setup and private explicit opt-in produced successful Actions runs `29969707165` and `29969957449`; each bot commit adopted a verified 1,033-byte `part-deflate` asset while retaining raw history. Both compressed pointers restored through the production UI to SHA-256 `30e14955…`; failed public run `29967844734` left its raw pointer cloneable and UI-materializable. Source `f7b4760a13` passed CI, CodeQL, Pages/wiki publication, cleanup audit, and exact-tag six-asset Release verification. |
 | July 21 Settings queue and mobile connection | **Implementation complete** | Verified empty-account copy, persisted-policy hydration, required-directory validation, parallel/sequential changes, enable/disable dispatch, English/Cantonese/bilingual rendering, responsive-surface registration |
 | July 21 responsiveness hardening | **Local implementation complete** | Deterministic regressions verified for remote scan terminator, late termination rejection, same-URL proxy coalescing, strict clone barrier, every prompt family, 500-update burst, failed request-ID reuse, and 25 Markdown reloads |
 | M25 Repository-bound API functions | **Implementation complete** | Built-in function seeding verified; function-button execution tested; per-repository rail visibility persistence checked; responsive Explorer styles verified |
@@ -348,7 +357,7 @@ The following items track the current cycle's progress against all six acceptanc
 | Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on main |
 | Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment |
 | Repository-wide feature revalidation | **Complete** | The historical revalidation verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and its then-current 52-image documentation gallery |
-| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages sources now catalog 73 named visual scenes. Existing images remain in place unless a new deterministic capture passes original-resolution privacy inspection; the July 22 continuation adds accepted group-chip, rich-palette, raw Cheap LFS, and cloud-compression UI screenshots. Final completion still requires byte-identical Pages/wiki delivery. |
+| Documentation gallery expansion | **M22 refresh complete** | README, wiki, and Pages catalog 73 named visual scenes. Existing images remain in place unless a new deterministic capture passes original-resolution privacy inspection; the July 22 continuation adds accepted group-chip, rich-palette, raw Cheap LFS, and cloud-compression UI screenshots. Pages serves the accepted cloud image byte-identically and wiki commit `407cbf260c229e9f8e7fd86062afad83e5080f63` matches the seven tracked source pages. |
 | Complete notifications and Releases dashboard | **Complete** | Verified every GitHub notification page, confirmed local/remote Clear all with partial-failure retention, release status metrics and loaded-result search/filtering, rich asset metadata, scoped retries, responsive layout, and inspected headless evidence |
 
 ## Acceptance gates

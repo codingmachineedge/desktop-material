@@ -86,10 +86,24 @@ targets through MCP in 420.6 seconds with `ok: true`, `client_ok: true`, and
 `returncode: 0`. The one-time development alias and GitHub credentials were
 deleted and verified absent, the production credential was restored with no
 backup left behind, the exact Electron process and zero-window headless desktop
-were closed, and the owned synchronized test-clone run root was removed. Exact
-source-repository CI and Release results, Pages/wiki publication, final source
-commit/push, and the final branch/worktree/stash audit remain for the
-publication checkpoint.
+were closed, and the owned synchronized test-clone run root was removed.
+
+Publication is complete for source checkpoint
+`f7b4760a13894f0320f7b361f055f6fba40d913f`, which is pushed on `main` with a
+clean zero-divergence checkout. Exact-source
+[CI `29972351158`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29972351158),
+[CodeQL `29972351173`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29972351173),
+and [Pages `29972351147`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29972351147)
+all succeeded. Wiki commit `407cbf260c229e9f8e7fd86062afad83e5080f63`
+publishes the synchronized seven-page source, and the live Pages gallery serves
+all 73 figures including the byte-identical 105,577-byte cloud-compression
+capture. Downstream
+[installer run `29973527338`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29973527338)
+published non-draft, non-prerelease latest Release
+[`v3.6.3-beta3-b0000040887`](https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-b0000040887)
+from that exact tag and commit with all six required Windows x64 assets. The
+final source audit found only local/remote `main`, one root worktree, and no
+stashes.
 
 ## 2026-07-22 live Cheap LFS public/private GitHub and UI acceptance
 

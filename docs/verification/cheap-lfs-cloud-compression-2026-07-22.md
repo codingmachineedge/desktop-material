@@ -145,7 +145,7 @@ that same endpoint in **420.6 seconds** with `ok: true`, `client_ok: true`,
 `returncode: 0`, empty stderr, and no timeout. The earlier staging bundle
 supplied the production UI used for the off-screen acceptance.
 
-## Cleanup and remaining publication
+## Cleanup and publication receipts
 
 The temporary development alias and GitHub credential entries were deleted and
 verified absent. The production application credential was restored, and its
@@ -155,8 +155,23 @@ owned temporary run root (including its two fully synchronized materialized
 test clones) was removed. The retained GitHub repositories, commits, Releases,
 assets, and Actions runs above are unaffected.
 
-The live feature behavior and local cleanup are accepted. Exact
-source-repository CI and Release results, Pages and GitHub wiki publication, the
-final source commit/push, and the final local/remote branch, worktree, and stash
-audit remain pending. Those receipts must not change the immutable live run and
-object evidence above.
+The live feature behavior and local cleanup are accepted. Source checkpoint
+`f7b4760a13894f0320f7b361f055f6fba40d913f` is pushed on `main` with zero local
+or remote divergence. Exact-source
+[CI `29972351158`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29972351158),
+[CodeQL `29972351173`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29972351173),
+and [Pages `29972351147`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29972351147)
+all succeeded. Wiki commit `407cbf260c229e9f8e7fd86062afad83e5080f63`
+publishes the synchronized seven-page source, and the live Pages gallery serves
+all 73 figures plus the exact 105,577-byte accepted cloud-compression image.
+
+Downstream
+[installer run `29973527338`](https://github.com/Ding-Ding-Projects/desktop-material/actions/runs/29973527338)
+succeeded and published latest non-draft, non-prerelease Release
+[`v3.6.3-beta3-b0000040887`](https://github.com/Ding-Ding-Projects/desktop-material/releases/tag/v3.6.3-beta3-b0000040887)
+from the exact source tag. Its six uploaded Windows x64 assets are
+`GitHub.Desktop-x64.zip`, two versioned full `.nupkg` files,
+`GitHubDesktopSetup-x64.exe`, `GitHubDesktopSetup-x64.msi`, and `RELEASES`; each
+has a nonzero size and GitHub SHA-256 digest. The final audit found only local
+and remote `main`, one root worktree, and no stashes. These publication receipts
+do not alter the immutable live run and object evidence above.
