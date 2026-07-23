@@ -357,6 +357,96 @@ async function withTempRepository(
   }
 }
 
+async function assertCompressedMaterializationFailure(
+  stored: Buffer,
+  declaredOutput: Buffer,
+  expectedError: RegExp,
+  expectedPartSha256: string = createHash('sha256')
+    .update(declaredOutput)
+    .digest('hex')
+): Promise<void> {
+  await withTempRepository(async (dir, repository) => {
+    const pointer: ICheapLfsPointer = {
+      version: CHEAP_LFS_POINTER_VERSION,
+      releaseTag: 'cloud-failure',
+      assetName: 'failed.bin.cheap-lfs.deflate',
+      sizeInBytes: declaredOutput.length,
+      sha256: expectedPartSha256,
+      parts: [
+        {
+          name: 'failed.bin.cheap-lfs.deflate',
+          sizeInBytes: declaredOutput.length,
+          sha256: expectedPartSha256,
+          deflatedSizeInBytes: stored.length,
+        },
+      ],
+    }
+    const trackedPath = join(dir, 'failed.bin')
+    const pointerText = serializeCheapLfsPointer(pointer)
+    await writeFile(trackedPath, pointerText, 'utf8')
+    const compressedAsset: IGitHubReleaseAsset = {
+      ...asset,
+      name: pointer.assetName,
+      sizeInBytes: stored.length,
+    }
+    const cloudRelease: IGitHubRelease = {
+      ...release,
+      tagName: pointer.releaseTag,
+      assets: [compressedAsset],
+    }
+    const store = await storeWith(
+      dependencies(() => fakeAPIForRelease(cloudRelease), {
+        downloadAsset: async (
+          _account,
+          _repository,
+          _releaseId,
+          _downloadedAsset,
+          destination
+        ) => {
+          await writeFile(destination, stored)
+          return {
+            ok: true,
+            path: destination,
+            bytes: stored.length,
+            localDigest: `sha256:${createHash('sha256')
+              .update(stored)
+              .digest('hex')}`,
+            matchesGitHubDigest: true,
+          }
+        },
+      })
+    )
+    const temporaryPaths = new Array<string>()
+    const fs: ICheapLfsFileSystem = {
+      ...defaultCheapLfsFileSystem,
+      temporaryPathFor: path => {
+        const temporaryPath = defaultCheapLfsFileSystem.temporaryPathFor(path)
+        temporaryPaths.push(temporaryPath)
+        return temporaryPath
+      },
+    }
+
+    await assert.rejects(
+      materializePointer(
+        store,
+        repository,
+        selected,
+        'failed.bin',
+        undefined,
+        undefined,
+        fs
+      ),
+      expectedError
+    )
+
+    assert.equal(await readFile(trackedPath, 'utf8'), pointerText)
+    assert.ok(temporaryPaths.length >= 2)
+    for (const temporaryPath of temporaryPaths) {
+      await assert.rejects(stat(temporaryPath))
+    }
+  })
+}
+
 function inMemoryReleaseGateway(
   currentRelease: () => IGitHubRelease,
   uploadAsset: ICheapLfsReleasesGateway['uploadAsset'],
@@ -512,6 +602,7 @@ describe('cheap LFS operations', () => {
       }
       let createdTargetCommitish: string | undefined
       let createdAsPrerelease: boolean | undefined
+      let createdRelease = draft
       let uploaded: { sourcePath: string; name: string } | undefined
       let uploadedBytes: Buffer | undefined
       const store = await storeWith(
@@ -519,12 +610,22 @@ describe('cheap LFS operations', () => {
           () =>
             fakeAPI({
               fetchReleaseByTag: async () => null,
+              fetchReleases: async () => ({
+                releases: [],
+                page: 1,
+                nextPage: null,
+                capped: false,
+              }),
               createReleaseDraft: async (_owner, _name, releaseDraft) => {
                 createdTargetCommitish = releaseDraft.targetCommitish
                 createdAsPrerelease = releaseDraft.prerelease
-                return { ...draft, tagName: releaseDraft.tagName }
+                createdRelease = { ...draft, tagName: releaseDraft.tagName }
+                return createdRelease
               },
-              fetchRelease: async () => draft,
+              // Revalidation must observe the same provider snapshot returned
+              // by creation; the release mutation guard intentionally rejects
+              // even subtle fixture drift.
+              fetchRelease: async () => createdRelease,
             }),
           {
             uploadAsset: async (
@@ -1960,6 +2061,112 @@ describe('cheap LFS operations', () => {
         await assert.rejects(stat(destination))
       }
     })
+  })
+
+  it('downloads and decompresses a cloud-style single object locally', async () => {
+    await withTempRepository(async (dir, repository) => {
+      const original = Buffer.from(
+        'cloud compressed, locally restored\n'.repeat(400)
+      )
+      const stored = await deflateRaw(original)
+      const digest = createHash('sha256').update(original).digest('hex')
+      const pointer: ICheapLfsPointer = {
+        version: CHEAP_LFS_POINTER_VERSION,
+        releaseTag: 'assets',
+        assetName: 'payload.bin.cheap-lfs.deflate',
+        sizeInBytes: original.length,
+        sha256: digest,
+        parts: [
+          {
+            name: 'payload.bin.cheap-lfs.deflate',
+            sizeInBytes: original.length,
+            sha256: digest,
+            deflatedSizeInBytes: stored.length,
+          },
+        ],
+      }
+      const trackedPath = join(dir, 'payload.bin')
+      await writeFile(trackedPath, serializeCheapLfsPointer(pointer), 'utf8')
+      const compressedAsset: IGitHubReleaseAsset = {
+        ...asset,
+        name: pointer.assetName,
+        sizeInBytes: stored.length,
+      }
+      const cloudRelease: IGitHubRelease = {
+        ...release,
+        tagName: pointer.releaseTag,
+        assets: [compressedAsset],
+      }
+      const store = await storeWith(
+        dependencies(() => fakeAPIForRelease(cloudRelease), {
+          downloadAsset: async (
+            _account,
+            _repository,
+            _releaseId,
+            _downloadedAsset,
+            destination
+          ) => {
+            await writeFile(destination, stored)
+            return {
+              ok: true,
+              path: destination,
+              bytes: stored.length,
+              localDigest: `sha256:${createHash('sha256')
+                .update(stored)
+                .digest('hex')}`,
+              matchesGitHubDigest: true,
+            }
+          },
+        })
+      )
+
+      const result = await materializePointer(
+        store,
+        repository,
+        selected,
+        'payload.bin'
+      )
+
+      assert.equal(result.bytes, original.length)
+      assert.deepEqual(await readFile(trackedPath), original)
+    })
+  })
+
+  it('leaves a cloud pointer intact when its DEFLATE stream is truncated', async () => {
+    const original = Buffer.from('truncated cloud object\n'.repeat(500))
+    const compressed = await deflateRaw(original)
+    const truncated = compressed.subarray(0, compressed.length - 3)
+
+    await assertCompressedMaterializationFailure(
+      truncated,
+      original,
+      /unexpected end|invalid|does not match/i
+    )
+  })
+
+  it('bounds cloud decompression and removes both stored and expanded temps', async () => {
+    const expanded = Buffer.from('expansion-boundary\n'.repeat(1_000))
+    const compressed = await deflateRaw(expanded)
+    const declared = expanded.subarray(0, expanded.length - 1)
+
+    await assertCompressedMaterializationFailure(
+      compressed,
+      declared,
+      /expands past its pointer size/
+    )
+  })
+
+  it('leaves a cloud pointer intact when exact-size output has the wrong hash', async () => {
+    const expected = Buffer.from('expected exact-size cloud bytes')
+    const different = Buffer.alloc(expected.length, 0x5a)
+    assert.equal(different.length, expected.length)
+    const compressed = await deflateRaw(different)
+
+    await assertCompressedMaterializationFailure(
+      compressed,
+      expected,
+      /does not match the pointer/
+    )
   })
 
   it('materializes multipart assets discovered beyond the release preview page', async () => {

@@ -28,14 +28,61 @@ A manual pin reviews the source file, repository-relative pointer path,
 release tag, optional release name, and byte size. The default tag is `assets`;
 if it has no release, the app creates an unpublished prerelease draft so an
 asset bucket can never replace the installer's `/releases/latest` update feed.
-A file at or below
-the per-asset cap uploads as one raw asset. A larger file is split into
-ordered raw parts of at most 1.5 GiB — GitHub allows release assets up to
-2 GiB, but uploads near that ceiling proved unreliable, so new parts stay
-well below it — and the pointer records every part's name, size, and SHA-256
-as well as the whole-file size and digest. Current uploads do not add a
-compression pass; legacy deflated pointers with parts up to exactly 2 GiB
-remain readable and materializable.
+A file at or below the per-asset cap initially uploads as one raw asset. A
+larger file is split into ordered raw parts of at most 1.5 GiB — GitHub allows
+release assets up to 2 GiB, but uploads near that ceiling proved unreliable,
+so new parts stay well below it — and the pointer records every part's name,
+size, and SHA-256 as well as the whole-file size and digest. The raw upload is
+immediately cloneable and remains the safe fallback while optional cloud
+compression runs.
+
+### Cloud compression
+
+![Bilingual private-repository cloud-compression consent with a verified compressed pointer](../../assets/screenshots/cheap-lfs-cloud-compression.png)
+
+Cloud compression is automatic for a repository whose GitHub visibility is
+confirmed public. It is off by default for private repositories and runs there
+only after the user explicitly enables the persisted **Cloud compression**
+setting; unknown visibility fails closed. Opening the Large files manager, or
+saving the private opt-in in Repository Settings, writes one owned caller at
+`.github/workflows/cheap-lfs-cloud-compression.yml`. The app never commits or
+pushes that file silently: it stays in Changes for review. The caller also
+checks live event visibility, so a formerly public repository stops if it
+becomes private unless private consent was explicitly recorded.
+
+The workflow writer canonicalizes each repository directory component, refuses
+redirected parents plus symlink, junction, hardlink, oversized, and unowned
+workflow entries, and writes a unique fsynced sibling before publication. New
+files use exclusive publication; updates use one same-directory atomic rename
+after an immediate identity/content recheck. A concurrent edit or failed rename
+leaves the reviewed original intact. UI persistence and workflow setup are also
+bound to the originating repository so switching repositories during a private
+opt-in cannot apply that consent elsewhere.
+
+The caller pins both `actions/checkout` and Desktop Material's reviewed
+composite compressor to immutable commit SHAs. One GitHub-hosted job downloads
+release objects directly, compresses them sequentially with raw DEFLATE level
+9, and uploads verified side assets directly back to the Release. It does not
+use Actions artifacts or caches, and it removes its temporary raw and
+compressed files before moving to the next object. This one-object-at-a-time
+working set avoids combining multi-gigabyte parts under the smaller Actions
+artifact/storage limits.
+
+Compression is adopted only when the stored result is strictly smaller. After
+the side asset's size and SHA-256 are verified, the job changes exactly one
+pointer object to the existing v1
+`part-deflate <original-sha256> <original-size> <stored-size> <asset-name>`
+record, commits that pointer alone, and pushes it with `[skip ci]`. A multipart
+pointer can therefore be mixed: successful parts become `part-deflate`, while
+failed or non-beneficial parts remain ordinary `part` records. The original raw
+assets are never deleted because older commits can still reference them.
+
+GitHub Actions only compresses. It never decompresses or decides that expanded
+bytes are valid. Desktop Material downloads a compressed object to an owned
+temporary file on the local PC, expands it with a strict output cap equal to
+the recorded original size, verifies the original part SHA-256 and size, then
+verifies the assembled whole-file SHA-256 and size before atomically replacing
+the pointer.
 
 GitHub permits 1,000 assets per Release. Cheap LFS inventories all ten bounded
 100-item pages and keeps at most 1,000 assets in each repository Release
@@ -44,6 +91,15 @@ by `assets-2`, `assets-3`, and so on. A single multipart file or one complete
 manual batch is allocated atomically: when it would cross the remaining slots,
 the entire group moves to the next bucket and every generated pointer records
 that exact derived tag.
+
+GitHub's direct release-by-tag endpoint does not return draft Releases, so the
+cloud Action falls back to a bounded inventory of at most 100 pages of 100 releases
+and matches the exact draft tag there. A draft outside those **10,000 releases**
+fails safely without changing the pointer or raw asset. Compression also needs
+one free asset slot for its verified side object. If the selected Release has
+already reached its **1,000-asset** capacity, the upload cannot be adopted and
+the raw pointer remains cloneable and locally materializable. Cheap LFS never
+deletes the historical raw asset merely to make room.
 
 Repository Build & Run settings provide two preferences, both enabled by
 default for compatibility:
@@ -54,6 +110,13 @@ default for compatibility:
 - **Download large files after cloning** materializes detected pointers after
   clone, pull, user fetch, or open under one cancelable per-repository batch.
   The panel also offers explicit per-file and Materialize all actions.
+
+The same settings surface shows public cloud compression as automatic and
+read-only. A private repository receives a separate off-by-default checkbox
+that explains private Actions usage before recording consent. English,
+playful Hong Kong-style Cantonese, and bilingual modes cover the setting,
+manager status, local-only decompression notice, and raw/compressed/mixed
+pointer badges.
 
 Automatic pinning reports separate hashing, release preparation, upload, and
 verification phases, pins files sequentially, reloads status, and stages the
@@ -168,10 +231,11 @@ Release so the next manual attempt can stage only the missing names.
 ## Persistence
 
 The committed pointer contains a format version, release tag, base asset name,
-whole-file byte size and SHA-256, plus ordered part records when required. The
-binary bytes remain in GitHub Release assets; publishing a draft release is a
-separate user decision. Per-repository auto-pin and auto-materialize choices
-are stored with the repository's Build & Run preferences.
+whole-file byte size and SHA-256, plus ordered raw or `part-deflate` records when
+required. The binary bytes remain in GitHub Release assets; publishing a draft
+release is a separate user decision. Per-repository auto-pin,
+auto-materialize, and private cloud-compression consent are stored with the
+repository's Build & Run preferences.
 
 Materialization downloads to sibling temporary files. A single asset is
 renamed over the pointer only after its size and digest match. Multipart files
@@ -227,6 +291,16 @@ An exact-name `starter` or other incomplete preexisting object still consumes
 Release capacity but never counts as completed upload progress; the error asks
 the user to wait for it or delete it in the Release editor before retrying.
 
+Cloud compression validates the raw asset's recorded size and SHA-256 before
+compressing. A download, compression, upload, verification, branch-protection,
+concurrent-push, or network failure leaves the remote pointer and raw asset
+unchanged. A result that is not strictly smaller is a successful safe skip.
+The job continues with later objects, reports each failure in the Actions
+summary, and fails the run after all candidates have had an independent chance.
+An unadopted attempt asset is deleted when ownership is exact; cleanup failure
+can leave only a harmless redundant side asset. The original raw asset is
+retained even after success so historical pointer commits remain materializable.
+
 The visible **Cancel** action asks for confirmation before it signals any
 active automatic upload or manual handoff. Declining the prompt does not touch
 the transfer controller, cancel request, or commit state. Confirming signals
@@ -274,6 +348,13 @@ the browser URL. Handoff cleanup removes only the random directory entries whose
 filesystem identities the operation created, so a replaced path is not
 deleted.
 
+The managed cloud caller grants only `contents: write`, runs on the default
+branch, serializes runs per repository and ref without canceling an in-flight
+object, and never places the app's OAuth token in a workflow input, argument,
+artifact, cache, or pointer. Asset names and pointer paths are passed as process
+and HTTP values rather than interpolated shell programs. Existing unowned
+workflow content at the managed path is never overwritten.
+
 ## Verification
 
 ### Live GitHub and Desktop Material UI acceptance — 2026-07-22
@@ -296,6 +377,35 @@ Detailed asset IDs, pointer line-ending sizes, hashes, screenshot evidence, and
 cleanup observations are in the record:
 
 - [Cheap LFS public/private GitHub and UI acceptance — 2026-07-22](../../verification/cheap-lfs-github-public-private-2026-07-22.md)
+- [Cheap LFS cloud compression acceptance — 2026-07-22](../../verification/cheap-lfs-cloud-compression-2026-07-22.md)
+
+### Live cloud-compression acceptance — 2026-07-22
+
+The production Large files UI added the reviewed public caller in commit
+[`72b2db3e0b6554364e07e5e34945c8be5c125216`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/commit/72b2db3e0b6554364e07e5e34945c8be5c125216).
+[Run `29969707165`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/actions/runs/29969707165)
+succeeded and pushed pointer-only bot commit
+[`f10d8d2acedbba0e3b5ce978dff09c25217cad9c`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/commit/f10d8d2acedbba0e3b5ce978dff09c25217cad9c).
+The private UI first showed the feature off, then persisted explicit consent in
+commit `3d398786dd4c599730e0dbb77b0c83a5fa14a57a`; run `29969957449`
+succeeded and pushed bot commit
+`6259b0fa0dc6c65cdb5a90af8e1da9358b45b0ac`.
+
+Both resulting compressed assets are 1,033 bytes with stored SHA-256
+`8d22b086820b0896bdcb33cf965ebc275cb0b5f0b4c44a364aa4144c015f9f7b`.
+Their raw 1,048,576-byte source assets remain present, and per-row UI
+materialization of each compressed pointer produced exactly 1,048,576 bytes
+with original SHA-256
+`30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58`.
+
+Earlier public run
+[`29967844734`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/actions/runs/29967844734)
+hit the draft-release tag-endpoint 404, reported one object failed safely, and
+left both the raw pointer and asset unchanged. Desktop Material then
+materialized that raw pointer through the production UI to the same exact size
+and digest. The corrected Action's bounded draft lookup produced the succeeding
+public and private results above. The full run, asset, pointer, screenshot, and
+remaining publication record is in the cloud-compression acceptance receipt.
 
 The focused Large files UI test also pins the factual 1.5 GiB-part copy.
 
@@ -305,7 +415,17 @@ deflated compatibility, size limits, part totals, path normalization, and the
 deduplicated asset names, 1,000-asset rollover without splitting groups,
 mutation reviews, attempt-owned cleanup, source race checks, cancellation,
 per-part and whole-file verification, paginated inventory reuse, and atomic
-materialization.
+materialization. Its cloud cases additionally prove bounded cleanup for a
+truncated DEFLATE stream, over-expansion, and exact-size wrong-hash output.
+`cheap-lfs/cloud-compression-action-test.ts` runs the real composite action
+against a temporary Git remote and fake GitHub Release API, proving a verified
+side asset and `part-deflate` commit, exact raw-pointer preservation on forced
+upload failure, and a non-beneficial incompressible skip. The cloud policy and
+UI suites cover public automatic setup, private explicit consent, unknown
+visibility, unowned-workflow refusal, symlink/junction/hardlink rejection,
+atomic replacement failure, concurrent edits, repository-switch races,
+immutable action pins, mixed badges, and local-only single-object
+decompression.
 `cheap-lfs/manual-upload-test.ts` covers whole-batch handoff names, atomic
 bucket rollover, Windows case-insensitive reservation, live preparation
 progress, free-space preflight, verified hardlink/copy staging, zero-byte and

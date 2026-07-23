@@ -150,7 +150,7 @@ The current maintenance additions in this section are implemented but remain sub
 integrated production/headless/publication gate. Historical gallery references do not imply that
 new acceptance has already completed.
 
-The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 67
+The [Guided Feature Gallery](Feature-Gallery) is the machine-checked documentation manifest for 73
 synthetic, user-facing visual functions and states associated with these subsystems. Each function
 owns one distinct tracked PNG; missing, duplicate, and unassigned assets fail the catalog contract.
 Keep captures free of personal paths, account identifiers, credentials, signed URLs, and unbounded

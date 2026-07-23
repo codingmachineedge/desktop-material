@@ -2,6 +2,8 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import * as React from 'react'
 import { Repository } from '../../../src/models/repository'
+import { GitHubRepository } from '../../../src/models/github-repository'
+import { Owner } from '../../../src/models/owner'
 import {
   IBuildRunPreferences,
   defaultBuildRunPreferences,
@@ -11,6 +13,19 @@ import { fireEvent, render, screen } from '../../helpers/ui/render'
 
 const repository = () =>
   new Repository('C:/cheap-lfs-repo', 1, null, false, null, {}, false)
+
+const githubRepository = (isPrivate: boolean | null) =>
+  new Repository(
+    'C:/cheap-lfs-repo',
+    1,
+    new GitHubRepository(
+      'cheap-lfs-repo',
+      new Owner('desktop', 'https://api.github.com', 1),
+      1,
+      isPrivate
+    ),
+    false
+  )
 
 describe('Build & Run cheap-LFS preferences', () => {
   it('defaults both automation toggles on', () => {
@@ -86,5 +101,58 @@ describe('Build & Run cheap-LFS preferences', () => {
     })
     assert.equal(materialize.checked, false)
     assert.equal(pin.checked, true)
+  })
+
+  it('shows confirmed-public cloud compression as automatic', () => {
+    render(
+      <BuildRunSettings
+        repository={githubRepository(false)}
+        preferences={defaultBuildRunPreferences}
+        onPreferencesChanged={() => {}}
+      />
+    )
+
+    const checkbox = screen.getByRole<HTMLInputElement>('checkbox', {
+      name: /automatic for public repositories/i,
+    })
+    assert.equal(checkbox.checked, true)
+    assert.equal(checkbox.disabled, true)
+  })
+
+  it('persists explicit private-repository cloud-compression consent', () => {
+    const changes: IBuildRunPreferences[] = []
+    render(
+      <BuildRunSettings
+        repository={githubRepository(true)}
+        preferences={defaultBuildRunPreferences}
+        onPreferencesChanged={preference => changes.push(preference)}
+      />
+    )
+
+    const checkbox = screen.getByRole<HTMLInputElement>('checkbox', {
+      name: /enable cloud compression for this private repository/i,
+    })
+    assert.equal(checkbox.checked, false)
+    fireEvent.click(checkbox)
+    assert.equal(changes.at(-1)?.cheapLfsCloudCompression, true)
+  })
+
+  it('fails closed when repository visibility is unknown', () => {
+    render(
+      <BuildRunSettings
+        repository={githubRepository(null)}
+        preferences={{
+          ...defaultBuildRunPreferences,
+          cheapLfsCloudCompression: true,
+        }}
+        onPreferencesChanged={() => {}}
+      />
+    )
+
+    const checkbox = screen.getByRole<HTMLInputElement>('checkbox', {
+      name: /enable cloud compression for this private repository/i,
+    })
+    assert.equal(checkbox.checked, false)
+    assert.equal(checkbox.disabled, true)
   })
 })

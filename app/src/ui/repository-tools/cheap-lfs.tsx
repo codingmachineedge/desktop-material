@@ -27,6 +27,13 @@ import {
 } from '../lib/filter-list-mode'
 import { showOpenDialog } from '../main-process-proxy'
 import { t } from '../../lib/i18n'
+import {
+  getCheapLfsCloudCompressionPolicy,
+  getCheapLfsCloudCompressionStats,
+  IEnsureCheapLfsCloudCompressionResult,
+} from '../../lib/cheap-lfs/cloud-compression'
+import { IBuildRunPreferences } from '../../models/build-run-preferences'
+import { Checkbox, CheckboxValue } from '../lib/checkbox'
 
 /**
  * The dispatcher surface the cheap-LFS panel drives. The real `Dispatcher`
@@ -50,6 +57,14 @@ export interface ICheapLfsDispatcher {
     signal?: AbortSignal,
     onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void
   ): Promise<ICheapLfsMaterializeResult>
+  updateRepositoryBuildRunPreferences?(
+    repository: Repository,
+    preferences: IBuildRunPreferences
+  ): Promise<IEnsureCheapLfsCloudCompressionResult | null>
+  ensureCheapLfsCloudCompressionWorkflow?(
+    repository: Repository,
+    preferences: IBuildRunPreferences
+  ): Promise<IEnsureCheapLfsCloudCompressionResult>
 }
 
 export interface ICheapLfsProps {
@@ -87,6 +102,9 @@ interface ICheapLfsState {
   readonly progress: IGitHubReleaseTransferProgressEvent | null
   readonly notice: string | null
   readonly error: string | null
+  readonly cloudBusy: boolean
+  readonly cloudPrivateOptIn: boolean
+  readonly cloudWorkflowReady: boolean
 }
 
 /** The persistence id for this panel's filter mode. */
@@ -144,6 +162,7 @@ function defaultTrackedPath(
 export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
   private mounted = false
   private generation = 0
+  private cloudGeneration = 0
   private operationController: AbortController | null = null
   private lastProgressAt = 0
   private readonly materializeHandlers = new Map<string, () => void>()
@@ -162,16 +181,29 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
       progress: null,
       notice: null,
       error: null,
+      cloudBusy: false,
+      cloudPrivateOptIn:
+        props.repository.buildRunPreferences.cheapLfsCloudCompression === true,
+      cloudWorkflowReady: false,
     }
   }
 
   public componentDidMount() {
     this.mounted = true
     void this.loadPointers()
+    void this.syncCloudCompression()
   }
 
   public componentDidUpdate(prevProps: ICheapLfsProps) {
     if (prevProps.repository.hash !== this.props.repository.hash) {
+      const cloudRepositoryChanged =
+        prevProps.repository.id !== this.props.repository.id ||
+        prevProps.repository.path !== this.props.repository.path ||
+        prevProps.repository.gitHubRepository?.hash !==
+          this.props.repository.gitHubRepository?.hash
+      if (cloudRepositoryChanged) {
+        this.cloudGeneration++
+      }
       this.generation++
       this.operationController?.abort()
       this.operationController = null
@@ -186,8 +218,20 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
           progress: null,
           notice: null,
           error: null,
+          cloudBusy: cloudRepositoryChanged ? false : this.state.cloudBusy,
+          cloudPrivateOptIn:
+            this.props.repository.buildRunPreferences
+              .cheapLfsCloudCompression === true,
+          cloudWorkflowReady: cloudRepositoryChanged
+            ? false
+            : this.state.cloudWorkflowReady,
         },
-        () => void this.loadPointers()
+        () => {
+          void this.loadPointers()
+          if (cloudRepositoryChanged) {
+            void this.syncCloudCompression()
+          }
+        }
       )
     }
   }
@@ -195,6 +239,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
   public componentWillUnmount() {
     this.mounted = false
     this.generation++
+    this.cloudGeneration++
     this.operationController?.abort()
     this.operationController = null
   }
@@ -620,6 +665,177 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     this.setState({ notice: 'Canceling the current cheap LFS operation…' })
   }
 
+  private async syncCloudCompression(
+    preferences: IBuildRunPreferences = this.props.repository
+      .buildRunPreferences
+  ): Promise<void> {
+    const dispatcher = this.props.dispatcher
+    const repository = this.props.repository
+    const generation = this.cloudGeneration
+    if (
+      dispatcher.ensureCheapLfsCloudCompressionWorkflow === undefined ||
+      this.state.cloudBusy
+    ) {
+      return
+    }
+    this.setState({ cloudBusy: true })
+    try {
+      const result = await dispatcher.ensureCheapLfsCloudCompressionWorkflow(
+        repository,
+        preferences
+      )
+      if (!this.isCurrentCloudRepository(repository, generation)) {
+        return
+      }
+      const enabled =
+        result.policy === 'automatic-public' ||
+        result.policy === 'enabled-private'
+      this.setState({
+        cloudBusy: false,
+        cloudWorkflowReady: enabled,
+        notice: !enabled
+          ? result.changed
+            ? t('cheapLfs.cloud.workflowDisabled')
+            : this.state.notice
+          : result.changed
+          ? t('cheapLfs.cloud.workflowAdded')
+          : enabled
+          ? t('cheapLfs.cloud.workflowReady')
+          : this.state.notice,
+      })
+    } catch (error) {
+      if (this.isCurrentCloudRepository(repository, generation)) {
+        this.setState({ cloudBusy: false, error: errorMessage(error) })
+      }
+    }
+  }
+
+  private isCurrentCloudRepository(
+    repository: Repository,
+    generation: number
+  ): boolean {
+    if (!this.mounted) {
+      return false
+    }
+    const sameRepository =
+      this.props.repository.id === repository.id &&
+      this.props.repository.path === repository.path
+    if (!sameRepository) {
+      return false
+    }
+    return this.cloudGeneration === generation
+  }
+
+  private onPrivateCloudCompressionChanged = async (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    if (
+      this.props.repository.gitHubRepository?.isPrivate !== true ||
+      this.state.cloudBusy
+    ) {
+      return
+    }
+    const repository = this.props.repository
+    const generation = this.cloudGeneration
+    const enabled = event.currentTarget.checked
+    const preferences: IBuildRunPreferences = {
+      ...repository.buildRunPreferences,
+      cheapLfsCloudCompression: enabled,
+    }
+    const dispatcher = this.props.dispatcher
+    if (dispatcher.updateRepositoryBuildRunPreferences === undefined) {
+      this.setState({
+        error: 'This build cannot persist the cloud-compression setting.',
+      })
+      return
+    }
+    this.setState({
+      cloudBusy: true,
+      cloudPrivateOptIn: enabled,
+      error: null,
+      notice: null,
+    })
+    try {
+      const result = await dispatcher.updateRepositoryBuildRunPreferences(
+        repository,
+        preferences
+      )
+      if (!this.isCurrentCloudRepository(repository, generation)) {
+        return
+      }
+      this.setState({
+        cloudBusy: false,
+        cloudWorkflowReady: enabled,
+        notice: enabled
+          ? result?.changed === true
+            ? t('cheapLfs.cloud.workflowAdded')
+            : t('cheapLfs.cloud.workflowReady')
+          : t('cheapLfs.cloud.workflowDisabled'),
+      })
+    } catch (error) {
+      if (this.isCurrentCloudRepository(repository, generation)) {
+        this.setState({
+          cloudBusy: false,
+          cloudPrivateOptIn:
+            this.props.repository.buildRunPreferences
+              .cheapLfsCloudCompression === true,
+          error: errorMessage(error),
+        })
+      }
+    }
+  }
+
+  private renderCloudCompression() {
+    const preferences: IBuildRunPreferences = {
+      ...this.props.repository.buildRunPreferences,
+      cheapLfsCloudCompression: this.state.cloudPrivateOptIn,
+    }
+    const policy = getCheapLfsCloudCompressionPolicy(
+      this.props.repository,
+      preferences
+    )
+    if (policy === 'not-github') {
+      return null
+    }
+    return (
+      <section
+        className="cheap-lfs-cloud-compression"
+        aria-labelledby="cheap-lfs-cloud-compression-title"
+      >
+        <h3 id="cheap-lfs-cloud-compression-title">
+          {t('cheapLfs.cloud.title')}
+        </h3>
+        {policy === 'automatic-public' && (
+          <p>{t('cheapLfs.cloud.publicAutomatic')}</p>
+        )}
+        {(policy === 'enabled-private' || policy === 'disabled-private') && (
+          <>
+            <Checkbox
+              label={t('cheapLfs.cloud.privateToggle')}
+              disabled={this.state.cloudBusy}
+              value={
+                this.state.cloudPrivateOptIn
+                  ? CheckboxValue.On
+                  : CheckboxValue.Off
+              }
+              onChange={this.onPrivateCloudCompressionChanged}
+            />
+            <p>{t('cheapLfs.cloud.privateHelp')}</p>
+          </>
+        )}
+        {policy === 'visibility-unknown' && (
+          <p>{t('cheapLfs.cloud.visibilityUnknown')}</p>
+        )}
+        <p>{t('cheapLfs.cloud.localOnly')}</p>
+        {this.state.cloudWorkflowReady && !this.state.cloudBusy && (
+          <p className="cheap-lfs-cloud-ready" role="status">
+            {t('cheapLfs.cloud.workflowReady')}
+          </p>
+        )}
+      </section>
+    )
+  }
+
   private renderIntro() {
     const account = getGitHubReleasesAccount(
       this.props.repository,
@@ -803,6 +1019,29 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
 
   private renderRow(entry: ICheapLfsPointerEntry) {
     const busy = this.state.busy !== null
+    const compression = getCheapLfsCloudCompressionStats(entry.pointer)
+    const savings =
+      compression.originalSizeInBytes === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.round(
+              (1 -
+                compression.storedSizeInBytes /
+                  compression.originalSizeInBytes) *
+                1000
+            ) / 10
+          )
+    const compressionLabel =
+      compression.compressedObjects === 0
+        ? t('cheapLfs.cloud.raw')
+        : compression.rawObjects === 0
+        ? t('cheapLfs.cloud.compressed', { savings: String(savings) })
+        : t('cheapLfs.cloud.mixed', {
+            compressed: String(compression.compressedObjects),
+            total: String(compression.totalObjects),
+            savings: String(savings),
+          })
     return (
       <article className="cheap-lfs-row" key={entry.relativePath}>
         <div className="cheap-lfs-row-heading">
@@ -811,6 +1050,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
             <span className="cheap-lfs-row-meta">
               {entry.pointer.releaseTag} · {entry.pointer.assetName}
             </span>
+            <span className="cheap-lfs-row-meta">{compressionLabel}</span>
           </div>
           <span className="cheap-lfs-row-size">
             {formatBytes(entry.pointer.sizeInBytes)}
@@ -909,6 +1149,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
         aria-label="Release-backed large files"
       >
         {this.renderIntro()}
+        {this.renderCloudCompression()}
         {this.renderStatus()}
         {this.renderList()}
       </div>

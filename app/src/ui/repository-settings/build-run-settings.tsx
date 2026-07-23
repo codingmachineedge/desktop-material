@@ -25,6 +25,7 @@ import {
   normalizeBuildFixProvider,
 } from '../../lib/build-run/codex'
 import { t } from '../../lib/i18n'
+import { getCheapLfsCloudCompressionPolicy } from '../../lib/cheap-lfs/cloud-compression'
 
 interface IBuildRunSettingsProps {
   readonly repository: Repository
@@ -279,6 +280,18 @@ export class BuildRunSettings extends React.Component<
     })
   }
 
+  private onCheapLfsCloudCompressionChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    if (this.props.repository.gitHubRepository?.isPrivate !== true) {
+      return
+    }
+    this.props.onPreferencesChanged({
+      ...this.props.preferences,
+      cheapLfsCloudCompression: event.currentTarget.checked,
+    })
+  }
+
   private renderProfileLabel(profile: IBuildProfile): JSX.Element {
     const location = profile.cwd.length === 0 ? 'repository root' : profile.cwd
     const reasons =
@@ -416,6 +429,10 @@ export class BuildRunSettings extends React.Component<
 
   private renderBehaviourToggles(): JSX.Element {
     const prefs = this.props.preferences
+    const cloudPolicy = getCheapLfsCloudCompressionPolicy(
+      this.props.repository,
+      prefs
+    )
 
     const elevatedLabel = (
       <span className="build-run-toggle-label">
@@ -507,6 +524,30 @@ export class BuildRunSettings extends React.Component<
           ariaLabel="About pinning large files on commit"
           ariaLiveMessage="When you commit a file larger than about 100 MB, upload it to a GitHub release and commit only a small pointer in its place, so the push stays under GitHub's file size limit. Needs the repository's GitHub account signed in. If a pin fails the commit is aborted rather than committing a half-pinned tree."
           tooltip="When you commit a file over ~100 MB, it is uploaded to a GitHub release and committed as a small pointer, keeping the push under GitHub's file size limit. Requires the repository's GitHub account. A failed pin aborts the commit rather than committing a half-pinned tree."
+        >
+          <Octicon symbol={octicons.info} />
+        </ToggledtippedContent>
+      </span>
+    )
+
+    const cloudCompressionLabel = (
+      <span className="build-run-toggle-label">
+        {cloudPolicy === 'automatic-public'
+          ? t('cheapLfs.cloud.publicAutomatic')
+          : t('cheapLfs.cloud.privateToggle')}
+        <ToggledtippedContent
+          className="build-run-toggle-tip"
+          ariaLabel={t('cheapLfs.cloud.title')}
+          ariaLiveMessage={
+            cloudPolicy === 'visibility-unknown'
+              ? t('cheapLfs.cloud.visibilityUnknown')
+              : t('cheapLfs.cloud.privateHelp')
+          }
+          tooltip={
+            cloudPolicy === 'visibility-unknown'
+              ? t('cheapLfs.cloud.visibilityUnknown')
+              : t('cheapLfs.cloud.privateHelp')
+          }
         >
           <Octicon symbol={octicons.info} />
         </ToggledtippedContent>
@@ -620,6 +661,22 @@ export class BuildRunSettings extends React.Component<
             }
             onChange={this.onAutoPinLargeFilesOnCommitChanged}
           />
+          {cloudPolicy !== 'not-github' && (
+            <Checkbox
+              label={cloudCompressionLabel}
+              disabled={
+                cloudPolicy === 'automatic-public' ||
+                cloudPolicy === 'visibility-unknown'
+              }
+              value={
+                cloudPolicy === 'automatic-public' ||
+                cloudPolicy === 'enabled-private'
+                  ? CheckboxValue.On
+                  : CheckboxValue.Off
+              }
+              onChange={this.onCheapLfsCloudCompressionChanged}
+            />
+          )}
         </div>
         <p className="build-run-section-description">
           Auto-ignore adds the profile's build-output patterns to{' '}

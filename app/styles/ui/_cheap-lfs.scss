@@ -77,6 +77,31 @@
   }
 }
 
+.cheap-lfs-cloud-compression {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  background: var(--md-sys-color-surface-container-low);
+
+  p {
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.45;
+  }
+
+  .checkbox-component label {
+    color: var(--md-sys-color-on-surface);
+    font-size: 13px;
+  }
+
+  .cheap-lfs-cloud-ready {
+    color: var(--md-sys-color-primary);
+    font-weight: 600;
+  }
+}
+
 .cheap-lfs-status {
   display: flex;
   flex-direction: column;
@@ -182,6 +207,7 @@
   }
 
   .cheap-lfs-row-meta {
+    display: block;
     color: var(--md-sys-color-on-surface-variant);
     font-size: 12px;
   }

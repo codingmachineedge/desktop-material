@@ -4,7 +4,7 @@
 
 Treat every gallery entry as part of a workflow: find the capability, open its named surface, review the exact scope, and keep the resulting evidence.
 
-This page maps 72 named, user-facing visual functions and states to a one-screenshot-per-function
+This page maps 73 named, user-facing visual functions and states to a one-screenshot-per-function
 acceptance gallery. Every view
 uses synthetic accounts, repositories, issues, pull requests, workflow runs, logs, and artifact
 metadata except the one purpose-built live Cheap LFS acceptance repository. No personal path,
@@ -27,9 +27,12 @@ contract rejects missing, duplicate, or unassigned assets.
 > folder discovery, explicit cheap-LFS preparation before the final branch commit, and the M21
 > local, pushed, and remote-only tag lifecycle workspace. The locally accepted July 22
 > continuation adds a restart-restored named tab-group chip, the command palette's fully visible
-> rich-row appearance editor, and the inspected live Cheap LFS UI result. Implementation checkpoint
-> `58be6fe5953477b015a134c414a8cf82363ecc75` is pushed; exact final CI, Pages, wiki, and Release
-> publication remain pending.
+> rich-row appearance editor, and the inspected live raw Cheap LFS UI result. The cloud-compression
+> continuation adds the accepted bilingual private-opt-in and compressed-pointer frame after live
+> public automatic/private explicit Actions runs and local restores. Action correction
+> `16983c59d702d9e6fa49d2ac4fa4b35c415e9190` is pushed; temporary credentials and the headless
+> test root are removed. Exact final source CI, Pages, wiki, Release, and Git-cleanup publication
+> receipts remain pending.
 > Exact build, interaction, and
 > privacy receipts are retained in `HANDOFF.md`; each promoted release records its own main, CI,
 > Pages, and wiki verification without implying that later maintenance work is complete.
@@ -77,6 +80,7 @@ active profile's style, label, and explicit language mode.
 | `material-tab-groups.png` | Restart-restored named group chip with visible repository membership and real collapse/expand behavior |
 | `material-command-palette-appearance.png` | Rich command results beside the fully visible density and row-content appearance editor |
 | `cheap-lfs-ui-acceptance.png` | Live private-repository Cheap LFS pin result with the verified pointer and Materialize action |
+| `cheap-lfs-cloud-compression.png` | Bilingual private opt-in with the managed cloud workflow ready and a verified compressed pointer |
 | `material-actions-cancel.png` | Exact workflow-run cancellation review with ref, actor, and commit context |
 | `material-rebase-review.png` | Reviewed current→target rebase with ahead/behind state and commit preview |
 | `material-pull-preview.png` | Freshly fetched ordinary pull review bound to one exact upstream OID |
@@ -189,8 +193,12 @@ automation remain noninteractive.
 ## Large-file commit preparation
 
 Oversized files are prepared and uploaded through release-backed cheap LFS before
-Git creates the branch commit. New uploads use raw bytes, retain one asset when
-it fits the release limit, and use ordered raw ranges when it does not. The
+Git creates the branch commit. New uploads start as raw bytes, retain one asset when
+it fits the release limit, and use ordered raw ranges when it does not. Public
+repositories can then cloud-compress each Release object sequentially through a
+SHA-pinned Action; private repositories require explicit opt-in. Failed and
+non-beneficial objects stay raw and cloneable, while decompression and full
+digest verification always happen locally in Desktop Material. The
 composer names hashing, release preparation, upload progress, and verification
 separately, then reserves **Committing to _branch_** for the small pointer
 commit. An isolated trusted GitHub CLI exact-range transport runs first so the
@@ -206,9 +214,13 @@ verification.
 
 The repository rail's direct **Large files** manager lists and searches the
 original nested pointer paths, pins reviewed files, and materializes one or all
-pointer files without sending users through GitHub Releases.
+pointer files without sending users through GitHub Releases. Its cloud card
+shows the visibility policy and local-only decompression boundary, and each row
+is labeled Raw, Compressed, or Mixed.
 
 ![Live private-repository Cheap LFS pin result with the verified pointer and Materialize action](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/cheap-lfs-ui-acceptance.png)
+
+![Bilingual private-repository cloud-compression opt-in with a verified compressed pointer](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/cheap-lfs-cloud-compression.png)
 
 Every repository bucket is bounded to GitHub's 1,000-asset Release limit.
 Whole multipart files and whole manual batches roll together from `assets` to

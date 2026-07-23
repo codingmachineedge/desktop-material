@@ -34,7 +34,7 @@ remote CI caught a macOS error-ordering defect without publishing; correction
 `98d93ccc` passed its full remote CI gate and published
 `v3.6.3-beta3-b0000000165`. Exact publication receipts are in `HANDOFF.md`.
 
-The [Guided Feature Gallery](Feature-Gallery) is the canonical 72-scene visual index: every
+The [Guided Feature Gallery](Feature-Gallery) is the canonical 73-scene visual index: every
 catalogued function or state owns one distinct screenshot rather than borrowing an overview image.
 
 - [The shell](#the-shell)
@@ -925,11 +925,37 @@ them. The app freshly fences every exact asset ID before pointer writes, recheck
 the pointers, and resumes the same commit automatically. Older GitHub
 Enterprise versions safely fall back to the repository Releases listing. **Cancel** stops either
 path until the verified pointer commit begins; that short final mutation phase finishes as one
-reviewed operation. The app waits for and verifies every multipart asset before writing the pointer. New uploads
-otherwise skip compression: a file fitting the 1.5 GiB per-asset cap is stored as one raw asset,
-while a larger file is split into ordered raw ranges of at most 1.5 GiB each. Downloads verify each range and the complete file before
-replacing the pointer. Existing compressed cheap-LFS pointers remain readable for backward
-compatibility.
+reviewed operation. The app waits for and verifies every multipart asset before writing the pointer.
+A file fitting the 1.5 GiB per-asset cap initially uses one raw asset, while a
+larger file uses ordered raw ranges of at most 1.5 GiB each. Public repositories
+then offer automatic cloud compression through one reviewed, SHA-pinned
+workflow file. Private repositories stay off until you explicitly enable
+**Cloud compression** in the Large files manager or Repository Settings; the
+copy warns that private Actions usage may consume the owner's minutes. Unknown
+visibility stays off.
+
+The GitHub Action downloads and raw-DEFLATEs one Release object at a time, uses
+no Actions artifacts or caches, and adopts a verified side asset only when it is
+strictly smaller. A failed or non-beneficial object keeps its exact raw pointer
+and asset, so it remains cloneable; other objects continue and a multipart
+pointer may safely be mixed. Raw assets remain available for older commits.
+GitHub Actions never decompresses. On clone, pull, open, or **Materialize**,
+Desktop Material downloads compressed bytes and expands them on your local PC
+under the pointer's exact output cap, then verifies every original part and the
+complete file before replacing the pointer.
+
+Draft Release discovery is bounded to 100 pages of 100 releases because GitHub's
+direct tag lookup does not expose drafts. If the exact tag is outside those
+10,000 releases, the Action leaves the object raw and reports a safe failure.
+The same rule applies when the Release has reached GitHub's 1,000-asset capacity
+and therefore has no free slot for a compressed side asset. Cheap LFS retains
+the raw historical object instead of deleting it to force compression.
+
+Live public automatic and private explicit-opt-in runs each reduced the 1 MiB
+acceptance object to a verified 1,033-byte side asset. Both compressed pointers
+were restored manually through Desktop Material to the exact original SHA-256;
+an earlier failed draft lookup also left its raw pointer materializable through
+the same production UI.
 
 Each Cheap LFS Release holds at most 1,000 assets. Desktop Material counts all ten asset pages and
 uses `assets`, then `assets-2`, `assets-3`, and later buckets as needed. A multipart file or one
@@ -943,7 +969,9 @@ instead of retaining one in-process request body.
 
 Open the repository rail's **Large files** destination to manage the pointers directly. It lists
 and searches original repository-relative paths, pins reviewed files, and materializes one or all
-pointer files without requiring you to find their backing assets in GitHub Releases. Materialize all
+pointer files without requiring you to find their backing assets in GitHub Releases. It also labels
+each pointer **Raw**, **Compressed**, or **Mixed**, shows the public/private cloud policy, and adds the
+managed workflow to Changes for your review rather than committing it silently. Materialize all
 reuses one paginated inventory per Release instead of repeating the same API pages for every pointer.
 
 The prepared folder is flat because GitHub Release assets cannot contain subfolders. Cheap LFS still

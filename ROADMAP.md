@@ -60,7 +60,7 @@ lint/format checks, the production build, and an isolated off-screen Win32 pull
 exercise passed; remote CI, Pages, and release verification follow the `main`
 push recorded in [HANDOFF.md](HANDOFF.md).
 
-## M26 — Cheap LFS / Express Release — **Live public/private UI accepted; publication verification pending**
+## M26 — Cheap LFS / Express Release — **Live cloud Actions/UI accepted; publication verification pending**
 
 - **Release-backed large-file storage**: The repository rail's **Large files**
   manager can pin working-tree files over 100 MiB to GitHub Release assets,
@@ -71,6 +71,20 @@ push recorded in [HANDOFF.md](HANDOFF.md).
   per-part SHA-256 verification. The manager lists and searches committed
   pointers, restores individually or all at once, and never requires browsing or
   decoding release asset names externally.
+- **Cloud compression**: Public repositories receive an automatic reviewed
+  caller; private repositories remain off until explicit persisted consent.
+  The SHA-pinned Action streams one Release object at a time directly to a
+  raw-DEFLATE side asset, never uses Actions artifact/cache storage, updates
+  only verified beneficial objects to v1 `part-deflate`, retains every raw
+  historical asset, and leaves failed/non-beneficial pointers cloneable.
+  Desktop Material is the only decompressor and verifies bounded expanded
+  bytes locally. Focused real-action, policy, failure, UI, and materialization
+  tests pass. Retained public/private production-UI caller commits triggered
+  successful Actions runs that adopted 1,033-byte side assets, and both bot
+  pointers restored locally to the exact original 1 MiB SHA-256. A preceding
+  public draft-tag 404 also proved the raw pointer and asset remain usable after
+  a failed run. Draft lookup is bounded to 10,000 releases; a missing bounded
+  draft or a full 1,000-asset Release fails safely without pointer adoption.
 - **Manual browser handoff**: When the trusted GitHub CLI path cannot complete
   safely, a browser-assisted upload handoff plans every remaining file, splits
   sources into ordered .partNNN files in a flat bounded folder, opens the
@@ -321,7 +335,7 @@ The following items track the current cycle's progress against all six acceptanc
 | Feature / Gate | Status | Key Evidence |
 |---|---|---|
 | July 22 tab groups, palette, Alt, and release gates | **Implementation pushed; publication verification pending** | Source contracts cover persistence, pin-boundary safety, portable-export stripping, three language modes, rich palette rows/appearance, deterministic bare-Alt sequencing, Super Express test-before-build, and release-PR `main` targeting. The exact production build passed through fixed MCP; off-screen interaction accepted group persistence/collapse/expansion and a fully visible palette editor with five Ollama matches; two inspected 1000×687 captures are tracked. Implementation checkpoint `58be6fe595` is pushed; exact final remote CI/Pages/wiki and Release evidence remain pending. |
-| M26 Cheap LFS / Express Release | **Implementation complete; live public/private UI accepted** | Retained public/private repositories contain pushed UI-created pointers and exact 1 MiB draft-release assets. The production Large files UI materialized and re-pinned both payloads through the native picker; fresh clones resolved to the UI commits with no Git LFS objects. The temporary authorized secure-store bridge was deleted and verified absent. Also: focused Release store and model/transfer gates pass 17/17 and 41/41; all five production Webpack targets and staging passed; comprehensive pointer, operation, manual-upload, automation, commit-entry-point, status-refresh, and release-transfer coverage remains in place. |
+| M26 Cheap LFS / Express Release | **Live public/private pin, cloud Actions, and local restore accepted; publication verification pending** | Retained public/private repositories contain pushed UI-created raw pointers and exact 1 MiB draft-release assets. Public automatic setup and private explicit opt-in produced successful Actions runs `29969707165` and `29969957449`; each bot commit adopted a verified 1,033-byte `part-deflate` asset while retaining raw history. Both compressed pointers restored through the production UI to SHA-256 `30e14955…`; failed public run `29967844734` left its raw pointer cloneable and UI-materializable. The new 960×660 bilingual acceptance frame is tracked. Temporary credentials, the headless desktop, and synchronized test clones are removed; exact source CI/Release, Pages/wiki publication, and final Git cleanup remain pending. |
 | July 21 Settings queue and mobile connection | **Implementation complete** | Verified empty-account copy, persisted-policy hydration, required-directory validation, parallel/sequential changes, enable/disable dispatch, English/Cantonese/bilingual rendering, responsive-surface registration |
 | July 21 responsiveness hardening | **Local implementation complete** | Deterministic regressions verified for remote scan terminator, late termination rejection, same-URL proxy coalescing, strict clone barrier, every prompt family, 500-update burst, failed request-ID reuse, and 25 Markdown reloads |
 | M25 Repository-bound API functions | **Implementation complete** | Built-in function seeding verified; function-button execution tested; per-repository rail visibility persistence checked; responsive Explorer styles verified |
@@ -334,7 +348,7 @@ The following items track the current cycle's progress against all six acceptanc
 | Detailed Pull All progress | **Complete** | Verified live per-repository state, bounded concurrency, completion summary, keyboard/accessibility semantics, compact-window containment, focused and full-suite coverage, the exact production build, and inspected off-screen evidence on main |
 | Clone-style Add Submodule | **Complete** | Verified hosted-provider and URL selection, exact-account affinity, reviewed relative path/branch, duplicate and occupied-path rejection, bounded progress, cancellation, list refresh, keyboard labels, and minimum-window containment |
 | Repository-wide feature revalidation | **Complete** | The historical revalidation verified the registered-surface and M0–M19 implementation inventory, focused and repository-wide tests, production builds/packages, isolated headless interaction, exact-SHA CI and installer runs, Pages, the seven-page wiki, and its then-current 52-image documentation gallery |
-| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages now catalog 72 named visual scenes. Existing images remain in place unless a new deterministic capture passes original-resolution privacy inspection; the July 22 continuation adds accepted group-chip, rich-palette, and live Cheap LFS UI screenshots. Final completion still requires byte-identical Pages/wiki delivery. |
+| Documentation gallery expansion | **M22 full refresh in progress** | README, wiki, and Pages sources now catalog 73 named visual scenes. Existing images remain in place unless a new deterministic capture passes original-resolution privacy inspection; the July 22 continuation adds accepted group-chip, rich-palette, raw Cheap LFS, and cloud-compression UI screenshots. Final completion still requires byte-identical Pages/wiki delivery. |
 | Complete notifications and Releases dashboard | **Complete** | Verified every GitHub notification page, confirmed local/remote Clear all with partial-failure retention, release status metrics and loaded-result search/filtering, rich asset metadata, scoped retries, responsive layout, and inspected headless evidence |
 
 ## Acceptance gates

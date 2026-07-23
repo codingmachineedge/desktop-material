@@ -47,8 +47,10 @@ Material is displaying or how a repository is represented in the application.
   storage](release-backed-cheap-lfs.md) — replace large tracked bytes with a
   verified GitHub Release pointer, recover a stalled or length-rejected native
   upload automatically through a bounded trusted GitHub CLI transport, retain a
-  verified whole-batch browser handoff, and materialize raw single or multipart
-  assets safely.
+  verified whole-batch browser handoff, automatically cloud-compress public
+  repository objects one at a time (private repositories require explicit
+  opt-in), fail safely at bounded draft/capacity limits, and always decompress
+  and verify raw or mixed objects locally.
 - [Parent-folder repository
   discovery](parent-folder-repository-discovery.md) — preview and register a
   bounded, link-safe set of working trees below one selected folder.

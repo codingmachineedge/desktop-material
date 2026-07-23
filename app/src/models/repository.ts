@@ -98,6 +98,7 @@ export class Repository {
       this.buildRunPreferences.autoBuildOnPull,
       this.buildRunPreferences.buildFixProvider,
       this.buildRunPreferences.buildFixAutoApprove,
+      this.buildRunPreferences.cheapLfsCloudCompression,
       this.groupName,
       this.defaultBranch,
       getEditorOverrideHash(this.customEditorOverride)

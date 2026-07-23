@@ -307,9 +307,20 @@ automation, and account isolation. The diagrams are reproducible with
 | --- | --- |
 | <img src="docs/assets/screenshots/material-tab-groups.png" alt="Desktop Material workspace with a visible named tab-group chip and its repository member" width="520"><br><sub>Named chip · collapse/expand · restart persistence</sub> | <img src="docs/assets/screenshots/material-command-palette-appearance.png" alt="Command palette showing Ollama results beside the fully visible row appearance editor" width="520"><br><sub>Rich result rows · density and visibility controls</sub> |
 
-| Live Cheap LFS UI |
-| --- |
-| <img src="docs/assets/screenshots/cheap-lfs-ui-acceptance.png" alt="Cheap LFS manager after a live private-repository UI pin with one verified pointer and its Materialize action" width="720"><br><sub>Public/private live GitHub · native picker · pushed pointer history</sub> |
+| Live Cheap LFS pin and restore | Live cloud compression |
+| --- | --- |
+| <img src="docs/assets/screenshots/cheap-lfs-ui-acceptance.png" alt="Cheap LFS manager after a live private-repository UI pin with one verified pointer and its Materialize action" width="520"><br><sub>Public/private live GitHub · native picker · pushed pointer history</sub> | <img src="docs/assets/screenshots/cheap-lfs-cloud-compression.png" alt="Bilingual private-repository Cheap LFS manager with explicit cloud-compression consent and a compressed pointer row" width="520"><br><sub>Private opt-in · 99.9% smaller · local verified materialization</sub> |
+
+Cheap LFS can now install a reviewed, SHA-pinned GitHub Actions caller that
+compresses Release objects sequentially without Actions artifacts or caches.
+Public repositories enable it automatically; private repositories stay off
+until the user opts in. Failed or non-beneficial objects keep their exact raw
+pointer and asset, while successful objects become backward-compatible
+`part-deflate` records. Decompression always happens locally in Desktop
+Material with bounded expansion plus original part and whole-file SHA-256
+verification. Live public and private Actions converted separate 1 MiB objects
+to verified 1,033-byte side assets while retaining their raw historical assets;
+both compressed pointers restored to the exact original bytes through the app.
 
 | Repository workflows | GitHub workflows | Accessibility and shell |
 | --- | --- | --- |

@@ -21,6 +21,7 @@ import {
   ICheapLfsPinResult,
   ICheapLfsPointerEntry,
 } from '../../lib/cheap-lfs/operations'
+import type { IEnsureCheapLfsCloudCompressionResult } from '../../lib/cheap-lfs/cloud-compression'
 import { shell } from '../../lib/app-shell'
 import type { IResolvedRepositoryAppearance } from '../../lib/appearance-customization'
 import {
@@ -3582,10 +3583,31 @@ export class Dispatcher {
   public async updateRepositoryBuildRunPreferences(
     repository: Repository,
     buildRunPreferences: IBuildRunPreferences
-  ) {
+  ): Promise<IEnsureCheapLfsCloudCompressionResult | null> {
+    const cloudCompressionChanged =
+      (repository.buildRunPreferences.cheapLfsCloudCompression === true) !==
+      (buildRunPreferences.cheapLfsCloudCompression === true)
     await this.appStore._updateRepositoryBuildRunPreferences(
       repository,
       buildRunPreferences
+    )
+    if (repository.gitHubRepository !== null && cloudCompressionChanged) {
+      return await this.appStore._ensureCheapLfsCloudCompressionWorkflow(
+        repository,
+        buildRunPreferences
+      )
+    }
+    return null
+  }
+
+  /** Keep the reviewed Cheap LFS cloud-compression caller in policy sync. */
+  public ensureCheapLfsCloudCompressionWorkflow(
+    repository: Repository,
+    preferences: IBuildRunPreferences
+  ): Promise<IEnsureCheapLfsCloudCompressionResult> {
+    return this.appStore._ensureCheapLfsCloudCompressionWorkflow(
+      repository,
+      preferences
     )
   }
 

@@ -51,6 +51,10 @@ import {
   getCheapLfsReleaseUploadURL,
   manualPinFilesToRelease,
 } from '../cheap-lfs/manual-upload'
+import {
+  ensureCheapLfsCloudCompressionWorkflow,
+  IEnsureCheapLfsCloudCompressionResult,
+} from '../cheap-lfs/cloud-compression'
 import { CheapLfsPinThresholdBytes } from '../large-files'
 import { IGitHubRelease } from '../github-releases'
 import { IGitHubReleaseTransferProgressEvent } from '../github-release-transfer'
@@ -12355,6 +12359,22 @@ export class AppStore extends TypedBaseStore<IAppState> {
     repository: Repository
   ): Promise<ReadonlyArray<ICheapLfsPointerEntry>> {
     return listCheapLfsPointers(repository)
+  }
+
+  /** Install or close the reviewed repository-local cloud-compression caller. */
+  public async _ensureCheapLfsCloudCompressionWorkflow(
+    repository: Repository,
+    preferences: IBuildRunPreferences
+  ): Promise<IEnsureCheapLfsCloudCompressionResult> {
+    await this.assertTemporaryRepositoryIsSafe(repository)
+    const result = await ensureCheapLfsCloudCompressionWorkflow(
+      repository,
+      preferences
+    )
+    if (result.changed) {
+      await this._loadStatus(repository)
+    }
+    return result
   }
 
   /**

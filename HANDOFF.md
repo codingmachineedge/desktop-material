@@ -1,5 +1,96 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-22 Cheap LFS cloud compression implementation
+
+Cheap LFS now has repository-local cloud compression without cloud
+decompression. A generated caller pins `actions/checkout` and Desktop
+Material's composite compressor to immutable SHAs, grants only
+`contents: write`, and runs on pushes to the repository's default branch or by
+manual dispatch. Public repositories receive automatic setup in the Large
+files UI. Private repositories remain off until the user explicitly enables a
+persisted setting; unknown visibility fails closed, and the workflow repeats a
+live event-visibility guard.
+
+The Action downloads Release objects directly, raw-DEFLATEs one object at a
+time at level 9, and uploads a verified side asset without Actions artifacts or
+caches. A strictly smaller success changes only that pointer object to the
+existing v1 `part-deflate` form and pushes a `[skip ci]` commit. Mixed raw and
+compressed multipart pointers are valid. Original raw assets are never deleted
+because historical commits can still name them. Failed or non-beneficial
+objects retain their exact raw pointer and remain cloneable; independent later
+objects still run.
+
+Desktop Material alone downloads and decompresses. Its existing bounded local
+inflate path checks the recorded output cap, original per-object size/SHA-256,
+and assembled whole-file size/SHA-256 before replacing a pointer. The UI labels
+raw, compressed, and mixed pointers, explains the local-only boundary, and
+offers English, playful Hong Kong-style Cantonese, and bilingual copy.
+
+Focused tests exercise the real composite Action against a temporary Git remote
+and fake Release API, workflow/policy ownership, public/private UI controls,
+settings persistence, pointer state, failure and non-beneficial fallback,
+ambiguous-push recovery, build-output-style pointer paths, bounded draft lookup,
+atomic workflow replacement and link rejection, repository-switch races, and
+local compressed-object materialization failures. The final combined gate
+passed 134/134 tests across 25 suites; all 27 script tests, repository-wide
+Prettier and ESLint, the ESLint/Prettier compatibility check, TypeScript, and
+`git diff --check` also passed.
+
+Live cloud-compression acceptance is complete in the retained repositories:
+
+- The public production UI wrote and pushed caller commit
+  [`72b2db3e0b6554364e07e5e34945c8be5c125216`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/commit/72b2db3e0b6554364e07e5e34945c8be5c125216).
+  [Actions run `29969707165`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/actions/runs/29969707165)
+  succeeded and pushed bot commit
+  [`f10d8d2acedbba0e3b5ce978dff09c25217cad9c`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/commit/f10d8d2acedbba0e3b5ce978dff09c25217cad9c).
+- The private production UI showed cloud compression off, then recorded the
+  explicit opt-in and pushed commit
+  `3d398786dd4c599730e0dbb77b0c83a5fa14a57a`. Private Actions run
+  `29969957449` succeeded and pushed bot commit
+  `6259b0fa0dc6c65cdb5a90af8e1da9358b45b0ac`.
+- Each bot commit changed only its payload pointer to `part-deflate`. The public
+  and private compressed assets are each **1,033 bytes**, have stored digest
+  `sha256:8d22b086820b0896bdcb33cf965ebc275cb0b5f0b4c44a364aa4144c015f9f7b`,
+  and expand to the original **1,048,576 bytes** with digest
+  `sha256:30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58`.
+  The corresponding raw 1 MiB assets remain uploaded for earlier commits.
+
+The first public run,
+[`29967844734`](https://github.com/DingDingChae/desktop-material-cheap-lfs-public-20260722-153308/actions/runs/29967844734),
+also provides the live safe-failure proof. GitHub's tag endpoint returned 404
+for the draft release; the Action reported `0 compressed, 0 kept raw, 1 failed
+safely`, did not rewrite the pointer or remove the raw asset, and exited failed.
+The production UI then materialized that still-raw pointer successfully with the
+exact 1 MiB digest above. After the bounded draft lookup correction, the public
+and private compressed pointers were each materialized manually through the UI
+and again produced that exact size and digest on the local PC.
+
+Draft lookup is deliberately bounded to 100 API pages of 100 releases, or **10,000
+releases**. If the exact draft tag is outside that window, the object fails
+safely and remains raw. A GitHub Release also holds at most **1,000 assets**;
+because the historical raw asset is retained, a full Release cannot accept the
+compressed side asset and likewise stays safely raw until capacity is available.
+
+The production bundle and all interaction ran through the fixed Lowlevel MCP
+HTTP endpoint on the isolated `DesktopMaterialCheapLfsCloud-20260722-190000`
+headless desktop. The accepted bilingual private-opt-in/compressed-row frame is:
+
+| Accepted local capture | Dimensions | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/assets/screenshots/cheap-lfs-cloud-compression.png` | 960×660 | 105,577 | `9449e50f60cd298e9cc261e9044fc0cd93706a8e9f243dcceb88d63b6df9ab8d` |
+
+The canonical `yarn build:prod` wrapper could not start because this fixed
+environment has no `yarn` executable. No dependency was downloaded; the
+equivalent existing-dependency production Webpack command compiled all five
+targets through MCP in 420.6 seconds with `ok: true`, `client_ok: true`, and
+`returncode: 0`. The one-time development alias and GitHub credentials were
+deleted and verified absent, the production credential was restored with no
+backup left behind, the exact Electron process and zero-window headless desktop
+were closed, and the owned synchronized test-clone run root was removed. Exact
+source-repository CI and Release results, Pages/wiki publication, final source
+commit/push, and the final branch/worktree/stash audit remain for the
+publication checkpoint.
+
 ## 2026-07-22 live Cheap LFS public/private GitHub and UI acceptance
 
 Live Cheap LFS protocol, history, and Desktop Material UI acceptance completed
@@ -126,9 +217,9 @@ returned five Ollama matches.
 | `docs/assets/screenshots/material-tab-groups.png` | 1000×687 | 94,467 | `fd857137f71b79fbef65225e4469f2d2e3d95ecb6701e4847b84da11ad2875b8` |
 | `docs/assets/screenshots/material-command-palette-appearance.png` | 1000×687 | 99,234 | `ac4db2aa3696d2e1987c0c93573ccf48f86c61111e42fcabf0cec54db3b87a7d` |
 
-README, Pages, the User Guide, and the 72-scene Guided Feature Gallery now
+README, Pages, the User Guide, and the 73-scene Guided Feature Gallery now
 reference the two inspected synthetic-only captures plus the separately
-accepted live Cheap LFS UI frame. Implementation checkpoint
+accepted raw and cloud-compression Cheap LFS UI frames. Implementation checkpoint
 `58be6fe5953477b015a134c414a8cf82363ecc75` is pushed on `main`; exact final
 CI/code scanning, Pages/wiki publication, and installer Release receipts remain
 required.

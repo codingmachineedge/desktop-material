@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import * as React from 'react'
-import * as electron from 'electron'
+import { ipcRenderer } from 'electron'
 
 import { ProfileStore } from '../../../src/lib/stores/profile-store'
 import { ElementAppearanceCoordinator } from '../../../src/lib/stores/element-appearance-coordinator'
@@ -39,15 +39,15 @@ import {
   within,
 } from '../../helpers/ui/render'
 
-let previousIpcSend: typeof electron.ipcRenderer.send
+let previousIpcSend: typeof ipcRenderer.send
 
 beforeEach(() => {
-  previousIpcSend = electron.ipcRenderer.send
-  electron.ipcRenderer.send = () => undefined
+  previousIpcSend = ipcRenderer.send
+  ipcRenderer.send = () => undefined
 })
 
 afterEach(() => {
-  electron.ipcRenderer.send = previousIpcSend
+  ipcRenderer.send = previousIpcSend
   localStorage.removeItem('language-mode-v1')
 })
 

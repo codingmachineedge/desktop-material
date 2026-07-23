@@ -718,7 +718,7 @@
               </div>
               <h3>
                 Release-backed large files
-                <span class="tag">Live UI accepted</span>
+                <span class="tag">Cloud Actions + UI accepted</span>
               </h3>
               <p>
                 Use the direct Large files manager to list, search, pin, and
@@ -736,7 +736,16 @@
                 <code>assets-2</code>, and later prerelease pointer tags without
                 replacing the installer feed. Retained public and private test
                 repositories passed materialize and re-pin through the
-                production UI and native Windows picker.
+                production UI and native Windows picker. Public repositories can
+                add automatic SHA-pinned cloud compression; private repositories
+                require explicit opt-in. Actions handles one Release object at a
+                time and leaves failures raw, while Desktop Material always
+                decompresses and verifies locally. Live public and private runs
+                adopted verified 1,033-byte side assets for separate 1 MiB
+                objects, retained the raw history assets, and restored both
+                originals through the app. Draft discovery is bounded to 10,000
+                releases; a missing bounded draft or a full 1,000-asset Release
+                fails safely without pointer replacement.
               </p>
             </article>
 
@@ -1263,6 +1272,26 @@
               </a>
               <figcaption>
                 Cheap LFS <span class="tag">Public · private · live UI</span>
+              </figcaption>
+            </figure>
+
+            <figure class="shot">
+              <a
+                href="docs/assets/screenshots/cheap-lfs-cloud-compression.png"
+                target="_blank"
+                rel="noopener"
+              >
+                <img
+                  src="docs/assets/screenshots/cheap-lfs-cloud-compression.png"
+                  alt="Bilingual private-repository Cheap LFS manager with explicit cloud-compression consent and a verified compressed pointer"
+                  loading="lazy"
+                />
+              </a>
+              <figcaption>
+                Cheap LFS cloud compression
+                <span class="tag"
+                  >Public auto · private opt-in · local restore</span
+                >
               </figcaption>
             </figure>
 

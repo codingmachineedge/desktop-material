@@ -1363,6 +1363,18 @@ export type TranslationKey =
   | 'cheapLfs.managerRail'
   | 'cheapLfs.managerTitle'
   | 'cheapLfs.managerIntro'
+  | 'cheapLfs.cloud.title'
+  | 'cheapLfs.cloud.publicAutomatic'
+  | 'cheapLfs.cloud.privateToggle'
+  | 'cheapLfs.cloud.privateHelp'
+  | 'cheapLfs.cloud.visibilityUnknown'
+  | 'cheapLfs.cloud.localOnly'
+  | 'cheapLfs.cloud.workflowAdded'
+  | 'cheapLfs.cloud.workflowReady'
+  | 'cheapLfs.cloud.workflowDisabled'
+  | 'cheapLfs.cloud.raw'
+  | 'cheapLfs.cloud.compressed'
+  | 'cheapLfs.cloud.mixed'
   | 'cheapLfs.manualUpload'
   | 'cheapLfs.cancel'
   | 'cheapLfs.cancelConfirmation'
@@ -3063,6 +3075,27 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'cheapLfs.managerTitle': 'Cheap LFS manager',
   'cheapLfs.managerIntro':
     'Find, pin, search, and restore repository large files here. You do not need to browse GitHub Releases or decode asset names.',
+  'cheapLfs.cloud.title': 'Cloud compression',
+  'cheapLfs.cloud.publicAutomatic':
+    'Automatic for public repositories. Commit and push the reviewed workflow change once; each release object is then compressed one by one.',
+  'cheapLfs.cloud.privateToggle':
+    'Enable cloud compression for this private repository',
+  'cheapLfs.cloud.privateHelp':
+    'Off by default for private repositories. Enabling uses your private GitHub Actions minutes and adds a reviewed workflow change to this repository.',
+  'cheapLfs.cloud.visibilityUnknown':
+    'Off until GitHub confirms whether this repository is public or private.',
+  'cheapLfs.cloud.localOnly':
+    'GitHub Actions compresses only. Desktop Material downloads and decompresses compressed objects locally, then verifies their original size and SHA-256.',
+  'cheapLfs.cloud.workflowAdded':
+    'Cloud-compression workflow added to Changes. Review, commit, and push it to activate compression.',
+  'cheapLfs.cloud.workflowReady':
+    'Cloud-compression workflow file is ready. Commit and push it once; pointer updates then arrive as GitHub Actions commits.',
+  'cheapLfs.cloud.workflowDisabled':
+    'Private cloud compression is off. Existing raw objects remain cloneable.',
+  'cheapLfs.cloud.raw': 'Raw',
+  'cheapLfs.cloud.compressed': 'Compressed · {savings}% smaller',
+  'cheapLfs.cloud.mixed':
+    'Mixed · {compressed}/{total} objects compressed · {savings}% smaller',
   'cheapLfs.manualUpload': 'Manual upload',
   'cheapLfs.cancel': 'Cancel',
   'cheapLfs.cancelConfirmation':
@@ -4627,6 +4660,26 @@ export const cantoneseTranslations: Readonly<
   'cheapLfs.managerTitle': 'Cheap LFS 管理器',
   'cheapLfs.managerIntro':
     '喺呢度就可以搵、釘選、搜尋同還原 repo 嘅大檔案，唔使自己走入 GitHub Releases 猜資產檔名。',
+  'cheapLfs.cloud.title': '雲端壓縮',
+  'cheapLfs.cloud.publicAutomatic':
+    '公開 repo 會自動開啟。第一次先檢查、commit 同 push 個 workflow 改動；之後每個 Release 物件會逐件壓縮。',
+  'cheapLfs.cloud.privateToggle': '為呢個私人 repo 開啟雲端壓縮',
+  'cheapLfs.cloud.privateHelp':
+    '私人 repo 預設關閉。開啟後會用你嘅私人 GitHub Actions 分鐘，亦會喺 repo 加一個畀你檢查嘅 workflow 改動。',
+  'cheapLfs.cloud.visibilityUnknown':
+    'GitHub 未確認個 repo 係公開定私人之前，會穩陣噉保持關閉。',
+  'cheapLfs.cloud.localOnly':
+    'GitHub Actions 只負責壓縮。Desktop Material 會喺你部機下載同解壓，再核對原本大小同 SHA-256。',
+  'cheapLfs.cloud.workflowAdded':
+    '雲端壓縮 workflow 已放入 Changes。檢查、commit 同 push 之後就會啟動。',
+  'cheapLfs.cloud.workflowReady':
+    '雲端壓縮 workflow 檔案已準備好。第一次 commit 同 push 之後，pointer 更新就會由 GitHub Actions commit 返嚟。',
+  'cheapLfs.cloud.workflowDisabled':
+    '私人雲端壓縮已關閉；原本 raw 物件照樣 clone 得返。',
+  'cheapLfs.cloud.raw': 'Raw 原檔',
+  'cheapLfs.cloud.compressed': '已壓縮 · 慳咗 {savings}%',
+  'cheapLfs.cloud.mixed':
+    '混合 · {compressed}/{total} 件已壓縮 · 慳咗 {savings}%',
   'cheapLfs.manualUpload': '手動上載',
   'cheapLfs.cancel': '取消',
   'cheapLfs.cancelConfirmation':

@@ -94,6 +94,15 @@ export interface IBuildRunPreferences {
   readonly autoPinLargeFilesOnCommit?: boolean
 
   /**
+   * Explicit consent to run Cheap LFS cloud compression in a private
+   * repository. Public repositories use cloud compression automatically;
+   * private and unknown-visibility repositories remain off unless this value
+   * is exactly true. The workflow compresses only. Desktop Material always
+   * downloads and decompresses objects locally.
+   */
+  readonly cheapLfsCloudCompression?: boolean
+
+  /**
    * Per-profile command-line overrides. A blank / absent value for a stage
    * means "use the detected command". Stored as raw command-line strings; the
    * dispatcher tokenises them into an argv array (never a shell string).
