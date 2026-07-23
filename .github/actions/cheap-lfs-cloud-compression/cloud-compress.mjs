@@ -1,15 +1,7 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import {
-  appendFile,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises'
+import { appendFile, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -18,16 +10,19 @@ import { createDeflateRaw } from 'node:zlib'
 
 const POINTER_VERSION = 'desktop-material/cheap-lfs/v1'
 const MAX_POINTER_BYTES = 512 * 1024
+const POINTER_BLOB_FILTER_BYTES = MAX_POINTER_BYTES + 1
 const MAX_ASSET_NAME_BYTES = 255
 const MAX_PART_BYTES = 2 * 1024 * 1024 * 1024
+const MAX_GIT_METADATA_BYTES = 64 * 1024 * 1024
 const API_VERSION = '2022-11-28'
 const workspace = process.env.GITHUB_WORKSPACE
 const repository = process.env.GITHUB_REPOSITORY
 const token = process.env.CHEAP_LFS_GITHUB_TOKEN
 const apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com'
 const refName = process.env.GITHUB_REF_NAME
+const eventCommit = process.env.GITHUB_SHA
 
-if (!workspace || !repository || !token || !refName) {
+if (!workspace || !repository || !token || !refName || !eventCommit) {
   throw new Error(
     'Cheap LFS cloud compression is missing its GitHub Actions context.'
   )
@@ -37,13 +32,23 @@ if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
     'Cheap LFS cloud compression received an invalid repository name.'
   )
 }
+if (!/^[a-f0-9]{40,64}$/.test(eventCommit)) {
+  throw new Error('Cheap LFS cloud compression received an invalid commit.')
+}
 
 function git(args, options = {}) {
   const output = execFileSync('git', ['-C', workspace, ...args], {
-    encoding: 'utf8',
-    stdio: options.quiet ? ['ignore', 'pipe', 'pipe'] : undefined,
+    encoding: options.buffer ? null : 'utf8',
+    env: {
+      ...process.env,
+      GIT_NO_LAZY_FETCH: '1',
+      ...options.env,
+    },
+    input: options.input,
+    maxBuffer: options.maxBuffer || MAX_GIT_METADATA_BYTES,
+    stdio: options.quiet ? ['pipe', 'pipe', 'pipe'] : undefined,
   })
-  return options.raw ? output : output.trim()
+  return options.raw || options.buffer ? output : output.trim()
 }
 
 function parsePointer(text) {
@@ -110,7 +115,7 @@ function parsePointer(text) {
     if (
       !Number.isSafeInteger(part.size) ||
       part.size < 0 ||
-      part.size > MAX_PART_BYTES ||
+      part.size >= MAX_PART_BYTES ||
       !part.name ||
       Buffer.byteLength(part.name, 'utf8') > MAX_ASSET_NAME_BYTES ||
       (part.storedSize !== undefined &&
@@ -153,25 +158,200 @@ function serializePointer(pointer) {
   return lines.join('\n') + '\n'
 }
 
-function trackedFiles() {
-  return git(['ls-files', '-z'], { quiet: true, raw: true })
-    .split('\0')
-    .filter(Boolean)
+function parseTreeEntries(output, commit) {
+  const entries = []
+  const seenPaths = new Set()
+  let offset = 0
+  while (offset < output.length) {
+    const end = output.indexOf(0, offset)
+    if (end < 0) throw new Error('Git returned an unterminated tree entry.')
+    const record = output.subarray(offset, end)
+    offset = end + 1
+    const separator = record.indexOf(9)
+    if (separator < 0) throw new Error('Git returned an invalid tree entry.')
+    const header = record.subarray(0, separator).toString('ascii')
+    const match = /^(100644|100755) blob ([a-f0-9]{40,64})$/.exec(header)
+    if (!match) continue
+    const pathBytes = record.subarray(separator + 1)
+    const path = pathBytes.toString('utf8')
+    if (
+      path.length === 0 ||
+      path.includes('\0') ||
+      !Buffer.from(path, 'utf8').equals(pathBytes) ||
+      seenPaths.has(path)
+    ) {
+      throw new Error('Git returned an unsafe or duplicate tree path.')
+    }
+    seenPaths.add(path)
+    entries.push({ commit, mode: match[1], oid: match[2], path })
+  }
+  return entries
 }
 
-async function readPointer(path) {
-  const absolutePath = join(workspace, path)
-  const file = await stat(absolutePath).catch(() => null)
-  if (!file?.isFile() || file.size > MAX_POINTER_BYTES) return null
-  const text = await readFile(absolutePath, 'utf8').catch(() => null)
-  if (
-    text === null ||
-    !text.replace(/^\uFEFF/, '').startsWith('version ' + POINTER_VERSION)
-  ) {
-    return null
+function treeEntriesAt(commit) {
+  const output = git(['ls-tree', '-r', '-z', '--full-tree', commit], {
+    buffer: true,
+    quiet: true,
+  })
+  return parseTreeEntries(output, commit)
+}
+
+function localPointerBlobCandidates(entries) {
+  const objectIds = [...new Set(entries.map(entry => entry.oid))]
+  if (objectIds.length === 0) return []
+  const output = git(
+    ['cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'],
+    {
+      input: objectIds.join('\n') + '\n',
+      quiet: true,
+      raw: true,
+    }
+  )
+  const lines = output.trimEnd().split('\n')
+  if (lines.length !== objectIds.length) {
+    throw new Error('Git returned an incomplete object inventory.')
   }
-  const pointer = parsePointer(text)
-  return pointer === null ? null : { path, absolutePath, text, pointer }
+  const local = []
+  for (let index = 0; index < objectIds.length; index++) {
+    const objectId = objectIds[index]
+    const line = lines[index]
+    if (line === objectId + ' missing') continue
+    const match = /^([a-f0-9]{40,64}) blob (0|[1-9][0-9]*)$/.exec(line)
+    if (!match || match[1] !== objectId) {
+      throw new Error('Git returned an invalid object inventory entry.')
+    }
+    const size = Number(match[2])
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new Error('Git returned an invalid blob size.')
+    }
+    if (size <= MAX_POINTER_BYTES) local.push({ oid: objectId, size })
+  }
+  return local
+}
+
+async function readPointerBlobs(candidates, onBlob) {
+  if (candidates.length === 0) return
+  const child = spawn('git', ['-C', workspace, 'cat-file', '--batch'], {
+    env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+  let stderr = ''
+  child.stderr.setEncoding('utf8')
+  child.stderr.on('data', chunk => {
+    if (stderr.length < MAX_GIT_METADATA_BYTES) stderr += chunk
+  })
+  const completion = new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', resolve)
+  })
+  child.stdin.end(candidates.map(candidate => candidate.oid).join('\n') + '\n')
+
+  let pending = Buffer.alloc(0)
+  let current = null
+  let index = 0
+  try {
+    for await (const chunk of child.stdout) {
+      pending = Buffer.concat([pending, chunk])
+      while (true) {
+        if (current === null) {
+          const newline = pending.indexOf(10)
+          if (newline < 0) break
+          const header = pending.subarray(0, newline).toString('ascii')
+          pending = pending.subarray(newline + 1)
+          const match = /^([a-f0-9]{40,64}) blob (0|[1-9][0-9]*)$/.exec(header)
+          const expected = candidates[index]
+          if (
+            !match ||
+            expected === undefined ||
+            match[1] !== expected.oid ||
+            Number(match[2]) !== expected.size
+          ) {
+            throw new Error('Git returned an invalid pointer-blob header.')
+          }
+          current = expected
+        }
+        if (pending.length < current.size + 1) break
+        if (pending[current.size] !== 10) {
+          throw new Error('Git returned an invalid pointer-blob delimiter.')
+        }
+        const contents = pending.subarray(0, current.size)
+        pending = pending.subarray(current.size + 1)
+        await onBlob(current.oid, contents)
+        index++
+        current = null
+      }
+    }
+  } catch (error) {
+    child.kill()
+    await completion.catch(() => {})
+    throw error
+  }
+  const exitCode = await completion
+  if (
+    exitCode !== 0 ||
+    current !== null ||
+    pending.length !== 0 ||
+    index !== candidates.length
+  ) {
+    throw new Error(
+      'Git could not read the bounded pointer blobs without lazy fetching: ' +
+        stderr.trim().slice(0, 500)
+    )
+  }
+}
+
+async function trackedPointersAt(commit) {
+  const entries = treeEntriesAt(commit)
+  const entriesByObject = new Map()
+  for (const entry of entries) {
+    const paths = entriesByObject.get(entry.oid) || []
+    paths.push(entry)
+    entriesByObject.set(entry.oid, paths)
+  }
+  const pointers = []
+  const candidates = localPointerBlobCandidates(entries)
+  await readPointerBlobs(candidates, async (oid, contents) => {
+    if (
+      contents.includes(0) ||
+      !contents
+        .subarray(0, Math.min(contents.length, 64))
+        .toString('utf8')
+        .replace(/^\uFEFF/, '')
+        .startsWith('version ' + POINTER_VERSION)
+    ) {
+      return
+    }
+    const text = contents.toString('utf8')
+    if (!Buffer.from(text, 'utf8').equals(contents)) return
+    const pointer = parsePointer(text)
+    if (pointer === null) return
+    for (const entry of entriesByObject.get(oid) || []) {
+      pointers.push({ ...entry, text, pointer })
+    }
+  })
+  return pointers
+}
+
+function fetchPointerSizedBlobs() {
+  const head = git(['rev-parse', '--verify', 'HEAD'])
+  if (head !== eventCommit) {
+    throw new Error(
+      'Checked-out HEAD does not match the workflow event commit.'
+    )
+  }
+  git([
+    'fetch',
+    '--no-tags',
+    '--refetch',
+    '--depth=1',
+    '--filter=blob:limit=' + POINTER_BLOB_FILTER_BYTES,
+    'origin',
+    eventCommit,
+  ])
+  if (git(['rev-parse', '--verify', 'HEAD']) !== head) {
+    throw new Error('Checked-out HEAD changed while fetching pointer blobs.')
+  }
+  return head
 }
 
 function rawObjects(entry) {
@@ -386,14 +566,59 @@ async function deleteAttemptAsset(assetId) {
   })
 }
 
+function remoteBranchCommit() {
+  const remoteRef = 'refs/heads/' + refName
+  const advertised = git(['ls-remote', '--refs', 'origin', remoteRef], {
+    quiet: true,
+    raw: true,
+  })
+  const match = /^([a-f0-9]{40,64})\t([^\r\n]+)\r?\n?$/.exec(advertised)
+  return match && match[2] === remoteRef ? match[1] : null
+}
+
+async function remoteContainsCommit(commit) {
+  const remoteCommit = remoteBranchCommit()
+  if (remoteCommit === null) return false
+  if (remoteCommit === commit) return true
+  try {
+    const response = await api(
+      '/repos/' + repository + '/compare/' + commit + '...' + remoteCommit
+    )
+    const comparison = await response.json()
+    return (
+      comparison.status === 'ahead' &&
+      comparison.merge_base_commit?.sha === commit
+    )
+  } catch (error) {
+    console.warn(
+      'Could not prove an ambiguously acknowledged pointer push: ' +
+        error.message
+    )
+    return false
+  }
+}
+
 async function adoptPointer(
   entry,
   object,
   candidateName,
   storedSize,
+  tempRoot,
   onPushAttempt
 ) {
-  const currentText = await readFile(entry.absolutePath, 'utf8')
+  const currentCommit = git(['rev-parse', '--verify', 'HEAD'])
+  git(['diff', '--quiet'])
+  git(['diff', '--cached', '--quiet'])
+  if (currentCommit !== entry.commit) {
+    throw new Error(
+      'Pointer changed while its release object was being compressed.'
+    )
+  }
+  const currentText = git(['cat-file', 'blob', entry.oid], {
+    maxBuffer: MAX_POINTER_BYTES + 1024,
+    quiet: true,
+    raw: true,
+  })
   if (currentText !== entry.text) {
     throw new Error(
       'Pointer changed while its release object was being compressed.'
@@ -417,47 +642,104 @@ async function adoptPointer(
           ),
   }
   const nextText = serializePointer(next)
-  const temporary = entry.absolutePath + '.cheap-lfs-cloud-' + process.pid
-  await writeFile(temporary, nextText, { encoding: 'utf8', flag: 'wx' })
-  await rename(temporary, entry.absolutePath)
+  if (Buffer.byteLength(nextText, 'utf8') > MAX_POINTER_BYTES) {
+    throw new Error('Compressed pointer exceeds the Cheap LFS pointer limit.')
+  }
 
-  try {
-    git(['add', '--', entry.path])
-    const staged = git(['diff', '--cached', '--name-only', '-z'], {
+  const temporaryIndex = join(tempRoot, 'pointer-index')
+  const indexEnvironment = { GIT_INDEX_FILE: temporaryIndex }
+  git(['read-tree', currentCommit], { env: indexEnvironment })
+  const nextOid = git(['hash-object', '-w', '--stdin'], { input: nextText })
+  git(['update-index', '-z', '--index-info'], {
+    env: indexEnvironment,
+    input: Buffer.from(entry.mode + ' ' + nextOid + '\t' + entry.path + '\0'),
+  })
+  // The temporary full-tree index intentionally references omitted promisor
+  // blobs. --missing-ok writes their existing object IDs without hydrating
+  // multi-gigabyte ordinary files.
+  const nextTree = git(['write-tree', '--missing-ok'], {
+    env: indexEnvironment,
+  })
+  const changedPaths = git(
+    [
+      'diff-tree',
+      '--no-commit-id',
+      '--name-only',
+      '-r',
+      '-z',
+      currentCommit,
+      nextTree,
+    ],
+    { quiet: true, raw: true }
+  )
+    .split('\0')
+    .filter(Boolean)
+  if (changedPaths.length !== 1 || changedPaths[0] !== entry.path) {
+    throw new Error('Pointer adoption prepared an unexpected tree change.')
+  }
+  if (
+    git(['rev-parse', '--verify', 'HEAD']) !== currentCommit ||
+    git(['cat-file', 'blob', entry.oid], {
+      maxBuffer: MAX_POINTER_BYTES + 1024,
       quiet: true,
       raw: true,
-    })
-      .split('\0')
-      .filter(Boolean)
-    if (staged.length !== 1 || staged[0] !== entry.path) {
-      throw new Error('Pointer adoption staged an unexpected path.')
-    }
-    git([
+    }) !== entry.text
+  ) {
+    throw new Error(
+      'Pointer changed while its release object was being compressed.'
+    )
+  }
+  if (remoteBranchCommit() !== currentCommit) {
+    throw new Error(
+      'The remote branch advanced while its release object was being compressed.'
+    )
+  }
+
+  const nextCommit = git(
+    [
       '-c',
       'user.name=github-actions[bot]',
       '-c',
       'user.email=41898282+github-actions[bot]@users.noreply.github.com',
-      'commit',
+      'commit-tree',
+      nextTree,
+      '-p',
+      currentCommit,
       '-m',
       'Compress Cheap LFS release object [skip ci]',
-      '--',
-      entry.path,
-    ])
-    try {
-      // A push can update the remote and still fail locally when the response is
-      // lost. From this point onward the side asset must be retained so a
-      // remotely adopted pointer can always be materialized.
-      onPushAttempt()
-      git(['push', 'origin', 'HEAD:' + refName])
-    } catch (error) {
-      git(['reset', '--hard', 'HEAD^'])
-      throw error
-    }
+    ],
+    { quiet: true }
+  )
+  // A push can update the remote and still fail locally when the response is
+  // lost. From this point onward the side asset must be retained so a remotely
+  // adopted pointer can always be materialized.
+  onPushAttempt()
+  try {
+    git(['push', 'origin', nextCommit + ':refs/heads/' + refName])
   } catch (error) {
-    if (git(['status', '--porcelain'], { quiet: true }).length > 0) {
-      git(['reset', '--hard', 'HEAD'])
-    }
-    throw error
+    if (!(await remoteContainsCommit(nextCommit))) throw error
+    console.warn(
+      'The pointer push acknowledgement was lost, but the remote contains the exact adopted commit.'
+    )
+  }
+  git(['diff', '--quiet'])
+  git(['diff', '--cached', '--quiet'])
+  git(['reset', '--hard', nextCommit])
+  if (
+    git(['rev-parse', '--verify', 'HEAD']) !== nextCommit ||
+    git(['diff', '--quiet'], { quiet: true }) !== '' ||
+    git(['diff', '--cached', '--quiet'], { quiet: true }) !== ''
+  ) {
+    throw new Error(
+      'Pointer adoption could not synchronize the local checkout.'
+    )
+  }
+  return {
+    ...entry,
+    commit: nextCommit,
+    oid: nextOid,
+    pointer: next,
+    text: nextText,
   }
 }
 
@@ -465,6 +747,9 @@ async function compressObject(entry, object) {
   const tempRoot = await mkdtemp(join(tmpdir(), 'cheap-lfs-cloud-'))
   let uploadedAttemptId = null
   try {
+    if (object.size >= MAX_PART_BYTES) {
+      throw new Error('Raw release object must be smaller than 2 GiB.')
+    }
     const release = await releaseForTag(entry.pointer.releaseTag)
     const assets = await allAssets(release.id)
     const rawAsset = assets.find(asset => asset.name === object.name)
@@ -519,6 +804,13 @@ async function compressObject(entry, object) {
         stored
       )
       uploadedAttemptId = uploaded.id
+      if (uploaded.name !== candidate.name) {
+        await deleteAttemptAsset(uploaded.id)
+        uploadedAttemptId = null
+        throw new Error(
+          'GitHub returned a different compressed release asset name.'
+        )
+      }
       if (
         !(await assetMatches(uploaded, stored.bytes, stored.sha256, tempRoot))
       ) {
@@ -530,14 +822,22 @@ async function compressObject(entry, object) {
       }
     }
 
-    await adoptPointer(entry, object, candidate.name, stored.bytes, () => {
-      uploadedAttemptId = null
-    })
+    const adoptedEntry = await adoptPointer(
+      entry,
+      object,
+      candidate.name,
+      stored.bytes,
+      tempRoot,
+      () => {
+        uploadedAttemptId = null
+      }
+    )
     uploadedAttemptId = null
     return {
       kind: 'compressed',
       storedBytes: stored.bytes,
       name: candidate.name,
+      entry: adoptedEntry,
     }
   } catch (error) {
     if (uploadedAttemptId !== null) await deleteAttemptAsset(uploadedAttemptId)
@@ -545,17 +845,6 @@ async function compressObject(entry, object) {
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
-}
-
-async function nextRawObject(attempted) {
-  for (const path of trackedFiles()) {
-    const entry = await readPointer(path)
-    if (!entry) continue
-    for (const object of rawObjects(entry)) {
-      if (!attempted.has(object.key)) return { entry, object }
-    }
-  }
-  return null
 }
 
 async function summaryLine(text) {
@@ -567,23 +856,40 @@ async function summaryLine(text) {
 async function main() {
   git(['diff', '--quiet'])
   git(['diff', '--cached', '--quiet'])
-  const attempted = new Set()
+  if (
+    git(['check-ref-format', '--branch', refName], { quiet: true }) !== refName
+  ) {
+    throw new Error('Cheap LFS cloud compression received an invalid branch.')
+  }
+  const head = fetchPointerSizedBlobs()
+  const entries = new Map()
+  const queue = []
+  for (const entry of await trackedPointersAt(head)) {
+    entries.set(entry.path, entry)
+    for (const object of rawObjects(entry))
+      queue.push({ path: entry.path, object })
+  }
   let compressed = 0
   let skipped = 0
   let failed = 0
   await summaryLine('## Cheap LFS cloud compression')
 
-  while (true) {
-    const candidate = await nextRawObject(attempted)
-    if (!candidate) break
-    const { entry, object } = candidate
-    attempted.add(object.key)
+  for (const candidate of queue) {
+    const entry = entries.get(candidate.path)
+    if (entry === undefined) {
+      throw new Error('Cheap LFS lost a tracked pointer during compression.')
+    }
+    const object = rawObjects(entry).find(
+      value => value.key === candidate.object.key
+    )
+    if (object === undefined) continue
     console.log(
       'Compressing ' + entry.path + ' object ' + object.name + ' one at a time…'
     )
     try {
       const result = await compressObject(entry, object)
       if (result.kind === 'compressed') {
+        entries.set(entry.path, result.entry)
         compressed++
         const percent = ((1 - result.storedBytes / object.size) * 100).toFixed(
           1

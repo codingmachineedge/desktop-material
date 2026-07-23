@@ -162,6 +162,10 @@ describe('Cheap LFS cloud compression policy', () => {
       publicCaller,
       /upload-artifact|cache@|pull_request_target/
     )
+    assert.match(publicCaller, /fetch-depth: 1/)
+    assert.match(publicCaller, /sparse-checkout: \.github/)
+    assert.match(publicCaller, /sparse-checkout-cone-mode: true/)
+    assert.doesNotMatch(publicCaller, /fetch-depth: 0|filter:/)
   })
 })
 

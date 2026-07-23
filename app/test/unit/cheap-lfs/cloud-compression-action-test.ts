@@ -12,6 +12,7 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, it } from 'node:test'
 import { inflateRawSync } from 'node:zlib'
 
@@ -60,6 +61,28 @@ interface IFixtureOptions {
   readonly ambiguousPush?: boolean
   readonly draftOnly?: boolean
   readonly pointerPath?: string
+  readonly companionFile?: { readonly path: string; readonly data: Buffer }
+  readonly omittedOrdinaryFile?: {
+    readonly path: string
+    readonly data: Buffer
+  }
+  readonly sparsePartialClone?: boolean
+  readonly mutatePointerAfterUpload?: boolean
+  readonly advanceRemoteAfterUpload?: boolean
+  readonly wrongUploadedAssetName?: boolean
+  readonly pointerText?: string
+}
+
+function hasLocalObject(cwd: string, oid: string): boolean {
+  try {
+    execFileSync('git', ['-C', cwd, 'cat-file', '-e', oid], {
+      env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+      stdio: 'ignore',
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function withFixture(
@@ -70,6 +93,8 @@ async function withFixture(
     readonly remote: string
     readonly pointerPath: string
     readonly pointerText: string
+    readonly initialCommit: string
+    readonly omittedOrdinaryOid: string | null
     readonly uploaded: ReadonlyArray<Buffer>
     readonly deleted: ReadonlyArray<number>
     readonly runAction: () => Promise<{
@@ -81,9 +106,9 @@ async function withFixture(
 ) {
   const root = await mkdtemp(join(tmpdir(), 'cheap-lfs-action-test-'))
   const remote = join(root, 'remote.git')
-  const workspace = join(root, 'workspace')
+  let workspace = join(root, 'workspace')
   const pointerPath = options.pointerPath ?? 'payload.bin'
-  const pointerText = pointerFor(original)
+  const pointerText = options.pointerText ?? pointerFor(original)
   const uploaded = new Array<Buffer>()
   const deleted = new Array<number>()
   const assets = [
@@ -101,7 +126,34 @@ async function withFixture(
   execFileSync('git', ['clone', remote, workspace])
   await mkdir(dirname(join(workspace, pointerPath)), { recursive: true })
   await writeFile(join(workspace, pointerPath), pointerText, 'utf8')
-  git(workspace, ['add', '--', pointerPath])
+  const trackedPaths = [pointerPath]
+  if (options.companionFile !== undefined) {
+    await mkdir(dirname(join(workspace, options.companionFile.path)), {
+      recursive: true,
+    })
+    await writeFile(
+      join(workspace, options.companionFile.path),
+      options.companionFile.data
+    )
+    trackedPaths.push(options.companionFile.path)
+  }
+  if (options.omittedOrdinaryFile !== undefined) {
+    await mkdir(dirname(join(workspace, options.omittedOrdinaryFile.path)), {
+      recursive: true,
+    })
+    await writeFile(
+      join(workspace, options.omittedOrdinaryFile.path),
+      options.omittedOrdinaryFile.data
+    )
+    trackedPaths.push(options.omittedOrdinaryFile.path)
+  }
+  if (options.sparsePartialClone === true) {
+    const sparseAnchor = '.github/cheap-lfs-sparse-anchor'
+    await mkdir(dirname(join(workspace, sparseAnchor)), { recursive: true })
+    await writeFile(join(workspace, sparseAnchor), 'sparse checkout anchor\n')
+    trackedPaths.push(sparseAnchor)
+  }
+  git(workspace, ['add', '--', ...trackedPaths])
   git(workspace, [
     '-c',
     'user.name=Test',
@@ -112,13 +164,37 @@ async function withFixture(
     'Add raw pointer',
   ])
   git(workspace, ['push', '-u', 'origin', 'main'])
+  const initialCommit = git(workspace, ['rev-parse', 'HEAD'])
+  const omittedOrdinaryOid =
+    options.omittedOrdinaryFile === undefined
+      ? null
+      : git(workspace, [
+          'rev-parse',
+          `HEAD:${options.omittedOrdinaryFile.path}`,
+        ])
+  if (options.sparsePartialClone === true) {
+    git(remote, ['config', 'uploadpack.allowFilter', 'true'])
+    await rm(workspace, { recursive: true, force: true })
+    workspace = join(root, 'partial-workspace')
+    execFileSync('git', [
+      'clone',
+      '--filter=blob:none',
+      '--no-checkout',
+      pathToFileURL(remote).href,
+      workspace,
+    ])
+    git(workspace, ['sparse-checkout', 'init', '--cone'])
+    git(workspace, ['sparse-checkout', 'set', '.github'])
+    git(workspace, ['checkout', 'main'])
+  }
   if (options.ambiguousPush === true) {
     const hook = join(workspace, '.git', 'hooks', 'pre-push')
     await writeFile(
       hook,
       [
         '#!/bin/sh',
-        'git push --no-verify origin HEAD:main',
+        'read local_ref local_oid remote_ref remote_oid',
+        'git push --no-verify origin "$local_oid:$remote_ref"',
         'result=$?',
         '[ "$result" -eq 0 ] || exit "$result"',
         'exit 1',
@@ -195,7 +271,10 @@ async function withFixture(
         json(response, 500, { message: 'forced upload failure' })
         return
       }
-      const name = url.searchParams.get('name') ?? 'missing-name'
+      const name =
+        options.wrongUploadedAssetName === true
+          ? 'server-renamed.deflate'
+          : url.searchParams.get('name') ?? 'missing-name'
       const asset = {
         id: 2,
         name,
@@ -205,6 +284,40 @@ async function withFixture(
         data,
       }
       assets.push(asset)
+      if (options.mutatePointerAfterUpload === true) {
+        const changed = pointerText.replace(
+          'asset-name payload.bin',
+          'asset-name externally-changed.bin'
+        )
+        await writeFile(join(workspace, pointerPath), changed, 'utf8')
+        git(workspace, ['add', '--', pointerPath])
+        git(workspace, [
+          '-c',
+          'user.name=External',
+          '-c',
+          'user.email=external@example.com',
+          'commit',
+          '-m',
+          'Change pointer during compression',
+        ])
+      }
+      if (options.advanceRemoteAfterUpload === true) {
+        const currentCommit = git(workspace, ['rev-parse', 'HEAD'])
+        const currentTree = git(workspace, ['rev-parse', 'HEAD^{tree}'])
+        const remoteCommit = git(workspace, [
+          '-c',
+          'user.name=External',
+          '-c',
+          'user.email=external@example.com',
+          'commit-tree',
+          currentTree,
+          '-p',
+          currentCommit,
+          '-m',
+          'Advance remote during compression',
+        ])
+        git(workspace, ['push', 'origin', `${remoteCommit}:refs/heads/main`])
+      }
       json(response, 201, (({ data: _data, ...value }) => value)(asset))
       return
     }
@@ -240,6 +353,7 @@ async function withFixture(
         GITHUB_REPOSITORY: 'owner/repo',
         GITHUB_API_URL: `http://127.0.0.1:${port}`,
         GITHUB_REF_NAME: 'main',
+        GITHUB_SHA: git(workspace, ['rev-parse', 'HEAD']),
         CHEAP_LFS_GITHUB_TOKEN: 'test-token',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -261,6 +375,8 @@ async function withFixture(
       remote,
       pointerPath,
       pointerText,
+      initialCommit,
+      omittedOrdinaryOid,
       uploaded,
       deleted,
       runAction,
@@ -272,6 +388,15 @@ async function withFixture(
 }
 
 describe('Cheap LFS cloud compression action', () => {
+  it('uses an ordinary fast-forward push with no force form', async () => {
+    const source = await readFile(actionScript, 'utf8')
+    assert.match(
+      source,
+      /git\(\['push', 'origin', nextCommit \+ ':refs\/heads\/' \+ refName\]\)/
+    )
+    assert.doesNotMatch(source, /--force(?:-with-lease)?/)
+  })
+
   it('uploads a verified side asset and commits a part-deflate pointer', async () => {
     const original = Buffer.from(
       'compressible desktop material payload\n'.repeat(2048)
@@ -336,7 +461,7 @@ describe('Cheap LFS cloud compression action', () => {
     })
   })
 
-  it('retains the compressed asset when a successful remote push reports failure', async () => {
+  it('reconciles a remotely accepted pointer when its push acknowledgement is lost', async () => {
     const original = Buffer.from(
       'accepted remotely before the push acknowledgement was lost\n'.repeat(
         1024
@@ -344,8 +469,8 @@ describe('Cheap LFS cloud compression action', () => {
     )
     await withFixture(original, { ambiguousPush: true }, async fixture => {
       const result = await fixture.runAction()
-      assert.equal(result.code, 1)
-      assert.match(result.stderr, /Cheap LFS object stayed raw/)
+      assert.equal(result.code, 0, result.stderr)
+      assert.match(result.stdout, /1 compressed, 0 kept raw, 0 failed safely/)
       assert.equal(fixture.uploaded.length, 1)
       assert.deepEqual(fixture.deleted, [])
       assert.deepEqual(inflateRawSync(fixture.uploaded[0]), original)
@@ -367,7 +492,11 @@ describe('Cheap LFS cloud compression action', () => {
         ]),
         '2'
       )
-      assert.equal(git(fixture.workspace, ['rev-list', '--count', 'HEAD']), '1')
+      assert.equal(git(fixture.workspace, ['rev-list', '--count', 'HEAD']), '2')
+      assert.match(
+        await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+        /^part-deflate /m
+      )
     })
   })
 
@@ -387,6 +516,187 @@ describe('Cheap LFS cloud compression action', () => {
         )
       }
     )
+  })
+
+  it('scans a sparse partial clone without fetching an omitted ordinary blob and adopts exactly one path', async () => {
+    const original = Buffer.from('partial clone pointer payload\n'.repeat(4096))
+    const ordinary = Buffer.alloc(700 * 1024, 0xa5)
+    const pointerPath = 'dist/資料 folder/payload.bin'
+    const companionPath = 'metadata/keep.txt'
+    await withFixture(
+      original,
+      {
+        pointerPath,
+        companionFile: {
+          path: companionPath,
+          data: Buffer.from('unchanged companion\n'),
+        },
+        omittedOrdinaryFile: {
+          path: 'build/large-ordinary.bin',
+          data: ordinary,
+        },
+        sparsePartialClone: true,
+      },
+      async fixture => {
+        assert.ok(fixture.omittedOrdinaryOid)
+        assert.equal(
+          hasLocalObject(fixture.workspace, fixture.omittedOrdinaryOid),
+          false
+        )
+        await assert.rejects(readFile(join(fixture.workspace, pointerPath)), {
+          code: 'ENOENT',
+        })
+
+        const result = await fixture.runAction()
+        assert.equal(result.code, 0, result.stderr)
+        assert.match(result.stdout, /1 compressed, 0 kept raw, 0 failed safely/)
+        assert.equal(
+          hasLocalObject(fixture.workspace, fixture.omittedOrdinaryOid),
+          false
+        )
+        await assert.rejects(readFile(join(fixture.workspace, pointerPath)), {
+          code: 'ENOENT',
+        })
+        assert.match(
+          git(fixture.workspace, ['show', `HEAD:${pointerPath}`]),
+          /^part-deflate /m
+        )
+        assert.equal(
+          git(fixture.workspace, ['show', `HEAD:${companionPath}`]),
+          'unchanged companion'
+        )
+        assert.deepEqual(
+          git(fixture.workspace, [
+            'diff-tree',
+            '--no-commit-id',
+            '--name-only',
+            '-r',
+            '-z',
+            fixture.initialCommit,
+            'HEAD',
+          ])
+            .split('\0')
+            .filter(Boolean),
+          [pointerPath]
+        )
+      }
+    )
+  })
+
+  it('rejects a stale pointer before committing and removes its unadopted side asset', async () => {
+    const original = Buffer.from('stale pointer payload\n'.repeat(4096))
+    await withFixture(
+      original,
+      { mutatePointerAfterUpload: true },
+      async fixture => {
+        const result = await fixture.runAction()
+        assert.equal(result.code, 1)
+        assert.match(
+          result.stderr,
+          /Pointer changed while its release object was being compressed/
+        )
+        assert.deepEqual(fixture.deleted, [2])
+        assert.match(
+          await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+          /^asset-name externally-changed\.bin$/m
+        )
+        assert.equal(
+          git(fixture.workspace, [
+            '--git-dir',
+            fixture.remote,
+            'rev-list',
+            '--count',
+            'main',
+          ]),
+          '1'
+        )
+        assert.equal(git(fixture.workspace, ['status', '--porcelain']), '')
+      }
+    )
+  })
+
+  it('stops before publication when the remote no longer equals the candidate parent', async () => {
+    const original = Buffer.from('remote race payload\n'.repeat(4096))
+    await withFixture(
+      original,
+      { advanceRemoteAfterUpload: true },
+      async fixture => {
+        const result = await fixture.runAction()
+        assert.equal(result.code, 1)
+        assert.match(
+          result.stderr,
+          /remote branch advanced while its release object was being compressed/i
+        )
+        assert.deepEqual(fixture.deleted, [2])
+        assert.equal(
+          git(fixture.workspace, ['rev-list', '--count', 'HEAD']),
+          '1'
+        )
+        assert.equal(
+          git(fixture.workspace, [
+            '--git-dir',
+            fixture.remote,
+            'rev-list',
+            '--count',
+            'main',
+          ]),
+          '2'
+        )
+        assert.equal(
+          await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+          fixture.pointerText
+        )
+      }
+    )
+  })
+
+  it('rejects a renamed upload response before pointer adoption', async () => {
+    const original = Buffer.from('server name mismatch payload\n'.repeat(4096))
+    await withFixture(
+      original,
+      { wrongUploadedAssetName: true },
+      async fixture => {
+        const result = await fixture.runAction()
+        assert.equal(result.code, 1)
+        assert.match(
+          result.stderr,
+          /GitHub returned a different compressed release asset name/
+        )
+        assert.deepEqual(fixture.deleted, [2])
+        assert.equal(
+          await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+          fixture.pointerText
+        )
+        assert.equal(
+          git(fixture.workspace, ['rev-list', '--count', 'HEAD']),
+          '1'
+        )
+      }
+    )
+  })
+
+  it('does not process a pointer containing a two-GiB part', async () => {
+    const original = Buffer.from('oversized part stays raw\n')
+    const pointerText = [
+      'version desktop-material/cheap-lfs/v1',
+      'release-tag assets',
+      'asset-name payload.bin',
+      `size ${2 * 1024 * 1024 * 1024}`,
+      `sha256 ${'a'.repeat(64)}`,
+      `part ${'b'.repeat(64)} ${2 * 1024 * 1024 * 1024} payload.bin`,
+      '',
+    ].join('\n')
+    await withFixture(original, { pointerText }, async fixture => {
+      const result = await fixture.runAction()
+      assert.equal(result.code, 0, result.stderr)
+      assert.match(result.stdout, /0 compressed, 0 kept raw, 0 failed safely/)
+      assert.equal(fixture.uploaded.length, 0)
+      assert.equal(
+        await readFile(join(fixture.workspace, fixture.pointerPath), 'utf8'),
+        pointerText
+      )
+      assert.equal(git(fixture.workspace, ['rev-list', '--count', 'HEAD']), '1')
+    })
   })
 
   it('keeps an incompressible object raw without treating it as a failure', async () => {
