@@ -2,6 +2,10 @@ import { ExecutableMenuItem } from '../models/app-menu'
 import { RequestResponseChannels, RequestChannels } from '../lib/ipc-shared'
 import * as ipcRenderer from '../lib/ipc-renderer'
 import { IBuildRunLogEvent, IBuildRunStateEvent } from '../lib/build-run/types'
+import {
+  IActionsLocalRunLogEvent,
+  IActionsLocalRunStateEvent,
+} from '../lib/actions-local-run/types'
 import { IOpencodeLogEvent } from '../lib/build-run/opencode'
 import { ICodexLogEvent } from '../lib/build-run/codex'
 import {
@@ -470,6 +474,50 @@ export function onBuildRunState(
   ) => void
 ) {
   ipcRenderer.on('build-run-state', handler)
+}
+
+/** Probe the host for the Local Actions runner toolchain (act + Docker). */
+export const detectActionsLocalTools = invokeProxy(
+  'detect-actions-local-tools',
+  0
+)
+
+/** List and parse the workflows under a repository's `.github/workflows`. */
+export const listActionsWorkflows = invokeProxy('list-actions-workflows', 1)
+
+/** Hand a resolved local-run plan to the main-process Actions runner. */
+export const startActionsLocalRun = invokeProxy('start-actions-local-run', 1)
+
+/** Request cancellation of an in-flight local Actions run. */
+export const cancelActionsLocalRun = invokeProxy('cancel-actions-local-run', 1)
+
+/**
+ * Subscribe to streamed local-run log lines pushed from the main process.
+ * Returns a disposer that removes the listener (dialogs mount/unmount, so they
+ * must not leak a subscription per open).
+ */
+export function onActionsLocalRunLog(
+  handler: (
+    event: Electron.IpcRendererEvent,
+    log: IActionsLocalRunLogEvent
+  ) => void
+): () => void {
+  ipcRenderer.on('actions-local-run-log', handler)
+  return () => ipcRenderer.removeListener('actions-local-run-log', handler)
+}
+
+/**
+ * Subscribe to local-run phase transitions pushed from the main process.
+ * Returns a disposer that removes the listener.
+ */
+export function onActionsLocalRunState(
+  handler: (
+    event: Electron.IpcRendererEvent,
+    state: IActionsLocalRunStateEvent
+  ) => void
+): () => void {
+  ipcRenderer.on('actions-local-run-state', handler)
+  return () => ipcRenderer.removeListener('actions-local-run-state', handler)
 }
 
 /** Probe the host for a usable opencode install (installed? authed?). */

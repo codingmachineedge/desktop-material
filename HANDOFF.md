@@ -1,5 +1,34 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-24 Local GitHub Actions runner (branch `feat/local-actions-runner`)
+
+Added a local GitHub Actions runner: **Repository ▸ Run actions locally…** (and
+the "Run Actions locally" command-palette entry) opens a dialog that discovers
+and parses `.github/workflows`, feature-detects `act`+Docker (clear localized
+install guidance when either is missing), and streams a chosen workflow/event/
+job run — with `workflow_dispatch` inputs, secrets (written to a `0600` temp
+`--secret-file`, deleted after the run, never logged, never on the argv), and a
+dry-run (`-n`) mode. Cancel tears down the container tree via Build & Run's
+`kill-tree`. Renderer↔main is wired over new IPC channels
+(`detect-actions-local-tools`, `list-actions-workflows`,
+`start-/cancel-actions-local-run`, and the `actions-local-run-log/-state`
+pushes).
+
+- **New code:** `app/src/lib/actions-local-run/{types,parse-workflows,command}.ts`
+  (pure, tested), `app/src/main-process/actions-local-run/{tool-resolver,
+  discovery,runner,index}.ts`, `app/src/ui/actions-local-run/
+  actions-local-run-dialog.tsx`, `app/styles/ui/_actions-local-run.scss`.
+- **Wiring:** ipc-shared, main-process-proxy, main.ts, menu-ids/menu-event/
+  build-default-menu, command-palette-catalog, desktop-material-features,
+  popup model + app.tsx, i18n-resources (EN + Cantonese; bilingual derived).
+- **Tests:** `command-test.ts` (15) and `parse-workflows-test.ts` (16) green;
+  `ipc-contract-test.ts` updated (5) and green. `npx tsc --noEmit` clean.
+- **MVP boundary:** running/streaming/secrets/inputs/dry-run and the
+  release-upload **detection + guarded notice** ship now. The one-click
+  "upload this run's artifact to the real release" button (reusing the
+  account-bound `upload-release-asset` boundary) is a documented follow-up.
+  A live container run is not covered by unit tests.
+
 ## 2026-07-24 final integration and clean Git topology receipt
 
 The requested merge-and-cleanup pass found no separate work left to integrate.

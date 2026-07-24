@@ -34,6 +34,7 @@ export type MenuEvent =
   | 'manage-gitignore'
   | 'manage-sparse-checkout'
   | 'build-and-run'
+  | 'run-actions-locally'
   | 'open-in-shell'
   | 'compare-on-github'
   | 'branch-on-github'

@@ -132,6 +132,7 @@ import {
   resolveEffectiveBranchRulesContext,
 } from '../lib/effective-branch-rules-context'
 import { CreateGitHubIssueDialog } from './create-github-issue'
+import { ActionsLocalRunDialog } from './actions-local-run/actions-local-run-dialog'
 import { CreateGitHubPullRequestDialog } from './create-github-pull-request'
 import { GitHubPullRequestLifecycleDialog } from './github-pull-request-lifecycle'
 import { GitLabMergeRequestDialog } from './merge-request'
@@ -781,6 +782,8 @@ export class App extends React.Component<IAppProps, IAppState> {
         return this.showSparseCheckout()
       case 'build-and-run':
         return this.buildAndRun()
+      case 'run-actions-locally':
+        return this.runActionsLocally()
       case 'view-repository-on-github':
         return this.viewRepositoryOnGitHub()
       case 'inspect-branch-rules':
@@ -2344,6 +2347,23 @@ export class App extends React.Component<IAppProps, IAppState> {
       .catch(err => log.error('Failed to start build & run', err))
   }
 
+  private runActionsLocally() {
+    const repository = this.getRepository()
+
+    if (
+      !repository ||
+      repository instanceof CloningRepository ||
+      repository instanceof SubmoduleRepository
+    ) {
+      return
+    }
+
+    this.props.dispatcher.showPopup({
+      type: PopupType.ActionsLocalRun,
+      repository,
+    })
+  }
+
   /** Open the guided issue creator for the current GitHub repository. */
   private openIssueCreationOnGitHub() {
     const repository = this.getRepository()
@@ -2779,6 +2799,14 @@ export class App extends React.Component<IAppProps, IAppState> {
             repository={popup.repository}
             accounts={this.state.accounts}
             dispatcher={this.props.dispatcher}
+            onDismissed={onPopupDismissedFn}
+          />
+        )
+      case PopupType.ActionsLocalRun:
+        return (
+          <ActionsLocalRunDialog
+            key={`actions-local-run-${popup.repository.id}`}
+            repository={popup.repository}
             onDismissed={onPopupDismissedFn}
           />
         )

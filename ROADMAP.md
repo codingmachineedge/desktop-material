@@ -13,6 +13,24 @@ This file is the compact public source of truth; implementation details and
 historical test receipts stay in [PLAN.md](PLAN.md) and
 [HANDOFF.md](HANDOFF.md).
 
+## July 24 Local GitHub Actions runner — **Implemented on `feat/local-actions-runner`**
+
+A new **Repository ▸ Run actions locally…** dialog (and "Run Actions locally"
+command-palette entry) discovers and parses a repository's `.github/workflows`,
+feature-detects `act`+Docker with localized install guidance when either is
+absent, and streams a chosen workflow/event/job run locally — supporting
+`workflow_dispatch` inputs, per-run secrets (ephemeral `0600` `--secret-file`,
+never logged or placed on the argv), a dry-run (`-n`) preview, and cancellation
+with full container-tree teardown. Pure workflow-parsing and `act`-argv engines
+are unit-tested (31 cases); `tsc` is clean. When a workflow contains a
+release-upload step the dialog surfaces a guarded notice; a local run never
+touches real releases.
+
+- **Follow-up (planned):** a one-click, explicitly-confirmed "upload this run's
+  produced artifact to the real GitHub Release" action reusing the account-bound
+  `upload-release-asset` transfer boundary. See
+  [docs/features/integrations/local-actions-runner.md](docs/features/integrations/local-actions-runner.md).
+
 ## July 23 cross-lane updater recovery — **Verified**
 
 Commits `241cc90ce9` and `04246fdf12` moved both release lanes into one

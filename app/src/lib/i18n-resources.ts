@@ -1358,6 +1358,48 @@ export type TranslationKey =
   | 'buildRun.autoApproveRepositoryHelp'
   | 'buildRun.codexInstallSafety'
   | 'buildRun.opencodeInstallSafety'
+  | 'actionsLocalRun.commandTitle'
+  | 'actionsLocalRun.dialogTitle'
+  | 'actionsLocalRun.subtitle'
+  | 'actionsLocalRun.checkingTools'
+  | 'actionsLocalRun.toolsMissingTitle'
+  | 'actionsLocalRun.actMissing'
+  | 'actionsLocalRun.dockerMissing'
+  | 'actionsLocalRun.installHint'
+  | 'actionsLocalRun.installActLink'
+  | 'actionsLocalRun.installDockerLink'
+  | 'actionsLocalRun.retryDetection'
+  | 'actionsLocalRun.noWorkflows'
+  | 'actionsLocalRun.workflowLabel'
+  | 'actionsLocalRun.eventLabel'
+  | 'actionsLocalRun.jobLabel'
+  | 'actionsLocalRun.allJobs'
+  | 'actionsLocalRun.parseErrorPrefix'
+  | 'actionsLocalRun.inputsHeading'
+  | 'actionsLocalRun.inputRequired'
+  | 'actionsLocalRun.secretsHeading'
+  | 'actionsLocalRun.secretsHint'
+  | 'actionsLocalRun.addSecret'
+  | 'actionsLocalRun.secretNamePlaceholder'
+  | 'actionsLocalRun.secretValuePlaceholder'
+  | 'actionsLocalRun.removeSecret'
+  | 'actionsLocalRun.dryRunLabel'
+  | 'actionsLocalRun.dryRunHelp'
+  | 'actionsLocalRun.runButton'
+  | 'actionsLocalRun.dryRunButton'
+  | 'actionsLocalRun.stopButton'
+  | 'actionsLocalRun.stoppingButton'
+  | 'actionsLocalRun.closeButton'
+  | 'actionsLocalRun.clearLog'
+  | 'actionsLocalRun.logRegionLabel'
+  | 'actionsLocalRun.statusStarting'
+  | 'actionsLocalRun.statusRunning'
+  | 'actionsLocalRun.statusSucceeded'
+  | 'actionsLocalRun.statusFailed'
+  | 'actionsLocalRun.statusCancelled'
+  | 'actionsLocalRun.releaseUploadHeading'
+  | 'actionsLocalRun.releaseUploadNote'
+  | 'actionsLocalRun.releaseUploadWarning'
   | 'cheapLfs.files.one'
   | 'cheapLfs.files.many'
   | 'cheapLfs.managerRail'
@@ -3137,6 +3179,57 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'Installs the official @openai/codex npm package globally. Desktop Material never asks for or stores your OpenAI credentials.',
   'buildRun.opencodeInstallSafety':
     'Installs OpenCode using its official npm package. Desktop Material never asks for or stores your OpenCode credentials.',
+  'actionsLocalRun.commandTitle': 'Run Actions locally',
+  'actionsLocalRun.dialogTitle': 'Run GitHub Actions locally',
+  'actionsLocalRun.subtitle':
+    'Pick a workflow and event, then run it on your machine with act and Docker.',
+  'actionsLocalRun.checkingTools': 'Checking for act and Docker…',
+  'actionsLocalRun.toolsMissingTitle': 'Local runner tools are missing',
+  'actionsLocalRun.actMissing':
+    'act (nektos/act) was not found on your PATH. It runs your workflows locally.',
+  'actionsLocalRun.dockerMissing':
+    'Docker was not found on your PATH. act needs a running Docker engine to execute jobs.',
+  'actionsLocalRun.installHint':
+    'Install the missing tools, make sure they are on your PATH, then check again.',
+  'actionsLocalRun.installActLink': 'How to install act',
+  'actionsLocalRun.installDockerLink': 'Get Docker',
+  'actionsLocalRun.retryDetection': 'Check again',
+  'actionsLocalRun.noWorkflows':
+    'No workflow files were found under .github/workflows in this repository.',
+  'actionsLocalRun.workflowLabel': 'Workflow',
+  'actionsLocalRun.eventLabel': 'Event',
+  'actionsLocalRun.jobLabel': 'Job',
+  'actionsLocalRun.allJobs': 'All jobs',
+  'actionsLocalRun.parseErrorPrefix': 'Could not fully parse this workflow: ',
+  'actionsLocalRun.inputsHeading': 'Workflow inputs',
+  'actionsLocalRun.inputRequired': 'required',
+  'actionsLocalRun.secretsHeading': 'Secrets',
+  'actionsLocalRun.secretsHint':
+    'Secrets are written to a temporary file for this run only and deleted afterwards. They are never logged.',
+  'actionsLocalRun.addSecret': 'Add secret',
+  'actionsLocalRun.secretNamePlaceholder': 'SECRET_NAME',
+  'actionsLocalRun.secretValuePlaceholder': 'value',
+  'actionsLocalRun.removeSecret': 'Remove secret',
+  'actionsLocalRun.dryRunLabel': 'Dry run (list steps without executing)',
+  'actionsLocalRun.dryRunHelp':
+    'Runs act with -n so you can preview the plan without starting any containers.',
+  'actionsLocalRun.runButton': 'Run workflow',
+  'actionsLocalRun.dryRunButton': 'Dry run',
+  'actionsLocalRun.stopButton': 'Stop',
+  'actionsLocalRun.stoppingButton': 'Stopping…',
+  'actionsLocalRun.closeButton': 'Close',
+  'actionsLocalRun.clearLog': 'Clear output',
+  'actionsLocalRun.logRegionLabel': 'Local Actions run output',
+  'actionsLocalRun.statusStarting': 'Starting…',
+  'actionsLocalRun.statusRunning': 'Running…',
+  'actionsLocalRun.statusSucceeded': 'Run succeeded',
+  'actionsLocalRun.statusFailed': 'Run failed',
+  'actionsLocalRun.statusCancelled': 'Run cancelled',
+  'actionsLocalRun.releaseUploadHeading': 'Release upload detected',
+  'actionsLocalRun.releaseUploadNote':
+    'This workflow contains a step that would upload a release asset. A local run does not touch your real GitHub releases.',
+  'actionsLocalRun.releaseUploadWarning':
+    'To upload a produced artifact to the real release, use the guarded release upload after the run — it always asks for confirmation before publishing.',
   'cheapLfs.files.one': '{count} large file',
   'cheapLfs.files.many': '{count} large files',
   'cheapLfs.managerRail': 'Large files',
@@ -4816,6 +4909,57 @@ export const cantoneseTranslations: Readonly<
     '會用 npm 全域安裝 OpenAI 官方嘅 @openai/codex 套件。Desktop Material 唔會問你攞、亦唔會儲存 OpenAI 登入資料。',
   'buildRun.opencodeInstallSafety':
     '會用 OpenCode 官方 npm 套件安裝 OpenCode。Desktop Material 唔會問你攞、亦唔會儲存 OpenCode 登入資料。',
+  'actionsLocalRun.commandTitle': '喺本機行 Actions',
+  'actionsLocalRun.dialogTitle': '喺本機行 GitHub Actions',
+  'actionsLocalRun.subtitle':
+    '揀個 workflow 同事件，就可以用 act 加 Docker 喺你部機度行。',
+  'actionsLocalRun.checkingTools': '檢查緊有冇 act 同 Docker⋯',
+  'actionsLocalRun.toolsMissingTitle': '本機執行工具唔齊',
+  'actionsLocalRun.actMissing':
+    '喺你嘅 PATH 搵唔到 act（nektos/act），佢係負責喺本機行 workflow 嘅。',
+  'actionsLocalRun.dockerMissing':
+    '喺你嘅 PATH 搵唔到 Docker。act 要有個行緊嘅 Docker engine 先可以執行啲 job。',
+  'actionsLocalRun.installHint':
+    '裝好欠咗嘅工具，確認佢哋喺 PATH 上面，然後再檢查多次。',
+  'actionsLocalRun.installActLink': '點裝 act',
+  'actionsLocalRun.installDockerLink': '攞 Docker',
+  'actionsLocalRun.retryDetection': '再檢查',
+  'actionsLocalRun.noWorkflows':
+    '呢個 repo 嘅 .github/workflows 度搵唔到任何 workflow 檔。',
+  'actionsLocalRun.workflowLabel': 'Workflow',
+  'actionsLocalRun.eventLabel': '事件',
+  'actionsLocalRun.jobLabel': 'Job',
+  'actionsLocalRun.allJobs': '全部 job',
+  'actionsLocalRun.parseErrorPrefix': '呢個 workflow 未能完全解析：',
+  'actionsLocalRun.inputsHeading': 'Workflow 輸入',
+  'actionsLocalRun.inputRequired': '必填',
+  'actionsLocalRun.secretsHeading': 'Secrets',
+  'actionsLocalRun.secretsHint':
+    'Secrets 只會為呢次執行寫入一個暫存檔，行完即刻刪走，亦唔會寫落 log。',
+  'actionsLocalRun.addSecret': '加 secret',
+  'actionsLocalRun.secretNamePlaceholder': 'SECRET_NAME',
+  'actionsLocalRun.secretValuePlaceholder': '數值',
+  'actionsLocalRun.removeSecret': '刪走 secret',
+  'actionsLocalRun.dryRunLabel': '試行（只列步驟，唔真正執行）',
+  'actionsLocalRun.dryRunHelp':
+    '會用 -n 行 act，等你可以預覽個計劃而唔使開任何 container。',
+  'actionsLocalRun.runButton': '行 workflow',
+  'actionsLocalRun.dryRunButton': '試行',
+  'actionsLocalRun.stopButton': '停',
+  'actionsLocalRun.stoppingButton': '停緊⋯',
+  'actionsLocalRun.closeButton': '閂',
+  'actionsLocalRun.clearLog': '清走輸出',
+  'actionsLocalRun.logRegionLabel': '本機 Actions 執行輸出',
+  'actionsLocalRun.statusStarting': '起動緊⋯',
+  'actionsLocalRun.statusRunning': '行緊⋯',
+  'actionsLocalRun.statusSucceeded': '執行成功',
+  'actionsLocalRun.statusFailed': '執行失敗',
+  'actionsLocalRun.statusCancelled': '執行已取消',
+  'actionsLocalRun.releaseUploadHeading': '偵測到 release 上載',
+  'actionsLocalRun.releaseUploadNote':
+    '呢個 workflow 有一步會上載 release 資產。本機執行唔會郁到你真正嘅 GitHub release。',
+  'actionsLocalRun.releaseUploadWarning':
+    '如果要將整出嚟嘅 artifact 上載去真正 release，請喺執行後用有防護嘅 release 上載——佢每次公開之前都會問你確認。',
   'cheapLfs.files.one': '{count} 個大檔案',
   'cheapLfs.files.many': '{count} 個大檔案',
   'cheapLfs.managerRail': '大檔案',

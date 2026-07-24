@@ -69,6 +69,10 @@ import {
   cliWorkbenchRunner,
   registerCLIWorkbenchIpc,
 } from './cli-workbench'
+import {
+  actionsLocalRunner,
+  registerActionsLocalRunIpc,
+} from './actions-local-run'
 import { AgentServerController } from './agent-server'
 import {
   cancelActionsTransfer,
@@ -257,6 +261,7 @@ const ownedShutdownTasks: ReadonlyArray<IOwnedShutdownTask> = [
     run: killAllActionsArtifactProvenanceVerifications,
   },
   { name: 'Build & Run processes', run: () => buildRunner.killAll() },
+  { name: 'Local Actions runs', run: () => actionsLocalRunner.killAll() },
   { name: 'opencode processes', run: () => opencodeRunner.killAll() },
   { name: 'Codex processes', run: () => codexRunner.killAll() },
   { name: 'CLI catalog probes', run: () => cliWorkbenchCatalog.killAll() },
@@ -743,6 +748,7 @@ app.on('ready', () => {
   )
 
   registerBuildRunIpc()
+  registerActionsLocalRunIpc()
   registerCLIWorkbenchIpc()
   registerGitHubReleaseTransferIPC(ipcMain)
   registerNotificationAutomationIpc()
