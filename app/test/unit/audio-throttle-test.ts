@@ -9,9 +9,12 @@ import {
   IAudioEnvironment,
   IAudioThrottleState,
   InitialThrottleState,
+  ProgressSfxCooldownMs,
   SfxCategoryCooldownMs,
   decideAudioActions,
+  isEssentialCategory,
   isWithinQuietHours,
+  sfxCooldownForCategory,
 } from '../../src/lib/audio/audio-throttle'
 
 const enabled: IAudioSystemSettings = {
@@ -111,6 +114,94 @@ describe('audio-throttle decisions', () => {
     const err = decide(enabled, first.next, 'error', 1000)
     assert.strictEqual(err.playSfx, true)
     assert.strictEqual(err.speak, true)
+  })
+
+  it('rate-limits progress cues harder than terminal cues', () => {
+    // A progress phase (building) fires, then another building arrives after the
+    // terminal cooldown would have cleared but before the longer progress one.
+    const first = decide(enabled, InitialThrottleState, 'building', 1000)
+    assert.strictEqual(first.playSfx, true)
+    const midway = 1000 + SfxCategoryCooldownMs + 1
+    const stillCooling = decide(enabled, first.next, 'building', midway)
+    assert.strictEqual(
+      stillCooling.playSfx,
+      false,
+      'progress cue is still cooling long after a terminal cue would clear'
+    )
+    const afterProgress = 1000 + ProgressSfxCooldownMs + 1
+    const cleared = decide(enabled, first.next, 'building', afterProgress)
+    assert.strictEqual(cleared.playSfx, true)
+  })
+
+  it('exposes the per-category cooldown durations', () => {
+    assert.strictEqual(
+      sfxCooldownForCategory('detecting'),
+      ProgressSfxCooldownMs
+    )
+    assert.strictEqual(
+      sfxCooldownForCategory('installing'),
+      ProgressSfxCooldownMs
+    )
+    assert.strictEqual(
+      sfxCooldownForCategory('building'),
+      ProgressSfxCooldownMs
+    )
+    assert.strictEqual(sfxCooldownForCategory('running'), ProgressSfxCooldownMs)
+    assert.strictEqual(sfxCooldownForCategory('push'), SfxCategoryCooldownMs)
+    assert.strictEqual(
+      sfxCooldownForCategory('succeeded'),
+      SfxCategoryCooldownMs
+    )
+    assert.ok(ProgressSfxCooldownMs > SfxCategoryCooldownMs)
+  })
+
+  it('treats a failed build/run as an always-audible essential cue', () => {
+    assert.strictEqual(isEssentialCategory('failed'), true)
+    assert.strictEqual(isEssentialCategory('error'), true)
+    assert.strictEqual(isEssentialCategory('succeeded'), false)
+
+    // Bypasses debounce/cooldown right after another cue.
+    const first = decide(enabled, InitialThrottleState, 'building', 1000)
+    const failed = decide(enabled, first.next, 'failed', 1000)
+    assert.strictEqual(failed.playSfx, true)
+    assert.strictEqual(failed.speak, true)
+  })
+
+  it('keeps a failed build audible during quiet hours and reduced-motion', () => {
+    const quiet: IAudioSystemSettings = {
+      ...enabled,
+      quietHours: { enabled: true, startHour: 22, endHour: 8 },
+    }
+    const night: IAudioEnvironment = { ...daytime, localHour: 23 }
+    const failedNight = decide(
+      quiet,
+      InitialThrottleState,
+      'failed',
+      1000,
+      night
+    )
+    assert.strictEqual(failedNight.playSfx, true)
+
+    const reduced: IAudioEnvironment = { ...daytime, reducedMotion: true }
+    const failedReduced = decide(
+      enabled,
+      InitialThrottleState,
+      'failed',
+      1000,
+      reduced
+    )
+    assert.strictEqual(failedReduced.playSfx, true)
+  })
+
+  it('plays a distinct effect for push, pull and fetch without speaking fetch', () => {
+    const push = decide(enabled, InitialThrottleState, 'push', 1000)
+    assert.strictEqual(push.playSfx, true)
+    assert.strictEqual(push.speak, true)
+
+    // Fetch is intentionally SFX-only (low-signal, no narration line).
+    const fetch = decide(enabled, InitialThrottleState, 'fetch', 5000)
+    assert.strictEqual(fetch.playSfx, true)
+    assert.strictEqual(fetch.speak, false)
   })
 
   it('mutes non-essential audio during quiet hours but keeps errors', () => {

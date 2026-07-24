@@ -2,53 +2,14 @@
  * Tiny Web Audio synthesizer for the app's sound effects. No bundled assets —
  * each cue is a short envelope over one or two oscillators, so it costs nothing
  * to ship and can't fail to load. Renderer-only.
+ *
+ * The motif for each category (the pure, testable event -> category -> motif
+ * mapping) lives in `sfx-event-map.ts`; this class only turns those tone steps
+ * into Web Audio nodes.
  */
 
 import { AudioCueCategory } from './audio-settings'
-
-interface IToneStep {
-  /** Frequency in Hz. */
-  readonly freq: number
-  /** Start offset from the cue's beginning, in seconds. */
-  readonly at: number
-  /** Duration in seconds. */
-  readonly dur: number
-  readonly type?: OscillatorType
-}
-
-/** A short, recognizable gesture per category (kept under ~0.4s total). */
-const cues: Readonly<Record<AudioCueCategory, ReadonlyArray<IToneStep>>> = {
-  // Rising two-note "done" chime.
-  commit: [
-    { freq: 587.33, at: 0, dur: 0.09 },
-    { freq: 880, at: 0.08, dur: 0.14 },
-  ],
-  // Quick upward whoosh-ish blip.
-  push: [
-    { freq: 659.25, at: 0, dur: 0.08 },
-    { freq: 987.77, at: 0.07, dur: 0.12 },
-  ],
-  // Gentle downward-then-up settle.
-  pull: [
-    { freq: 783.99, at: 0, dur: 0.09 },
-    { freq: 523.25, at: 0.08, dur: 0.12 },
-  ],
-  // Soft single tick.
-  fetch: [{ freq: 660, at: 0, dur: 0.07 }],
-  // Bright three-note arpeggio.
-  success: [
-    { freq: 523.25, at: 0, dur: 0.08 },
-    { freq: 659.25, at: 0.07, dur: 0.08 },
-    { freq: 783.99, at: 0.14, dur: 0.16 },
-  ],
-  // Low descending buzz.
-  error: [
-    { freq: 311.13, at: 0, dur: 0.12, type: 'sawtooth' },
-    { freq: 233.08, at: 0.11, dur: 0.2, type: 'sawtooth' },
-  ],
-  // Neutral soft blip.
-  info: [{ freq: 698.46, at: 0, dur: 0.09 }],
-}
+import { motifForCategory } from './sfx-event-map'
 
 type AudioContextCtor = new () => AudioContext
 
@@ -95,7 +56,7 @@ export class ToneSynth {
       master.gain.value = Math.min(1, Math.max(0, volume)) * 0.6
       master.connect(context.destination)
 
-      for (const step of cues[category]) {
+      for (const step of motifForCategory(category)) {
         const osc = context.createOscillator()
         osc.type = step.type ?? 'sine'
         osc.frequency.value = step.freq

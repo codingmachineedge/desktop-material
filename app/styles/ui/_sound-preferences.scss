@@ -116,4 +116,47 @@
       outline-offset: 2px;
     }
   }
+
+  .sound-cue-audition {
+    margin-top: 8px;
+  }
+
+  .sound-cue-family {
+    margin: 10px 0;
+  }
+
+  .sound-cue-family-heading {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .sound-cue-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sound-cue-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 6px 14px;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 18px;
+    cursor: pointer;
+    color: var(--md-sys-color-on-surface);
+    background: var(--md-sys-color-surface-container-high);
+
+    &:hover {
+      filter: brightness(1.05);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
 }

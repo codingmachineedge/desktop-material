@@ -1271,6 +1271,28 @@ export type TranslationKey =
   | 'settings.soundQuietHoursEndLabel'
   | 'settings.soundReducedMotionTitle'
   | 'settings.soundReducedMotionDescription'
+  | 'settings.soundSfxAuditionHeading'
+  | 'settings.soundSfxAuditionHint'
+  | 'settings.soundCuePlayLabel'
+  | 'settings.soundFamilySuccess'
+  | 'settings.soundFamilyProgress'
+  | 'settings.soundFamilyWarning'
+  | 'settings.soundFamilyError'
+  | 'settings.soundFamilyNeutral'
+  | 'settings.soundCueCommit'
+  | 'settings.soundCuePush'
+  | 'settings.soundCuePull'
+  | 'settings.soundCueFetch'
+  | 'settings.soundCueDetecting'
+  | 'settings.soundCueInstalling'
+  | 'settings.soundCueBuilding'
+  | 'settings.soundCueRunning'
+  | 'settings.soundCueSucceeded'
+  | 'settings.soundCueFailed'
+  | 'settings.soundCueCancelled'
+  | 'settings.soundCueSuccess'
+  | 'settings.soundCueError'
+  | 'settings.soundCueInfo'
   | 'settings.mobileConnectionHeading'
   | 'settings.mobileConnectionDescription'
   | 'settings.mobileConnectionOpen'
@@ -3169,6 +3191,29 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'settings.soundReducedMotionTitle': 'Follow reduced-motion for sound',
   'settings.soundReducedMotionDescription':
     'When the system asks for reduced motion, also mute non-essential sound and music.',
+  'settings.soundSfxAuditionHeading': 'Audition each cue',
+  'settings.soundSfxAuditionHint':
+    'Every app event has its own recognizable cue, grouped by family. Push, fetch and pull are distinct, and each build-and-run phase has its own sound.',
+  'settings.soundCuePlayLabel': 'Play the {cue} cue',
+  'settings.soundFamilySuccess': 'Success',
+  'settings.soundFamilyProgress': 'Progress',
+  'settings.soundFamilyWarning': 'Warning',
+  'settings.soundFamilyError': 'Error',
+  'settings.soundFamilyNeutral': 'Neutral',
+  'settings.soundCueCommit': 'Commit',
+  'settings.soundCuePush': 'Push',
+  'settings.soundCuePull': 'Pull',
+  'settings.soundCueFetch': 'Fetch',
+  'settings.soundCueDetecting': 'Detecting',
+  'settings.soundCueInstalling': 'Installing',
+  'settings.soundCueBuilding': 'Building',
+  'settings.soundCueRunning': 'Running',
+  'settings.soundCueSucceeded': 'Succeeded',
+  'settings.soundCueFailed': 'Failed',
+  'settings.soundCueCancelled': 'Cancelled',
+  'settings.soundCueSuccess': 'Success',
+  'settings.soundCueError': 'Error',
+  'settings.soundCueInfo': 'Info',
   'settings.mobileConnectionHeading': 'Mobile connection',
   'settings.mobileConnectionDescription':
     'Opens a fresh one-time pairing link in your default browser. Its secret stays in the URL fragment and is replaced the next time you open one.',
@@ -5046,6 +5091,29 @@ export const cantoneseTranslations: Readonly<
   'settings.soundReducedMotionTitle': '跟隨減少動態嘅設定收聲',
   'settings.soundReducedMotionDescription':
     '當系統要求減少動態時，順便靜音非必要嘅聲音同音樂。',
+  'settings.soundSfxAuditionHeading': '試聽每種提示音',
+  'settings.soundSfxAuditionHint':
+    '每個事件都有自己認得出嘅提示音，按家族分組。Push、fetch 同 pull 各有唔同，build 同 run 每個階段亦有自己嘅聲。',
+  'settings.soundCuePlayLabel': '播「{cue}」提示音',
+  'settings.soundFamilySuccess': '成功',
+  'settings.soundFamilyProgress': '進行中',
+  'settings.soundFamilyWarning': '警告',
+  'settings.soundFamilyError': '出錯',
+  'settings.soundFamilyNeutral': '一般',
+  'settings.soundCueCommit': 'Commit',
+  'settings.soundCuePush': 'Push',
+  'settings.soundCuePull': 'Pull',
+  'settings.soundCueFetch': 'Fetch',
+  'settings.soundCueDetecting': '偵測中',
+  'settings.soundCueInstalling': '安裝中',
+  'settings.soundCueBuilding': 'Build 緊',
+  'settings.soundCueRunning': '執行中',
+  'settings.soundCueSucceeded': '成功',
+  'settings.soundCueFailed': '失敗',
+  'settings.soundCueCancelled': '已取消',
+  'settings.soundCueSuccess': '完成',
+  'settings.soundCueError': '出錯',
+  'settings.soundCueInfo': '資訊',
   'settings.mobileConnectionHeading': '手機連線',
   'settings.mobileConnectionDescription':
     '用預設瀏覽器開一條全新嘅一次性配對連結；秘密只放喺 URL fragment，下次再開就會換新。',

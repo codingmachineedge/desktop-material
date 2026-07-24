@@ -8,15 +8,69 @@ import {
   getPersistedLanguageMode,
   LanguageModeChangedEvent,
   translate,
+  translatedVariable,
 } from '../../lib/i18n'
+import { TranslationKey } from '../../lib/i18n-resources'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { Repository } from '../../models/repository'
 import { showOpenDialog } from '../main-process-proxy'
 import { AudioCueStore } from '../../lib/audio/audio-cue-store'
 import {
+  AudioCueCategory,
   clampFunnyLevel,
   IAudioSystemSettings,
 } from '../../lib/audio/audio-settings'
+
+/**
+ * The auditionable sound-effect cues, grouped by their motif family so the
+ * preview grid reads as a coherent set. Labels reuse pane-scoped translation
+ * keys; each button plays that category's synthesized cue.
+ */
+const CueFamilies: ReadonlyArray<{
+  readonly headingKey: TranslationKey
+  readonly categories: ReadonlyArray<{
+    readonly category: AudioCueCategory
+    readonly labelKey: TranslationKey
+  }>
+}> = [
+  {
+    headingKey: 'settings.soundFamilySuccess',
+    categories: [
+      { category: 'commit', labelKey: 'settings.soundCueCommit' },
+      { category: 'push', labelKey: 'settings.soundCuePush' },
+      { category: 'pull', labelKey: 'settings.soundCuePull' },
+      { category: 'fetch', labelKey: 'settings.soundCueFetch' },
+      { category: 'succeeded', labelKey: 'settings.soundCueSucceeded' },
+      { category: 'success', labelKey: 'settings.soundCueSuccess' },
+    ],
+  },
+  {
+    headingKey: 'settings.soundFamilyProgress',
+    categories: [
+      { category: 'detecting', labelKey: 'settings.soundCueDetecting' },
+      { category: 'installing', labelKey: 'settings.soundCueInstalling' },
+      { category: 'building', labelKey: 'settings.soundCueBuilding' },
+      { category: 'running', labelKey: 'settings.soundCueRunning' },
+    ],
+  },
+  {
+    headingKey: 'settings.soundFamilyWarning',
+    categories: [
+      { category: 'cancelled', labelKey: 'settings.soundCueCancelled' },
+    ],
+  },
+  {
+    headingKey: 'settings.soundFamilyError',
+    categories: [
+      { category: 'failed', labelKey: 'settings.soundCueFailed' },
+      { category: 'error', labelKey: 'settings.soundCueError' },
+    ],
+  },
+  {
+    headingKey: 'settings.soundFamilyNeutral',
+    categories: [{ category: 'info', labelKey: 'settings.soundCueInfo' }],
+  },
+]
 
 interface ISoundPreferencesProps {
   readonly audioCueStore: AudioCueStore
@@ -135,6 +189,7 @@ export class SoundPreferences extends React.Component<
               languageMode={languageMode}
             />
           </button>
+          {this.renderCueAudition()}
         </fieldset>
 
         <fieldset
@@ -275,6 +330,65 @@ export class SoundPreferences extends React.Component<
           )}
         </fieldset>
       </DialogContent>
+    )
+  }
+
+  /**
+   * A grid of buttons that audition every sound-effect cue, grouped by motif
+   * family. Each button plays the synthesized cue for its category regardless of
+   * throttling, and carries a localized "Play the X cue" accessible name.
+   */
+  private renderCueAudition() {
+    const { languageMode } = this.state
+    return (
+      <div className="sound-cue-audition">
+        <h3 className="sound-subheading">
+          <LocalizedText
+            translationKey="settings.soundSfxAuditionHeading"
+            languageMode={languageMode}
+          />
+        </h3>
+        <p className="settings-description">
+          <LocalizedText
+            translationKey="settings.soundSfxAuditionHint"
+            languageMode={languageMode}
+          />
+        </p>
+        {CueFamilies.map(family => (
+          <div className="sound-cue-family" key={family.headingKey}>
+            <h4 className="sound-cue-family-heading">
+              <LocalizedText
+                translationKey={family.headingKey}
+                languageMode={languageMode}
+              />
+            </h4>
+            <div
+              className="sound-cue-grid"
+              role="group"
+              aria-label={translate(family.headingKey, languageMode)}
+            >
+              {family.categories.map(({ category, labelKey }) => (
+                <button
+                  key={category}
+                  type="button"
+                  className="sound-cue-button"
+                  onClick={() => this.props.audioCueStore.previewCue(category)}
+                  aria-label={translate(
+                    'settings.soundCuePlayLabel',
+                    languageMode,
+                    { cue: translatedVariable(labelKey) }
+                  )}
+                >
+                  <LocalizedText
+                    translationKey={labelKey}
+                    languageMode={languageMode}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     )
   }
 

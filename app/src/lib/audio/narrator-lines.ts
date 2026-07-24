@@ -73,7 +73,13 @@ const englishLines: LocaleLines = {
     light: 'All done.',
     playful: 'Nailed it. Everything worked.',
   },
-  // Errors stay clear at every level.
+  succeeded: {
+    plain: 'Build and run succeeded.',
+    light: 'Build finished — all green.',
+    playful: 'Green across the board. Build ran clean!',
+  },
+  // Failures and errors stay clear at every level.
+  failed: 'The build and run failed. Please check the output.',
   error: 'Something went wrong. Please check the details.',
 }
 
@@ -98,7 +104,13 @@ const cantoneseLines: LocaleLines = {
     light: '全部搞掂。',
     playful: '一take過，全部搞掂晒！',
   },
-  // Errors stay clear at every level.
+  succeeded: {
+    plain: 'Build 同 run 成功。',
+    light: 'Build 完成，全綠燈。',
+    playful: '一路綠燈，build 跑得靚仔！',
+  },
+  // Failures and errors stay clear at every level.
+  failed: 'Build 同 run 失敗咗，請睇吓輸出。',
   error: '有啲嘢出錯，請睇吓詳情。',
 }
 

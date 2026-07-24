@@ -12,5 +12,9 @@
 - [Audio system](audio-system.md) — optional, off-by-default spoken narrator,
   synthesized sound effects, and per-repository music, with rate-limiting,
   quiet hours, reduced-sound, screen-reader coexistence, and funny-level tone.
+- [Distinct sound-effect event mapping](sfx-event-mapping.md) — pure event →
+  category → motif mapping that gives push/fetch/pull and every Build & Run
+  phase their own cue in four motif families, with per-category cooldowns and a
+  per-cue audition grid in Settings → Sound.
 
 This category has no HTTP API. Postman collections are not applicable.

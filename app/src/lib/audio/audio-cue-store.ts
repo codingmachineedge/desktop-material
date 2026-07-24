@@ -34,6 +34,8 @@ import {
 } from './audio-throttle'
 import { categoryForNotificationKind, pickNarratorLine } from './narrator-lines'
 import { ToneSynth } from './tone-synth'
+import { categoryForSfxEvent, type GitAudioOperation } from './sfx-event-map'
+import type { BuildRunPhase } from '../build-run/types'
 
 /** The spoken locale chosen for a language mode (bilingual speaks one side). */
 function spokenLocale(mode: LanguageMode): 'en' | 'zh-HK' {
@@ -165,6 +167,25 @@ export class AudioCueStore {
   public handleNotificationEntry(entry: INotificationEntry): void {
     const category = categoryForNotificationKind(entry.kind)
     this.playForCategory(category)
+  }
+
+  /**
+   * Route a completed git network/history operation (push, pull, fetch, commit)
+   * into its own distinct cue, gated through the same throttle as everything
+   * else. This is what gives push/fetch/pull audibly different feedback instead
+   * of borrowing the shared commit sound.
+   */
+  public handleGitOperation(operation: GitAudioOperation): void {
+    this.playForCategory(categoryForSfxEvent({ kind: 'git', operation }))
+  }
+
+  /**
+   * Route a Build & Run lifecycle phase transition into its cue. Progress phases
+   * are rate-limited harder than terminal ones and a failed run is always
+   * audible (see `decideAudioActions`).
+   */
+  public handleBuildRunPhase(phase: BuildRunPhase): void {
+    this.playForCategory(categoryForSfxEvent({ kind: 'build-run', phase }))
   }
 
   /** Core gate: decide, then play SFX and/or speak for a category. */
