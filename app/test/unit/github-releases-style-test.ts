@@ -84,7 +84,7 @@ describe('GitHub Releases responsive Material styles', () => {
     )
     assert.match(
       materialCards,
-      /:not\(\.actions-view\):not\(\.github-releases-view\) \{\s*overflow: hidden;/
+      /:not\(\.actions-view\):not\(\.github-releases-view\):not\(\.cheap-lfs-manager-view\) \{\s*overflow: hidden;/
     )
     assert.match(
       styles,
