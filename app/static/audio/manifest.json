@@ -1,0 +1,1229 @@
+{
+  "voices": {
+    "en": "en-US-AriaNeural",
+    "yue": "zh-HK-HiuMaanNeural"
+  },
+  "categories": [
+    "info",
+    "success",
+    "progress",
+    "error"
+  ],
+  "events": [
+    {
+      "id": "welcome",
+      "category": "info",
+      "en": {
+        "text": "Welcome back to Desktop Material.",
+        "voice": "en-US-AriaNeural",
+        "file": "welcome.en.mp3"
+      },
+      "yue": {
+        "text": "歡迎返嚟 Desktop Material。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "welcome.yue.mp3"
+      },
+      "melody": "welcome.melody.wav"
+    },
+    {
+      "id": "commit-created",
+      "category": "success",
+      "en": {
+        "text": "Commit created.",
+        "voice": "en-US-AriaNeural",
+        "file": "commit-created.en.mp3"
+      },
+      "yue": {
+        "text": "Commit 搞掂喇。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "commit-created.yue.mp3"
+      },
+      "melody": "commit-created.melody.wav"
+    },
+    {
+      "id": "changes-committed",
+      "category": "success",
+      "en": {
+        "text": "Your changes are committed.",
+        "voice": "en-US-AriaNeural",
+        "file": "changes-committed.en.mp3"
+      },
+      "yue": {
+        "text": "你嘅改動已經 commit 好晒。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "changes-committed.yue.mp3"
+      },
+      "melody": "changes-committed.melody.wav"
+    },
+    {
+      "id": "push-complete",
+      "category": "success",
+      "en": {
+        "text": "Pushed to origin. Nice work.",
+        "voice": "en-US-AriaNeural",
+        "file": "push-complete.en.mp3"
+      },
+      "yue": {
+        "text": "已經 push 上 origin，做得好。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "push-complete.yue.mp3"
+      },
+      "melody": "push-complete.melody.wav"
+    },
+    {
+      "id": "fetch-start",
+      "category": "progress",
+      "en": {
+        "text": "Fetching the latest changes.",
+        "voice": "en-US-AriaNeural",
+        "file": "fetch-start.en.mp3"
+      },
+      "yue": {
+        "text": "而家幫你攞緊最新嘅改動。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "fetch-start.yue.mp3"
+      },
+      "melody": "fetch-start.melody.wav"
+    },
+    {
+      "id": "up-to-date",
+      "category": "info",
+      "en": {
+        "text": "You're all caught up.",
+        "voice": "en-US-AriaNeural",
+        "file": "up-to-date.en.mp3"
+      },
+      "yue": {
+        "text": "全部都係最新，唔使更新。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "up-to-date.yue.mp3"
+      },
+      "melody": "up-to-date.melody.wav"
+    },
+    {
+      "id": "pull-complete",
+      "category": "success",
+      "en": {
+        "text": "Pull complete.",
+        "voice": "en-US-AriaNeural",
+        "file": "pull-complete.en.mp3"
+      },
+      "yue": {
+        "text": "Pull 完成喇。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "pull-complete.yue.mp3"
+      },
+      "melody": "pull-complete.melody.wav"
+    },
+    {
+      "id": "branch-switched",
+      "category": "info",
+      "en": {
+        "text": "Branch switched.",
+        "voice": "en-US-AriaNeural",
+        "file": "branch-switched.en.mp3"
+      },
+      "yue": {
+        "text": "已經幫你轉咗 branch。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "branch-switched.yue.mp3"
+      },
+      "melody": "branch-switched.melody.wav"
+    },
+    {
+      "id": "cheaplfs-restored",
+      "category": "success",
+      "en": {
+        "text": "Large files restored.",
+        "voice": "en-US-AriaNeural",
+        "file": "cheaplfs-restored.en.mp3"
+      },
+      "yue": {
+        "text": "大檔已經還原好晒。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "cheaplfs-restored.yue.mp3"
+      },
+      "melody": "cheaplfs-restored.melody.wav"
+    },
+    {
+      "id": "publish-start",
+      "category": "progress",
+      "en": {
+        "text": "Publishing your repository.",
+        "voice": "en-US-AriaNeural",
+        "file": "publish-start.en.mp3"
+      },
+      "yue": {
+        "text": "而家幫你 publish 個 repo。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "publish-start.yue.mp3"
+      },
+      "melody": "publish-start.melody.wav"
+    },
+    {
+      "id": "publish-done",
+      "category": "success",
+      "en": {
+        "text": "Repository published.",
+        "voice": "en-US-AriaNeural",
+        "file": "publish-done.en.mp3"
+      },
+      "yue": {
+        "text": "個 repo publish 咗喇。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "publish-done.yue.mp3"
+      },
+      "melody": "publish-done.melody.wav"
+    },
+    {
+      "id": "batch-pushed",
+      "category": "success",
+      "en": {
+        "text": "Batch pushed. Moving on.",
+        "voice": "en-US-AriaNeural",
+        "file": "batch-pushed.en.mp3"
+      },
+      "yue": {
+        "text": "呢批 push 咗，繼續落去。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "batch-pushed.yue.mp3"
+      },
+      "melody": "batch-pushed.melody.wav"
+    },
+    {
+      "id": "all-done",
+      "category": "success",
+      "en": {
+        "text": "All done.",
+        "voice": "en-US-AriaNeural",
+        "file": "all-done.en.mp3"
+      },
+      "yue": {
+        "text": "全部搞掂。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "all-done.yue.mp3"
+      },
+      "melody": "all-done.melody.wav"
+    },
+    {
+      "id": "br-detecting",
+      "category": "progress",
+      "en": {
+        "text": "Detecting how to build.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-detecting.en.mp3"
+      },
+      "yue": {
+        "text": "偵測緊點樣 build。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-detecting.yue.mp3"
+      },
+      "melody": "br-detecting.melody.wav"
+    },
+    {
+      "id": "br-gitignore",
+      "category": "progress",
+      "en": {
+        "text": "Updating gitignore.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-gitignore.en.mp3"
+      },
+      "yue": {
+        "text": "更新緊 gitignore。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-gitignore.yue.mp3"
+      },
+      "melody": "br-gitignore.melody.wav"
+    },
+    {
+      "id": "br-installing",
+      "category": "progress",
+      "en": {
+        "text": "Installing dependencies.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-installing.en.mp3"
+      },
+      "yue": {
+        "text": "安裝緊啲相依套件。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-installing.yue.mp3"
+      },
+      "melody": "br-installing.melody.wav"
+    },
+    {
+      "id": "br-building",
+      "category": "progress",
+      "en": {
+        "text": "Building your project.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-building.en.mp3"
+      },
+      "yue": {
+        "text": "Build 緊你個 project。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-building.yue.mp3"
+      },
+      "melody": "br-building.melody.wav"
+    },
+    {
+      "id": "br-running",
+      "category": "progress",
+      "en": {
+        "text": "Running your project.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-running.en.mp3"
+      },
+      "yue": {
+        "text": "Run 緊你個 project。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-running.yue.mp3"
+      },
+      "melody": "br-running.melody.wav"
+    },
+    {
+      "id": "br-succeeded",
+      "category": "success",
+      "en": {
+        "text": "Build and run succeeded.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-succeeded.en.mp3"
+      },
+      "yue": {
+        "text": "Build 同 run 都成功。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-succeeded.yue.mp3"
+      },
+      "melody": "br-succeeded.melody.wav"
+    },
+    {
+      "id": "br-failed",
+      "category": "error",
+      "en": {
+        "text": "Build or run failed.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-failed.en.mp3"
+      },
+      "yue": {
+        "text": "Build 或者 run 失敗咗。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-failed.yue.mp3"
+      },
+      "melody": "br-failed.melody.wav"
+    },
+    {
+      "id": "br-cancelled",
+      "category": "info",
+      "en": {
+        "text": "Build and run cancelled.",
+        "voice": "en-US-AriaNeural",
+        "file": "br-cancelled.en.mp3"
+      },
+      "yue": {
+        "text": "Build 同 run 取消咗。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "br-cancelled.yue.mp3"
+      },
+      "melody": "br-cancelled.melody.wav"
+    },
+    {
+      "id": "err-bad-config-value",
+      "category": "error",
+      "en": {
+        "text": "There's a bad value in your Git config.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-bad-config-value.en.mp3"
+      },
+      "yue": {
+        "text": "你 Git config 有個值唔啱。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-bad-config-value.yue.mp3"
+      },
+      "melody": "err-bad-config-value.melody.wav"
+    },
+    {
+      "id": "err-ssh-key-audit",
+      "category": "error",
+      "en": {
+        "text": "Your SSH key needs verifying.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-ssh-key-audit.en.mp3"
+      },
+      "yue": {
+        "text": "你個 SSH key 要驗證先得。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-ssh-key-audit.yue.mp3"
+      },
+      "melody": "err-ssh-key-audit.melody.wav"
+    },
+    {
+      "id": "err-ssh-auth-failed",
+      "category": "error",
+      "en": {
+        "text": "SSH authentication failed.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-ssh-auth-failed.en.mp3"
+      },
+      "yue": {
+        "text": "SSH 驗證失敗。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-ssh-auth-failed.yue.mp3"
+      },
+      "melody": "err-ssh-auth-failed.melody.wav"
+    },
+    {
+      "id": "err-ssh-permission-denied",
+      "category": "error",
+      "en": {
+        "text": "SSH permission denied.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-ssh-permission-denied.en.mp3"
+      },
+      "yue": {
+        "text": "SSH 冇權限。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-ssh-permission-denied.yue.mp3"
+      },
+      "melody": "err-ssh-permission-denied.melody.wav"
+    },
+    {
+      "id": "err-https-auth-failed",
+      "category": "error",
+      "en": {
+        "text": "Sign-in failed. Check your credentials.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-https-auth-failed.en.mp3"
+      },
+      "yue": {
+        "text": "登入失敗，檢查你嘅帳號密碼。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-https-auth-failed.yue.mp3"
+      },
+      "melody": "err-https-auth-failed.melody.wav"
+    },
+    {
+      "id": "err-remote-disconnect",
+      "category": "error",
+      "en": {
+        "text": "The remote disconnected.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-remote-disconnect.en.mp3"
+      },
+      "yue": {
+        "text": "遠端斷咗線。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-remote-disconnect.yue.mp3"
+      },
+      "melody": "err-remote-disconnect.melody.wav"
+    },
+    {
+      "id": "err-host-down",
+      "category": "error",
+      "en": {
+        "text": "The server looks down.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-host-down.en.mp3"
+      },
+      "yue": {
+        "text": "個伺服器好似 down 咗。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-host-down.yue.mp3"
+      },
+      "melody": "err-host-down.melody.wav"
+    },
+    {
+      "id": "err-rebase-conflicts",
+      "category": "error",
+      "en": {
+        "text": "Rebase conflicts. Resolve them to continue.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-rebase-conflicts.en.mp3"
+      },
+      "yue": {
+        "text": "Rebase 有衝突，解決咗先繼續。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-rebase-conflicts.yue.mp3"
+      },
+      "melody": "err-rebase-conflicts.melody.wav"
+    },
+    {
+      "id": "err-merge-conflicts",
+      "category": "error",
+      "en": {
+        "text": "Merge conflicts. Resolve them to continue.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-merge-conflicts.en.mp3"
+      },
+      "yue": {
+        "text": "合併有衝突，解決咗先繼續。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-merge-conflicts.yue.mp3"
+      },
+      "melody": "err-merge-conflicts.melody.wav"
+    },
+    {
+      "id": "err-https-repo-not-found",
+      "category": "error",
+      "en": {
+        "text": "Repository not found.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-https-repo-not-found.en.mp3"
+      },
+      "yue": {
+        "text": "揾唔到個 repository。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-https-repo-not-found.yue.mp3"
+      },
+      "melody": "err-https-repo-not-found.melody.wav"
+    },
+    {
+      "id": "err-ssh-repo-not-found",
+      "category": "error",
+      "en": {
+        "text": "Repository not found over SSH.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-ssh-repo-not-found.en.mp3"
+      },
+      "yue": {
+        "text": "SSH 揾唔到個 repository。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-ssh-repo-not-found.yue.mp3"
+      },
+      "melody": "err-ssh-repo-not-found.melody.wav"
+    },
+    {
+      "id": "err-push-not-fast-forward",
+      "category": "error",
+      "en": {
+        "text": "Push rejected. Pull the latest changes first.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-push-not-fast-forward.en.mp3"
+      },
+      "yue": {
+        "text": "Push 俾人拒絕，先 pull 最新改動。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-push-not-fast-forward.yue.mp3"
+      },
+      "melody": "err-push-not-fast-forward.melody.wav"
+    },
+    {
+      "id": "err-branch-deletion-failed",
+      "category": "error",
+      "en": {
+        "text": "Couldn't delete that branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-branch-deletion-failed.en.mp3"
+      },
+      "yue": {
+        "text": "刪唔到個 branch。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-branch-deletion-failed.yue.mp3"
+      },
+      "melody": "err-branch-deletion-failed.melody.wav"
+    },
+    {
+      "id": "err-default-branch-deletion",
+      "category": "error",
+      "en": {
+        "text": "You can't delete the default branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-default-branch-deletion.en.mp3"
+      },
+      "yue": {
+        "text": "預設 branch 刪唔到。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-default-branch-deletion.yue.mp3"
+      },
+      "melody": "err-default-branch-deletion.melody.wav"
+    },
+    {
+      "id": "err-revert-conflicts",
+      "category": "error",
+      "en": {
+        "text": "Revert conflicts to resolve.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-revert-conflicts.en.mp3"
+      },
+      "yue": {
+        "text": "還原有衝突要解決。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-revert-conflicts.yue.mp3"
+      },
+      "melody": "err-revert-conflicts.melody.wav"
+    },
+    {
+      "id": "err-empty-rebase-patch",
+      "category": "error",
+      "en": {
+        "text": "The rebase patch is empty.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-empty-rebase-patch.en.mp3"
+      },
+      "yue": {
+        "text": "Rebase 個 patch 係空嘅。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-empty-rebase-patch.yue.mp3"
+      },
+      "melody": "err-empty-rebase-patch.melody.wav"
+    },
+    {
+      "id": "err-no-matching-remote-branch",
+      "category": "error",
+      "en": {
+        "text": "No matching remote branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-no-matching-remote-branch.en.mp3"
+      },
+      "yue": {
+        "text": "冇對應嘅遠端 branch。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-no-matching-remote-branch.yue.mp3"
+      },
+      "melody": "err-no-matching-remote-branch.melody.wav"
+    },
+    {
+      "id": "err-no-existing-remote-branch",
+      "category": "error",
+      "en": {
+        "text": "That remote branch doesn't exist.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-no-existing-remote-branch.en.mp3"
+      },
+      "yue": {
+        "text": "個遠端 branch 唔存在。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-no-existing-remote-branch.yue.mp3"
+      },
+      "melody": "err-no-existing-remote-branch.melody.wav"
+    },
+    {
+      "id": "err-nothing-to-commit",
+      "category": "error",
+      "en": {
+        "text": "There's nothing to commit.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-nothing-to-commit.en.mp3"
+      },
+      "yue": {
+        "text": "冇嘢好 commit。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-nothing-to-commit.yue.mp3"
+      },
+      "melody": "err-nothing-to-commit.melody.wav"
+    },
+    {
+      "id": "err-no-submodule-mapping",
+      "category": "error",
+      "en": {
+        "text": "Missing submodule mapping.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-no-submodule-mapping.en.mp3"
+      },
+      "yue": {
+        "text": "冇 submodule 對應。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-no-submodule-mapping.yue.mp3"
+      },
+      "melody": "err-no-submodule-mapping.melody.wav"
+    },
+    {
+      "id": "err-submodule-missing",
+      "category": "error",
+      "en": {
+        "text": "The submodule repository is missing.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-submodule-missing.en.mp3"
+      },
+      "yue": {
+        "text": "Submodule 個 repository 唔見咗。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-submodule-missing.yue.mp3"
+      },
+      "melody": "err-submodule-missing.melody.wav"
+    },
+    {
+      "id": "err-invalid-submodule-sha",
+      "category": "error",
+      "en": {
+        "text": "The submodule SHA is invalid.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-invalid-submodule-sha.en.mp3"
+      },
+      "yue": {
+        "text": "Submodule 個 SHA 唔啱。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-invalid-submodule-sha.yue.mp3"
+      },
+      "melody": "err-invalid-submodule-sha.melody.wav"
+    },
+    {
+      "id": "err-local-permission-denied",
+      "category": "error",
+      "en": {
+        "text": "Permission denied on a local file.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-local-permission-denied.en.mp3"
+      },
+      "yue": {
+        "text": "本機檔案冇權限。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-local-permission-denied.yue.mp3"
+      },
+      "melody": "err-local-permission-denied.melody.wav"
+    },
+    {
+      "id": "err-invalid-merge",
+      "category": "error",
+      "en": {
+        "text": "That merge isn't valid.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-invalid-merge.en.mp3"
+      },
+      "yue": {
+        "text": "呢個合併唔啱。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-invalid-merge.yue.mp3"
+      },
+      "melody": "err-invalid-merge.melody.wav"
+    },
+    {
+      "id": "err-invalid-rebase",
+      "category": "error",
+      "en": {
+        "text": "That rebase isn't valid.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-invalid-rebase.en.mp3"
+      },
+      "yue": {
+        "text": "呢個 rebase 唔啱。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-invalid-rebase.yue.mp3"
+      },
+      "melody": "err-invalid-rebase.melody.wav"
+    },
+    {
+      "id": "err-non-ff-merge-empty",
+      "category": "error",
+      "en": {
+        "text": "Can't merge into an empty branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-non-ff-merge-empty.en.mp3"
+      },
+      "yue": {
+        "text": "空嘅 branch 唔可以咁合併。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-non-ff-merge-empty.yue.mp3"
+      },
+      "melody": "err-non-ff-merge-empty.melody.wav"
+    },
+    {
+      "id": "err-patch-does-not-apply",
+      "category": "error",
+      "en": {
+        "text": "The patch doesn't apply cleanly.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-patch-does-not-apply.en.mp3"
+      },
+      "yue": {
+        "text": "個 patch 貼唔到落去。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-patch-does-not-apply.yue.mp3"
+      },
+      "melody": "err-patch-does-not-apply.melody.wav"
+    },
+    {
+      "id": "err-branch-already-exists",
+      "category": "error",
+      "en": {
+        "text": "That branch already exists.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-branch-already-exists.en.mp3"
+      },
+      "yue": {
+        "text": "個 branch 已經存在。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-branch-already-exists.yue.mp3"
+      },
+      "melody": "err-branch-already-exists.melody.wav"
+    },
+    {
+      "id": "err-bad-revision",
+      "category": "error",
+      "en": {
+        "text": "That revision doesn't exist.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-bad-revision.en.mp3"
+      },
+      "yue": {
+        "text": "個 revision 揾唔到。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-bad-revision.yue.mp3"
+      },
+      "melody": "err-bad-revision.melody.wav"
+    },
+    {
+      "id": "err-not-a-git-repo",
+      "category": "error",
+      "en": {
+        "text": "This folder isn't a Git repository.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-not-a-git-repo.en.mp3"
+      },
+      "yue": {
+        "text": "呢個資料夾唔係 Git repository。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-not-a-git-repo.yue.mp3"
+      },
+      "melody": "err-not-a-git-repo.melody.wav"
+    },
+    {
+      "id": "err-unrelated-histories",
+      "category": "error",
+      "en": {
+        "text": "These histories are unrelated.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-unrelated-histories.en.mp3"
+      },
+      "yue": {
+        "text": "兩段歷史冇關係，唔可以直接合併。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-unrelated-histories.yue.mp3"
+      },
+      "melody": "err-unrelated-histories.melody.wav"
+    },
+    {
+      "id": "err-lfs-attribute-mismatch",
+      "category": "error",
+      "en": {
+        "text": "An LFS attribute doesn't match.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-lfs-attribute-mismatch.en.mp3"
+      },
+      "yue": {
+        "text": "有個 LFS 屬性對唔上。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-lfs-attribute-mismatch.yue.mp3"
+      },
+      "melody": "err-lfs-attribute-mismatch.melody.wav"
+    },
+    {
+      "id": "err-branch-rename-failed",
+      "category": "error",
+      "en": {
+        "text": "Couldn't rename the branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-branch-rename-failed.en.mp3"
+      },
+      "yue": {
+        "text": "改唔到 branch 個名。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-branch-rename-failed.yue.mp3"
+      },
+      "melody": "err-branch-rename-failed.melody.wav"
+    },
+    {
+      "id": "err-path-does-not-exist",
+      "category": "error",
+      "en": {
+        "text": "That path doesn't exist.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-path-does-not-exist.en.mp3"
+      },
+      "yue": {
+        "text": "個路徑唔存在。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-path-does-not-exist.yue.mp3"
+      },
+      "melody": "err-path-does-not-exist.melody.wav"
+    },
+    {
+      "id": "err-invalid-object-name",
+      "category": "error",
+      "en": {
+        "text": "That object name is invalid.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-invalid-object-name.en.mp3"
+      },
+      "yue": {
+        "text": "個 object 名唔啱。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-invalid-object-name.yue.mp3"
+      },
+      "melody": "err-invalid-object-name.melody.wav"
+    },
+    {
+      "id": "err-outside-repository",
+      "category": "error",
+      "en": {
+        "text": "That path is outside the repository.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-outside-repository.en.mp3"
+      },
+      "yue": {
+        "text": "個路徑喺 repository 外面。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-outside-repository.yue.mp3"
+      },
+      "melody": "err-outside-repository.melody.wav"
+    },
+    {
+      "id": "err-lock-file-exists",
+      "category": "error",
+      "en": {
+        "text": "A lock file already exists.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-lock-file-exists.en.mp3"
+      },
+      "yue": {
+        "text": "已經有個 lock 檔。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-lock-file-exists.yue.mp3"
+      },
+      "melody": "err-lock-file-exists.melody.wav"
+    },
+    {
+      "id": "err-no-merge-to-abort",
+      "category": "error",
+      "en": {
+        "text": "There's no merge to abort.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-no-merge-to-abort.en.mp3"
+      },
+      "yue": {
+        "text": "冇合併可以取消。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-no-merge-to-abort.yue.mp3"
+      },
+      "melody": "err-no-merge-to-abort.melody.wav"
+    },
+    {
+      "id": "err-local-changes-overwritten",
+      "category": "error",
+      "en": {
+        "text": "Your local changes would be overwritten.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-local-changes-overwritten.en.mp3"
+      },
+      "yue": {
+        "text": "你本機嘅改動會俾覆蓋。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-local-changes-overwritten.yue.mp3"
+      },
+      "melody": "err-local-changes-overwritten.melody.wav"
+    },
+    {
+      "id": "err-unresolved-conflicts",
+      "category": "error",
+      "en": {
+        "text": "There are unresolved conflicts.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-unresolved-conflicts.en.mp3"
+      },
+      "yue": {
+        "text": "仲有衝突未解決。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-unresolved-conflicts.yue.mp3"
+      },
+      "melody": "err-unresolved-conflicts.melody.wav"
+    },
+    {
+      "id": "err-gpg-sign-failed",
+      "category": "error",
+      "en": {
+        "text": "GPG couldn't sign the commit.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-gpg-sign-failed.en.mp3"
+      },
+      "yue": {
+        "text": "GPG 簽唔到個 commit。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-gpg-sign-failed.yue.mp3"
+      },
+      "melody": "err-gpg-sign-failed.melody.wav"
+    },
+    {
+      "id": "err-conflict-modify-deleted",
+      "category": "error",
+      "en": {
+        "text": "A file was modified and deleted in different branches.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-conflict-modify-deleted.en.mp3"
+      },
+      "yue": {
+        "text": "有檔案喺唔同 branch 一邊改一邊刪。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-conflict-modify-deleted.yue.mp3"
+      },
+      "melody": "err-conflict-modify-deleted.melody.wav"
+    },
+    {
+      "id": "err-push-file-size-limit",
+      "category": "error",
+      "en": {
+        "text": "A file is too big to push.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-push-file-size-limit.en.mp3"
+      },
+      "yue": {
+        "text": "有檔案太大，push 唔到。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-push-file-size-limit.yue.mp3"
+      },
+      "melody": "err-push-file-size-limit.melody.wav"
+    },
+    {
+      "id": "err-hex-branch-rejected",
+      "category": "error",
+      "en": {
+        "text": "That branch name was rejected.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-hex-branch-rejected.en.mp3"
+      },
+      "yue": {
+        "text": "呢個 branch 名俾人拒絕。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-hex-branch-rejected.yue.mp3"
+      },
+      "melody": "err-hex-branch-rejected.melody.wav"
+    },
+    {
+      "id": "err-force-push-rejected",
+      "category": "error",
+      "en": {
+        "text": "Force push was rejected.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-force-push-rejected.en.mp3"
+      },
+      "yue": {
+        "text": "強制 push 俾人拒絕。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-force-push-rejected.yue.mp3"
+      },
+      "melody": "err-force-push-rejected.melody.wav"
+    },
+    {
+      "id": "err-invalid-ref-length",
+      "category": "error",
+      "en": {
+        "text": "That reference name is too long.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-invalid-ref-length.en.mp3"
+      },
+      "yue": {
+        "text": "個 reference 名太長。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-invalid-ref-length.yue.mp3"
+      },
+      "melody": "err-invalid-ref-length.melody.wav"
+    },
+    {
+      "id": "err-protected-needs-review",
+      "category": "error",
+      "en": {
+        "text": "This branch requires a review.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-protected-needs-review.en.mp3"
+      },
+      "yue": {
+        "text": "呢個 branch 要人 review 先得。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-protected-needs-review.yue.mp3"
+      },
+      "melody": "err-protected-needs-review.melody.wav"
+    },
+    {
+      "id": "err-protected-force-push",
+      "category": "error",
+      "en": {
+        "text": "You can't force push a protected branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-protected-force-push.en.mp3"
+      },
+      "yue": {
+        "text": "受保護嘅 branch 唔可以強制 push。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-protected-force-push.yue.mp3"
+      },
+      "melody": "err-protected-force-push.melody.wav"
+    },
+    {
+      "id": "err-protected-delete",
+      "category": "error",
+      "en": {
+        "text": "You can't delete a protected branch.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-protected-delete.en.mp3"
+      },
+      "yue": {
+        "text": "受保護嘅 branch 唔可以刪。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-protected-delete.yue.mp3"
+      },
+      "melody": "err-protected-delete.melody.wav"
+    },
+    {
+      "id": "err-protected-required-status",
+      "category": "error",
+      "en": {
+        "text": "Required checks haven't passed.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-protected-required-status.en.mp3"
+      },
+      "yue": {
+        "text": "必要嘅檢查未過。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-protected-required-status.yue.mp3"
+      },
+      "melody": "err-protected-required-status.melody.wav"
+    },
+    {
+      "id": "err-push-private-email",
+      "category": "error",
+      "en": {
+        "text": "Your email is private. Adjust your Git settings.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-push-private-email.en.mp3"
+      },
+      "yue": {
+        "text": "你個 email 係私隱，改一下 Git 設定。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-push-private-email.yue.mp3"
+      },
+      "melody": "err-push-private-email.melody.wav"
+    },
+    {
+      "id": "err-config-lock-exists",
+      "category": "error",
+      "en": {
+        "text": "The Git config is locked.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-config-lock-exists.en.mp3"
+      },
+      "yue": {
+        "text": "Git config 俾鎖住咗。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-config-lock-exists.yue.mp3"
+      },
+      "melody": "err-config-lock-exists.melody.wav"
+    },
+    {
+      "id": "err-remote-already-exists",
+      "category": "error",
+      "en": {
+        "text": "That remote already exists.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-remote-already-exists.en.mp3"
+      },
+      "yue": {
+        "text": "個 remote 已經存在。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-remote-already-exists.yue.mp3"
+      },
+      "melody": "err-remote-already-exists.melody.wav"
+    },
+    {
+      "id": "err-tag-already-exists",
+      "category": "error",
+      "en": {
+        "text": "That tag already exists.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-tag-already-exists.en.mp3"
+      },
+      "yue": {
+        "text": "個 tag 已經存在。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-tag-already-exists.yue.mp3"
+      },
+      "melody": "err-tag-already-exists.melody.wav"
+    },
+    {
+      "id": "err-merge-with-local-changes",
+      "category": "error",
+      "en": {
+        "text": "Commit or stash your changes before merging.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-merge-with-local-changes.en.mp3"
+      },
+      "yue": {
+        "text": "合併前先 commit 或者 stash 你嘅改動。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-merge-with-local-changes.yue.mp3"
+      },
+      "melody": "err-merge-with-local-changes.melody.wav"
+    },
+    {
+      "id": "err-rebase-with-local-changes",
+      "category": "error",
+      "en": {
+        "text": "Commit or stash your changes before rebasing.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-rebase-with-local-changes.en.mp3"
+      },
+      "yue": {
+        "text": "Rebase 前先 commit 或者 stash 你嘅改動。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-rebase-with-local-changes.yue.mp3"
+      },
+      "melody": "err-rebase-with-local-changes.melody.wav"
+    },
+    {
+      "id": "err-merge-commit-no-mainline",
+      "category": "error",
+      "en": {
+        "text": "This merge commit needs a mainline.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-merge-commit-no-mainline.en.mp3"
+      },
+      "yue": {
+        "text": "呢個合併 commit 要指定 mainline。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-merge-commit-no-mainline.yue.mp3"
+      },
+      "melody": "err-merge-commit-no-mainline.melody.wav"
+    },
+    {
+      "id": "err-unsafe-directory",
+      "category": "error",
+      "en": {
+        "text": "Git flagged this folder as unsafe.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-unsafe-directory.en.mp3"
+      },
+      "yue": {
+        "text": "Git 話呢個資料夾唔安全。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-unsafe-directory.yue.mp3"
+      },
+      "melody": "err-unsafe-directory.melody.wav"
+    },
+    {
+      "id": "err-path-not-in-ref",
+      "category": "error",
+      "en": {
+        "text": "That path isn't in this revision.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-path-not-in-ref.en.mp3"
+      },
+      "yue": {
+        "text": "呢個 revision 冇呢個路徑。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-path-not-in-ref.yue.mp3"
+      },
+      "melody": "err-path-not-in-ref.melody.wav"
+    },
+    {
+      "id": "err-push-secret-detected",
+      "category": "error",
+      "en": {
+        "text": "A secret was detected in your push.",
+        "voice": "en-US-AriaNeural",
+        "file": "err-push-secret-detected.en.mp3"
+      },
+      "yue": {
+        "text": "Push 入面揾到機密資料。",
+        "voice": "zh-HK-HiuMaanNeural",
+        "file": "err-push-secret-detected.yue.mp3"
+      },
+      "melody": "err-push-secret-detected.melody.wav"
+    }
+  ]
+}
