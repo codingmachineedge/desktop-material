@@ -84,7 +84,9 @@ import {
 import { CheapLfsPinThresholdBytes } from '../large-files'
 import {
   AutomaticCommitPushBatchByteLimit,
+  AutomaticCommitPushBatchGitMaintenanceArgs,
   assertAutomaticCommitPushBatchSafety,
+  computeCommitBatchProgress,
   CommitPushBatchError,
   executeCommitPushBatches,
   ICommitPushBatch,
@@ -6195,6 +6197,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
                         requiredCommitFiles.length === 0
                           ? undefined
                           : requiredCommitFiles,
+                      // A multi-batch commit suppresses background auto-gc /
+                      // auto-maintenance so a long repack cannot fire between
+                      // batches; a single repack runs once after the sequence.
+                      disableAutoMaintenance: batches.length > 1,
                     }
                   )
                 } catch (error) {
@@ -6282,15 +6288,40 @@ export class AppStore extends TypedBaseStore<IAppState> {
             await this.proveAndClearPendingCommitPushBatch(repository, pending)
             return true
           },
-          onProgress: phase => {
+          onProgress: (phase, _batch, index) => {
             if (pushAfterCommit) {
               this.setOneClickCommitPushPhase(
                 repository,
                 phase === 'committing' ? 'committing' : 'pushing'
               )
             }
+            // Surface detailed per-batch progress (which batch, files/bytes
+            // already committed) so a large change set shows real motion
+            // instead of a generic, seemingly stuck "committing files" state.
+            if (!this.isTemporaryRepositoryActive(repository)) {
+              return
+            }
+            this.repositoryStateCache.update(repository, () => ({
+              commitOperationPhase: {
+                kind: 'git-commit',
+                cheapLfsPointerCount: pinned.length,
+                batchProgress: computeCommitBatchProgress(
+                  batches,
+                  phase,
+                  index
+                ),
+              },
+            }))
+            this.emitUpdate()
           },
         })
+        // Every batch was committed and pushed with auto-gc/auto-maintenance
+        // suppressed. Run a SINGLE controlled repack now, once, to reclaim the
+        // loose objects those batches created — instead of the many mid-batch
+        // auto-repacks that would otherwise stall a large change set.
+        if (batches.length > 1) {
+          await this.repackAfterBatchedCommit(repository)
+        }
       } else if (!(await commitBatch(batches[0]))) {
         return false
       }
@@ -9711,6 +9742,31 @@ export class AppStore extends TypedBaseStore<IAppState> {
           action: { kind: 'open-repository', repositoryId: repository.id },
         })
       }
+    }
+  }
+
+  /**
+   * Run one controlled repack after a large batched commit-and-push sequence.
+   * The batched commits and pushes suppressed auto-gc/auto-maintenance so no
+   * repack stalled them mid-flight; this reclaims the loose objects they left
+   * behind in a single pass. It is best-effort: the batches are already
+   * committed and pushed, so a repack failure must never fail the operation.
+   */
+  private async repackAfterBatchedCommit(
+    repository: Repository
+  ): Promise<void> {
+    try {
+      await git(
+        [...AutomaticCommitPushBatchGitMaintenanceArgs, 'repack', '-d'],
+        repository.path,
+        'repackAfterBatchedCommit',
+        { successExitCodes: new Set([0, 1, 128]) }
+      )
+    } catch (error) {
+      log.warn(
+        'Post-batch repack failed; leaving loose objects in place',
+        error
+      )
     }
   }
 

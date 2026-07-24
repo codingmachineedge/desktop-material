@@ -65,6 +65,30 @@ touches real releases.
   `upload-release-asset` transfer boundary. See
   [docs/features/integrations/local-actions-runner.md](docs/features/integrations/local-actions-runner.md).
 
+## July 24 batching dual caps, commit progress, and gc isolation — **Implemented and locally verified**
+
+- Automatic commit batching now bounds every batch by **both** a file-count
+  ceiling (10,000 files) **and** the 1.4 GB changed-blob byte ceiling, whichever
+  is reached first. The legacy-history rebatching decision applies the same dual
+  ceiling, so a local-only commit whose file count alone exceeds the cap is
+  rebuilt into bounded batches even when its bytes fit, while a combined range
+  that only crosses a ceiling in aggregate is pushed one existing tip at a time.
+- Each committed batch is still pushed and proven at the remote tip before the
+  next commit starts; a push failure aborts before the next batch. The existing
+  gh-credential push fallback is unchanged and no `gh auth switch` is used.
+- The Changes UI now surfaces detailed commit progress (stage, batch index/total,
+  and cumulative files/bytes committed) instead of a generic "committing files"
+  state, wired through the existing `commitOperationPhase`.
+- Large batched commits, their staging, and their pushes suppress both auto-gc
+  and background auto-maintenance (`-c gc.auto=0 -c maintenance.auto=false`) so a
+  long repack never fires mid-batch and stalls the operation; a single
+  best-effort `git repack -d` runs once after the whole sequence. Ordinary
+  single-batch commits keep their normal maintenance behavior.
+- Verified locally: `npx tsc --noEmit` clean for the changed files, Prettier
+  clean, and green node:test suites — `commit-push-batching` (19), the mock
+  `git/local-commit-batching` (24), `legacy local commit batching entry points`
+  (8), and the real-Git `git/local-commit-batching-git` integration suite.
+
 ## July 23 cross-lane updater recovery — **Verified**
 
 Commits `241cc90ce9` and `04246fdf12` moved both release lanes into one

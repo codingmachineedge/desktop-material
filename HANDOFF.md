@@ -112,6 +112,56 @@ pushes).
   account-bound `upload-release-asset` boundary) is a documented follow-up.
   A live container run is not covered by unit tests.
 
+## 2026-07-24 batching dual caps, detailed commit progress, and gc isolation
+
+Extended the automatic local commit batching and commit progress.
+
+- **Dual per-batch caps.** Batching is now bounded by **both** a configurable
+  file-count ceiling (default 10,000 files, `AutomaticLocalCommitBatchFileCountLimit`,
+  kept in lockstep with the existing per-batch path bound) **and** the existing
+  1.4 GB changed-blob byte ceiling, whichever is reached first. `createLocalCommitBatchPlan`
+  threads the file-count limit into the shared splitter, and `decideLocalCommitPushBatching`
+  now considers file count as well as bytes: a single local-only commit whose file
+  count exceeds the cap is rewritten into bounded batches even when its bytes fit,
+  and a combined range that only crosses a ceiling in aggregate (every commit within
+  both caps) is pushed one existing tip at a time. The design note in
+  `commit-push-batching.ts` records why the byte default stays at the conservative
+  1.4 GB changed-blob figure (which keeps each push below the hard 1.5 GB
+  `AutomaticCommitPushMaximumBytes` push ceiling after pack/tree/commit overhead)
+  rather than a nominal 1.5 GiB.
+- **Auto-push per batch preserved.** Each committed batch is pushed and proven at
+  the remote branch tip before the next commit is created; a push failure aborts
+  before the next batch and restores the original tip where safe. No `gh auth switch`
+  is used; the existing gh-credential push path is unchanged.
+- **Detailed commit progress.** Added `ICommitBatchProgress` and the pure
+  `computeCommitBatchProgress` helper; extended the `git-commit` `commitOperationPhase`
+  variant with an optional `batchProgress` field (stage, batch index/total, cumulative
+  files/bytes committed). `_commitIncludedChanges` emits it from the batch sequencer's
+  `onProgress`, and the commit-message UI renders "Committing/Pushing batch N of M
+  (X/Y files)" for multi-batch commits. Single-batch commits keep their existing text.
+- **Auto-gc / auto-maintenance isolation.** Large batched commits, their explicit
+  staging, and their pushes now carry `-c gc.auto=0 -c maintenance.auto=false`
+  (`AutomaticCommitPushBatchGitMaintenanceArgs`) so a `gc --auto` / `maintenance --auto`
+  repack cannot fire mid-batch (observed live to burn 1000+ CPU-seconds and hang the
+  operation). The working-tree commit opts into this via a new `disableAutoMaintenance`
+  createCommit flag gated to multi-batch runs, and a single best-effort `git repack -d`
+  runs once after the whole sequence (`repackAfterBatchedCommit`). Ordinary single-batch
+  commits are unchanged.
+
+Files changed: `app/src/lib/commit-push-batching.ts`, `app/src/lib/git/local-commit-batching.ts`,
+`app/src/lib/git/local-commit-batching-git.ts`, `app/src/lib/git/commit.ts`,
+`app/src/lib/app-state.ts`, `app/src/lib/stores/app-store.ts`, `app/src/ui/changes/commit-message.tsx`,
+plus the `commit-push-batching`, `git/local-commit-batching`, `git/local-commit-batching-git`,
+and `legacy local commit batching entry points` unit suites, and
+`docs/features/repository-management/automatic-commit-push-batching.md`.
+
+Local verification: `npx tsc --noEmit` is clean for the changed files (the only tree-wide
+tsc errors belong to an unrelated in-progress `settings-search`/`actions-local-run` feature
+being edited concurrently in the same checkout, not to this change). Prettier is clean on
+every changed file. node:test suites green: `commit-push-batching` 19/19, mock
+`git/local-commit-batching` 24/24, `legacy local commit batching entry points` 8/8, and the
+real-Git `git/local-commit-batching-git` integration suite.
+
 ## 2026-07-24 final integration and clean Git topology receipt
 
 The requested merge-and-cleanup pass found no separate work left to integrate.

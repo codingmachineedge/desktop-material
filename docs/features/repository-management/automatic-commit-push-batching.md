@@ -11,9 +11,15 @@ This is Desktop Material's conservative safety policy for a push containing
 many ordinary files, not a claim that every Git host publishes an exact 1.5 GB
 push limit. A single large file should normally become a Cheap LFS pointer
 first; a remaining ordinary file above the 1.4 GB changed-blob ceiling fails
-instead of creating an oversized batch. Each batch is also bounded to 10,000
-proof paths and a conservative 48 MiB raw-diff estimate, so huge collections
-of tiny or zero-byte files split before Git creates an unprovable commit.
+instead of creating an oversized batch. Each batch is bounded by **both** a
+file-count ceiling (10,000 files) **and** the byte ceiling, whichever is reached
+first, plus a conservative 48 MiB raw-diff estimate, so huge collections of tiny
+or zero-byte files split before Git creates an unprovable commit. The
+legacy-history rebatching decision applies the same dual ceiling: a local-only
+commit whose file count alone exceeds 10,000 files is rebuilt into bounded
+batches even when its total bytes fit, and a combined range that crosses either
+ceiling but keeps every individual commit within both is pushed one existing tip
+at a time.
 
 ## Behavior and configuration
 
@@ -38,10 +44,18 @@ then repeats this strict sequence:
 3. prove the created commit is the remote branch tip and refresh the repository;
 4. only then create the next commit.
 
-The immutable batch push uses process-local `pack.window=0` and
-`pack.compression=0` overrides before the `push` subcommand. Disabling delta
-search and zlib work trades a larger wire pack for predictable completion of
-the already bounded batch. These overrides apply only to the automatic exact-
+While this sequence runs, the Changes UI shows detailed commit progress instead
+of a generic "committing files" state: the current stage (committing or
+pushing), the batch index and total, and the cumulative files and bytes already
+committed across the whole change set. A batch's files and bytes count as
+committed once its own commit completes, so a very large selection shows real
+motion rather than appearing stuck.
+
+The immutable batch push uses process-local `gc.auto=0`, `maintenance.auto=false`,
+`pack.window=0`, and `pack.compression=0` overrides before the `push`
+subcommand. Suppressing auto-gc/auto-maintenance keeps a repack from firing
+between batch pushes, and disabling delta search and zlib work trades a larger
+wire pack for predictable completion of the already bounded batch. These overrides apply only to the automatic exact-
 SHA refspec; ordinary pushes and repository/global Git configuration are
 unchanged. Credentials, pre-push hooks, terminal callbacks, fast-forward rules,
 destination comparison, and the post-push exact-tip proof remain in force.
@@ -124,6 +138,24 @@ process. Desktop Material never changes the repository, global, or system
 successfully written commit into a misleading failure during automatic
 packing.
 
+A large change set committed as many batches additionally suppresses the newer
+background maintenance scheduler. Each batched commit, its explicit staging, and
+each batch push run with both `-c gc.auto=0` and `-c maintenance.auto=false` as
+leading process-local arguments, so no `gc --auto` or `maintenance --auto`
+repack fires between batches. This is deliberate: an auto-repack triggered
+mid-sequence was observed to burn over a thousand CPU-seconds, contend for the
+object-store lock, and effectively hang a very large batched commit-and-push.
+Because these are process-local `-c` overrides, ordinary single-batch commits
+keep their normal maintenance behavior and nothing is written to repository,
+global, or system configuration.
+
+Once every batch of a multi-batch sequence is committed and proven pushed,
+Desktop Material runs a **single** controlled `git repack -d` (itself with
+auto-gc and auto-maintenance suppressed) to reclaim the loose objects those
+batches created — replacing the many stalling mid-batch repacks with one pass at
+the end. That final repack is best-effort: the batches are already committed and
+pushed, so a repack failure is logged and never fails the operation.
+
 The ordinary commit flow also records the exact HEAD before invoking Git. If
 Git exits nonzero, the app reads HEAD again and accepts the operation only when
 the new object is one valid commit with the expected parent transition (or a
@@ -196,6 +228,19 @@ The exact-push adapter test also asserts the complete process-local pack argv,
 fully qualified SHA refspec, remote environment, credential account key, and
 hook callbacks; a disposable bare-remote case proves the same path performs a
 real fast-forward push.
+
+Additional unit coverage asserts the dual file-count and byte ceiling: a plan
+closes a batch on the 10,000-file cap before the byte cap, the rebatching
+decision returns a rewrite when a single commit's file count exceeds the cap and
+an existing-tip push when only the combined range does, and a file-count-driven
+rewrite proves each batch push between commits and stops before the next commit
+when a push is rejected. Detailed-progress tests assert the cumulative batch,
+file, and byte snapshot for the committing and pushing stages and reject an
+out-of-range batch index. Maintenance tests assert every batched commit,
+staging, and push invocation carries the exact `-c gc.auto=0
+-c maintenance.auto=false` prefix, and that the multi-batch commit path opts into
+suppressing auto-maintenance and runs a single best-effort repack once after the
+whole sequence.
 
 The first live large-payload acceptance used the public
 `codingmachineedge/bambu-build` repository. Desktop Material created and pushed

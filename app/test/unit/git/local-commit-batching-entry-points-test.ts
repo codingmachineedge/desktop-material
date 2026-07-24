@@ -111,4 +111,36 @@ describe('legacy local commit batching entry points', () => {
     assert.match(body, /remoteBranchRef: `refs\/heads\/\$\{remoteBranchName\}`/)
     assert.doesNotMatch(body, /upstreamRemoteName === null[\s\S]*return/)
   })
+
+  it('disables auto-maintenance per batch and repacks once after the sequence', () => {
+    const body = methodBody(
+      'public async _commitIncludedChanges(',
+      'private async _refreshRepositoryAfterCommit('
+    )
+    // The multi-batch commit opts into suppressing background maintenance.
+    assert.match(body, /disableAutoMaintenance: batches\.length > 1/)
+    // A single controlled repack runs after the batch sequence, gated to the
+    // genuinely batched (multi-batch) path.
+    const runBatches = body.indexOf('executeCommitPushBatches(')
+    const repack = body.indexOf('repackAfterBatchedCommit(')
+    assert.ok(runBatches >= 0)
+    assert.ok(repack > runBatches)
+    assert.match(
+      body,
+      /batches\.length > 1\s*\)\s*\{\s*await this\.repackAfterBatchedCommit\(/
+    )
+  })
+
+  it('runs the post-batch repack once with auto-gc suppressed and best-effort', () => {
+    const body = methodBody(
+      'private async repackAfterBatchedCommit(',
+      'private async withIsCommitting('
+    )
+    assert.match(
+      body,
+      /AutomaticCommitPushBatchGitMaintenanceArgs,\s*'repack',\s*'-d'/
+    )
+    // Best-effort: a repack failure is caught and logged, never rethrown.
+    assert.match(body, /try \{[\s\S]*\} catch \(error\) \{[\s\S]*log\.warn/)
+  })
 })

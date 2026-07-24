@@ -733,7 +733,13 @@ export class CommitMessage extends React.Component<
       (previousCommitPhase?.kind === 'cheap-lfs' &&
         currentCommitPhase?.kind === 'cheap-lfs' &&
         previousCommitPhase.progress.phase !==
-          currentCommitPhase.progress.phase)
+          currentCommitPhase.progress.phase) ||
+      (previousCommitPhase?.kind === 'git-commit' &&
+        currentCommitPhase?.kind === 'git-commit' &&
+        (previousCommitPhase.batchProgress?.batchNumber !==
+          currentCommitPhase.batchProgress?.batchNumber ||
+          previousCommitPhase.batchProgress?.phase !==
+            currentCommitPhase.batchProgress?.phase))
     if (
       this.props.isCommitting &&
       (prevProps.isCommitting !== this.props.isCommitting || commitPhaseChanged)
@@ -1998,6 +2004,12 @@ export class CommitMessage extends React.Component<
         return this.getCheapLfsOperationText()
       }
       case 'git-commit': {
+        const batch = phase.batchProgress
+        if (batch !== undefined && batch.batchCount > 1) {
+          const verb = batch.phase === 'pushing' ? 'Pushing' : 'Committing'
+          const fileWord = batch.filesTotal === 1 ? 'file' : 'files'
+          return `${verb} batch ${batch.batchNumber} of ${batch.batchCount} (${batch.filesCommitted}/${batch.filesTotal} ${fileWord})`
+        }
         const count = phase.cheapLfsPointerCount
         if (count < 1) {
           return null

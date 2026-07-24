@@ -13,6 +13,7 @@ import {
   LocalCommitBatchingError,
   validateLocalCommitBatchingInspection,
 } from '../../../src/lib/git/local-commit-batching'
+import { AutomaticLocalCommitBatchFileCountLimit } from '../../../src/lib/commit-push-batching'
 
 const oid = (digit: string) => digit.repeat(40)
 const BaseSha = oid('1')
@@ -89,6 +90,55 @@ function makeInitialPublicationInspection(
   mutable(inspection).upstreamTreeSha = EmptyTreeSha
   mutable(inspection).localOnlyCommits[0].parentShas = []
   return inspection
+}
+
+/**
+ * Build an inspection whose local-only commits each contain a chosen number of
+ * one-byte files, so the file-count ceiling can be exercised independently of
+ * the byte ceiling. Supports up to two commits (the fixture SHAs available).
+ */
+function makeMultiFileInspection(
+  perCommitFileCounts: ReadonlyArray<number>
+): ILocalCommitBatchingInspection {
+  assert(perCommitFileCounts.length <= 2)
+  const localOnlyCommits = perCommitFileCounts.map((fileCount, index) => {
+    const changes = Array.from({ length: fileCount }, (_unused, file) => ({
+      path: `c${index + 1}-f${file}.bin`,
+      sizeInBytes: 1,
+    }))
+    return {
+      sha: index === 0 ? FirstOldSha : SecondOldSha,
+      parentShas: [index === 0 ? BaseSha : FirstOldSha],
+      message: `original message ${index + 1}`,
+      payloadSizeInBytes: fileCount,
+      changes,
+    }
+  })
+  const headSha = localOnlyCommits[localOnlyCommits.length - 1]?.sha ?? BaseSha
+  const netChanges = localOnlyCommits.flatMap(commit => commit.changes)
+  const fingerprint: ILocalCommitBatchingFingerprint = {
+    branchRef: 'refs/heads/main',
+    upstreamRef: 'refs/remotes/origin/main',
+    headSha,
+    upstreamSha: BaseSha,
+    indexTreeSha: HeadTreeSha,
+    worktreeFingerprint: 'exact-final-worktree',
+    isIndexClean: true,
+    isWorktreeClean: true,
+    hasConflicts: false,
+    operationState: null,
+  }
+  return {
+    remoteName: 'origin',
+    remoteBranchRef: 'refs/heads/main',
+    headTreeSha: HeadTreeSha,
+    upstreamTreeSha: BaseTreeSha,
+    ahead: localOnlyCommits.length,
+    behind: 0,
+    localOnlyCommits,
+    netChanges,
+    fingerprint,
+  }
 }
 
 type PushBehavior =
@@ -343,6 +393,7 @@ describe('git/local-commit-batching', () => {
     )
     assert.deepStrictEqual(emptyNetBatch, {
       byteLimit: 100,
+      fileCountLimit: AutomaticLocalCommitBatchFileCountLimit,
       totalSizeInBytes: 0,
       batches: [
         {
@@ -946,6 +997,138 @@ describe('git/local-commit-batching', () => {
 
     assert.equal(error.backupRetained, false)
     assert.equal(error.restoredOriginalTip, true)
+    assert.equal(harness.getRemoteTip(), BaseSha)
+    assert.equal(harness.backups.size, 0)
+  })
+
+  it('closes a batch on the file-count cap before the size cap is reached', () => {
+    const changes = Array.from({ length: 5 }, (_unused, file) => ({
+      path: `tiny-${file}.bin`,
+      sizeInBytes: 1,
+    }))
+    const plan = createLocalCommitBatchPlan(
+      changes,
+      (paths, index, total) =>
+        `count ${index + 1}/${total}: ${paths.join('+')}`,
+      1_000_000, // The 5-byte total is far within the size ceiling.
+      2 // Two files per batch is reached first.
+    )
+
+    assert.equal(plan.fileCountLimit, 2)
+    assert.deepStrictEqual(
+      plan.batches.map(batch => batch.changes.map(change => change.path)),
+      [
+        ['tiny-0.bin', 'tiny-1.bin'],
+        ['tiny-2.bin', 'tiny-3.bin'],
+        ['tiny-4.bin'],
+      ]
+    )
+    // Every batch is within both ceilings.
+    assert.equal(
+      plan.batches.every(
+        batch => batch.changes.length <= 2 && batch.sizeInBytes <= 1_000_000
+      ),
+      true
+    )
+  })
+
+  it('decides batching from the file-count cap even when every byte fits', () => {
+    // One commit whose file count alone exceeds the limit must be rewritten.
+    const single = makeMultiFileInspection([5])
+    assert.equal(
+      decideLocalCommitPushBatching(single, 1_000_000, 3).kind,
+      'rewrite'
+    )
+    assert.deepStrictEqual(
+      decideLocalCommitPushBatching(single, 1_000_000, 10),
+      {
+        kind: 'not-needed',
+        reason: 'within-limit',
+        totalSizeInBytes: 5,
+      }
+    )
+
+    // Two commits under the per-commit cap whose combined file count crosses it
+    // are pushed one existing tip at a time rather than rewritten.
+    const pair = makeMultiFileInspection([3, 3])
+    assert.equal(
+      decideLocalCommitPushBatching(pair, 1_000_000, 4).kind,
+      'push-existing'
+    )
+    assert.equal(
+      decideLocalCommitPushBatching(pair, 1_000_000, 10).kind,
+      'not-needed'
+    )
+  })
+
+  it('rewrites a file-count-oversized commit and proves each push between batches', async () => {
+    const reviewed = makeMultiFileInspection([4])
+    const plan = createLocalCommitBatchPlan(
+      reviewed.netChanges,
+      (_paths, index, total) => `count batch ${index + 1}/${total}`,
+      1_000_000,
+      2
+    )
+    assert.equal(plan.batches.length, 2)
+    assert.equal(
+      decideLocalCommitPushBatching(reviewed, 1_000_000, 2).kind,
+      'rewrite'
+    )
+    const harness = makeHarness(reviewed)
+
+    const result = await handleLocalCommitPushBatching(
+      reviewed,
+      harness.operations,
+      plan,
+      1_000_000,
+      false,
+      2
+    )
+
+    assert.equal(result.status, 'completed')
+    if (result.status !== 'completed') {
+      assert.fail('expected completed rewrite')
+    }
+    assert.equal(result.batchesCommitted, 2)
+    assert.equal(result.batchesPushed, 2)
+    // Each batch commit is immediately followed by its own proven push, before
+    // the next commit begins.
+    assert.deepStrictEqual(
+      harness.events.filter(
+        event => event.startsWith('commit:') || event.startsWith('push:')
+      ),
+      [
+        'commit:c1-f0.bin,c1-f1.bin:count batch 1/2',
+        `push:${BaseSha}:${FirstNewSha}:force=false:success`,
+        'commit:c1-f2.bin,c1-f3.bin:count batch 2/2',
+        `push:${FirstNewSha}:${SecondNewSha}:force=false:success`,
+      ]
+    )
+    assert.equal(harness.getRemoteTip(), SecondNewSha)
+  })
+
+  it('stops a file-count rewrite before the next commit when a push is rejected', async () => {
+    const reviewed = makeMultiFileInspection([4])
+    const plan = createLocalCommitBatchPlan(
+      reviewed.netChanges,
+      (_paths, index, total) => `count batch ${index + 1}/${total}`,
+      1_000_000,
+      2
+    )
+    const harness = makeHarness(reviewed, { pushBehaviors: ['rejected'] })
+
+    const error = await expectBatchingError(
+      executeLocalCommitBatchPlan(reviewed, plan, harness.operations),
+      'push-failed'
+    )
+
+    assert.equal(error.publishedBatches, 0)
+    assert.equal(error.restoredOriginalTip, true)
+    // The second batch never committed once the first push was rejected.
+    assert.equal(
+      harness.events.filter(event => event.startsWith('commit:')).length,
+      1
+    )
     assert.equal(harness.getRemoteTip(), BaseSha)
     assert.equal(harness.backups.size, 0)
   })

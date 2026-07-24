@@ -23,6 +23,7 @@ import {
   handleLocalCommitPushBatching,
   LocalCommitBatchingError,
 } from '../../../src/lib/git/local-commit-batching'
+import { AutomaticCommitPushBatchGitMaintenanceArgs } from '../../../src/lib/commit-push-batching'
 import { git } from '../../../src/lib/git/core'
 import { Repository } from '../../../src/models/repository'
 
@@ -200,6 +201,10 @@ describe('git/local-commit-batching-git', () => {
       ),
       [
         '-c',
+        'gc.auto=0',
+        '-c',
+        'maintenance.auto=false',
+        '-c',
         'pack.window=0',
         '-c',
         'pack.compression=0',
@@ -211,6 +216,10 @@ describe('git/local-commit-batching-git', () => {
     assert.equal(calls.length, 1)
     assert.deepStrictEqual(calls[0], {
       args: [
+        '-c',
+        'gc.auto=0',
+        '-c',
+        'maintenance.auto=false',
         '-c',
         'pack.window=0',
         '-c',
@@ -293,6 +302,10 @@ describe('git/local-commit-batching-git', () => {
       false
     )
     assert.deepStrictEqual(buildLocalCommitExplicitStageArgv(), [
+      '-c',
+      'gc.auto=0',
+      '-c',
+      'maintenance.auto=false',
       '--literal-pathspecs',
       'add',
       '--all',
@@ -302,6 +315,8 @@ describe('git/local-commit-batching-git', () => {
     assert.deepStrictEqual(buildLocalCommitArgv(), [
       '-c',
       'gc.auto=0',
+      '-c',
+      'maintenance.auto=false',
       'commit',
       '-F',
       '-',
@@ -309,6 +324,8 @@ describe('git/local-commit-batching-git', () => {
     assert.deepStrictEqual(buildLocalCommitArgv(true), [
       '-c',
       'gc.auto=0',
+      '-c',
+      'maintenance.auto=false',
       'commit',
       '-F',
       '-',
@@ -324,6 +341,36 @@ describe('git/local-commit-batching-git', () => {
           `:100644 100644 ${base} ${target} R100\0old\0new\0`
         ),
       error => error instanceof LocalCommitBatchingGitError
+    )
+  })
+
+  it('suppresses auto-gc and auto-maintenance on every batched git invocation', () => {
+    assert.deepStrictEqual(AutomaticCommitPushBatchGitMaintenanceArgs, [
+      '-c',
+      'gc.auto=0',
+      '-c',
+      'maintenance.auto=false',
+    ])
+
+    const gc = AutomaticCommitPushBatchGitMaintenanceArgs
+    const startsWith = (args: ReadonlyArray<string>) =>
+      gc.every((value, index) => args[index] === value)
+
+    // The commit, staging, and push a batch performs must all carry the exact
+    // gc-disabling config as their leading arguments so no repack fires
+    // mid-batch.
+    assert.equal(startsWith(buildLocalCommitArgv()), true)
+    assert.equal(startsWith(buildLocalCommitArgv(true)), true)
+    assert.equal(startsWith(buildLocalCommitExplicitStageArgv()), true)
+    assert.equal(
+      startsWith(
+        buildLocalCommitBatchingExactPushArgv(
+          'origin',
+          oid('a'),
+          'refs/heads/main'
+        )
+      ),
+      true
     )
   })
 
@@ -659,7 +706,9 @@ describe('git/local-commit-batching-git', () => {
           call =>
             call.args[0] === '-c' &&
             call.args[1] === 'gc.auto=0' &&
-            call.args[2] === 'commit'
+            call.args[2] === '-c' &&
+            call.args[3] === 'maintenance.auto=false' &&
+            call.args[4] === 'commit'
         ),
       true
     )

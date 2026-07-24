@@ -504,6 +504,13 @@ export interface ICreateCommitOptions extends HookCallbackOptions {
    * bytes must survive both staging and commit hooks in the resulting tree.
    */
   readonly requiredFiles?: ReadonlyArray<IRequiredCommitFile>
+  /**
+   * Set only by the large/batched commit path. When true, this commit also
+   * suppresses the newer background `maintenance --auto` (classic `gc --auto`
+   * is always suppressed) so a long auto-repack never fires between batches.
+   * A single controlled repack runs once after the whole batch sequence.
+   */
+  readonly disableAutoMaintenance?: boolean
 }
 
 export interface IRequiredCommitFile {
@@ -729,7 +736,17 @@ export async function createCommit(
   if (options?.allowEmpty) {
     args.push('--allow-empty')
   }
-  const commitArguments = ['-c', 'gc.auto=0', 'commit', ...args]
+  const commitArguments = [
+    '-c',
+    'gc.auto=0',
+    // The large/batched path also suppresses background auto-maintenance so a
+    // long repack never fires between batches; ordinary commits keep it.
+    ...(options?.disableAutoMaintenance
+      ? ['-c', 'maintenance.auto=false']
+      : []),
+    'commit',
+    ...args,
+  ]
 
   await options?.onCommitIndexPrepared?.()
 

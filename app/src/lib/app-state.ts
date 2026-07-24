@@ -78,6 +78,7 @@ import type { Model } from '@github/copilot-sdk/dist/generated/rpc'
 import type { IAutomationSettingsState } from './automation/automation-settings'
 import type { IMergeAllState } from './automation/merge-all'
 import type { ICheapLfsAutoPinProgress } from './cheap-lfs/operations'
+import type { ICommitBatchProgress } from './commit-push-batching'
 
 export enum SelectionType {
   Repository,
@@ -637,6 +638,12 @@ export type CommitOperationPhase =
   | {
       readonly kind: 'git-commit'
       readonly cheapLfsPointerCount: number
+      /**
+       * Detailed automatic commit-batch progress, present only while a commit
+       * is split into more than one commit-and-push batch. Absent for an
+       * ordinary single-batch commit, which keeps its existing behavior.
+       */
+      readonly batchProgress?: ICommitBatchProgress
     }
 
 export interface IRepositoryState {

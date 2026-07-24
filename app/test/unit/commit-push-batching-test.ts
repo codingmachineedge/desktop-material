@@ -2,9 +2,12 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import {
   AutomaticCommitPushBatchByteLimit,
+  AutomaticCommitPushBatchGitMaintenanceArgs,
   AutomaticCommitPushBatchMaximumPaths,
   AutomaticCommitPushMaximumBytes,
+  AutomaticLocalCommitBatchFileCountLimit,
   assertAutomaticCommitPushBatchSafety,
+  computeCommitBatchProgress,
   CommitPushBatchError,
   executeCommitPushBatches,
   measureWorkingTreeBatchFiles,
@@ -348,5 +351,96 @@ describe('automatic commit and push batching', () => {
         error.batchIndex === 0
     )
     assert.deepEqual(events, ['commit:0', 'push:0'])
+  })
+
+  it('carries process-local config that disables auto-gc and auto-maintenance', () => {
+    assert.deepStrictEqual(AutomaticCommitPushBatchGitMaintenanceArgs, [
+      '-c',
+      'gc.auto=0',
+      '-c',
+      'maintenance.auto=false',
+    ])
+  })
+
+  it('defaults the local-commit file-count cap to the per-batch path bound', () => {
+    assert.equal(
+      AutomaticLocalCommitBatchFileCountLimit,
+      AutomaticCommitPushBatchMaximumPaths
+    )
+    assert.equal(AutomaticLocalCommitBatchFileCountLimit, 10_000)
+  })
+
+  it('reports cumulative batch, file, and byte progress for each stage', () => {
+    const batches = splitCommitPushBatches(
+      [
+        { item: 'a', path: 'a', sizeInBytes: 4 },
+        { item: 'b', path: 'b', sizeInBytes: 6 },
+        { item: 'c', path: 'c', sizeInBytes: 3 },
+      ],
+      10
+    )
+    // Two batches: [a, b] (10 bytes) and [c] (3 bytes).
+    assert.equal(batches.length, 2)
+
+    // While committing the first batch nothing is committed yet.
+    assert.deepStrictEqual(
+      computeCommitBatchProgress(batches, 'committing', 0),
+      {
+        phase: 'committing',
+        batchNumber: 1,
+        batchCount: 2,
+        filesCommitted: 0,
+        filesTotal: 3,
+        bytesCommitted: 0,
+        bytesTotal: 13,
+      }
+    )
+    // While pushing the first batch its two files/10 bytes are committed.
+    assert.deepStrictEqual(computeCommitBatchProgress(batches, 'pushing', 0), {
+      phase: 'pushing',
+      batchNumber: 1,
+      batchCount: 2,
+      filesCommitted: 2,
+      filesTotal: 3,
+      bytesCommitted: 10,
+      bytesTotal: 13,
+    })
+    // Committing the final batch: the first batch is done, this one is not.
+    assert.deepStrictEqual(
+      computeCommitBatchProgress(batches, 'committing', 1),
+      {
+        phase: 'committing',
+        batchNumber: 2,
+        batchCount: 2,
+        filesCommitted: 2,
+        filesTotal: 3,
+        bytesCommitted: 10,
+        bytesTotal: 13,
+      }
+    )
+    // Pushing the final batch: everything is committed.
+    assert.deepStrictEqual(computeCommitBatchProgress(batches, 'pushing', 1), {
+      phase: 'pushing',
+      batchNumber: 2,
+      batchCount: 2,
+      filesCommitted: 3,
+      filesTotal: 3,
+      bytesCommitted: 13,
+      bytesTotal: 13,
+    })
+  })
+
+  it('rejects an out-of-range batch progress index', () => {
+    const batches = splitCommitPushBatches(
+      [{ item: 'a', path: 'a', sizeInBytes: 4 }],
+      10
+    )
+    assert.throws(
+      () => computeCommitBatchProgress(batches, 'committing', 1),
+      (error: unknown) =>
+        error instanceof CommitPushBatchError &&
+        error.kind === 'invalid-limit' &&
+        error.batchIndex === 1
+    )
   })
 })

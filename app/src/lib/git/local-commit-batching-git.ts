@@ -5,7 +5,11 @@ import { isAbsolute, join } from 'path'
 
 import { Repository } from '../../models/repository'
 import { IRemote } from '../../models/remote'
-import { AutomaticCommitPushBatchByteLimit } from '../commit-push-batching'
+import {
+  AutomaticCommitPushBatchByteLimit,
+  AutomaticCommitPushBatchGitMaintenanceArgs,
+  AutomaticLocalCommitBatchFileCountLimit,
+} from '../commit-push-batching'
 import {
   createLocalCommitBatchPlan,
   decideLocalCommitPushBatching,
@@ -122,7 +126,8 @@ export interface ILocalCommitBatchingGitSession {
   readonly inspect: () => Promise<ILocalCommitBatchingInspection>
   readonly prepare: (
     messageForBatch: LocalCommitBatchMessageFactory,
-    byteLimit?: number
+    byteLimit?: number,
+    fileCountLimit?: number
   ) => Promise<ILocalCommitBatchingGitPreparation>
 }
 
@@ -259,6 +264,8 @@ export function buildLocalCommitBatchingExactPushArgv(
   requireObjectId(headSha, 'push tip')
   requireRemoteBranchRef(remoteBranchRef)
   return [
+    // Suppress auto-gc/auto-maintenance so no repack fires between batch pushes.
+    ...AutomaticCommitPushBatchGitMaintenanceArgs,
     '-c',
     'pack.window=0',
     '-c',
@@ -324,6 +331,8 @@ export function buildLocalCommitRawDiffArgv(
 /** Paths are supplied only through NUL-delimited stdin. */
 export function buildLocalCommitExplicitStageArgv(): string[] {
   return [
+    // Suppress auto-gc/auto-maintenance while staging a large batch.
+    ...AutomaticCommitPushBatchGitMaintenanceArgs,
     '--literal-pathspecs',
     'add',
     '--all',
@@ -335,8 +344,8 @@ export function buildLocalCommitExplicitStageArgv(): string[] {
 /** Messages are supplied only through stdin so they never enter argv/logs. */
 export function buildLocalCommitArgv(allowEmpty: boolean = false): string[] {
   return [
-    '-c',
-    'gc.auto=0',
+    // Suppress auto-gc/auto-maintenance so no repack fires mid-batch.
+    ...AutomaticCommitPushBatchGitMaintenanceArgs,
     'commit',
     '-F',
     '-',
@@ -1950,10 +1959,15 @@ export function createLocalCommitBatchingGitSession(
 
   const prepare = async (
     messageForBatch: LocalCommitBatchMessageFactory,
-    byteLimit: number = AutomaticCommitPushBatchByteLimit
+    byteLimit: number = AutomaticCommitPushBatchByteLimit,
+    fileCountLimit: number = AutomaticLocalCommitBatchFileCountLimit
   ): Promise<ILocalCommitBatchingGitPreparation> => {
     const inspection = await inspect()
-    const decision = decideLocalCommitPushBatching(inspection, byteLimit)
+    const decision = decideLocalCommitPushBatching(
+      inspection,
+      byteLimit,
+      fileCountLimit
+    )
     return decision.kind === 'rewrite'
       ? {
           inspection,
@@ -1961,7 +1975,8 @@ export function createLocalCommitBatchingGitSession(
           rewritePlan: createLocalCommitBatchPlan(
             inspection.netChanges,
             messageForBatch,
-            byteLimit
+            byteLimit,
+            fileCountLimit
           ),
         }
       : { inspection, decision }

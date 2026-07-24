@@ -2,6 +2,7 @@ import { isAbsolute } from 'path'
 
 import {
   AutomaticCommitPushBatchByteLimit,
+  AutomaticLocalCommitBatchFileCountLimit,
   CommitPushBatchError,
   splitCommitPushBatches,
 } from '../commit-push-batching'
@@ -71,6 +72,8 @@ export interface ILocalCommitBatch {
 
 export interface ILocalCommitBatchPlan {
   readonly byteLimit: number
+  /** Maximum number of files any one batch may commit. */
+  readonly fileCountLimit: number
   readonly totalSizeInBytes: number
   readonly batches: ReadonlyArray<ILocalCommitBatch>
 }
@@ -178,13 +181,25 @@ function validateChangedPaths(
 /**
  * Decide before checking cleanliness so an ordinary small push is never
  * blocked merely because the user has unrelated current working-tree edits.
+ *
+ * A batch is bounded by BOTH a byte ceiling and a file-count ceiling, whichever
+ * is reached first. A commit is treated as oversized (and therefore rewritten)
+ * when it exceeds either ceiling; a combined range that stays within both
+ * ceilings per commit but crosses one in aggregate is pushed one existing tip
+ * at a time.
  */
 export function decideLocalCommitPushBatching(
   inspection: ILocalCommitBatchingInspection,
-  byteLimit: number = AutomaticCommitPushBatchByteLimit
+  byteLimit: number = AutomaticCommitPushBatchByteLimit,
+  fileCountLimit: number = AutomaticLocalCommitBatchFileCountLimit
 ): LocalCommitPushBatchingDecision {
   if (!Number.isSafeInteger(byteLimit) || byteLimit <= 0) {
     planError('Automatic local-commit batching requires a positive byte limit.')
+  }
+  if (!Number.isSafeInteger(fileCountLimit) || fileCountLimit <= 0) {
+    planError(
+      'Automatic local-commit batching requires a positive file-count limit.'
+    )
   }
   if (inspection.localOnlyCommits.length === 0) {
     return {
@@ -195,6 +210,7 @@ export function decideLocalCommitPushBatching(
   }
 
   let totalSizeInBytes = 0
+  let totalFileCount = 0
   const oversizedCommitShas = new Array<string>()
   for (const commit of inspection.localOnlyCommits) {
     const measured = validateChangedPaths(commit.changes, true)
@@ -210,12 +226,16 @@ export function decideLocalCommitPushBatching(
       )
     }
     totalSizeInBytes += commit.payloadSizeInBytes
-    if (commit.payloadSizeInBytes > byteLimit) {
+    totalFileCount += commit.changes.length
+    if (
+      commit.payloadSizeInBytes > byteLimit ||
+      commit.changes.length > fileCountLimit
+    ) {
       oversizedCommitShas.push(commit.sha)
     }
   }
 
-  if (totalSizeInBytes <= byteLimit) {
+  if (totalSizeInBytes <= byteLimit && totalFileCount <= fileCountLimit) {
     return { kind: 'not-needed', reason: 'within-limit', totalSizeInBytes }
   }
   if (oversizedCommitShas.length === 0) {
@@ -225,15 +245,22 @@ export function decideLocalCommitPushBatching(
 }
 
 /**
- * Build a deterministic next-fit plan. The input order is preserved, exact
- * 1.5 GiB boundaries stay together. A one-batch plan is useful when an older
- * commit was oversized but its final upstream-to-HEAD tree delta is now small.
+ * Build a deterministic next-fit plan. The input order is preserved and a batch
+ * is closed as soon as it would cross either the byte ceiling or the file-count
+ * ceiling. A one-batch plan is useful when an older commit was oversized but its
+ * final upstream-to-HEAD tree delta is now small.
  */
 export function createLocalCommitBatchPlan(
   changes: ReadonlyArray<ILocalCommitBatchingChange>,
   messageForBatch: LocalCommitBatchMessageFactory,
-  byteLimit: number = AutomaticCommitPushBatchByteLimit
+  byteLimit: number = AutomaticCommitPushBatchByteLimit,
+  fileCountLimit: number = AutomaticLocalCommitBatchFileCountLimit
 ): ILocalCommitBatchPlan {
+  if (!Number.isSafeInteger(fileCountLimit) || fileCountLimit <= 0) {
+    planError(
+      'Automatic local-commit batching requires a positive file-count limit.'
+    )
+  }
   const seenPaths = new Set<string>()
   let totalSizeInBytes = 0
   for (const change of changes) {
@@ -265,7 +292,8 @@ export function createLocalCommitBatchPlan(
         path: change.path,
         sizeInBytes: change.sizeInBytes,
       })),
-      byteLimit
+      byteLimit,
+      { maximumPathsPerBatch: fileCountLimit }
     )
   } catch (error) {
     if (error instanceof CommitPushBatchError) {
@@ -279,6 +307,7 @@ export function createLocalCommitBatchPlan(
     validateCommitMessage(message)
     return {
       byteLimit,
+      fileCountLimit,
       totalSizeInBytes,
       batches: [{ changes: [], sizeInBytes: 0, message }],
     }
@@ -294,7 +323,7 @@ export function createLocalCommitBatchPlan(
     }
   })
 
-  return { byteLimit, totalSizeInBytes, batches }
+  return { byteLimit, fileCountLimit, totalSizeInBytes, batches }
 }
 
 export interface ILocalCommitBatchingFingerprint {
@@ -687,6 +716,8 @@ function validatePlan(plan: ILocalCommitBatchPlan): void {
   if (
     !Number.isSafeInteger(plan.byteLimit) ||
     plan.byteLimit <= 0 ||
+    !Number.isSafeInteger(plan.fileCountLimit) ||
+    plan.fileCountLimit <= 0 ||
     !Number.isSafeInteger(plan.totalSizeInBytes) ||
     plan.totalSizeInBytes < 0 ||
     plan.batches.length < 1
@@ -705,7 +736,8 @@ function validatePlan(plan: ILocalCommitBatchPlan): void {
         (plan.totalSizeInBytes !== 0 || plan.batches.length !== 1)) ||
       !Number.isSafeInteger(batch.sizeInBytes) ||
       batch.sizeInBytes < 0 ||
-      batch.sizeInBytes > plan.byteLimit
+      batch.sizeInBytes > plan.byteLimit ||
+      batch.changes.length > plan.fileCountLimit
     ) {
       planError('Automatic local-commit rebatching received an invalid batch.')
     }
@@ -843,9 +875,14 @@ export async function executeExistingLocalCommitPushBatches(
   reviewed: ILocalCommitBatchingInspection,
   operations: ILocalCommitBatchingOperations,
   byteLimit: number = AutomaticCommitPushBatchByteLimit,
-  pushEvenWhenCombinedSizeIsWithinLimit: boolean = false
+  pushEvenWhenCombinedSizeIsWithinLimit: boolean = false,
+  fileCountLimit: number = AutomaticLocalCommitBatchFileCountLimit
 ): Promise<ILocalCommitBatchingResult> {
-  const decision = decideLocalCommitPushBatching(reviewed, byteLimit)
+  const decision = decideLocalCommitPushBatching(
+    reviewed,
+    byteLimit,
+    fileCountLimit
+  )
   const shouldFlushWithinLimit =
     pushEvenWhenCombinedSizeIsWithinLimit &&
     decision.kind === 'not-needed' &&
@@ -985,9 +1022,14 @@ export async function handleLocalCommitPushBatching(
   operations: ILocalCommitBatchingOperations,
   rewritePlan?: ILocalCommitBatchPlan,
   byteLimit: number = AutomaticCommitPushBatchByteLimit,
-  flushExistingBeforeNewCommit: boolean = false
+  flushExistingBeforeNewCommit: boolean = false,
+  fileCountLimit: number = AutomaticLocalCommitBatchFileCountLimit
 ): Promise<ILocalCommitBatchingResult> {
-  const decision = decideLocalCommitPushBatching(reviewed, byteLimit)
+  const decision = decideLocalCommitPushBatching(
+    reviewed,
+    byteLimit,
+    fileCountLimit
+  )
   if (decision.kind === 'not-needed') {
     if (
       flushExistingBeforeNewCommit &&
@@ -998,7 +1040,8 @@ export async function handleLocalCommitPushBatching(
         reviewed,
         operations,
         byteLimit,
-        true
+        true,
+        fileCountLimit
       )
     }
     return {
@@ -1011,10 +1054,16 @@ export async function handleLocalCommitPushBatching(
     return executeExistingLocalCommitPushBatches(
       reviewed,
       operations,
-      byteLimit
+      byteLimit,
+      false,
+      fileCountLimit
     )
   }
-  if (rewritePlan === undefined || rewritePlan.byteLimit !== byteLimit) {
+  if (
+    rewritePlan === undefined ||
+    rewritePlan.byteLimit !== byteLimit ||
+    rewritePlan.fileCountLimit !== fileCountLimit
+  ) {
     throw new LocalCommitBatchingError(
       'invalid-plan',
       'An individually oversized local commit needs an exact reviewed rewrite plan.'
@@ -1037,7 +1086,8 @@ export async function executeLocalCommitBatchPlan(
   validatePlan(plan)
   requirePlanMatchesReviewedNetChanges(plan, reviewed)
   if (
-    decideLocalCommitPushBatching(reviewed, plan.byteLimit).kind !== 'rewrite'
+    decideLocalCommitPushBatching(reviewed, plan.byteLimit, plan.fileCountLimit)
+      .kind !== 'rewrite'
   ) {
     throw new LocalCommitBatchingError(
       'not-oversized',
@@ -1246,13 +1296,14 @@ export async function executeLocalCommitBatchPlan(
         !Number.isSafeInteger(commitResult.sizeInBytes) ||
         commitResult.sizeInBytes < 0 ||
         commitResult.sizeInBytes !== batch.sizeInBytes ||
-        commitResult.sizeInBytes > plan.byteLimit
+        commitResult.sizeInBytes > plan.byteLimit ||
+        commitResult.paths.length > plan.fileCountLimit
       ) {
         throw new LocalCommitBatchingError(
           'commit-failed',
           `Automatic commit batch ${
             index + 1
-          } contained unplanned paths or exceeded the byte limit.`
+          } contained unplanned paths or exceeded the byte or file-count limit.`
         )
       }
       if (

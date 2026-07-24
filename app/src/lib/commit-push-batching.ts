@@ -14,6 +14,36 @@ export const AutomaticCommitPushBatchByteLimit = 1_400_000_000
 /** Bound both Git argument/proof work and pathological tiny-file batches. */
 export const AutomaticCommitPushBatchMaximumPaths = 10_000
 
+/**
+ * Default file-count ceiling for one automatic local-commit batch. A batch is
+ * flushed and a new one started once it would exceed EITHER this many files OR
+ * the byte limit, whichever is reached first. It is kept in lockstep with the
+ * per-batch path bound above so the split planner and the batching decision
+ * agree on a single, configurable file ceiling.
+ *
+ * The companion size ceiling stays at `AutomaticCommitPushBatchByteLimit`
+ * (~1.4 GB of changed blobs). That conservative value — rather than a nominal
+ * 1.5 GiB (1_610_612_736 bytes) — is intentional: it keeps the resulting pack
+ * comfortably below the app's hard 1.5 GB (`AutomaticCommitPushMaximumBytes`,
+ * 1_500_000_000 bytes) push ceiling after pack/tree/commit/protocol overhead.
+ */
+export const AutomaticLocalCommitBatchFileCountLimit =
+  AutomaticCommitPushBatchMaximumPaths
+
+/**
+ * Process-local Git config that suppresses BOTH the classic `gc --auto` and the
+ * newer background `maintenance --auto` for the duration of a single Git
+ * invocation. Batched commits, staging, and pushes carry this so that a long
+ * auto-repack never fires mid-batch — observed live to burn 1000+ CPU-seconds,
+ * contend for the object-store lock, and effectively hang a large batched
+ * commit-and-push. A single controlled repack is run once after every batch is
+ * pushed instead. These `-c` values apply only to the process they are passed
+ * to and never persist to repository configuration, so ordinary small commits
+ * keep their normal maintenance behavior.
+ */
+export const AutomaticCommitPushBatchGitMaintenanceArgs: ReadonlyArray<string> =
+  ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false']
+
 /** Stay comfortably below the proof reader's hard 64 MiB stdout ceiling. */
 export const AutomaticCommitPushBatchProofByteBudget = 48 * 1024 * 1024
 
@@ -585,6 +615,78 @@ export interface ICommitPushBatchExecution<T> {
     index: number,
     total: number
   ) => void
+}
+
+/**
+ * Detailed, UI-facing snapshot of how far an automatic commit-and-push
+ * sequence has progressed. Surfaced so a large change set shows real motion
+ * (which batch, how many files/bytes are already committed) instead of a
+ * generic "committing files" state that can look stuck.
+ */
+export interface ICommitBatchProgress {
+  /** The stage of the current batch: still committing, or pushing it. */
+  readonly phase: 'committing' | 'pushing'
+  /** 1-based index of the batch currently being processed. */
+  readonly batchNumber: number
+  /** Total number of batches this commit was split into. */
+  readonly batchCount: number
+  /** Files whose batch commit has already completed. */
+  readonly filesCommitted: number
+  /** Total files across every batch of this commit. */
+  readonly filesTotal: number
+  /** Changed bytes whose batch commit has already completed. */
+  readonly bytesCommitted: number
+  /** Total changed bytes across every batch of this commit. */
+  readonly bytesTotal: number
+}
+
+/**
+ * Derive a cumulative progress snapshot for `executeCommitPushBatches`. A
+ * batch's files and bytes count as committed once its own commit has completed:
+ * during the `committing` stage only earlier batches are done, and during the
+ * `pushing` stage this batch's commit has completed too.
+ */
+export function computeCommitBatchProgress<T>(
+  batches: ReadonlyArray<ICommitPushBatch<T>>,
+  phase: 'committing' | 'pushing',
+  index: number
+): ICommitBatchProgress {
+  if (!Number.isInteger(index) || index < 0 || index >= batches.length) {
+    throw new CommitPushBatchError(
+      'invalid-limit',
+      'Automatic commit batch progress received an out-of-range batch index.',
+      null,
+      index
+    )
+  }
+
+  let filesTotal = 0
+  let bytesTotal = 0
+  let filesBefore = 0
+  let bytesBefore = 0
+  for (let i = 0; i < batches.length; i++) {
+    const batchFiles = batches[i].items.length
+    const batchBytes = batches[i].sizeInBytes
+    filesTotal += batchFiles
+    bytesTotal += batchBytes
+    if (i < index) {
+      filesBefore += batchFiles
+      bytesBefore += batchBytes
+    }
+  }
+
+  const includeCurrent = phase === 'pushing'
+  return {
+    phase,
+    batchNumber: index + 1,
+    batchCount: batches.length,
+    filesCommitted:
+      filesBefore + (includeCurrent ? batches[index].items.length : 0),
+    filesTotal,
+    bytesCommitted:
+      bytesBefore + (includeCurrent ? batches[index].sizeInBytes : 0),
+    bytesTotal,
+  }
 }
 
 /**
