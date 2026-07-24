@@ -17,10 +17,17 @@ describe('command-scoped commit auto-GC suppression', () => {
       'app/src/lib/stores/helpers/create-tutorial-repository.ts'
     )
 
-    assert.match(commit, /\['-c', 'gc\.auto=0', 'commit', \.\.\.args\]/)
+    assert.match(
+      commit,
+      /\[\s*'-c',\s*'gc\.auto=0',[\s\S]*?'commit',\s*\.\.\.args,?\s*\]/
+    )
     assert.match(
       batching,
-      /buildLocalCommitArgv[\s\S]*?'gc\.auto=0'[\s\S]*?'commit'[\s\S]*?'-F'[\s\S]*?'-'/
+      /buildLocalCommitArgv[\s\S]*?AutomaticCommitPushBatchGitMaintenanceArgs[\s\S]*?'commit'[\s\S]*?'-F'[\s\S]*?'-'/
+    )
+    assert.match(
+      source('app/src/lib/commit-push-batching.ts'),
+      /AutomaticCommitPushBatchGitMaintenanceArgs[\s\S]*?'-c',\s*'gc\.auto=0',\s*'-c',\s*'maintenance\.auto=false'/
     )
     assert.match(merge, /\['-c', 'gc\.auto=0', 'commit', '--no-edit'\]/)
     assert.match(

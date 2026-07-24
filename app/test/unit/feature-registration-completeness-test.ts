@@ -45,7 +45,9 @@ describe('public feature registration completeness', () => {
     for (const tab of registered) {
       assert.match(
         preferences,
-        new RegExp(`getTabId\\(PreferencesTab\\.${tab}\\)`),
+        new RegExp(
+          `(?:getTabId|renderRailTab)\\(\\s*PreferencesTab\\.${tab}\\b`
+        ),
         `${tab} is missing its tab control`
       )
       const cases = preferences.match(

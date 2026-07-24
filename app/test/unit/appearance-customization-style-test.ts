@@ -97,13 +97,14 @@ describe('appearance customization style contracts', () => {
       )
     }
 
+    assert.match(preferences, /data-dm-feature=\{isFeature \|\| undefined\}/)
     assert.match(
       preferences,
-      /getTabId\(PreferencesTab\.AgentAccess\)[\s\S]*?data-dm-feature/
+      /renderRailTab\(\s*PreferencesTab\.AgentAccess,[\s\S]*?true\s*\)/
     )
     assert.match(
       preferences,
-      /getTabId\(PreferencesTab\.Automation\)[\s\S]*?data-dm-feature/
+      /renderRailTab\(\s*PreferencesTab\.Automation,[\s\S]*?true\s*\)/
     )
 
     for (const className of [

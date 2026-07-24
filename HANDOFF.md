@@ -1,5 +1,28 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-24 feature-wave integration into `main`
+
+The five July 24 feature branches and the narration-asset branch were merged
+into `main` sequentially: `feat/settings-search`, `feat/tab-overflow-dropdown`,
+`feat/audio-system`, `feat/audio-narration-assets` (244 MP3/WAV files +
+`manifest.json` under `app/static/audio/`), `feat/local-actions-runner`, and
+`feat/batching-filecount-progress-wip` (#14). Per the handoff plan, the
+batching WIP branch's stray concurrent-agent copies of the settings-search and
+preferences files were resolved in favor of the already-merged feature
+branches; its batching-only changes (dual caps, commit progress, gc isolation)
+merged cleanly. One integration commit follows the merges: the Sound pane
+(which merged in parallel with settings search) is now indexed by the
+settings-search catalog — tab name key in English and Cantonese plus five
+entries reusing the pane's own labels.
+
+Known follow-up: the bundled narration/melody assets are not yet played by the
+audio runtime — the narrator currently uses live TTS and SFX are synthesized;
+wiring the pre-generated files (and per-event melodies) remains task #9's
+second half. Remaining backlog after this integration: #10 sound effects
+mapping, #11 repo-themed music tracks, #15 auto-fix errors, #16 native
+large-repo handling, and the Cheap LFS end-to-end app test (push as
+codingmachineedge, big-file auto-pin, fresh-clone verify).
+
 ## 2026-07-24 settings search (feat/settings-search)
 
 Added a search box to the Settings (Preferences) dialog rail so a setting can be
