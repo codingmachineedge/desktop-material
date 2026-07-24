@@ -28,6 +28,8 @@ import {
   IBuildRunPreferences,
 } from '../../../src/models/build-run-preferences'
 import { getCheapLfsCloudCompressionPolicy } from '../../../src/lib/cheap-lfs/cloud-compression'
+import { Popup, PopupType } from '../../../src/models/popup'
+import { RepositorySettingsTab } from '../../../src/ui/repository-settings/repository-settings'
 import {
   fireEvent,
   render,
@@ -161,6 +163,7 @@ class FakeCheapLfsDispatcher implements ICheapLfsDispatcher {
   }>()
   public readonly cancelMaterializeCalls: Array<AbortSignal | undefined> = []
   public readonly removeCalls: string[] = []
+  public readonly popupCalls: Popup[] = []
   public materializeAllGate: Promise<void> = Promise.resolve()
   public materializeAllResult: ICheapLfsBatchMaterializeResult = {
     materialized: [],
@@ -179,6 +182,10 @@ class FakeCheapLfsDispatcher implements ICheapLfsDispatcher {
   public listCheapLfsPointers = async (_repository: Repository) => {
     this.listCalls++
     return this.pointers
+  }
+
+  public showPopup = async (popup: Popup): Promise<void> => {
+    this.popupCalls.push(popup)
   }
 
   public pinFileToRelease = async (
@@ -330,6 +337,26 @@ describe('CheapLfs panel', () => {
     )
     assert.ok(await screen.findByText('Cheap LFS manager'))
     assert.ok(screen.getByText(/do not need to browse GitHub Releases/i))
+  })
+
+  it('opens the Cheap LFS settings directly on Build & run', async () => {
+    const dispatcher = new FakeCheapLfsDispatcher([])
+    render(
+      <CheapLfs repository={repository} accounts={[]} dispatcher={dispatcher} />
+    )
+    await screen.findByText('Cheap LFS manager')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open Cheap LFS settings' })
+    )
+
+    assert.equal(dispatcher.popupCalls.length, 1)
+    const popup = dispatcher.popupCalls[0]
+    if (popup.type !== PopupType.RepositorySettings) {
+      assert.fail(`Expected Repository settings, got ${popup.type}`)
+    }
+    assert.equal(popup.repository, repository)
+    assert.equal(popup.initialSelectedTab, RepositorySettingsTab.BuildRun)
   })
 
   it('lists committed pointers with path, tag, asset, and size', async () => {

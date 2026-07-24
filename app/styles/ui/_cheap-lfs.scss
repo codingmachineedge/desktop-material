@@ -77,6 +77,21 @@
   }
 }
 
+.cheap-lfs-settings-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-low);
+
+  p {
+    flex: 1 1 240px;
+  }
+}
+
 .cheap-lfs-cloud-compression {
   display: flex;
   flex-direction: column;

@@ -960,6 +960,13 @@ not prove live quota, billing, organization policy, or service health. The Git
 repository stores only the pointer; the original bytes live in Release assets
 or registry layers.
 
+Before committing a private registry pointer, Desktop Material proves its exact
+tracked shared key. An unsafe selected path remains blocked unless a fresh,
+repository-bound Git status proves that the exact Windows-hostile legacy path is
+currently deleted. The exception is deletion-only: a current nondeleted unsafe
+path, an absent or mismatched status proof, and a real OCI pointer under a
+control-plane path all remain fail-closed.
+
 Desktop Material first uses a bounded exact-length `gh api` upload when GitHub CLI exists in its
 trusted Program Files location. This avoids opening Electron's native upload pipe, which can crash
 the app if its remote data-pipe consumer closes during a write. The app
@@ -1164,7 +1171,10 @@ OCI rows offer **Remove from image**, which publishes a survivor-only snapshot
 and updates the other pointers before the path is removed. The managed Release
 workflow is added to Changes for your review rather than committed silently.
 Materialize all reuses one paginated inventory per Release instead of repeating
-the same API pages for every pointer.
+the same API pages for every pointer. Choose **Open Cheap LFS settings** to jump
+straight to **Repository settings → Build & run**. The Large files page owns the
+repository view's vertical scroll, so every row and action in a long inventory
+remains reachable without a competing nested page scroll.
 
 The prepared folder is flat because GitHub Release assets cannot contain subfolders. Cheap LFS still
 remembers every original repository-relative path: files in nested folders return to those exact

@@ -33,16 +33,57 @@ already failing at the previous HEAD (the dispose assertions matched an
 outdated map shape and a line-wrapped source pattern) and were repaired with
 the field rename.
 
-Remaining verified findings, not yet fixed: committing `.git*`-prefixed paths
-whose parent directory is missing or symlinked throws an unhandled
+Remaining verified findings, not yet fixed: committing a selected **non-deleted**
+`.git*`-prefixed path whose parent directory is a symlink/junction, or whose
+leaf is a symlink or multi-link file, still throws an unhandled
 `CheapLfsTrackedPathError` that fails the whole commit
-(`app/src/lib/cheap-lfs/commit-key.ts:60`, high, a regression of "Allow
-ordinary .github commit files"); `maybeAutoMaterializeCheapLfs` awaiting the
-whole per-checkout queue can stall awaited `_selectRepository` chains behind
-long downloads (`app-store.ts`, medium); the cloud-compression action rejects
-documented-valid exactly-2-GiB legacy parts and lacks a stdin `error` listener
-in `readPointerBlobs` (`.github/actions/cheap-lfs-cloud-compression/cloud-compress.mjs`,
-medium/low).
+(`app/src/lib/cheap-lfs/commit-key.ts`, a regression of "Allow ordinary
+.github commit files"; the merged legacy-deletion guard from `9a0be385a1`
+already bypasses the more common deleted-path case);
+`maybeAutoMaterializeCheapLfs` awaiting the whole per-checkout queue can stall
+awaited `_selectRepository` chains behind long downloads (`app-store.ts`,
+medium); the cloud-compression action rejects documented-valid exactly-2-GiB
+legacy parts and lacks a stdin `error` listener in `readPointerBlobs`
+(`.github/actions/cheap-lfs-cloud-compression/cloud-compress.mjs`, medium/low).
+
+## 2026-07-23 Cheap LFS settings, scrolling, and legacy-deletion key guard
+
+The Large files manager now makes its configuration route explicit: **Open
+Cheap LFS settings** opens **Repository settings → Build & run**, where storage,
+automatic pinning, transfer concurrency, clone/open materialization, and cloud
+compression are configured. The manager is also the repository page's vertical
+scroll owner, so long pinned-file inventories remain reachable instead of being
+clipped by the repository shell.
+
+Private-registry commit-key validation keeps its pointer/key proof fail-closed.
+Its only compatibility exception is an otherwise Windows-hostile selected path
+whose exact repository-relative identity is proven deleted by a fresh live Git
+status. A current nondeleted unsafe path, a missing or mismatched status proof,
+or a real OCI pointer stored under a control-plane path is still rejected. This
+allows a legacy deletion to commit without turning path validation into a key
+bypass.
+
+UI note / 介面提示：**Open Cheap LFS settings / 開啟 Cheap LFS 設定** 會直接帶你去
+**Repository settings → Build & run**；長檔案清單都可以一路碌到底，唔使周圍搵
+設定。
+
+Exact-source verification passed **58/58** focused key, commit-entry, UI,
+localization, navigation, and temporary-workspace regressions; TypeScript and
+the full source lint passed. The fixed Lowlevel MCP production build returned
+`0`. An isolated 960×660 app then rendered 60 canonical pointers with computed
+`overflow-y: auto` (`518` px client height, `9,942` px scroll height), reached
+`assets/large-file-60.bin`, and opened `#repository-settings` with **Build &
+run** as the sole selected tab. The complete bundle/capture hashes and
+recoverable cleanup receipt are in
+`.codex/run-manifests/2026-07-23-cheap-lfs-settings-scroll-key.md`.
+
+The first concurrent publication at `9a0be385a1` passed lint, ARM64 packaging,
+packaged x64 E2E, Pages, CodeQL, and Cheap LFS cloud automation. Its x64 unit
+job found two pre-existing source-contract regexes that still expected the old
+three-item scroll-owner exception list. The follow-up makes both contracts
+expect the new Cheap LFS exception and also preserves the earlier
+Prettier-tolerant controller assertion. / 首次 push 功能本身過關，但 CI 捉到兩條舊
+regex 仲認住舊 scroll-owner 清單；今次一齊更新，唔畀測試字蝨再扮大佬。
 
 ## 2026-07-23 responsive Releases publication and live Bambu checkpoint
 

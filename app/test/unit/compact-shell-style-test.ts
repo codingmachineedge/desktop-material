@@ -43,7 +43,7 @@ describe('compact shell style contracts', () => {
 
     assert.match(
       cards,
-      /:not\(\.github-api-explorer\):not\(\.actions-view\):not\(\.github-releases-view\)\s*\{[\s\S]*?overflow: hidden;/
+      /:not\(\.github-api-explorer\):not\(\.actions-view\):not\(\.github-releases-view\):not\(\.cheap-lfs-manager-view\)\s*\{[\s\S]*?overflow: hidden;/
     )
     const actions = read('app/styles/ui/_actions-view.scss')
     assert.match(

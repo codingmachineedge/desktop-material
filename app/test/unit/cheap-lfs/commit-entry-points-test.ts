@@ -96,6 +96,28 @@ describe('cheap LFS commit entry points', () => {
     )
   })
 
+  it('refreshes selected deletions before private pointer key proof', () => {
+    const body = methodBody(
+      'public async _commitIncludedChanges(',
+      'private async _refreshRepositoryAfterCommit('
+    )
+    const deletionRefresh = body.indexOf(
+      'selectedFiles.some(file => file.isDeleted())'
+    )
+    const keyProof = body.indexOf('resolveCheapLfsCommitKeyRequirement(')
+
+    assert.ok(deletionRefresh >= 0)
+    assert.ok(keyProof > deletionRefresh)
+    assert.match(
+      body.slice(deletionRefresh, keyProof),
+      /await this\._loadStatus\(repository\)[\s\S]*file\.selection\.getSelectionType\(\) !== DiffSelectionType\.None/
+    )
+    assert.match(
+      body.slice(keyProof),
+      /relativePath: file\.path,\s*deleted: file\.isDeleted\(\)/
+    )
+  })
+
   it('waits for verified materialization when opening or completing a clone', () => {
     assert.match(
       source,

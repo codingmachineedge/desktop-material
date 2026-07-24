@@ -727,43 +727,49 @@
               <p>
                 Use the direct Large files manager to list, search, pin, remove,
                 and restore original nested paths without browsing provider
-                payloads. The Changes view can isolate files over 100 MiB and
-                keeps a compact terminal below Commit with three worker rows,
-                queued counts, sanitized phases, bytes, results, selected and
-                recommended providers with the reason, observed timing and ETA,
-                and honest manual-handoff state. Long recommendations use a
-                native keyboard-focusable disclosure. A persisted toggle chooses
-                sequential work or at most three transfers; one failed raw file
-                stays retryable while safe changes and verified pointers may
-                still commit. Release storage uses published prerelease buckets,
-                verified assets, optional cloud compression, and a bounded
-                manual browser handoff. Public repositories prepare the owned
-                compression caller in Changes automatically; private
-                repositories require explicit opt-in, and either caller runs
-                only after a reviewed commit and push. Actions compresses one
-                Release object at a time. Failed or non-beneficial objects
-                remain raw and cloneable, while all decompression and
-                verification happens locally in Desktop Material. GHCR and
-                Docker Hub instead keep the complete current object set in one
-                logical OCI image: additions and removals publish a new
-                immutable manifest, reuse unchanged blobs, and retain
-                digest-specific tags for older pointers. Timed-out GHCR layers
-                are rebuilt at half the prior bound rather than appended to, and
-                private-source chunks use AES-256-GCM with the shared key
-                tracked by that private repository. Clone/open detection and
-                Materialize all verify and replace old pointer-only working-tree
-                files locally. Ordinary small-file selections are split into
-                conservative sub-1.5 GB commit/push batches, with each remote
-                tip proven before the next commit is created. The live public
-                Bambu exercise covered 8,305 files and 14,809,588,162 bytes in
-                four UI-created batches; its first HTTP 408 preserved the exact
-                pending SHA for retry. Cloud run 30048474438 reported 13
-                compressed, 0 kept raw, and 0 failed while retaining all raw
-                originals. Commit 712ad85 passed verifier 30054805137, and a
-                fresh UI clone restored 10/10 hashes from 370–514-byte Git
-                pointers. The first automatic/manual overlap prompted
-                repository-scoped serialization instead of treating
-                hash-identical CAS recovery copies as acceptable scheduling.
+                payloads. It owns the repository page's vertical scroll so long
+                inventories remain reachable, and Open Cheap LFS settings jumps
+                directly to Repository settings → Build & run. The Changes view
+                can isolate files over 100 MiB and keeps a compact terminal
+                below Commit with three worker rows, queued counts, sanitized
+                phases, bytes, results, selected and recommended providers with
+                the reason, observed timing and ETA, and honest manual-handoff
+                state. Long recommendations use a native keyboard-focusable
+                disclosure. A persisted toggle chooses sequential work or at
+                most three transfers; one failed raw file stays retryable while
+                safe changes and verified pointers may still commit. Release
+                storage uses published prerelease buckets, verified assets,
+                optional cloud compression, and a bounded manual browser
+                handoff. Public repositories prepare the owned compression
+                caller in Changes automatically; private repositories require
+                explicit opt-in, and either caller runs only after a reviewed
+                commit and push. Actions compresses one Release object at a
+                time. Failed or non-beneficial objects remain raw and cloneable,
+                while all decompression and verification happens locally in
+                Desktop Material. GHCR and Docker Hub instead keep the complete
+                current object set in one logical OCI image: additions and
+                removals publish a new immutable manifest, reuse unchanged
+                blobs, and retain digest-specific tags for older pointers.
+                Timed-out GHCR layers are rebuilt at half the prior bound rather
+                than appended to, and private-source chunks use AES-256-GCM with
+                the shared key tracked by that private repository. Clone/open
+                detection and Materialize all verify and replace old
+                pointer-only working-tree files locally. Commit-key validation
+                permits a Windows-hostile legacy path only when fresh Git status
+                proves that exact path is deleted; current unsafe paths and real
+                control-plane OCI pointers remain blocked. Ordinary small-file
+                selections are split into conservative sub-1.5 GB commit/push
+                batches, with each remote tip proven before the next commit is
+                created. The live public Bambu exercise covered 8,305 files and
+                14,809,588,162 bytes in four UI-created batches; its first HTTP
+                408 preserved the exact pending SHA for retry. Cloud run
+                30048474438 reported 13 compressed, 0 kept raw, and 0 failed
+                while retaining all raw originals. Commit 712ad85 passed
+                verifier 30054805137, and a fresh UI clone restored 10/10 hashes
+                from 370–514-byte Git pointers. The first automatic/manual
+                overlap prompted repository-scoped serialization instead of
+                treating hash-identical CAS recovery copies as acceptable
+                scheduling.
               </p>
             </article>
 

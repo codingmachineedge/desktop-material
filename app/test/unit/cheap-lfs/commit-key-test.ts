@@ -156,6 +156,44 @@ describe('Cheap LFS private pointer commit key', () => {
     )
   })
 
+  it('ignores only a status-proven deletion of a Windows-hostile path', async t => {
+    const repository = await setupEmptyRepository(t)
+    const keyResult = await resolveCheapLfsGhcrRepositoryKey({
+      repositoryPath: repository.path,
+      visibility: 'verified-private',
+      createIfMissing: true,
+      generateRandomBytes: () => Buffer.alloc(32, 0x41),
+    })
+    const keyId = cheapLfsRegistryRepositoryKeyId(keyResult.key!)
+    keyResult.key!.fill(0)
+    await writeFile(
+      join(repository.path, 'private.ptr'),
+      privatePointerText(keyId)
+    )
+
+    const requirement = await resolveCheapLfsCommitKeyRequirement(
+      repository.path,
+      [
+        { relativePath: 'CON.txt', deleted: true },
+        { relativePath: 'private.ptr', deleted: false },
+      ],
+      'verified-private'
+    )
+    assert.deepEqual(
+      requirement?.boundPointerFiles.map(file => file.relativePath),
+      ['private.ptr']
+    )
+
+    await assert.rejects(
+      resolveCheapLfsCommitKeyRequirement(
+        repository.path,
+        [{ relativePath: 'CON.txt', deleted: false }],
+        'verified-private'
+      ),
+      /unsafe selected path/i
+    )
+  })
+
   it('does not create a key while validating a pointer whose key is missing', async t => {
     const repository = await setupEmptyRepository(t)
     const pointerPath = join(repository.path, 'missing-key.ptr')

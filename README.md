@@ -288,7 +288,10 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
   configure commit/tag signing, administer Git LFS, and run bounded guided
   bisect sessions from named Repository Tools panels. The repository rail's
   direct **Large files** manager lists, searches, pins, and materializes
-  Release- and OCI-backed Cheap LFS pointers. For Release storage, automatic
+  Release- and OCI-backed Cheap LFS pointers. It owns the repository page's
+  vertical scroll, so a long inventory stays reachable, and its direct
+  **Open Cheap LFS settings** action opens **Repository settings → Build & run**.
+  For Release storage, automatic
   uploads prefer the trusted, isolated `gh api` exact-range transport, avoiding
   Electron's crash-prone native upload pipe when GitHub CLI is available; the
   memory-bounded native path remains a compatibility fallback. Reconciliation
@@ -326,7 +329,10 @@ provider-sync exercise is recorded in [`HANDOFF.md`](HANDOFF.md).
   files stay selected for retry while unrelated changes and successful pointers
   may commit. The Changes filter can isolate files over the same 100 MiB
   threshold, and the default clone/open detector repairs both new and older
-  pointer-only clones through verified local materialization
+  pointer-only clones through verified local materialization. Private registry
+  key validation accepts a Windows-hostile legacy path only when fresh Git
+  status proves that exact selected path is deleted; a current unsafe path or a
+  real OCI pointer in a control-plane path remains blocked
 - When many ordinary small files approach a decimal 1.5 GB push, Desktop
   Material automatically creates and pushes commits with a conservative 1.4 GB
   changed-blob budget plus bounded path/proof overhead. It proves each

@@ -5947,13 +5947,42 @@ export class AppStore extends TypedBaseStore<IAppState> {
         }
       }
 
+      if (selectedFiles.some(file => file.isDeleted())) {
+        // A clone from another platform may expose a selected deletion whose
+        // path Windows cannot safely materialize. Refresh immediately before
+        // key proof so only a current deletion may bypass pointer-byte
+        // classification; a recreated or otherwise stale path is reclassified
+        // fail-closed below.
+        const selectedPaths = new Set(selectedFiles.map(file => file.path))
+        const refreshedStatus = await this._loadStatus(repository)
+        if (
+          refreshedStatus === null ||
+          !this.isTemporaryRepositoryActive(repository)
+        ) {
+          return false
+        }
+        selectedFiles = this.repositoryStateCache
+          .get(repository)
+          .changesState.workingDirectory.files.filter(
+            file =>
+              selectedPaths.has(file.path) &&
+              file.selection.getSelectionType() !== DiffSelectionType.None
+          )
+        if (selectedFiles.length === 0) {
+          return false
+        }
+      }
+
       let cheapLfsCommitKeyRequirement: ICheapLfsRequiredCommitFile | null
       try {
         const isPrivate = repository.gitHubRepository?.isPrivate
         cheapLfsCommitKeyRequirement =
           await resolveCheapLfsCommitKeyRequirement(
             repository.path,
-            selectedFiles.map(file => file.path),
+            selectedFiles.map(file => ({
+              relativePath: file.path,
+              deleted: file.isDeleted(),
+            })),
             isPrivate === true
               ? 'verified-private'
               : isPrivate === false

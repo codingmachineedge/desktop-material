@@ -52,9 +52,9 @@
 }
 
 // Most repository pages delegate scrolling to an owned descendant. The API
-// Explorer, Actions, and Releases instead become their own scroll owners when
-// their columns stack, so do not let this higher-specificity card rule override
-// those responsive contracts.
-#repository > *:not(.repository-rail):not(.focus-container):not(.tutorial-panel-component):not(.github-api-explorer):not(.actions-view):not(.github-releases-view) {
+// Explorer, Actions, Releases, and Cheap LFS instead become their own scroll
+// owners, so do not let this higher-specificity card rule override those
+// responsive contracts.
+#repository > *:not(.repository-rail):not(.focus-container):not(.tutorial-panel-component):not(.github-api-explorer):not(.actions-view):not(.github-releases-view):not(.cheap-lfs-manager-view) {
   overflow: hidden;
 }

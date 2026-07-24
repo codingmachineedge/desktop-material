@@ -1363,6 +1363,8 @@ export type TranslationKey =
   | 'cheapLfs.managerRail'
   | 'cheapLfs.managerTitle'
   | 'cheapLfs.managerIntro'
+  | 'cheapLfs.settings.location'
+  | 'cheapLfs.settings.open'
   | 'cheapLfs.cloud.title'
   | 'cheapLfs.cloud.publicAutomatic'
   | 'cheapLfs.cloud.privateToggle'
@@ -3141,6 +3143,9 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'cheapLfs.managerTitle': 'Cheap LFS manager',
   'cheapLfs.managerIntro':
     'Find, pin, search, and restore repository large files here. You do not need to browse GitHub Releases or decode asset names.',
+  'cheapLfs.settings.location':
+    'Cheap LFS settings are in Repository settings → Build & run.',
+  'cheapLfs.settings.open': 'Open Cheap LFS settings',
   'cheapLfs.cloud.title': 'Cloud compression',
   'cheapLfs.cloud.publicAutomatic':
     'Automatic for public repositories. Commit and push the reviewed workflow change once; each release object is then compressed one by one.',
@@ -4817,6 +4822,9 @@ export const cantoneseTranslations: Readonly<
   'cheapLfs.managerTitle': 'Cheap LFS 管理器',
   'cheapLfs.managerIntro':
     '喺呢度就可以搵、釘選、搜尋同還原 repo 嘅大檔案，唔使自己走入 GitHub Releases 猜資產檔名。',
+  'cheapLfs.settings.location':
+    'Cheap LFS 設定喺 Repository settings → Build & run，唔使周圍搵。',
+  'cheapLfs.settings.open': '開啟 Cheap LFS 設定',
   'cheapLfs.cloud.title': '雲端壓縮',
   'cheapLfs.cloud.publicAutomatic':
     '公開 repo 會自動開啟。第一次先檢查、commit 同 push 個 workflow 改動；之後每個 Release 物件會逐件壓縮。',

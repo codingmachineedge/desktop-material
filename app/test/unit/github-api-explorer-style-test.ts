@@ -45,7 +45,7 @@ describe('GitHub API Explorer responsive Material styles', () => {
     )
     assert.match(
       cards,
-      /:not\(\.tutorial-panel-component[\s\S]*?:not\(\.github-api-explorer\):not\(\.actions-view\):not\(\.github-releases-view\)\s*\{[\s\S]*?overflow: hidden;/
+      /:not\(\.tutorial-panel-component[\s\S]*?:not\(\.github-api-explorer\):not\(\.actions-view\):not\(\.github-releases-view\):not\(\.cheap-lfs-manager-view\)\s*\{[\s\S]*?overflow: hidden;/
     )
   })
 

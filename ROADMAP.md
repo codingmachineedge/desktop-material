@@ -43,6 +43,11 @@ in [HANDOFF.md](HANDOFF.md).
   three transfers; sequential mode remains available. Failed raw large files
   stay selected for retry while successful pointers and unrelated safe changes
   can commit, and the Changes filter can isolate files over 100 MiB.
+- The repository rail's **Large files** page owns its vertical scroll so long
+  pointer inventories remain reachable. Its direct settings action opens
+  **Repository settings → Build & run**, where the storage provider, automatic
+  pinning, transfer concurrency, clone/open materialization, and cloud policy
+  live.
 - Repository settings select published GitHub prereleases, GHCR, or Docker Hub.
   The registry modes publish the full repository object set as one logical OCI
   image within 4,096-object, 8,192-layer, and 8 MiB config/manifest proof
@@ -56,6 +61,10 @@ in [HANDOFF.md](HANDOFF.md).
   repository. The documentation calls out that this protects a registry-only
   leak, not anyone who can read the repository or its history. Private pointers
   bind the exact key id and the commit flow force-includes and proves that key.
+  Commit-key path validation has one narrow legacy exception: it permits an
+  otherwise Windows-hostile selected path only when a fresh, repository-bound
+  status proves that exact path is deleted. Current nondeleted unsafe paths and
+  real OCI pointers under control-plane paths remain fail-closed.
   Clone, pull, fetch, and open detection restores strict pointers by default,
   including old pointer-only clones; public registry and explicitly public
   GitHub.com Release restores can run while signed out.

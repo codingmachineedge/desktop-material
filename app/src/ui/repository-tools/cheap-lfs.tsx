@@ -39,6 +39,8 @@ import {
   IBuildRunPreferences,
 } from '../../models/build-run-preferences'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
+import { Popup, PopupType } from '../../models/popup'
+import { RepositorySettingsTab } from '../repository-settings/repository-settings'
 
 /**
  * The dispatcher surface the cheap-LFS panel drives. The real `Dispatcher`
@@ -47,6 +49,7 @@ import { Checkbox, CheckboxValue } from '../lib/checkbox'
  * has to select an account for the transfer itself.
  */
 export interface ICheapLfsDispatcher {
+  showPopup(popup: Popup): Promise<void>
   listCheapLfsPointers(
     repository: Repository
   ): Promise<ReadonlyArray<ICheapLfsManagedPointerEntry>>
@@ -964,6 +967,14 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     )
   }
 
+  private openCheapLfsSettings = () => {
+    void this.props.dispatcher.showPopup({
+      type: PopupType.RepositorySettings,
+      repository: this.props.repository,
+      initialSelectedTab: RepositorySettingsTab.BuildRun,
+    })
+  }
+
   private renderIntro() {
     const account = getGitHubReleasesAccount(
       this.props.repository,
@@ -996,6 +1007,12 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
             ? 'Sign in with the account selected for this repository to pin or materialize files.'
             : `Using ${account.login} · ${account.friendlyEndpoint}`}
         </p>
+        <div className="cheap-lfs-settings-link">
+          <p>{t('cheapLfs.settings.location')}</p>
+          <Button onClick={this.openCheapLfsSettings}>
+            {t('cheapLfs.settings.open')}
+          </Button>
+        </div>
       </div>
     )
   }

@@ -248,7 +248,7 @@ describe('temporary submodule mutation guard contract', () => {
     assert.match(dispose, /commitMessageGenerationAbortController\?\.abort/)
     assert.match(dispose, /copilotResolutionAbortController\?\.abort/)
     assert.match(dispose, /mergeAllControllers\?\.get/)
-    assert.match(dispose, /cheapLfsMaterializeOwners\s*\?\.get/)
+    assert.match(dispose, /cheapLfsMaterializeOwners\s*\?\.\s*get/)
 
     assert.match(
       getMethodBody(source, 'updateMergeAllState'),

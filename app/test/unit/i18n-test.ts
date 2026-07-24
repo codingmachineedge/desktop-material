@@ -124,6 +124,8 @@ describe('recent UI internationalization', () => {
       'cheapLfs.managerRail',
       'cheapLfs.managerTitle',
       'cheapLfs.managerIntro',
+      'cheapLfs.settings.location',
+      'cheapLfs.settings.open',
     ] as const) {
       const english = translate(key, 'english')
       const cantonese = translate(key, 'cantonese')

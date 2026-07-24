@@ -20,7 +20,10 @@ Material sees the pointer text, and collaborators need access to the referenced
 release to materialize the original bytes. The manager lists and searches
 committed pointers, restores one or all files, and removes the need to browse or
 decode the backing Release asset names. The same panel remains available from
-Repository Tools for users who enter through the tools hub.
+Repository Tools for users who enter through the tools hub. The repository-rail
+page owns its vertical scroll, keeping every row reachable in a long inventory.
+Choose **Open Cheap LFS settings** in that page to open **Repository settings →
+Build & run** directly.
 
 The original bytes are in the named GitHub Release asset or ordered assets, not
 inside the Git commit. A fresh clone therefore receives the pointer first.
@@ -34,8 +37,10 @@ account-gated.
 
 ## Behavior and configuration
 
-**Repository settings → Build & Run → Large-file storage** selects a
+**Repository settings → Build & run → Large-file storage** selects a
 published GitHub prerelease, one GHCR OCI image, or one Docker Hub OCI image.
+The Large files page's direct settings action opens this tab; users do not need
+to leave the repository and hunt through global preferences.
 The commit panel recommends ordinary Git, Releases, GHCR, or Docker Hub from the
 selected byte total and detected local provider setup, but does not silently
 change the saved choice. A configured account or credential does not prove live
@@ -175,6 +180,24 @@ that explains private Actions usage before recording consent. English,
 playful Hong Kong-style Cantonese, and bilingual modes cover the setting,
 manager status, local-only decompression notice, and raw/compressed/mixed
 pointer badges.
+
+### Private pointer commit-key guard
+
+A private OCI pointer binds its exact shared registry key to the commit. The
+commit preflight therefore keeps unsafe selected paths fail-closed and never
+treats an unreadable path as proof of a key. There is one narrow compatibility
+exception for deleting a legacy path that Windows cannot safely address: the
+app must freshly read repository-bound Git status and prove that the exact
+normalized selected path is currently deleted. Because no working-tree content
+is being admitted, that status-proven deletion can proceed without reopening
+the hostile name.
+
+The exception does not apply to an added, modified, renamed, untracked, missing,
+or otherwise nondeleted unsafe path, nor when live status is absent or disagrees
+with the selection. A safely readable control-plane path that contains a real
+OCI pointer also remains rejected. Ordinary manifests and workflows in such a
+control-plane directory may commit, but they cannot be used to smuggle a private
+pointer around its exact key proof.
 
 Automatic pinning reports separate hashing, release preparation, upload, and
 verification phases. With parallel upload enabled it runs at most three stable

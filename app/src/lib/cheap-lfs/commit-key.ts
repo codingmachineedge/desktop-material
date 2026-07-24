@@ -34,6 +34,17 @@ export interface ICheapLfsRequiredCommitFile {
   }>
 }
 
+/**
+ * Live status metadata for one selected Git change. A deletion is the only
+ * selected change that may safely bypass path-based pointer classification:
+ * it cannot introduce new pointer bytes, and Git repositories cloned from
+ * another platform can legitimately contain names Windows cannot materialize.
+ */
+export interface ICheapLfsCommitSelection {
+  readonly relativePath: string
+  readonly deleted: boolean
+}
+
 export class CheapLfsCommitKeyError extends Error {
   public constructor(
     message: string,
@@ -132,7 +143,7 @@ function validateSelectedCommitPath(
  */
 export async function resolveCheapLfsCommitKeyRequirement(
   repositoryPath: string,
-  selectedRelativePaths: ReadonlyArray<string>,
+  selectedRelativePaths: ReadonlyArray<string | ICheapLfsCommitSelection>,
   visibility: CheapLfsGhcrVerifiedVisibility
 ): Promise<ICheapLfsRequiredCommitFile | null> {
   const entries = new Array<{
@@ -141,7 +152,14 @@ export async function resolveCheapLfsCommitKeyRequirement(
     readonly contentSha256: string
   }>()
   const selectedPathSpellings = new Map<string, ISelectedCommitPath>()
-  for (const relativePath of selectedRelativePaths) {
+  for (const selectedPath of selectedRelativePaths) {
+    const relativePath =
+      typeof selectedPath === 'string'
+        ? selectedPath
+        : selectedPath.relativePath
+    if (typeof selectedPath !== 'string' && selectedPath.deleted) {
+      continue
+    }
     const validated = validateSelectedCommitPath(relativePath)
     if (validated === null) {
       throw new CheapLfsCommitKeyError(

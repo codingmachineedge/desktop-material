@@ -11,6 +11,10 @@ const cheapLfsStyles = readFileSync(
   join(process.cwd(), 'app', 'styles', 'ui', '_cheap-lfs.scss'),
   'utf8'
 )
+const materialCardStyles = readFileSync(
+  join(process.cwd(), 'app', 'styles', 'ui', '_material-cards.scss'),
+  'utf8'
+)
 
 describe('repository section navigation source contract', () => {
   it('uses one complete visible-section mapping for clicks and keyboard navigation', () => {
@@ -50,6 +54,11 @@ describe('repository section navigation source contract', () => {
     assert.match(
       cheapLfsStyles,
       /#repository > \.cheap-lfs-manager-view[\s\S]*?overflow-y: auto/
+    )
+    assert.match(
+      materialCardStyles,
+      /#repository > \*:not\(\.repository-rail\)[^{]*:not\(\.cheap-lfs-manager-view\)\s*\{\s*overflow: hidden;/,
+      'the higher-specificity card rule must exempt the Cheap LFS scroll owner'
     )
   })
 })
