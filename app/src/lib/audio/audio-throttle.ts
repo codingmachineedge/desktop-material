@@ -57,20 +57,51 @@ export interface IAudioDecision {
  * stack into a wall of noise.
  */
 export const GlobalSfxDebounceMs = 250
-/** Per-category SFX cooldown so the same cue doesn't rapid-fire. */
+/**
+ * Default per-category SFX cooldown so the same cue doesn't rapid-fire. Used by
+ * terminal cues (git operations, succeeded/cancelled, generic outcomes).
+ */
 export const SfxCategoryCooldownMs = 900
+/**
+ * Progress phases (`detecting`/`installing`/`building`/`running`) fire far more
+ * often than terminal cues, so they are rate-limited harder to avoid a stutter
+ * of ticks during a busy build.
+ */
+export const ProgressSfxCooldownMs = 4_000
+
+/** The in-flight Build & Run phases that share the harder progress cooldown. */
+const ProgressCategories: ReadonlySet<AudioCueCategory> =
+  new Set<AudioCueCategory>(['detecting', 'installing', 'building', 'running'])
+
+/** The per-category SFX cooldown, in ms — progress cues are held back longer. */
+export function sfxCooldownForCategory(category: AudioCueCategory): number {
+  return ProgressCategories.has(category)
+    ? ProgressSfxCooldownMs
+    : SfxCategoryCooldownMs
+}
 
 /**
- * Categories the narrator will speak. Low-signal `info` and routine `fetch`
- * events still get a sound effect but are intentionally NOT spoken, honouring
- * "only narrate meaningful events".
+ * Categories the narrator will speak. Low-signal `info`/`fetch`, the in-flight
+ * progress phases and a plain `cancelled` still get a sound effect but are
+ * intentionally NOT spoken, honouring "only narrate meaningful events".
  */
 const SpeakableCategories: ReadonlySet<AudioCueCategory> =
-  new Set<AudioCueCategory>(['commit', 'push', 'pull', 'success', 'error'])
+  new Set<AudioCueCategory>([
+    'commit',
+    'push',
+    'pull',
+    'success',
+    'succeeded',
+    'failed',
+    'error',
+  ])
 
-/** Errors are always essential — they bypass cooldown, quiet-hours and reduced-sound. */
+/**
+ * Essential cues are always audible when SFX is enabled — they bypass cooldown,
+ * debounce, quiet-hours and reduced-sound. A failed run counts as an error.
+ */
 export function isEssentialCategory(category: AudioCueCategory): boolean {
-  return category === 'error'
+  return category === 'error' || category === 'failed'
 }
 
 /** True when `hour` falls inside a (possibly midnight-wrapping) quiet window. */
@@ -129,7 +160,7 @@ export function decideAudioActions(
     const onCooldown =
       !essential &&
       lastForCategory !== 0 &&
-      nowMs - lastForCategory < SfxCategoryCooldownMs
+      nowMs - lastForCategory < sfxCooldownForCategory(event.category)
     if (!debounced && !onCooldown) {
       playSfx = true
       lastSfxAtMs = { ...state.lastSfxAtMs, [event.category]: nowMs }

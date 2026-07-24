@@ -705,6 +705,8 @@ import {
   NotificationAutomationReceiptPrefix,
 } from '../notifications/automation/notification-automation'
 import { evaluateNotificationAutomations } from '../notifications/automation/evaluate'
+import { getAudioCueStore } from '../audio/audio-cue-store'
+import type { GitAudioOperation } from '../audio/sfx-event-map'
 import {
   dismissErrorNotice,
   enqueueErrorNotice,
@@ -9660,6 +9662,9 @@ export class AppStore extends TypedBaseStore<IAppState> {
         getAccountForRepository(this.accounts, repository),
         options
       )
+
+      // Distinct "pushed" cue, gated by the optional audio system.
+      this.emitGitAudioCue('push')
     })
   }
 
@@ -9879,6 +9884,19 @@ export class AppStore extends TypedBaseStore<IAppState> {
         }))
         this.emitUpdate()
       }
+    }
+  }
+
+  /**
+   * Play the optional audio cue for a completed git operation (push/pull/fetch).
+   * Best-effort and fully gated by the audio system's own settings/throttle —
+   * it stays silent unless the user has opted in. Never throws into a git path.
+   */
+  private emitGitAudioCue(operation: GitAudioOperation): void {
+    try {
+      getAudioCueStore().handleGitOperation(operation)
+    } catch {
+      // Audio is best-effort and must never break a push/pull/fetch.
     }
   }
 
@@ -10754,6 +10772,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
       if (reviewedPreview !== undefined && !pullExecutionStarted) {
         throw new PullPreviewError('busy')
       }
+
+      // A distinct "pulled" cue, but only when a pull actually ran to completion
+      // (a no-op pull on an up-to-date branch stays silent).
+      if (pullExecutionStarted) {
+        this.emitGitAudioCue('pull')
+      }
     } catch (error) {
       if (reviewedPreview === undefined) {
         throw error
@@ -11437,6 +11461,12 @@ export class AppStore extends TypedBaseStore<IAppState> {
         await this.refreshBranchProtectionState(repository)
 
         await this._refreshRepository(repository)
+
+        // A distinct "fetched" cue for user-initiated fetches only; frequent
+        // background fetches stay silent so they never chatter.
+        if (fetchType === FetchType.UserInitiatedTask) {
+          this.emitGitAudioCue('fetch')
+        }
       } finally {
         this.updatePushPullFetchProgress(repository, null)
 

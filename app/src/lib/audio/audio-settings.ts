@@ -7,12 +7,32 @@
  * is OFF by default and every part is independently gated.
  */
 
-/** A logical category an app event maps to, driving both SFX and narration. */
+/**
+ * A logical category an app event maps to, driving both SFX and narration.
+ *
+ * Grouped by the motif family it belongs to (see `sfx-event-map.ts`):
+ *  - success: git operations and terminal good outcomes.
+ *  - progress: in-flight Build & Run phases (rate-limited harder).
+ *  - warning: a cancelled run.
+ *  - error: a failed run and the generic error.
+ *  - neutral: low-signal info.
+ */
 export type AudioCueCategory =
+  // git operations (each distinct)
   | 'commit'
   | 'push'
   | 'pull'
   | 'fetch'
+  // Build & Run progress phases
+  | 'detecting'
+  | 'installing'
+  | 'building'
+  | 'running'
+  // Build & Run terminal phases
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  // generic outcomes
   | 'success'
   | 'error'
   | 'info'
@@ -22,6 +42,13 @@ export const AudioCueCategories: ReadonlyArray<AudioCueCategory> = [
   'push',
   'pull',
   'fetch',
+  'detecting',
+  'installing',
+  'building',
+  'running',
+  'succeeded',
+  'failed',
+  'cancelled',
   'success',
   'error',
   'info',

@@ -16,5 +16,9 @@
   pre-generated per-event voice clips (English/Cantonese/bilingual, serialized
   in one non-overlapping queue) and melody cues in place of live speech and
   synthesized effects, with automatic fallback and a persisted toggle.
+- [Distinct sound-effect event mapping](sfx-event-mapping.md) — pure event →
+  category → motif mapping that gives push/fetch/pull and every Build & Run
+  phase their own cue in four motif families, with per-category cooldowns and a
+  per-cue audition grid in Settings → Sound.
 
 This category has no HTTP API. Postman collections are not applicable.

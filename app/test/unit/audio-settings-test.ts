@@ -152,6 +152,28 @@ describe('narrator lines', () => {
   it('returns null for silent categories', () => {
     assert.strictEqual(pickNarratorLine('info', 'en', 5), null)
     assert.strictEqual(pickNarratorLine('fetch', 'en', 5), null)
+    // In-flight build phases are SFX-only; a plain cancel has no line either.
+    assert.strictEqual(pickNarratorLine('detecting', 'en', 5), null)
+    assert.strictEqual(pickNarratorLine('building', 'en', 5), null)
+    assert.strictEqual(pickNarratorLine('cancelled', 'en', 5), null)
+  })
+
+  it('scales a succeeded-build line with the funny level', () => {
+    const serious = pickNarratorLine('succeeded', 'en', 1)
+    const playful = pickNarratorLine('succeeded', 'en', 5)
+    assert.ok(serious && playful)
+    assert.notStrictEqual(serious, playful)
+    const ct = pickNarratorLine('succeeded', 'zh-HK', 3)
+    assert.ok(ct && ct.length > 0)
+  })
+
+  it('keeps a failed-build line clear regardless of funny level', () => {
+    const low = pickNarratorLine('failed', 'en', 1)
+    const high = pickNarratorLine('failed', 'en', 5)
+    assert.strictEqual(low, high)
+    assert.ok(low && low.length > 0)
+    const ct = pickNarratorLine('failed', 'zh-HK', 5)
+    assert.ok(ct && ct.length > 0)
   })
 
   it('produces distinct English and Cantonese text', () => {

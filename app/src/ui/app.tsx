@@ -17,6 +17,7 @@ import {
   IssuesStore,
   RepositoryTabsStore,
   BuildRunStore,
+  BuildRunViewPhase,
   ActionsStore,
   GitHubReleasesStore,
   GitHubIssuesStore,
@@ -524,6 +525,12 @@ export class App extends React.Component<IAppProps, IAppState> {
   private audioSeeded = false
   /** Last repository path handed to the audio system, to detect changes. */
   private audioLastRepositoryPath: string | null = null
+  /**
+   * Last Build & Run phase seen per repository, so only genuine phase
+   * transitions play a cue. Seeding a repo's current phase silently on first
+   * sight keeps a mid-run reload from replaying its phase.
+   */
+  private readonly audioLastBuildRunPhase = new Map<number, BuildRunViewPhase>()
 
   public constructor(props: IAppProps) {
     super(props)
@@ -580,6 +587,12 @@ export class App extends React.Component<IAppProps, IAppState> {
     props.appStore.onDidError(error => {
       props.dispatcher.postError(error)
     })
+
+    // Build & Run phase transitions get their own distinct audio cues, fed from
+    // the dedicated build-run store (they don't travel through IAppState).
+    props.buildRunStore.onDidUpdate(repositoryId =>
+      this.syncBuildRunAudio(repositoryId)
+    )
 
     ipcRenderer.on('menu-event', (_, name) => this.onMenuEvent(name))
 
@@ -2291,6 +2304,35 @@ export class App extends React.Component<IAppProps, IAppState> {
       }
     } catch {
       // Audio is best-effort and must never break app-state handling.
+    }
+  }
+
+  /**
+   * Feed Build & Run phase transitions into the optional audio system so each
+   * phase (detecting, installing, building, running, succeeded, failed,
+   * cancelled) gets its own distinct cue. Only genuine transitions play, and the
+   * resting `idle` phase is silent. The build-run store is in-memory and always
+   * starts a repository at `idle`, so an unseen repository is treated as `idle`
+   * — the first real transition (e.g. idle -> detecting) correctly cues. Never
+   * throws.
+   */
+  private syncBuildRunAudio(repositoryId: number | null) {
+    if (repositoryId === null) {
+      return
+    }
+    try {
+      const phase =
+        this.props.buildRunStore.getStateForRepository(repositoryId).phase
+      const previous = this.audioLastBuildRunPhase.get(repositoryId) ?? 'idle'
+      if (phase === previous) {
+        return
+      }
+      this.audioLastBuildRunPhase.set(repositoryId, phase)
+      if (phase !== 'idle') {
+        this.audioCueStore.handleBuildRunPhase(phase)
+      }
+    } catch {
+      // Audio is best-effort and must never break build-run handling.
     }
   }
 

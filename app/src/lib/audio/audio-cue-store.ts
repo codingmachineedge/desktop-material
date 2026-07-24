@@ -44,6 +44,8 @@ import {
   supportedLocaleFor,
 } from './narration-assets'
 import { encodePathAsUrl } from '../path'
+import { categoryForSfxEvent, type GitAudioOperation } from './sfx-event-map'
+import type { BuildRunPhase } from '../build-run/types'
 
 /** One queued spoken item: a recorded clip and/or its live-TTS fallback text. */
 interface IQueuedUtterance {
@@ -203,6 +205,26 @@ export class AudioCueStore {
     const category = categoryForNotificationKind(entry.kind)
     const eventId = narrationEventIdForKind(entry.kind)
     this.playForEvent(category, eventId)
+  }
+
+  /**
+   * Route a completed git network/history operation (push, pull, fetch, commit)
+   * into its own distinct cue, gated through the same throttle as everything
+   * else. This is what gives push/fetch/pull audibly different feedback instead
+   * of borrowing the shared commit sound. Recorded narration stays attached to
+   * the operation's notification entry, so operation cues pass a null event id.
+   */
+  public handleGitOperation(operation: GitAudioOperation): void {
+    this.playForEvent(categoryForSfxEvent({ kind: 'git', operation }), null)
+  }
+
+  /**
+   * Route a Build & Run lifecycle phase transition into its cue. Progress phases
+   * are rate-limited harder than terminal ones and a failed run is always
+   * audible (see `decideAudioActions`).
+   */
+  public handleBuildRunPhase(phase: BuildRunPhase): void {
+    this.playForEvent(categoryForSfxEvent({ kind: 'build-run', phase }), null)
   }
 
   /**
