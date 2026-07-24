@@ -33,6 +33,21 @@ describe('floating surface layout contracts', () => {
     const component = read('app/src/ui/lib/regex-builder/regex-builder.tsx')
     const style = read('app/styles/ui/_regex-builder.scss')
 
+    // The overlay must portal out of its host dialog: every non-modal dialog is
+    // a fixed-position containing block (transform: scale(1)) that also clips
+    // (overflow: hidden), so an inline overlay is re-anchored to the small
+    // dialog box and its palette/tester edges and Apply footer get cropped.
+    // Portalling into a dedicated top-level layer rebinds `position: fixed` to
+    // the viewport so the responsive contract below is honoured at true size.
+    assert.match(component, /import \* as ReactDOM from 'react-dom'/)
+    assert.match(component, /ReactDOM\.createPortal\(overlay, host\)/)
+    assert.match(component, /function getRegexBuilderPortalHost\(\)/)
+    assert.match(component, /const RegexBuilderLayerId = 'regex-builder-layer'/)
+    assert.match(component, /host\.id = RegexBuilderLayerId/)
+    // The host is an inert box (`display: contents`) so the overlay lays out and
+    // stacks exactly as if it were a direct child of <body>.
+    assert.match(style, /#regex-builder-layer\s*\{\s*display: contents;\s*\}/)
+
     assert.match(component, /clampDialogOffset\(/)
     assert.match(component, /className="regex-builder-scroll-region"/)
     assert.match(component, /role="dialog"/)

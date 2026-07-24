@@ -129,4 +129,61 @@ describe('Regex builder v2 style contract', () => {
     assert.doesNotMatch(builder, /\btitle=/)
     assert.doesNotMatch(guide, /\btitle=/)
   })
+
+  it('portals out of host dialogs so it is never clipped by them', () => {
+    // Root cause of the clipping audit: rendered inline, the overlay is
+    // re-parented into the host <dialog>, which is simultaneously a
+    // fixed-position containing block (transform: scale(1)) and an overflow
+    // clip. Portalling to a top-level layer is the shared fix for every audited
+    // surface (preferences rail, account picker, copilot/ollama pickers, clone,
+    // submodule/subtree dialogs, repository-settings tabs, notification
+    // automations, command palette).
+    assert.match(builder, /import \* as ReactDOM from 'react-dom'/)
+    assert.match(builder, /const host = getRegexBuilderPortalHost\(\)/)
+    assert.match(
+      builder,
+      /host === null \? overlay : ReactDOM\.createPortal\(overlay, host\)/
+    )
+    // The overlay is built once then portalled — it must not be returned inline.
+    assert.match(builder, /const overlay = \(/)
+    // A dedicated, inert (`display: contents`) host on document.body.
+    assert.match(builder, /document\.body\.appendChild\(host\)/)
+    assert.match(styles, /#regex-builder-layer\s*\{\s*display: contents;\s*\}/)
+  })
+
+  it('pins the responsive contract that keeps every control reachable', () => {
+    // A min()-bounded box against the *viewport* (only correct once portalled),
+    // never wider/taller than the window minus a 50px margin.
+    assert.match(
+      styles,
+      /\.regex-builder-dialog\s*\{[\s\S]*?width: min\(900px, calc\(100vw - 50px\)\);[\s\S]*?height: min\(644px, calc\(100vh - 50px\)\);/
+    )
+    // A single internal scroll region owns overflow (flex: 1 + overflow-y auto)…
+    assert.match(
+      styles,
+      /\.regex-builder-scroll-region\s*\{[\s\S]*?flex: 1;[\s\S]*?min-height: 0;[\s\S]*?overflow-y: auto;/
+    )
+    // …so the footer stays pinned (flex: none) and its Apply button reachable at
+    // any height, down to the app minimum and 200% zoom.
+    assert.match(
+      styles,
+      /\.regex-builder-footer\s*\{[\s\S]*?flex: none;[\s\S]*?flex-wrap: wrap;/
+    )
+    assert.match(
+      styles,
+      /\.regex-builder-apply\s*\{[\s\S]*?max-width: 100%;[\s\S]*?white-space: normal;/
+    )
+    // Two-column palette collapses to one column on narrow widths, and the
+    // footer buttons grow to full width so the labels never clip.
+    assert.match(
+      styles,
+      /@media \(max-width: 760px\)[\s\S]*?\.regex-builder-palette\s*\{[\s\S]*?flex-direction: column;/
+    )
+    assert.match(
+      styles,
+      /@media \(max-width: 620px\)[\s\S]*?\.regex-builder-apply\s*\{[\s\S]*?flex: 1 1 120px;/
+    )
+    // A short-viewport rule compacts the header so the body + footer still fit.
+    assert.match(styles, /@media \(max-height: 420px\)/)
+  })
 })
