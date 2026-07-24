@@ -320,6 +320,19 @@ export class RepositoryTabStrip extends React.Component<
       }
     }
 
+    // A strip that has no realized layout (hidden, display:none, or a test DOM
+    // without layout) measures every width as zero. Those numbers carry no
+    // information, so never split on them — show every tab until real,
+    // positive measurements arrive.
+    const unmeasurable =
+      list.clientWidth <= 0 || measurements.every(m => m.width <= 0)
+    if (unmeasurable) {
+      if (this.state.overflowIds.length > 0 || this.state.pendingMeasure) {
+        this.setState({ overflowIds: [], pendingMeasure: false })
+      }
+      return
+    }
+
     const overflowButtonWidth = this.measureOverflowButtonWidth(gap)
     const availableWidth = Math.max(0, list.clientWidth - chipFootprint)
 
