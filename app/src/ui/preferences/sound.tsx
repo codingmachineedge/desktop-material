@@ -16,7 +16,9 @@ import { AudioCueStore } from '../../lib/audio/audio-cue-store'
 import {
   clampFunnyLevel,
   IAudioSystemSettings,
+  RepoMusicOverride,
 } from '../../lib/audio/audio-settings'
+import { repositoryThemeName } from '../../lib/audio/repo-theme-name'
 
 interface ISoundPreferencesProps {
   readonly audioCueStore: AudioCueStore
@@ -26,7 +28,7 @@ interface ISoundPreferencesProps {
 interface ISoundPreferencesState {
   readonly languageMode: LanguageMode
   readonly settings: IAudioSystemSettings
-  readonly repositoryTrack: string | null
+  readonly repositoryOverride: RepoMusicOverride | null
 }
 
 /** Settings pane for the optional audio system: SFX, narrator, and music. */
@@ -41,7 +43,9 @@ export class SoundPreferences extends React.Component<
     this.state = {
       languageMode: getPersistedLanguageMode(),
       settings: props.audioCueStore.getSettings(),
-      repositoryTrack: props.audioCueStore.getRepositoryMusic(props.repository),
+      repositoryOverride: props.audioCueStore.getRepositoryOverride(
+        props.repository
+      ),
     }
   }
 
@@ -433,7 +437,7 @@ export class SoundPreferences extends React.Component<
   }
 
   private renderMusicChooser() {
-    const { languageMode, repositoryTrack } = this.state
+    const { languageMode, repositoryOverride } = this.state
     const { repository } = this.props
     if (repository === null) {
       return (
@@ -446,39 +450,123 @@ export class SoundPreferences extends React.Component<
       )
     }
 
-    const label = translate('settings.soundMusicRepoLabel', languageMode, {
-      repository: bilingualVariable(repository.name, repository.name),
-    })
+    const theme = this.props.audioCueStore.getRepositoryTheme(repository)
+    const themeName =
+      theme === null ? '' : repositoryThemeName(theme, languageMode)
+    const customTrack =
+      repositoryOverride !== null && repositoryOverride.kind === 'custom'
+        ? repositoryOverride.track
+        : ''
+    const isTheme = repositoryOverride === null
+    const isCustom =
+      repositoryOverride !== null && repositoryOverride.kind === 'custom'
+    const isOff =
+      repositoryOverride !== null && repositoryOverride.kind === 'off'
+
+    const themeLabel = translate(
+      'settings.soundThemeCurrentLabel',
+      languageMode,
+      { repository: bilingualVariable(repository.name, repository.name) }
+    )
+    const stateKey = isOff
+      ? 'settings.soundThemeStateOff'
+      : isCustom
+      ? 'settings.soundThemeStateCustom'
+      : 'settings.soundThemeStateTheme'
 
     return (
-      <div className="sound-field-group">
-        <label htmlFor="sound-music-track">{label}</label>
-        <div className="sound-music-row">
-          <input
-            id="sound-music-track"
-            type="text"
-            readOnly={true}
-            value={repositoryTrack ?? ''}
-            placeholder={translate('settings.soundMusicNoTrack', languageMode)}
+      <div className="sound-theme">
+        <h3 className="sound-subheading">
+          <LocalizedText
+            translationKey="settings.soundThemeSubheading"
+            languageMode={languageMode}
           />
+        </h3>
+        <p className="settings-description">
+          <LocalizedText
+            translationKey="settings.soundThemeExplanation"
+            languageMode={languageMode}
+          />
+        </p>
+
+        <div className="sound-field-group">
+          <span className="sound-theme-name-label" id="sound-theme-name-label">
+            {themeLabel}
+          </span>
+          <output
+            className="sound-theme-name"
+            aria-labelledby="sound-theme-name-label"
+          >
+            {themeName}
+          </output>
+          <p className="settings-description" role="status">
+            <LocalizedText
+              translationKey={stateKey}
+              languageMode={languageMode}
+            />
+          </p>
+        </div>
+
+        <div className="sound-field-group">
+          <label htmlFor="sound-music-track">
+            {translate('settings.soundMusicRepoLabel', languageMode, {
+              repository: bilingualVariable(repository.name, repository.name),
+            })}
+          </label>
+          <div className="sound-music-row">
+            <input
+              id="sound-music-track"
+              type="text"
+              readOnly={true}
+              value={customTrack}
+              placeholder={translate(
+                'settings.soundMusicNoTrack',
+                languageMode
+              )}
+            />
+            <button
+              type="button"
+              className="sound-tonal-button"
+              onClick={this.chooseTrack}
+            >
+              <LocalizedText
+                translationKey="settings.soundMusicChoose"
+                languageMode={languageMode}
+              />
+            </button>
+          </div>
+        </div>
+
+        <div className="sound-theme-actions">
           <button
             type="button"
-            className="sound-tonal-button"
-            onClick={this.chooseTrack}
+            className="sound-text-button"
+            onClick={this.previewTheme}
           >
             <LocalizedText
-              translationKey="settings.soundMusicChoose"
+              translationKey="settings.soundThemePreview"
               languageMode={languageMode}
             />
           </button>
           <button
             type="button"
             className="sound-text-button"
-            onClick={this.clearTrack}
-            disabled={repositoryTrack === null}
+            onClick={this.muteHere}
+            disabled={isOff}
           >
             <LocalizedText
-              translationKey="settings.soundMusicClear"
+              translationKey="settings.soundThemeMute"
+              languageMode={languageMode}
+            />
+          </button>
+          <button
+            type="button"
+            className="sound-text-button"
+            onClick={this.useTheme}
+            disabled={isTheme}
+          >
+            <LocalizedText
+              translationKey="settings.soundThemeUseTheme"
               languageMode={languageMode}
             />
           </button>
@@ -505,16 +593,29 @@ export class SoundPreferences extends React.Component<
     if (track === null || request !== this.trackRequest) {
       return
     }
-    this.props.audioCueStore.setRepositoryMusic(repository, track)
-    this.setState({ repositoryTrack: track })
+    this.props.audioCueStore.setRepositoryCustomTrack(repository, track)
+    this.setState({ repositoryOverride: { kind: 'custom', track } })
   }
 
-  private clearTrack = () => {
+  private muteHere = () => {
     const { repository } = this.props
     if (repository === null) {
       return
     }
-    this.props.audioCueStore.setRepositoryMusic(repository, null)
-    this.setState({ repositoryTrack: null })
+    this.props.audioCueStore.muteRepository(repository)
+    this.setState({ repositoryOverride: { kind: 'off' } })
+  }
+
+  private useTheme = () => {
+    const { repository } = this.props
+    if (repository === null) {
+      return
+    }
+    this.props.audioCueStore.useRepositoryTheme(repository)
+    this.setState({ repositoryOverride: null })
+  }
+
+  private previewTheme = () => {
+    this.props.audioCueStore.previewRepositoryTheme(this.props.repository)
   }
 }

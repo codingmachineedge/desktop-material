@@ -244,3 +244,163 @@ export function setRepoMusicTrack(
   }
   return next
 }
+
+/**
+ * A per-repository music override. The absence of an override for a repository
+ * key means "use the derived, synthesized theme"; these two shapes explicitly
+ * replace it:
+ *  - `custom`: play the user's chosen local file or URL instead of the theme.
+ *  - `off`: keep this one repository silent even while music is globally on.
+ */
+export type RepoMusicOverride =
+  | { readonly kind: 'custom'; readonly track: string }
+  | { readonly kind: 'off' }
+
+/** Version tag for the on-disk per-repository music document. */
+export const RepoMusicDocumentVersion = 1
+
+/**
+ * The whole per-repository music selection, persisted as one JSON document in a
+ * dedicated Git-backed setting repository. Keys are opaque repository keys; a
+ * missing key means the repository plays its derived theme.
+ */
+export interface IRepoMusicDocument {
+  readonly version: typeof RepoMusicDocumentVersion
+  readonly overrides: Readonly<Record<string, RepoMusicOverride>>
+}
+
+export const DefaultRepoMusicDocument: IRepoMusicDocument = {
+  version: RepoMusicDocumentVersion,
+  overrides: {},
+}
+
+/** Coerce an arbitrary parsed value into a valid override, or drop it. */
+function normalizeRepoMusicOverride(value: unknown): RepoMusicOverride | null {
+  if (typeof value !== 'object' || value === null) {
+    return null
+  }
+  const raw = value as Record<string, unknown>
+  if (raw.kind === 'off') {
+    return { kind: 'off' }
+  }
+  if (
+    raw.kind === 'custom' &&
+    typeof raw.track === 'string' &&
+    raw.track.length > 0
+  ) {
+    return { kind: 'custom', track: raw.track }
+  }
+  return null
+}
+
+/** Normalize any parsed value into a clean, fully-populated music document. */
+export function normalizeRepoMusicDocument(value: unknown): IRepoMusicDocument {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return DefaultRepoMusicDocument
+  }
+  const raw = value as Record<string, unknown>
+  const source =
+    typeof raw.overrides === 'object' &&
+    raw.overrides !== null &&
+    !Array.isArray(raw.overrides)
+      ? (raw.overrides as Record<string, unknown>)
+      : {}
+  const overrides: Record<string, RepoMusicOverride> = {}
+  for (const [key, candidate] of Object.entries(source)) {
+    if (typeof key !== 'string' || key.length === 0) {
+      continue
+    }
+    const override = normalizeRepoMusicOverride(candidate)
+    if (override !== null) {
+      overrides[key] = override
+    }
+  }
+  return { version: RepoMusicDocumentVersion, overrides }
+}
+
+/** A document is valid iff it survives normalization unchanged. */
+export function isRepoMusicDocument(
+  value: unknown
+): value is IRepoMusicDocument {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).version === RepoMusicDocumentVersion &&
+    JSON.stringify(normalizeRepoMusicDocument(value)) === JSON.stringify(value)
+  )
+}
+
+export function parseRepoMusicDocument(raw: string | null): IRepoMusicDocument {
+  if (raw === null || raw.length === 0) {
+    return DefaultRepoMusicDocument
+  }
+  try {
+    return normalizeRepoMusicDocument(JSON.parse(raw))
+  } catch {
+    return DefaultRepoMusicDocument
+  }
+}
+
+export function serializeRepoMusicDocument(
+  document: IRepoMusicDocument
+): string {
+  return JSON.stringify(document)
+}
+
+/** Read one repository's override, or null when it uses the derived theme. */
+export function getRepoMusicOverride(
+  document: IRepoMusicDocument,
+  key: string
+): RepoMusicOverride | null {
+  return document.overrides[key] ?? null
+}
+
+/**
+ * Return the document with `override` assigned to `key`, or with `key` removed
+ * (reverting to the derived theme) when `override` is null. Pure.
+ */
+export function setRepoMusicOverride(
+  document: IRepoMusicDocument,
+  key: string,
+  override: RepoMusicOverride | null
+): IRepoMusicDocument {
+  const overrides: Record<string, RepoMusicOverride> = { ...document.overrides }
+  if (override === null) {
+    delete overrides[key]
+  } else {
+    overrides[key] = override
+  }
+  return { version: RepoMusicDocumentVersion, overrides }
+}
+
+/**
+ * Fold a legacy {@link RepoMusicMap} (repository key -> track) into a document,
+ * treating each legacy entry as a `custom` override. Existing overrides win so
+ * a repeated migration is a no-op and never clobbers newer choices.
+ */
+export function mergeLegacyRepoMusicMap(
+  document: IRepoMusicDocument,
+  legacy: RepoMusicMap
+): IRepoMusicDocument {
+  const overrides: Record<string, RepoMusicOverride> = { ...document.overrides }
+  for (const [key, track] of Object.entries(legacy)) {
+    if (
+      typeof key === 'string' &&
+      key.length > 0 &&
+      typeof track === 'string' &&
+      track.length > 0 &&
+      overrides[key] === undefined
+    ) {
+      overrides[key] = { kind: 'custom', track }
+    }
+  }
+  return { version: RepoMusicDocumentVersion, overrides }
+}
+
+/** Build a document straight from a legacy map (used as a bootstrap cache). */
+export function repoMusicDocumentFromLegacyMap(
+  legacy: RepoMusicMap
+): IRepoMusicDocument {
+  return mergeLegacyRepoMusicMap(DefaultRepoMusicDocument, legacy)
+}
