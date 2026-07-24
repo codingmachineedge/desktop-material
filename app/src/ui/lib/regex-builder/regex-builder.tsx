@@ -1,4 +1,5 @@
 import * as React from 'react'
+import * as ReactDOM from 'react-dom'
 import classNames from 'classnames'
 import { Octicon, OcticonSymbol } from '../../octicons'
 import * as octicons from '../../octicons/octicons.generated'
@@ -10,6 +11,53 @@ import { clampDialogOffset } from '../../dialog/dialog-geometry'
 
 /** The maximum number of visible items used to seed the tester's sample. */
 const MaxSampleItems = 50
+
+/**
+ * Id of the dedicated top-level layer the builder overlay is portalled into.
+ * Kept alongside `#dialog-layer` / `#foldout-container` / `#dragElement` as one
+ * of the app's inert overlay hosts.
+ */
+const RegexBuilderLayerId = 'regex-builder-layer'
+
+/**
+ * Resolve (creating once) the top-level host the builder overlay renders into.
+ *
+ * The builder is a viewport-anchored (`position: fixed`) floating surface that
+ * must cover the whole app. Rendered inline it is re-parented into whichever
+ * host `<dialog>` opened it, and every non-modal dialog is BOTH a fixed-position
+ * containing block (`transform: scale(1)`, _dialog.scss) AND a clipping box
+ * (`overflow: hidden`, _dialog-layer.scss). That combination re-anchors the
+ * `inset: 0` overlay to the small dialog box and crops it — the palette rail and
+ * live tester lose ~150px per side inside a 600px dialog and the footer "Apply"
+ * button falls below the clipped edge, so a composed pattern can never be
+ * applied.
+ *
+ * Portalling the overlay into a dedicated layer on `document.body` (which the
+ * `#regex-builder-layer` rule collapses with `display: contents`) removes it
+ * from every host's containing block and overflow scope. Its `position: fixed`
+ * box then resolves against the real viewport, so the responsive contract in
+ * _regex-builder.scss — `min(900px, 100vw - 50px)` × `min(644px, 100vh - 50px)`,
+ * the internal `overflow-y: auto` scroll region, and the two-column → one-column
+ * palette collapse — is honoured at the actual window size and every control,
+ * including the Apply footer, stays visible and keyboard reachable at 100–200%
+ * zoom. React portals preserve component-tree event bubbling, so host dialogs
+ * that inspect `event.target.closest('.regex-builder-overlay')` keep working.
+ */
+function getRegexBuilderPortalHost(): HTMLElement | null {
+  if (typeof document === 'undefined' || document.body === null) {
+    return null
+  }
+
+  const existing = document.getElementById(RegexBuilderLayerId)
+  if (existing !== null) {
+    return existing
+  }
+
+  const host = document.createElement('div')
+  host.id = RegexBuilderLayerId
+  document.body.appendChild(host)
+  return host
+}
 
 interface IRegexBuilderProps {
   /** Stable audit identity of the search surface that opened this builder. */
@@ -129,9 +177,13 @@ class RegexBuilderViewTab extends React.Component<IViewTabProps> {
 /**
  * A self-contained, non-modal, draggable regex builder overlay. It floats over
  * the live app (its own `pointer-events` scaffold lets clicks pass through the
- * empty margin) so it works embedded inside other dialogs such as the clone
- * dialog. Applying writes the composed pattern back into the originating search
- * field and turns that field's regex mode on.
+ * empty margin). The overlay is portalled into a top-level layer (see
+ * {@link getRegexBuilderPortalHost}) so it escapes the fixed-position containing
+ * block and overflow clip of any host dialog that opened it — the clone,
+ * repository-settings, submodule/subtree, notification-automation, command
+ * palette, and preferences dialogs all embed it without cropping it. Applying
+ * writes the composed pattern back into the originating search field and turns
+ * that field's regex mode on.
  */
 export class RegexBuilder extends React.Component<
   IRegexBuilderProps,
@@ -401,7 +453,7 @@ export class RegexBuilder extends React.Component<
     const flagsString = flagsToString(this.state.flags)
     const transform = `translate(${this.state.dragOffset.x}px, ${this.state.dragOffset.y}px)`
 
-    return (
+    const overlay = (
       <div
         className="regex-builder-overlay"
         data-search-surface-id={this.props.searchSurfaceId}
@@ -520,5 +572,11 @@ export class RegexBuilder extends React.Component<
         </div>
       </div>
     )
+
+    // Escape any host dialog's fixed-position containing block + overflow clip
+    // by portalling into a top-level layer; fall back to inline rendering only
+    // when there is no document (non-DOM environments).
+    const host = getRegexBuilderPortalHost()
+    return host === null ? overlay : ReactDOM.createPortal(overlay, host)
   }
 }

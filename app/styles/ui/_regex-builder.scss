@@ -1,6 +1,17 @@
 // Regex builder — a self-contained, non-modal, draggable overlay dialog.
 // Design reference: design-spec-overlays.md §6 + regex-builder.png.
 
+// The builder is portalled into this dedicated top-level layer on `document.body`
+// (see getRegexBuilderPortalHost in regex-builder.tsx) so it escapes any host
+// dialog that is a fixed-position containing block (`transform: scale(1)`,
+// _dialog.scss) and clips its overflow (`overflow: hidden`, _dialog-layer.scss).
+// `display: contents` makes the host generate no box, so the overlay resolves
+// its `position: fixed` geometry against the real viewport — never the cramped
+// host dialog box — keeping the palette, tester, and Apply footer fully visible.
+#regex-builder-layer {
+  display: contents;
+}
+
 .regex-builder-overlay {
   position: fixed;
   inset: 0;
