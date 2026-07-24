@@ -930,6 +930,15 @@ export type ChangesSelection =
 export interface IChangesState {
   readonly workingDirectory: WorkingDirectoryStatus
 
+  /**
+   * Whether a `git status` result has ever been applied for this repository
+   * since it was seeded. Until the first result lands the working directory is
+   * empty even on a large repository whose status is still computing, so the
+   * Changes view shows an explicit "computing" state rather than the misleading
+   * "No local changes" (see `decideStatusEmptyState`).
+   */
+  readonly hasLoadedStatus: boolean
+
   /** The commit message for a work-in-progress commit in the changes view. */
   readonly commitMessage: ICommitMessage
 

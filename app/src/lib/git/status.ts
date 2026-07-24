@@ -28,6 +28,7 @@ import { getRebaseInternalState } from './rebase'
 import { RebaseInternalState } from '../../models/rebase'
 import { isCherryPickHeadFound } from './cherry-pick'
 import { git } from '.'
+import { largeRepositoryGitArgsForPath } from '../large-repository/large-repository-mode'
 
 /** The encapsulation of the result from 'git status' */
 export interface IStatusResult {
@@ -210,6 +211,10 @@ export async function getStatus(
   rejectOnError = false
 ): Promise<IStatusResult | null> {
   const args = [
+    // For a large repository these lead with `-c gc.auto=0 -c
+    // maintenance.auto=false` so a background repack never fires mid-status;
+    // for an ordinary repository this is empty and behaviour is unchanged.
+    ...largeRepositoryGitArgsForPath(repository.path),
     '--no-optional-locks',
     'status',
     ...(includeUntracked ? ['--untracked-files=all'] : []),

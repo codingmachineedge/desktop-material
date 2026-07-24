@@ -15,6 +15,12 @@ contracts that span more than one user workflow.
   non-fast-forward push, forbidden org-remote push, detached-HEAD commit),
   proposes a safety-classed remediation, and surfaces a localized one-click
   "Fix it" action on the transient error notice without ever force-pushing.
+- [Native large-repository
+  handling](native-large-repository-handling.md) — per-repository large mode
+  that extends gc/maintenance suppression to status/add/checkout/fetch plus a
+  controlled repack, fail-closed stale-`index.lock` removal, an explicit
+  status-computing state, suspended polling with one persistent notification for
+  deleted repositories, and confirm-class nested-`.git` compression.
 
 ## API applicability
 

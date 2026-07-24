@@ -694,6 +694,8 @@ import {
 } from './notifications-store'
 import { NotificationCentreStore } from './notification-centre-store'
 import { NotificationAutomationStore } from './notification-automation-store'
+import { evaluateLargeRepository } from '../large-repository/large-repository-controller'
+import { buildMissingRepositoryNotification } from '../large-repository/missing-repository-polling'
 import { LogStore } from './log-store'
 import { setLogSinkVerbose } from '../logging/renderer/log-sink'
 import {
@@ -4761,6 +4763,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
       updateChangedFiles(state, status, clearPartialState)
     )
 
+    // The first real status result is now applied: an empty working directory
+    // from here on genuinely means "no local changes", so the Changes view may
+    // stop showing the explicit "computing" state.
+    this.repositoryStateCache.updateChangesState(repository, () => ({
+      hasLoadedStatus: true,
+    }))
+
     this.repositoryStateCache.updateChangesState(repository, state => ({
       conflictState: updateConflictState(state, status, this.statsStore),
     }))
@@ -6752,6 +6761,14 @@ export class AppStore extends TypedBaseStore<IAppState> {
 
     const state = this.repositoryStateCache.get(repository)
     const gitStore = this.gitStoreCache.get(repository)
+
+    // Fire-and-forget: classify the repository's scale so that large ones start
+    // carrying gc/maintenance suppression on their app-issued Git operations.
+    // The cheap probe is cached and coalesced, so calling it on every refresh
+    // is safe; it never blocks the refresh itself.
+    evaluateLargeRepository(repository).catch(error =>
+      log.debug(`Could not evaluate large-repository mode: ${error}`)
+    )
 
     // if we cannot get a valid status it's a good indicator that the repository
     // is in a bad state - let's mark it as missing here and give up on the
@@ -15438,6 +15455,26 @@ export class AppStore extends TypedBaseStore<IAppState> {
     repository: Repository,
     missing: boolean
   ): Promise<Repository> {
+    // On the transition into "missing", post a single persistent notification
+    // (the centre coalesces by title+body) instead of the app looping repeated
+    // "ENOENT: Could not list worktrees" error toasts for a deleted directory.
+    // Its open-repository action takes the user to the built-in missing screen
+    // where the locate/remove actions live.
+    if (missing && !repository.missing) {
+      const notification = buildMissingRepositoryNotification(
+        repository.id,
+        t('largeRepo.missing.title'),
+        t('largeRepo.missing.body', {
+          name: repository.name,
+        })
+      )
+      this.notificationCentreStore
+        .post(notification)
+        .catch(error =>
+          log.debug(`Could not post missing-repository notification: ${error}`)
+        )
+    }
+
     return this.repositoriesStore.updateRepositoryMissing(repository, missing)
   }
 
