@@ -43,7 +43,8 @@
         { "member": "Accessibility", "label": "Accessibility" },
         { "member": "AgentAccess", "label": "Agent access" },
         { "member": "Automation", "label": "Automation" },
-        { "member": "Queue", "label": "Clone queue" }
+        { "member": "Queue", "label": "Clone queue" },
+        { "member": "Sound", "label": "Sound" }
       ]
     },
     "repositorySettings": {

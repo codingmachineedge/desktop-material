@@ -493,12 +493,12 @@ describe('responsive surface smoke catalog', () => {
         0
       ) + catalog.nestedSurfaces.length
     assert.equal(metadata.size, catalogCount)
-    assert.equal(metadata.size, 87)
+    assert.equal(metadata.size, 88)
     assert.equal(
       [...metadata.keys()].filter(id => id !== 'popup.batch-clone-recovery')
         .length,
-      86,
-      'The 86 product surfaces remain cataloged beside the recovery popup.'
+      87,
+      'The 87 product surfaces remain cataloged beside the recovery popup.'
     )
 
     const baseline = verifier.decorateLedger(metadataRows(metadata), metadata)
