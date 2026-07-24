@@ -1,5 +1,49 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-23 materialize cancel/summary correction from verified bug audit
+
+A multi-agent bug audit of the last fifteen commits (nine finder lenses, every
+finding adversarially verified by three independent reviewers) confirmed seven
+defects. The three user-facing materialize-flow defects are fixed in this
+change:
+
+- **Cancel now reaches queued batches.** Materialization owners register in
+  `cheapLfsMaterializeOwners` from enqueue time, so canceling Materialize all
+  aborts every pending batch for the repository — including an automatic
+  restore enqueued by a concurrent fetch/pull, which previously took over the
+  queue slot and restarted the downloads the user had just canceled. A
+  single-file cancel stays scoped to its own request signal, and
+  `disposeTemporaryRepositoryState` aborts queued owners too.
+- **Honest completion reporting.** `runCheapLfsMaterialize` resolves with an
+  `ICheapLfsBatchMaterializeResult` (per-file failures now carry messages and
+  the batch total bytes), and the Large files panel reports "Materialized N
+  files; M files failed and were left as pointers." instead of unconditionally
+  claiming every object is verified locally.
+- **No stale list after cancel.** A canceled Materialize all reloads the
+  pinned-file list again, so files completed before the cancel no longer keep
+  `workingTreeState: 'pointer'` — which also restored the local-deletion
+  warning on Remove for those files.
+
+Verification: `tsc --noEmit` clean; ESLint and Prettier clean on every touched
+file; focused suites pass — `app/test/unit/cheap-lfs` **298/298**,
+`ui/cheap-lfs-test.tsx` **20/20** (three new behavioral tests plus the
+rewritten repo-wide-cancel test), `submodule-mutation-guard-test.ts` **7/7**
+and `submodule-repository-navigation-test.ts` **21/21**. The latter two were
+already failing at the previous HEAD (the dispose assertions matched an
+outdated map shape and a line-wrapped source pattern) and were repaired with
+the field rename.
+
+Remaining verified findings, not yet fixed: committing `.git*`-prefixed paths
+whose parent directory is missing or symlinked throws an unhandled
+`CheapLfsTrackedPathError` that fails the whole commit
+(`app/src/lib/cheap-lfs/commit-key.ts:60`, high, a regression of "Allow
+ordinary .github commit files"); `maybeAutoMaterializeCheapLfs` awaiting the
+whole per-checkout queue can stall awaited `_selectRepository` chains behind
+long downloads (`app-store.ts`, medium); the cloud-compression action rejects
+documented-valid exactly-2-GiB legacy parts and lacks a stdin `error` listener
+in `readPointerBlobs` (`.github/actions/cheap-lfs-cloud-compression/cloud-compress.mjs`,
+medium/low).
+
 ## 2026-07-23 responsive Releases publication and live Bambu checkpoint
 
 The integrated Cheap LFS, ordinary-Git batching, responsive Repository

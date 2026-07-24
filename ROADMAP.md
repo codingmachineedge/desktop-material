@@ -28,6 +28,15 @@ in [HANDOFF.md](HANDOFF.md).
 
 ## July 23 Cheap LFS + push batching — **Live acceptance and serialization correction complete**
 
+- A verified bug audit of the serialization change corrected three
+  materialize-flow defects: canceling Materialize all now cancels queued
+  batches repository-wide (an automatic restore enqueued by a concurrent fetch
+  could previously restart the canceled downloads), the panel reports partial
+  failures ("N materialized; M failed and were left as pointers.") from the
+  batch summary instead of unconditional success, and a canceled batch reloads
+  the pinned-file list so completed files never keep a stale pointer state that
+  also suppressed Remove's local-deletion warning. Single-file cancels remain
+  scoped to their own request.
 - Cheap LFS commit preparation now exposes sanitized per-file phases, bytes,
   success/failure counts, and the selected-versus-recommended storage route in
   a compact terminal below Commit. A persisted default-on toggle permits up to

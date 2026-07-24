@@ -151,6 +151,16 @@ default for compatibility:
 - **Download large files after cloning** materializes detected pointers after
   clone, pull, user fetch, or open under one cancelable per-repository batch.
   The panel also offers explicit per-file and Materialize all actions.
+  Canceling Materialize all cancels repository-wide: every batch still queued
+  behind the active one (including automatic restores enqueued by a concurrent
+  fetch or pull) aborts too, so a canceled download cannot restart when the
+  next batch takes over the queue slot. A single-file cancel stays scoped to
+  its own request. The batch resolves with a summary, and the panel reports
+  partial failure ("Materialized N files; M files failed and were left as
+  pointers.") instead of claiming unconditional success, then reloads the
+  pinned-file list after completion **and** after a cancel so completed files
+  never keep a stale pointer state (which previously also suppressed the
+  local-deletion warning on Remove).
 
 The Changes filter includes a **Large files** chip that matches working-tree
 files strictly over the same 100 MiB Cheap LFS threshold. Its bounded,

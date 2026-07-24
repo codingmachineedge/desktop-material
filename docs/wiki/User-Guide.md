@@ -1057,7 +1057,12 @@ commit still held only 370–514-byte pointer blobs. Its first explicit
 hash-identical compare-and-swap recovery copies. The bytes remained correct,
 but Desktop Material now serializes automatic and manual materialization per
 repository; `HANDOFF.md` records the corrected UI acceptance separately from
-that initial integrity proof.
+that initial integrity proof. Canceling **Materialize all** now cancels every
+batch queued for that repository — including automatic restores enqueued by a
+concurrent fetch or pull — so a canceled download cannot silently restart, the
+panel reloads the pinned-file list after a cancel, and a batch that finishes
+with failures reports how many files were left as pointers instead of claiming
+unconditional success.
 
 ![Live public Bambu build Cheap LFS inventory with ten tracked Release-backed pointer objects](https://raw.githubusercontent.com/Ding-Ding-Projects/desktop-material/main/docs/assets/screenshots/cheap-lfs-bambu-build-live.png)
 

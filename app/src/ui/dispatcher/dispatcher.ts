@@ -16,6 +16,7 @@ import { RemoveRepositoryResult } from '../../models/remove-repository-result'
 import { IGitHubRelease } from '../../lib/github-releases'
 import { IGitHubReleaseTransferProgressEvent } from '../../lib/github-release-transfer'
 import {
+  ICheapLfsBatchMaterializeResult,
   ICheapLfsMaterializeResult,
   ICheapLfsManagedPointerEntry,
   ICheapLfsPinOptions,
@@ -3187,13 +3188,14 @@ export class Dispatcher {
    * Materialize every committed cheap-LFS pointer in the working tree as one
    * cancelable background batch (the manual "Materialize all" control). It
    * queues behind an existing checkout-scoped materialization and rechecks the
-   * pointer state before downloading.
+   * pointer state before downloading. Resolves with the batch summary so the
+   * caller can report partial failures.
    */
   public materializeAllCheapLfsPointers(
     repository: Repository,
     signal?: AbortSignal,
     onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void
-  ): Promise<void> {
+  ): Promise<ICheapLfsBatchMaterializeResult> {
     return this.appStore._materializeAllCheapLfsPointers(
       repository,
       signal,
@@ -3201,7 +3203,11 @@ export class Dispatcher {
     )
   }
 
-  /** Cancel an in-flight automatic or manual cheap-LFS materialize batch. */
+  /**
+   * Cancel pending cheap-LFS materialize batches — queued ones included. With
+   * a `requestSignal` only that request's batches are canceled; without one
+   * every pending batch for the repository is.
+   */
   public cancelAutoMaterializeCheapLfs(
     repository: Repository,
     requestSignal?: AbortSignal

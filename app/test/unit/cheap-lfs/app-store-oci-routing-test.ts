@@ -303,7 +303,7 @@ describe('AppStore Cheap LFS OCI routing', () => {
     const store = Object.create(AppStore.prototype) as AppStore
     Object.assign(store, {
       accounts: [],
-      cheapLfsMaterializeControllers: new Map(),
+      cheapLfsMaterializeOwners: new Map(),
       cheapLfsMaterializeTails: new Map(),
       runCheapLfsMaterialize: async (
         _repository: Repository,
@@ -346,7 +346,7 @@ describe('AppStore Cheap LFS OCI routing', () => {
       const store = Object.create(AppStore.prototype) as AppStore
       Object.assign(store, {
         accounts: [],
-        cheapLfsMaterializeControllers: new Map(),
+        cheapLfsMaterializeOwners: new Map(),
         cheapLfsMaterializeTails: new Map(),
         runCheapLfsMaterialize: async () => {
           materializeRuns++
@@ -391,7 +391,7 @@ describe('AppStore Cheap LFS OCI routing', () => {
     const progressEvents = new Array<IGitHubReleaseTransferProgressEvent>()
     const store = Object.create(AppStore.prototype) as AppStore
     Object.assign(store, {
-      cheapLfsMaterializeControllers: new Map(),
+      cheapLfsMaterializeOwners: new Map(),
       cheapLfsMaterializeTails: new Map(),
       isTemporaryRepositoryActive: () => true,
       withTemporaryRepositoryMutationGuard: async (
@@ -485,7 +485,7 @@ describe('AppStore Cheap LFS OCI routing', () => {
     const store = Object.create(AppStore.prototype) as AppStore
     Object.assign(store, {
       accounts: [],
-      cheapLfsMaterializeControllers: new Map(),
+      cheapLfsMaterializeOwners: new Map(),
       cheapLfsMaterializeTails: new Map(),
       isTemporaryRepositoryActive: () => true,
       withTemporaryRepositoryMutationGuard: async (
@@ -562,7 +562,7 @@ describe('AppStore Cheap LFS OCI routing', () => {
     )
     const store = Object.create(AppStore.prototype) as AppStore
     Object.assign(store, {
-      cheapLfsMaterializeControllers: new Map(),
+      cheapLfsMaterializeOwners: new Map(),
       cheapLfsMaterializeTails: new Map(),
     })
     const lockStore = store as unknown as {
@@ -634,7 +634,7 @@ describe('AppStore Cheap LFS OCI routing', () => {
     )
     const store = Object.create(AppStore.prototype) as AppStore
     Object.assign(store, {
-      cheapLfsMaterializeControllers: new Map(),
+      cheapLfsMaterializeOwners: new Map(),
       cheapLfsMaterializeTails: new Map(),
     })
     const lockStore = store as unknown as {
@@ -671,6 +671,173 @@ describe('AppStore Cheap LFS OCI routing', () => {
     await assert.rejects(active, /expected materialization failure/)
     assert.equal(await successor, 42)
     assert.equal(successorEntered, true)
+  })
+
+  it('cancels queued batches together with the active one on a repo-wide cancel', async () => {
+    const repository = new Repository(
+      'C:/materialize-cancel-all',
+      197,
+      null,
+      false
+    )
+    const store = Object.create(AppStore.prototype) as AppStore
+    Object.assign(store, {
+      cheapLfsMaterializeOwners: new Map(),
+      cheapLfsMaterializeTails: new Map(),
+    })
+    const lockStore = store as unknown as {
+      withCheapLfsMaterializeLock<T>(
+        repository: Repository,
+        requestSignal: AbortSignal | undefined,
+        operation: (signal: AbortSignal) => Promise<T>
+      ): Promise<T>
+    }
+    const entered = deferred<void>()
+    const manualController = new AbortController()
+    let queuedAutoRan = false
+
+    const manual = lockStore.withCheapLfsMaterializeLock(
+      repository,
+      manualController.signal,
+      async signal => {
+        entered.resolve()
+        await new Promise<void>(resolve => {
+          if (signal.aborted) {
+            resolve()
+          } else {
+            signal.addEventListener('abort', () => resolve(), { once: true })
+          }
+        })
+        const error = new Error('manual batch canceled')
+        error.name = 'AbortError'
+        throw error
+      }
+    )
+    await entered.promise
+    // A queued automatic batch has no request signal, exactly like the
+    // fetch/pull detect points which call maybeAutoMaterializeCheapLfs.
+    const queuedAuto = lockStore.withCheapLfsMaterializeLock(
+      repository,
+      undefined,
+      async () => {
+        queuedAutoRan = true
+      }
+    )
+
+    store._cancelAutoMaterializeCheapLfs(repository)
+
+    await assert.rejects(manual, { name: 'AbortError' })
+    await assert.rejects(queuedAuto, { name: 'AbortError' })
+    assert.equal(queuedAutoRan, false)
+  })
+
+  it('keeps a signal-scoped cancel away from other pending batches', async () => {
+    const repository = new Repository(
+      'C:/materialize-cancel-one',
+      198,
+      null,
+      false
+    )
+    const store = Object.create(AppStore.prototype) as AppStore
+    Object.assign(store, {
+      cheapLfsMaterializeOwners: new Map(),
+      cheapLfsMaterializeTails: new Map(),
+    })
+    const lockStore = store as unknown as {
+      withCheapLfsMaterializeLock<T>(
+        repository: Repository,
+        requestSignal: AbortSignal | undefined,
+        operation: (signal: AbortSignal) => Promise<T>
+      ): Promise<T>
+    }
+    const entered = deferred<void>()
+    const releaseActive = deferred<void>()
+    const singleController = new AbortController()
+    let activeAborted = false
+    let queuedSingleRan = false
+
+    const activeAuto = lockStore.withCheapLfsMaterializeLock(
+      repository,
+      undefined,
+      async signal => {
+        entered.resolve()
+        signal.addEventListener('abort', () => (activeAborted = true), {
+          once: true,
+        })
+        await releaseActive.promise
+        return 'auto-finished'
+      }
+    )
+    await entered.promise
+    const queuedSingle = lockStore.withCheapLfsMaterializeLock(
+      repository,
+      singleController.signal,
+      async () => {
+        queuedSingleRan = true
+      }
+    )
+
+    store._cancelAutoMaterializeCheapLfs(repository, singleController.signal)
+
+    assert.equal(activeAborted, false)
+    releaseActive.resolve()
+    assert.equal(await activeAuto, 'auto-finished')
+    // The canceled queued request observes its abort once it reaches the slot.
+    await assert.rejects(queuedSingle, { name: 'AbortError' })
+    assert.equal(queuedSingleRan, false)
+  })
+
+  it('resolves Materialize all with per-file failures instead of silent success', async t => {
+    const root = await createTempDirectory(t)
+    const relativePath = 'failing.bin'
+    const raw = Buffer.from('bytes that will fail to download\n')
+    const sha256 = createHash('sha256').update(raw).digest('hex')
+    const pointer = serializeCheapLfsGhcrPointer({
+      version: CHEAP_LFS_OCI_POINTER_VERSION,
+      image: `ghcr.io/owner/repo-cheap-lfs@sha256:${'6'.repeat(64)}`,
+      object: `sha256:${sha256}`,
+      sizeInBytes: raw.length,
+      layers: [`sha256:${'7'.repeat(64)}`],
+    })
+    await execFile('git', ['init', '--quiet'], { cwd: root })
+    await execFile('git', ['config', 'user.name', 'Cheap LFS Test'], {
+      cwd: root,
+    })
+    await execFile('git', ['config', 'user.email', 'cheap-lfs@example.test'], {
+      cwd: root,
+    })
+    await writeFile(join(root, relativePath), pointer)
+    await execFile('git', ['add', '--', relativePath], { cwd: root })
+    await execFile('git', ['commit', '--quiet', '-m', 'Track pointer'], {
+      cwd: root,
+    })
+
+    const repository = new Repository(root, 199, null, false)
+    const store = Object.create(AppStore.prototype) as AppStore
+    Object.assign(store, {
+      accounts: [],
+      cheapLfsMaterializeOwners: new Map(),
+      cheapLfsMaterializeTails: new Map(),
+      isTemporaryRepositoryActive: () => true,
+      withTemporaryRepositoryMutationGuard: async (
+        _repository: Repository,
+        operation: () => Promise<unknown>
+      ) => await operation(),
+      materializeCheapLfsEntry: async () => {
+        throw new Error('release asset missing')
+      },
+      _refreshRepository: async () => undefined,
+      postCheapLfsMaterializeNotification: () => undefined,
+    })
+
+    const summary = await store._materializeAllCheapLfsPointers(repository)
+
+    assert.equal(summary.materialized.length, 0)
+    assert.deepEqual(summary.failures, [
+      { relativePath, message: 'release asset missing' },
+    ])
+    assert.equal(summary.canceled, false)
+    assert.equal(summary.totalBytes, raw.length)
   })
 
   it('fails closed when an OCI manual pin does not name its selected working-tree file', async t => {

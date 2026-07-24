@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { beforeEach, describe, it } from 'node:test'
-import { join } from 'node:path'
+import { join, normalize, resolve } from 'node:path'
 
 import { AppStore } from '../../src/lib/stores/app-store'
 import {
@@ -559,10 +559,21 @@ describe('temporary submodule repository navigation', () => {
       'mergeAllControllers',
       new Map([[temporary.id, mergeAll]])
     )
+    // Owners are keyed by the canonical checkout path and hold owner records,
+    // matching disposeTemporaryRepositoryState's real lookup.
+    const cheapLfsKey =
+      process.platform === 'win32'
+        ? normalize(resolve(temporary.path)).toLowerCase()
+        : normalize(resolve(temporary.path))
     Reflect.set(
       store,
-      'cheapLfsMaterializeControllers',
-      new Map([[temporary.id, cheapLfs]])
+      'cheapLfsMaterializeOwners',
+      new Map([
+        [
+          cheapLfsKey,
+          new Set([{ controller: cheapLfs, requestSignal: undefined }]),
+        ],
+      ])
     )
 
     const dispose = Reflect.get(store, 'disposeTemporaryRepositoryState') as (
@@ -579,12 +590,8 @@ describe('temporary submodule repository navigation', () => {
       0
     )
     assert.equal(
-      (
-        Reflect.get(store, 'cheapLfsMaterializeControllers') as Map<
-          number,
-          unknown
-        >
-      ).size,
+      (Reflect.get(store, 'cheapLfsMaterializeOwners') as Map<string, unknown>)
+        .size,
       0
     )
 

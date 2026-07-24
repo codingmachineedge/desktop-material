@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Account } from '../../models/account'
 import { Repository } from '../../models/repository'
 import {
+  ICheapLfsBatchMaterializeResult,
   ICheapLfsMaterializeResult,
   ICheapLfsPinOptions,
   ICheapLfsPinResult,
@@ -65,7 +66,7 @@ export interface ICheapLfsDispatcher {
     repository: Repository,
     signal?: AbortSignal,
     onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void
-  ): Promise<void>
+  ): Promise<ICheapLfsBatchMaterializeResult>
   cancelAutoMaterializeCheapLfs(
     repository: Repository,
     requestSignal?: AbortSignal
@@ -184,6 +185,8 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
   private cloudGeneration = 0
   private operationController: AbortController | null = null
   private lastProgressAt = 0
+  /** True while the current operation is a whole-repository Materialize all. */
+  private materializeAllInFlight = false
   private readonly materializeHandlers = new Map<string, () => void>()
   private readonly removeHandlers = new Map<string, () => void>()
 
@@ -273,6 +276,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     }
     const controller = new AbortController()
     this.operationController = controller
+    this.materializeAllInFlight = false
     this.setState({ busy: kind, error: null, notice: null, progress: null })
     return { generation: this.generation, controller }
   }
@@ -307,7 +311,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     }
   }
 
-  private loadPointers = async (notice?: string) => {
+  private loadPointers = async (notice?: string, failure?: string) => {
     const operation = this.startOperation('listing')
     if (operation === null) {
       return
@@ -325,7 +329,7 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
         loaded: true,
         busy: null,
         materializingPath: null,
-        error: null,
+        error: failure ?? null,
         notice: notice ?? null,
       })
     } catch (error) {
@@ -536,42 +540,68 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     if (operation === null) {
       return
     }
+    this.materializeAllInFlight = true
     this.lastProgressAt = 0
     this.setState({ materializingPath: 'all pinned files' })
     try {
-      await this.props.dispatcher.materializeAllCheapLfsPointers(
-        this.props.repository,
-        operation.controller.signal,
-        progress =>
-          this.updateProgress(
-            operation.generation,
-            operation.controller,
-            progress
-          )
-      )
+      const summary =
+        await this.props.dispatcher.materializeAllCheapLfsPointers(
+          this.props.repository,
+          operation.controller.signal,
+          progress =>
+            this.updateProgress(
+              operation.generation,
+              operation.controller,
+              progress
+            )
+        )
       if (!this.isCurrent(operation.generation, operation.controller)) {
         return
       }
       this.finishOperation(operation.controller)
+      const completed = summary.materialized.length
+      const failed = summary.failures.length
       this.setState(
         { busy: null, progress: null, materializingPath: null },
         () =>
           void this.loadPointers(
-            'Materialize all finished. The pinned-file list now reflects every verified local object.'
+            failed > 0
+              ? undefined
+              : summary.canceled
+              ? 'Materialize canceled; completed files remain verified locally.'
+              : 'Materialize all finished. The pinned-file list now reflects every verified local object.',
+            failed > 0
+              ? `Materialized ${completed} ${
+                  completed === 1 ? 'file' : 'files'
+                }; ${failed} ${
+                  failed === 1
+                    ? 'file failed and was left as a pointer.'
+                    : 'files failed and were left as pointers.'
+                }`
+              : undefined
           )
       )
     } catch (error) {
       if (this.isCurrent(operation.generation, operation.controller)) {
         const canceled = (error as Error)?.name === 'AbortError'
-        this.setState({
-          busy: null,
-          progress: null,
-          materializingPath: null,
-          error: canceled ? null : errorMessage(error),
-          notice: canceled
-            ? 'Materialize canceled; completed files remain verified locally.'
-            : null,
-        })
+        if (canceled) {
+          this.finishOperation(operation.controller)
+          this.setState(
+            { busy: null, progress: null, materializingPath: null },
+            () =>
+              void this.loadPointers(
+                'Materialize canceled; completed files remain verified locally.'
+              )
+          )
+        } else {
+          this.setState({
+            busy: null,
+            progress: null,
+            materializingPath: null,
+            error: errorMessage(error),
+            notice: null,
+          })
+        }
       }
     } finally {
       this.finishOperation(operation.controller)
@@ -747,9 +777,13 @@ export class CheapLfs extends React.Component<ICheapLfsProps, ICheapLfsState> {
     const controller = this.operationController
     controller?.abort()
     if (controller !== null && this.state.busy === 'materialize') {
+      // Canceling Materialize all cancels repository-wide: a queued automatic
+      // restore would otherwise take over the queue slot and restart the
+      // downloads the user just canceled. A single-file cancel stays scoped to
+      // its own request signal.
       this.props.dispatcher.cancelAutoMaterializeCheapLfs(
         this.props.repository,
-        controller.signal
+        this.materializeAllInFlight ? undefined : controller.signal
       )
     }
     this.setState({ notice: 'Canceling the current cheap LFS operation…' })

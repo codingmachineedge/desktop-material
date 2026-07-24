@@ -7,6 +7,7 @@ import { Owner } from '../../../src/models/owner'
 import { Repository } from '../../../src/models/repository'
 import { CheapLfs, ICheapLfsDispatcher } from '../../../src/ui/repository-tools'
 import {
+  ICheapLfsBatchMaterializeResult,
   ICheapLfsMaterializeResult,
   ICheapLfsManagedPointerEntry,
   ICheapLfsPinOptions,
@@ -161,12 +162,24 @@ class FakeCheapLfsDispatcher implements ICheapLfsDispatcher {
   public readonly cancelMaterializeCalls: Array<AbortSignal | undefined> = []
   public readonly removeCalls: string[] = []
   public materializeAllGate: Promise<void> = Promise.resolve()
+  public materializeAllResult: ICheapLfsBatchMaterializeResult = {
+    materialized: [],
+    failures: [],
+    totalBytes: 0,
+    canceled: false,
+  }
+  /** When set, materializeAllCheapLfsPointers rejects with this after the gate. */
+  public materializeAllRejectWith: Error | null = null
+  public listCalls = 0
 
   public constructor(initial: ReadonlyArray<ICheapLfsManagedPointerEntry>) {
     this.pointers = initial
   }
 
-  public listCheapLfsPointers = async (_repository: Repository) => this.pointers
+  public listCheapLfsPointers = async (_repository: Repository) => {
+    this.listCalls++
+    return this.pointers
+  }
 
   public pinFileToRelease = async (
     _repository: Repository,
@@ -198,7 +211,7 @@ class FakeCheapLfsDispatcher implements ICheapLfsDispatcher {
     _repository: Repository,
     signal?: AbortSignal,
     onProgress?: (progress: IGitHubReleaseTransferProgressEvent) => void
-  ): Promise<void> => {
+  ): Promise<ICheapLfsBatchMaterializeResult> => {
     this.materializeAllCalls.push({ signal, onProgress })
     onProgress?.({
       operationId: 'materialize-all-test',
@@ -207,6 +220,10 @@ class FakeCheapLfsDispatcher implements ICheapLfsDispatcher {
       totalBytes: 10,
     })
     await this.materializeAllGate
+    if (this.materializeAllRejectWith !== null) {
+      throw this.materializeAllRejectWith
+    }
+    return this.materializeAllResult
   }
 
   public cancelAutoMaterializeCheapLfs = (
@@ -655,7 +672,7 @@ describe('CheapLfs panel', () => {
     await screen.findByText(/Materialize all finished/i)
   })
 
-  it('forwards Materialize-all cancellation with the exact request signal', async () => {
+  it('cancels Materialize all repository-wide so queued batches stop too', async () => {
     const dispatcher = new FakeCheapLfsDispatcher(pointers)
     const gate = deferred<void>()
     dispatcher.materializeAllGate = gate.promise
@@ -672,12 +689,87 @@ describe('CheapLfs panel', () => {
     await waitFor(() =>
       assert.equal(dispatcher.cancelMaterializeCalls.length, 1)
     )
-    assert.strictEqual(dispatcher.cancelMaterializeCalls[0], requestSignal)
+    // No request signal: the store cancels every pending batch for the
+    // repository, including queued automatic restores.
+    assert.strictEqual(dispatcher.cancelMaterializeCalls[0], undefined)
     assert.equal(requestSignal?.aborted, true)
     gate.resolve()
     await waitFor(() =>
       assert.equal(screen.queryByRole('button', { name: 'Cancel' }), null)
     )
+  })
+
+  it('scopes a single-file materialize cancel to its own request signal', async () => {
+    const dispatcher = new FakeCheapLfsDispatcher(pointers)
+    const gate = deferred<ICheapLfsMaterializeResult>()
+    dispatcher.materializePointer = async (
+      _repository: Repository,
+      trackedRelativePath: string
+    ) => {
+      dispatcher.materializeCalls.push(trackedRelativePath)
+      return await gate.promise
+    }
+    render(
+      <CheapLfs repository={repository} accounts={[]} dispatcher={dispatcher} />
+    )
+    await screen.findByText('assets/logo.psd')
+    const row = rowFor('assets/logo.psd')
+    fireEvent.click(within(row).getByRole('button', { name: 'Materialize' }))
+    await waitFor(() => assert.equal(dispatcher.materializeCalls.length, 1))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() =>
+      assert.equal(dispatcher.cancelMaterializeCalls.length, 1)
+    )
+    assert.ok(dispatcher.cancelMaterializeCalls[0] instanceof AbortSignal)
+    assert.equal(dispatcher.cancelMaterializeCalls[0]?.aborted, true)
+    gate.resolve({ path: 'assets/logo.psd', bytes: 10 })
+  })
+
+  it('reports partial Materialize-all failure instead of unconditional success', async () => {
+    const dispatcher = new FakeCheapLfsDispatcher(pointers)
+    dispatcher.materializeAllResult = {
+      materialized: [{ path: pickedFile('docs/diagram.png'), bytes: 2048 }],
+      failures: [{ relativePath: 'assets/logo.psd', message: 'asset missing' }],
+      totalBytes: 5 * 1024 * 1024 + 2048,
+      canceled: false,
+    }
+    render(
+      <CheapLfs repository={repository} accounts={[]} dispatcher={dispatcher} />
+    )
+    await screen.findByText('assets/logo.psd')
+    const listCallsBefore = dispatcher.listCalls
+
+    fireEvent.click(screen.getByRole('button', { name: 'Materialize all' }))
+
+    await screen.findByText(
+      'Materialized 1 file; 1 file failed and was left as a pointer.'
+    )
+    assert.equal(screen.queryByText(/Materialize all finished/i), null)
+    assert.ok(dispatcher.listCalls > listCallsBefore)
+  })
+
+  it('refreshes the pinned-file list after a canceled Materialize all', async () => {
+    const dispatcher = new FakeCheapLfsDispatcher(pointers)
+    const gate = deferred<void>()
+    dispatcher.materializeAllGate = gate.promise
+    const abortError = new Error('Cheap LFS materialization was canceled.')
+    abortError.name = 'AbortError'
+    dispatcher.materializeAllRejectWith = abortError
+    render(
+      <CheapLfs repository={repository} accounts={[]} dispatcher={dispatcher} />
+    )
+    await screen.findByText('assets/logo.psd')
+    const listCallsBefore = dispatcher.listCalls
+
+    fireEvent.click(screen.getByRole('button', { name: 'Materialize all' }))
+    await waitFor(() => assert.equal(dispatcher.materializeAllCalls.length, 1))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    gate.resolve()
+
+    await screen.findByText(/Materialize canceled/i)
+    await waitFor(() => assert.ok(dispatcher.listCalls > listCallsBefore))
   })
 
   it('pins a picked file after review with a repo-relative default path', async () => {
