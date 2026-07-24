@@ -77,13 +77,27 @@ manual materialization.
 The repository-scoped correction passed **29/29** focused queue and UI tests;
 the wider four-suite Cheap LFS pass immediately before the final progress
 plumbing was **108/108**. Coverage includes a real disposable-Git concurrency
-regression in which automatic,
-individual, and Materialize-all requests target the same checkout. The test
+regression in which automatic, individual, and Materialize-all requests target
+the same checkout. The test
 proves one download, FIFO queue release, exact-request cancellation ownership,
 fresh pointer re-listing under the lock, and no rejected-tail poisoning. The
 initial real-UI clone remains the GUI receipt; a second multi-gigabyte overlap
 rerun was not claimed because the user requested immediate publication and
 worktree cleanup.
+
+Cleanup followed remote proof of exact handoff commit `a64c1cb54c`. All six
+completed Desktop Material task tips were ancestors of `origin/main`; their
+clean linked worktrees and merged local branches were removed, the default
+checkout was fast-forwarded, and the repository finished with only clean
+`main`, no stash, and zero divergence. The older unstaged run-manifest draft
+contained no exact receipt token absent from the pushed final manifest and was
+therefore dropped as superseded. In `codingmachineedge/bambu-build`, both sets
+of locally materialized payloads were size- and SHA-256-proven against all ten
+committed pointers before restoration; its default checkout now equals
+`712ad85`, and its merged manifest worktree/branch were removed. The empty
+headless desktop was closed, and the two owned temporary evidence directories
+were moved to the Windows Recycle Bin, so they remain recoverable. The unrelated
+`BambuStudio/.claude/worktrees/recursing-kepler-58a6c3` checkout was preserved.
 
 Historical initial integration commit
 [`c3db37ea5524b91f9603151ae5d1107205f16a59`](https://github.com/Ding-Ding-Projects/desktop-material/commit/c3db37ea5524b91f9603151ae5d1107205f16a59)
