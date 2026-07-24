@@ -247,6 +247,12 @@ export const SearchSurfaceRegistry: ReadonlyArray<ISearchSurfaceRegistration> =
       implementation: 'standalone',
     },
     {
+      id: 'stash-inventory',
+      label: 'Stashes',
+      source: 'stashing/stash-manager.tsx',
+      implementation: 'standalone',
+    },
+    {
       id: 'tag-lifecycle-inventory',
       label: 'Tags',
       source: 'tag/tag-lifecycle-manager.tsx',
