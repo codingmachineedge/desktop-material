@@ -33,6 +33,8 @@ import { NotificationBellButton } from '../notifications/notification-bell-butto
 import { RepositoryStateCache } from '../../lib/stores/repository-state-cache'
 import { ArrangeTabsPopover } from './arrange-tabs-popover'
 import { TabSearchPopover } from './tab-search-popover'
+import { TabOverflowPopover } from './tab-overflow-popover'
+import { computeTabOverflowLayout, ITabWidthMeasurement } from './tab-overflow'
 import {
   repositoryTabMatchKeys,
   repositoryTabStatusRank,
@@ -68,12 +70,35 @@ interface IRepositoryTabStripState {
   readonly closeExceptAnchor: HTMLElement | null
   readonly arrangeAnchor: HTMLElement | null
   readonly searchAnchor: HTMLElement | null
+  readonly overflowAnchor: HTMLElement | null
   readonly draggingTabId: string | null
   readonly announcement: string
   /** The tab awaiting a name for the new group it will start. */
   readonly createGroupForTab: IRepositoryTab | null
   readonly languageMode: LanguageMode
+  /**
+   * Ids of tabs pushed out of the strip into the overflow dropdown because they
+   * did not fit. Recomputed from measured widths whenever the tabs or the
+   * available width change.
+   */
+  readonly overflowIds: ReadonlyArray<string>
+  /**
+   * When true, the next render lays out every tab so their widths can be
+   * measured; the overflow split is applied on the following render.
+   */
+  readonly pendingMeasure: boolean
 }
+
+/** Fallback flex gap (px) between strip items when it cannot be measured. */
+const DefaultStripGap = 6
+
+/**
+ * Reserved width (px) for the overflow button, including its leading gap, used
+ * for the very first split before the button has mounted and can be measured.
+ * Sized to comfortably fit the flex button (min-width 34 + 16px padding + the
+ * chevron and a one/two-digit count) plus the 6px gap so it never clips.
+ */
+const OverflowButtonReserve = 56
 
 /**
  * Debounce for the commit-chip refresh. Kept longer than the profile store's
@@ -93,6 +118,13 @@ export class RepositoryTabStrip extends React.Component<
   private disposable: Disposable | null = null
   private settingsCommitDisposable: Disposable | null = null
   private readonly stripRef = React.createRef<HTMLDivElement>()
+  private readonly listRef = React.createRef<HTMLDivElement>()
+  private readonly overflowButtonRef = React.createRef<HTMLButtonElement>()
+  /** Cached outer widths (px) for rendered tabs, keyed by tab id. */
+  private readonly tabWidthCache = new Map<string, number>()
+  /** Cached outer widths (px) for rendered group chips, keyed by group id. */
+  private readonly chipWidthCache = new Map<string, number>()
+  private resizeObserver: ResizeObserver | null = null
   private styleEditorRequest = 0
   private settingsCommitRefreshTimer: ReturnType<typeof setTimeout> | null =
     null
@@ -110,10 +142,13 @@ export class RepositoryTabStrip extends React.Component<
       closeExceptAnchor: null,
       arrangeAnchor: null,
       searchAnchor: null,
+      overflowAnchor: null,
       draggingTabId: null,
       announcement: '',
       createGroupForTab: null,
       languageMode: getPersistedLanguageMode(),
+      overflowIds: [],
+      pendingMeasure: true,
     }
   }
 
@@ -123,7 +158,9 @@ export class RepositoryTabStrip extends React.Component<
       this.onLanguageModeChanged
     )
     this.disposable = this.props.tabsStore.onDidUpdate(tabs => {
-      this.setState({ tabs })
+      // A changed tab set (or renamed/restyled tab) can change widths, so mark
+      // the strip for a fresh measurement pass before re-applying the overflow.
+      this.setState({ tabs, pendingMeasure: true })
       this.scheduleSettingsCommitRefresh()
     })
     this.settingsCommitDisposable =
@@ -131,6 +168,16 @@ export class RepositoryTabStrip extends React.Component<
     void this.props.tabsStore
       .refreshSettingsCommitSummary()
       .catch(err => log.error('Failed to refresh settings commit chip', err))
+
+    if (typeof ResizeObserver === 'function') {
+      this.resizeObserver = new ResizeObserver(() => this.recomputeOverflow())
+      if (this.listRef.current !== null) {
+        this.resizeObserver.observe(this.listRef.current)
+        this.observedList = true
+      }
+    }
+    // The initial render lays out every tab (pendingMeasure), so measure now.
+    this.recomputeOverflow()
   }
 
   public componentWillUnmount() {
@@ -138,6 +185,8 @@ export class RepositoryTabStrip extends React.Component<
       LanguageModeChangedEvent,
       this.onLanguageModeChanged
     )
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
     this.styleEditorRequest++
     this.disposable?.dispose()
     this.disposable = null
@@ -151,6 +200,152 @@ export class RepositoryTabStrip extends React.Component<
       clearTimeout(this.commitPulseTimer)
       this.commitPulseTimer = null
     }
+  }
+
+  public componentDidUpdate() {
+    // Keep observing the list element even if the ref changed between renders.
+    if (
+      this.resizeObserver !== null &&
+      this.listRef.current !== null &&
+      !this.observedList
+    ) {
+      this.resizeObserver.observe(this.listRef.current)
+      this.observedList = true
+    }
+    if (this.state.pendingMeasure) {
+      this.recomputeOverflow()
+    }
+  }
+
+  /** Tracks whether the ResizeObserver is already watching the current list. */
+  private observedList = false
+
+  /**
+   * The ids of the tabs actually rendered as tab elements in the strip, in
+   * order. Collapsed-group members are excluded because they live inside their
+   * chip rather than the strip and therefore can never overflow.
+   */
+  private getRenderableTabIds(): ReadonlyArray<string> {
+    const groups = new Map(
+      this.props.tabsStore.getGroups().map(group => [group.id, group] as const)
+    )
+    const ids: string[] = []
+    for (const tab of this.state.tabs.tabs) {
+      const groupId = tab.groupId ?? null
+      const group = groupId === null ? undefined : groups.get(groupId)
+      if (group !== undefined && group.isCollapsed === true) {
+        continue
+      }
+      ids.push(tab.id)
+    }
+    return ids
+  }
+
+  /** Parse the strip's flex gap from its computed style, with a fallback. */
+  private measureGap(list: HTMLElement): number {
+    const raw = window.getComputedStyle(list).columnGap
+    const parsed = Number.parseFloat(raw)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DefaultStripGap
+  }
+
+  /**
+   * Measure the strip and recompute which tabs overflow into the dropdown.
+   *
+   * On a `pendingMeasure` render every tab is laid out, so this reads each
+   * width straight from the DOM and refreshes the caches. On a plain resize the
+   * overflowed tabs are absent from the DOM, so their cached widths are reused;
+   * if any width is unknown, a full measurement pass is scheduled instead.
+   */
+  private recomputeOverflow = () => {
+    const list = this.listRef.current
+    if (list === null) {
+      return
+    }
+
+    const renderableIds = this.getRenderableTabIds()
+    const renderableSet = new Set(renderableIds)
+
+    // Refresh caches from any tab/chip elements currently in the DOM.
+    list
+      .querySelectorAll<HTMLElement>('.repository-tab[data-tab-id]')
+      .forEach(element => {
+        const id = element.dataset.tabId
+        if (id !== undefined) {
+          this.tabWidthCache.set(id, element.offsetWidth)
+        }
+      })
+    list
+      .querySelectorAll<HTMLElement>(
+        '.repository-tab-group-chip[data-group-id]'
+      )
+      .forEach(element => {
+        const id = element.dataset.groupId
+        if (id !== undefined) {
+          this.chipWidthCache.set(id, element.offsetWidth)
+        }
+      })
+    // Drop cache entries for tabs that no longer exist.
+    for (const id of Array.from(this.tabWidthCache.keys())) {
+      if (!renderableSet.has(id)) {
+        this.tabWidthCache.delete(id)
+      }
+    }
+
+    const missingWidth = renderableIds.some(id => !this.tabWidthCache.has(id))
+    if (missingWidth) {
+      // Need a full layout pass to measure the unknown widths.
+      if (!this.state.pendingMeasure) {
+        this.setState({ pendingMeasure: true })
+      }
+      return
+    }
+
+    const gap = this.measureGap(list)
+    const measurements: ReadonlyArray<ITabWidthMeasurement> = renderableIds.map(
+      id => ({ id, width: this.tabWidthCache.get(id) ?? 0 })
+    )
+
+    // Reserve the room the always-visible group chips consume so tabs only
+    // compete for the leftover width.
+    const visibleGroupIds = new Set(
+      this.state.tabs.tabs
+        .map(tab => tab.groupId ?? null)
+        .filter((id): id is string => id !== null)
+    )
+    let chipFootprint = 0
+    for (const groupId of visibleGroupIds) {
+      const width = this.chipWidthCache.get(groupId)
+      if (width !== undefined) {
+        chipFootprint += width + gap
+      }
+    }
+
+    const overflowButtonWidth = this.measureOverflowButtonWidth(gap)
+    const availableWidth = Math.max(0, list.clientWidth - chipFootprint)
+
+    const layout = computeTabOverflowLayout(measurements, {
+      availableWidth,
+      gap,
+      overflowButtonWidth,
+      activeTabId: this.state.tabs.activeTabId,
+    })
+
+    const changed =
+      layout.overflowIds.length !== this.state.overflowIds.length ||
+      layout.overflowIds.some((id, i) => id !== this.state.overflowIds[i])
+
+    if (changed || this.state.pendingMeasure) {
+      this.setState({ overflowIds: layout.overflowIds, pendingMeasure: false })
+    }
+  }
+
+  /** The overflow button's measured width plus a gap, or a safe fallback. */
+  private measureOverflowButtonWidth(gap: number): number {
+    const button = this.overflowButtonRef.current
+    if (button !== null && button.offsetWidth > 0) {
+      return button.offsetWidth + gap
+    }
+    return OverflowButtonReserve
   }
 
   private onLanguageModeChanged = (event: Event) => {
@@ -750,6 +945,7 @@ export class RepositoryTabStrip extends React.Component<
       closeExceptAnchor: anchor,
       arrangeAnchor: null,
       searchAnchor: null,
+      overflowAnchor: null,
     })
   }
 
@@ -769,6 +965,7 @@ export class RepositoryTabStrip extends React.Component<
       closeMatchingAnchor: null,
       closeExceptAnchor: null,
       searchAnchor: null,
+      overflowAnchor: null,
     })
   }
 
@@ -794,6 +991,7 @@ export class RepositoryTabStrip extends React.Component<
       arrangeAnchor: null,
       closeMatchingAnchor: null,
       closeExceptAnchor: null,
+      overflowAnchor: null,
     })
   }
 
@@ -809,6 +1007,32 @@ export class RepositoryTabStrip extends React.Component<
       return
     }
     this.setState({ searchAnchor: null }, () =>
+      this.restorePopoverFocus(anchor)
+    )
+  }
+
+  private openOverflow = (anchor: HTMLElement) => {
+    this.setState({
+      overflowAnchor: anchor,
+      searchAnchor: null,
+      arrangeAnchor: null,
+      closeMatchingAnchor: null,
+      closeExceptAnchor: null,
+    })
+  }
+
+  private onOverflowButtonClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    this.openOverflow(event.currentTarget)
+  }
+
+  private onOverflowDismiss = () => {
+    const anchor = this.state.overflowAnchor
+    if (anchor === null) {
+      return
+    }
+    this.setState({ overflowAnchor: null }, () =>
       this.restorePopoverFocus(anchor)
     )
   }
@@ -847,6 +1071,7 @@ export class RepositoryTabStrip extends React.Component<
       closeExceptAnchor: null,
       arrangeAnchor: null,
       searchAnchor: null,
+      overflowAnchor: null,
     })
   }
 
@@ -1058,6 +1283,28 @@ export class RepositoryTabStrip extends React.Component<
     )
   }
 
+  private renderOverflowPopover() {
+    const { overflowAnchor } = this.state
+    if (overflowAnchor === null) {
+      return null
+    }
+    const overflowSet = new Set(this.state.overflowIds)
+    const overflowTabs = this.state.tabs.tabs.filter(tab =>
+      overflowSet.has(tab.id)
+    )
+    return (
+      <TabOverflowPopover
+        tabs={overflowTabs}
+        activeTabId={this.state.tabs.activeTabId}
+        anchor={overflowAnchor}
+        languageMode={this.state.languageMode}
+        resolveLabel={this.labelForTab}
+        onSelect={this.onSelect}
+        onClose={this.onOverflowDismiss}
+      />
+    )
+  }
+
   private renderGroupChip(
     group: ITabGroup,
     members: ReadonlyArray<IRepositoryTab>,
@@ -1139,7 +1386,8 @@ export class RepositoryTabStrip extends React.Component<
   /** Render one group chip before its first member and omit collapsed members. */
   private renderRepositoryTabs(
     tabs: ReadonlyArray<IRepositoryTab>,
-    activeTabId: string | null
+    activeTabId: string | null,
+    hiddenTabIds: ReadonlySet<string>
   ): ReadonlyArray<JSX.Element> {
     const groups = new Map(
       this.props.tabsStore.getGroups().map(group => [group.id, group] as const)
@@ -1163,7 +1411,9 @@ export class RepositoryTabStrip extends React.Component<
       const groupId = tab.groupId ?? null
       const group = groupId === null ? undefined : groups.get(groupId)
       if (group === undefined) {
-        elements.push(this.renderRepositoryTab(tab, null, activeTabId))
+        if (!hiddenTabIds.has(tab.id)) {
+          elements.push(this.renderRepositoryTab(tab, null, activeTabId))
+        }
         continue
       }
 
@@ -1178,7 +1428,7 @@ export class RepositoryTabStrip extends React.Component<
         )
       }
 
-      if (group.isCollapsed !== true) {
+      if (group.isCollapsed !== true && !hiddenTabIds.has(tab.id)) {
         elements.push(this.renderRepositoryTab(tab, group, activeTabId))
       }
     }
@@ -1200,8 +1450,33 @@ export class RepositoryTabStrip extends React.Component<
     )
   }
 
+  private renderOverflowButton() {
+    const overflowCount = this.state.overflowIds.length
+    if (this.state.pendingMeasure || overflowCount === 0) {
+      return null
+    }
+    const count = String(overflowCount)
+    return (
+      <button
+        ref={this.overflowButtonRef}
+        className="repository-tab-overflow"
+        data-dm-feature={true}
+        aria-label={this.accessibleText('tabs.overflowButtonLabel', { count })}
+        aria-haspopup="dialog"
+        aria-expanded={this.state.overflowAnchor !== null}
+        onClick={this.onOverflowButtonClick}
+      >
+        <Octicon symbol={octicons.chevronDown} />
+        <span className="repository-tab-overflow-count">{count}</span>
+      </button>
+    )
+  }
+
   public render() {
     const { tabs, activeTabId } = this.state.tabs
+    const hiddenTabIds: ReadonlySet<string> = this.state.pendingMeasure
+      ? new Set<string>()
+      : new Set(this.state.overflowIds)
 
     return (
       <div
@@ -1213,8 +1488,9 @@ export class RepositoryTabStrip extends React.Component<
         data-customization-label="Repository tabs"
         data-customization-scope="profile"
       >
-        <div className="repository-tab-list">
-          {this.renderRepositoryTabs(tabs, activeTabId)}
+        <div className="repository-tab-list" ref={this.listRef}>
+          {this.renderRepositoryTabs(tabs, activeTabId, hiddenTabIds)}
+          {this.renderOverflowButton()}
         </div>
         <button
           className="repository-tab-search"
@@ -1284,6 +1560,7 @@ export class RepositoryTabStrip extends React.Component<
         {this.renderCloseExceptPopover()}
         {this.renderArrangePopover()}
         {this.renderSearchPopover()}
+        {this.renderOverflowPopover()}
         {this.renderCreateGroupDialog()}
         <div
           className="repository-tab-announcement"

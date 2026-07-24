@@ -21,7 +21,11 @@
     align-items: flex-end;
     gap: 6px;
     flex: 1;
-    overflow-x: auto;
+    // Tabs that do not fit move into the overflow dropdown instead of scrolling
+    // or clipping, so the row itself never scrolls horizontally. min-width: 0
+    // lets the flex item shrink so its clientWidth reflects the true room.
+    min-width: 0;
+    overflow: hidden;
     scrollbar-width: none;
 
     &::-webkit-scrollbar {
@@ -305,6 +309,54 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
 
   &:active {
     transform: scale(0.86);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
+    outline-offset: 2px;
+  }
+}
+
+.repository-tab-overflow {
+  // The "more tabs" dropdown trigger, seated at the end of the visible tab run
+  // when the strip overflows. It matches the strip's other icon buttons but
+  // widens for its overflow count so the number reads clearly.
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+  align-self: center;
+  height: 30px;
+  min-width: 34px;
+  margin-bottom: 2px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 200ms var(--emph), color 200ms var(--emph), transform 200ms var(--spring-fast);
+
+  .repository-tab-overflow-count {
+    font-size: 12px;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1;
+  }
+
+  .octicon {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  &:active {
+    transform: scale(0.9);
   }
 
   &:focus-visible {
@@ -1742,9 +1794,144 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   }
 }
 
+// The overflow dropdown reuses the tab-search visual language: a titled sheet
+// with a scrollable listbox of selectable rows. Each row re-applies its tab's
+// own title style so a customized tab looks the same here as in the strip.
+.tab-overflow-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 360px;
+  min-width: 0;
+  max-width: calc(100vw - 52px);
+  max-height: min(560px, calc(var(--available-height, 100vh) - 28px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  color: var(--md-sys-color-on-surface);
+
+  .tab-overflow-header {
+    min-width: 0;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    p {
+      margin: 4px 0 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  }
+
+  .tab-overflow-results {
+    min-width: 0;
+    max-height: 350px;
+    margin: 0;
+    padding: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 16px;
+    list-style: none;
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .tab-overflow-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &.highlighted {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    &.active {
+      box-shadow: inset 3px 0 var(--md-sys-color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  .tab-overflow-result-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+
+    strong,
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    strong {
+      font-size: 12px;
+    }
+
+    .tab-overflow-result-path {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px;
+    }
+  }
+
+  .tab-overflow-result-chips {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+
+    > span {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--md-sys-color-surface-container-highest);
+      font-size: 9px;
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+
+  .tab-overflow-empty {
+    min-height: 80px;
+    margin: 0;
+    padding: 24px 12px;
+    color: var(--md-sys-color-on-surface-variant);
+    text-align: center;
+  }
+
+  .tab-overflow-status {
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 11px;
+  }
+}
+
 .popover-component:has(.close-tabs-containing),
 .popover-component:has(.close-tabs-except),
 .popover-component:has(.arrange-tabs),
+.popover-component:has(.tab-overflow-popover),
 .popover-component:has(.tab-search-popover) {
   max-width: calc(100vw - 20px);
   border-radius: 22px;
@@ -1763,10 +1950,15 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   .close-tabs-containing,
   .close-tabs-except,
   .arrange-tabs,
+  .tab-overflow-popover,
   .tab-search-popover {
     gap: 10px;
     max-width: calc(100vw - 36px);
     max-height: calc(var(--available-height, 100vh) - 20px);
+  }
+
+  .tab-overflow-popover .tab-overflow-results {
+    max-height: 220px;
   }
 
   .tab-search-popover .tab-search-filter-row .filter-regex-builder-label {
@@ -1815,6 +2007,7 @@ body[data-dm-tab-close-buttons='active'] .repository-tab:not(.active):hover .rep
   .popover-component:has(.close-tabs-containing) .popover-content,
   .popover-component:has(.close-tabs-except) .popover-content,
   .popover-component:has(.arrange-tabs) .popover-content,
+  .popover-component:has(.tab-overflow-popover) .popover-content,
   .popover-component:has(.tab-search-popover) .popover-content {
     padding: 10px;
   }

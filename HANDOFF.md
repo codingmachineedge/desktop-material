@@ -1,5 +1,34 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-24 tab-strip overflow dropdown (branch `feat/tab-overflow-dropdown`)
+
+When the repository tab strip overflows its width, the tabs that no longer fit
+move into a keyboard-accessible "more tabs" dropdown instead of clipping or
+scrolling horizontally. The split keeps a contiguous, in-order run of tabs
+visible, guarantees the active tab stays on screen by sliding the run, pins
+collapsed-group chips, and preserves every per-tab appearance customization for
+both visible tabs and dropdown rows.
+
+- New pure geometry module
+  `app/src/ui/repository-tabs/tab-overflow.ts` (`computeTabOverflowLayout`,
+  `hasTabOverflow`) — DOM-free and unit-tested.
+- New dropdown `app/src/ui/repository-tabs/tab-overflow-popover.tsx`
+  (labelled listbox, arrow/Home/End/Enter/Escape, per-tab styling).
+- `repository-tab-strip.tsx` measures widths via a `ResizeObserver`, caches
+  them, and renders the more-tabs button plus popover; `.repository-tab-list`
+  now clips (`overflow: hidden`) instead of scrolling.
+- i18n: `tabs.overflow*` keys added in English and Cantonese (bilingual derived).
+- Tests: `app/test/unit/tab-overflow-test.ts`, 11 cases, all green via
+  `node script/test.mjs`. `npx tsc --noEmit` clean; Prettier applied.
+- Docs:
+  `docs/features/identity-and-workspace/tab-overflow-dropdown.md` (+ category
+  README index).
+
+MVP-vs-complete: the split, active-tab guarantee, chip pinning, appearance
+preservation, a11y, i18n, and tests are complete. Overflow rows do not carry
+the live repository logo/icon (they show label + path + status chips); adding
+the async logo loader to dropdown rows is a possible follow-up.
+
 ## 2026-07-24 final integration and clean Git topology receipt
 
 The requested merge-and-cleanup pass found no separate work left to integrate.

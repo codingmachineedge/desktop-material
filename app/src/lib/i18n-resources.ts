@@ -104,6 +104,18 @@ export type TranslationKey =
   | 'tabs.groupActionFailed'
   | 'tabs.tabPinnedSuffix'
   | 'tabs.tabFavoriteSuffix'
+  | 'tabs.overflowButton'
+  | 'tabs.overflowButtonLabel'
+  | 'tabs.overflowTitle'
+  | 'tabs.overflowDescription'
+  | 'tabs.overflowListLabel'
+  | 'tabs.overflowEmpty'
+  | 'tabs.overflowActiveSuffix'
+  | 'tabs.overflowActiveChip'
+  | 'tabs.overflowPinnedChip'
+  | 'tabs.overflowFavoriteChip'
+  | 'tabs.overflowCountOne'
+  | 'tabs.overflowCountMany'
   | 'language.english'
   | 'language.cantonese'
   | 'language.bilingual'
@@ -1580,6 +1592,18 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'tabs.groupActionFailed': 'Could not update the tab group. Try again.',
   'tabs.tabPinnedSuffix': ', pinned',
   'tabs.tabFavoriteSuffix': ', favorite',
+  'tabs.overflowButton': '{count} more',
+  'tabs.overflowButtonLabel': 'Show {count} more tabs',
+  'tabs.overflowTitle': 'More tabs',
+  'tabs.overflowDescription': 'Tabs that did not fit in the strip.',
+  'tabs.overflowListLabel': 'Overflowing repository tabs',
+  'tabs.overflowEmpty': 'Every tab fits in the strip.',
+  'tabs.overflowActiveSuffix': ', active',
+  'tabs.overflowActiveChip': 'Active',
+  'tabs.overflowPinnedChip': 'Pinned',
+  'tabs.overflowFavoriteChip': 'Favorite',
+  'tabs.overflowCountOne': '1 tab in this menu',
+  'tabs.overflowCountMany': '{count} tabs in this menu',
   'language.english': 'English',
   'language.cantonese': 'Playful Hong Kong Cantonese',
   'language.bilingual': 'Bilingual',
@@ -3404,6 +3428,18 @@ export const cantoneseTranslations: Readonly<
   'tabs.groupActionFailed': '未能更新分頁群組，等陣再試。',
   'tabs.tabPinnedSuffix': '，已置頂',
   'tabs.tabFavoriteSuffix': '，最愛',
+  'tabs.overflowButton': '仲有 {count} 個',
+  'tabs.overflowButtonLabel': '打開多 {count} 個分頁',
+  'tabs.overflowTitle': '仲有啲分頁',
+  'tabs.overflowDescription': '呢啲分頁擠唔落條分頁列。',
+  'tabs.overflowListLabel': '擠唔落嘅倉庫分頁',
+  'tabs.overflowEmpty': '所有分頁都擺得落。',
+  'tabs.overflowActiveSuffix': '，使用緊',
+  'tabs.overflowActiveChip': '使用緊',
+  'tabs.overflowPinnedChip': '已置頂',
+  'tabs.overflowFavoriteChip': '最愛',
+  'tabs.overflowCountOne': '呢個選單有 1 個分頁',
+  'tabs.overflowCountMany': '呢個選單有 {count} 個分頁',
   'language.english': '英文',
   'language.cantonese': '玩味港式廣東話',
   'language.bilingual': '雙語',

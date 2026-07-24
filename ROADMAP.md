@@ -13,6 +13,16 @@ This file is the compact public source of truth; implementation details and
 historical test receipts stay in [PLAN.md](PLAN.md) and
 [HANDOFF.md](HANDOFF.md).
 
+## July 24 tab-strip overflow dropdown — **Implemented on `feat/tab-overflow-dropdown`; publication pending**
+
+When the repository tab strip overflows, the tabs that no longer fit move into a
+keyboard-accessible "more tabs" dropdown instead of clipping or scrolling
+sideways. A contiguous run of tabs stays visible, the active tab is guaranteed
+on screen, collapsed-group chips stay pinned, and every per-tab appearance
+customization is preserved in both the strip and the dropdown rows. Split
+geometry lives in a DOM-free, unit-tested module (`tab-overflow.ts`, 11 cases);
+`npx tsc --noEmit` is clean. English/Cantonese/bilingual copy and docs shipped.
+
 ## July 23 cross-lane updater recovery — **Verified**
 
 Commits `241cc90ce9` and `04246fdf12` moved both release lanes into one
