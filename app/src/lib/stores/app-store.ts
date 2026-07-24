@@ -694,7 +694,10 @@ import {
 } from './notifications-store'
 import { NotificationCentreStore } from './notification-centre-store'
 import { NotificationAutomationStore } from './notification-automation-store'
-import { evaluateLargeRepository } from '../large-repository/large-repository-controller'
+import {
+  evaluateLargeRepository,
+  setLargeRepositoryRepackObserver,
+} from '../large-repository/large-repository-controller'
 import { buildMissingRepositoryNotification } from '../large-repository/missing-repository-polling'
 import { LogStore } from './log-store'
 import { setLogSinkVerbose } from '../logging/renderer/log-sink'
@@ -1531,6 +1534,35 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.notificationCentreStore.setAutomationTrigger(entry =>
       this.runNotificationAutomations(entry)
     )
+
+    // The idle repack for large repositories reports through the notification
+    // centre so the "Repack large repositories when idle" setting has visible,
+    // non-blocking behavior (progress and outcome are toasts, never dialogs).
+    setLargeRepositoryRepackObserver(event => {
+      const name = event.repository.name
+      if (event.phase === 'started') {
+        this.postNotification({
+          kind: 'info',
+          title: t('largeRepo.repack.progressTitle'),
+          body: t('largeRepo.repack.progressBody', { name }),
+        })
+      } else if (event.phase === 'ok') {
+        this.postNotification({
+          kind: 'info',
+          title: t('largeRepo.repack.successTitle'),
+          body: t('largeRepo.repack.successBody', { name }),
+        })
+      } else {
+        this.postNotification({
+          kind: 'app-error',
+          title: t('largeRepo.repack.failedTitle'),
+          body: t('largeRepo.repack.failedBody', {
+            name,
+            error: event.error ?? 'unknown error',
+          }),
+        })
+      }
+    })
 
     this.batchCloneStore = new BatchCloneStore(
       this.cloningRepositoriesStore,
