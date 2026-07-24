@@ -155,6 +155,13 @@ export class SoundPreferences extends React.Component<
             ttsEnabled => this.update({ ttsEnabled }),
             'sound-tts'
           )}
+          {this.renderToggle(
+            'settings.soundRecordedNarrationTitle',
+            'settings.soundRecordedNarrationDescription',
+            settings.useRecordedNarration,
+            useRecordedNarration => this.update({ useRecordedNarration }),
+            'sound-recorded-narration'
+          )}
           {this.renderVolume(
             'settings.soundTtsVolumeLabel',
             'sound-tts-volume',

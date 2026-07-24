@@ -53,6 +53,13 @@ export interface IAudioSystemSettings {
    * never chatters. Errors bypass this so they are always heard.
    */
   readonly ttsCooldownMs: number
+  /**
+   * When true and the pre-generated assets are present, narrated events play a
+   * recorded voice clip (and its melody cue) instead of live speech synthesis
+   * and a synthesized effect. Falls back to the live path whenever an asset is
+   * missing or fails to decode.
+   */
+  readonly useRecordedNarration: boolean
 
   readonly musicEnabled: boolean
   /** 0..1 gain for the looped per-repository track (kept deliberately low). */
@@ -81,6 +88,9 @@ export const DefaultAudioSystemSettings: IAudioSystemSettings = {
   ttsEnabled: false,
   ttsVolume: 1,
   ttsCooldownMs: 8_000,
+  // Recorded assets ship with the app, so recorded narration is the default
+  // when the narrator is turned on.
+  useRecordedNarration: true,
   musicEnabled: false,
   musicVolume: 0.15,
   respectReducedMotion: true,
@@ -155,6 +165,10 @@ export function normalizeAudioSettings(value: unknown): IAudioSystemSettings {
         MaxTtsCooldownMs,
         d.ttsCooldownMs
       )
+    ),
+    useRecordedNarration: coerceBoolean(
+      raw.useRecordedNarration,
+      d.useRecordedNarration
     ),
     musicEnabled: coerceBoolean(raw.musicEnabled, d.musicEnabled),
     musicVolume: clampVolume(raw.musicVolume, d.musicVolume),

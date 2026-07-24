@@ -317,6 +317,22 @@ export const SettingsSearchCatalog: ReadonlyArray<ISettingsSearchEntry> =
       ],
     },
     {
+      id: 'sound-recorded-narration',
+      tab: PreferencesTab.Sound,
+      titleKey: 'settings.soundRecordedNarrationTitle',
+      descriptionKey: 'settings.soundRecordedNarrationDescription',
+      keywords: [
+        'recorded',
+        'narration',
+        'voice',
+        'melody',
+        'prerecorded',
+        '錄音',
+        '預錄',
+        '旁白',
+      ],
+    },
+    {
       id: 'sound-effects',
       tab: PreferencesTab.Sound,
       titleKey: 'settings.soundSfxEnableTitle',

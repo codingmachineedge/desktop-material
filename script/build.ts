@@ -313,6 +313,14 @@ function copyStaticResources() {
     force: false,
     verbatimSymlinks: true,
   })
+
+  // The pre-generated narration + melody assets live in a top-level static dir
+  // (not under common/), so copy them into the packaged static/audio folder the
+  // renderer references via encodePathAsUrl(__dirname, 'static/audio', …).
+  const audioSource = path.join(projectRoot, 'app', 'static', 'audio')
+  if (existsSync(audioSource)) {
+    removeAndCopy(audioSource, path.join(destination, 'audio'))
+  }
 }
 
 function moveAnalysisFiles() {
