@@ -23,6 +23,13 @@ import {
   IBuildRunStateEvent,
 } from './build-run/types'
 import {
+  IActionsLocalRunLogEvent,
+  IActionsLocalRunPlan,
+  IActionsLocalRunStateEvent,
+  IActionsLocalToolAvailability,
+  IActionsWorkflow,
+} from './actions-local-run/types'
+import {
   IOpencodeInstallRequest,
   IOpencodeInstallResult,
   IOpencodeLogEvent,
@@ -182,6 +189,8 @@ export type RequestChannels = {
   'uninstall-windows-cli': () => void
   'build-run-log': (event: IBuildRunLogEvent) => void
   'build-run-state': (event: IBuildRunStateEvent) => void
+  'actions-local-run-log': (event: IActionsLocalRunLogEvent) => void
+  'actions-local-run-state': (event: IActionsLocalRunStateEvent) => void
   'opencode-log': (event: IOpencodeLogEvent) => void
   'codex-log': (event: ICodexLogEvent) => void
   'cli-command-output': (event: ICLICommandOutputEvent) => void
@@ -281,6 +290,12 @@ export type RequestResponseChannels = {
   'request-notifications-permission': () => Promise<boolean>
   'start-build-run': (plan: IBuildRunPlan) => Promise<void>
   'cancel-build-run': (runId: string) => Promise<void>
+  'detect-actions-local-tools': () => Promise<IActionsLocalToolAvailability>
+  'list-actions-workflows': (
+    repositoryPath: string
+  ) => Promise<ReadonlyArray<IActionsWorkflow>>
+  'start-actions-local-run': (plan: IActionsLocalRunPlan) => Promise<void>
+  'cancel-actions-local-run': (runId: string) => Promise<void>
   'notification-automation-run-webhook': (
     request: INotificationAutomationRunRequest
   ) => Promise<INotificationWebhookResult>

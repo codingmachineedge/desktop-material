@@ -91,6 +91,7 @@ export enum PopupType {
   GitLabMergeRequest = 'GitLabMergeRequest',
   BranchRules = 'BranchRules',
   SparseCheckout = 'SparseCheckout',
+  ActionsLocalRun = 'ActionsLocalRun',
   RepositorySettings = 'RepositorySettings',
   AddSubmodule = 'AddSubmodule',
   CloneableSubmodules = 'CloneableSubmodules',
@@ -265,6 +266,7 @@ export type PopupDetail =
   | { type: PopupType.LogHistory }
   | { type: PopupType.FileHistory; repository: Repository; path: string }
   | { type: PopupType.CreateGitHubIssue; repository: Repository }
+  | { type: PopupType.ActionsLocalRun; repository: Repository }
   | {
       type: PopupType.CreateGitHubPullRequest
       repository: RepositoryWithGitHubRepository

@@ -1,0 +1,108 @@
+// Local GitHub Actions runner dialog. Uses M3 tokens shared by the other
+// Desktop Material dialogs; no bespoke colours except the functional log
+// streams (data, not chrome).
+#actions-local-run {
+  width: min(720px, calc(100vw - var(--spacing-double)));
+  max-width: calc(100vw - var(--spacing-double));
+  min-width: min(460px, calc(100vw - var(--spacing-double)));
+  max-height: calc(100vh - var(--spacing-double));
+  overflow-x: hidden;
+
+  &,
+  * {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .dialog-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .actions-local-run-subtitle {
+    margin-top: 0;
+    color: var(--text-secondary-color);
+  }
+
+  .actions-local-run-help {
+    margin: var(--spacing-half) 0 var(--spacing);
+    color: var(--text-secondary-color);
+    font-size: var(--font-size-sm);
+  }
+
+  .actions-local-run-config {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing);
+  }
+
+  h3 {
+    margin: var(--spacing) 0 var(--spacing-half);
+    font-size: var(--font-size);
+  }
+
+  .actions-local-run-tools-missing,
+  .actions-local-run-release-upload {
+    padding: var(--spacing);
+    border: 1px solid var(--box-border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing);
+
+    ul {
+      margin: var(--spacing-half) 0;
+      padding-left: var(--spacing-double);
+    }
+
+    p {
+      margin: var(--spacing-half) 0;
+    }
+  }
+
+  .actions-local-run-parse-error,
+  .actions-local-run-empty,
+  .actions-local-run-status {
+    color: var(--text-secondary-color);
+    font-size: var(--font-size-sm);
+  }
+
+  .actions-local-run-secret-row {
+    display: flex;
+    gap: var(--spacing-half);
+    align-items: flex-end;
+    margin-bottom: var(--spacing-half);
+
+    .text-box-component {
+      flex: 1 1 auto;
+    }
+  }
+
+  .actions-local-run-run-status {
+    font-weight: var(--font-weight-semibold);
+    margin: var(--spacing) 0 var(--spacing-half);
+  }
+
+  .actions-local-run-output {
+    max-height: 280px;
+    overflow: auto;
+    padding: var(--spacing-half);
+    border: 1px solid var(--box-border-color);
+    border-radius: var(--border-radius);
+    background: var(--box-alt-background-color);
+    font-family: var(--font-family-monospace);
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+
+    .actions-local-run-line {
+      &.stream-stderr {
+        color: var(--dialog-error-color, var(--error-color));
+      }
+
+      &.stream-meta,
+      &.stream-command {
+        color: var(--text-secondary-color);
+        font-style: italic;
+      }
+    }
+  }
+}

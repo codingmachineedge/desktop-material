@@ -173,6 +173,14 @@ export const CommandPaletteCatalog: ReadonlyArray<IPaletteCommand> = [
     keywords: 'docker compose npm make',
   },
   {
+    event: 'run-actions-locally',
+    title: 'Run Actions locally',
+    titleKey: 'actionsLocalRun.commandTitle',
+    group: 'Repository',
+    keywords: 'github actions workflow act ci run local',
+    isAvailable: whenRepository,
+  },
+  {
     event: 'open-pull-request',
     title: 'Open the pull request',
     group: 'Repository',

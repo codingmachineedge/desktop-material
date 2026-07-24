@@ -14,6 +14,7 @@ export const DesktopMaterialFeatureEntryPointIds: ReadonlySet<string> = new Set(
     'manage-gitignore',
     'manage-sparse-checkout',
     'permanently-discard-all-changes',
+    'run-actions-locally',
     'show-repository-tools',
     'show-settings-history',
     'squash-and-merge-branch',

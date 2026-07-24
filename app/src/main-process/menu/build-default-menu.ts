@@ -469,6 +469,11 @@ export function buildDefaultMenuTemplate({
         accelerator: 'CmdOrCtrl+Shift+B',
         click: emit('build-and-run'),
       },
+      {
+        label: __DARWIN__ ? 'Run Actions Locally…' : 'Run &actions locally…',
+        id: 'run-actions-locally',
+        click: emit('run-actions-locally'),
+      },
     ],
   })
 

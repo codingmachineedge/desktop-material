@@ -33,6 +33,7 @@ export type MenuIDs =
   | 'manage-gitignore'
   | 'manage-sparse-checkout'
   | 'build-and-run'
+  | 'run-actions-locally'
   | 'open-external-editor'
   | 'open-with-external-editor'
   | 'remove-repository'
