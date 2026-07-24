@@ -1250,6 +1250,8 @@ export type TranslationKey =
   | 'settings.soundTtsEnableDescription'
   | 'settings.soundTtsVolumeLabel'
   | 'settings.soundTtsCooldownLabel'
+  | 'settings.soundRecordedNarrationTitle'
+  | 'settings.soundRecordedNarrationDescription'
   | 'settings.soundPreviewNarration'
   | 'settings.soundFunnyHeading'
   | 'settings.soundFunnyEnglishLabel'
@@ -3144,6 +3146,9 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'Narrates meaningful events in English or Cantonese, rate-limited so it never chatters. Suppressed when a screen reader would already announce the same thing.',
   'settings.soundTtsVolumeLabel': 'Narrator volume',
   'settings.soundTtsCooldownLabel': 'Minimum gap between lines',
+  'settings.soundRecordedNarrationTitle': 'Use recorded narration',
+  'settings.soundRecordedNarrationDescription':
+    'Play the pre-recorded voice lines and their melodies that ship with the app instead of live speech synthesis. Falls back to live narration automatically when a clip is unavailable.',
   'settings.soundPreviewNarration': 'Preview narration',
   'settings.soundFunnyHeading': 'Narrator tone',
   'settings.soundFunnyEnglishLabel': 'English playfulness',
@@ -5022,6 +5027,9 @@ export const cantoneseTranslations: Readonly<
     '會用英文或者廣東話讀出有意義嘅事件，有限速唔會嘈住晒。如果螢幕閱讀器已經會讀，就會自動收聲。',
   'settings.soundTtsVolumeLabel': '旁白音量',
   'settings.soundTtsCooldownLabel': '兩句之間最短間隔',
+  'settings.soundRecordedNarrationTitle': '用錄好嘅旁白',
+  'settings.soundRecordedNarrationDescription':
+    '播應用程式內附嘅預錄語音同旋律，唔使即時合成。如果搵唔到對應嘅錄音，會自動改用即時旁白。',
   'settings.soundPreviewNarration': '試聽旁白',
   'settings.soundFunnyHeading': '旁白語氣',
   'settings.soundFunnyEnglishLabel': '英文搞笑程度',

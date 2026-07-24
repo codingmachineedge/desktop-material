@@ -12,5 +12,9 @@
 - [Audio system](audio-system.md) — optional, off-by-default spoken narrator,
   synthesized sound effects, and per-repository music, with rate-limiting,
   quiet hours, reduced-sound, screen-reader coexistence, and funny-level tone.
+- [Recorded narration + melody assets](narration-assets.md) — plays the
+  pre-generated per-event voice clips (English/Cantonese/bilingual, serialized
+  in one non-overlapping queue) and melody cues in place of live speech and
+  synthesized effects, with automatic fallback and a persisted toggle.
 
 This category has no HTTP API. Postman collections are not applicable.

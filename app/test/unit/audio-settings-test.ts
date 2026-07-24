@@ -78,6 +78,20 @@ describe('audio-settings serialization', () => {
     assert.strictEqual(parsed.sfxEnabled, DefaultAudioSystemSettings.sfxEnabled)
     assert.strictEqual(parsed.ttsEnabled, DefaultAudioSystemSettings.ttsEnabled)
   })
+
+  it('defaults recorded narration on and coerces a bad value', () => {
+    assert.strictEqual(DefaultAudioSystemSettings.useRecordedNarration, true)
+    assert.strictEqual(
+      normalizeAudioSettings({ useRecordedNarration: false })
+        .useRecordedNarration,
+      false
+    )
+    assert.strictEqual(
+      normalizeAudioSettings({ useRecordedNarration: 'nope' })
+        .useRecordedNarration,
+      true
+    )
+  })
 })
 
 describe('audio repo-music map', () => {
