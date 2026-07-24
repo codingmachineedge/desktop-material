@@ -1,5 +1,59 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-24 mega wave: audio wiring, auto-fix, large repos, search
+
+Seven more branches were merged into `main` after the morning feature wave,
+each built by an isolated Opus agent and adversarially reviewed before
+integration:
+
+- `feat/wire-narration-assets` (#9b) — the 243 bundled narration/melody assets
+  now play at runtime: per-language recorded MP3 narration (English /
+  Cantonese / bilingual strictly serialized) through one non-overlapping
+  queue with live-TTS fallback, melody WAVs as per-event cues, packaged
+  `static/audio` copying, a persisted "use recorded narration" toggle, and a
+  filesystem manifest-completeness contract test.
+- `feat/sfx-event-mapping` (#10) — push/fetch/pull and every Build & Run
+  phase get audibly distinct motifs (four families) via a pure, exhaustively
+  tested event → category → motif mapping, plus a per-cue audition grid in
+  Settings → Sound.
+- `feat/repo-theme-music` (#11) — a deterministic synthesized theme per
+  repository (seeded from its identity) with per-repo override/clear;
+  persistence moved from localStorage to a Git-backed dedicated-setting
+  store with one-time migration.
+- `feat/auto-fix-errors` (#15) — pure classifier for recognized Git failures
+  (stale `index.lock`, auto-gc/maintenance hang, non-fast-forward push,
+  forbidden org-remote push, detached-HEAD commit) with safety classes
+  (auto / confirm / manual; destructive fixes are never automatic) and a
+  localized one-click "Fix it" notification action.
+- `feat/native-large-repo` (#16) — per-repository large mode extends
+  gc/maintenance suppression to status/add/checkout/fetch, fail-closed stale
+  index.lock removal, an explicit "checking for changes" state (no more
+  transient "No local changes"), suspended polling with one persistent
+  notification for missing-on-disk repositories, and a confirm-class nested
+  `.git` compression offer. The review's one confirmed blocker — a dead
+  "Repack large repositories when idle" toggle — was fixed at integration:
+  large classification now schedules one controlled deferred repack per
+  repository per process (setting re-checked at fire time) with
+  notification-centre progress/outcome toasts.
+- `feat/more-search-bars` — the stash manager inventory gains the shared
+  fuzzy/substring/regex filter with the full inline regex builder, registered
+  in the search-surface audit registry (audit rated the other unsearchable
+  surfaces low-value; they remain listed in the workflow result).
+- `fix/regex-builder-clipping` — the regex builder gets a responsive
+  contract (min-width floor with single-column collapse, internal
+  max-height scroll region) so small host dialogs no longer clip it,
+  pinned by new style-contract tests.
+
+Integration notes: `audio-cue-store.ts` needed a real three-way resolution
+(narration queue × SFX routing × theme player — operation cues route through
+the merged `playForEvent` gate with null event ids so recorded narration
+stays attached to notifications); `i18n-resources.ts` resolved keep-both
+three times. One regression was found by the first complete full-suite run
+and fixed at the root: a hidden or unrealized tab strip measures every tab
+width as zero and the overflow split collapsed all but one tab — the strip
+now never splits on unmeasurable widths. Earlier "full" runs had silently
+skipped the tab UI suite; the final gate below is a complete run.
+
 ## 2026-07-24 feature-wave integration into `main`
 
 The five July 24 feature branches and the narration-asset branch were merged

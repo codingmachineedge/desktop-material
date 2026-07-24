@@ -13,6 +13,22 @@ This file is the compact public source of truth; implementation details and
 historical test receipts stay in [PLAN.md](PLAN.md) and
 [HANDOFF.md](HANDOFF.md).
 
+## July 24 mega wave — **Implemented, locally accepted**
+
+Five backlog features built in parallel by isolated Opus agents, each
+adversarially reviewed, then integrated: recorded narration wiring (the 243
+bundled voice/melody assets now play at runtime with a serialized
+non-overlapping queue and live-TTS fallback), distinct SFX event mapping
+(push/fetch/pull and Build & Run phases each get their own motif), deterministic
+repository-themed music (Git-backed persistence with localStorage migration),
+safe Git auto-fix (classified auto/confirm/manual remediations, never
+destructive automatically), and native large-repository handling
+(gc/maintenance suppression across operations, stale-lock removal, explicit
+status-computing state, missing-repo polling suspension, wired idle repack).
+Plus: stash-inventory search with the full regex builder, and a responsive
+contract that stops small dialogs clipping the regex builder. Details in
+[HANDOFF.md](HANDOFF.md).
+
 ## July 24 settings search — **Implemented, locally accepted**
 
 A search box in the Settings dialog rail filters a bilingual catalog of settings
