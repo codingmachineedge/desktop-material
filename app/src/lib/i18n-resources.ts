@@ -951,6 +951,14 @@ export type TranslationKey =
   | 'stashManager.manageAction'
   | 'stashManager.controlsAria'
   | 'stashManager.cancelOperationAction'
+  | 'stashManager.filterLabel'
+  | 'stashManager.filterPlaceholder'
+  | 'stashManager.filterAria'
+  | 'stashManager.filterRegexTarget'
+  | 'stashManager.filterMatchSingular'
+  | 'stashManager.filterMatchPlural'
+  | 'stashManager.noMatches'
+  | 'stashManager.invalidFilterPattern'
   | 'tagLifecycle.rejectedError'
   | 'tagLifecycle.operationFailedError'
   | 'tagLifecycle.createdStatus'
@@ -2793,6 +2801,14 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'stashManager.manageAction': 'Manage',
   'stashManager.controlsAria': 'Managed stash controls',
   'stashManager.cancelOperationAction': 'Cancel operation',
+  'stashManager.filterLabel': 'Filter stashes',
+  'stashManager.filterPlaceholder': 'Filter by name or branch',
+  'stashManager.filterAria': 'Filter repository stashes by name or branch',
+  'stashManager.filterRegexTarget': 'Stashes',
+  'stashManager.filterMatchSingular': '{count} stash matches',
+  'stashManager.filterMatchPlural': '{count} stashes match',
+  'stashManager.noMatches': 'No stashes match this filter.',
+  'stashManager.invalidFilterPattern': 'Invalid search pattern: {error}',
   'tagLifecycle.rejectedError':
     'Git rejected the tag operation. Review the application error for details.',
   'tagLifecycle.operationFailedError': 'The tag operation failed.',
@@ -4690,6 +4706,14 @@ export const cantoneseTranslations: Readonly<
   'stashManager.manageAction': '管理',
   'stashManager.controlsAria': '受管 stash 控制',
   'stashManager.cancelOperationAction': '取消操作',
+  'stashManager.filterLabel': '篩選 stash',
+  'stashManager.filterPlaceholder': '按名或者分支篩走',
+  'stashManager.filterAria': '按名或者分支篩選 repo stash',
+  'stashManager.filterRegexTarget': 'Stash',
+  'stashManager.filterMatchSingular': '中咗 {count} 個 stash',
+  'stashManager.filterMatchPlural': '中咗 {count} 個 stash',
+  'stashManager.noMatches': '冇 stash 啱呢個篩選。',
+  'stashManager.invalidFilterPattern': '搜尋格式唔啱：{error}',
   'tagLifecycle.rejectedError': 'Git 拒絕咗標籤操作；請查看應用程式錯誤詳情。',
   'tagLifecycle.operationFailedError': '標籤操作未能完成。',
   'tagLifecycle.createdStatus': '已建立本機標籤 {name}。',

@@ -4,9 +4,11 @@ import * as React from 'react'
 
 import {
   describeManagedStashError,
+  filterManagedStashInventory,
   groupManagedStashes,
   StashManager,
 } from '../../../src/ui/stashing/stash-manager'
+import { FilterMode } from '../../../src/lib/fuzzy-find'
 import {
   IStashEntry,
   StashedChangesLoadStates,
@@ -153,6 +155,94 @@ describe('stash manager', () => {
       ]
     )
     assert.equal(groups.flatMap(group => group.entries).length, 2)
+  })
+
+  it('passes every entry through an empty inventory filter', () => {
+    const result = filterManagedStashInventory(
+      [featureEntry, mainEntry],
+      'main',
+      '   ',
+      { mode: FilterMode.Fuzzy, caseSensitive: false }
+    )
+    assert.equal(result.matchCount, 2)
+    assert.equal(result.regexError, null)
+    assert.deepEqual(
+      result.groups.map(group => group.branchName),
+      ['main', 'feature/long-lived-work']
+    )
+  })
+
+  it('narrows the inventory filter by title and by branch name', () => {
+    const byTitle = filterManagedStashInventory(
+      [featureEntry, mainEntry],
+      'main',
+      'Feature review',
+      { mode: FilterMode.Substring, caseSensitive: false }
+    )
+    assert.deepEqual(
+      byTitle.groups.flatMap(group => group.entries.map(e => e.stashSha)),
+      [featureEntry.stashSha]
+    )
+    assert.equal(byTitle.matchCount, 1)
+
+    const byBranch = filterManagedStashInventory(
+      [featureEntry, mainEntry],
+      'main',
+      'long-lived',
+      { mode: FilterMode.Substring, caseSensitive: false }
+    )
+    assert.deepEqual(
+      byBranch.groups.map(group => group.branchName),
+      ['feature/long-lived-work']
+    )
+    assert.equal(byBranch.matchCount, 1)
+  })
+
+  it('keeps an invalid inventory regex non-throwing and preserves every entry', () => {
+    const result = filterManagedStashInventory(
+      [featureEntry, mainEntry],
+      'main',
+      '(',
+      { mode: FilterMode.Regex, caseSensitive: false }
+    )
+    assert.ok(result.regexError)
+    assert.equal(result.matchCount, 2)
+  })
+
+  it('honours case sensitivity in substring inventory matching', () => {
+    const sensitive = filterManagedStashInventory(
+      [featureEntry, mainEntry],
+      'main',
+      'feature review',
+      { mode: FilterMode.Substring, caseSensitive: true }
+    )
+    assert.equal(sensitive.matchCount, 0)
+
+    const insensitive = filterManagedStashInventory(
+      [featureEntry, mainEntry],
+      'main',
+      'feature review',
+      { mode: FilterMode.Substring, caseSensitive: false }
+    )
+    assert.equal(insensitive.matchCount, 1)
+  })
+
+  it('filters the inventory list from the search field and reports no matches', () => {
+    renderManager(new FakeStashDispatcher(), [featureEntry, mainEntry])
+    fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
+    assert(screen.getByText('Main review'))
+    assert(screen.getByText('Feature review'))
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Filter repository stashes by name or branch',
+    })
+    fireEvent.change(search, { target: { value: 'Feature' } })
+    assert(screen.queryByText('Main review') === null)
+    assert(screen.getByText('Feature review'))
+    assert(screen.getByText('1 stash matches'))
+
+    fireEvent.change(search, { target: { value: 'zzz-none' } })
+    assert(screen.getByText('No stashes match this filter.'))
   })
 
   it('renders a compact summary then exposes accessible all-branch inventory', () => {

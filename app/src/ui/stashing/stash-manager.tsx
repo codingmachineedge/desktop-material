@@ -26,12 +26,24 @@ import {
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
 import { LocalizedText } from '../lib/localized-text'
+import { FilterMode, IFilterOptions, matchWithMode } from '../../lib/fuzzy-find'
+import { FilterModeControl } from '../lib/filter-mode-control'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
 
 const StashManagerPanelId = 'desktop-material-stash-manager-panel'
 const StashNameInputId = 'desktop-material-stash-name'
 const StashMetadataNameInputId = 'desktop-material-stash-metadata-name'
 const StashMetadataBranchInputId = 'desktop-material-stash-metadata-branch'
 const StashBranchInputId = 'desktop-material-stash-new-branch'
+
+/** Stable audit identity shared by the inventory search input and its controls. */
+const StashInventoryFilterSurfaceId = 'stash-inventory'
+const StashInventoryFilterInputId = 'desktop-material-stash-inventory-filter'
+const StashInventoryFilterErrorId =
+  'desktop-material-stash-inventory-filter-error'
 
 const StashIcon: OcticonSymbolVariant = {
   w: 16,
@@ -81,6 +93,56 @@ export function groupManagedStashes(
       isCurrentBranch: branchName === currentBranchName,
       entries: branchEntries,
     }))
+}
+
+/** The grouped, filtered inventory ready to render in the stash manager. */
+export interface IFilteredStashInventory {
+  /** The branch groups that survived the filter (current branch first). */
+  readonly groups: ReadonlyArray<IManagedStashGroup>
+  /** How many entries matched, summed across every branch group. */
+  readonly matchCount: number
+  /**
+   * A human readable message when a supplied regex pattern was invalid (or too
+   * long); `null` otherwise. When set, `groups` still holds every entry so the
+   * list stays usable while the user is mid-pattern.
+   */
+  readonly regexError: string | null
+}
+
+/**
+ * Narrow the repository stash inventory by free text, then regroup it by
+ * branch. An empty query passes every entry through unchanged. Matching spans
+ * each entry's display title and its recorded branch name using the shared
+ * fuzzy / substring / regex engine, so an invalid regex leaves the list intact
+ * (guarding against catastrophic backtracking via the shared guard limits).
+ */
+export function filterManagedStashInventory(
+  entries: ReadonlyArray<IStashEntry>,
+  currentBranchName: string | null,
+  filterText: string,
+  options: IFilterOptions
+): IFilteredStashInventory {
+  const query = filterText.trim()
+  if (query.length === 0) {
+    return {
+      groups: groupManagedStashes(entries, currentBranchName),
+      matchCount: entries.length,
+      regexError: null,
+    }
+  }
+
+  const { results, regexError } = matchWithMode(
+    query,
+    entries,
+    entry => [stashEntryTitle(entry), entry.branchName],
+    options
+  )
+  const matched = results.map(result => result.item)
+  return {
+    groups: groupManagedStashes(matched, currentBranchName),
+    matchCount: matched.length,
+    regexError,
+  }
 }
 
 export function formatManagedStashTimestamp(
@@ -165,6 +227,12 @@ interface IStashManagerState {
   readonly status: ILocalizedMessage | null
   readonly error: ILocalizedMessage | string | null
   readonly languageMode: LanguageMode
+  /** Free-text query narrowing the inventory by title or branch. */
+  readonly inventoryFilterText: string
+  /** The text-match strategy for the inventory search field. */
+  readonly inventoryFilterMode: FilterMode
+  /** Whether Substring / Regex inventory matching is case sensitive. */
+  readonly inventoryFilterCaseSensitive: boolean
 }
 
 /** A native, task-specific manager for Desktop-managed repository stashes. */
@@ -194,6 +262,11 @@ export class StashManager extends React.Component<
       status: null,
       error: null,
       languageMode: getPersistedLanguageMode(),
+      inventoryFilterText: '',
+      inventoryFilterMode: readPersistedFilterMode(
+        StashInventoryFilterSurfaceId
+      ),
+      inventoryFilterCaseSensitive: false,
     }
   }
 
@@ -1019,10 +1092,90 @@ export class StashManager extends React.Component<
     )
   }
 
+  private onInventoryFilterChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => this.setState({ inventoryFilterText: event.currentTarget.value })
+
+  private onInventoryFilterModeChanged = (inventoryFilterMode: FilterMode) => {
+    persistFilterMode(StashInventoryFilterSurfaceId, inventoryFilterMode)
+    this.setState({ inventoryFilterMode })
+  }
+
+  private onInventoryFilterCaseSensitiveChanged = (
+    inventoryFilterCaseSensitive: boolean
+  ) => this.setState({ inventoryFilterCaseSensitive })
+
+  private onInventoryRegexPatternApply = (pattern: string) =>
+    this.setState({ inventoryFilterText: pattern })
+
+  private getInventoryFilterSamples = (): ReadonlyArray<string> =>
+    this.props.allStashEntries.map(
+      entry => `${stashEntryTitle(entry)} · ${entry.branchName}`
+    )
+
+  private renderInventoryFilter(regexError: string | null) {
+    return (
+      <div className="stash-manager-inventory-filter">
+        <label
+          htmlFor={StashInventoryFilterInputId}
+          className="stash-manager-filter-label"
+        >
+          {this.localized('stashManager.filterLabel')}
+        </label>
+        <div className="stash-manager-filter-field">
+          <input
+            id={StashInventoryFilterInputId}
+            data-search-surface-id="stash-inventory"
+            type="search"
+            className="stash-manager-filter-input"
+            value={this.state.inventoryFilterText}
+            placeholder={this.accessibleText('stashManager.filterPlaceholder')}
+            aria-label={this.accessibleText('stashManager.filterAria')}
+            aria-describedby={
+              regexError !== null ? StashInventoryFilterErrorId : undefined
+            }
+            onChange={this.onInventoryFilterChanged}
+          />
+          <FilterModeControl
+            searchSurfaceId="stash-inventory"
+            mode={this.state.inventoryFilterMode}
+            caseSensitive={this.state.inventoryFilterCaseSensitive}
+            onModeChange={this.onInventoryFilterModeChanged}
+            onCaseSensitiveChange={this.onInventoryFilterCaseSensitiveChanged}
+            regexBuilderTarget={this.accessibleText(
+              'stashManager.filterRegexTarget'
+            )}
+            getSampleItems={this.getInventoryFilterSamples}
+            filterText={this.state.inventoryFilterText}
+            onRegexPatternApply={this.onInventoryRegexPatternApply}
+          />
+        </div>
+        {regexError !== null ? (
+          <p
+            id={StashInventoryFilterErrorId}
+            className="stash-manager-error"
+            role="alert"
+          >
+            {this.localized('stashManager.invalidFilterPattern', {
+              error: regexError,
+            })}
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+
   private renderInventory() {
-    const groups = groupManagedStashes(
+    const hasEntries = this.props.allStashEntries.length > 0
+    const filterActive = this.state.inventoryFilterText.trim().length > 0
+    const { groups, matchCount, regexError } = filterManagedStashInventory(
       this.props.allStashEntries,
-      this.props.branch
+      this.props.branch,
+      this.state.inventoryFilterText,
+      {
+        mode: this.state.inventoryFilterMode,
+        caseSensitive: this.state.inventoryFilterCaseSensitive,
+      }
     )
     return (
       <section
@@ -1046,9 +1199,24 @@ export class StashManager extends React.Component<
             })}
           </Button>
         </div>
-        {groups.length === 0 ? (
+        {hasEntries ? this.renderInventoryFilter(regexError) : null}
+        {hasEntries && filterActive ? (
+          <p className="stash-manager-filter-status" role="status">
+            {this.localized(
+              matchCount === 1
+                ? 'stashManager.filterMatchSingular'
+                : 'stashManager.filterMatchPlural',
+              { count: String(matchCount) }
+            )}
+          </p>
+        ) : null}
+        {!hasEntries ? (
           <p className="stash-manager-empty">
             {this.localized('stashManager.emptyInventory')}
+          </p>
+        ) : groups.length === 0 ? (
+          <p className="stash-manager-empty">
+            {this.localized('stashManager.noMatches')}
           </p>
         ) : (
           groups.map(group => (
