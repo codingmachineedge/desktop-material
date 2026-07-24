@@ -1464,6 +1464,26 @@ export type TranslationKey =
   | 'workflowDispatch.noMatches'
   | 'workflowDispatch.stateActive'
   | 'workflowDispatch.stateDisabled'
+  | 'gitAutoFix.fixIt'
+  | 'gitAutoFix.staleIndexLock.title'
+  | 'gitAutoFix.staleIndexLock.summary'
+  | 'gitAutoFix.staleIndexLock.action'
+  | 'gitAutoFix.autoGcRetry.title'
+  | 'gitAutoFix.autoGcRetry.summary'
+  | 'gitAutoFix.pushNonFastForward.title'
+  | 'gitAutoFix.pushNonFastForward.summary'
+  | 'gitAutoFix.pushForbiddenGithubCli.title'
+  | 'gitAutoFix.pushForbiddenGithubCli.summary'
+  | 'gitAutoFix.detachedHeadRescueBranch.title'
+  | 'gitAutoFix.detachedHeadRescueBranch.summary'
+  | 'gitAutoFix.detachedHeadRescueBranch.action'
+  | 'gitAutoFix.unknown.title'
+  | 'gitAutoFix.unknown.summary'
+  | 'gitAutoFix.unknown.action'
+  | 'gitAutoFix.rescueBranch.successTitle'
+  | 'gitAutoFix.rescueBranch.successBody'
+  | 'gitAutoFix.rescueBranch.failureTitle'
+  | 'gitAutoFix.rescueBranch.failureBody'
 
 /** Complete base catalog. Every missing locale entry falls back to this. */
 export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
@@ -3286,6 +3306,33 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'workflowDispatch.noMatches': 'No workflows match the current filter.',
   'workflowDispatch.stateActive': 'Active',
   'workflowDispatch.stateDisabled': 'Disabled',
+  'gitAutoFix.fixIt': 'Fix it',
+  'gitAutoFix.staleIndexLock.title': 'Repository is locked',
+  'gitAutoFix.staleIndexLock.summary':
+    'A leftover index.lock is blocking Git. If no Git process is running, the stale lock can be removed and the operation retried.',
+  'gitAutoFix.staleIndexLock.action': 'Remove lock file',
+  'gitAutoFix.autoGcRetry.title': 'Background maintenance stalled',
+  'gitAutoFix.autoGcRetry.summary':
+    'Git background packing or maintenance interrupted the operation. It can be retried with automatic maintenance disabled.',
+  'gitAutoFix.pushNonFastForward.title': 'Push rejected (out of date)',
+  'gitAutoFix.pushNonFastForward.summary':
+    'The remote has commits your branch does not. Integrate them with fetch and rebase, or pull, then push again. Force-pushing is never done automatically.',
+  'gitAutoFix.pushForbiddenGithubCli.title': 'Push was forbidden (403)',
+  'gitAutoFix.pushForbiddenGithubCli.summary':
+    'The remote refused the push. Desktop can retry once using your GitHub CLI credentials, without changing which account gh uses.',
+  'gitAutoFix.detachedHeadRescueBranch.title': 'Commit is on a detached HEAD',
+  'gitAutoFix.detachedHeadRescueBranch.summary':
+    'This commit is not on any branch and could be lost. Create a rescue branch to keep it.',
+  'gitAutoFix.detachedHeadRescueBranch.action': 'Create rescue branch',
+  'gitAutoFix.unknown.title': 'Git operation failed',
+  'gitAutoFix.unknown.summary':
+    'Desktop does not have an automatic fix for this error. Review the details and resolve it manually.',
+  'gitAutoFix.unknown.action': 'View details',
+  'gitAutoFix.rescueBranch.successTitle': 'Rescue branch created',
+  'gitAutoFix.rescueBranch.successBody': 'Your commit was saved on {branch}.',
+  'gitAutoFix.rescueBranch.failureTitle': 'Could not create rescue branch',
+  'gitAutoFix.rescueBranch.failureBody':
+    'The rescue branch could not be created: {error}',
 }
 
 /** Hong Kong Cantonese catalog. Missing entries deliberately use English. */
@@ -4960,4 +5007,30 @@ export const cantoneseTranslations: Readonly<
   'workflowDispatch.noMatches': '冇 workflow 啱而家嘅篩選。',
   'workflowDispatch.stateActive': '開緊',
   'workflowDispatch.stateDisabled': '停咗',
+  'gitAutoFix.fixIt': '修復',
+  'gitAutoFix.staleIndexLock.title': '版本庫俾鎖住咗',
+  'gitAutoFix.staleIndexLock.summary':
+    '有殘留嘅 index.lock 阻住 Git。如果冇 Git 程序行緊，可以移除呢個殘留鎖，再重試操作。',
+  'gitAutoFix.staleIndexLock.action': '移除鎖檔',
+  'gitAutoFix.autoGcRetry.title': '背景維護卡住咗',
+  'gitAutoFix.autoGcRetry.summary':
+    'Git 背景打包或者維護中斷咗今次操作。可以停用自動維護再重試。',
+  'gitAutoFix.pushNonFastForward.title': '推送被拒（版本落後）',
+  'gitAutoFix.pushNonFastForward.summary':
+    '遠端有你本機未有嘅提交。用 fetch 加 rebase，或者 pull 整合返，再推送。系統永遠唔會自動強制推送。',
+  'gitAutoFix.pushForbiddenGithubCli.title': '推送被拒（403）',
+  'gitAutoFix.pushForbiddenGithubCli.summary':
+    '遠端拒絕咗今次推送。Desktop 可以用你嘅 GitHub CLI 憑證重試一次，唔會轉 gh 用邊個帳戶。',
+  'gitAutoFix.detachedHeadRescueBranch.title': '提交喺分離 HEAD 上面',
+  'gitAutoFix.detachedHeadRescueBranch.summary':
+    '呢個提交唔喺任何分支上面，有機會唔見咗。開一個救援分支保住佢。',
+  'gitAutoFix.detachedHeadRescueBranch.action': '開救援分支',
+  'gitAutoFix.unknown.title': 'Git 操作失敗',
+  'gitAutoFix.unknown.summary':
+    'Desktop 冇自動修復呢個錯誤。請睇詳情自行處理。',
+  'gitAutoFix.unknown.action': '睇詳情',
+  'gitAutoFix.rescueBranch.successTitle': '已建立救援分支',
+  'gitAutoFix.rescueBranch.successBody': '你嘅提交已經保存喺 {branch}。',
+  'gitAutoFix.rescueBranch.failureTitle': '建立救援分支失敗',
+  'gitAutoFix.rescueBranch.failureBody': '建立唔到救援分支：{error}',
 }

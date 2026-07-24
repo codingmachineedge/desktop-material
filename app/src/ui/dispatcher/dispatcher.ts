@@ -269,6 +269,7 @@ import { BuildFixProvider, ICodexStatus } from '../../lib/build-run/codex'
 import { BuildRunViewPhase } from '../../lib/stores/build-run-store'
 import { resolveWithin } from '../../lib/path'
 import { CherryPickResult } from '../../lib/git/cherry-pick'
+import { AutoFixKind } from '../../lib/git/auto-fix'
 import { sleep } from '../../lib/promise'
 import { DragElement, DragType } from '../../models/drag-drop'
 import { ILastThankYou } from '../../models/last-thank-you'
@@ -855,6 +856,15 @@ export class Dispatcher {
       noticeId,
       confirmed
     )
+  }
+
+  /** Apply a recognized, safe one-click Git auto-fix from an error notice. */
+  public applyGitAutoFix(
+    repositoryId: number,
+    fixKind: AutoFixKind,
+    noticeId: string
+  ): Promise<void> {
+    return this.appStore._applyGitAutoFix(repositoryId, fixKind, noticeId)
   }
 
   /** Load a newest-first page of notification-history commits. */

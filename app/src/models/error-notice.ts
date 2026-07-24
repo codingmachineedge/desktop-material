@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'crypto'
+import type { AutoFixKind } from '../lib/git/auto-fix'
 
 /** The default number of transient errors retained for display. */
 export const ErrorNoticeQueueLimit = 4
@@ -40,10 +41,20 @@ export interface IErrorNotice {
   readonly action?: IErrorNoticeAction
 }
 
-export type IErrorNoticeAction = {
-  readonly kind: 'remove-repository-lock'
-  readonly repositoryId: number
-}
+export type IErrorNoticeAction =
+  | {
+      readonly kind: 'remove-repository-lock'
+      readonly repositoryId: number
+    }
+  | {
+      /** Apply a recognized, safe one-click Git auto-fix (see git/auto-fix). */
+      readonly kind: 'apply-git-auto-fix'
+      readonly repositoryId: number
+      /** Which recognized remediation to apply. */
+      readonly fixKind: AutoFixKind
+      /** Pre-localized action-button label resolved when the notice was made. */
+      readonly label: string
+    }
 
 /** Caller-owned error data before normalization and queue insertion. */
 export interface IErrorNoticeInput {

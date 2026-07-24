@@ -707,6 +707,7 @@ import {
   dismissErrorNotice,
   enqueueErrorNotice,
   IErrorNotice,
+  IErrorNoticeAction,
 } from '../../models/error-notice'
 import {
   ErrorPresentationStyle,
@@ -735,6 +736,8 @@ import {
   gitErrorReferencesRepositoryIndexLock,
   removeStaleRepositoryLock,
 } from '../git/remove-lock'
+import { AutoFixKind, classifyGitOperationError } from '../git/auto-fix'
+import { coerceToString } from '../git/coerce-to-string'
 import { ValidNotificationPullRequestReview } from '../valid-notification-pull-request-review'
 import { determineMergeability } from '../git/merge-tree'
 import { PopupManager } from '../popup-manager'
@@ -1474,6 +1477,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   private errorNotices: ReadonlyArray<IErrorNotice> = []
   private errorPresentationStyle = getErrorPresentationStyle()
   private readonly repositoryLockRemovalInFlight = new Set<number>()
+  private readonly gitAutoFixInFlight = new Set<string>()
 
   /** Coordinates cloning many repositories at once (see BatchCloneStore). */
   private readonly batchCloneStore: BatchCloneStore
@@ -7138,6 +7142,146 @@ export class AppStore extends TypedBaseStore<IAppState> {
   }
 
   /**
+   * Build the notice action for a recognized, safe, one-click Git auto-fix, or
+   * `undefined` when the error is unrecognized or its fix is not one-click
+   * applicable from the notice context. Stale-index-lock is intentionally
+   * excluded here because it has its own confirmation-gated recovery path. Pure
+   * classification lives in `git/auto-fix`; this only maps a recognized fix to a
+   * localized, non-destructive one-click action.
+   */
+  private buildGitAutoFixAction(
+    error: unknown,
+    repositoryId: number
+  ): IErrorNoticeAction | undefined {
+    const errorText =
+      error instanceof GitError
+        ? `${coerceToString(error.result.stderr)}\n${coerceToString(
+            error.result.stdout
+          )}\n${error.message}`
+        : error instanceof Error
+        ? error.message
+        : String(error ?? '')
+
+    const { recognized, fix } = classifyGitOperationError({ errorText })
+    if (
+      !recognized ||
+      !fix.oneClick ||
+      fix.destructive ||
+      fix.kind === 'stale-index-lock'
+    ) {
+      return undefined
+    }
+
+    return {
+      kind: 'apply-git-auto-fix',
+      repositoryId,
+      fixKind: fix.kind,
+      label: t(fix.actionLabelKey),
+    }
+  }
+
+  /**
+   * Apply a recognized, safe, one-click Git auto-fix surfaced on an error
+   * notice, then report the outcome as a non-blocking notification. Only
+   * non-destructive fixes reach this path (see {@link buildGitAutoFixAction}).
+   * Never throws.
+   */
+  public async _applyGitAutoFix(
+    repositoryId: number,
+    fixKind: AutoFixKind,
+    noticeId: string
+  ): Promise<void> {
+    const guardKey = `${repositoryId}:${noticeId}`
+    if (this.gitAutoFixInFlight.has(guardKey)) {
+      return
+    }
+
+    const repository =
+      (this.selectedRepository instanceof Repository &&
+      this.selectedRepository.id === repositoryId
+        ? this.selectedRepository
+        : this.repositories.find(candidate => candidate.id === repositoryId)) ??
+      null
+    if (repository === null) {
+      this.postNotification({
+        kind: 'app-error',
+        title: t('gitAutoFix.rescueBranch.failureTitle'),
+        body: t('gitAutoFix.rescueBranch.failureBody', {
+          error: t('gitAutoFix.unknown.title'),
+        }),
+      })
+      return
+    }
+
+    this.gitAutoFixInFlight.add(guardKey)
+    try {
+      switch (fixKind) {
+        case 'detached-head-rescue-branch':
+          await this.applyRescueBranchFix(repository, noticeId)
+          break
+        // Config-only retries and remote-credential retries require the original
+        // captured operation and are applied at the call sites (commit/push), so
+        // they are never surfaced as a one-click action here.
+        case 'stale-index-lock':
+        case 'auto-gc-retry':
+        case 'push-non-fast-forward':
+        case 'push-forbidden-github-cli':
+        case 'unknown':
+        default:
+          break
+      }
+    } finally {
+      this.gitAutoFixInFlight.delete(guardKey)
+    }
+  }
+
+  /**
+   * Save a detached-HEAD commit by creating (and checking out) a fresh rescue
+   * branch at HEAD. Adds a ref only — it removes and rewrites nothing.
+   */
+  private async applyRescueBranchFix(
+    repository: Repository,
+    noticeId: string
+  ): Promise<void> {
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .replace(/-\d{3}Z$/, 'Z')
+    const branchName = `rescue/detached-head-${stamp}`
+    try {
+      const branch = await this._createBranch(repository, branchName, 'HEAD')
+      if (branch === undefined) {
+        this.postNotification({
+          kind: 'app-error',
+          title: t('gitAutoFix.rescueBranch.failureTitle'),
+          body: t('gitAutoFix.rescueBranch.failureBody', {
+            error: branchName,
+          }),
+        })
+        return
+      }
+      this._dismissErrorNotice(noticeId)
+      this.postNotification({
+        kind: 'info',
+        title: t('gitAutoFix.rescueBranch.successTitle'),
+        body: t('gitAutoFix.rescueBranch.successBody', {
+          branch: branch.name,
+        }),
+        repositoryId: repository.id,
+        action: { kind: 'open-repository', repositoryId: repository.id },
+      })
+    } catch (error) {
+      this.postNotification({
+        kind: 'app-error',
+        title: t('gitAutoFix.rescueBranch.failureTitle'),
+        body: t('gitAutoFix.rescueBranch.failureBody', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      })
+    }
+  }
+
+  /**
    * Refresh all the data for the Changes section.
    *
    * This will be called automatically when appropriate.
@@ -8148,7 +8292,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
         error.metadata.repository instanceof Repository
           ? error.metadata.repository
           : null
-      const action =
+      const lockAction =
         underlying instanceof GitError &&
         underlying.result.gitError === DugiteError.LockFileAlreadyExists &&
         repository !== null &&
@@ -8158,13 +8302,21 @@ export class AppStore extends TypedBaseStore<IAppState> {
               repositoryId: repository.id,
             }
           : undefined
+      // When no dedicated recovery already applies, offer a recognized, safe,
+      // one-click Git auto-fix (see git/auto-fix). Destructive fixes and
+      // force-pushes are never surfaced as a one-click action.
+      const autoFixAction =
+        lockAction === undefined && repository !== null
+          ? this.buildGitAutoFixAction(underlying, repository.id)
+          : undefined
+      const action: IErrorNoticeAction | undefined = lockAction ?? autoFixAction
       this.errorNotices = enqueueErrorNotice(this.errorNotices, {
         title: presentation.title,
         message: presentation.message,
         details: presentation.details,
-        ...(action === undefined
+        ...(lockAction === undefined
           ? {}
-          : { dedupeKey: `repository-index-lock:${action.repositoryId}` }),
+          : { dedupeKey: `repository-index-lock:${lockAction.repositoryId}` }),
         ...(action === undefined ? {} : { action }),
       }).notices
     } else {

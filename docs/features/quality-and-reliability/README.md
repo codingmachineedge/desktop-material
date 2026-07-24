@@ -10,6 +10,11 @@ contracts that span more than one user workflow.
   discovery, hard-bound advisory process cleanup, coalesce stalled proxy work,
   serialize credential prompts, coalesce high-frequency appearance writes, and
   release request and markdown-preview resources deterministically.
+- [Git operation auto-fix](git-operation-auto-fix.md) — a pure classifier that
+  recognizes fixable Git failures (stale index.lock, auto-gc/maintenance hang,
+  non-fast-forward push, forbidden org-remote push, detached-HEAD commit),
+  proposes a safety-classed remediation, and surfaces a localized one-click
+  "Fix it" action on the transient error notice without ever force-pushing.
 
 ## API applicability
 
