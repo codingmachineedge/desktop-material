@@ -20,5 +20,9 @@
   category → motif mapping that gives push/fetch/pull and every Build & Run
   phase their own cue in four motif families, with per-category cooldowns and a
   per-cue audition grid in Settings → Sound.
+- [Repository-themed music](repository-theme-music.md) — a deterministic,
+  synthesized looping theme per repository (no bundled files) seeded from its
+  identity, with per-repo custom-track/mute overrides persisted in a Git-backed
+  dedicated setting and a one-time migration from localStorage.
 
 This category has no HTTP API. Postman collections are not applicable.

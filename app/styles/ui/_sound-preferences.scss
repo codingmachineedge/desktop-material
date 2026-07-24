@@ -159,4 +159,31 @@
       outline-offset: 2px;
     }
   }
+
+  .sound-theme {
+    margin-top: 6px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--md-sys-color-surface-container-high);
+  }
+
+  .sound-theme-name-label {
+    font-weight: var(--font-weight-medium);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .sound-theme-name {
+    display: block;
+    font-size: 18px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--md-sys-color-primary);
+    word-break: break-word;
+  }
+
+  .sound-theme-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
 }

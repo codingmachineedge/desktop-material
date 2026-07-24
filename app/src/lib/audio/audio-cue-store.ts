@@ -1,29 +1,40 @@
 /**
  * Renderer-only orchestrator for the optional audio system. Owns the settings,
  * a {@link ToneSynth} for sound effects, a SpeechSynthesis wrapper for the
- * narrator, and a single looped <audio> element for per-repository music.
+ * narrator, a looped <audio> element for user-chosen per-repository tracks, and
+ * a {@link RepositoryThemePlayer} that synthesizes each repository's derived
+ * theme when no custom track is chosen.
  *
- * All the "should this play" decisions live in the pure `audio-throttle` module
- * so the noisy parts here stay dumb. Everything is best-effort and defensive:
- * an audio failure must never propagate into the app.
+ * Per-repository selections are persisted in a dedicated, Git-backed setting
+ * repository (via {@link RepoMusicStore}); any legacy localStorage value is
+ * migrated once on first load. All the "should this play" decisions live in the
+ * pure `audio-throttle` module so the noisy parts here stay dumb. Everything is
+ * best-effort and defensive: an audio failure must never propagate into the app.
  */
+
+import { join } from 'path'
 
 import { Repository } from '../../models/repository'
 import { INotificationEntry } from '../../models/notification-centre'
 import { getPersistedLanguageMode } from '../i18n'
 import { prefersReducedMotion } from '../../ui/lib/ripple'
+import { getPath } from '../../ui/main-process-proxy'
+import {
+  RepoMusicDirectoryName,
+  RepoMusicStore,
+} from '../stores/repo-music-store'
 import {
   AudioCueCategory,
   AudioRepoMusicStorageKey,
-  AudioSettingsStorageKey,
   DefaultAudioSystemSettings,
   IAudioSystemSettings,
+  IRepoMusicDocument,
   parseAudioSettings,
   parseRepoMusicMap,
-  RepoMusicMap,
+  RepoMusicOverride,
+  repoMusicDocumentFromLegacyMap,
   serializeAudioSettings,
-  serializeRepoMusicMap,
-  setRepoMusicTrack,
+  AudioSettingsStorageKey,
 } from './audio-settings'
 import {
   decideAudioActions,
@@ -32,6 +43,12 @@ import {
   InitialThrottleState,
 } from './audio-throttle'
 import { categoryForNotificationKind, pickNarratorLine } from './narrator-lines'
+import {
+  deriveRepositoryTheme,
+  IRepositoryTheme,
+  repositoryThemeSeedKey,
+} from './repo-theme'
+import { RepositoryThemePlayer } from './theme-player'
 import { ToneSynth } from './tone-synth'
 import {
   getNarrationEvent,
@@ -75,16 +92,26 @@ function funnyLevelFor(
     : settings.funnyLevelEnglish
 }
 
-/** Stable per-repository key for the music map. */
+/** Stable per-repository key for the music override map. */
 export function repositoryMusicKey(repository: Repository): string {
   return repository.path
 }
 
+/** The seed identity used to derive a repository's theme. */
+export function repositorySeedKey(repository: Repository): string {
+  return repositoryThemeSeedKey({
+    fullName: repository.gitHubRepository?.fullName ?? null,
+    name: repository.name,
+    path: repository.path,
+  })
+}
+
 export class AudioCueStore {
   private settings: IAudioSystemSettings
-  private repoMusic: RepoMusicMap
+  private overrides: Readonly<Record<string, RepoMusicOverride>>
   private throttle: IAudioThrottleState = InitialThrottleState
   private readonly synth = new ToneSynth()
+  private readonly themePlayer = new RepositoryThemePlayer()
   private music: HTMLAudioElement | null = null
   private currentRepository: Repository | null = null
 
@@ -100,10 +127,15 @@ export class AudioCueStore {
   private narrationAudio: HTMLAudioElement | null = null
   /** Reused element for the per-event melody sound effect. */
   private melodyAudio: HTMLAudioElement | null = null
+  private repoMusicStore: RepoMusicStore | null = null
+  private repoMusicInitialization: Promise<void> | null = null
 
   public constructor() {
     this.settings = this.loadSettings()
-    this.repoMusic = this.loadRepoMusic()
+    // Seed the in-memory cache synchronously from any legacy value so the
+    // settings UI has something to show before the Git-backed store loads.
+    this.overrides = this.loadBootstrapOverrides()
+    this.repoMusicInitialization = this.initializeRepoMusic()
   }
 
   private loadSettings(): IAudioSystemSettings {
@@ -114,34 +146,50 @@ export class AudioCueStore {
     }
   }
 
-  private loadRepoMusic(): RepoMusicMap {
+  private loadBootstrapOverrides(): Readonly<
+    Record<string, RepoMusicOverride>
+  > {
     try {
-      return parseRepoMusicMap(localStorage.getItem(AudioRepoMusicStorageKey))
+      const legacy = parseRepoMusicMap(
+        localStorage.getItem(AudioRepoMusicStorageKey)
+      )
+      return repoMusicDocumentFromLegacyMap(legacy).overrides
     } catch {
       return {}
     }
   }
 
-  private persistSettings(): void {
+  /** Open the Git-backed store and migrate any legacy localStorage value once. */
+  private async initializeRepoMusic(): Promise<void> {
     try {
-      localStorage.setItem(
-        AudioSettingsStorageKey,
-        serializeAudioSettings(this.settings)
-      )
+      const root = join(await getPath('userData'), RepoMusicDirectoryName)
+      const store = new RepoMusicStore({ root })
+      await store.initialize()
+
+      try {
+        const legacy = parseRepoMusicMap(
+          localStorage.getItem(AudioRepoMusicStorageKey)
+        )
+        const migrated = await store.migrateLegacyMap(legacy)
+        if (migrated || Object.keys(legacy).length > 0) {
+          localStorage.removeItem(AudioRepoMusicStorageKey)
+        }
+      } catch {
+        // Migration is opportunistic; a failure must not block the store.
+      }
+
+      this.repoMusicStore = store
+      store.onDidUpdate(document => this.onRepoMusicDocument(document))
+      this.onRepoMusicDocument(store.getDocument())
     } catch {
-      // ignore persistence failures
+      // No Git-backed store available (e.g. outside the renderer): keep the
+      // bootstrap cache so the derived themes and any legacy tracks still play.
     }
   }
 
-  private persistRepoMusic(): void {
-    try {
-      localStorage.setItem(
-        AudioRepoMusicStorageKey,
-        serializeRepoMusicMap(this.repoMusic)
-      )
-    } catch {
-      // ignore persistence failures
-    }
+  private onRepoMusicDocument(document: IRepoMusicDocument): void {
+    this.overrides = document.overrides
+    this.updateMusic()
   }
 
   public getSettings(): IAudioSystemSettings {
@@ -155,25 +203,83 @@ export class AudioCueStore {
     this.updateMusic()
   }
 
-  public getRepositoryMusic(repository: Repository | null): string | null {
+  private persistSettings(): void {
+    try {
+      localStorage.setItem(
+        AudioSettingsStorageKey,
+        serializeAudioSettings(this.settings)
+      )
+    } catch {
+      // ignore persistence failures
+    }
+  }
+
+  /** The current repository's override, or null when it plays its theme. */
+  public getRepositoryOverride(
+    repository: Repository | null
+  ): RepoMusicOverride | null {
     if (repository === null) {
       return null
     }
-    return this.repoMusic[repositoryMusicKey(repository)] ?? null
+    return this.overrides[repositoryMusicKey(repository)] ?? null
   }
 
-  /** Choose (or clear, with null) the looped track for a repository. */
-  public setRepositoryMusic(
+  /** The deterministic theme derived for a repository (null when none). */
+  public getRepositoryTheme(
+    repository: Repository | null
+  ): IRepositoryTheme | null {
+    if (repository === null) {
+      return null
+    }
+    return deriveRepositoryTheme(repositorySeedKey(repository))
+  }
+
+  /** Replace a repository's music with a user-chosen local file or URL. */
+  public setRepositoryCustomTrack(repository: Repository, track: string): void {
+    this.applyOverride(repository, { kind: 'custom', track })
+  }
+
+  /** Keep this one repository silent even while music is globally enabled. */
+  public muteRepository(repository: Repository): void {
+    this.applyOverride(repository, { kind: 'off' })
+  }
+
+  /** Clear any override, returning the repository to its derived theme. */
+  public useRepositoryTheme(repository: Repository): void {
+    this.applyOverride(repository, null)
+  }
+
+  private applyOverride(
     repository: Repository,
-    track: string | null
+    override: RepoMusicOverride | null
   ): void {
-    this.repoMusic = setRepoMusicTrack(
-      this.repoMusic,
-      repositoryMusicKey(repository),
-      track
-    )
-    this.persistRepoMusic()
+    const key = repositoryMusicKey(repository)
+    // Update the cache and playback immediately; persist in the background.
+    const next: Record<string, RepoMusicOverride> = { ...this.overrides }
+    if (override === null) {
+      delete next[key]
+    } else {
+      next[key] = override
+    }
+    this.overrides = next
     this.updateMusic()
+    void this.persistOverride(key, override)
+  }
+
+  private async persistOverride(
+    key: string,
+    override: RepoMusicOverride | null
+  ): Promise<void> {
+    try {
+      if (this.repoMusicInitialization !== null) {
+        await this.repoMusicInitialization
+      }
+      if (this.repoMusicStore !== null) {
+        await this.repoMusicStore.setOverride(key, override)
+      }
+    } catch {
+      // Persistence is best-effort; the in-memory cache still reflects the choice.
+    }
   }
 
   /** Note the active repository so its themed music can start/stop. */
@@ -495,18 +601,52 @@ export class AudioCueStore {
     this.speakForEvent(category, PreviewNarrationEventId)
   }
 
-  /** Start, stop, or reconfigure the looped per-repo music element. */
-  private updateMusic(): void {
-    const track =
-      this.settings.masterEnabled && this.settings.musicEnabled
-        ? this.getRepositoryMusic(this.currentRepository)
-        : null
+  /** Preview a repository's derived theme for a couple of loops (settings UI). */
+  public previewRepositoryTheme(repository: Repository | null): void {
+    const theme = this.getRepositoryTheme(repository)
+    if (theme === null) {
+      return
+    }
+    this.themePlayer.preview(theme, this.settings.musicVolume || 0.15)
+  }
 
-    if (track === null) {
+  /**
+   * Start, stop, or reconfigure looped music for the selected repository:
+   *  - a `custom` override plays the chosen file through the <audio> element;
+   *  - an `off` override keeps the repository silent;
+   *  - otherwise the repository's derived theme is synthesized on the fly.
+   */
+  private updateMusic(): void {
+    const enabled = this.settings.masterEnabled && this.settings.musicEnabled
+    const repository = this.currentRepository
+    if (!enabled || repository === null) {
       this.stopMusic()
+      this.themePlayer.stop()
       return
     }
 
+    const override = this.getRepositoryOverride(repository)
+    const volume = Math.min(1, Math.max(0, this.settings.musicVolume))
+
+    if (override !== null && override.kind === 'off') {
+      this.stopMusic()
+      this.themePlayer.stop()
+      return
+    }
+
+    if (override !== null && override.kind === 'custom') {
+      this.themePlayer.stop()
+      this.playCustomTrack(override.track, volume)
+      return
+    }
+
+    // Default: synthesize the repository's deterministic theme.
+    this.stopMusic()
+    const theme = deriveRepositoryTheme(repositorySeedKey(repository))
+    this.themePlayer.play(theme, volume)
+  }
+
+  private playCustomTrack(track: string, volume: number): void {
     try {
       if (this.music === null) {
         this.music = new Audio()
@@ -516,7 +656,7 @@ export class AudioCueStore {
       if (this.music.src !== url) {
         this.music.src = url
       }
-      this.music.volume = Math.min(1, Math.max(0, this.settings.musicVolume))
+      this.music.volume = volume
       void this.music.play().catch(() => {
         /* autoplay may be blocked until a gesture; ignore */
       })
@@ -538,11 +678,17 @@ export class AudioCueStore {
   /** Pause any playing music without forgetting the selection. */
   public pauseMusic(): void {
     this.stopMusic()
+    this.themePlayer.stop()
   }
 
   /** Resume music for the current repository if enabled. */
   public resumeMusic(): void {
     this.updateMusic()
+  }
+
+  /** Flush any pending per-repository music commits (e.g. before quit). */
+  public flush(): Promise<void> {
+    return this.repoMusicStore?.flush() ?? Promise.resolve()
   }
 
   public dispose(): void {
@@ -553,6 +699,7 @@ export class AudioCueStore {
     this.narrationQueue = []
     this.narrationAudio = null
     this.melodyAudio = null
+    this.themePlayer.dispose()
     this.synth.dispose()
   }
 }

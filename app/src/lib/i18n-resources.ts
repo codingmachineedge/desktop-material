@@ -1266,6 +1266,38 @@ export type TranslationKey =
   | 'settings.soundMusicClear'
   | 'settings.soundMusicNoRepo'
   | 'settings.soundMusicNoTrack'
+  | 'settings.soundThemeSubheading'
+  | 'settings.soundThemeExplanation'
+  | 'settings.soundThemeCurrentLabel'
+  | 'settings.soundThemeStateTheme'
+  | 'settings.soundThemeStateCustom'
+  | 'settings.soundThemeStateOff'
+  | 'settings.soundThemeUseTheme'
+  | 'settings.soundThemeMute'
+  | 'settings.soundThemePreview'
+  | 'settings.repoThemeNameFormat'
+  | 'settings.repoThemeMoodCalm'
+  | 'settings.repoThemeMoodBright'
+  | 'settings.repoThemeMoodDriving'
+  | 'settings.repoThemeMoodDreamy'
+  | 'settings.repoThemeMoodMellow'
+  | 'settings.repoThemeMoodPlayful'
+  | 'settings.repoThemeMoodSolemn'
+  | 'settings.repoThemeMoodElectric'
+  | 'settings.repoThemeTexturePulse'
+  | 'settings.repoThemeTextureCascade'
+  | 'settings.repoThemeTextureDrift'
+  | 'settings.repoThemeTextureBloom'
+  | 'settings.repoThemeTextureCircuit'
+  | 'settings.repoThemeTextureHorizon'
+  | 'settings.repoThemeTextureLantern'
+  | 'settings.repoThemeTextureTide'
+  | 'settings.repoThemeScaleMajor'
+  | 'settings.repoThemeScaleMinor'
+  | 'settings.repoThemeScaleDorian'
+  | 'settings.repoThemeScaleMixolydian'
+  | 'settings.repoThemeScaleLydian'
+  | 'settings.repoThemeScalePentatonic'
   | 'settings.soundQuietHoursHeading'
   | 'settings.soundQuietHoursEnableTitle'
   | 'settings.soundQuietHoursEnableDescription'
@@ -3187,6 +3219,40 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'settings.soundMusicClear': 'Clear',
   'settings.soundMusicNoRepo': 'Open a repository to choose its music.',
   'settings.soundMusicNoTrack': 'No track chosen.',
+  'settings.soundThemeSubheading': 'Repository theme',
+  'settings.soundThemeExplanation':
+    'Every repository gets its own looping theme, synthesized from its name — no files to download.',
+  'settings.soundThemeCurrentLabel': 'Theme for {repository}',
+  'settings.soundThemeStateTheme': 'Playing this repository’s generated theme.',
+  'settings.soundThemeStateCustom':
+    'Playing your chosen track instead of the theme.',
+  'settings.soundThemeStateOff': 'Music is muted for this repository.',
+  'settings.soundThemeUseTheme': 'Use generated theme',
+  'settings.soundThemeMute': 'Mute here',
+  'settings.soundThemePreview': 'Preview theme',
+  'settings.repoThemeNameFormat': '{mood} {texture} in {root} {scale}',
+  'settings.repoThemeMoodCalm': 'Calm',
+  'settings.repoThemeMoodBright': 'Bright',
+  'settings.repoThemeMoodDriving': 'Driving',
+  'settings.repoThemeMoodDreamy': 'Dreamy',
+  'settings.repoThemeMoodMellow': 'Mellow',
+  'settings.repoThemeMoodPlayful': 'Playful',
+  'settings.repoThemeMoodSolemn': 'Solemn',
+  'settings.repoThemeMoodElectric': 'Electric',
+  'settings.repoThemeTexturePulse': 'Pulse',
+  'settings.repoThemeTextureCascade': 'Cascade',
+  'settings.repoThemeTextureDrift': 'Drift',
+  'settings.repoThemeTextureBloom': 'Bloom',
+  'settings.repoThemeTextureCircuit': 'Circuit',
+  'settings.repoThemeTextureHorizon': 'Horizon',
+  'settings.repoThemeTextureLantern': 'Lantern',
+  'settings.repoThemeTextureTide': 'Tide',
+  'settings.repoThemeScaleMajor': 'major',
+  'settings.repoThemeScaleMinor': 'minor',
+  'settings.repoThemeScaleDorian': 'Dorian',
+  'settings.repoThemeScaleMixolydian': 'Mixolydian',
+  'settings.repoThemeScaleLydian': 'Lydian',
+  'settings.repoThemeScalePentatonic': 'pentatonic',
   'settings.soundQuietHoursHeading': 'Quiet hours',
   'settings.soundQuietHoursEnableTitle': 'Mute during quiet hours',
   'settings.soundQuietHoursEnableDescription':
@@ -5090,6 +5156,39 @@ export const cantoneseTranslations: Readonly<
   'settings.soundMusicClear': '清除',
   'settings.soundMusicNoRepo': '開一個 repository 先可以揀佢嘅音樂。',
   'settings.soundMusicNoTrack': '未揀歌。',
+  'settings.soundThemeSubheading': 'Repository 主題曲',
+  'settings.soundThemeExplanation':
+    '每個 repository 都有自己嘅 loop 主題曲，用個名即場砌出嚟，唔使 download 任何檔案。',
+  'settings.soundThemeCurrentLabel': '{repository} 嘅主題曲',
+  'settings.soundThemeStateTheme': '而家播緊呢個 repository 自動生成嘅主題曲。',
+  'settings.soundThemeStateCustom': '而家播緊你揀嘅歌，冇播主題曲。',
+  'settings.soundThemeStateOff': '呢個 repository 嘅音樂已經靜咗音。',
+  'settings.soundThemeUseTheme': '用返生成主題曲',
+  'settings.soundThemeMute': '呢度靜音',
+  'settings.soundThemePreview': '試聽主題曲',
+  'settings.repoThemeNameFormat': '{root} {scale}・{mood}{texture}',
+  'settings.repoThemeMoodCalm': '靜謐',
+  'settings.repoThemeMoodBright': '明亮',
+  'settings.repoThemeMoodDriving': '澎湃',
+  'settings.repoThemeMoodDreamy': '夢幻',
+  'settings.repoThemeMoodMellow': '柔和',
+  'settings.repoThemeMoodPlayful': '俏皮',
+  'settings.repoThemeMoodSolemn': '莊嚴',
+  'settings.repoThemeMoodElectric': '電感',
+  'settings.repoThemeTexturePulse': '脈動',
+  'settings.repoThemeTextureCascade': '流瀑',
+  'settings.repoThemeTextureDrift': '漂浮',
+  'settings.repoThemeTextureBloom': '綻放',
+  'settings.repoThemeTextureCircuit': '電路',
+  'settings.repoThemeTextureHorizon': '天際',
+  'settings.repoThemeTextureLantern': '燈火',
+  'settings.repoThemeTextureTide': '潮汐',
+  'settings.repoThemeScaleMajor': '大調',
+  'settings.repoThemeScaleMinor': '小調',
+  'settings.repoThemeScaleDorian': '多利安調',
+  'settings.repoThemeScaleMixolydian': '混合利底亞調',
+  'settings.repoThemeScaleLydian': '利底亞調',
+  'settings.repoThemeScalePentatonic': '五聲音階',
   'settings.soundQuietHoursHeading': '安靜時段',
   'settings.soundQuietHoursEnableTitle': '安靜時段內靜音',
   'settings.soundQuietHoursEnableDescription':
