@@ -7265,7 +7265,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
   /**
    * Apply a recognized, safe, one-click Git auto-fix surfaced on an error
    * notice, then report the outcome as a non-blocking notification. Only
-   * non-destructive fixes reach this path (see {@link buildGitAutoFixAction}).
+   * non-destructive fixes reach this path (see `buildGitAutoFixAction`).
    * Never throws.
    */
   public async _applyGitAutoFix(

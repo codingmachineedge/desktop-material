@@ -1,7 +1,7 @@
 /**
  * A fresh `index.lock` may still belong to a Git process that has not touched
  * it yet, so a lock younger than this is never treated as stale. Kept in
- * lockstep with {@link MinimumStaleRepositoryLockAgeMs} in `git/remove-lock.ts`.
+ * lockstep with `MinimumStaleRepositoryLockAgeMs` in `git/remove-lock.ts`.
  */
 export const DefaultMinimumStaleIndexLockAgeMs = 30_000
 

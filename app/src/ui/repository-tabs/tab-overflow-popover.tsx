@@ -87,7 +87,7 @@ export class TabOverflowPopover extends React.Component<
     }
   }
 
-  private onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  private onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
     const count = this.props.tabs.length
     if (count === 0) {
       return
@@ -140,7 +140,7 @@ export class TabOverflowPopover extends React.Component<
         ariaDescribedBy="tab-overflow-status"
         onClickOutside={this.props.onClose}
       >
-        <div className="tab-overflow-popover" onKeyDown={this.onKeyDown}>
+        <div className="tab-overflow-popover">
           <header className="tab-overflow-header">
             <h3 id="tab-overflow-title">{this.text('tabs.overflowTitle')}</h3>
             <p>{this.text('tabs.overflowDescription')}</p>
@@ -158,6 +158,7 @@ export class TabOverflowPopover extends React.Component<
               aria-label={this.text('tabs.overflowListLabel')}
               aria-activedescendant={activeDescendant}
               tabIndex={0}
+              onKeyDown={this.onKeyDown}
             >
               {tabs.map((tab, index) => {
                 const label = this.props.resolveLabel(tab)

@@ -3,12 +3,7 @@
     "en": "en-US-AriaNeural",
     "yue": "zh-HK-HiuMaanNeural"
   },
-  "categories": [
-    "info",
-    "success",
-    "progress",
-    "error"
-  ],
+  "categories": ["info", "success", "progress", "error"],
   "events": [
     {
       "id": "welcome",

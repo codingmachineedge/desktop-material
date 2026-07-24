@@ -130,6 +130,9 @@ export class RepositoryTabStrip extends React.Component<
     null
   private commitPulseTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** Tracks whether the ResizeObserver is already watching the current list. */
+  private observedList = false
+
   public constructor(props: IRepositoryTabStripProps) {
     super(props)
     this.state = {
@@ -216,9 +219,6 @@ export class RepositoryTabStrip extends React.Component<
       this.recomputeOverflow()
     }
   }
-
-  /** Tracks whether the ResizeObserver is already watching the current list. */
-  private observedList = false
 
   /**
    * The ids of the tabs actually rendered as tab elements in the strip, in

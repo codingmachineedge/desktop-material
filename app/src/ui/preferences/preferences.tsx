@@ -277,7 +277,7 @@ export class Preferences extends React.Component<
   /** Cached per-render settings-search results (recomputed each render). */
   private settingsSearchResults: ReadonlyArray<IMatch<ISettingsSearchEntry>> =
     []
-  /** Per-tab match counts derived from {@link settingsSearchResults}. */
+  /** Per-tab match counts derived from `settingsSearchResults`. */
   private settingsMatchCounts: ReadonlyMap<PreferencesTab, number> = new Map()
   /** Tabs with at least one match; used to dim non-matching rail tabs. */
   private settingsMatchedTabs: ReadonlySet<PreferencesTab> = new Set()
@@ -417,11 +417,7 @@ export class Preferences extends React.Component<
     }
 
     return (
-      <span
-        className="preferences-tab-match-badge"
-        aria-hidden={true}
-        title={String(count)}
-      >
+      <span className="preferences-tab-match-badge" aria-hidden={true}>
         {count}
       </span>
     )

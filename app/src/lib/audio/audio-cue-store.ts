@@ -118,7 +118,7 @@ export class AudioCueStore {
   /**
    * Serialized narration queue for recorded clips and their live-TTS fallbacks:
    * index 0 is the item currently playing. A newer event supersedes anything
-   * still queued (see {@link enqueueNarration}) so only one voice is ever heard.
+   * still queued (see `enqueueNarration`) so only one voice is ever heard.
    */
   private narrationQueue: Array<IQueuedUtterance> = []
   /** Monotonic token invalidating the callbacks of a superseded narration. */
