@@ -1464,6 +1464,66 @@ export type TranslationKey =
   | 'workflowDispatch.noMatches'
   | 'workflowDispatch.stateActive'
   | 'workflowDispatch.stateDisabled'
+  | 'settingsSearch.inputLabel'
+  | 'settingsSearch.inputPlaceholder'
+  | 'settingsSearch.resultsHeading'
+  | 'settingsSearch.noResults'
+  | 'settingsSearch.resultCountOne'
+  | 'settingsSearch.resultCountMany'
+  | 'settingsSearch.inTab'
+  | 'settingsSearch.clear'
+  | 'settingsSearch.jumpHint'
+  | 'settingsSearch.tabName.accounts'
+  | 'settingsSearch.tabName.integrations'
+  | 'settingsSearch.tabName.copilot'
+  | 'settingsSearch.tabName.git'
+  | 'settingsSearch.tabName.appearance'
+  | 'settingsSearch.tabName.notifications'
+  | 'settingsSearch.tabName.prompts'
+  | 'settingsSearch.tabName.advanced'
+  | 'settingsSearch.tabName.accessibility'
+  | 'settingsSearch.tabName.agentAccess'
+  | 'settingsSearch.tabName.automation'
+  | 'settingsSearch.tabName.queue'
+  | 'settingsSearch.entry.accountsSignIn.title'
+  | 'settingsSearch.entry.accountsSignIn.desc'
+  | 'settingsSearch.entry.accountsEnterprise.title'
+  | 'settingsSearch.entry.accountsEnterprise.desc'
+  | 'settingsSearch.entry.copilotModels.title'
+  | 'settingsSearch.entry.copilotModels.desc'
+  | 'settingsSearch.entry.copilotConflict.title'
+  | 'settingsSearch.entry.copilotConflict.desc'
+  | 'settingsSearch.entry.gitName.title'
+  | 'settingsSearch.entry.gitName.desc'
+  | 'settingsSearch.entry.gitEmail.title'
+  | 'settingsSearch.entry.gitEmail.desc'
+  | 'settingsSearch.entry.gitDefaultBranch.title'
+  | 'settingsSearch.entry.gitDefaultBranch.desc'
+  | 'settingsSearch.entry.appearanceTheme.title'
+  | 'settingsSearch.entry.appearanceTheme.desc'
+  | 'settingsSearch.entry.appearanceAccent.title'
+  | 'settingsSearch.entry.appearanceAccent.desc'
+  | 'settingsSearch.entry.appearanceFont.title'
+  | 'settingsSearch.entry.appearanceFont.desc'
+  | 'settingsSearch.entry.appearanceZoom.title'
+  | 'settingsSearch.entry.appearanceZoom.desc'
+  | 'settingsSearch.entry.notificationsErrorStyle.title'
+  | 'settingsSearch.entry.notificationsErrorStyle.desc'
+  | 'settingsSearch.entry.promptsDiscard.title'
+  | 'settingsSearch.entry.promptsDiscard.desc'
+  | 'settingsSearch.entry.promptsForcePush.title'
+  | 'settingsSearch.entry.promptsForcePush.desc'
+  | 'settingsSearch.entry.promptsRemoveRepo.title'
+  | 'settingsSearch.entry.promptsRemoveRepo.desc'
+  | 'settingsSearch.entry.advancedOpenSSH.title'
+  | 'settingsSearch.entry.advancedOpenSSH.desc'
+  | 'settingsSearch.entry.accessibilityUnderline.title'
+  | 'settingsSearch.entry.accessibilityUnderline.desc'
+  | 'settingsSearch.entry.accessibilityDiffMarks.title'
+  | 'settingsSearch.entry.accessibilityDiffMarks.desc'
+  | 'settingsSearch.entry.agentAccessServer.title'
+  | 'settingsSearch.entry.agentAccessServer.desc'
+  | 'settingsSearch.entry.queueMode.desc'
 
 /** Complete base catalog. Every missing locale entry falls back to this. */
 export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
@@ -3286,6 +3346,87 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
   'workflowDispatch.noMatches': 'No workflows match the current filter.',
   'workflowDispatch.stateActive': 'Active',
   'workflowDispatch.stateDisabled': 'Disabled',
+  'settingsSearch.inputLabel': 'Search settings',
+  'settingsSearch.inputPlaceholder': 'Search settings',
+  'settingsSearch.resultsHeading': 'Search results',
+  'settingsSearch.noResults': 'No settings match “{query}”.',
+  'settingsSearch.resultCountOne': '1 setting found',
+  'settingsSearch.resultCountMany': '{count} settings found',
+  'settingsSearch.inTab': 'in {tab}',
+  'settingsSearch.clear': 'Clear settings search',
+  'settingsSearch.jumpHint': 'Press Enter to open the setting’s tab.',
+  'settingsSearch.tabName.accounts': 'Accounts',
+  'settingsSearch.tabName.integrations': 'Integrations',
+  'settingsSearch.tabName.copilot': 'Copilot',
+  'settingsSearch.tabName.git': 'Git',
+  'settingsSearch.tabName.appearance': 'Appearance',
+  'settingsSearch.tabName.notifications': 'Notifications',
+  'settingsSearch.tabName.prompts': 'Prompts',
+  'settingsSearch.tabName.advanced': 'Advanced',
+  'settingsSearch.tabName.accessibility': 'Accessibility',
+  'settingsSearch.tabName.agentAccess': 'Agent access',
+  'settingsSearch.tabName.automation': 'Automation',
+  'settingsSearch.tabName.queue': 'Clone queue',
+  'settingsSearch.entry.accountsSignIn.title': 'Sign in to GitHub',
+  'settingsSearch.entry.accountsSignIn.desc':
+    'Add a GitHub.com account to Desktop Material.',
+  'settingsSearch.entry.accountsEnterprise.title': 'GitHub Enterprise sign in',
+  'settingsSearch.entry.accountsEnterprise.desc':
+    'Connect a GitHub Enterprise Server account.',
+  'settingsSearch.entry.copilotModels.title': 'Copilot models',
+  'settingsSearch.entry.copilotModels.desc':
+    'Choose which AI models Copilot uses for each feature.',
+  'settingsSearch.entry.copilotConflict.title':
+    'Use Copilot for conflict resolution',
+  'settingsSearch.entry.copilotConflict.desc':
+    'Let Copilot help resolve merge conflicts automatically.',
+  'settingsSearch.entry.gitName.title': 'Name',
+  'settingsSearch.entry.gitName.desc':
+    'The author name written to your commits.',
+  'settingsSearch.entry.gitEmail.title': 'Email',
+  'settingsSearch.entry.gitEmail.desc':
+    'The author email address written to your commits.',
+  'settingsSearch.entry.gitDefaultBranch.title': 'Default branch',
+  'settingsSearch.entry.gitDefaultBranch.desc':
+    'The branch name used when creating new repositories.',
+  'settingsSearch.entry.appearanceTheme.title': 'Theme',
+  'settingsSearch.entry.appearanceTheme.desc':
+    'Switch between light, dark, and system themes.',
+  'settingsSearch.entry.appearanceAccent.title': 'Accent color',
+  'settingsSearch.entry.appearanceAccent.desc':
+    'Pick the seed color used across the interface.',
+  'settingsSearch.entry.appearanceFont.title': 'Interface font',
+  'settingsSearch.entry.appearanceFont.desc':
+    'Choose the UI font family, size, and weight.',
+  'settingsSearch.entry.appearanceZoom.title': 'Zoom',
+  'settingsSearch.entry.appearanceZoom.desc':
+    'Scale the whole interface up or down.',
+  'settingsSearch.entry.notificationsErrorStyle.title': 'Error display style',
+  'settingsSearch.entry.notificationsErrorStyle.desc':
+    'Show errors as a banner or a dialog.',
+  'settingsSearch.entry.promptsDiscard.title': 'Confirm discarding changes',
+  'settingsSearch.entry.promptsDiscard.desc':
+    'Ask before discarding uncommitted changes.',
+  'settingsSearch.entry.promptsForcePush.title': 'Confirm force push',
+  'settingsSearch.entry.promptsForcePush.desc':
+    'Ask before force-pushing to a remote.',
+  'settingsSearch.entry.promptsRemoveRepo.title': 'Confirm removing repository',
+  'settingsSearch.entry.promptsRemoveRepo.desc':
+    'Ask before removing a repository from the list.',
+  'settingsSearch.entry.advancedOpenSSH.title': 'Use system OpenSSH',
+  'settingsSearch.entry.advancedOpenSSH.desc':
+    'Use the operating system’s OpenSSH client instead of the bundled one.',
+  'settingsSearch.entry.accessibilityUnderline.title': 'Underline links',
+  'settingsSearch.entry.accessibilityUnderline.desc':
+    'Always underline links for easier recognition.',
+  'settingsSearch.entry.accessibilityDiffMarks.title': 'Diff check marks',
+  'settingsSearch.entry.accessibilityDiffMarks.desc':
+    'Show +/− marks in diffs so color is not the only cue.',
+  'settingsSearch.entry.agentAccessServer.title': 'Agent access server',
+  'settingsSearch.entry.agentAccessServer.desc':
+    'Let local agents and MCP tools talk to Desktop Material.',
+  'settingsSearch.entry.queueMode.desc':
+    'Clone queued repositories in parallel or one at a time.',
 }
 
 /** Hong Kong Cantonese catalog. Missing entries deliberately use English. */
@@ -4960,4 +5101,76 @@ export const cantoneseTranslations: Readonly<
   'workflowDispatch.noMatches': '冇 workflow 啱而家嘅篩選。',
   'workflowDispatch.stateActive': '開緊',
   'workflowDispatch.stateDisabled': '停咗',
+  'settingsSearch.inputLabel': '搜尋設定',
+  'settingsSearch.inputPlaceholder': '打字搵設定…',
+  'settingsSearch.resultsHeading': '搜尋結果',
+  'settingsSearch.noResults': '搵唔到啱「{query}」嘅設定。',
+  'settingsSearch.resultCountOne': '搵到 1 項設定',
+  'settingsSearch.resultCountMany': '搵到 {count} 項設定',
+  'settingsSearch.inTab': '喺{tab}',
+  'settingsSearch.clear': '清走搜尋',
+  'settingsSearch.jumpHint': '撳 Enter 就跳去嗰個設定分頁。',
+  'settingsSearch.tabName.accounts': '帳戶',
+  'settingsSearch.tabName.integrations': '整合',
+  'settingsSearch.tabName.copilot': 'Copilot',
+  'settingsSearch.tabName.git': 'Git',
+  'settingsSearch.tabName.appearance': '外觀',
+  'settingsSearch.tabName.notifications': '通知',
+  'settingsSearch.tabName.prompts': '提示',
+  'settingsSearch.tabName.advanced': '進階',
+  'settingsSearch.tabName.accessibility': '無障礙',
+  'settingsSearch.tabName.agentAccess': '代理存取',
+  'settingsSearch.tabName.automation': '自動化',
+  'settingsSearch.tabName.queue': 'Clone 隊列',
+  'settingsSearch.entry.accountsSignIn.title': '登入 GitHub',
+  'settingsSearch.entry.accountsSignIn.desc':
+    '喺 Desktop Material 加個 GitHub.com 帳戶。',
+  'settingsSearch.entry.accountsEnterprise.title': '登入 GitHub Enterprise',
+  'settingsSearch.entry.accountsEnterprise.desc':
+    '駁埋你嘅 GitHub Enterprise Server 帳戶。',
+  'settingsSearch.entry.copilotModels.title': 'Copilot 模型',
+  'settingsSearch.entry.copilotModels.desc': '揀每個功能用邊個 AI 模型。',
+  'settingsSearch.entry.copilotConflict.title': '用 Copilot 幫手解衝突',
+  'settingsSearch.entry.copilotConflict.desc':
+    '俾 Copilot 自動幫你處理 merge 衝突。',
+  'settingsSearch.entry.gitName.title': '名',
+  'settingsSearch.entry.gitName.desc': '寫入 commit 嘅作者名。',
+  'settingsSearch.entry.gitEmail.title': '電郵',
+  'settingsSearch.entry.gitEmail.desc': '寫入 commit 嘅作者電郵。',
+  'settingsSearch.entry.gitDefaultBranch.title': '預設分支',
+  'settingsSearch.entry.gitDefaultBranch.desc':
+    '開新 repository 時用嘅分支名。',
+  'settingsSearch.entry.appearanceTheme.title': '主題',
+  'settingsSearch.entry.appearanceTheme.desc': '喺淺色、深色同跟系統之間揀。',
+  'settingsSearch.entry.appearanceAccent.title': '主色',
+  'settingsSearch.entry.appearanceAccent.desc': '揀成個介面用嘅種子顏色。',
+  'settingsSearch.entry.appearanceFont.title': '介面字體',
+  'settingsSearch.entry.appearanceFont.desc': '揀介面字體、字型大細同粗幼。',
+  'settingsSearch.entry.appearanceZoom.title': '縮放',
+  'settingsSearch.entry.appearanceZoom.desc': '將成個介面放大或者縮細。',
+  'settingsSearch.entry.notificationsErrorStyle.title': '錯誤顯示方式',
+  'settingsSearch.entry.notificationsErrorStyle.desc':
+    '錯誤用橫額定係對話框顯示。',
+  'settingsSearch.entry.promptsDiscard.title': '捨棄改動前問一問',
+  'settingsSearch.entry.promptsDiscard.desc': '捨棄未 commit 嘅改動前先確認。',
+  'settingsSearch.entry.promptsForcePush.title': '強制 push 前問一問',
+  'settingsSearch.entry.promptsForcePush.desc':
+    '強制 push 去 remote 前先確認。',
+  'settingsSearch.entry.promptsRemoveRepo.title': '移除 repository 前問一問',
+  'settingsSearch.entry.promptsRemoveRepo.desc':
+    '喺清單度移除 repository 前先確認。',
+  'settingsSearch.entry.advancedOpenSSH.title': '用系統 OpenSSH',
+  'settingsSearch.entry.advancedOpenSSH.desc':
+    '用作業系統嘅 OpenSSH，唔用內附嗰個。',
+  'settingsSearch.entry.accessibilityUnderline.title': '連結加底線',
+  'settingsSearch.entry.accessibilityUnderline.desc':
+    '成日俾連結加底線，易認啲。',
+  'settingsSearch.entry.accessibilityDiffMarks.title': 'Diff 加符號',
+  'settingsSearch.entry.accessibilityDiffMarks.desc':
+    '喺 diff 度加 +/− 符號，唔淨係靠顏色。',
+  'settingsSearch.entry.agentAccessServer.title': '代理存取伺服器',
+  'settingsSearch.entry.agentAccessServer.desc':
+    '俾本機代理同 MCP 工具駁到 Desktop Material。',
+  'settingsSearch.entry.queueMode.desc':
+    '隊列入面嘅 repository 一齊 clone 定逐個 clone。',
 }

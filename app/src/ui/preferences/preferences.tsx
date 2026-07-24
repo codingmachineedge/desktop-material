@@ -92,6 +92,22 @@ import { AgentAccess } from './agent-access'
 import { ErrorPresentationStyle } from '../../models/error-presentation'
 import { QueuePreferences } from './queue'
 import { LocalizedText } from '../lib/localized-text'
+import { SettingsSearch, SettingsSearchSurfaceId } from './settings-search'
+import {
+  filterSettingsEntries,
+  settingsTabsWithMatches,
+  ISettingsSearchEntry,
+} from '../../lib/settings-search/settings-search-catalog'
+import { FilterMode, IMatch } from '../../lib/fuzzy-find'
+import {
+  persistFilterMode,
+  readPersistedFilterMode,
+} from '../lib/filter-list-mode'
+import { LanguageMode } from '../../models/language-mode'
+import {
+  getPersistedLanguageMode,
+  LanguageModeChangedEvent,
+} from '../../lib/i18n'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -221,6 +237,15 @@ interface IPreferencesState {
   readonly selectedNumberFormat?: INumberFormat
   readonly preferAbsoluteDates?: boolean
   readonly automationSettings: IAutomationSettingsState
+
+  /** The current settings-search query text. */
+  readonly settingsSearchQuery: string
+  /** The active settings-search filter mode. */
+  readonly settingsSearchFilterMode: FilterMode
+  /** Whether settings-search matching is case sensitive. */
+  readonly settingsSearchCaseSensitive: boolean
+  /** The active language mode, kept in sync with the persisted preference. */
+  readonly languageMode: LanguageMode
 }
 
 /**
@@ -247,6 +272,14 @@ export class Preferences extends React.Component<
   IPreferencesProps,
   IPreferencesState
 > {
+  /** Cached per-render settings-search results (recomputed each render). */
+  private settingsSearchResults: ReadonlyArray<IMatch<ISettingsSearchEntry>> =
+    []
+  /** Per-tab match counts derived from {@link settingsSearchResults}. */
+  private settingsMatchCounts: ReadonlyMap<PreferencesTab, number> = new Map()
+  /** Tabs with at least one match; used to dim non-matching rail tabs. */
+  private settingsMatchedTabs: ReadonlySet<PreferencesTab> = new Set()
+
   public constructor(props: IPreferencesProps) {
     super(props)
 
@@ -313,7 +346,135 @@ export class Preferences extends React.Component<
       selectedNumberFormat: getNumberFormatPreference(),
       preferAbsoluteDates: getPreferAbsoluteDates(),
       automationSettings: this.props.automationSettings,
+      settingsSearchQuery: '',
+      settingsSearchFilterMode: readPersistedFilterMode(
+        SettingsSearchSurfaceId
+      ),
+      settingsSearchCaseSensitive: false,
+      languageMode: getPersistedLanguageMode(),
     }
+  }
+
+  public componentDidMount() {
+    window.addEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  public componentWillUnmount() {
+    window.removeEventListener(
+      LanguageModeChangedEvent,
+      this.onLanguageModeChanged
+    )
+  }
+
+  private onLanguageModeChanged = () => {
+    this.setState({ languageMode: getPersistedLanguageMode() })
+  }
+
+  private onSettingsSearchQueryChange = (settingsSearchQuery: string) => {
+    this.setState({ settingsSearchQuery })
+  }
+
+  private onSettingsSearchFilterModeChange = (
+    settingsSearchFilterMode: FilterMode
+  ) => {
+    persistFilterMode(SettingsSearchSurfaceId, settingsSearchFilterMode)
+    this.setState({ settingsSearchFilterMode })
+  }
+
+  private onSettingsSearchCaseSensitiveChange = (
+    settingsSearchCaseSensitive: boolean
+  ) => {
+    this.setState({ settingsSearchCaseSensitive })
+  }
+
+  private onSettingsSearchRegexPatternApply = (pattern: string) => {
+    this.setState({ settingsSearchQuery: pattern })
+  }
+
+  private onSettingsSearchNavigate = (tab: PreferencesTab) => {
+    // Jump to the setting's tab and clear the query so the pane shows through.
+    this.setState({ selectedIndex: tab, settingsSearchQuery: '' })
+  }
+
+  private getSettingsSearchResults(): ReadonlyArray<
+    IMatch<ISettingsSearchEntry>
+  > {
+    return filterSettingsEntries(this.state.settingsSearchQuery, {
+      mode: this.state.settingsSearchFilterMode,
+      caseSensitive: this.state.settingsSearchCaseSensitive,
+    }).results
+  }
+
+  private renderTabMatchBadge(tab: PreferencesTab) {
+    const count = this.settingsMatchCounts.get(tab)
+    if (count === undefined || count === 0) {
+      return null
+    }
+
+    return (
+      <span
+        className="preferences-tab-match-badge"
+        aria-hidden={true}
+        title={String(count)}
+      >
+        {count}
+      </span>
+    )
+  }
+
+  /** Recompute the settings-search results and derived tab maps for a render. */
+  private updateSettingsSearchContext() {
+    this.settingsSearchResults = this.getSettingsSearchResults()
+    this.settingsMatchedTabs = settingsTabsWithMatches(
+      this.settingsSearchResults
+    )
+    const counts = new Map<PreferencesTab, number>()
+    for (const match of this.settingsSearchResults) {
+      counts.set(match.item.tab, (counts.get(match.item.tab) ?? 0) + 1)
+    }
+    this.settingsMatchCounts = counts
+  }
+
+  private renderSettingsSearch() {
+    return (
+      <SettingsSearch
+        query={this.state.settingsSearchQuery}
+        filterMode={this.state.settingsSearchFilterMode}
+        caseSensitive={this.state.settingsSearchCaseSensitive}
+        results={this.settingsSearchResults}
+        languageMode={this.state.languageMode}
+        onQueryChange={this.onSettingsSearchQueryChange}
+        onFilterModeChange={this.onSettingsSearchFilterModeChange}
+        onCaseSensitiveChange={this.onSettingsSearchCaseSensitiveChange}
+        onRegexPatternApply={this.onSettingsSearchRegexPatternApply}
+        onNavigate={this.onSettingsSearchNavigate}
+      />
+    )
+  }
+
+  private renderRailTab(
+    tab: PreferencesTab,
+    symbol: typeof octicons.home,
+    label: React.ReactNode,
+    isFeature = false
+  ) {
+    const isSearching = this.state.settingsSearchQuery.trim().length > 0
+    const noMatch = isSearching && !this.settingsMatchedTabs.has(tab)
+
+    return (
+      <span
+        id={this.getTabId(tab)}
+        data-dm-feature={isFeature || undefined}
+        data-settings-no-match={noMatch || undefined}
+      >
+        <Octicon className="icon" symbol={symbol} />
+        {label}
+        {this.renderTabMatchBadge(tab)}
+      </span>
+    )
   }
 
   public async componentWillMount() {
@@ -414,6 +575,7 @@ export class Preferences extends React.Component<
   }
 
   public render() {
+    this.updateSettingsSearchContext()
     return (
       <Dialog
         id="preferences"
@@ -427,70 +589,76 @@ export class Preferences extends React.Component<
             <h2 id={PreferencesTitleId} className="preferences-title">
               Settings
             </h2>
+            {this.renderSettingsSearch()}
             <TabBar
               onTabClicked={this.onTabClicked}
               selectedIndex={this.tabToVisualIndex(this.state.selectedIndex)}
               type={TabBarType.Vertical}
             >
-              <span id={this.getTabId(PreferencesTab.Accounts)}>
-                <Octicon className="icon" symbol={octicons.home} />
-                Accounts
-              </span>
-              <span id={this.getTabId(PreferencesTab.Integrations)}>
-                <Octicon className="icon" symbol={octicons.person} />
-                Integrations
-              </span>
-              {this.isCopilotSdkEnabled && (
-                <span id={this.getTabId(PreferencesTab.Copilot)}>
-                  <Octicon className="icon" symbol={octicons.copilot} />
-                  Copilot
-                </span>
+              {this.renderRailTab(
+                PreferencesTab.Accounts,
+                octicons.home,
+                'Accounts'
               )}
-              <span id={this.getTabId(PreferencesTab.Git)}>
-                <Octicon className="icon" symbol={octicons.gitCommit} />
-                Git
-              </span>
-              <span id={this.getTabId(PreferencesTab.Appearance)}>
-                <Octicon className="icon" symbol={octicons.paintbrush} />
-                Appearance
-              </span>
-              <span id={this.getTabId(PreferencesTab.Notifications)}>
-                <Octicon className="icon" symbol={octicons.bell} />
-                Notifications
-              </span>
-              <span id={this.getTabId(PreferencesTab.Prompts)}>
-                <Octicon className="icon" symbol={octicons.question} />
-                Prompts
-              </span>
-              <span id={this.getTabId(PreferencesTab.Advanced)}>
-                <Octicon className="icon" symbol={octicons.gear} />
-                Advanced
-              </span>
-              <span id={this.getTabId(PreferencesTab.Accessibility)}>
-                <Octicon className="icon" symbol={octicons.accessibility} />
-                Accessibility
-              </span>
-              <span
-                id={this.getTabId(PreferencesTab.AgentAccess)}
-                data-dm-feature={true}
-              >
-                <Octicon className="icon" symbol={octicons.server} />
-                Agent access
-              </span>
-              <span
-                id={this.getTabId(PreferencesTab.Automation)}
-                data-dm-feature={true}
-              >
-                <Octicon className="icon" symbol={octicons.sync} />
-                Automation
-              </span>
-              <span
-                id={this.getTabId(PreferencesTab.Queue)}
-                data-dm-feature={true}
-              >
-                <Octicon className="icon" symbol={octicons.stack} />
-                <LocalizedText translationKey="settings.queueTab" />
-              </span>
+              {this.renderRailTab(
+                PreferencesTab.Integrations,
+                octicons.person,
+                'Integrations'
+              )}
+              {this.isCopilotSdkEnabled &&
+                this.renderRailTab(
+                  PreferencesTab.Copilot,
+                  octicons.copilot,
+                  'Copilot'
+                )}
+              {this.renderRailTab(
+                PreferencesTab.Git,
+                octicons.gitCommit,
+                'Git'
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Appearance,
+                octicons.paintbrush,
+                'Appearance'
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Notifications,
+                octicons.bell,
+                'Notifications'
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Prompts,
+                octicons.question,
+                'Prompts'
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Advanced,
+                octicons.gear,
+                'Advanced'
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Accessibility,
+                octicons.accessibility,
+                'Accessibility'
+              )}
+              {this.renderRailTab(
+                PreferencesTab.AgentAccess,
+                octicons.server,
+                'Agent access',
+                true
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Automation,
+                octicons.sync,
+                'Automation',
+                true
+              )}
+              {this.renderRailTab(
+                PreferencesTab.Queue,
+                octicons.stack,
+                <LocalizedText translationKey="settings.queueTab" />,
+                true
+              )}
             </TabBar>
             <div className="preferences-version">Desktop Material 0.1.0</div>
           </div>

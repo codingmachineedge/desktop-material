@@ -73,6 +73,12 @@ export const SearchSurfaceRegistry: ReadonlyArray<ISearchSurfaceRegistration> =
       implementation: 'standalone',
     },
     {
+      id: 'preferences',
+      label: 'Settings',
+      source: 'preferences/settings-search.tsx',
+      implementation: 'standalone',
+    },
+    {
       id: 'pull-requests',
       label: 'Pull requests',
       source: 'branches/pull-request-list.tsx',

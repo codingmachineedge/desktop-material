@@ -13,6 +13,18 @@ This file is the compact public source of truth; implementation details and
 historical test receipts stay in [PLAN.md](PLAN.md) and
 [HANDOFF.md](HANDOFF.md).
 
+## July 24 settings search — **Implemented, locally accepted**
+
+A search box in the Settings dialog rail filters a bilingual catalog of settings
+by title, description, and keyword across every tab, highlights matches, badges
+and dims tabs by match, and jumps to the owning tab on select. Reuses the shared
+fuzzy/substring/regex filter control and regex builder (registered `preferences`
+surface). Fully localized (English / Cantonese / bilingual), keyboard- and
+screen-reader-accessible, tone-neutral. `tsc` clean; new filter/matching tests
+15/15 with registry and i18n suites still green. Detail in
+[HANDOFF.md](HANDOFF.md); feature doc under
+`docs/features/identity-and-workspace/settings-search.md`.
+
 ## July 23 cross-lane updater recovery — **Verified**
 
 Commits `241cc90ce9` and `04246fdf12` moved both release lanes into one

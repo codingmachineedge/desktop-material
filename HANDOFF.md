@@ -1,5 +1,34 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-24 settings search (feat/settings-search)
+
+Added a search box to the Settings (Preferences) dialog rail so a setting can be
+found by title, description, or keyword across every tab and jumped to directly.
+Because the rail renders on every tab, the box is present on every settings page.
+
+- New pure catalog + matching module
+  `app/src/lib/settings-search/settings-search-catalog.ts`
+  (`SettingsSearchCatalog`, `filterSettingsEntries`, `groupSettingsResultsByTab`,
+  `settingsTabsWithMatches`, `settingsSearchKeys`, `settingsTabNameKey`). All
+  searchable text is packed into the first two match keys so keyword aliases
+  (e.g. "telemetry" → Usage stats) match in fuzzy mode, not only substring/regex.
+- New UI `app/src/ui/preferences/settings-search.tsx` (`SettingsSearch`):
+  labelled combobox → listbox results grouped by tab, highlighted title matches,
+  full keyboard nav (arrows/Home/End/Enter/Escape), `role="status"` live count,
+  clear button. Reuses the shared `FilterModeControl` + regex builder; registered
+  as the `preferences` standalone surface in `collection-surface-registry.ts`.
+- `app/src/ui/preferences/preferences.tsx` mounts the box in the rail, tracks
+  query/mode/case/languageMode state, subscribes to `LanguageModeChangedEvent`,
+  shows per-tab match-count badges, and dims non-matching tabs during a search.
+- Fully localized (English / Cantonese / bilingual) via new `settingsSearch.*`
+  keys in `app/src/lib/i18n-resources.ts`; navigational so tone is funny-level
+  neutral. Styles in `app/styles/ui/_preferences.scss`. Docs:
+  `docs/features/identity-and-workspace/settings-search.md`.
+- Verification: `npx tsc --noEmit` clean; `app/test/unit/settings-search-test.ts`
+  15/15 pass; `collection-surface-registry-test.ts` 3/3 and `i18n-test.ts` 16/16
+  still pass. The catalog is a representative index of high-value settings, not
+  an exhaustive mirror of every control — new settings should add an entry.
+
 ## 2026-07-24 final integration and clean Git topology receipt
 
 The requested merge-and-cleanup pass found no separate work left to integrate.
