@@ -1615,6 +1615,32 @@ export type TranslationKey =
   | 'settingsSearch.entry.agentAccessServer.title'
   | 'settingsSearch.entry.agentAccessServer.desc'
   | 'settingsSearch.entry.queueMode.desc'
+  | 'largeRepo.settings.title'
+  | 'largeRepo.settings.autoDetect'
+  | 'largeRepo.settings.autoDetectDescription'
+  | 'largeRepo.settings.autoRepack'
+  | 'largeRepo.settings.autoRepackDescription'
+  | 'largeRepo.status.computing'
+  | 'largeRepo.repack.progressTitle'
+  | 'largeRepo.repack.progressBody'
+  | 'largeRepo.repack.successTitle'
+  | 'largeRepo.repack.successBody'
+  | 'largeRepo.repack.failedTitle'
+  | 'largeRepo.repack.failedBody'
+  | 'largeRepo.lock.removedTitle'
+  | 'largeRepo.lock.removedBody'
+  | 'largeRepo.missing.title'
+  | 'largeRepo.missing.body'
+  | 'largeRepo.missing.locate'
+  | 'largeRepo.missing.remove'
+  | 'largeRepo.nestedGit.title'
+  | 'largeRepo.nestedGit.body'
+  | 'largeRepo.nestedGit.confirm'
+  | 'largeRepo.nestedGit.cancel'
+  | 'settingsSearch.entry.largeRepoAutoDetect.title'
+  | 'settingsSearch.entry.largeRepoAutoDetect.desc'
+  | 'settingsSearch.entry.largeRepoAutoRepack.title'
+  | 'settingsSearch.entry.largeRepoAutoRepack.desc'
 
 /** Complete base catalog. Every missing locale entry falls back to this. */
 export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
@@ -3626,6 +3652,39 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'Let local agents and MCP tools talk to Desktop Material.',
   'settingsSearch.entry.queueMode.desc':
     'Clone queued repositories in parallel or one at a time.',
+  'largeRepo.settings.title': 'Large repository handling',
+  'largeRepo.settings.autoDetect': 'Detect large repositories automatically',
+  'largeRepo.settings.autoDetectDescription':
+    'Above {files} files, suppress background gc and maintenance on this repository’s Git operations so a long repack never stalls status, add, checkout, or fetch.',
+  'largeRepo.settings.autoRepack': 'Repack large repositories when idle',
+  'largeRepo.settings.autoRepackDescription':
+    'Run one controlled git repack at a quiet moment, with a non-blocking progress notification.',
+  'largeRepo.status.computing': 'Checking for local changes…',
+  'largeRepo.repack.progressTitle': 'Optimizing large repository',
+  'largeRepo.repack.progressBody': 'Repacking {name} in the background…',
+  'largeRepo.repack.successTitle': 'Repository optimized',
+  'largeRepo.repack.successBody': '{name} was repacked.',
+  'largeRepo.repack.failedTitle': 'Could not optimize repository',
+  'largeRepo.repack.failedBody': 'Repacking {name} failed: {error}',
+  'largeRepo.lock.removedTitle': 'Cleared a stale lock',
+  'largeRepo.lock.removedBody':
+    'A leftover index.lock in {name} was removed before continuing.',
+  'largeRepo.missing.title': 'Repository missing on disk',
+  'largeRepo.missing.body':
+    '{name} could not be found on disk. Background updates are paused. Locate the folder or remove it from Desktop Material.',
+  'largeRepo.missing.locate': 'Locate…',
+  'largeRepo.missing.remove': 'Remove',
+  'largeRepo.nestedGit.title': 'Nested Git repositories found',
+  'largeRepo.nestedGit.body':
+    'Found {count} nested .git folder(s) in {name}. Compress them into {archive} to speed up Git operations?',
+  'largeRepo.nestedGit.confirm': 'Compress nested repositories',
+  'largeRepo.nestedGit.cancel': 'Keep as-is',
+  'settingsSearch.entry.largeRepoAutoDetect.title': 'Detect large repositories',
+  'settingsSearch.entry.largeRepoAutoDetect.desc':
+    'Suppress background gc and maintenance on big repositories automatically.',
+  'settingsSearch.entry.largeRepoAutoRepack.title': 'Repack large repositories',
+  'settingsSearch.entry.largeRepoAutoRepack.desc':
+    'Run one controlled repack at a quiet moment with a progress notification.',
 }
 
 /** Hong Kong Cantonese catalog. Missing entries deliberately use English. */
@@ -5479,4 +5538,37 @@ export const cantoneseTranslations: Readonly<
     '俾本機代理同 MCP 工具駁到 Desktop Material。',
   'settingsSearch.entry.queueMode.desc':
     '隊列入面嘅 repository 一齊 clone 定逐個 clone。',
+  'largeRepo.settings.title': '大型 repository 處理',
+  'largeRepo.settings.autoDetect': '自動偵測大型 repository',
+  'largeRepo.settings.autoDetectDescription':
+    '超過 {files} 個檔案就會喺呢個 repository 嘅 Git 操作停埋背景 gc 同 maintenance，唔會俾長時間 repack 卡住 status、add、checkout 或 fetch。',
+  'largeRepo.settings.autoRepack': '得閒就同大型 repository repack',
+  'largeRepo.settings.autoRepackDescription':
+    '揀個靜靜時做一次受控嘅 git repack，會有唔阻手嘅進度通知。',
+  'largeRepo.status.computing': '查緊有冇本地改動…',
+  'largeRepo.repack.progressTitle': '優化緊大型 repository',
+  'largeRepo.repack.progressBody': '喺背景 repack 緊 {name}…',
+  'largeRepo.repack.successTitle': 'Repository 優化好',
+  'largeRepo.repack.successBody': '{name} 已經 repack 好。',
+  'largeRepo.repack.failedTitle': '無法優化 repository',
+  'largeRepo.repack.failedBody': 'Repack {name} 失敗：{error}',
+  'largeRepo.lock.removedTitle': '已清走殘留鎖',
+  'largeRepo.lock.removedBody':
+    '繼續之前，已移除 {name} 入面殘留嘅 index.lock。',
+  'largeRepo.missing.title': 'Repository 喺磁碟上搵唔到',
+  'largeRepo.missing.body':
+    '喺磁碟上搵唔到 {name}。背景更新已暫停。請定位資料夾，或者喺 Desktop Material 移除佢。',
+  'largeRepo.missing.locate': '定位…',
+  'largeRepo.missing.remove': '移除',
+  'largeRepo.nestedGit.title': '搵到巢狀 Git repository',
+  'largeRepo.nestedGit.body':
+    '喺 {name} 入面搵到 {count} 個巢狀 .git 資料夾。要唔要壓縮成 {archive} 令 Git 快啲？',
+  'largeRepo.nestedGit.confirm': '壓縮巢狀 repository',
+  'largeRepo.nestedGit.cancel': '維持原狀',
+  'settingsSearch.entry.largeRepoAutoDetect.title': '偵測大型 repository',
+  'settingsSearch.entry.largeRepoAutoDetect.desc':
+    '自動喺大 repository 停埋背景 gc 同 maintenance。',
+  'settingsSearch.entry.largeRepoAutoRepack.title': 'Repack 大型 repository',
+  'settingsSearch.entry.largeRepoAutoRepack.desc':
+    '揀個靜靜時做一次受控 repack，有進度通知。',
 }

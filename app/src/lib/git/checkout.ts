@@ -16,13 +16,24 @@ import { ManualConflictResolution } from '../../models/manual-conflict-resolutio
 import { CommitOneLine, shortenSHA } from '../../models/commit'
 import { IRemote } from '../../models/remote'
 import { updateSubmodulesAfterOperation } from './submodule'
+import { largeRepositoryGitArgsForPath } from '../large-repository/large-repository-mode'
 
 export type ProgressCallback = (progress: ICheckoutProgress) => void
 
 const CheckoutStepWeight = 0.9
 
-function getCheckoutArgs(progressCallback?: ProgressCallback) {
-  return ['checkout', ...(progressCallback ? ['--progress'] : [])]
+function getCheckoutArgs(
+  repository: Repository,
+  progressCallback?: ProgressCallback
+) {
+  return [
+    // Large repositories carry gc/maintenance suppression on checkout too so a
+    // background repack never contends with the working-tree update. Empty for
+    // ordinary repositories.
+    ...largeRepositoryGitArgsForPath(repository.path),
+    'checkout',
+    ...(progressCallback ? ['--progress'] : []),
+  ]
 }
 
 async function getBranchCheckoutArgs(branch: Branch) {
@@ -118,7 +129,7 @@ export async function checkoutBranch(
     `Switching to ${__DARWIN__ ? 'Branch' : 'branch'}`
   )
 
-  const baseArgs = getCheckoutArgs(progressCallback)
+  const baseArgs = getCheckoutArgs(repository, progressCallback)
   const args = [...baseArgs, ...(await getBranchCheckoutArgs(branch))]
 
   await git(args, repository.path, 'checkoutBranch', opts)
@@ -179,7 +190,7 @@ export async function checkoutCommit(
       : undefined
   )
 
-  const baseArgs = getCheckoutArgs(progressCallback)
+  const baseArgs = getCheckoutArgs(repository, progressCallback)
   const args = [...baseArgs, commit.sha]
 
   await git(args, repository.path, 'checkoutCommit', opts)
@@ -212,7 +223,13 @@ export async function checkoutPaths(
   paths: ReadonlyArray<string>
 ): Promise<void> {
   await git(
-    ['checkout', 'HEAD', '--', ...paths],
+    [
+      ...largeRepositoryGitArgsForPath(repository.path),
+      'checkout',
+      'HEAD',
+      '--',
+      ...paths,
+    ],
     repository.path,
     'checkoutPaths'
   )
@@ -228,7 +245,13 @@ export async function checkoutConflictedFile(
   resolution: ManualConflictResolution
 ) {
   await git(
-    ['checkout', `--${resolution}`, '--', file.path],
+    [
+      ...largeRepositoryGitArgsForPath(repository.path),
+      'checkout',
+      `--${resolution}`,
+      '--',
+      file.path,
+    ],
     repository.path,
     'checkoutConflictedFile'
   )

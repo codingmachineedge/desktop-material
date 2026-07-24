@@ -30,6 +30,7 @@ import {
   GitHubUserStore,
 } from '../lib/stores'
 import { assertNever } from '../lib/fatal-error'
+import { shouldShowStatusComputing } from '../lib/large-repository/status-computing'
 import { Account } from '../models/account'
 import { FocusContainer } from './lib/focus-container'
 import { ImageDiffType } from '../models/diff'
@@ -1080,6 +1081,23 @@ export class RepositoryView extends React.Component<
     )
   }
 
+  private renderStatusComputing(): JSX.Element {
+    return (
+      <div className="changes-interstitial">
+        <div className="content">
+          <div className="interstitial-header">
+            <div className="interstitial-icon" aria-hidden="true">
+              <Octicon symbol={octicons.sync} className="spin" />
+            </div>
+            <div className="text">
+              <h1 aria-live="polite">{t('largeRepo.status.computing')}</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   private renderTutorialPane(): JSX.Element {
     if (
       [TutorialStep.AllDone, TutorialStep.Announced].includes(
@@ -1124,6 +1142,18 @@ export class RepositoryView extends React.Component<
     }
 
     if (workingDirectory.files.length === 0) {
+      // A large repository's first `git status` can take a moment; until that
+      // result lands the working directory is empty even when changes exist, so
+      // show an explicit computing state rather than a misleading "No local
+      // changes". Small repositories load fast enough for this to be invisible.
+      if (
+        shouldShowStatusComputing({
+          fileCount: workingDirectory.files.length,
+          hasLoadedStatus: changesState.hasLoadedStatus,
+        })
+      ) {
+        return this.renderStatusComputing()
+      }
       if (this.props.currentTutorialStep !== TutorialStep.NotApplicable) {
         return this.renderTutorialPane()
       } else {

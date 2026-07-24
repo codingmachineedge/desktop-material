@@ -12,6 +12,11 @@ import {
   translate,
 } from '../../lib/i18n'
 import { LanguageMode, normalizeLanguageMode } from '../../models/language-mode'
+import {
+  getLargeRepositorySettings,
+  setLargeRepositorySettings,
+} from '../../lib/large-repository/large-repository-settings'
+import { clearLargeRepositoryEvaluations } from '../../lib/large-repository/large-repository-controller'
 
 interface IAdvancedPreferencesProps {
   readonly useWindowsOpenSSH: boolean
@@ -35,6 +40,9 @@ interface IAdvancedPreferencesState {
   readonly optOutOfUsageTracking: boolean
   readonly canUseWindowsSSH: boolean
   readonly useExternalCredentialHelper: boolean
+  readonly largeRepoAutoDetect: boolean
+  readonly largeRepoAutoRepack: boolean
+  readonly largeRepoFileThreshold: number
 }
 
 export class Advanced extends React.Component<
@@ -44,11 +52,16 @@ export class Advanced extends React.Component<
   public constructor(props: IAdvancedPreferencesProps) {
     super(props)
 
+    const largeRepo = getLargeRepositorySettings()
+
     this.state = {
       languageMode: getPersistedLanguageMode(),
       optOutOfUsageTracking: this.props.optOutOfUsageTracking,
       canUseWindowsSSH: false,
       useExternalCredentialHelper: this.props.useExternalCredentialHelper,
+      largeRepoAutoDetect: largeRepo.autoDetect,
+      largeRepoAutoRepack: largeRepo.autoRepack,
+      largeRepoFileThreshold: largeRepo.thresholds.fileCount,
     }
   }
 
@@ -121,6 +134,31 @@ export class Advanced extends React.Component<
     event: React.FormEvent<HTMLInputElement>
   ) => {
     this.props.onVerboseLoggingChanged(event.currentTarget.checked)
+  }
+
+  private onLargeRepoAutoDetectChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    const value = event.currentTarget.checked
+    this.setState({ largeRepoAutoDetect: value })
+    setLargeRepositorySettings({
+      ...getLargeRepositorySettings(),
+      autoDetect: value,
+    })
+    // The auto-detect switch changes how every repository is classified, so
+    // drop cached verdicts and let the next refresh re-probe.
+    clearLargeRepositoryEvaluations()
+  }
+
+  private onLargeRepoAutoRepackChanged = (
+    event: React.FormEvent<HTMLInputElement>
+  ) => {
+    const value = event.currentTarget.checked
+    this.setState({ largeRepoAutoRepack: value })
+    setLargeRepositorySettings({
+      ...getLargeRepositorySettings(),
+      autoRepack: value,
+    })
   }
 
   private reportDesktopUsageLabel() {
@@ -244,8 +282,69 @@ export class Advanced extends React.Component<
             </p>
           </div>
         </div>
+        {this.renderLargeRepositorySettings()}
         {this.renderDataDisclosures()}
       </DialogContent>
+    )
+  }
+
+  /**
+   * Self-contained "Large repository handling" controls. These persist to a
+   * dedicated localStorage blob (mirroring the audio system) so the toggles
+   * don't need to thread through the app-store hot path. Error-free copy is
+   * localized and scales with the active language mode.
+   */
+  private renderLargeRepositorySettings() {
+    const { languageMode, largeRepoFileThreshold } = this.state
+    return (
+      <div className="advanced-section">
+        <h2>{translate('largeRepo.settings.title', languageMode)}</h2>
+        <Checkbox
+          label={translate('largeRepo.settings.autoDetect', languageMode)}
+          value={
+            this.state.largeRepoAutoDetect
+              ? CheckboxValue.On
+              : CheckboxValue.Off
+          }
+          onChange={this.onLargeRepoAutoDetectChanged}
+          ariaDescribedBy="large-repo-auto-detect-description"
+        />
+        <div
+          id="large-repo-auto-detect-description"
+          className="settings-description"
+        >
+          <p>
+            {translate(
+              'largeRepo.settings.autoDetectDescription',
+              languageMode,
+              {
+                files: largeRepoFileThreshold.toLocaleString(),
+              }
+            )}
+          </p>
+        </div>
+        <Checkbox
+          label={translate('largeRepo.settings.autoRepack', languageMode)}
+          value={
+            this.state.largeRepoAutoRepack
+              ? CheckboxValue.On
+              : CheckboxValue.Off
+          }
+          onChange={this.onLargeRepoAutoRepackChanged}
+          ariaDescribedBy="large-repo-auto-repack-description"
+        />
+        <div
+          id="large-repo-auto-repack-description"
+          className="settings-description"
+        >
+          <p>
+            {translate(
+              'largeRepo.settings.autoRepackDescription',
+              languageMode
+            )}
+          </p>
+        </div>
+      </div>
     )
   }
 

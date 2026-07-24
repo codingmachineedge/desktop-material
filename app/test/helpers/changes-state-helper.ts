@@ -10,6 +10,7 @@ export function createState<K extends keyof IChangesState>(
 ): IChangesState {
   const baseChangesState: IChangesState = {
     workingDirectory: WorkingDirectoryStatus.fromFiles([]),
+    hasLoadedStatus: true,
     selection: {
       kind: ChangesSelectionKind.WorkingDirectory,
       selectedFileIDs: [],

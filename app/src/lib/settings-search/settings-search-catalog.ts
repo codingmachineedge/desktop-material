@@ -240,6 +240,29 @@ export const SettingsSearchCatalog: ReadonlyArray<ISettingsSearchEntry> =
       descriptionKey: 'settingsSearch.entry.advancedOpenSSH.desc',
       keywords: ['ssh', 'openssh', 'system', 'key', '金鑰'],
     },
+    {
+      id: 'advanced-large-repo-auto-detect',
+      tab: PreferencesTab.Advanced,
+      titleKey: 'settingsSearch.entry.largeRepoAutoDetect.title',
+      descriptionKey: 'settingsSearch.entry.largeRepoAutoDetect.desc',
+      keywords: [
+        'large',
+        'repository',
+        'monorepo',
+        'gc',
+        'maintenance',
+        'performance',
+        '大型',
+        '效能',
+      ],
+    },
+    {
+      id: 'advanced-large-repo-auto-repack',
+      tab: PreferencesTab.Advanced,
+      titleKey: 'settingsSearch.entry.largeRepoAutoRepack.title',
+      descriptionKey: 'settingsSearch.entry.largeRepoAutoRepack.desc',
+      keywords: ['repack', 'gc', 'pack', 'optimize', 'compact', '壓縮'],
+    },
     // Accessibility
     {
       id: 'accessibility-underline-links',

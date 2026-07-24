@@ -5,6 +5,7 @@ import { FetchProgressParser, executionOptionsWithProgress } from '../progress'
 import { IRemote } from '../../models/remote'
 import { ITrackingBranch } from '../../models/branch'
 import { envForRemoteOperation } from './environment'
+import { largeRepositoryGitArgsForPath } from '../large-repository/large-repository-mode'
 
 async function getFetchArgs(
   remote: string,
@@ -86,7 +87,12 @@ export async function fetch(
     progressCallback({ kind, title, value: 0, remote: remote.name })
   }
 
-  const args = await getFetchArgs(remote.name, progressCallback)
+  const args = [
+    // Large repositories carry gc/maintenance suppression on fetch too; this is
+    // empty for ordinary repositories.
+    ...largeRepositoryGitArgsForPath(repository.path),
+    ...(await getFetchArgs(remote.name, progressCallback)),
+  ]
 
   await git(args, repository.path, 'fetch', opts)
 }
@@ -99,11 +105,21 @@ export async function fetchRefspec(
   /** Stable account identity to force for this fetch. Never a token. */
   accountKey?: string
 ): Promise<void> {
-  await git(['fetch', remote.name, refspec], repository.path, 'fetchRefspec', {
-    successExitCodes: new Set([0, 128]),
-    env: await envForRemoteOperation(remote.url),
-    credentialAccountKey: accountKey,
-  })
+  await git(
+    [
+      ...largeRepositoryGitArgsForPath(repository.path),
+      'fetch',
+      remote.name,
+      refspec,
+    ],
+    repository.path,
+    'fetchRefspec',
+    {
+      successExitCodes: new Set([0, 128]),
+      env: await envForRemoteOperation(remote.url),
+      credentialAccountKey: accountKey,
+    }
+  )
 }
 
 export async function fastForwardBranches(
@@ -118,6 +134,7 @@ export async function fastForwardBranches(
 
   await git(
     [
+      ...largeRepositoryGitArgsForPath(repository.path),
       'fetch',
       '.',
       // Make sure we don't try to update branches that can't be fast-forwarded

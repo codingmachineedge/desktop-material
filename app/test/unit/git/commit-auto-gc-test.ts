@@ -62,4 +62,35 @@ describe('command-scoped commit auto-GC suppression', () => {
       /gitRebaseArguments[\s\S]*?\['-c', 'gc\.auto=0'\]/
     )
   })
+
+  it('extends suppression to status/add/checkout/fetch for large repositories', () => {
+    // The large-repository module holds the single literal suppression shape,
+    // covering BOTH the classic gc --auto and the newer maintenance --auto.
+    assert.match(
+      source('app/src/lib/large-repository/large-repository-mode.ts'),
+      /LargeRepositoryGitMaintenanceArgs[\s\S]*?'-c',\s*'gc\.auto=0',\s*'-c',\s*'maintenance\.auto=false'/
+    )
+
+    // Each large-repo-scoped command inherits the flags through the same seam
+    // rather than hard-coding them, so ordinary repositories are unaffected.
+    for (const file of [
+      'app/src/lib/git/status.ts',
+      'app/src/lib/git/add.ts',
+      'app/src/lib/git/checkout.ts',
+      'app/src/lib/git/fetch.ts',
+    ]) {
+      assert.match(
+        source(file),
+        /largeRepositoryGitArgsForPath\(\s*repository\.path\s*\)/,
+        `expected ${file} to carry large-repository maintenance suppression`
+      )
+    }
+
+    // The one explicit repack the app runs for a large repository also carries
+    // the suppression so it is the ONLY packing that runs.
+    assert.match(
+      source('app/src/lib/large-repository/large-repository-probe.ts'),
+      /LargeRepositoryGitMaintenanceArgs,\s*'repack',\s*'-d'/
+    )
+  })
 })
