@@ -1235,6 +1235,42 @@ export type TranslationKey =
   | 'settings.queueDisabledStatus'
   | 'settings.queueDirectoryRequired'
   | 'settings.queueSafetyNote'
+  | 'settings.soundTab'
+  | 'settings.soundHeading'
+  | 'settings.soundDescription'
+  | 'settings.soundMasterEnableTitle'
+  | 'settings.soundMasterEnableDescription'
+  | 'settings.soundSfxHeading'
+  | 'settings.soundSfxEnableTitle'
+  | 'settings.soundSfxEnableDescription'
+  | 'settings.soundSfxVolumeLabel'
+  | 'settings.soundPreviewCue'
+  | 'settings.soundTtsHeading'
+  | 'settings.soundTtsEnableTitle'
+  | 'settings.soundTtsEnableDescription'
+  | 'settings.soundTtsVolumeLabel'
+  | 'settings.soundTtsCooldownLabel'
+  | 'settings.soundPreviewNarration'
+  | 'settings.soundFunnyHeading'
+  | 'settings.soundFunnyEnglishLabel'
+  | 'settings.soundFunnyCantoneseLabel'
+  | 'settings.soundFunnyHint'
+  | 'settings.soundMusicHeading'
+  | 'settings.soundMusicEnableTitle'
+  | 'settings.soundMusicEnableDescription'
+  | 'settings.soundMusicVolumeLabel'
+  | 'settings.soundMusicRepoLabel'
+  | 'settings.soundMusicChoose'
+  | 'settings.soundMusicClear'
+  | 'settings.soundMusicNoRepo'
+  | 'settings.soundMusicNoTrack'
+  | 'settings.soundQuietHoursHeading'
+  | 'settings.soundQuietHoursEnableTitle'
+  | 'settings.soundQuietHoursEnableDescription'
+  | 'settings.soundQuietHoursStartLabel'
+  | 'settings.soundQuietHoursEndLabel'
+  | 'settings.soundReducedMotionTitle'
+  | 'settings.soundReducedMotionDescription'
   | 'settings.mobileConnectionHeading'
   | 'settings.mobileConnectionDescription'
   | 'settings.mobileConnectionOpen'
@@ -3046,6 +3082,50 @@ export const englishTranslations: Readonly<Record<TranslationKey, string>> = {
     'Choose a base directory before turning on this queue.',
   'settings.queueSafetyNote':
     'Each batch is bounded to 500 repositories, existing folders are reviewed safely, and background queues never open an unsolicited progress dialog.',
+  'settings.soundTab': 'Sound',
+  'settings.soundHeading': 'Sound',
+  'settings.soundDescription':
+    'An optional audio system: a spoken narrator, sound effects for common actions, and quiet per-repository music. Everything is off by default.',
+  'settings.soundMasterEnableTitle': 'Enable sound',
+  'settings.soundMasterEnableDescription':
+    'Master switch for the whole audio system. When off, nothing ever plays.',
+  'settings.soundSfxHeading': 'Sound effects',
+  'settings.soundSfxEnableTitle': 'Play sound effects',
+  'settings.soundSfxEnableDescription':
+    'Short synthesized cues for commit, push, pull, success, and errors.',
+  'settings.soundSfxVolumeLabel': 'Effect volume',
+  'settings.soundPreviewCue': 'Preview effect',
+  'settings.soundTtsHeading': 'Spoken narrator',
+  'settings.soundTtsEnableTitle': 'Speak selected events',
+  'settings.soundTtsEnableDescription':
+    'Narrates meaningful events in English or Cantonese, rate-limited so it never chatters. Suppressed when a screen reader would already announce the same thing.',
+  'settings.soundTtsVolumeLabel': 'Narrator volume',
+  'settings.soundTtsCooldownLabel': 'Minimum gap between lines',
+  'settings.soundPreviewNarration': 'Preview narration',
+  'settings.soundFunnyHeading': 'Narrator tone',
+  'settings.soundFunnyEnglishLabel': 'English playfulness',
+  'settings.soundFunnyCantoneseLabel': 'Cantonese playfulness',
+  'settings.soundFunnyHint':
+    '1 is fully serious, 5 is maximum fun. Errors always stay clear.',
+  'settings.soundMusicHeading': 'Per-repository music',
+  'settings.soundMusicEnableTitle': 'Play themed music',
+  'settings.soundMusicEnableDescription':
+    'Loops a track you choose for the current repository, quietly. Pausable any time.',
+  'settings.soundMusicVolumeLabel': 'Music volume',
+  'settings.soundMusicRepoLabel': 'Track for {repository}',
+  'settings.soundMusicChoose': 'Choose track',
+  'settings.soundMusicClear': 'Clear',
+  'settings.soundMusicNoRepo': 'Open a repository to choose its music.',
+  'settings.soundMusicNoTrack': 'No track chosen.',
+  'settings.soundQuietHoursHeading': 'Quiet hours',
+  'settings.soundQuietHoursEnableTitle': 'Mute during quiet hours',
+  'settings.soundQuietHoursEnableDescription':
+    'Silences effects, narration, and music in the window below. Errors are still spoken so nothing important is missed.',
+  'settings.soundQuietHoursStartLabel': 'From (hour)',
+  'settings.soundQuietHoursEndLabel': 'To (hour)',
+  'settings.soundReducedMotionTitle': 'Follow reduced-motion for sound',
+  'settings.soundReducedMotionDescription':
+    'When the system asks for reduced motion, also mute non-essential sound and music.',
   'settings.mobileConnectionHeading': 'Mobile connection',
   'settings.mobileConnectionDescription':
     'Opens a fresh one-time pairing link in your default browser. Its secret stays in the URL fragment and is replaced the next time you open one.',
@@ -4828,6 +4908,49 @@ export const cantoneseTranslations: Readonly<
   'settings.queueDirectoryRequired': '開啟隊列之前，請先揀基礎資料夾。',
   'settings.queueSafetyNote':
     '每批最多 500 個 repository；遇到現有資料夾會安全覆核，而且背景隊列唔會無啦啦彈進度視窗阻住你。',
+  'settings.soundTab': '聲音',
+  'settings.soundHeading': '聲音',
+  'settings.soundDescription':
+    '一套可選嘅音效系統：有旁白、常見動作嘅音效、仲有每個 repository 靜靜哋播嘅音樂。全部預設關閉。',
+  'settings.soundMasterEnableTitle': '開啟聲音',
+  'settings.soundMasterEnableDescription':
+    '成套音效系統嘅總掣。熄咗就乜都唔會出聲。',
+  'settings.soundSfxHeading': '音效',
+  'settings.soundSfxEnableTitle': '播音效',
+  'settings.soundSfxEnableDescription':
+    'commit、push、pull、成功同出錯都有短短嘅合成提示聲。',
+  'settings.soundSfxVolumeLabel': '音效音量',
+  'settings.soundPreviewCue': '試聽音效',
+  'settings.soundTtsHeading': '旁白',
+  'settings.soundTtsEnableTitle': '讀出指定事件',
+  'settings.soundTtsEnableDescription':
+    '會用英文或者廣東話讀出有意義嘅事件，有限速唔會嘈住晒。如果螢幕閱讀器已經會讀，就會自動收聲。',
+  'settings.soundTtsVolumeLabel': '旁白音量',
+  'settings.soundTtsCooldownLabel': '兩句之間最短間隔',
+  'settings.soundPreviewNarration': '試聽旁白',
+  'settings.soundFunnyHeading': '旁白語氣',
+  'settings.soundFunnyEnglishLabel': '英文搞笑程度',
+  'settings.soundFunnyCantoneseLabel': '廣東話搞笑程度',
+  'settings.soundFunnyHint': '1 係認真，5 係最搞笑。出錯訊息永遠都會講清楚。',
+  'settings.soundMusicHeading': '每個 repository 嘅音樂',
+  'settings.soundMusicEnableTitle': '播主題音樂',
+  'settings.soundMusicEnableDescription':
+    '會靜靜哋 loop 你為呢個 repository 揀嘅一首歌，隨時可以暫停。',
+  'settings.soundMusicVolumeLabel': '音樂音量',
+  'settings.soundMusicRepoLabel': '{repository} 嘅音樂',
+  'settings.soundMusicChoose': '揀歌',
+  'settings.soundMusicClear': '清除',
+  'settings.soundMusicNoRepo': '開一個 repository 先可以揀佢嘅音樂。',
+  'settings.soundMusicNoTrack': '未揀歌。',
+  'settings.soundQuietHoursHeading': '安靜時段',
+  'settings.soundQuietHoursEnableTitle': '安靜時段內靜音',
+  'settings.soundQuietHoursEnableDescription':
+    '喺下面嘅時段內熄晒音效、旁白同音樂。但出錯訊息照樣會讀出嚟，唔會漏咗重要嘢。',
+  'settings.soundQuietHoursStartLabel': '由（幾點）',
+  'settings.soundQuietHoursEndLabel': '到（幾點）',
+  'settings.soundReducedMotionTitle': '跟隨減少動態嘅設定收聲',
+  'settings.soundReducedMotionDescription':
+    '當系統要求減少動態時，順便靜音非必要嘅聲音同音樂。',
   'settings.mobileConnectionHeading': '手機連線',
   'settings.mobileConnectionDescription':
     '用預設瀏覽器開一條全新嘅一次性配對連結；秘密只放喺 URL fragment，下次再開就會換新。',

@@ -11,4 +11,5 @@ export enum PreferencesTab {
   AgentAccess,
   Automation,
   Queue,
+  Sound,
 }

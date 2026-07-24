@@ -53,6 +53,7 @@ import {
 import { getEditorOverrideLabel } from '../models/editor-override'
 import { Branch } from '../models/branch'
 import { PreferencesTab } from '../models/preferences'
+import { AudioCueStore, getAudioCueStore } from '../lib/audio/audio-cue-store'
 import { findItemByAccessKey, itemIsSelectable } from '../models/app-menu'
 import { Account, isDotComAccount } from '../models/account'
 import { TipState } from '../models/tip'
@@ -138,6 +139,7 @@ import { GitLabMergeRequestDialog } from './merge-request'
 import type { IGitLabMergeRequestDialogService } from './merge-request'
 import { getGitHubPullRequestContextVersion } from '../lib/github-pull-request'
 import { NotificationCentrePanel } from './notifications/notification-centre-panel'
+import { INotificationEntry } from '../models/notification-centre'
 import { ErrorNoticeStack } from './error-notice-stack'
 import { CrashProofBoundary } from './crash-proof-boundary'
 import { Button } from './lib/button'
@@ -513,6 +515,15 @@ export class App extends React.Component<IAppProps, IAppState> {
     return () => this.props.dispatcher.bringPopupToFront(popupId)
   })
 
+  /** Renderer-only audio system (TTS narrator, SFX, per-repo music). */
+  private readonly audioCueStore: AudioCueStore = getAudioCueStore()
+  /** Notification ids already routed to audio, so we never replay history. */
+  private readonly audioSeenNotificationIds = new Set<string>()
+  /** Seeded on the first update so startup history stays silent. */
+  private audioSeeded = false
+  /** Last repository path handed to the audio system, to detect changes. */
+  private audioLastRepositoryPath: string | null = null
+
   public constructor(props: IAppProps) {
     super(props)
 
@@ -561,6 +572,7 @@ export class App extends React.Component<IAppProps, IAppState> {
       if (this.state.showWelcomeFlow && !state.showWelcomeFlow) {
         this.showFirstRunChecklist = true
       }
+      this.syncAudioSystem(state)
       this.setState(state)
     })
 
@@ -2223,6 +2235,60 @@ export class App extends React.Component<IAppProps, IAppState> {
     }
 
     return state.repository
+  }
+
+  /**
+   * Feed the optional audio system from app-state updates: play a cue/narration
+   * for genuinely new notifications and keep the per-repository music in sync
+   * with the selected repository. Never throws into the update path.
+   */
+  private syncAudioSystem(state: IAppState) {
+    try {
+      const selected = state.selectedState?.repository ?? null
+      const repository = selected instanceof Repository ? selected : null
+      const path = repository?.path ?? null
+      if (path !== this.audioLastRepositoryPath) {
+        this.audioLastRepositoryPath = path
+        this.audioCueStore.setSelectedRepository(repository)
+      }
+
+      const entries = state.notifications
+      if (!this.audioSeeded) {
+        // First update: remember existing history without replaying it.
+        for (const entry of entries) {
+          this.audioSeenNotificationIds.add(entry.id)
+        }
+        this.audioSeeded = true
+        return
+      }
+
+      // Entries are newest-first; play for any id we have not seen yet.
+      const fresh: Array<INotificationEntry> = []
+      for (const entry of entries) {
+        if (this.audioSeenNotificationIds.has(entry.id)) {
+          break
+        }
+        fresh.push(entry)
+      }
+      for (let i = fresh.length - 1; i >= 0; i--) {
+        this.audioSeenNotificationIds.add(fresh[i].id)
+        this.audioCueStore.handleNotificationEntry(fresh[i])
+      }
+
+      // Keep the seen-set bounded so it can't grow without limit.
+      if (this.audioSeenNotificationIds.size > 1000) {
+        const keep = new Set<string>()
+        for (const entry of entries) {
+          keep.add(entry.id)
+        }
+        this.audioSeenNotificationIds.clear()
+        for (const id of keep) {
+          this.audioSeenNotificationIds.add(id)
+        }
+      }
+    } catch {
+      // Audio is best-effort and must never break app-state handling.
+    }
   }
 
   private showRebaseDialog() {

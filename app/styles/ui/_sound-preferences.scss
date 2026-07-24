@@ -1,0 +1,119 @@
+#preferences .sound-preferences {
+  max-width: 100%;
+  min-width: 0;
+  color: var(--md-sys-color-on-surface);
+
+  .sound-group {
+    border: none;
+    margin: 0 0 8px;
+    padding: 0;
+
+    &[disabled],
+    &[aria-disabled='true'] {
+      opacity: 0.55;
+    }
+  }
+
+  .sound-subheading {
+    margin: 14px 0 4px;
+    font-size: 15px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .sound-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+    min-width: 0;
+
+    label {
+      font-weight: var(--font-weight-medium);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+
+    select {
+      max-width: 160px;
+    }
+  }
+
+  .sound-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    input[type='range'] {
+      flex: 1 1 auto;
+      min-width: 0;
+      accent-color: var(--md-sys-color-primary);
+    }
+  }
+
+  .sound-slider-value {
+    flex: none;
+    min-width: 44px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .sound-quiet-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .sound-music-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+
+    input[type='text'] {
+      flex: 1 1 220px;
+      min-width: 0;
+    }
+  }
+
+  .sound-preview-button,
+  .sound-tonal-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    color: var(--md-sys-color-on-secondary-container);
+    background: var(--md-sys-color-secondary-container);
+
+    &:hover {
+      filter: brightness(1.05);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .sound-text-button {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    color: var(--md-sys-color-primary);
+    background: transparent;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+  }
+}

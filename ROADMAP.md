@@ -35,6 +35,18 @@ customization is preserved in both the strip and the dropdown rows. Split
 geometry lives in a DOM-free, unit-tested module (`tab-overflow.ts`, 11 cases);
 `npx tsc --noEmit` is clean. English/Cantonese/bilingual copy and docs shipped.
 
+## July 24 optional audio system — **Implemented, locally accepted**
+
+An opt-in, off-by-default audio layer: a bilingual (English + Cantonese) TTS
+narrator, Web Audio synthesized sound effects, and per-repository looped music,
+all gated in a new **Settings → Sound** pane. Event routing runs through the
+in-app notification centre; a pure `decideAudioActions` enforces rate-limiting,
+per-category cooldown, quiet hours, reduced-sound, and screen-reader
+coexistence, with errors always clear and never suppressed. Narrator tone
+scales with a per-language funny-level (1–5). `tsc` clean; 31 new unit tests
+pass. Details in [HANDOFF.md](HANDOFF.md) and
+[docs/features/design-system/audio-system.md](docs/features/design-system/audio-system.md).
+
 ## July 23 cross-lane updater recovery — **Verified**
 
 Commits `241cc90ce9` and `04246fdf12` moved both release lanes into one

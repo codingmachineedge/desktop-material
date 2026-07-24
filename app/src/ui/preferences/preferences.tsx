@@ -91,6 +91,8 @@ import {
 import { AgentAccess } from './agent-access'
 import { ErrorPresentationStyle } from '../../models/error-presentation'
 import { QueuePreferences } from './queue'
+import { SoundPreferences } from './sound'
+import { getAudioCueStore } from '../../lib/audio/audio-cue-store'
 import { LocalizedText } from '../lib/localized-text'
 import { SettingsSearch, SettingsSearchSurfaceId } from './settings-search'
 import {
@@ -659,6 +661,12 @@ export class Preferences extends React.Component<
                 <LocalizedText translationKey="settings.queueTab" />,
                 true
               )}
+              {this.renderRailTab(
+                PreferencesTab.Sound,
+                octicons.unmute,
+                <LocalizedText translationKey="settings.soundTab" />,
+                true
+              )}
             </TabBar>
             <div className="preferences-version">Desktop Material 0.1.0</div>
           </div>
@@ -720,6 +728,9 @@ export class Preferences extends React.Component<
         break
       case PreferencesTab.Queue:
         suffix = 'queue'
+        break
+      case PreferencesTab.Sound:
+        suffix = 'sound'
         break
       default:
         return assertNever(tab, `Unknown tab type: ${tab}`)
@@ -1072,6 +1083,14 @@ export class Preferences extends React.Component<
           <QueuePreferences
             accounts={this.props.accounts}
             dispatcher={this.props.dispatcher}
+          />
+        )
+        break
+      case PreferencesTab.Sound:
+        View = (
+          <SoundPreferences
+            audioCueStore={getAudioCueStore()}
+            repository={this.props.repository}
           />
         )
         break

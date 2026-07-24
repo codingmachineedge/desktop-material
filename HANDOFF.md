@@ -58,6 +58,31 @@ preservation, a11y, i18n, and tests are complete. Overflow rows do not carry
 the live repository logo/icon (they show label + path + status chips); adding
 the async logo loader to dropdown rows is a possible follow-up.
 
+## 2026-07-24 optional audio system (branch `feat/audio-system`)
+
+Added an optional, off-by-default audio layer with three parts: a spoken TTS
+narrator (English + `zh-HK` Cantonese, rate-limited), Web Audio synthesized
+sound effects (no bundled assets), and per-repository looped music. New pure
+modules under `app/src/lib/audio/` (`audio-settings`, `audio-throttle`,
+`narrator-lines`, `tone-synth`) plus the renderer `audio-cue-store`; a new
+**Settings → Sound** pane (`app/src/ui/preferences/sound.tsx`) wired through the
+`PreferencesTab.Sound` tab; and event routing added to `App` via the in-app
+notification centre (`syncAudioSystem`). Anti-annoyance is enforced by the pure
+`decideAudioActions` (master gate, global SFX debounce + per-category cooldown,
+narrator cooldown, quiet hours, reduced-sound, screen-reader coexistence);
+errors always bypass suppression and stay clear at every funny-level. All copy
+localized (English / Cantonese / bilingual) via `settings.sound*`. Funny-level
+(1–5, per language) scales only narrator tone.
+
+Verification: `npx tsc --noEmit` clean; `app/test/unit/audio-throttle-test.ts`
+(16) and `app/test/unit/audio-settings-test.ts` (15) pass — 31 total. Feature
+doc: [docs/features/design-system/audio-system.md](docs/features/design-system/audio-system.md).
+MVP scope: throttling, settings serialization, TTS/SFX/music, and the Settings
+UI are complete and working; build-run phase SFX and a distinct push/fetch cue
+mapping are noted follow-ups (push currently narrates via the `auto-commit`
+notification). Per-repo music persists in localStorage rather than the
+git-backed dedicated-setting store — a possible future upgrade.
+
 ## 2026-07-24 final integration and clean Git topology receipt
 
 The requested merge-and-cleanup pass found no separate work left to integrate.
