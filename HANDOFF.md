@@ -1,5 +1,59 @@
 # Desktop Material — Active parity handoff
 
+## 2026-07-24 final integration and clean Git topology receipt
+
+The requested merge-and-cleanup pass found no separate work left to integrate.
+After `git fetch origin --prune --tags`, both local `main` and live
+`origin/main` were exactly
+`727496025775c1015492beb936b79e0b4f019b04` with `0/0` divergence. The live
+remote exposed only `refs/heads/main`, GitHub had no open pull requests, the
+checkout had no local non-default branch, `.git/worktrees` did not exist, the
+sole registered worktree was the clean primary checkout, and the stash list was
+empty. Accordingly, branch merges, branch deletion, linked-worktree removal,
+stale-metadata pruning, and stash deletion were all deliberate no-ops: every
+available repository tip was already contained in `main`.
+
+Exact-source local acceptance ran before this documentation-only receipt. The
+fixed Lowlevel MCP service reported healthy at `127.0.0.1:8765`; its scheduled
+task pointed to the required checkout and Python, whose source tip was
+`547a102a49169d41da876de217856229ab7c03a1`. The prescribed unpackaged
+production build returned `0`, did not time out, and completed in **527.53
+seconds**. Its binding hashes were `out/main.js`
+`c0573314a9e3fcda894e41cf545e5c2e876c1324317a3b7b5da7bbfcc3a1c625`,
+`out/index.html`
+`d44d3b8f637b17fc75c9f3ea14bc08166a7fa931de46b6ea41971ccd6131f553`,
+`out/keytar.node`
+`391976ea3af33d6697a9df2e007a8a00d5c7e0aa6f08c7eceeb21fb483591c09`,
+and Electron
+`082d352efc6a9f5882354ee4096ae0b40b78bc6c8e52fc5084f3df9254c613ff`.
+
+That bundle launched only on the uniquely named off-screen Win32 desktop
+`DM-Merge-20260724-a82f`, using isolated profile and disposable Git fixture
+paths. The runtime-resolved `Desktop Material` window (PID `18216`, HWND
+`1056160`) produced a stable, nonblank, unclipped, private-data-free 960×660
+client capture: 90,059 bytes, SHA-256
+`f6d8bcf136f3a993eafbfeaba5a18ef1b55298ec9923173641984357b5a0c80f`.
+The generic background close helper could not resolve that alternate-desktop
+HWND, so the already revalidated saved PID was terminated as the declared
+fallback. The desktop then reported zero windows and closed successfully. The
+exact owned Temp root and the two ignored trampoline bootstrap directories were
+moved to the Recycle Bin after path validation; all remain recoverable until
+the bin is emptied.
+
+Local validation passed Electron-version and changelog checks, TypeScript,
+full source lint/Prettier, and all **39/39** script tests. The optional local
+desktop-trampoline bootstrap could not compile because this host lacks the
+ClangCL Visual Studio toolset (and uses Node 26/Python 3.9 rather than CI's
+pinned Node 24.15/Python 3.11); it changed no tracked source, and its generated
+directories were removed as described above. The authoritative fresh Windows
+x64/arm64, packaged x64 E2E, CodeQL, Cheap LFS, and downstream installer/release
+results for this receipt are therefore verified after its single `main` push
+and recorded in the GitHub Discussion plus the final external handoff, avoiding
+an endless documentation-release loop.
+
+This receipt changes no product behavior or UI. / 今次純粹係合併同清場驗收：啲分支
+一早已經乖乖地入晒 `main`，冇偷走、冇亂刪，亦冇整花個介面。
+
 ## 2026-07-23 materialize cancel/summary correction from verified bug audit
 
 A multi-agent bug audit of the last fifteen commits (nine finder lenses, every
