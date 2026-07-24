@@ -5100,6 +5100,15 @@ export class App extends React.Component<IAppProps, IAppState> {
         notice.id,
         true
       )
+      return
+    }
+
+    if (action.kind === 'apply-git-auto-fix') {
+      void this.props.dispatcher.applyGitAutoFix(
+        action.repositoryId,
+        action.fixKind,
+        notice.id
+      )
     }
   }
 

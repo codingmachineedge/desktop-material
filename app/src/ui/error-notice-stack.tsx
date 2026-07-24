@@ -47,6 +47,13 @@ class ErrorNoticeCard extends React.PureComponent<
     }
   }
 
+  private onApplyAutoFix = () => {
+    const { action } = this.props.notice
+    if (action?.kind === 'apply-git-auto-fix') {
+      this.props.onAction?.(this.props.notice, action)
+    }
+  }
+
   private onCancelLockRemoval = () => {
     this.setState({ confirmingLockRemoval: false })
   }
@@ -126,6 +133,15 @@ class ErrorNoticeCard extends React.PureComponent<
                 Remove lock file
               </button>
             )}
+          {notice.action?.kind === 'apply-git-auto-fix' && (
+            <button
+              type="button"
+              className="error-notice-recovery"
+              onClick={this.onApplyAutoFix}
+            >
+              {notice.action.label}
+            </button>
+          )}
           {showDetails && (
             <button
               type="button"
